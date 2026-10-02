@@ -106,6 +106,8 @@ enum FleetOpen: Equatable, Sendable {
     case task(jobID: String, profileID: String)
     case newChat(profileID: String)
     case group(roomID: String)
+    /// A new group chat with these agents, from New chat's Group chat.
+    case newGroup(profileIDs: [String])
     /// The agent's routines (its scheduled tasks).
     case routines(profileID: String)
     case destination(FleetDestination)

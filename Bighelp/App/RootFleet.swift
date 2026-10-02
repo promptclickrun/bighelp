@@ -105,15 +105,17 @@ extension RootShellView {
         openFleet(.group(roomID: group.roomID), on: group.hostID)
     }
 
-    /// New group chat from the all-hosts list: on the selected host, or ask which.
-    func startFleetGroup() { fleetGate(.newGroup) }
+    /// A group chat with the agents picked in New chat. They're all on one
+    /// host; that host becomes the selected one first.
+    func startFleetGroupChat(with agents: [FleetAgent]) {
+        guard let hostID = agents.first?.hostID, agents.allSatisfy({ $0.hostID == hostID }) else { return }
+        openFleet(.newGroup(profileIDs: agents.map(\.profileID)), on: hostID)
+    }
 
     func fleetHome(_ fleet: FleetStore) -> FleetHomeView {
-        let newGroup: (() -> Void)? = menuDestinations.onNewGroup == nil ? nil : { startFleetGroup() }
-        return FleetHomeView(fleet: fleet, onOpen: { openFleetAgent($0) }, onNewChat: { isFleetNewChatPresented = true },
-                             onSetPinned: { setFleetPin($0, $1) }, onGroupAction: { performFleetGroupAction($0, $1) },
-                             onNewGroup: newGroup,
-                             onOpenRoutines: { openFleet(.routines(profileID: $0.profileID), on: $0.hostID) })
+        FleetHomeView(fleet: fleet, onOpen: { openFleetAgent($0) }, onNewChat: { isFleetNewChatPresented = true },
+                      onSetPinned: { setFleetPin($0, $1) }, onGroupAction: { performFleetGroupAction($0, $1) },
+                      onOpenRoutines: { openFleet(.routines(profileID: $0.profileID), on: $0.hostID) })
     }
 
     /// Settings, Projects and other one-host screens: with several hosts, ask
@@ -223,6 +225,8 @@ extension RootShellView {
         case .group(let roomID):
             guard let owner = currentWorkspaceOwner else { return }
             handleAgentWorkspaceAction(.init(owner: owner, action: .openGroup(roomID: roomID)))
+        case .newGroup(let profileIDs):
+            createGroupChat(with: profileIDs)
         case .routines(let profileID):
             openScheduledTasks(filteredTo: profileID)
         case .task(let jobID, let profileID):
@@ -324,8 +328,11 @@ struct FleetSheets: ViewModifier {
     @Binding var isNewChatPresented: Bool
     let onGate: (FleetDestination, UUID) -> Void
     let onNewChat: (FleetAgent) -> Void
+    /// None when the selected host can't make group chats.
+    let onNewGroup: (([FleetAgent]) -> Void)?
     @State private var pickedHost: (destination: FleetDestination, hostID: UUID)?
     @State private var pickedAgent: FleetAgent?
+    @State private var pickedGroup: [FleetAgent]?
 
     func body(content: Content) -> some View {
         content
@@ -342,15 +349,22 @@ struct FleetSheets: ViewModifier {
                 }
             }
             .sheet(isPresented: $isNewChatPresented, onDismiss: {
+                if let group = pickedGroup {
+                    pickedGroup = nil
+                    onNewGroup?(group)
+                }
                 guard let agent = pickedAgent else { return }
                 pickedAgent = nil
                 onNewChat(agent)
             }) {
                 if let fleet {
-                    FleetAgentPicker(fleet: fleet) { agent in
+                    FleetAgentPicker(fleet: fleet, onPick: { agent in
                         pickedAgent = agent
                         isNewChatPresented = false
-                    }
+                    }, onPickGroup: onNewGroup.map { _ in { agents in
+                        pickedGroup = agents
+                        isNewChatPresented = false
+                    } })
                 }
             }
     }

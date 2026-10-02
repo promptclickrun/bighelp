@@ -267,6 +267,67 @@ final class AllHostsUITests: BighelpUITestCase {
         }
     }
 
+    /// New chat picks one agent and opens its chat. Its Group chat button
+    /// picks several agents on one host instead, and Create chat makes the
+    /// group and opens it. Organize no longer starts group chats.
+    @MainActor
+    func testNewChatPicksOneAgentOrSeveralForAGroup() throws {
+        for appearance in ["light", "dark"] { newChatPicksOneAgentOrSeveralForAGroup(appearance) }
+    }
+
+    @MainActor
+    private func newChatPicksOneAgentOrSeveralForAGroup(_ appearance: String) {
+        let app = makeApp()
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-bighelp.hosts.all-hosts", "YES",
+                               "-preview-group-create", // demo group chats can be created
+                               "-loopdy.demo.appearance", appearance]
+        app.launch()
+
+        let organize = app.buttons["fleet.organize"]
+        XCTAssertTrue(organize.waitForExistence(timeout: 10))
+        organize.tap()
+        XCTAssertTrue(app.buttons["fleet.organize.new-section"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["fleet.organize.new-group"].exists, "Group chats start from New chat now")
+        XCTAssertFalse(app.buttons["New group chat"].exists)
+        app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.12)).tap()
+
+        // One agent: its chat opens, as before.
+        let newChat = app.buttons["fleet.new-chat"]
+        XCTAssertTrue(newChat.waitForExistence(timeout: 5))
+        newChat.tap()
+        let avery = app.buttons["fleet.new-chat.Avery Park"]
+        XCTAssertTrue(avery.waitForExistence(timeout: 5))
+        shot("new-chat-\(appearance)", app)
+        avery.tap()
+        XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 10), "Avery's new chat opens")
+        app.buttons["chat.back"].firstMatch.tap()
+
+        // Several agents: Group chat, pick, Create chat.
+        XCTAssertTrue(newChat.waitForExistence(timeout: 5))
+        newChat.tap()
+        let group = app.buttons["fleet.new-chat.group"]
+        XCTAssertTrue(group.waitForExistence(timeout: 5))
+        group.tap()
+        let create = app.buttons["fleet.new-chat.create-group"]
+        XCTAssertTrue(create.waitForExistence(timeout: 5))
+        XCTAssertFalse(create.isEnabled, "Nobody picked yet")
+        let mina = app.buttons["fleet.new-chat.Mina Shah"]
+        mina.tap()
+        XCTAssertEqual(mina.value as? String, "Selected")
+        XCTAssertFalse(create.isEnabled, "One agent isn't a group")
+        XCTAssertFalse(app.buttons["fleet.new-chat.Sage Ortiz"].isEnabled, "Another host's agents can't join this group")
+        app.buttons["fleet.new-chat.Avery Park"].tap()
+        XCTAssertTrue(create.isEnabled)
+        shot("new-group-picked-\(appearance)", app)
+        create.tap()
+        XCTAssertTrue(app.buttons["chat.people"].waitForExistence(timeout: 10), "The new group chat opens")
+        XCTAssertTrue(app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS %@", "Mina Shah & Avery Park")).firstMatch.exists,
+                      "It's named after its agents")
+        shot("new-group-chat-\(appearance)", app)
+        app.terminate()
+    }
+
     /// Saves a screenshot into TEST_RUNNER_BIGHELP_FLEET_SHOTS when set.
     @MainActor
     private func shot(_ name: String, _ app: XCUIApplication) {

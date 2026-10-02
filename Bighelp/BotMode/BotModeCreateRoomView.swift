@@ -347,11 +347,15 @@ struct BotModeCreateRoomView: View {
             || name.count > 200
     }
 
-    /// New-chat groups may skip the name: "Juno & Alfie", "Juno, Alfie & Nova".
+    /// New-chat groups may skip the name.
     private var groupName: String {
         let typed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard typed.isEmpty else { return typed }
-        let names = agents.profiles.filter { selected.contains($0.id) }.map(\.name)
+        return Self.automaticName(agents.profiles.filter { selected.contains($0.id) }.map(\.name))
+    }
+
+    /// A group named after its agents: "Juno & Alfie", "Juno, Alfie & Nova".
+    static func automaticName(_ names: [String]) -> String {
         guard let last = names.last else { return "Group chat" }
         let joined = names.count == 1 ? last : names.dropLast().joined(separator: ", ") + " & " + last
         return String(joined.prefix(200))

@@ -185,7 +185,8 @@ struct RootShellView: View {
         .modifier(FleetSheets(
             fleet: fleet, gate: $fleetGateRequest, isNewChatPresented: $isFleetNewChatPresented,
             onGate: { destination, hostID in openFleet(.destination(destination), on: hostID) },
-            onNewChat: startFleetChat))
+            onNewChat: startFleetChat,
+            onNewGroup: newGroupChatAction == nil ? nil : { startFleetGroupChat(with: $0) }))
         .modifier(FleetHooks(
             liveKey: liveFleetKey, readiness: fleetOpenReadiness, hostsKey: fleetHostsKey, scenePhase: scenePhase,
             keepsConnected: keepsFleetHostsConnected,

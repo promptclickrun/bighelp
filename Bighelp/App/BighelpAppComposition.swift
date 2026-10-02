@@ -291,11 +291,18 @@ struct BighelpAppComposition {
         #if DEBUG && targetEnvironment(simulator)
         if usesFixtures,
            arguments.contains(AgentsAcceptanceFixture.launchArgument) || arguments.contains("-preview-agent-groups")
-            || arguments.contains(AppStoreScreenshotFixture.launchArgument) {
+            || arguments.contains(AppStoreScreenshotFixture.launchArgument)
+            || arguments.contains(BotModeCatalogFixtureClient.createsGroupsArgument) {
             botModeRooms.configureNativeClient(BotModeCatalogFixtureClient(
                 previewsExistingGroup: arguments.contains("-preview-agent-groups"),
-                showsStoreScreenshots: arguments.contains(AppStoreScreenshotFixture.launchArgument)
+                showsStoreScreenshots: arguments.contains(AppStoreScreenshotFixture.launchArgument),
+                createsGroups: arguments.contains(BotModeCatalogFixtureClient.createsGroupsArgument)
             ))
+            // A real host's runtime reads what it can do at connect; the demo
+            // does it now, so New chat › Group chat shows from the start.
+            if arguments.contains(BotModeCatalogFixtureClient.createsGroupsArgument) {
+                Task { await botModeRooms.refreshNativeRoomCatalog() }
+            }
         }
         if usesFixtures, arguments.contains(TeamCallDemoGroupsClient.launchArgument) {
             botModeRooms.configureNativeClient(TeamCallDemoGroupsClient())

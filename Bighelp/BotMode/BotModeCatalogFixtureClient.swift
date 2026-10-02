@@ -3,11 +3,16 @@ import Foundation
 
 @MainActor
 class BotModeCatalogFixtureClient: HermesBotModeCatalogClient {
+    /// Demo group chats can be created (and then sit quiet, with no replies).
+    static let createsGroupsArgument = "-preview-group-create"
+
     private var states: [HermesBotModeRoomState]
     private let showsStoreScreenshots: Bool
+    private let createsGroups: Bool
 
-    init(previewsExistingGroup: Bool = false, showsStoreScreenshots: Bool = false) {
+    init(previewsExistingGroup: Bool = false, showsStoreScreenshots: Bool = false, createsGroups: Bool = false) {
         self.showsStoreScreenshots = showsStoreScreenshots
+        self.createsGroups = createsGroups
         states = showsStoreScreenshots ? [AppStoreScreenshotFixture.groupRoom] : previewsExistingGroup ? [
             Self.room("demo-agent-group", name: "Household team", profiles: ["finance", "home"])
         ] : [
@@ -17,7 +22,7 @@ class BotModeCatalogFixtureClient: HermesBotModeCatalogClient {
     }
 
     func groupsCapabilities() async throws -> HermesBotModeCapabilities {
-        if showsStoreScreenshots {
+        if showsStoreScreenshots || createsGroups {
             return .init(
                 protocolVersion: 2, driver: true, persistentProcess: true,
                 authorityGatewayID: "fixture-gateway", roomLink: [:],
@@ -56,13 +61,26 @@ class BotModeCatalogFixtureClient: HermesBotModeCatalogClient {
                          hasMore: (page.last?.sequence ?? events.count) < events.count,
                          authority: .init(gatewayID: "fixture-gateway", epoch: 1))
         }
+        if createsGroups, limit > 0 {
+            return .init(events: [], cursor: sinceSequence, latestSequence: sinceSequence, hasMore: false,
+                         authority: .init(gatewayID: "fixture-gateway", epoch: 1))
+        }
         guard sinceSequence == 0, limit > 0 else { throw WorkspaceClientError.invalidRequest }
         return .init(events: [], cursor: 0, latestSequence: 0, hasMore: false,
                      authority: .init(gatewayID: "fixture-gateway", epoch: 1))
     }
 
     func groupsCreate(roomID: String, name: String, members: [HermesBotModeRoomMember]) async throws -> HermesBotModeRoomState {
-        throw BotModeRoomError.executionUnavailable
+        guard createsGroups else { throw BotModeRoomError.executionUnavailable }
+        guard !states.contains(where: { $0.roomID == roomID }) else { throw WorkspaceClientError.invalidRequest }
+        let now = Date().timeIntervalSince1970
+        let state = HermesBotModeRoomState(
+            roomID: roomID, name: name, members: members,
+            authorityGatewayID: "fixture-gateway", authorityEpoch: 1, revision: 1,
+            createdAt: now, updatedAt: now, latestSequence: 0, disbandedAt: nil, driverStatus: nil
+        )
+        states.insert(state, at: 0)
+        return state
     }
     func groupsRename(roomID: String, eventID: String, name: String) async throws -> HermesBotModeRoomState {
         let state = try await groupsState(roomID: roomID, includeDisbanded: false)

@@ -139,8 +139,6 @@ struct FleetHomeView: View {
     var onSetPinned: ((FleetAgent, Bool) -> Void)? = nil
     /// Opens, renames or deletes a group chat. None hides group chats' actions.
     var onGroupAction: ((FleetGroup, FleetGroupAction) -> Void)? = nil
-    /// Starts a new group chat.
-    var onNewGroup: (() -> Void)? = nil
     /// The agent's routines: add, pause, resume or delete them there.
     var onOpenRoutines: ((FleetAgent) -> Void)? = nil
     @State private var hostFilter: UUID?
@@ -279,15 +277,11 @@ struct FleetHomeView: View {
         }
     }
 
-    /// New section, new group chat, and showing hidden agents.
+    /// New section, and showing hidden agents. New group chat is in New chat.
     private var organizeMenu: some View {
         Menu {
             Button("New section", systemImage: "folder.badge.plus") { namePrompt = .newSection(filing: nil) }
                 .accessibilityIdentifier("fleet.organize.new-section")
-            if let onNewGroup {
-                Button("New group chat", systemImage: "person.3", action: onNewGroup)
-                    .accessibilityIdentifier("fleet.organize.new-group")
-            }
             let hidden = fleet.hiddenAgentCount
             if hidden > 0 || showsHidden {
                 Toggle(isOn: $showsHidden) {
@@ -304,7 +298,7 @@ struct FleetHomeView: View {
         .foregroundStyle(theme.action)
         .padding(.trailing, BighelpTokens.space8)
         .accessibilityLabel("Organize")
-        .accessibilityHint("New section, new group chat, hidden agents.")
+        .accessibilityHint("New section, hidden agents.")
         .accessibilityIdentifier("fleet.organize")
     }
 
@@ -730,45 +724,127 @@ struct FleetHostPicker: View {
     @BighelpThemeReader private var theme
 }
 
-/// New chat in the all-hosts view: pick any agent on any host.
+/// New chat in the all-hosts view: pick any agent on any host. Group chat
+/// turns it into picking several agents from one host.
 struct FleetAgentPicker: View {
     let fleet: FleetStore
     let onPick: (FleetAgent) -> Void
+    /// Starts a group chat with the picked agents. None hides Group chat.
+    var onPickGroup: (([FleetAgent]) -> Void)? = nil
     @State private var search = ""
+    @State private var isPickingGroup = false
+    /// Picked agents, in the order they were tapped.
+    @State private var picked: [FleetAgent] = []
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
-            List(agents) { agent in
-                Button { onPick(agent) } label: {
-                    HStack(spacing: BighelpTokens.space12) {
-                        AvatarView(stableID: agent.profileID, displayName: agent.name,
-                                   imageURL: fleet.avatars.url(for: agent.avatarFile), size: 40)
-                        VStack(alignment: .leading, spacing: 2) {
-                            HStack(spacing: BighelpTokens.space8) {
-                                Text(agent.name).font(.bighelp(.body).weight(.semibold)).foregroundStyle(theme.primaryText)
-                                if fleet.showsHostNames { FleetHostTag(name: fleet.hostName(agent.hostID)) }
-                            }
-                            if !agent.role.isEmpty {
-                                Text(agent.role).font(.bighelp(.footnote)).foregroundStyle(theme.secondaryText).lineLimit(1)
-                            }
-                        }
-                        Spacer(minLength: 0)
-                    }
-                    .frame(minHeight: BighelpTokens.hitTarget)
-                    .contentShape(.rect)
+            List {
+                Section {
+                    ForEach(agents) { agent in row(agent) }
+                } header: {
+                    if isPickingGroup { groupHeader }
                 }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("fleet.new-chat.\(agent.name)")
             }
             .searchable(text: $search, prompt: "Search agents")
-            .navigationTitle("New chat with…")
+            .navigationTitle(isPickingGroup ? "New group chat" : "New chat with…")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction).bighelpToolbarText() }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                        .keyboardShortcut(.cancelAction)
+                        .accessibilityIdentifier("fleet.new-chat.cancel")
+                        .bighelpToolbarText()
+                }
+                if let onPickGroup {
+                    ToolbarItem(placement: .confirmationAction) {
+                        if isPickingGroup {
+                            Button("Create chat") { onPickGroup(picked) }
+                                .fontWeight(.semibold)
+                                .disabled(!(2...BotModeRoom.maximumMembers).contains(picked.count))
+                                .bighelpDefaultAction()
+                                .accessibilityIdentifier("fleet.new-chat.create-group")
+                                .bighelpToolbarText()
+                        } else {
+                            Button("Group chat") { withAnimation(.snappy(duration: 0.2)) { isPickingGroup = true } }
+                                .accessibilityHint("Pick several agents for one chat.")
+                                .accessibilityIdentifier("fleet.new-chat.group")
+                                .bighelpToolbarText()
+                        }
+                    }
+                }
             }
         }
         .presentationDragIndicator(.visible)
+        .bighelpSheetSize(.standard)
+    }
+
+    private func row(_ agent: FleetAgent) -> some View {
+        let isPicked = picked.contains { $0.id == agent.id }
+        let isAvailable = !isPickingGroup || isPicked || canAdd(agent)
+        return Button { tap(agent) } label: {
+            HStack(spacing: BighelpTokens.space12) {
+                AvatarView(stableID: agent.profileID, displayName: agent.name,
+                           imageURL: fleet.avatars.url(for: agent.avatarFile), size: 40)
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: BighelpTokens.space8) {
+                        Text(agent.name).font(.bighelp(.body).weight(.semibold)).foregroundStyle(theme.primaryText)
+                        if fleet.showsHostNames { FleetHostTag(name: fleet.hostName(agent.hostID)) }
+                    }
+                    if !agent.role.isEmpty {
+                        Text(agent.role).font(.bighelp(.footnote)).foregroundStyle(theme.secondaryText).lineLimit(1)
+                    }
+                }
+                Spacer(minLength: 0)
+                if isPickingGroup {
+                    Image(systemName: isPicked ? "checkmark.circle.fill" : "circle")
+                        .font(.bighelp(.title3))
+                        .foregroundStyle(isPicked ? theme.action : theme.tertiaryText)
+                        .accessibilityHidden(true)
+                }
+            }
+            .frame(minHeight: BighelpTokens.hitTarget)
+            .contentShape(.rect)
+            .opacity(isAvailable ? 1 : 0.4)
+        }
+        .bighelpPlainButtonStyle()
+        .disabled(!isAvailable)
+        .accessibilityValue(isPickingGroup ? (isPicked ? "Selected" : "Not selected") : "")
+        .accessibilityAddTraits(isPicked ? .isSelected : [])
+        .accessibilityIdentifier("fleet.new-chat.\(agent.name)")
+    }
+
+    /// How many are picked, and why another host's agents can't join.
+    private var groupHeader: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(picked.count < 2 ? "Pick 2 to \(BotModeRoom.maximumMembers) agents"
+                 : "\(picked.count) of \(BotModeRoom.maximumMembers) picked")
+                .monospacedDigit()
+            if fleet.showsHostNames {
+                Text(picked.first.map { "Agents on \(fleet.hostName($0.hostID)) can join." }
+                     ?? "Everyone in a group chat is on the same host.")
+            }
+        }
+        .font(.bighelp(.footnote))
+        .textCase(nil)
+        .foregroundStyle(theme.secondaryText)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("fleet.new-chat.group-note")
+    }
+
+    /// A group chat lives on one host, and holds a few agents at most.
+    private func canAdd(_ agent: FleetAgent) -> Bool {
+        guard picked.count < BotModeRoom.maximumMembers else { return false }
+        return picked.first.map { $0.hostID == agent.hostID } ?? true
+    }
+
+    private func tap(_ agent: FleetAgent) {
+        guard isPickingGroup else { return onPick(agent) }
+        if let index = picked.firstIndex(where: { $0.id == agent.id }) {
+            picked.remove(at: index)
+        } else if canAdd(agent) {
+            picked.append(agent)
+        }
     }
 
     private var agents: [FleetAgent] {

@@ -180,12 +180,47 @@ extension RootShellView {
     }
 
     func inviteToGroup(seed: String?) {
-        guard let owner = currentWorkspaceOwner, botModeRooms.canCreateNativeRoom,
-              currentWorkspaceCapabilities.supports(.groupsCreate, owner: owner, profileID: nil) else {
+        guard let owner = groupCreationReadyOwner else {
             actionErrorMessage = "Group chats need a connected Hermes host."
             return
         }
         handleAgentWorkspaceAction(AgentWorkspaceActionRequest(owner: owner, action: .createGroup(seedProfileID: seed)))
+    }
+
+    /// The selected host, when it can make group chats.
+    private var groupCreationReadyOwner: WorkspaceOwner? {
+        guard let owner = currentWorkspaceOwner, botModeRooms.canCreateNativeRoom,
+              currentWorkspaceCapabilities.supports(.groupsCreate, owner: owner, profileID: nil) else { return nil }
+        return owner
+    }
+
+    /// A group chat with these agents right away, named after them, then
+    /// opened: what New group chat's Create does, minus the form (All agents'
+    /// New chat › Group chat already picked who's in it).
+    func createGroupChat(with profileIDs: [String]) {
+        guard let owner = groupCreationReadyOwner else {
+            actionErrorMessage = "Group chats need a connected Hermes host."
+            return
+        }
+        let profiles = profileIDs.compactMap { id in agents.profiles.first { $0.id == id } }
+        guard profiles.count == profileIDs.count, (2...BotModeRoom.maximumMembers).contains(profiles.count) else {
+            actionErrorMessage = "Those agents aren't all on this host anymore. Pick them again from New chat."
+            return
+        }
+        Task { @MainActor in
+            do {
+                let room = try await botModeRooms.createNativeRoom(
+                    roomID: "room-\(UUID().uuidString)",
+                    name: BotModeCreateRoomView.automaticName(profiles.map(\.name)), profiles: profiles)
+                // A reconnect meanwhile is still this computer.
+                guard isCurrentSignIn(owner), let current = currentWorkspaceOwner else { return }
+                openHostedGroup(room.id, owner: current, settings: false)
+            } catch is CancellationError {
+            } catch {
+                guard isCurrentSignIn(owner) else { return }
+                actionErrorMessage = "The group chat couldn't be created. Check the host, then try again."
+            }
+        }
     }
 
     /// Closes the open home sheet, then runs the next step once it is gone.

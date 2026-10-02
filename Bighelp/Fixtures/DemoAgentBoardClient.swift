@@ -112,8 +112,14 @@ final class DemoAgentBoardClient: AgentBoardClient {
                                + "Want me to hold two seats before they climb again?",
                            icon: "✈️", source: "Flight watch", read: false, createdAt: ago(35)),
             AgentBoardItem(id: "feed-2", kind: .feed, title: "Three stories worth your time tonight",
-                           body: "A new battery chemistry doubles e-bike range; the city approved the waterfront "
-                               + "park; and your favorite bakery opens a second shop on Saturday.",
+                           body: """
+                               ### Tonight's picks
+                               - A new battery chemistry **doubles** e-bike range
+                               - The city approved the waterfront park
+                               - Your favorite bakery opens a second shop on Saturday
+
+                               > Worth a look before the weekend.
+                               """,
                            icon: "📰", links: [.init(url: URL(string: "https://example.com/news")!, title: "Read more")],
                            source: "Evening news", createdAt: ago(60 * 4)),
             AgentBoardItem(id: "feed-3", kind: .feed, title: "Your week at a glance",

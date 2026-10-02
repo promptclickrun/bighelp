@@ -72,7 +72,8 @@ final class ProjectsAndBoardUITests: BighelpUITestCase {
             app.buttons["Too frequent"].tap()
             wait(for: [expectation(for: NSPredicate(format: "isSelected == true"), evaluatedWith: down)], timeout: 5)
 
-            post.press(forDuration: 1.2)
+            // Held on its Markdown text: the post's center is its link preview, which has its own menu.
+            post.staticTexts["The city approved the waterfront park"].press(forDuration: 1.2)
             XCTAssertTrue(app.buttons["Copy"].waitForExistence(timeout: 5), "The long-press menu opens")
             XCTAssertTrue(app.buttons["Mark as unread"].exists || app.buttons["Mark as read"].exists)
             save("board-3-long-press", app)
@@ -95,6 +96,28 @@ final class ProjectsAndBoardUITests: BighelpUITestCase {
             app.buttons["tab.goals"].tap()
             XCTAssertTrue(app.descendants(matching: .any)["board.goal.goal-from-idea-3"].waitForExistence(timeout: 10))
             save("board-5-goal", app)
+            app.terminate()
+        }
+    }
+
+    /// Agents write Feed posts in Markdown (the plugin's `bighelp_board` says so). Headings, lists
+    /// and quotes show as such, never as raw `###` or `-` lines.
+    @MainActor
+    func testFeedPostsShowMarkdown() throws {
+        for appearance in ["light", "dark"] {
+            let app = launch(appearance: appearance)
+            let feedTab = app.buttons["tab.feed"]
+            XCTAssertTrue(feedTab.waitForExistence(timeout: 10))
+            feedTab.tap()
+            let post = app.descendants(matching: .any)["board.feed.post.feed-2"]
+            XCTAssertTrue(post.waitForExistence(timeout: 10))
+            XCTAssertTrue(post.staticTexts["Tonight's picks"].exists, "The heading is its own line, without ###")
+            XCTAssertTrue(post.staticTexts["A new battery chemistry doubles e-bike range"].exists, "Each list item stands alone")
+            XCTAssertTrue(post.staticTexts["The city approved the waterfront park"].exists)
+            XCTAssertTrue(post.staticTexts["Worth a look before the weekend."].exists, "The quote shows without >")
+            let raw = NSPredicate(format: "label CONTAINS '###' OR label BEGINSWITH '- ' OR label CONTAINS '**' OR label BEGINSWITH '>'")
+            XCTAssertEqual(post.staticTexts.matching(raw).count, 0, "No raw Markdown shows")
+            save("board-feed-markdown-\(appearance)", app)
             app.terminate()
         }
     }

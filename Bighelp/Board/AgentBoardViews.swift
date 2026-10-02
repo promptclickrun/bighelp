@@ -449,11 +449,12 @@ private struct FeedPostView: View {
                     UnreadDot(item: item, store: context.store)
                 }
                 if !item.body.isEmpty {
-                    Text(markdown(item.body))
-                        .font(.bighelp(.body))
+                    // Agents write posts in Markdown (bighelp_board): headings, lists, quotes, code
+                    // and tables draw as they do in chat.
+                    MarkdownMessageView(document: MarkdownDocument(item.body),
+                                        primaryText: theme.primaryText.opacity(0.9))
                         .foregroundStyle(theme.primaryText.opacity(0.9))
                         .tint(theme.action)
-                        .fixedSize(horizontal: false, vertical: true)
                 }
                 if !item.pictures.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {

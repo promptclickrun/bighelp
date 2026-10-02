@@ -414,6 +414,14 @@ struct FleetHomeView: View {
             if let role = AgentFeaturedTile.roleLine(agent.role) { Text(role) }
         }
         .accessibilityElement(children: .combine)
+        // Once, with its computer like the rows say ("on Desk Hermes"); the picture also named it.
+        .accessibilityLabel(pinnedLabel(agent))
+    }
+
+    private func pinnedLabel(_ agent: FleetAgent) -> String {
+        let parts = [agent.name, AgentFeaturedTile.roleLine(agent.role),
+                     fleet.showsHostNames ? "on \(fleet.hostName(agent.hostID))" : nil]
+        return parts.compactMap { $0 }.joined(separator: ", ")
     }
 
     @BighelpThemeReader private var theme

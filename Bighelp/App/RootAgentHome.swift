@@ -304,19 +304,23 @@ extension RootShellView {
 
     struct AgentBoardClientKey: Equatable {
         let owner: WorkspaceOwner?
-        let supported: Bool
+        /// Unknown until the plugin's features arrive after each (re)connect.
+        let board: WorkspaceAvailability
         let feedback: Bool
         let fixtures: Bool
+        /// The selected computer will reconnect by itself (it has a saved sign-in).
+        let reconnects: Bool
     }
 
     var agentBoardClientKey: AgentBoardClientKey {
         let owner = currentWorkspaceOwner
-        let supported = owner.map { currentWorkspaceCapabilities.supports(.agentBoard, owner: $0, profileID: nil) } ?? false
+        let board = owner.map { currentWorkspaceCapabilities.availability(for: .agentBoard, owner: $0) } ?? .unknown
         let feedback = owner.map {
             currentWorkspaceCapabilities.supports(.agentBoardFeedback, owner: $0, profileID: nil)
         } ?? false
-        return AgentBoardClientKey(owner: owner, supported: supported, feedback: feedback,
-                                   fixtures: usesWorkspaceFixtures && workspaceConnections?.isDirectSelected != true)
+        return AgentBoardClientKey(owner: owner, board: board, feedback: feedback,
+                                   fixtures: usesWorkspaceFixtures && workspaceConnections?.isDirectSelected != true,
+                                   reconnects: nativeWorkspaceStore?.hasSavedConnection == true)
     }
 
     /// Keyed by sign-in, not connection: a reconnect keeps the usage on screen,
@@ -346,27 +350,39 @@ extension RootShellView {
         ), scope: signIn)
     }
 
-    func configureAgentBoard(_ key: AgentBoardClientKey) {
+    /// Feed, Ideas and Goals follow the connection. Coming back to the app reconnects and
+    /// relearns the plugin's features; meanwhile the board waits and keeps what it shows,
+    /// then reloads. Only a host that answers without the feature asks for a plugin update.
+    func configureAgentBoard(_ key: AgentBoardClientKey) async {
         // Media has its own plugin feature; the route says when it's missing.
         agentMedia.configure(client: key.owner.flatMap { owner in
             key.fixtures ? nil : workspaceConnections?.workspace.map { DirectHermesAgentMediaClient(workspace: $0, owner: owner) }
         })
-        guard let owner = key.owner else {
-            agentBoard.configure(client: nil, isDisconnected: true)
-            BighelpWidgetBoardLoader.shared.configure(client: nil)
+        if key.fixtures, key.owner != nil {
+            let client = DemoAgentBoardClient()
+            BighelpWidgetBoardLoader.shared.configure(client: client, scope: "fixtures")
+            await agentBoard.connect(client: client, scope: "fixtures")
             return
         }
-        let client: (any AgentBoardClient)?
-        if key.fixtures {
-            client = DemoAgentBoardClient()
-        } else if key.supported, let workspace = workspaceConnections?.workspace {
-            client = DirectHermesAgentBoardClient(workspace: workspace, owner: owner, supportsFeedback: key.feedback)
-        } else {
-            client = nil
+        switch AgentBoardConnectionStep.decide(isConnected: key.owner != nil, board: key.board,
+                                               reconnects: key.reconnects) {
+        case .wait:
+            agentBoard.waitForConnection()
+        case .connect:
+            guard let owner = key.owner, let workspace = workspaceConnections?.workspace else {
+                return agentBoard.waitForConnection()
+            }
+            let client = DirectHermesAgentBoardClient(workspace: workspace, owner: owner, supportsFeedback: key.feedback)
+            // Feed, Ideas and Goals widgets set to another agent read its board the same way.
+            BighelpWidgetBoardLoader.shared.configure(client: client, scope: owner.cacheScopeID)
+            await agentBoard.connect(client: client, scope: owner.cacheScopeID)
+        case .pluginMissing:
+            agentBoard.configure(client: nil)
+            BighelpWidgetBoardLoader.shared.configure(client: nil, scope: nil)
+        case .disconnected:
+            agentBoard.configure(client: nil, isDisconnected: true)
+            BighelpWidgetBoardLoader.shared.configure(client: nil, scope: nil)
         }
-        agentBoard.configure(client: client)
-        // Feed, Ideas and Goals widgets set to another agent read its board the same way.
-        BighelpWidgetBoardLoader.shared.configure(client: client)
     }
 
     /// Attached to the workspace shell only: host setup and onboarding have no
@@ -447,7 +463,7 @@ extension RootShellView {
 
     func agentHomeSheets<Content: View>(_ content: Content) -> some View {
         content
-            .task(id: agentBoardClientKey) { configureAgentBoard(agentBoardClientKey) }
+            .task(id: agentBoardClientKey) { await configureAgentBoard(agentBoardClientKey) }
             .task(id: providerUsageKey) { configureProviderUsage(providerUsageKey) }
             .task(id: agentBoardClientKey) { await configureKanban(agentBoardClientKey) }
             // Loads the home agent's board up front, so new Feed, Ideas and Goals

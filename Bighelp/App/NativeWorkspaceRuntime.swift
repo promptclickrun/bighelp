@@ -442,6 +442,12 @@ final class NativeWorkspaceRuntime {
         widgetPublisher = BighelpWidgetSnapshotPublisher(sessions: sessions, scheduledTasks: scheduledTasks, agents: agents)
     }
 
+    /// Features the bighelp plugin serves (from its `/native/context`), not Hermes itself.
+    static let pluginCapabilities: Set<WorkspaceCapability> = [
+        .liveVoice, .wikiRead, .wikiEdit, .wikiDisconnect, .cardTemplates, .cards, .forms, .cloudNotifications,
+        .phoneTools, .projectChangesRead, .agentBoard, .agentBoardFeedback,
+    ]
+
     func refresh() async {
         await refreshFlight.run { [weak self] in
             await self?.performRefresh()
@@ -624,10 +630,19 @@ final class NativeWorkspaceRuntime {
             let manifest = try await directStore.discoverCapabilityManifest(expectedOwner: owner.connectionGeneration)
             try require(owner, request: request)
             var supported = manifest.supportedOperations
+            // Hermes' own list says nothing about the plugin. Until the plugin's list is read,
+            // its features are unknown rather than missing, so no screen asks for an update
+            // while a reconnect is still under way.
+            var pluginFeaturesKnown = false
             func publishCapabilities() throws {
                 try require(owner, request: request)
                 var availability = manifest.operationAvailability
                 for capability in supported { availability[capability] = .available }
+                if !pluginFeaturesKnown {
+                    for capability in Self.pluginCapabilities where availability[capability] != .available {
+                        availability[capability] = .unknown
+                    }
+                }
                 try connections.installCapabilities(WorkspaceCapabilities(owner: owner, values: availability))
             }
             try publishCapabilities()
@@ -658,6 +673,23 @@ final class NativeWorkspaceRuntime {
                 try require(owner, request: request)
                 optionalFeatureMessage = "Optional host integrations are unavailable. Core workspace access does not require them."
             }
+            if let context = workspace.nativeContext {
+                if context.features.contains("native-voice-v1") { supported.insert(.liveVoice) }
+                if context.features.contains("native-wiki-v1") { supported.formUnion([.wikiRead, .wikiEdit]) }
+                if context.features.contains("native-wiki-disconnect-v1") { supported.insert(.wikiDisconnect) }
+                if context.features.contains("native-card-templates-v1") { supported.insert(.cardTemplates) }
+                // Rich interactive cards (generative UI, including forms) and the
+                // plugin notification channel are core plugin capabilities, not
+                // versioned feature flags: a fetched native context means the
+                // bighelp plugin is installed and serving them.
+                supported.formUnion([.cards, .forms, .cloudNotifications])
+                if context.features.contains("native-device-tools-v1") { supported.insert(.phoneTools) }
+                if context.features.contains("native-project-git-read-v1") { supported.insert(.projectChangesRead) }
+                if context.features.contains("native-agent-board-v1") { supported.insert(.agentBoard) }
+                if context.features.contains("native-agent-board-feedback-v1") { supported.insert(.agentBoardFeedback) }
+            }
+            pluginFeaturesKnown = true
+            try publishCapabilities()
             try await agents.load()
             try require(owner, request: request)
             try agentRepository.save(agents.profiles)
@@ -685,21 +717,6 @@ final class NativeWorkspaceRuntime {
             if rooms.nativeExecutionAvailable {
                 supported.formUnion([.groupsRead, .groupsCreate, .groupsSend, .groupsRename, .groupsStop,
                                      .groupsRetry, .groupsApprove, .groupsDisband])
-            }
-            if let context = workspace.nativeContext {
-                if context.features.contains("native-voice-v1") { supported.insert(.liveVoice) }
-                if context.features.contains("native-wiki-v1") { supported.formUnion([.wikiRead, .wikiEdit]) }
-                if context.features.contains("native-wiki-disconnect-v1") { supported.insert(.wikiDisconnect) }
-                if context.features.contains("native-card-templates-v1") { supported.insert(.cardTemplates) }
-                // Rich interactive cards (generative UI, including forms) and the
-                // plugin notification channel are core plugin capabilities, not
-                // versioned feature flags: a fetched native context means the
-                // bighelp plugin is installed and serving them.
-                supported.formUnion([.cards, .forms, .cloudNotifications])
-                if context.features.contains("native-device-tools-v1") { supported.insert(.phoneTools) }
-                if context.features.contains("native-project-git-read-v1") { supported.insert(.projectChangesRead) }
-                if context.features.contains("native-agent-board-v1") { supported.insert(.agentBoard) }
-                if context.features.contains("native-agent-board-feedback-v1") { supported.insert(.agentBoardFeedback) }
             }
             try publishCapabilities()
             connections.cloneClient = DirectHermesAgentProfileCloneClient(

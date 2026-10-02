@@ -166,6 +166,61 @@ struct AgentBoardTests {
         #expect(store.state == .unavailable)
     }
 
+    /// Coming back to the app reconnects: for a moment there's no connection, then one whose
+    /// plugin features aren't known yet. Feed, Ideas and Goals keep what they show (never "update
+    /// the plugin") and reload by themselves once the new connection is ready.
+    @Test func comingBackKeepsTheBoardAndReloadsIt() async {
+        let first = FakeBoardClient(items: [AgentBoardItem(id: "a", kind: .feed, title: "Before")])
+        let store = AgentBoardStore()
+        await store.connect(client: first, scope: "studio")
+        await store.load(agentID: "default")
+        #expect(store.feed.map(\.title) == ["Before"])
+
+        store.waitForConnection()
+        #expect(store.state == .loaded && store.feed.map(\.title) == ["Before"])
+        #expect(store.state != .unavailable)
+
+        let second = FakeBoardClient(items: [AgentBoardItem(id: "b", kind: .feed, title: "After")])
+        await store.connect(client: second, scope: "studio")
+        #expect(store.state == .loaded && store.feed.map(\.title) == ["After"], "Reloaded without leaving the screen")
+    }
+
+    @Test func aFirstConnectionWaitsInsteadOfAskingForAPluginUpdate() async {
+        let store = AgentBoardStore()
+        store.waitForConnection()
+        #expect(store.state == .loading)
+        await store.load(agentID: "default")
+        #expect(store.state == .loading, "No client yet: still waiting, not unavailable")
+        await store.connect(client: FakeBoardClient(items: [AgentBoardItem(id: "i", kind: .idea, title: "Plan")]),
+                            scope: "studio")
+        #expect(store.state == .loaded && store.ideas.count == 1, "The page asked for an agent; it loads now")
+    }
+
+    @Test func anotherComputerStartsFresh() async {
+        let store = AgentBoardStore()
+        await store.connect(client: FakeBoardClient(items: [AgentBoardItem(id: "a", kind: .feed, title: "Studio")]),
+                            scope: "studio")
+        await store.load(agentID: "default")
+        await store.connect(client: FakeBoardClient(items: [AgentBoardItem(id: "b", kind: .feed, title: "Lab")]),
+                            scope: "lab")
+        #expect(store.items.isEmpty && store.state == .idle, "Nothing from the other computer stays")
+        // A host whose plugin really lacks the board still says so.
+        store.configure(client: nil)
+        #expect(store.state == .unavailable && !store.isDisconnected)
+    }
+
+    /// Only a host that answered without the board asks for a plugin update. Reconnecting, and the
+    /// moment after when the features still belong to the old connection, just wait.
+    @Test func onlyAMissingBoardAsksForAPluginUpdate() {
+        typealias Step = AgentBoardConnectionStep
+        #expect(Step.decide(isConnected: true, board: .available, reconnects: true) == .connect)
+        #expect(Step.decide(isConnected: true, board: .unknown, reconnects: true) == .wait)
+        #expect(Step.decide(isConnected: true, board: .unavailable(.notConnected), reconnects: true) == .wait)
+        #expect(Step.decide(isConnected: false, board: .unknown, reconnects: true) == .wait)
+        #expect(Step.decide(isConnected: true, board: .unavailable(.pluginRequired), reconnects: true) == .pluginMissing)
+        #expect(Step.decide(isConnected: false, board: .unknown, reconnects: false) == .disconnected)
+    }
+
     @Test func profileHistoryLoadsEvenWithoutIdentityFiles() async {
         let client = FakeBoardClient(items: [])
         client.failsIdentity = true

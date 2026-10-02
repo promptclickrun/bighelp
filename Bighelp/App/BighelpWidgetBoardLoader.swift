@@ -12,6 +12,7 @@ final class BighelpWidgetBoardLoader {
     private let extras: BighelpWidgetExtras
     private let pickedAgentIDs: @MainActor () async -> [String]
     private var client: (any AgentBoardClient)?
+    private var scope: String?
     private var generation = 0
 
     init(extras: BighelpWidgetExtras = .shared,
@@ -20,12 +21,15 @@ final class BighelpWidgetBoardLoader {
         self.pickedAgentIDs = pickedAgentIDs
     }
 
-    /// A new host, account or plugin drops every board read so far.
-    func configure(client: (any AgentBoardClient)?) {
+    /// Another computer (or none) drops every board read so far; a new connection
+    /// to the same one keeps them until the next refresh.
+    func configure(client: (any AgentBoardClient)?, scope: String?) {
         guard client !== self.client else { return }
+        let sameComputer = client != nil && scope != nil && scope == self.scope
         self.client = client
+        self.scope = scope
         generation &+= 1
-        if !extras.agentBoards.isEmpty { extras.agentBoards = [:] }
+        if !sameComputer, !extras.agentBoards.isEmpty { extras.agentBoards = [:] }
     }
 
     func refresh(homeAgentID: String?, knownAgentIDs: Set<String>) async {

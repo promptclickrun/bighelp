@@ -69,7 +69,7 @@ struct BighelpBoardWidgetTests {
         let extras = BighelpWidgetExtras()
         var picked = [Self.rex, Self.juno, "gone", "a", "b", "c", "d", "e", "f"]
         let loader = BighelpWidgetBoardLoader(extras: extras, pickedAgentIDs: { picked })
-        loader.configure(client: client)
+        loader.configure(client: client, scope: "studio")
         let known = Set([Self.juno, Self.rex, "a", "b", "c", "d", "e", "f"])
         await loader.refresh(homeAgentID: Self.juno, knownAgentIDs: known)
         #expect(client.requested.first == Self.rex)
@@ -91,7 +91,7 @@ struct BighelpBoardWidgetTests {
         // Signing out or switching computers drops every board.
         picked = [Self.rex]
         await loader.refresh(homeAgentID: Self.juno, knownAgentIDs: known)
-        loader.configure(client: nil)
+        loader.configure(client: nil, scope: nil)
         #expect(extras.agentBoards.isEmpty)
     }
 

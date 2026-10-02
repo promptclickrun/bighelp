@@ -28,6 +28,25 @@ final class ProjectsAndBoardHostUITests: BighelpUITestCase {
         XCTAssertTrue(stockTips.waitForExistence(timeout: 20), "The host's Feed shows")
         save("features-1-feed", app)
 
+        // Coming back to the app on the Feed: the connection closes in the background, then
+        // reconnects and learns the plugin's features again. The posts stay, and it never says
+        // the plugin is older in between (it used to, until you left the tab and came back).
+        XCUIDevice.shared.press(.home)
+        XCTAssertTrue(app.wait(for: .runningBackground, timeout: 10))
+        sleep(35) // past the 25-second grace: the app closes its connection
+        app.activate()
+        let older = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "older bighelp plugin")).firstMatch
+        var sawOlder = false
+        let deadline = Date().addingTimeInterval(20)
+        while Date() < deadline, !sawOlder {
+            sawOlder = older.exists
+            if !sawOlder { Thread.sleep(forTimeInterval: 0.2) }
+        }
+        if sawOlder { save("features-1b-older-plugin-after-return", app) }
+        XCTAssertFalse(sawOlder, "Coming back never says the plugin is older")
+        XCTAssertTrue(stockTips.waitForExistence(timeout: 10), "The posts are there after coming back")
+        save("features-1c-feed-after-return", app)
+
         // Thumbs down with a reason (the probe checks the host kept both).
         let thumbsDown = stockTips.buttons["board.feed.thumbs-down"]
         XCTAssertTrue(thumbsDown.waitForExistence(timeout: 5))

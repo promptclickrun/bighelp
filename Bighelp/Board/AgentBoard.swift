@@ -381,6 +381,27 @@ final class DirectHermesAgentBoardClient: AgentBoardClient {
 
 // MARK: - Store
 
+/// What Feed, Ideas and Goals do with the connection as it stands.
+enum AgentBoardConnectionStep: Equatable {
+    /// Reconnecting, or the plugin's features aren't known for this connection yet.
+    case wait
+    case connect
+    /// The host answered without the board: its plugin needs an update.
+    case pluginMissing
+    /// No computer to reconnect to.
+    case disconnected
+
+    static func decide(isConnected: Bool, board: WorkspaceAvailability, reconnects: Bool) -> Self {
+        guard isConnected else { return reconnects ? .wait : .disconnected }
+        switch board {
+        case .available: return .connect
+        // Right after a reconnect the features still belong to the old connection.
+        case .unknown, .unavailable(.notConnected): return .wait
+        case .unavailable: return .pluginMissing
+        }
+    }
+}
+
 @MainActor
 @Observable
 final class AgentBoardStore {
@@ -398,6 +419,14 @@ final class AgentBoardStore {
     private var client: (any AgentBoardClient)?
     private var pictures: [String: Data] = [:]
     private var generation = 0
+    /// The computer the board is for (its cache scope); a new connection to the
+    /// same one keeps what's shown.
+    private var scope: String?
+    /// Reconnecting, or the plugin's features aren't known yet: neither "update
+    /// the plugin" nor an empty board, just a short wait.
+    private var isWaiting = false
+    /// The agent a page asked for while waiting, loaded once connected.
+    private var pendingAgentID: String?
 
     var isAvailable: Bool { client != nil }
     var supportsFeedback: Bool { client?.supportsFeedback ?? false }
@@ -410,7 +439,8 @@ final class AgentBoardStore {
     /// A new client (host, account or plugin change) drops everything shown so far.
     func configure(client: (any AgentBoardClient)?, isDisconnected: Bool = false) {
         self.isDisconnected = client == nil && isDisconnected
-        guard client !== self.client else { return }
+        guard client !== self.client || isWaiting else { return }
+        isWaiting = false; pendingAgentID = nil; scope = nil
         self.client = client
         generation &+= 1
         items = []; activity = []; approvals = []; pictures = [:]; identity = nil; recentlyHidden = nil
@@ -419,14 +449,52 @@ final class AgentBoardStore {
         agentID = nil
     }
 
+    /// The app came back or the features are still being learned: drop the old
+    /// connection but keep what's on screen until `connect` brings a new one.
+    func waitForConnection() {
+        client = nil
+        generation &+= 1
+        isWaiting = true
+        isDisconnected = false
+        if state != .loaded { state = .loading }
+    }
+
+    /// A ready connection. The same computer again (coming back to the app) keeps
+    /// what's shown and reloads it; another computer starts fresh.
+    func connect(client: any AgentBoardClient, scope: String) async {
+        guard client !== self.client else { return }
+        let sameComputer = scope == self.scope
+        let pending = pendingAgentID
+        if sameComputer {
+            self.client = client
+            generation &+= 1
+            isWaiting = false; isDisconnected = false; pendingAgentID = nil
+            if state == .loading, agentID == nil { state = .idle }
+        } else {
+            configure(client: client)
+            self.scope = scope
+        }
+        if let reload = pending ?? (sameComputer ? agentID : nil) { await load(agentID: reload) }
+    }
+
     func load(agentID: String) async {
-        guard let client else { state = .unavailable; return }
+        guard let client else {
+            if isWaiting {
+                pendingAgentID = agentID
+                if self.agentID != agentID { state = .loading }
+            } else {
+                state = .unavailable
+            }
+            return
+        }
         let generation = generation
+        // Reloading what's already shown keeps it on screen, without a spinner.
+        let isRefresh = state == .loaded && self.agentID == agentID
         if self.agentID != agentID {
             self.agentID = agentID
             items = []; activity = []; approvals = []; identity = nil
         }
-        state = .loading
+        if !isRefresh { state = .loading }
         do {
             let loaded = try await client.items(agentID: agentID)
             guard generation == self.generation, self.agentID == agentID else { return }

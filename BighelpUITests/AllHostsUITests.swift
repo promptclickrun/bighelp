@@ -237,6 +237,36 @@ final class AllHostsUITests: BighelpUITestCase {
         XCTAssertTrue(trips.waitForExistence(timeout: 5))
     }
 
+    /// Holding a pinned agent and holding an agent's row show the same kind
+    /// of menu, readable in light and dark.
+    @MainActor
+    func testHoldingPinnedAgentShowsItsMenu() throws {
+        for appearance in ["light", "dark"] {
+            let app = makeApp()
+            app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-bighelp.hosts.all-hosts", "YES",
+                                   "-loopdy.demo.appearance", appearance]
+            app.launch()
+            let tile = app.descendants(matching: .any)["fleet.pinned.Avery Park"]
+            XCTAssertTrue(tile.waitForExistence(timeout: 10))
+            tile.press(forDuration: 1.0)
+            XCTAssertTrue(app.buttons["Unpin"].firstMatch.waitForExistence(timeout: 3), "Holding a pinned agent offers Unpin")
+            XCTAssertTrue(app.buttons["Hide from list"].firstMatch.exists, "The same menu as the agent's row")
+            XCTAssertTrue(app.buttons["Move to section"].firstMatch.exists)
+            sleep(1)
+            shot("pinned-menu-\(appearance)", app)
+            app.terminate()
+
+            app.launch()
+            let row = app.buttons["fleet.agent.Mina Shah"]
+            XCTAssertTrue(row.waitForExistence(timeout: 10))
+            row.press(forDuration: 1.0)
+            XCTAssertTrue(app.buttons["Pin"].firstMatch.waitForExistence(timeout: 3))
+            sleep(1)
+            shot("row-menu-\(appearance)", app)
+            app.terminate()
+        }
+    }
+
     /// Saves a screenshot into TEST_RUNNER_BIGHELP_FLEET_SHOTS when set.
     @MainActor
     private func shot(_ name: String, _ app: XCUIApplication) {

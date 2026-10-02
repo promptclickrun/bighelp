@@ -39,9 +39,11 @@ struct AgentPinnedGrid: View {
 /// a new place and the others make room, or let go without moving to see its
 /// actions (when it has any).
 ///
-/// Long-press menus can't be used here: the grid is one List row, and a List
-/// row shows the first menu in it whichever tile was pressed. On the Mac each
-/// tile has its own right-click menu instead (`MacTileMenu`).
+/// SwiftUI long-press menus can't be used here: the grid is one List row, and
+/// a List row shows the first menu in it whichever tile was pressed. So with
+/// `menu`, letting go opens the tile's own UIKit menu (`TileMenuAnchor`), the
+/// same system menu a row's `.contextMenu` shows. On the Mac each tile also
+/// has its own right-click menu (`MacTileMenu`).
 struct PinnedArrangeGrid<Item: Identifiable, Tile: View, Trailing: View>: View where Item.ID == String {
     let items: [Item]
     let columns: [GridItem]
@@ -50,6 +52,9 @@ struct PinnedArrangeGrid<Item: Identifiable, Tile: View, Trailing: View>: View w
     let space: String
     let open: (Item) -> Void
     let manage: ((Item) -> Void)?
+    /// The tile's menu, shown when it's let go without moving. Where a menu
+    /// can't be opened (visionOS, iOS before 17.4), `manage` runs instead.
+    var menu: ((Item) -> [TileMenuItem])? = nil
     let reorder: ([String]) -> Void
     @Binding var isArranging: Bool
     let identifier: (Item) -> String
@@ -71,6 +76,9 @@ struct PinnedArrangeGrid<Item: Identifiable, Tile: View, Trailing: View>: View w
     @State private var frames: [String: CGRect] = [:]
     @State private var arrangement: [Item]?
     @State private var lift: Lift?
+    #if os(iOS)
+    @State private var anchors = TileMenuAnchors()
+    #endif
     @GestureState private var isTouching = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -81,6 +89,21 @@ struct PinnedArrangeGrid<Item: Identifiable, Tile: View, Trailing: View>: View w
             ForEach(shown) { item in cell(item) }
             trailing()
         }
+        #if os(iOS)
+        // Beside the tiles, not in them, so each tile stays one element.
+        .background(alignment: .topLeading) {
+            if menu != nil {
+                ForEach(items) { item in
+                    if let frame = frames[item.id] {
+                        TileMenuAnchor(id: item.id, anchors: anchors)
+                            .frame(width: frame.width, height: frame.height)
+                            .offset(x: frame.minX, y: frame.minY)
+                    }
+                }
+                .accessibilityHidden(true)
+            }
+        }
+        #endif
         .coordinateSpace(.named(space))
         .onChange(of: isTouching) { _, touching in
             // Ends a lift however the touch ended, including a cancelled one.
@@ -94,6 +117,7 @@ struct PinnedArrangeGrid<Item: Identifiable, Tile: View, Trailing: View>: View w
             #if targetEnvironment(macCatalyst)
             .overlay { MacTileMenu(items: { macMenu(for: item) }).accessibilityHidden(true) }
             #endif
+
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(space)) } action: { frames[item.id] = $0 }
             .offset(lifted ? offset(for: item) : .zero)
             .zIndex(lifted ? 1 : 0)
@@ -105,7 +129,13 @@ struct PinnedArrangeGrid<Item: Identifiable, Tile: View, Trailing: View>: View w
             .accessibilityHint(hint)
             .accessibilityAction { open(item) }
             .accessibilityActions {
-                if let manage { Button("Manage agent") { manage(item) } }
+                if let menu {
+                    ForEach(Array(menu(item).filter { $0.children == nil && $0.isEnabled }.enumerated()), id: \.offset) {
+                        Button($0.element.title, action: $0.element.perform)
+                    }
+                } else if let manage {
+                    Button("Manage agent") { manage(item) }
+                }
                 if canReorder {
                     Button("Move earlier") { move(item, by: -1) }
                     Button("Move later") { move(item, by: 1) }
@@ -116,13 +146,13 @@ struct PinnedArrangeGrid<Item: Identifiable, Tile: View, Trailing: View>: View w
 
     private var hint: String {
         #if targetEnvironment(macCatalyst)
-        switch (canReorder, manage != nil) {
+        switch (canReorder, manage != nil || menu != nil) {
         case (true, true): "Opens this agent's chat. Click and hold to move it; right-click for more actions."
         case (true, false): "Opens this agent's chat. Click and hold to move it."
         case (false, _): "Opens this agent's chat. Right-click for more actions."
         }
         #else
-        switch (canReorder, manage != nil) {
+        switch (canReorder, manage != nil || menu != nil) {
         case (true, true): "Opens this agent's chat. Touch and hold to move it or for more actions."
         case (true, false): "Opens this agent's chat. Touch and hold to move it."
         case (false, _): "Opens this agent's chat. Touch and hold for more actions."
@@ -134,7 +164,13 @@ struct PinnedArrangeGrid<Item: Identifiable, Tile: View, Trailing: View>: View w
     /// The same choices as holding a tile on iPhone, plus moving it without a drag.
     private func macMenu(for item: Item) -> [MacTileMenu.Item] {
         var entries = [MacTileMenu.Item(title: "Open chat", systemImage: "bubble.left") { open(item) }]
-        if let manage {
+        if let menu {
+            entries += menu(item).enumerated().map { index, entry in
+                var entry = entry
+                if index == 0 { entry.startsGroup = true }
+                return entry
+            }
+        } else if let manage {
             entries.append(MacTileMenu.Item(title: "Manage agent", systemImage: "slider.horizontal.3") { manage(item) })
         }
         if canReorder, let index = items.firstIndex(where: { $0.id == item.id }) {
@@ -199,6 +235,9 @@ struct PinnedArrangeGrid<Item: Identifiable, Tile: View, Trailing: View>: View w
         }
         isArranging = false
         if !finished.moved, let item = items.first(where: { $0.id == finished.id }) {
+            #if os(iOS)
+            if let menu, anchors.present(item.id, items: menu(item)) { return }
+            #endif
             manage?(item)
         } else if canReorder, let order, order != items.map(\.id) {
             reorder(order)
@@ -288,15 +327,7 @@ private struct HoldToDrag: UIGestureRecognizerRepresentable {
 /// Control-clicks land on this view; other clicks, hovers and scrolls pass
 /// through to the tile.
 struct MacTileMenu: UIViewRepresentable {
-    struct Item {
-        let title: String
-        let systemImage: String
-        var isDestructive = false
-        var isEnabled = true
-        /// Draws a separator above this item.
-        var startsGroup = false
-        let perform: () -> Void
-    }
+    typealias Item = TileMenuItem
 
     /// Read when the menu opens, so it shows the tile's current choices.
     let items: () -> [Item]
@@ -338,30 +369,122 @@ struct MacTileMenu: UIViewRepresentable {
         ) -> UIContextMenuConfiguration? {
             shown = items()
             guard !shown.isEmpty else { return nil }
-            var groups: [[UIMenuElement]] = [[]]
-            for (index, item) in shown.enumerated() {
-                if item.startsGroup, !(groups.last?.isEmpty ?? true) { groups.append([]) }
-                var attributes: UIMenuElement.Attributes = []
-                if item.isDestructive { attributes.insert(.destructive) }
-                if !item.isEnabled { attributes.insert(.disabled) }
-                groups[groups.count - 1].append(UIAction(
-                    title: item.title, image: UIImage(systemName: item.systemImage), attributes: attributes
-                ) { [weak self] _ in
-                    self?.perform(index)
-                })
-            }
-            let children: [UIMenuElement] = groups.count == 1
-                ? groups[0]
-                : groups.map { UIMenu(options: .displayInline, children: $0) }
-            return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { _ in
-                UIMenu(children: children)
-            }
+            let menu = TileMenuItem.menu(shown)
+            return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { _ in menu }
         }
+    }
+}
+#endif
 
-        private func perform(_ index: Int) {
-            guard shown.indices.contains(index) else { return }
-            shown[index].perform()
+/// One choice in a pinned tile's menu. The same list draws as a SwiftUI menu
+/// (`TileMenuContent`, a row's `.contextMenu`) and as a UIKit one (a tile's
+/// own menu), so a pinned tile and its row offer the same things.
+struct TileMenuItem {
+    let title: String
+    let systemImage: String
+    var isDestructive = false
+    var isEnabled = true
+    /// Draws a separator above this item.
+    var startsGroup = false
+    /// A submenu's choices; nil for an action.
+    var children: [TileMenuItem]? = nil
+    var identifier: String? = nil
+    var perform: @MainActor () -> Void = {}
+
+    #if os(iOS)
+    @MainActor
+    static func menu(_ items: [TileMenuItem], title: String = "", image: UIImage? = nil) -> UIMenu {
+        var groups: [[UIMenuElement]] = [[]]
+        for item in items {
+            if item.startsGroup, !(groups.last?.isEmpty ?? true) { groups.append([]) }
+            let image = UIImage(systemName: item.systemImage)
+            if let children = item.children {
+                groups[groups.count - 1].append(menu(children, title: item.title, image: image))
+                continue
+            }
+            var attributes: UIMenuElement.Attributes = []
+            if item.isDestructive { attributes.insert(.destructive) }
+            if !item.isEnabled { attributes.insert(.disabled) }
+            let perform = item.perform
+            let action = UIAction(title: item.title, image: image, attributes: attributes) { _ in perform() }
+            action.accessibilityIdentifier = item.identifier
+            groups[groups.count - 1].append(action)
         }
+        let children: [UIMenuElement] = groups.count == 1
+            ? groups[0]
+            : groups.map { UIMenu(options: .displayInline, children: $0) }
+        return UIMenu(title: title, image: image, children: children)
+    }
+    #endif
+}
+
+/// `TileMenuItem`s as SwiftUI menu content, for a row's `.contextMenu`.
+struct TileMenuContent: View {
+    let items: [TileMenuItem]
+
+    var body: some View {
+        ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+            if item.startsGroup { Divider() }
+            if let children = item.children {
+                Menu {
+                    TileMenuContent(items: children)
+                } label: {
+                    Label(item.title, systemImage: item.systemImage)
+                }
+                .accessibilityIdentifier(item.identifier ?? item.title)
+            } else {
+                Button(item.title, systemImage: item.systemImage, role: item.isDestructive ? .destructive : nil,
+                       action: item.perform)
+                    .disabled(!item.isEnabled)
+                    .accessibilityIdentifier(item.identifier ?? item.title)
+            }
+        }
+    }
+}
+
+#if os(iOS)
+/// The tiles' menu buttons, by tile, so the grid can open one when a tile is
+/// let go without moving.
+@MainActor
+final class TileMenuAnchors {
+    private var buttons: [String: WeakButton] = [:]
+
+    private struct WeakButton { weak var button: UIButton? }
+
+    func register(_ button: UIButton, for id: String) { buttons[id] = WeakButton(button: button) }
+
+    /// Opens the tile's menu beside it. False when it can't be opened here.
+    func present(_ id: String, items: [TileMenuItem]) -> Bool {
+        guard #available(iOS 17.4, *), !items.isEmpty, let button = buttons[id]?.button, button.window != nil else {
+            return false
+        }
+        button.menu = TileMenuItem.menu(items)
+        button.performPrimaryAction()
+        return true
+    }
+}
+
+/// An invisible menu button the size of a tile. It never takes touches (the
+/// tile's own tap and hold do); the grid opens its menu (`TileMenuAnchors`).
+struct TileMenuAnchor: UIViewRepresentable {
+    let id: String
+    let anchors: TileMenuAnchors
+
+    func makeUIView(context: Context) -> AnchorButton {
+        let button = AnchorButton(type: .custom)
+        button.showsMenuAsPrimaryAction = true
+        button.isAccessibilityElement = false
+        button.accessibilityElementsHidden = true
+        anchors.register(button, for: id)
+        return button
+    }
+
+    func updateUIView(_ button: AnchorButton, context: Context) {
+        anchors.register(button, for: id)
+    }
+
+    final class AnchorButton: UIButton {
+        override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? { nil }
     }
 }
 #endif

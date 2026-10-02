@@ -149,7 +149,8 @@ struct FleetHomeView: View {
     @State private var namePrompt: FleetNamePrompt?
     @State private var deletingGroup: FleetGroup?
     @State private var deletedSection: FleetSectionDeletion?
-    /// A pinned agent held and let go: its actions.
+    /// A pinned agent held and let go, where its menu can't open (visionOS,
+    /// iOS before 17.4): its actions.
     @State private var managing: FleetAgent?
     @State private var search = ""
     @State private var isArrangingPinned = false
@@ -322,36 +323,39 @@ struct FleetHomeView: View {
         }
         .buttonStyle(.plain)
         .listRowBackground(Color.clear)
-        .contextMenu { agentMenu(agent) }
+        .contextMenu { TileMenuContent(items: agentMenu(agent)) }
         .accessibilityValue(agent.isHidden ? "Hidden" : "")
         .accessibilityIdentifier("fleet.agent.\(agent.name)")
     }
 
-    @ViewBuilder
-    private func agentMenu(_ agent: FleetAgent) -> some View {
+    /// An agent's long-press menu, the same for its row and its pinned tile.
+    private func agentMenu(_ agent: FleetAgent) -> [TileMenuItem] {
+        var items: [TileMenuItem] = []
         if let onSetPinned {
-            Button(agent.isPinned ? "Unpin" : "Pin", systemImage: agent.isPinned ? "pin.slash" : "pin") {
+            items.append(TileMenuItem(title: agent.isPinned ? "Unpin" : "Pin",
+                                      systemImage: agent.isPinned ? "pin.slash" : "pin",
+                                      identifier: "fleet.agent.\(agent.isPinned ? "unpin" : "pin")") {
                 onSetPinned(agent, !agent.isPinned)
-            }
-            .accessibilityIdentifier("fleet.agent.\(agent.isPinned ? "unpin" : "pin")")
+            })
         }
         if let onOpenRoutines {
             let count = fleet.tasks(on: agent.hostID).filter { $0.profileID == agent.profileID }.count
-            Button(count == 0 ? "Routines" : "Routines (\(count))", systemImage: "clock.arrow.circlepath") {
+            items.append(TileMenuItem(title: count == 0 ? "Routines" : "Routines (\(count))",
+                                      systemImage: "clock.arrow.circlepath", identifier: "fleet.agent.routines") {
                 onOpenRoutines(agent)
-            }
-            .accessibilityIdentifier("fleet.agent.routines")
+            })
         }
         if onGroupAction != nil {
-            sectionMenu(current: fleet.section(of: agent), item: .agent(agent)) { id in
+            items.append(sectionMenu(current: fleet.section(of: agent), item: .agent(agent)) { id in
                 Task { try? await fleet.file(agent, in: id) }
-            }
-            Button(agent.isHidden ? "Show in list" : "Hide from list",
-                   systemImage: agent.isHidden ? "eye" : "eye.slash") {
+            })
+            items.append(TileMenuItem(title: agent.isHidden ? "Show in list" : "Hide from list",
+                                      systemImage: agent.isHidden ? "eye" : "eye.slash",
+                                      identifier: "fleet.agent.\(agent.isHidden ? "unhide" : "hide")") {
                 Task { try? await fleet.setHidden(agent, !agent.isHidden) }
-            }
-            .accessibilityIdentifier("fleet.agent.\(agent.isHidden ? "unhide" : "hide")")
+            })
         }
+        return items
     }
 
     private func groupRow(_ group: FleetGroup) -> some View {
@@ -360,7 +364,9 @@ struct FleetHomeView: View {
             .listRowBackground(Color.clear)
             .contextMenu {
                 Button("Open chat", systemImage: "bubble.left.and.bubble.right") { onGroupAction?(group, .open) }
-                sectionMenu(current: fleet.section(of: group), item: .group(group)) { fleet.file(group, in: $0) }
+                TileMenuContent(items: [sectionMenu(current: fleet.section(of: group), item: .group(group)) {
+                    fleet.file(group, in: $0)
+                }])
                 if group.hostID == fleet.selectedHostID {
                     Button("Rename", systemImage: "pencil") { namePrompt = .renameGroup(group) }
                         .disabled(!group.canRename)
@@ -375,22 +381,18 @@ struct FleetHomeView: View {
 
     /// Move to a section, a new one, or out of the one it's in.
     private func sectionMenu(current: FleetSection?, item: FleetListItem,
-                             file: @escaping (String?) -> Void) -> some View {
-        Menu {
-            ForEach(fleet.sections) { section in
-                Button(section.name, systemImage: section.id == current?.id ? "checkmark" : "folder") { file(section.id) }
-                    .disabled(section.id == current?.id)
-            }
-            Button("New section", systemImage: "folder.badge.plus") { namePrompt = .newSection(filing: item) }
-                .accessibilityIdentifier("fleet.move.new-section")
-            if current != nil {
-                Button("Remove from section", systemImage: "folder.badge.minus") { file(nil) }
-                    .accessibilityIdentifier("fleet.move.remove")
-            }
-        } label: {
-            Label("Move to section", systemImage: "folder")
+                             file: @escaping (String?) -> Void) -> TileMenuItem {
+        var choices = fleet.sections.map { section in
+            TileMenuItem(title: section.name, systemImage: section.id == current?.id ? "checkmark" : "folder",
+                         isEnabled: section.id != current?.id) { file(section.id) }
         }
-        .accessibilityIdentifier("fleet.move")
+        choices.append(TileMenuItem(title: "New section", systemImage: "folder.badge.plus",
+                                    identifier: "fleet.move.new-section") { namePrompt = .newSection(filing: item) })
+        if current != nil {
+            choices.append(TileMenuItem(title: "Remove from section", systemImage: "folder.badge.minus",
+                                        identifier: "fleet.move.remove") { file(nil) })
+        }
+        return TileMenuItem(title: "Move to section", systemImage: "folder", children: choices, identifier: "fleet.move")
     }
 
     /// Big pictures with the name and role, simple like a contact grid. Touch
@@ -400,7 +402,7 @@ struct FleetHomeView: View {
             items: agents,
             columns: PinnedAgentsLayout.columns,
             canReorder: true, space: "fleet.pinned", open: onOpen, manage: { managing = $0 },
-            reorder: { fleet.reorderPinned($0) }, isArranging: $isArrangingPinned,
+            menu: { agentMenu($0) }, reorder: { fleet.reorderPinned($0) }, isArranging: $isArrangingPinned,
             identifier: { "fleet.pinned.\($0.name)" },
             tile: { agent, lifted in pinnedTile(agent, lifted: lifted) },
             trailing: { EmptyView() }

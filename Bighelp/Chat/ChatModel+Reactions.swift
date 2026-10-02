@@ -296,6 +296,14 @@ extension ChatModel {
         nativeMessageReactionErrors[rowID] = nil
         uncertainNativeMessageReactionRows.remove(rowID)
         advanceNativeMessageReactionRevision()
+        // A reaction that lands after the agent's silence marker still makes it the reply.
+        if role == .human, reactions.contains(where: { $0.author == .agent }),
+           items.contains(where: { item in
+               guard item.role == .assistant, case .message(let text) = item.content else { return false }
+               return ChatSilentReply.isMarker(text)
+           }) {
+            rebuildTranscript()
+        }
     }
 
     func advanceNativeMessageReactionRevision() {

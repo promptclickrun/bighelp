@@ -1084,6 +1084,53 @@ struct DirectHermesConversationTests {
         turn.cancel()
     }
 
+    /// Hermes retries a reply with no text, so an agent whose reaction says it all ends the turn
+    /// with a silence marker. That answers the person: no bubble and no "silence marker" warning,
+    /// whether the reaction lands before the marker or just after it. Without a reaction the
+    /// person still gets Hermes' notice.
+    @Test(arguments: ["before", "after", "none"])
+    func aReactionThenASilenceMarkerIsTheWholeReply(reaction: String) async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let rpc = DirectTestRPC()
+        rpc.handler = { method, _ in
+            guard method == "prompt.submit" else { return .object(["status": .string("queued")]) }
+            return .object(["status": .string("streaming"), "user_row_id": .integer(8_933)])
+        }
+        let client = try DirectHermesConversationClient(rpc: rpc, hostIdentity: "host", profile: "default",
+            runtimeID: "runtime", storedID: "stored", title: "Native", epoch: "epoch", drafts: .init(root: root))
+        defer { client.suspend() }
+        let model = ChatModel(conversationID: client.conversationID, client: client, initialItems: [])
+        client.model = model
+        model.draft = "Ok"
+        let turn = Task { await model.send() }
+        for _ in 0..<200 where !rpc.requests.contains(where: { $0.method == "prompt.submit" }) {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        try await Task.sleep(for: .milliseconds(50))
+        func thumbsUp(_ sequence: Int) -> DirectHermesEvent {
+            .init(type: "message.reaction", sessionID: "runtime", payload: [
+                "row_id": .integer(8_933), "role": .string("user"),
+                "reactions": .array([.object(["emoji": .string("👍"), "author": .string("agent")])]),
+            ], sequence: sequence)
+        }
+        client.receive(.init(type: "message.start", sessionID: "runtime", payload: [:], sequence: 1))
+        if reaction == "before" { client.receive(thumbsUp(2)) }
+        client.receive(.init(type: "message.complete", sessionID: "runtime", payload: [
+            "text": .string("[SILENT]"), "persisted_turn": .object([
+                "user_row_id": .integer(8_933), "row_ids": .array([.integer(8_933), .integer(8_934)]),
+                "final_assistant_row_id": .integer(8_934), "complete": .boolean(true),
+            ]),
+        ], sequence: 3))
+        if reaction == "after" { client.receive(thumbsUp(4)) }
+        let shown = model.transcriptEntries.compactMap { entry -> String? in
+            guard case .message(let item) = entry, case .message(let text) = item.content else { return nil }
+            return text
+        }
+        #expect(shown == (reaction == "none" ? ["Ok", ChatSilentReply.notice] : ["Ok"]))
+        turn.cancel()
+    }
+
     @Test func reactingUsesHermesReactionsWithoutAnExtraTurn() async throws {
         // Hermes records the reaction and tells the agent at its next turn
         // (display.message_reactions). The app must not start a turn of its own.

@@ -121,7 +121,8 @@ background, so a Shortcut first proves the host answers (the agent list) and rec
 Reactions use Hermes' own: the app saves them with `message.react`, and with Settings › Chat › "Agents see your
 reactions" on (the host's `display.message_reactions`), Hermes tells the agent at its next turn. The app sends no
 note or turn of its own. Agents tapback through the plugin's `bighelp_react_to_message`. A reply that is only a
-silence marker follows Hermes' rules (`ChatSilentReply`).
+silence marker follows Hermes' rules (`ChatSilentReply`), with one addition: after the agent reacted to the
+person's message, a bare marker means the reaction was the whole reply, so it leaves no bubble and no warning.
 
 Feed, Ideas and Goals start empty. They fill only when the user asks the agent for updates; the agent then posts
 with the plugin's `bighelp_board` tool, often from a scheduled job it sets up. Nothing runs on the user's AI

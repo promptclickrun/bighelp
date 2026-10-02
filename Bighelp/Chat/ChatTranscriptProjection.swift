@@ -111,11 +111,13 @@ enum ChatTranscriptProjection {
         visibility: ChatActivityVisibility,
         isBotMode: Bool,
         isScheduled: Bool = false,
-        after previous: TimelineItem? = nil
+        after previous: TimelineItem? = nil,
+        reactedTo: (TimelineItem) -> Bool = { _ in false }
     ) -> [ChatTranscriptEntry] {
         // An agent that chose not to answer an off-screen note leaves no bubble.
         let items = ChatSilentReply.presented(
-            allItems, lane: isBotMode ? .room : isScheduled ? .scheduled : .chat, after: previous)
+            allItems, lane: isBotMode ? .room : isScheduled ? .scheduled : .chat, after: previous,
+            reactedTo: reactedTo)
         // A room exposes participant messages, not the members' private work.
         // Retain recorded activity in its store without projecting tool or
         // agent-to-agent cards into either live or reopened room transcripts.

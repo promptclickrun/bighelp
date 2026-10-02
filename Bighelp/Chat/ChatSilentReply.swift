@@ -37,24 +37,30 @@ enum ChatSilentReply {
     /// A live reply. Saved history already applied the turn's real kind; here the only signal is
     /// what came right before: a bare marker answering the person's own message becomes Hermes'
     /// notice, and one answering something unseen (an off-screen note) disappears. Group chats and
-    /// scheduled runs keep every bare marker quiet.
-    static func presentation(of item: TimelineItem, after previous: TimelineItem?, lane: Lane) -> Presentation {
+    /// scheduled runs keep every bare marker quiet. An agent that reacted to the person's message
+    /// (`bighelp_react_to_message`) and then sent a marker answered with the reaction: Hermes
+    /// retries a reply with no text, so the marker is how a reaction ends the turn.
+    static func presentation(of item: TimelineItem, after previous: TimelineItem?, lane: Lane,
+                             answeredWithReaction: Bool = false) -> Presentation {
         guard item.role == .assistant, item.sender.kind != .system, case .message(let text) = item.content else {
             return .show
         }
         if item.metadata.delivery == "Streaming" { return mayBecomeMarker(text) ? .hide : .show }
         guard isMarker(text) else { return .show }
-        guard lane == .chat, let previous, previous.role == .human else { return .hide }
+        guard lane == .chat, let previous, previous.role == .human, !answeredWithReaction else { return .hide }
         return .notice
     }
 
     /// `items` as shown: silent replies removed, a bare marker to a person replaced by the notice.
     /// `previous` is the conversation message just before `items`, when they continue a list.
-    static func presented(_ items: [TimelineItem], lane: Lane, after previous: TimelineItem? = nil) -> [TimelineItem] {
+    /// `reactedTo` says whether the agent reacted to a person's message.
+    static func presented(_ items: [TimelineItem], lane: Lane, after previous: TimelineItem? = nil,
+                          reactedTo: (TimelineItem) -> Bool = { _ in false }) -> [TimelineItem] {
         var previous = previous
         return items.compactMap { item in
             defer { if isConversationMessage(item) { previous = item } }
-            switch presentation(of: item, after: previous, lane: lane) {
+            let answeredWithReaction = previous.map { $0.role == .human && reactedTo($0) } ?? false
+            switch presentation(of: item, after: previous, lane: lane, answeredWithReaction: answeredWithReaction) {
             case .show: return item
             case .hide: return nil
             case .notice: return noticeItem(replacing: item)

@@ -35,6 +35,19 @@ struct ChatSilentReplyTests {
         #expect(ChatSilentReply.presented([marker], lane: .chat, after: person).map(Self.text) == [ChatSilentReply.notice])
     }
 
+    @Test func aReactionToThePersonIsTheWholeReply() {
+        let person = Self.message(.human, "Ok")
+        let marker = Self.message(.assistant, "[SILENT]")
+        #expect(ChatSilentReply.presentation(of: marker, after: person, lane: .chat, answeredWithReaction: true) == .hide)
+        #expect(ChatSilentReply.presented([person, marker], lane: .chat, reactedTo: { $0.id == person.id })
+            .map(Self.text) == ["Ok"])
+        #expect(ChatSilentReply.presented([marker], lane: .chat, after: person, reactedTo: { $0.id == person.id }).isEmpty)
+        // A reaction on an earlier message doesn't excuse a bare marker to this one.
+        let earlier = Self.message(.human, "Morning")
+        #expect(ChatSilentReply.presented([earlier, Self.message(.assistant, "Hi!"), person, marker], lane: .chat,
+                                          reactedTo: { $0.id == earlier.id }).map(Self.text).last == ChatSilentReply.notice)
+    }
+
     @Test func silenceAfterSomethingUnseenOrInRoomsAndScheduledRunsLeavesNoBubble() {
         let person = Self.message(.human, "Thanks!")
         let marker = Self.message(.assistant, "[SILENT]")
@@ -78,6 +91,18 @@ struct ChatSilentReplyTests {
         #expect(!page.messages.map(Self.text).contains(ChatSilentReply.notice))
     }
 
+    @Test func savedHistoryCountsTheAgentsReactionAsTheReply() throws {
+        let rows = try [
+            Self.row(1, "user", "Ok", reactions: [("👍", "agent")]),
+            Self.row(2, "assistant", "[SILENT]"),
+            Self.row(3, "user", "Got it", reactions: [("❤️", "user")]),
+            Self.row(4, "assistant", "NO_REPLY")
+        ].map { try DirectHermesHistoryRow($0, sessionID: "tip") }
+        let chat = try DirectHermesHistoryProjection(rows: rows, appID: "app", profileID: "alpha", source: nil, sourceOrderBase: 0)
+        // Only the agent's own reaction answers; the person's reaction on their message doesn't.
+        #expect(chat.messages.map(Self.text) == ["Ok", "Got it", ChatSilentReply.notice])
+    }
+
     private static func message(_ role: TimelineRole, _ text: String, streaming: Bool = false) -> TimelineItem {
         TimelineItem(id: UUID().uuidString, role: role,
                      sender: role == .human ? .user(snapshot: .init(name: "You")) : .agent(id: "default", snapshot: .init(name: "Juno")),
@@ -91,14 +116,19 @@ struct ChatSilentReplyTests {
     }
 
     private static func row(_ id: Int, _ role: String, _ content: String, displayKind: String? = nil,
-                            replyExpected: Bool? = nil) -> BighelpJSONValue {
+                            replyExpected: Bool? = nil, reactions: [(String, String)] = []) -> BighelpJSONValue {
         var value: [String: BighelpJSONValue] = [
             "id": .integer(id), "session_id": .string("tip"), "role": .string(role),
             "content": .string(content), "timestamp": .number(Double(id)),
             "tool_calls": .null, "tool_call_id": .null, "tool_name": .null
         ]
         if let displayKind { value["display_kind"] = .string(displayKind) }
-        if let replyExpected { value["display_metadata"] = .object(["reply_expected": .boolean(replyExpected)]) }
+        var metadata: [String: BighelpJSONValue] = [:]
+        if let replyExpected { metadata["reply_expected"] = .boolean(replyExpected) }
+        if !reactions.isEmpty {
+            metadata["reactions"] = .array(reactions.map { .object(["emoji": .string($0.0), "author": .string($0.1)]) })
+        }
+        if !metadata.isEmpty { value["display_metadata"] = .object(metadata) }
         return .object(value)
     }
 }

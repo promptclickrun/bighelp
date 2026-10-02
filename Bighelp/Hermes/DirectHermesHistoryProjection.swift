@@ -33,6 +33,13 @@ struct DirectHermesHistoryRow: Equatable, Sendable {
         raw["display_metadata"]?.object?["reply_expected"]?.boolean
     }
 
+    /// The agent reacted to this message (`display_metadata.reactions`, author "agent").
+    var hasAgentReaction: Bool {
+        raw["display_metadata"]?.object?["reactions"]?.array?.contains {
+            $0.object?["author"]?.string == "agent"
+        } ?? false
+    }
+
     init(_ value: BighelpJSONValue, sessionID: String) throws {
         guard let row = value.object, let id = row["id"]?.integer,
               id > 0, id <= 9_007_199_254_740_991 else { throw WorkspaceClientError.invalidResponse }
@@ -243,10 +250,11 @@ struct DirectHermesHistoryProjection: Equatable, Sendable {
             let isModelSwitch = row.displayKind == "model_switch"
             var text = row.role == "user" && !isModelSwitch ? HermesUserMessageDisplay.text(row.text) : row.text
             // Hermes' rule with the turn's real kind (ChatSilentReply): quiet unless a person's
-            // message got only a marker, which shows Hermes' notice. An unknown turn stays quiet.
+            // message got only a marker, which shows Hermes' notice. An unknown turn stays quiet,
+            // and so does one the agent answered with a reaction.
             var isSilent = false
             if row.role == "assistant", ChatSilentReply.isMarker(text) {
-                if !isScheduled, let prompt = turnPrompt, !ChatSilentReply.silenceAllowed(
+                if !isScheduled, let prompt = turnPrompt, !prompt.hasAgentReaction, !ChatSilentReply.silenceAllowed(
                     displayKind: prompt.displayKind, replyExpected: prompt.replyExpected) {
                     text = ChatSilentReply.notice
                 } else {

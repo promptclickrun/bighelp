@@ -496,7 +496,8 @@ extension ChatModel {
                 activityEvents: events,
                 visibility: activityVisibility,
                 isBotMode: isBotMode,
-                isScheduled: sourceSession?.isCronSession == true
+                isScheduled: sourceSession?.isCronSession == true,
+                reactedTo: agentReacted(to:)
             )
             rebuildTranscriptIndexes(work: &work)
             recordProjectionWork(work)
@@ -537,7 +538,8 @@ extension ChatModel {
             isScheduled: sourceSession?.isCronSession == true,
             after: projectedItems.last {
                 ($0.metadata.sourceOrder ?? .max) < invalidationOrder && ChatSilentReply.isConversationMessage($0)
-            }
+            },
+            reactedTo: agentReacted(to:)
         )
         rebuildTranscriptIndexes(work: &work)
         recordProjectionWork(work)
@@ -570,11 +572,19 @@ extension ChatModel {
            ChatSilentReply.isMarker(text), let index = items.lastIndex(where: { $0.id == item.id }) {
             previous = items[..<index].last(where: ChatSilentReply.isConversationMessage)
         }
-        switch ChatSilentReply.presentation(of: item, after: previous, lane: lane) {
+        let answeredWithReaction = previous.map(agentReacted(to:)) ?? false
+        switch ChatSilentReply.presentation(of: item, after: previous, lane: lane,
+                                            answeredWithReaction: answeredWithReaction) {
         case .show: return item
         case .hide: return nil
         case .notice: return ChatSilentReply.noticeItem(replacing: item)
         }
+    }
+
+    /// The agent reacted to this person's message, live or saved.
+    func agentReacted(to item: TimelineItem) -> Bool {
+        guard item.role == .human, itemIndexByID[item.id] != nil else { return false }
+        return nativeMessageReactionPresentation(for: item).reactions.contains { $0.author == .agent }
     }
 
     private func transcriptUpperOrder(_ entry: ChatTranscriptEntry) -> Int {

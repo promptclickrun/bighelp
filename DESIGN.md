@@ -125,7 +125,7 @@ silence marker follows Hermes' rules (`ChatSilentReply`), with one addition: aft
 person's message, a bare marker means the reaction was the whole reply, so it leaves no bubble and no warning.
 
 Feed, Ideas and Goals start empty. They fill only when the user asks the agent for updates; the agent then posts
-with the plugin's `bighelp_board` tool, often from a scheduled job it sets up. A Feed post's text is Markdown, drawn
+with the plugin's `bighelp_board` tool, often from a scheduled job it sets up. Feed posts and Ideas are Markdown, drawn
 with chat's renderer (`MarkdownMessageView`): headings, lists, quotes, code and tables. Nothing runs on the user's AI
 provider by itself. Every item has a long-press menu (and the same VoiceOver actions) with only what fits
 it: thumbs up/down on Feed (a thumbs down may ask "Less like this?" with quick reasons, never required), "Turn

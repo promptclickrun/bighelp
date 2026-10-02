@@ -122,6 +122,30 @@ final class ProjectsAndBoardUITests: BighelpUITestCase {
         }
     }
 
+    /// Ideas are Markdown too: the list shows a clean preview and the idea itself draws it fully.
+    @MainActor
+    func testIdeasShowMarkdown() throws {
+        for appearance in ["light", "dark"] {
+            let app = launch(appearance: appearance)
+            let ideasTab = app.buttons["tab.ideas"]
+            XCTAssertTrue(ideasTab.waitForExistence(timeout: 10))
+            ideasTab.tap()
+            let idea = app.buttons["board.idea.idea-1"]
+            XCTAssertTrue(idea.waitForExistence(timeout: 10))
+            // "**" or a line starting "1. " (prose like "September 11. I" isn't Markdown).
+            let raw = NSPredicate(format: "label CONTAINS '**' OR label MATCHES '(?s)(.*\\n)?1\\. .*'")
+            XCTAssertFalse(raw.evaluate(with: idea), "The preview shows no raw Markdown: \(idea.label)")
+            save("board-ideas-markdown-\(appearance)", app)
+            idea.tap()
+            let step = app.staticTexts["Check who's free on the family calendar"]
+            XCTAssertTrue(step.waitForExistence(timeout: 5), "Each numbered step stands alone")
+            XCTAssertTrue(app.staticTexts["Book the table"].exists)
+            XCTAssertEqual(app.staticTexts.matching(raw).count, 0, "The idea shows no raw Markdown")
+            save("board-idea-detail-markdown-\(appearance)", app)
+            app.terminate()
+        }
+    }
+
     @MainActor private func launch(appearance: String) -> XCUIApplication {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.demo.appearance", appearance,

@@ -126,8 +126,12 @@ final class DemoAgentBoardClient: AgentBoardClient {
                            body: "Two dinners, one dentist visit Thursday at 9:30, and the plants need water "
                                + "Tuesday and Friday.", icon: "🗓️", source: "Monday brief", createdAt: ago(60 * 26)),
             AgentBoardItem(id: "idea-1", kind: .idea, title: "I can plan Sam's birthday dinner end to end",
-                           body: "Her birthday is in 12 days. I can shortlist three restaurants she'd like, "
-                               + "check who's free on the family calendar and book the table.",
+                           body: """
+                               Her birthday is in **12 days**. I can:
+                               1. Shortlist three restaurants she'd like
+                               2. Check who's free on the family calendar
+                               3. Book the table
+                               """,
                            icon: "🎂", section: "Family", read: false, createdAt: ago(60 * 2)),
             AgentBoardItem(id: "idea-2", kind: .idea, title: "I can make your sleep goal trackable again",
                            body: "Sleep data stopped arriving on September 11. I can find why, fix it if it's on "

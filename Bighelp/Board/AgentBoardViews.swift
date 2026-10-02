@@ -580,11 +580,6 @@ private struct FeedPostView: View {
     @BighelpThemeReader private var theme
 }
 
-private func markdown(_ text: String) -> AttributedString {
-    (try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
-        ?? AttributedString(text)
-}
-
 struct BoardPictureView: View {
     let item: AgentBoardItem
     let picture: AgentBoardItem.Picture
@@ -680,7 +675,8 @@ struct AgentIdeasView: View {
                     .font(.bighelp(.headline))
                     .foregroundStyle(theme.primaryText)
                     .multilineTextAlignment(.leading)
-                Text(idea.body)
+                // A short preview reads like a message preview: the Markdown's words, no symbols.
+                Text(MarkdownDocument(idea.body).visiblePlainText.replacingOccurrences(of: "\n\n", with: "\n"))
                     .font(.bighelp(.subheadline))
                     .foregroundStyle(theme.secondaryText)
                     .lineLimit(4)
@@ -709,8 +705,7 @@ private struct IdeaDetailSheet: View {
                 Text(idea.title)
                     .font(.bighelp(.title2).weight(.bold))
                     .foregroundStyle(theme.primaryText)
-                Text(markdown(idea.body))
-                    .font(.bighelp(.body))
+                MarkdownMessageView(document: MarkdownDocument(idea.body))
                     .foregroundStyle(theme.primaryText)
                     .tint(theme.action)
                 VStack(spacing: BighelpTokens.space8) {

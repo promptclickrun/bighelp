@@ -69,7 +69,8 @@ TESTS = {
                  "ProviderUsageHostUITests/testUsageLoadsFromTheChatTheAppOpensWith"],
     "update": ["PluginReleaseUpdateHostUITests/testUpdatesToTheLatestReleaseOnARealHost"],
     "fleet": ["AllHostsHostUITests/testAllHostsListsBothHostsAndOpensTheOther",
-              "AllHostsHostUITests/testProviderUsageLoadsInAChatOnTheOtherHost"],
+              "AllHostsHostUITests/testProviderUsageLoadsInAChatOnTheOtherHost",
+              "AllHostsHostUITests/testSecureInputAndQuestionsWorkInAChatOnTheOtherHost"],
     "media": ["testGeneratedImageStaysAfterTheTurnEnds", "testVaultCodePopUpEntersTheCode",
               "testSaveLoginPopUpSavesTheLogin", "testVaultSavesAndImportsLoginsOnTheHost",
               "testACardStreamsBehindALoader"],
@@ -128,11 +129,17 @@ class ToolTurnModel(BaseHTTPRequestHandler):
             return
         call = None
         if start >= 0 and not results:
+            # "secure input test 2" asks for SECURE_INPUT_FIXTURE_2: a value already saved isn't asked again.
+            round_suffix = re.search(r"secure input test (\d+)", asked)
             name, arguments = (("bighelp_request_secure_input",
-                                {"name": "SECURE_INPUT_FIXTURE", "label": "Fixture value",
+                                {"name": "SECURE_INPUT_FIXTURE" + (f"_{round_suffix.group(1)}" if round_suffix else ""),
+                                 "label": "Fixture value",
                                  "prompt": "A test of the secure pop-up. Type anything."})
                                if secure else
-                               ("clarify", {"question": "Which fixture option?", "choices": ["Alpha", "Beta"]})
+                               ("clarify", {"question": "Which fixture option?", "choices": ["Alpha", "Beta"],
+                                            # Newer Hermes asks in batches and requires this form.
+                                            "questions": [{"question": "Which fixture option?",
+                                                           "choices": ["Alpha", "Beta"]}]})
                                if question else probe_tool or ("terminal", {"command": "sleep 20"}))
             if name not in offered and "tool_call" in offered:
                 name, arguments = "tool_call", {"name": name, "arguments": arguments}
@@ -400,12 +407,14 @@ def session_sources(home: Path) -> list[str]:
 
 
 def run_fleet(args, repo: Path) -> int:
-    """Two open hosts with the plugin: "Desk agent" on one; "Lab agent" and "researcher" on the other."""
+    """Two open hosts with the plugin: "Desk agent" on one; "Lab agent" and "researcher" on the other.
+    The scripted tool model answers plain messages like the synthetic one, and its secure input and
+    question turns check prompts in a chat on the host the all-hosts view switched to."""
     if not args.plugin:
         raise SystemExit("fleet mode needs --plugin <bighelp plugin folder>")
     with tempfile.TemporaryDirectory(prefix="signin-fleet-", dir="/tmp") as temporary:
         temp = Path(temporary).resolve()
-        model = ThreadingHTTPServer(("127.0.0.1", 0), SyntheticModel)
+        model = ThreadingHTTPServer(("127.0.0.1", 0), ToolTurnModel)
         threading.Thread(target=model.serve_forever, daemon=True).start()
         hosts, logs, proxies = [], [], []
         try:

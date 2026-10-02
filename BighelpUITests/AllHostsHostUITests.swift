@@ -125,6 +125,120 @@ final class AllHostsHostUITests: BighelpUITestCase {
         XCTAssertFalse(failed.exists, "Usage loads in the other host's chat")
     }
 
+    /// Secure input and a question in a chat on the host the all-hosts list switched to.
+    /// They were refused at once there, so the agent heard "declined" without the person
+    /// ever seeing the pop-up.
+    @MainActor func testSecureInputAndQuestionsWorkInAChatOnTheOtherHost() throws {
+        guard let path = ProcessInfo.processInfo.environment["BIGHELP_SIGNIN_PROBE"] else {
+            throw XCTSkip("Run through Scripts/HostSignInMatrixProbe.py --modes fleet")
+        }
+        probe = try JSONDecoder().decode([String: String].self, from: Data(contentsOf: URL(fileURLWithPath: path)))
+        guard probe["mode"] == "fleet" else { throw XCTSkip("This host runs the \(probe["mode"] ?? "?") mode") }
+        let app = makeApp()
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-test-no-configured-hosts",
+                               "-bighelp.hosts.all-hosts", "NO"]
+        app.launch()
+        try addHost(app, address: try XCTUnwrap(probe["address_a"]), name: "Desk Hermes")
+        let menu = app.buttons["home.drawer.open"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 20))
+        menu.tap()
+        app.buttons["menu.hosts"].tap()
+        app.buttons["menu.host.add"].tap()
+        try addHost(app, address: try XCTUnwrap(probe["address_b"]), name: "Lab Hermes")
+        XCTAssertTrue(menu.waitForExistence(timeout: 20))
+        menu.tap()
+        app.buttons["menu.all-hosts"].tap()
+        let desk = named("Desk agent", in: app)
+        XCTAssertTrue(desk.waitForExistence(timeout: 45))
+        desk.tap()
+
+        let composer = app.textViews["chat.composer.text"]
+        XCTAssertTrue(composer.waitForExistence(timeout: 45), "Desk Hermes' chat opens")
+        send("secure input test", composer: composer, in: app)
+        let field = app.secureTextFields["direct-hermes.secure-input"]
+        XCTAssertTrue(field.waitForExistence(timeout: 30), "The secure pop-up appears on the other host's chat")
+        save("fleet-5-secure-pop-up", app)
+        field.tap()
+        field.typeText("fixture-value-not-a-secret")
+        app.buttons["direct-hermes.secure-submit"].tap()
+        let saved = app.textViews.matching(NSPredicate(format: "value CONTAINS %@", "Secure input fixture: saved.")).firstMatch
+        XCTAssertTrue(saved.waitForExistence(timeout: 30), "The agent got the value, not a refusal")
+        save("fleet-6-secure-saved", app)
+
+        send("question test", composer: composer, in: app)
+        let attention = app.navigationBars["Needs attention"]
+        XCTAssertTrue(attention.waitForExistence(timeout: 30), "The agent's question pops up on the other host's chat")
+        save("fleet-7-question", app)
+        // Answer it, so the turn ends before the next round.
+        // The question is both in the pop-up and in the chat behind it; answer the one on top.
+        func tapVisible(_ query: XCUIElementQuery) {
+            let deadline = Date().addingTimeInterval(10)
+            while Date() < deadline {
+                if let visible = query.allElementsBoundByIndex.last(where: { $0.isHittable && $0.isEnabled }) {
+                    return visible.tap()
+                }
+                Thread.sleep(forTimeInterval: 0.3)
+            }
+            XCTFail("Nothing to tap for \(query)")
+        }
+        tapVisible(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Alpha")))
+        tapVisible(app.buttons.matching(NSPredicate(format: "label == %@", "Done")))
+        let answered = app.textViews.matching(NSPredicate(format: "value CONTAINS %@", "Question fixture answered")).firstMatch
+        XCTAssertTrue(answered.waitForExistence(timeout: 30), "The agent got the answer")
+        if attention.exists { attention.buttons["Later"].tap() }
+
+        // Over to the other host's agent and back, then ask again.
+        app.buttons["chat.back"].firstMatch.tap()
+        let lab = named("Lab agent", in: app)
+        XCTAssertTrue(lab.waitForExistence(timeout: 30))
+        lab.tap()
+        XCTAssertTrue(composer.waitForExistence(timeout: 45), "Lab Hermes' chat opens")
+        app.buttons["chat.back"].firstMatch.tap()
+        XCTAssertTrue(desk.waitForExistence(timeout: 30))
+        desk.tap()
+        XCTAssertTrue(composer.waitForExistence(timeout: 45), "Back on Desk Hermes' chat")
+        try secureInput(round: "after switching back", number: 2, composer: composer, in: app)
+
+        // Away from the app long enough for its connections to close, then back to the same chat.
+        XCUIDevice.shared.press(.home)
+        XCTAssertTrue(app.wait(for: .runningBackground, timeout: 10))
+        sleep(35)
+        app.activate()
+        XCTAssertTrue(composer.waitForExistence(timeout: 45))
+        try secureInput(round: "after coming back to the app", number: 3, composer: composer, in: app)
+    }
+
+    /// Asks for secure input and answers it; each round must reach the agent as saved.
+    @MainActor private func secureInput(round: String, number: Int, composer: XCUIElement,
+                                        in app: XCUIApplication) throws {
+        let saved = app.textViews.matching(NSPredicate(format: "value CONTAINS %@", "Secure input fixture: saved."))
+        let before = saved.count
+        let declined = app.textViews.matching(NSPredicate(format: "value CONTAINS %@", "Secure input fixture: not saved"))
+        let declinedBefore = declined.count
+        // Its own value each round: one already saved on the host isn't asked for again.
+        send("secure input test \(number)", composer: composer, in: app)
+        let field = app.secureTextFields["direct-hermes.secure-input"]
+        let shown = field.waitForExistence(timeout: 30)
+        save("fleet-secure-\(round.replacingOccurrences(of: " ", with: "-"))", app)
+        XCTAssertTrue(shown, "The secure pop-up appears \(round)")
+        XCTAssertEqual(declined.count, declinedBefore, "Not declined without asking \(round)")
+        guard shown else { return }
+        field.tap()
+        field.typeText("fixture-value-not-a-secret")
+        app.buttons["direct-hermes.secure-submit"].tap()
+        let more = expectation(for: NSPredicate(format: "count > %d", before), evaluatedWith: saved)
+        wait(for: [more], timeout: 30)
+    }
+
+    @MainActor private func send(_ message: String, composer: XCUIElement, in app: XCUIApplication) {
+        composer.tap()
+        composer.typeText(message)
+        let send = app.buttons["chat.send"]
+        let deadline = Date().addingTimeInterval(30)
+        while !send.isEnabled, Date() < deadline { Thread.sleep(forTimeInterval: 0.3) }
+        send.tap()
+    }
+
     /// Seconds from tapping an agent to its chat, with the given message, on screen.
     @MainActor private func timeToOpen(_ agent: XCUIElement, showing message: String,
                                        in app: XCUIApplication) throws -> Double {
@@ -180,7 +294,8 @@ final class AllHostsHostUITests: BighelpUITestCase {
         let nameField = app.textFields["host-setup.name"]
         if nameField.waitForExistence(timeout: 3) {
             nameField.tap()
-            nameField.typeText(name)
+            // Return closes the keyboard, which otherwise covers Continue.
+            nameField.typeText(name + "\n")
         }
         // An open host connects straight from the address.
         tapConnect(app)

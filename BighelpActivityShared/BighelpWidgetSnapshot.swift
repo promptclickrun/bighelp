@@ -17,14 +17,43 @@ struct BighelpWidgetSnapshot: Codable, Equatable, Sendable {
         var activity: String? = nil
     }
 
-    /// A Feed post or Goal from the default agent's board.
+    /// A Feed post, Idea or Goal from an agent's board.
     struct BoardItem: Codable, Equatable, Sendable, Identifiable {
         let id: String
         let title: String
         let icon: String
         var note: String? = nil
         var isDone = false
+        /// The first words of the post or idea, without Markdown.
+        var preview: String? = nil
         let date: Date
+    }
+
+    /// An agent on this computer, for the widgets' agent choice.
+    struct Agent: Codable, Equatable, Sendable, Identifiable {
+        let id: String
+        let name: String
+    }
+
+    /// The board of an agent a Feed, Ideas or Goals widget is set to.
+    struct AgentBoard: Codable, Equatable, Sendable {
+        let agentID: String
+        var feed: [BoardItem]
+        var ideas: [BoardItem]
+        var goals: [BoardItem]
+    }
+
+    enum BoardSection: String, CaseIterable, Sendable {
+        case feed, ideas, goals
+    }
+
+    /// One widget's board: the agent it shows and that agent's items. Not loaded
+    /// when the app hasn't read that agent's board yet.
+    struct ResolvedBoard: Equatable, Sendable {
+        let agentID: String?
+        let agentName: String
+        let items: [BoardItem]
+        let isLoaded: Bool
     }
 
     /// The app's chosen colors (bubble color, Cream/Paper, Graphite/Black).
@@ -53,6 +82,9 @@ struct BighelpWidgetSnapshot: Codable, Equatable, Sendable {
     var generatedAt: Date
     var feed: [BoardItem]? = nil
     var goals: [BoardItem]? = nil
+    var ideas: [BoardItem]? = nil
+    var agents: [Agent]? = nil
+    var boards: [AgentBoard]? = nil
     var lightPalette: Palette? = nil
     var darkPalette: Palette? = nil
 
@@ -61,8 +93,9 @@ struct BighelpWidgetSnapshot: Codable, Equatable, Sendable {
 
     static let appGroup = "group.app.loopdy.mobile.buzzkit"
     static let fileName = "loopdy-widget-snapshot-v1.json"
+    static let boardWidgetKinds = ["BighelpFeedWidget", "BighelpIdeasWidget", "BighelpGoalsWidget"]
     static let widgetKinds = ["LoopdyAgentWidget", "LoopdyActiveSessionsWidget", "LoopdyScheduledTasksWidget",
-                              "LoopdyNewChatWidget", "LoopdyActivityFeedWidget"]
+                              "LoopdyNewChatWidget", "LoopdyActivityFeedWidget"] + boardWidgetKinds
 
     static var fileURL: URL? {
         FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup)?
@@ -83,6 +116,30 @@ struct BighelpWidgetSnapshot: Codable, Equatable, Sendable {
     }
 
     var runningSessions: [Session] { sessions.filter(\.isRunning) }
+
+    /// A section of the board for `agentID`, or Auto (nil): the agent picked in the app.
+    /// Nil when that agent isn't on this computer anymore.
+    func board(_ section: BoardSection, agentID: String?) -> ResolvedBoard? {
+        if agentID == nil || agentID == defaultAgentID {
+            let items: [BoardItem]? = switch section {
+            case .feed: feed
+            case .ideas: ideas
+            case .goals: goals
+            }
+            return ResolvedBoard(agentID: defaultAgentID, agentName: defaultAgentName ?? "Your agent",
+                                 items: items ?? [], isLoaded: true)
+        }
+        guard let agentID, let agent = agents?.first(where: { $0.id == agentID }) else { return nil }
+        guard let board = boards?.first(where: { $0.agentID == agentID }) else {
+            return ResolvedBoard(agentID: agentID, agentName: agent.name, items: [], isLoaded: false)
+        }
+        let items = switch section {
+        case .feed: board.feed
+        case .ideas: board.ideas
+        case .goals: board.goals
+        }
+        return ResolvedBoard(agentID: agentID, agentName: agent.name, items: items, isLoaded: true)
+    }
 
     /// Running sessions first, then the most recently active.
     var feedSessions: [Session] {
@@ -111,9 +168,12 @@ struct BighelpWidgetSnapshot: Codable, Equatable, Sendable {
     }
     static let sessionsURL = URL(string: "loopdy://sessions")!
 
-    /// The agent home: "chat", "feed", "ideas", "goals" or "apps".
-    static func agentURL(_ tab: String = "chat") -> URL {
-        URL(string: "loopdy://agent/\(tab)") ?? URL(string: "loopdy://home")!
+    /// The agent home: "chat", "feed", "ideas", "goals" or "apps", for one agent or the picked one.
+    static func agentURL(_ tab: String = "chat", agentID: String? = nil) -> URL {
+        var components = URLComponents()
+        components.scheme = "loopdy"; components.host = "agent"; components.path = "/" + tab
+        if let agentID { components.queryItems = [URLQueryItem(name: "agent", value: agentID)] }
+        return components.url ?? URL(string: "loopdy://home")!
     }
 }
 

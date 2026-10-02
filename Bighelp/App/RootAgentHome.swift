@@ -351,15 +351,22 @@ extension RootShellView {
         agentMedia.configure(client: key.owner.flatMap { owner in
             key.fixtures ? nil : workspaceConnections?.workspace.map { DirectHermesAgentMediaClient(workspace: $0, owner: owner) }
         })
-        guard let owner = key.owner else { agentBoard.configure(client: nil, isDisconnected: true); return }
-        if key.fixtures {
-            agentBoard.configure(client: DemoAgentBoardClient())
-        } else if key.supported, let workspace = workspaceConnections?.workspace {
-            agentBoard.configure(client: DirectHermesAgentBoardClient(workspace: workspace, owner: owner,
-                                                                      supportsFeedback: key.feedback))
-        } else {
-            agentBoard.configure(client: nil)
+        guard let owner = key.owner else {
+            agentBoard.configure(client: nil, isDisconnected: true)
+            BighelpWidgetBoardLoader.shared.configure(client: nil)
+            return
         }
+        let client: (any AgentBoardClient)?
+        if key.fixtures {
+            client = DemoAgentBoardClient()
+        } else if key.supported, let workspace = workspaceConnections?.workspace {
+            client = DirectHermesAgentBoardClient(workspace: workspace, owner: owner, supportsFeedback: key.feedback)
+        } else {
+            client = nil
+        }
+        agentBoard.configure(client: client)
+        // Feed, Ideas and Goals widgets set to another agent read its board the same way.
+        BighelpWidgetBoardLoader.shared.configure(client: client)
     }
 
     /// Attached to the workspace shell only: host setup and onboarding have no
@@ -380,6 +387,14 @@ extension RootShellView {
     struct BoardPreloadKey: Equatable {
         let client: AgentBoardClientKey
         let agentID: String?
+    }
+
+    /// Widget boards refresh when the app opens, the host changes, or the agents do.
+    struct WidgetBoardsKey: Equatable {
+        let client: AgentBoardClientKey
+        let homeAgentID: String?
+        let agentIDs: Set<String>
+        let isActive: Bool
     }
 
     struct HomeAutoOpenKey: Equatable {
@@ -440,6 +455,12 @@ extension RootShellView {
             .task(id: BoardPreloadKey(client: agentBoardClientKey, agentID: homeAgent?.id)) {
                 guard agentBoard.isAvailable, let agentID = homeAgent?.id, agentBoard.agentID != agentID else { return }
                 await agentBoard.load(agentID: agentID)
+            }
+            .task(id: WidgetBoardsKey(client: agentBoardClientKey, homeAgentID: homeAgent?.id,
+                                      agentIDs: Set(agents.profiles.map(\.id)), isActive: scenePhase == .active)) {
+                guard scenePhase == .active else { return }
+                await BighelpWidgetBoardLoader.shared.refresh(homeAgentID: homeAgent?.id,
+                                                              knownAgentIDs: Set(agents.profiles.map(\.id)))
             }
             .modifier(ProviderUsageHost(
                 store: providerUsage,

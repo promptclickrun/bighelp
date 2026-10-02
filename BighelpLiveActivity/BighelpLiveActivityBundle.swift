@@ -13,5 +13,8 @@ struct BighelpLiveActivityBundle: WidgetBundle {
         BighelpNewChatWidget()
         BighelpActivityFeedWidget()
         BighelpKanbanWidget()
+        BighelpFeedWidget()
+        BighelpIdeasWidget()
+        BighelpGoalsWidget()
     }
 }

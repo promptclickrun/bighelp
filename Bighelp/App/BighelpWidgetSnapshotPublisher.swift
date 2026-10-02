@@ -10,6 +10,7 @@ final class BighelpWidgetSnapshotPublisher {
     private weak var sessions: SessionCatalogStore?
     private weak var scheduledTasks: ScheduledTasksStore?
     private weak var agents: AgentDirectoryStore?
+    private let extras: BighelpWidgetExtras
     private var pending: Task<Void, Never>?
     private var lastPublished: BighelpWidgetSnapshot?
     private var retired = false
@@ -17,9 +18,9 @@ final class BighelpWidgetSnapshotPublisher {
     private let write: (BighelpWidgetSnapshot) -> Void
 
     init(sessions: SessionCatalogStore, scheduledTasks: ScheduledTasksStore, agents: AgentDirectoryStore,
-         interval: Duration = .seconds(2),
+         extras: BighelpWidgetExtras = .shared, interval: Duration = .seconds(2),
          write: @escaping (BighelpWidgetSnapshot) -> Void = BighelpWidgetSnapshotPublisher.persist) {
-        self.sessions = sessions; self.scheduledTasks = scheduledTasks; self.agents = agents
+        self.sessions = sessions; self.scheduledTasks = scheduledTasks; self.agents = agents; self.extras = extras
         self.interval = interval; self.write = write
         observe()
     }
@@ -88,10 +89,13 @@ final class BighelpWidgetSnapshotPublisher {
                     agentName: names[task.agentID] ?? "Agent", schedule: Self.clip(task.scheduleDescription, 60) ?? "",
                     nextRun: task.nextRun, lastResult: Self.clip(task.lastResult, 100))
             }
-        let extras = BighelpWidgetExtras.shared
+        // Only agents on this computer, so another host's boards never reach the Home Screen.
+        let agentRows = profiles.prefix(50).map { BighelpWidgetSnapshot.Agent(id: $0.id, name: Self.clip($0.name, 40) ?? "Agent") }
+        let boards = extras.agentBoards.values.filter { names[$0.agentID] != nil }.sorted { $0.agentID < $1.agentID }
         return BighelpWidgetSnapshot(defaultAgentID: defaultAgent?.id, defaultAgentName: defaultAgent?.name,
                                     sessions: Array(sessionRows), tasks: Array(taskRows), generatedAt: .now,
-                                    feed: extras.feed, goals: extras.goals,
+                                    feed: extras.feed, goals: extras.goals, ideas: extras.ideas,
+                                    agents: Array(agentRows), boards: boards,
                                     lightPalette: extras.lightPalette, darkPalette: extras.darkPalette)
     }
 

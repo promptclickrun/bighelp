@@ -306,6 +306,7 @@
 		3A0019E2847052ACE800E926 /* ChatCompletedTurnTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBCFB9A0E5579974EAC62DEE /* ChatCompletedTurnTests.swift */; };
 		3A137298CA51606AC6972405 /* card-catalog-index.json in Resources */ = {isa = PBXBuildFile; fileRef = D6CD0DEFA89A000590BF9837 /* card-catalog-index.json */; };
 		3A1938056AC1833ACD2140F6 /* WatchWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DFC0469859FF2F766A0F9A5 /* WatchWire.swift */; };
+		3A4C3BD63F9AD9122450E4A5 /* BighelpBoardWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E3F7BC4DE0D166012849DBB /* BighelpBoardWidgets.swift */; };
 		3AB6DDD20A75CEB013581D39 /* NativeWorkspaceSessionBridge+Prompts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5467FAB05B10A607ED9DBE3C /* NativeWorkspaceSessionBridge+Prompts.swift */; };
 		3AC380D2C6ED5E6C41E85C5A /* BighelpV3MessageStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F7281B7E7971EE34A73716B /* BighelpV3MessageStyle.swift */; };
 		3B26D057C95D7D70F4D15F81 /* BighelpCardValidatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2007B746E9AB0E6276E8303F /* BighelpCardValidatorTests.swift */; };
@@ -1025,6 +1026,7 @@
 		CF2BA778D2EBC2CE605E9F62 /* BighelpManagedNotificationLedger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86794A73A72414A5A0AB866D /* BighelpManagedNotificationLedger.swift */; };
 		CF4BE1A5F9B7079A9439A96A /* DirectHermesWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 850AE168A6048304FA498CFB /* DirectHermesWorkspaceView.swift */; };
 		CF51270F0A7273B5CB0C02F9 /* RootAgentHome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 180030F6E8C769153C77C4D8 /* RootAgentHome.swift */; };
+		CF5BBABB155B59EF0DD63373 /* BighelpBoardWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E3F7BC4DE0D166012849DBB /* BighelpBoardWidgets.swift */; };
 		CF7E8E05BC55615CE88E1035 /* BighelpCardCatalogUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F57F8B8ACD9288950969538E /* BighelpCardCatalogUITests.swift */; };
 		CF9D19C6AE5D6A7C76176688 /* AchievementsModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CFA1F1A5F321802807EE9E5 /* AchievementsModels.swift */; };
 		CFC2936896B5888D43D622E8 /* GitHubDeviceCode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78569AED58B1C7BD8A6C15F7 /* GitHubDeviceCode.swift */; };
@@ -1055,6 +1057,7 @@
 		D48AB0EC6C19B34F9C7FD852 /* TeamCallDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4CD5F8FB20FADD80B3987E5 /* TeamCallDemo.swift */; };
 		D50A143F55770B637E7AD405 /* BighelpLinkProductionClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF3EE765FA9E35FB38C1C6CD /* BighelpLinkProductionClient.swift */; };
 		D5857DE5CB024DD5C2F41876 /* DirectHermesProjectGitClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC7A06A6391FB704F789A1C5 /* DirectHermesProjectGitClientTests.swift */; };
+		D59F6BF222D2AFBB5925E31F /* BighelpBoardWidgetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFC226437CC84C778C2073F0 /* BighelpBoardWidgetTests.swift */; };
 		D5E1168C73C3D7AF347C66A1 /* BotModeObservedToolView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3804996F38C55F49E94E091B /* BotModeObservedToolView.swift */; };
 		D61515622140213AD7E0FB1E /* soul-counterpoint.md in Resources */ = {isa = PBXBuildFile; fileRef = 60C035E1E9D9E86ADE7FF305 /* soul-counterpoint.md */; };
 		D658DABD316296699BA57736 /* soul-quill.md in Resources */ = {isa = PBXBuildFile; fileRef = EBA3D8873FF00E975871E446 /* soul-quill.md */; };
@@ -1208,6 +1211,7 @@
 		F496354FB7045C0EAF3A86B9 /* ProjectLifecycleStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AC84C8E8881720E69DDDB59 /* ProjectLifecycleStore.swift */; };
 		F4C81665D8B97B4D1E880632 /* ReferenceCanonicalState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7AFBAD05FFB3A2C204E28E5 /* ReferenceCanonicalState.swift */; };
 		F51A14889112908617C9D957 /* CapabilityManagementStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F785A9AF73A54FED0BFCF6EB /* CapabilityManagementStateTests.swift */; };
+		F55B38C69DB95B4BE3D1750D /* BighelpWidgetBoardLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B12123F382499E8623101848 /* BighelpWidgetBoardLoader.swift */; };
 		F57B31D2845EA941D1ED33A5 /* BighelpCardValueResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6056D88AFCE4AACEDA78AF68 /* BighelpCardValueResolver.swift */; };
 		F5E6CA8967041FCF43404DFD /* BighelpTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60766A9532090D8E8A79ACE8 /* BighelpTokens.swift */; };
 		F5E9F1D3A69D3BFA6EAB6308 /* ReferenceCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = F62835AF1B54DF0076781B3E /* ReferenceCodec.swift */; };
@@ -2017,6 +2021,7 @@
 		7D7745D5E94F1FD8C5764702 /* BighelpManagedLiveActivityRegistrar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpManagedLiveActivityRegistrar.swift; sourceTree = "<group>"; };
 		7DB1B9E73CD85A90EC183093 /* CapabilitiesManagementModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapabilitiesManagementModels.swift; sourceTree = "<group>"; };
 		7DEB7CF97F0548FE943B36FE /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
+		7E3F7BC4DE0D166012849DBB /* BighelpBoardWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpBoardWidgets.swift; sourceTree = "<group>"; };
 		7E6C5F041D5AA49174026344 /* VoiceOrb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceOrb.swift; sourceTree = "<group>"; };
 		7F17ED3AA403533F22755654 /* NativeWorkspaceSessionBridge+Maintenance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NativeWorkspaceSessionBridge+Maintenance.swift"; sourceTree = "<group>"; };
 		7F188F6E953D952F74316C39 /* Bighelp.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Bighelp.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -2268,6 +2273,7 @@
 		AED019851D26CEBCF106055B /* ScheduledTaskRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduledTaskRow.swift; sourceTree = "<group>"; };
 		AF43A2369F4FE66BB1569EBF /* KanbanBoardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanbanBoardView.swift; sourceTree = "<group>"; };
 		AF43FE7C65CE6F08A4870AA1 /* ModelNameCatalogStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelNameCatalogStore.swift; sourceTree = "<group>"; };
+		AFC226437CC84C778C2073F0 /* BighelpBoardWidgetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpBoardWidgetTests.swift; sourceTree = "<group>"; };
 		AFFC40BDB331AB0165CD9E85 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		B0476538AF53E4A6601833D9 /* ChatActivityLedger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatActivityLedger.swift; sourceTree = "<group>"; };
 		B0640E3E2195E13C7537FDEF /* NotificationEventWireModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationEventWireModels.swift; sourceTree = "<group>"; };
@@ -2277,6 +2283,7 @@
 		B0B675FFCCB9F021A03340E5 /* MarkdownMessageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownMessageView.swift; sourceTree = "<group>"; };
 		B0DE05E6C5C380E5B3B7D1C9 /* BotModeApprovalCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BotModeApprovalCard.swift; sourceTree = "<group>"; };
 		B0EC71D7FF4691AFBEBB2F27 /* BighelpLiveActivityPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpLiveActivityPresentationTests.swift; sourceTree = "<group>"; };
+		B12123F382499E8623101848 /* BighelpWidgetBoardLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpWidgetBoardLoader.swift; sourceTree = "<group>"; };
 		B137A48449FD0518C75ABB06 /* BighelpCardModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpCardModels.swift; sourceTree = "<group>"; };
 		B147B77930BA89891FE3634C /* SpatialAvatarSettingsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpatialAvatarSettingsSection.swift; sourceTree = "<group>"; };
 		B14A45B5B18773D922FAF813 /* ReferenceHubStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReferenceHubStore.swift; sourceTree = "<group>"; };
@@ -3209,6 +3216,7 @@
 				171EC4C4FCD5B6442AB8A2E0 /* BighelpRuntimeConfiguration.swift */,
 				21D5F1F7073125CA2EC42B19 /* BighelpSessionContentReader.swift */,
 				724E3B60353CBF97DFFF0449 /* BighelpSideMenu.swift */,
+				B12123F382499E8623101848 /* BighelpWidgetBoardLoader.swift */,
 				B781E1AA9B45BF3FC59FF2D9 /* BighelpWidgetExtras.swift */,
 				61FAF80155262EA27672A941 /* BighelpWidgetSnapshotPublisher.swift */,
 				422D437FFA91390550EBC51B /* ChatDestinationAttachments.swift */,
@@ -3261,6 +3269,7 @@
 			children = (
 				CD81C509ADE4E67B19BA9F6E /* BighelpActivityPose.swift */,
 				9271648D36B89271BB6F58AF /* BighelpAgentWidget.swift */,
+				7E3F7BC4DE0D166012849DBB /* BighelpBoardWidgets.swift */,
 				16B85BE01827FCFD38480171 /* BighelpHomeWidgets.swift */,
 				8540B54D37AC7754A2D6B4AB /* BighelpKanbanWidget.swift */,
 				69316E6086691BDD2C164048 /* BighelpSessionActivityAttributes.swift */,
@@ -3476,6 +3485,7 @@
 				0284978EC9F5AD21700F6E31 /* AvatarKitRenderTests.swift */,
 				0C19439A3E92DA153EE7170C /* BighelpAppIntentContractTests.swift */,
 				B963A502AE3A6F31A6705B0A /* BighelpAppReadinessTests.swift */,
+				AFC226437CC84C778C2073F0 /* BighelpBoardWidgetTests.swift */,
 				FCD72AB088AD85CF46830B9D /* BighelpCardCatalogClientTests.swift */,
 				5433B16421F5A33E4E92E569 /* BighelpCardDataClientTests.swift */,
 				1B3CDA4226DAC5A7A0F3B78E /* BighelpCardEnvelopeTests.swift */,
@@ -5120,6 +5130,7 @@
 				176A01E1ECECBF3C854B568B /* BighelpAppReadiness.swift in Sources */,
 				D298D910DEC65761AE8B3AF0 /* BighelpAppearanceChoices.swift in Sources */,
 				49C55CB4934DDF4C731D9900 /* BighelpBackgroundGrace.swift in Sources */,
+				3A4C3BD63F9AD9122450E4A5 /* BighelpBoardWidgets.swift in Sources */,
 				BE1A557335049C987A0AA692 /* BighelpButtonLoading.swift in Sources */,
 				64B142D1345CA8273CB4C67A /* BighelpBuzzKitPreferences.swift in Sources */,
 				400697422195AAFA2E6A188B /* BighelpBuzzKitPresentation.swift in Sources */,
@@ -5233,6 +5244,7 @@
 				72A83A62B47F041E17F9F7DD /* BighelpVisibleChats.swift in Sources */,
 				70B5BD8457E458400211F63D /* BighelpVoiceSessionClient.swift in Sources */,
 				EA7E92788796802E90DB0B57 /* BighelpVoiceSettingsClient.swift in Sources */,
+				F55B38C69DB95B4BE3D1750D /* BighelpWidgetBoardLoader.swift in Sources */,
 				05E9717D1C98DAB38E5B77AC /* BighelpWidgetExtras.swift in Sources */,
 				C9AB02210A36530B2026C103 /* BighelpWidgetSnapshot.swift in Sources */,
 				C2AFE20C3C4AA8CDDA8FE812 /* BighelpWidgetSnapshotPublisher.swift in Sources */,
@@ -5891,6 +5903,7 @@
 			files = (
 				008C54331AC97F43C96F1AC4 /* BighelpActivityPose.swift in Sources */,
 				624D2499A678D18DA954C8CC /* BighelpAgentWidget.swift in Sources */,
+				CF5BBABB155B59EF0DD63373 /* BighelpBoardWidgets.swift in Sources */,
 				B665E162FA1BACCA4168073B /* BighelpHomeWidgets.swift in Sources */,
 				A4C2A472F47C2ACFBAAFDC50 /* BighelpKanbanWidget.swift in Sources */,
 				1A315D6D7B38C1DED76F92FE /* BighelpLiveActivityBundle.swift in Sources */,
@@ -5954,6 +5967,7 @@
 				34CDFC72CAD26CDBFA0751FB /* AvatarKitRenderTests.swift in Sources */,
 				9CAA4822D2C4C3F051132BB1 /* BighelpAppIntentContractTests.swift in Sources */,
 				6A8C7525245CBBF43A8912B7 /* BighelpAppReadinessTests.swift in Sources */,
+				D59F6BF222D2AFBB5925E31F /* BighelpBoardWidgetTests.swift in Sources */,
 				3B80F6C4CC3034E0A30EE01F /* BighelpCardCatalogClientTests.swift in Sources */,
 				8FD03A42A10014510162F2A3 /* BighelpCardDataClientTests.swift in Sources */,
 				7C570BC437FE16E082ED006F /* BighelpCardEnvelopeTests.swift in Sources */,

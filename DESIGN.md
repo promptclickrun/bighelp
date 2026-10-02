@@ -92,7 +92,9 @@ lead widget: the agent's face ringed while it works with a badge for the work, i
 New chat, and Chat/Feed/Ideas/Goals links (`loopdy://agent/<tab>`); it also comes in Lock Screen sizes. Active
 Chats, Scheduled Tasks, New Chat and Recent Chats share the same look. Tinted and Lock Screen modes fall back to
 system styles. **Kanban** shows cards from the boards, filtered by board, status and agent and grouped by status,
-agent or board; tapping a card opens it in the app. On Vision Pro the same widgets sit on a wall or table as glass,
+agent or board; tapping a card opens it in the app. **Feed**, **Ideas** and **Goals** each show one board, for an
+agent picked in the widget or Auto (the agent picked in the app). The app reads only the boards widgets are set to
+(`BighelpWidgetBoardLoader`, a few agents at most) and the widget says so until it has. On Vision Pro the same widgets sit on a wall or table as glass,
 without the Lock Screen sizes.
 
 Apps: **Artifacts** lists what the agent made or changed lately, newest first, from one plugin request

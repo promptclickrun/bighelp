@@ -79,8 +79,24 @@ enum MentionParser {
         return room.memberIDs.filter(selected.contains)
     }
 
+    struct Token {
+        let handle: String
+        let range: NSRange
+    }
+
     private static func parsedMentions(in text: String) throws -> [String] {
-        let scalars = Array(text.precomposedStringWithCanonicalMapping.unicodeScalars)
+        try tokens(in: text).map(\.handle)
+    }
+
+    /// Keep ranges in the original UTF-16 text, including decomposed names.
+    static func tokens(in text: String, rejectingInvalid: Bool = true) throws -> [Token] {
+        let scalars = Array(text.unicodeScalars)
+        var offsets = [0]
+        var utf16Offset = 0
+        for scalar in scalars {
+            utf16Offset += scalar.utf16.count
+            offsets.append(utf16Offset)
+        }
         var ignored = Set<Int>()
         var index = 0
         while index < scalars.count {
@@ -97,7 +113,7 @@ enum MentionParser {
             }
         }
 
-        var mentions: [String] = []
+        var mentions: [Token] = []
         index = 0
         while index < scalars.count {
             guard scalars[index] == "@", !ignored.contains(index), isMentionStart(scalars, at: index) else {
@@ -112,9 +128,16 @@ enum MentionParser {
             var end = start
             while end < scalars.count, isHandleScalar(scalars[end]) { end += 1 }
             guard end > start, isMentionEnd(scalars, at: end) else {
-                throw MentionError.unknown(unresolvedToken(in: scalars, after: index))
+                if rejectingInvalid {
+                    throw MentionError.unknown(unresolvedToken(in: scalars, after: index))
+                }
+                index = max(end, index + 1)
+                continue
             }
-            mentions.append(normalizedForMatching(String(String.UnicodeScalarView(scalars[start..<end]))))
+            mentions.append(Token(
+                handle: normalizedForMatching(String(String.UnicodeScalarView(scalars[start..<end]))),
+                range: NSRange(location: offsets[index], length: offsets[end] - offsets[index])
+            ))
             index = end
         }
         return mentions

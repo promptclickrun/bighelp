@@ -117,7 +117,8 @@ extension ChatView {
         case .earlierMessage(let item):
             TimelineItemView(item: item, onApprovalTap: onApprovalTap,
                              pendingMidSessionBehavior: model.pendingMidSessionBehavior(for: item.id),
-                             senderResolver: senderResolver, showsSenderName: model.isBotMode)
+                             senderResolver: senderResolver, showsSenderName: model.isBotMode,
+                             mentionIdentities: model.messageMentionIdentities)
         case .divider(let title): timelineDivider(title)
         case .previousHistory: previousHistoryButton
         case .welcome: emptyTimeline
@@ -279,7 +280,8 @@ extension ChatView {
                 messageReaction: nativeReaction,
                 onMessageReaction: nativeReaction == nil ? nil : { emoji in
                     setMessageReaction(emoji, for: item)
-                }
+                },
+                mentionIdentities: model.messageMentionIdentities
             )
             .id(entry.id)
         case .activity(let turn):

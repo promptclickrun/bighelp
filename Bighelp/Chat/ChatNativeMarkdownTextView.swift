@@ -67,6 +67,7 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
     let onFork: (() -> Void)?
     let onReact: (() -> Void)?
     var textScale: CGFloat = 1
+    var mentionIdentities: [ChatMentionIdentity] = []
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
@@ -79,7 +80,7 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
         // Read-only messages use incremental NSTextStorage updates and full-height
         // measurement. Avoid TextKit 2 fragment relayout on each streaming append.
         // The editable composer keeps its own text system and selection owner.
-        let view = UITextView(usingTextLayoutManager: false)
+        let view = ChatMentionTextView(usingTextLayoutManager: false)
         view.delegate = context.coordinator
         view.isEditable = false
         view.isSelectable = true
@@ -135,8 +136,6 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
             .foregroundColor: accentColor,
             .underlineStyle: NSUnderlineStyle.single.rawValue,
         ]
-        view.accessibilityLabel = "\(speakerName): \(document.visiblePlainText)"
-
         let updatedText = context.coordinator.renderCache.render(
             document: document,
             style: ChatNativeMarkdownStyle(
@@ -147,9 +146,11 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
                 proseLineSpacing: proseLineSpacing,
                 traitCollection: view.traitCollection,
                 theme: theme,
-                textScale: textScale
+                textScale: textScale,
+                mentionIdentities: mentionIdentities
             )
         )
+        view.accessibilityLabel = "\(speakerName): \(ChatMentionRendering.plainText(updatedText, usingNames: true))"
         guard context.coordinator.renderedText?.isEqual(to: updatedText) != true else { return }
 
         let previousSelection = view.selectedRange

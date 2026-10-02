@@ -24,6 +24,10 @@ enum AppFixtureSetup {
            let index = initialSessions.firstIndex(where: { $0.id == "demo-finance" }) {
             initialSessions[index] = ConversationFixtures.nativeReactionPreview
         }
+        if usesFixtures, arguments.contains("-test-inline-mentions"),
+           let index = initialSessions.firstIndex(where: { $0.id == "demo-finance" }) {
+            initialSessions[index] = ConversationFixtures.inlineMentionsPreview
+        }
         if usesFixtures, arguments.contains("-preview-simple-chat"),
            let index = initialSessions.firstIndex(where: { $0.id == "demo-finance" }) {
             initialSessions[index] = ConversationFixtures.simpleChatPreview

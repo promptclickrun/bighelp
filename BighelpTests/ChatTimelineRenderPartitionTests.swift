@@ -154,10 +154,11 @@ struct ChatTimelineRenderPartitionTests {
     }
 
     @Test func streamingTextEditsOnlyTheChangedSuffix() async throws {
-        let originalText = String(repeating: "Already rendered paragraph.\n\n", count: 60)
+        let originalText = "Ask @sage.\n\n" + String(repeating: "Already rendered paragraph.\n\n", count: 60)
         func view(_ text: String) -> some View {
             MessageBubble(role: .assistant, speakerName: "Agent", text: text,
-                          delivery: "Streaming", isPendingSubmission: false, onFork: nil)
+                          delivery: "Streaming", isPendingSubmission: false, onFork: nil,
+                          mentionIdentities: [.init(handle: "sage", name: "Sage Green")])
                 .environment(\.bighelpUIV3Enabled, true)
                 .frame(width: 350)
         }
@@ -173,6 +174,9 @@ struct ChatTimelineRenderPartitionTests {
         }
         try await Task.sleep(for: .milliseconds(250))
         let textView = try #require(textViews(host.view).first)
+        let mention = try #require(textView.textStorage.attribute(.attachment, at: 4, effectiveRange: nil) as? ChatMentionAttachment)
+        #expect(mention.displayName == "Sage Green")
+        let originalPlainText = ChatMentionRendering.plainText(textView.textStorage)
         let edits = TimelineTextStorageEdits()
         textView.textStorage.delegate = edits
         textView.selectedRange = NSRange(location: 10, length: 8)
@@ -184,6 +188,8 @@ struct ChatTimelineRenderPartitionTests {
         #expect(edits.characterRanges.allSatisfy { $0.location > 1000 },
                 "Streaming must preserve the stable text prefix instead of replacing and laying out the entire answer.")
         #expect(textView.selectedRange == NSRange(location: 10, length: 8))
+        #expect(textView.textStorage.attribute(.attachment, at: 4, effectiveRange: nil) as? ChatMentionAttachment === mention)
+        #expect(ChatMentionRendering.plainText(textView.textStorage).hasPrefix(originalPlainText))
     }
 
     @Test func retainedIdealLayoutMatchesFullMeasurementAcrossTextAndFontEdits() {

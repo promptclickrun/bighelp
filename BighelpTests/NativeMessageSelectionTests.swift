@@ -36,6 +36,95 @@ struct NativeMessageSelectionTests {
         )
     }
 
+    @Test func allMentionIsAnIdentityPillAtItsOriginalPosition() {
+        let rendered = ChatNativeMarkdownAttributedBuilder.build(
+            document: MarkdownDocument("Ask @all about this."), style: style())
+        #expect(rendered.string == "Ask \u{fffc} about this.")
+        #expect(rendered.attribute(.attachment, at: 4, effectiveRange: nil) is NSTextAttachment)
+    }
+
+    @Test func agentMentionsStayInlineAndCopyKeepsTypedHandles() throws {
+        var mentionStyle = style()
+        mentionStyle.mentionIdentities = [.init(handle: "sage", name: "Sage Green")]
+        let source = "Before @SAGE, ask @all; then @sage! After."
+        let rendered = ChatNativeMarkdownAttributedBuilder.build(document: MarkdownDocument(source), style: mentionStyle)
+        #expect(rendered.string == "Before \u{fffc}, ask \u{fffc}; then \u{fffc}! After.")
+        #expect(ChatMentionRendering.plainText(rendered) == source)
+        #expect(ChatMentionRendering.plainText(rendered, usingNames: true)
+            == "Before Sage Green, ask All; then Sage Green! After.")
+        let attachment = try #require(rendered.attribute(.attachment, at: 7, effectiveRange: nil) as? ChatMentionAttachment)
+        #expect(attachment.displayName == "Sage Green")
+        #expect(attachment.image != nil)
+        let view = ChatMentionTextView(usingTextLayoutManager: false)
+        view.isEditable = false
+        view.textStorage.setAttributedString(rendered)
+        view.selectedRange = NSRange(location: 7, length: 6)
+        // Only read what this test writes; reading another process's clipboard prompts for permission.
+        defer { UIPasteboard.general.items = [] }
+        view.copy(nil)
+        #expect(UIPasteboard.general.string == "@SAGE, ask")
+    }
+
+    @Test func onlyRecognizedProseMentionsBecomePills() {
+        var mentionStyle = style()
+        mentionStyle.mentionIdentities = [.init(handle: "sage", name: "Sage Green")]
+        let source = "person@sage.test https://example.test/@sage `@sage` [@sage](https://example.test) @missing @sage/path\n\n```\n@all @sage\n```"
+        let rendered = ChatNativeMarkdownAttributedBuilder.build(document: MarkdownDocument(source), style: mentionStyle)
+        var count = 0
+        rendered.enumerateAttribute(.attachment, in: NSRange(location: 0, length: rendered.length)) { value, _, _ in
+            if value is ChatMentionAttachment { count += 1 }
+        }
+        #expect(count == 0)
+        #expect(ChatMentionRendering.plainText(rendered).contains("@missing @sage/path"))
+        let noMention = ChatNativeMarkdownAttributedBuilder.build(document: MarkdownDocument("Just an update."), style: mentionStyle)
+        #expect(noMention.string == "Just an update.")
+    }
+
+    @Test func unicodeMentionsAndAmbiguousNamesDoNotChangeSurroundingText() {
+        var mentionStyle = style()
+        mentionStyle.mentionIdentities = [.init(handle: "café", name: "Café Agent")]
+        let source = "👋🏽 Ask @cafe\u{301}. Done."
+        let rendered = ChatNativeMarkdownAttributedBuilder.build(document: MarkdownDocument(source), style: mentionStyle)
+        #expect(rendered.string == "👋🏽 Ask \u{fffc}. Done.")
+        #expect(Array(ChatMentionRendering.plainText(rendered).utf8) == Array(source.utf8))
+        mentionStyle.mentionIdentities.append(.init(handle: "CAFÉ", name: "Another Agent"))
+        let ambiguous = ChatNativeMarkdownAttributedBuilder.build(document: MarkdownDocument(source), style: mentionStyle)
+        #expect(ambiguous.string == source)
+    }
+
+    @Test func mentionRenderingRefreshesForNamesAndGrowsWithDynamicType() throws {
+        let cache = ChatNativeMarkdownRenderCache()
+        let document = MarkdownDocument("Ask @sage.")
+        var mentionStyle = style()
+        mentionStyle.mentionIdentities = [.init(handle: "sage", name: "Sage Green")]
+        let first = cache.render(document: document, style: mentionStyle)
+        #expect(cache.render(document: document, style: mentionStyle) === first)
+        let normal = try #require(first.attribute(.attachment, at: 4, effectiveRange: nil) as? ChatMentionAttachment)
+        mentionStyle.mentionIdentities = [.init(handle: "sage", name: "Sage Blue")]
+        let renamed = cache.render(document: document, style: mentionStyle)
+        #expect(ChatMentionRendering.plainText(renamed, usingNames: true) == "Ask Sage Blue.")
+        var largeStyle = style(.accessibilityExtraExtraExtraLarge)
+        largeStyle.mentionIdentities = mentionStyle.mentionIdentities
+        let large = cache.render(document: document, style: largeStyle)
+        let larger = try #require(large.attribute(.attachment, at: 4, effectiveRange: nil) as? ChatMentionAttachment)
+        #expect(larger.bounds.height > normal.bounds.height)
+        #expect(larger.bounds.width <= 220 + larger.font.pointSize)
+    }
+
+    @Test func streamingKeepsTheExistingPillAndOnlyEditsTheSuffix() throws {
+        let cache = ChatNativeMarkdownRenderCache()
+        var mentionStyle = style()
+        mentionStyle.mentionIdentities = [.init(handle: "sage", name: "Sage Green")]
+        let first = cache.render(document: MarkdownDocument("Ask @sage. Stable text."), style: mentionStyle)
+        let attachment = try #require(first.attribute(.attachment, at: 4, effectiveRange: nil) as? ChatMentionAttachment)
+        let updated = cache.render(document: MarkdownDocument("Ask @sage. Stable text. More text."), style: mentionStyle)
+        #expect(updated.attribute(.attachment, at: 4, effectiveRange: nil) as? ChatMentionAttachment === attachment)
+        let storage = NSTextStorage(attributedString: first)
+        ChatNativeTextStorageUpdater.apply(updated, previous: first, to: storage)
+        #expect(ChatMentionRendering.plainText(storage) == "Ask @sage. Stable text. More text.")
+        #expect(storage.attribute(.attachment, at: 4, effectiveRange: nil) as? ChatMentionAttachment === attachment)
+    }
+
     @Test func nativeProseUsesSystemFontByDefault() throws {
         let rendered = ChatNativeMarkdownAttributedBuilder.build(document: MarkdownDocument("Hello"), style: style())
         let actual = try #require(rendered.attribute(.font, at: 0, effectiveRange: nil) as? UIFont)

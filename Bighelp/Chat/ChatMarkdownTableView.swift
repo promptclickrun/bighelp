@@ -138,7 +138,7 @@ struct ChatTableCellText: UIViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(openURL: openURL) }
 
     func makeUIView(context: Context) -> UITextView {
-        let view = UITextView(usingTextLayoutManager: false)
+        let view = ChatMentionTextView(usingTextLayoutManager: false)
         view.delegate = context.coordinator
         view.isEditable = false
         view.isSelectable = true
@@ -163,6 +163,7 @@ struct ChatTableCellText: UIViewRepresentable {
             primaryText: UIColor(textColor), secondaryText: UIColor(theme.secondaryText),
             accent: UIColor(theme.action), codeBackground: UIColor(theme.primaryText.opacity(0.07)),
             proseLineSpacing: 0, traitCollection: view.traitCollection, theme: theme))
+        view.accessibilityLabel = ChatMentionRendering.plainText(text, usingNames: true)
         if view.attributedText?.isEqual(to: text) != true {
             view.attributedText = text
             view.invalidateIntrinsicContentSize()

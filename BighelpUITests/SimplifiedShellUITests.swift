@@ -3,6 +3,51 @@ import XCTest
 /// Shipping-shell simplification: four destinations, one contextual compose action.
 final class SimplifiedShellUITests: BighelpUITestCase {
     @MainActor
+    func testMentionsStayInsideTheirMessageInLightAppearance() {
+        verifyInlineMentions(appearance: "light")
+    }
+
+    @MainActor
+    func testMentionsStayInsideTheirMessageInDarkAppearance() {
+        verifyInlineMentions(appearance: "dark")
+    }
+
+    @MainActor
+    private func verifyInlineMentions(appearance: String) {
+        let app = makeApp()
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-test-inline-mentions",
+                               "-loopdy.home.opens-chat", "NO", "-loopdy.demo.appearance", appearance]
+        app.launch()
+        let conversation = app.buttons["session.row.demo-finance"]
+        XCTAssertTrue(conversation.waitForExistence(timeout: 10))
+        conversation.tap()
+        let human = app.textViews.matching(NSPredicate(format: "label == %@",
+            "You: Before Avery Park, ask All about the plan; then Avery Park can review it. After.")).firstMatch
+        let agent = app.textViews.matching(NSPredicate(format: "label == %@",
+            "Avery Park: Ask Jordan Lee for a second opinion. Code stays plain: @all.")).firstMatch
+        XCTAssertTrue(human.waitForExistence(timeout: 5))
+        XCTAssertTrue(agent.waitForExistence(timeout: 5))
+        XCTAssertTrue(human.isHittable)
+        XCTAssertTrue(agent.isHittable)
+        capture("chat-inline-mentions-\(appearance)", in: app)
+        human.press(forDuration: 1)
+        XCTAssertTrue(app.buttons["Copy to clipboard"].waitForExistence(timeout: 3))
+        app.buttons["Copy to clipboard"].tap()
+        XCTAssertTrue(human.exists)
+        let input = app.textFields["Message"].exists ? app.textFields["Message"] : app.textViews["Message"]
+        XCTAssertTrue(input.waitForExistence(timeout: 3))
+        input.tap()
+        input.typeText("Please ask @avery-park and @all to review this.")
+        let send = app.buttons["chat.send"]
+        XCTAssertTrue(send.waitForExistence(timeout: 3))
+        send.tap()
+        let sent = app.textViews.matching(NSPredicate(format: "label ENDSWITH %@",
+            "Please ask Avery Park and All to review this.")).firstMatch
+        XCTAssertTrue(sent.waitForExistence(timeout: 5))
+        capture("chat-inline-mentions-sent-\(appearance)", in: app)
+    }
+
+    @MainActor
     func testWideAssistantRepliesInDarkAppearance() {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-simple-chat",

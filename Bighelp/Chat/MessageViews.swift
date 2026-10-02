@@ -99,6 +99,7 @@ struct TimelineItemView: View {
     let showsSenderName: Bool
     let messageReaction: NativeMessageReactionPresentation?
     let onMessageReaction: ((String?) -> Void)?
+    let mentionIdentities: [ChatMentionIdentity]
 
     init(
         item: TimelineItem,
@@ -108,7 +109,8 @@ struct TimelineItemView: View {
         senderResolver: TimelineSenderResolver = TimelineSenderResolver(),
         showsSenderName: Bool = false,
         messageReaction: NativeMessageReactionPresentation? = nil,
-        onMessageReaction: ((String?) -> Void)? = nil
+        onMessageReaction: ((String?) -> Void)? = nil,
+        mentionIdentities: [ChatMentionIdentity] = []
     ) {
         self.item = item
         self.onApprovalTap = onApprovalTap
@@ -118,6 +120,7 @@ struct TimelineItemView: View {
         self.showsSenderName = showsSenderName
         self.messageReaction = messageReaction
         self.onMessageReaction = onMessageReaction
+        self.mentionIdentities = mentionIdentities
     }
 
     var body: some View {
@@ -171,7 +174,8 @@ struct TimelineItemView: View {
                         contentReference: item.metadata.contentReference,
                         metadata: item.metadata,
                         reactionPresentation: messageReaction,
-                        onReaction: onMessageReaction
+                        onReaction: onMessageReaction,
+                        mentionIdentities: mentionIdentities
                     )
                 }
             case .budgetSummary(let summary):

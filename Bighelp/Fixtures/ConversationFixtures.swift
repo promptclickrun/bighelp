@@ -144,6 +144,21 @@ enum ConversationFixtures {
         )
     }
 
+    static var inlineMentionsPreview: SessionRecord {
+        let items = [
+            TimelineItem(id: "inline-mentions-human", role: .human,
+                sender: .user(snapshot: .init(name: "You")),
+                content: .message("Before @avery-park, ask @all about the plan; then @avery-park can review it. After."),
+                metadata: .init(sourceOrder: 1)),
+            TimelineItem(id: "inline-mentions-agent", role: .assistant,
+                sender: .agent(id: "finance", snapshot: .init(name: "Avery Park")),
+                content: .message("Ask @jordan-lee for a second opinion. Code stays plain: `@all`."),
+                metadata: .init(sourceOrder: 2))
+        ]
+        return SessionRecord(id: "demo-finance", kind: .direct, agentIDs: ["finance"],
+            title: "Inline mentions", items: items, hasAcceptedMessage: true)
+    }
+
     static var simpleChatPreview: SessionRecord {
         let agent = TimelineSender.agent(id: "finance", snapshot: .init(name: "Avery Park"))
         let now = Date()

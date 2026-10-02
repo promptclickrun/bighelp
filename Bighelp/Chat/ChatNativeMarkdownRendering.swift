@@ -12,6 +12,7 @@ struct ChatNativeMarkdownStyle {
     var theme: BighelpTheme = .light
     /// Interim agent messages render slightly smaller than the answer.
     var textScale: CGFloat = 1
+    var mentionIdentities: [ChatMentionIdentity] = []
 }
 
 /// One rendered revision per native text view. The cache never crosses a
@@ -25,8 +26,10 @@ final class ChatNativeMarkdownRenderCache {
         let typeface: BighelpThemeTypeface
         let typography: BighelpThemeTypography
         let colors: [CGColor]
+        let mentionIdentities: [ChatMentionIdentity]
 
         init(_ style: ChatNativeMarkdownStyle) {
+            mentionIdentities = style.mentionIdentities
             lineSpacing = style.proseLineSpacing
             textScale = style.textScale
             typeface = style.theme.typeface
@@ -70,8 +73,12 @@ final class ChatNativeMarkdownRenderCache {
            let rendered {
             return rendered
         }
-        let rendered = NSAttributedString(attributedString:
+        let updated = NSMutableAttributedString(attributedString:
             ChatNativeMarkdownAttributedBuilder.build(document: document, style: style))
+        if styleKey == key, let previous = rendered {
+            ChatMentionRendering.reuseAttachments(in: updated, from: previous)
+        }
+        let rendered = NSAttributedString(attributedString: updated)
         self.document = document
         self.styleKey = key
         self.rendered = rendered
@@ -305,6 +312,7 @@ enum ChatNativeMarkdownAttributedBuilder {
             result.append(NSAttributedString(string: runText, attributes: runAttributes))
         }
 
+        ChatMentionRendering.apply(to: result, identities: style.mentionIdentities, traits: style.traitCollection)
         return result
     }
 

@@ -101,6 +101,7 @@ struct MessageBubble: View {
     let metadata: TimelineMetadata?
     let reactionPresentation: NativeMessageReactionPresentation?
     let onReaction: ((String?) -> Void)?
+    let mentionIdentities: [ChatMentionIdentity]
 
     @State private var isSelectingText = false
     @State private var isCopied = false
@@ -121,7 +122,8 @@ struct MessageBubble: View {
         contentReference: CanonicalContentReference? = nil,
         metadata: TimelineMetadata? = nil,
         reactionPresentation: NativeMessageReactionPresentation? = nil,
-        onReaction: ((String?) -> Void)? = nil
+        onReaction: ((String?) -> Void)? = nil,
+        mentionIdentities: [ChatMentionIdentity] = []
     ) {
         self.messageID = messageID
         self.role = role
@@ -134,6 +136,7 @@ struct MessageBubble: View {
         self.metadata = metadata
         self.reactionPresentation = reactionPresentation
         self.onReaction = onReaction
+        self.mentionIdentities = mentionIdentities
     }
 
     private var isStreaming: Bool {
@@ -418,7 +421,8 @@ struct MessageBubble: View {
                 onSelect: { isSelectingText = true },
                 onFork: onFork,
                 onReact: canReact ? { isReactionPickerPresented = true } : nil,
-                textScale: (isInterimReply ? ChatInterimReplyStyle.textScale : 1) * chatTextSize.scale
+                textScale: (isInterimReply ? ChatInterimReplyStyle.textScale : 1) * chatTextSize.scale,
+                mentionIdentities: mentionIdentities
             )
             .modifier(BighelpV3MessageSurface(
                 role: role,
@@ -495,7 +499,8 @@ struct MessageBubble: View {
                             onCopy: { copyMessage(interaction) },
                             onSelect: { isSelectingText = true },
                             onFork: onFork,
-                            onReact: canReact ? { isReactionPickerPresented = true } : nil
+                            onReact: canReact ? { isReactionPickerPresented = true } : nil,
+                            mentionIdentities: mentionIdentities
                         )
                     } else {
                         MarkdownMessageView(document: document, proseLineSpacing: proseLineSpacing)

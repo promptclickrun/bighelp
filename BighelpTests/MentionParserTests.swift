@@ -1,7 +1,18 @@
+import Foundation
 import Testing
 @testable import Bighelp
 
 struct MentionParserTests {
+    @Test func displayRangesPreserveOriginalUnicodeAndIgnoreMalformedTokens() throws {
+        let source = "👋🏽 @cafe\u{301}, @missing/path then @all!"
+        let tokens = try MentionParser.tokens(in: source, rejectingInvalid: false)
+        #expect(tokens.map(\.handle) == ["café", "all"])
+        #expect(tokens.map { (source as NSString).substring(with: $0.range) } == ["@cafe\u{301}", "@all"])
+        #expect(throws: MentionError.unknown("missing/path")) {
+            try MentionParser.tokens(in: source)
+        }
+    }
+
     @Test func noMentionTargetsAllButUnknownMentionRejects() throws {
         let room = BotModeRoom.fixture(memberIDs: ["finance", "research"])
 

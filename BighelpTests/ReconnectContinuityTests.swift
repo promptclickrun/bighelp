@@ -67,10 +67,14 @@ struct ConnectionIslandRulesTests {
         #expect(next(from: .hidden, .connected, isRecovering: true).phase == .connected)
     }
 
-    @Test func aLongOutageStaysTuckedAway() {
-        let still = next(from: .hidden, .disconnected, isRecovering: true)
-        #expect(still.phase == .hidden)
-        #expect(still.after == nil)
+    /// The pill is the only place a chat says the connection is down, so it stays
+    /// until it's back; only "Connected!" goes away by itself.
+    @Test func theConnectionStaysShownUntilItsBack() {
+        for phase: ConnectionIslandPhase in [.connecting, .reconnecting, .disconnected, .noInternet] {
+            #expect(ConnectionIslandRules.hideDelay(after: phase) == nil, "\(phase)")
+        }
+        #expect(ConnectionIslandRules.hideDelay(after: .connected) == ConnectionIslandRules.connectedHold)
+        #expect(next(from: .disconnected, .disconnected).phase == .disconnected)
     }
 
     @Test func nothingShowsInTheBackground() {

@@ -13,11 +13,15 @@ enum ConnectionIslandRules {
     static let showDelay: Duration = .milliseconds(700)
     /// How long "Connected!" stays before the pill goes away.
     static let connectedHold: Duration = .seconds(1.6)
-    /// A long outage tucks the pill away; the chat's own banner stays.
-    static let dropHold: Duration = .seconds(12)
+
+    /// How long a shown status stays by itself. Only "Connected!" goes: the pill is
+    /// the one place that says the connection is down, so that stays until it's back.
+    static func hideDelay(after phase: ConnectionIslandPhase) -> Duration? {
+        phase == .connected ? connectedHold : nil
+    }
 
     /// What to show next, and how long to wait first (nil: now). `isRecovering`:
-    /// the pill showed the connection was down, then tucked itself away.
+    /// the pill has shown the connection was down.
     static func next(from phase: ConnectionIslandPhase, state: WorkspaceConnectionState,
                      hasConnected: Bool, hasNetwork: Bool, isActive: Bool,
                      isRecovering: Bool) -> (phase: ConnectionIslandPhase, after: Duration?) {
@@ -78,13 +82,8 @@ final class ConnectionIslandModel {
         phase = next
         guard next != .hidden else { return }
         UIAccessibility.post(notification: .announcement, argument: next.spokenStatus)
-        if next == .connected {
-            isRecovering = false
-            hide(after: ConnectionIslandRules.connectedHold)
-        } else {
-            isRecovering = true
-            hide(after: ConnectionIslandRules.dropHold)
-        }
+        isRecovering = next != .connected
+        if let delay = ConnectionIslandRules.hideDelay(after: next) { hide(after: delay) }
     }
 
     private func hide(after delay: Duration) {

@@ -19,8 +19,8 @@ enum WorkspaceReconnectPolicy {
     }
 }
 
-/// Restores a dropped host connection while the app is open, and tells an
-/// open chat what is happening so a disabled Send button is never a mystery.
+/// Restores a dropped host connection while the app is open, and tells the
+/// connection pill what is happening so a disabled Send button is never a mystery.
 ///
 /// It observes the store directly instead of relying on view updates: a view
 /// under a pushed chat does not refresh its tasks until it is visible again.
@@ -81,7 +81,7 @@ final class WorkspaceConnectionKeeper {
         evaluate()
     }
 
-    /// A chat's Retry button: try now and restart the backoff.
+    /// Try now and restart the backoff (opening a saved chat while disconnected).
     func retry() {
         attempt = 0
         loop?.cancel()
@@ -173,39 +173,4 @@ final class WorkspaceConnectionKeeper {
         hasNetwork = hold.network
     }
     #endif
-}
-
-/// Shown above the composer while the host connection is being restored.
-struct ChatConnectionBanner: View {
-    let state: WorkspaceConnectionState
-    let retry: () -> Void
-
-    @Environment(WorkspaceConnectionKeeper.self) private var keeper: WorkspaceConnectionKeeper?
-    @BighelpThemeReader private var theme
-
-    var body: some View {
-        if let status = HostConnectionStatus(chat: state, hasNetwork: keeper?.hasNetwork ?? true,
-                                             hasConnected: keeper?.hasConnected ?? true) {
-            HStack(spacing: BighelpTokens.space8) {
-                BighelpConnectionIndicator(phase: status.phase)
-                Text(status.label)
-                    .font(.bighelp(.footnote).weight(.medium))
-                    .foregroundStyle(theme.secondaryText)
-                    .contentTransition(.opacity)
-                Spacer(minLength: BighelpTokens.space8)
-                if status.phase == .disconnected {
-                    Button("Retry", action: retry)
-                        .font(.bighelp(.footnote).weight(.semibold))
-                        .foregroundStyle(theme.action)
-                        .frame(minHeight: BighelpTokens.hitTarget)
-                        .accessibilityIdentifier("chat.connection.retry")
-                }
-            }
-            .padding(.horizontal, BighelpTokens.space12)
-            .frame(minHeight: 36)
-            .background(theme.incomingMessageBackground, in: .capsule)
-            .accessibilityElement(children: .contain)
-            .accessibilityIdentifier("chat.connection-banner")
-        }
-    }
 }

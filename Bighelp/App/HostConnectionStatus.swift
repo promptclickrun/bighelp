@@ -26,8 +26,8 @@ struct HostConnectionStatus: Equatable, Sendable {
 }
 
 extension HostConnectionStatus {
-    /// The pill under the Dynamic Island; nil while it's tucked away. "Not
-    /// connected", as the chat, Hosts and the opening screen say beside it.
+    /// The pill under the Dynamic Island; nil while it's hidden. "Not
+    /// connected", as Hosts and the opening screen say beside it.
     init?(island: ConnectionIslandPhase) {
         switch island {
         case .hidden: return nil
@@ -39,7 +39,7 @@ extension HostConnectionStatus {
         }
     }
 
-    /// Above a chat's message box while the connection is restored; nil once
+    /// In "Needs attention" while the connection is restored; nil once
     /// it's back. Like the island: "Connecting" until the computer has
     /// answered once, and no network at all says so.
     init?(chat state: WorkspaceConnectionState, hasNetwork: Bool = true, hasConnected: Bool = true) {

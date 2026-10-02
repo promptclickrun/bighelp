@@ -1,30 +1,23 @@
 import XCTest
 
 /// Every place that shows the host connection uses the shared loaders, mapped
-/// by one adapter so they agree: the chat's banner (with the island under the
-/// Dynamic Island following the same state), host setup's check and All
-/// agents' hosts. Demo holds put each one in each state. Set BIGHELP_CONNECTION_EVIDENCE (TEST_RUNNER_…) to a
+/// by one adapter so they agree: the pill under the Dynamic Island, host
+/// setup's check and All agents' hosts. Demo holds put each one in each state. Set BIGHELP_CONNECTION_EVIDENCE (TEST_RUNNER_…) to a
 /// folder to save screenshots there.
 final class ConnectionStatusUITests: BighelpUITestCase {
+    /// A chat leaves the connection to the pill at the top: no second status
+    /// above the message box, whatever the connection is doing.
     @MainActor
-    func testChatBannerSaysWhatTheConnectionIsDoing() throws {
-        let holds: [(hold: String, words: String, offersRetry: Bool)] = [
-            ("connecting", "Connecting to your computer…", false),
-            ("reconnecting", "Reconnecting to your computer…", false),
-            ("disconnected", "Not connected to your computer", true),
-            ("no-internet", "No internet connection", true),
-        ]
-        for (hold, words, offersRetry) in holds {
+    func testChatLeavesTheConnectionToThePillAtTheTop() throws {
+        for hold in ["connecting", "reconnecting", "disconnected", "no-internet"] {
             let app = makeApp()
             app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.home.opens-chat", "YES",
                                    "-test-connection-keeper", hold]
             app.launch()
-            let banner = app.descendants(matching: .any)["chat.connection-banner"].firstMatch
-            XCTAssertTrue(banner.waitForExistence(timeout: 15), hold)
-            XCTAssertTrue(banner.staticTexts[words].exists, "\(hold): \(words)")
-            XCTAssertEqual(app.buttons["chat.connection.retry"].exists, offersRetry, hold)
-            // The island follows the same state a moment later.
+            XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 15), hold)
+            // The pill follows the held state a moment later.
             Thread.sleep(forTimeInterval: 1.2)
+            XCTAssertFalse(app.descendants(matching: .any)["chat.connection-banner"].exists, hold)
             save("chat-\(hold)", app)
             app.terminate()
         }

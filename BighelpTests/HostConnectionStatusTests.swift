@@ -30,7 +30,7 @@ struct HostConnectionStatusTests {
         #expect(HostConnectionStatus(island: .hidden) == nil)
     }
 
-    @Test func theChatBannerShowsOnlyWhileTheConnectionIsntThere() {
+    @Test func theReconnectingNoteShowsOnlyWhileTheConnectionIsntThere() {
         #expect(HostConnectionStatus(chat: .connected) == nil)
         #expect(shown(HostConnectionStatus(chat: .reconnecting))! == (.reconnecting, "Reconnecting to your computer…"))
         #expect(shown(HostConnectionStatus(chat: .disconnected))! == (.disconnected, "Not connected to your computer"))

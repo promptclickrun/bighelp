@@ -7,7 +7,6 @@ struct ChatComposer: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.nerdModeEnabled) private var nerdModeEnabled
     @Environment(\.providerUsage) private var providerUsage
-    @Environment(WorkspaceConnectionKeeper.self) private var connectionKeeper: WorkspaceConnectionKeeper?
     @ScaledMetric(relativeTo: .body) private var compactDraftLineHeight: CGFloat = 22
     @Bindable var model: ChatModel
     let agentName: String
@@ -43,11 +42,6 @@ struct ChatComposer: View {
 
     var body: some View {
         VStack(spacing: BighelpTokens.space4) {
-            if !model.isBotMode, let connectionKeeper, connectionKeeper.state != .connected {
-                ChatConnectionBanner(state: connectionKeeper.state, retry: connectionKeeper.retry)
-                    .padding(.horizontal, BighelpTokens.space4)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
             if let context = model.sessionContext, context.isCompacting {
                 SessionCompactionCard(context: context)
                     .padding(.horizontal, BighelpTokens.space4)

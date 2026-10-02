@@ -119,6 +119,11 @@ car screen says Connecting, Listening, Thinking or Speaking, with End and Mute; 
 
 Shortcuts run with bighelp closed, in the background or open. The app closes its host connection in the
 background, so a Shortcut first proves the host answers (the agent list) and reconnects once if not.
+In the Shortcuts app bighelp's actions sit under **Chat** (Ask an agent, New chat, Continue last chat, Open group
+chat, Start voice chat), **Automation** (Run scheduled task now, Add Kanban task, Get computer status, Get Feed,
+Ideas or Goals), **Navigation** (Open in bighelp) and **Agents** (Switch agent, Open agent). Ten of them are
+ready-made Shortcuts, the most an app may have, with a tile per agent, scheduled task, group chat or place.
+Actions that open a screen hand bighelp a `loopdy://` link, so they wait for the host like a widget tap.
 
 Reactions use Hermes' own: the app saves them with `message.react`, and with Settings › Chat › "Agents see your
 reactions" on (the host's `display.message_reactions`), Hermes tells the agent at its next turn. The app sends no

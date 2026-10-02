@@ -360,7 +360,11 @@ sections can crash only on devices ("Thread stack size exceeded").
 
 - The app closes its host connection in the background. A suspended runtime can still report "ready".
 - Shortcuts and widgets first check that the host answers, and reconnect once if it doesn't.
-- An incoming widget or link tap during startup is queued until the host runtime is ready.
+- An incoming widget or link tap during startup is queued until the host runtime is ready. Shortcuts that open a
+  screen post their link to `BighelpIncomingLinkCenter`, which takes the same path.
+- An app may have at most 10 App Shortcuts (`BighelpAppShortcuts`); Xcode's App Intents metadata step refuses
+  more. Every other intent is still an ordinary Shortcuts action. Tiles per agent, scheduled task and group chat
+  refresh through `BighelpShortcutParameters` when those names change, never on every load.
 - Returning to a chat reloads it from the host. Treat the host's saved history as the truth after a turn ends.
 - Every reconnect is a new `WorkspaceOwner` (its `connectionGeneration` changes), and the owner is nil while
   disconnected. To decide whether to close open sheets or screens, compare `owner.signIn`, never the whole

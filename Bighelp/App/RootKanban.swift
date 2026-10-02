@@ -11,7 +11,7 @@ extension RootShellView {
     /// Hermes' Kanban plugin on the connected host; demo mode has samples.
     func makeKanbanService() -> KanbanService? {
         if usesWorkspaceFixtures, workspaceConnections?.isDirectSelected != true {
-            return DemoKanbanService()
+            return DemoKanbanService.shared
         }
         guard let owner = currentWorkspaceOwner,
               workspaceConnections?.hosts.selectedWorkspace?.nativeClient != nil else { return nil }

@@ -748,6 +748,7 @@ struct BighelpAppComposition {
             catalog: sessionCatalog,
             featureStore: featureStore,
             newChatCoordinator: newChatCoordinator,
+            botModeRooms: botModeRooms,
             prepareConnection: {
                 guard usesFixtures else { throw BighelpShortcutServiceError.connectionUnavailable }
             }

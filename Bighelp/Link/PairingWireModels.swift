@@ -15,6 +15,12 @@ enum BighelpIncomingURLRoute: Equatable, Sendable {
     case approval(id: String)
     /// "loopdy://kanban?board=…&task=…": Kanban, a board, or one card.
     case kanban(board: String?, task: String?)
+    /// "loopdy://group/<room>": a group chat hosted on the computer, from Shortcuts.
+    case group(roomID: String)
+    /// "loopdy://agents", "loopdy://projects", "loopdy://settings": ☰'s pages.
+    case agents
+    case projects
+    case settings
     case pairBighelpLink(BighelpLinkPairingReference)
 
     static func parse(_ url: URL) -> BighelpIncomingURLRoute? {
@@ -64,6 +70,18 @@ enum BighelpIncomingURLRoute: Equatable, Sendable {
         if url.host?.lowercased() == "approval", url.pathComponents.count == 2,
            let id = url.pathComponents.last, !id.isEmpty, id.utf8.count <= 240 {
             return .approval(id: id)
+        }
+        if url.host?.lowercased() == "group", url.pathComponents.count == 2,
+           let id = url.pathComponents.last, !id.isEmpty, id != "/", id.utf8.count <= 240 {
+            return .group(roomID: id)
+        }
+        if url.pathComponents.count <= 1 {
+            switch url.host?.lowercased() {
+            case "agents": return .agents
+            case "projects": return .projects
+            case "settings": return .settings
+            default: break
+            }
         }
         guard
             url.host?.lowercased() == "chat",

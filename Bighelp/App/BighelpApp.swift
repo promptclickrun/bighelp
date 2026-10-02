@@ -143,7 +143,10 @@ struct BighelpApp: App {
         _workspaceConnections = State(initialValue: connections)
         let nativeWorkspaces = composition.makeNativeWorkspaceSelection(connections: connections)
         _nativeWorkspaces = State(initialValue: nativeWorkspaces)
+        // Demo runs without a real host use the demo stores, as the shell does.
+        let usesDemoWorkspace = arguments.contains("-use-demo-fixtures") || arguments.contains("-disable-demo-delays")
         let nativeWorkspaceKey: @MainActor () -> BighelpShortcutWorkspaceKey? = {
+            if usesDemoWorkspace, !connections.isDirectSelected { return nil }
             guard hostRegistry.connectionMode == .independent || connections.isDirectSelected else { return nil }
             return BighelpShortcutWorkspaceKey(
                 hostID: hostRegistry.selectedHostID,
@@ -192,6 +195,8 @@ struct BighelpApp: App {
             resolve: resolveNativeWorkspace,
             reconnect: reconnectHost
         )
+        composition.shortcutService.hostServices = Self.shortcutHostServices(connections: connections,
+                                                                            arguments: arguments)
         AppDependencyManager.shared.add(dependency: composition.shortcutService)
         let notificationComposition = BighelpManagedNotificationComposition(
             factory: composition.managedNotificationFactory,
@@ -237,6 +242,46 @@ struct BighelpApp: App {
         _spatialAvatar = State(initialValue: Self.makeSpatialAvatar(composition, arguments: arguments))
         BighelpVisionChrome.useReadableNavigationColors()
         #endif
+    }
+
+    /// Feed, Kanban and the host's name for Shortcuts, on the host in use;
+    /// demo runs use the local fixtures.
+    private static func shortcutHostServices(connections: WorkspaceConnectionStore,
+                                             arguments: [String]) -> BighelpShortcutHostServices {
+        let usesDemo = arguments.contains("-use-demo-fixtures") || arguments.contains("-disable-demo-delays")
+        let demo: @MainActor () -> Bool = { usesDemo && !connections.isDirectSelected }
+        let demoBoards = DemoAgentBoardClient()
+        return BighelpShortcutHostServices(
+            hostName: { demo() ? "Demo host" : connections.selectedDirectHost?.name },
+            hermesVersion: {
+                if demo() { return "0.21.4" }
+                guard let owner = connections.owner, let workspace = connections.workspace,
+                      let stats = try? await workspace.perform(.systemStatus, payload: [:], owner: owner)
+                else { return nil }
+                return stats["hermes_version"]?.string
+            },
+            boards: {
+                if demo() { return demoBoards }
+                guard let owner = connections.owner, let workspace = connections.workspace,
+                      connections.capabilities.supports(.agentBoard, owner: owner) else { return nil }
+                return DirectHermesAgentBoardClient(
+                    workspace: workspace, owner: owner,
+                    supportsFeedback: connections.capabilities.supports(.agentBoardFeedback, owner: owner))
+            },
+            kanban: {
+                if demo() { return DemoKanbanService.shared }
+                guard let owner = connections.owner, connections.hosts.selectedWorkspace?.nativeClient != nil else {
+                    return nil
+                }
+                return LiveKanbanService(
+                    host: owner.authority,
+                    currentOwner: { connections.owner },
+                    makeClient: { owner in
+                        connections.hosts.selectedWorkspace?.nativeClient?
+                            .makeKanbanClient(owner: owner, currentOwner: { connections.owner })
+                    })
+            }
+        )
     }
 
     #if os(iOS) && !targetEnvironment(macCatalyst)

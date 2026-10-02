@@ -19,6 +19,9 @@ final class DemoKanbanService: KanbanService {
     private var nextEventID = 100
     private let now = Date.now
 
+    /// One board for the app and Shortcuts, so a card added from a Shortcut shows.
+    static let shared = DemoKanbanService()
+
     init() {
         seed()
     }

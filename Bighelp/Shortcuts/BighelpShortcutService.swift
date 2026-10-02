@@ -67,6 +67,14 @@ enum BighelpShortcutServiceError: LocalizedError, Equatable {
     case responseUnavailable
     case foregroundUnavailable
     case emptyMessage
+    case scheduledTaskUnavailable
+    case scheduledTaskFailed
+    case groupChatUnavailable
+    case boardUnavailable
+    case kanbanUnavailable
+    case kanbanNoBoard
+    case kanbanFailed
+    case emptyTitle
 
     var errorDescription: String? {
         switch self {
@@ -88,6 +96,22 @@ enum BighelpShortcutServiceError: LocalizedError, Equatable {
             "Open bighelp to wait for a response, or turn off Wait for response to send in the background."
         case .emptyMessage:
             "Enter a message for your agent."
+        case .scheduledTaskUnavailable:
+            "That scheduled task isn't on your computer anymore."
+        case .scheduledTaskFailed:
+            "bighelp couldn't start that scheduled task. Check that your computer is connected, then try again."
+        case .groupChatUnavailable:
+            "That group chat isn't on your computer anymore."
+        case .boardUnavailable:
+            "Update the bighelp plugin on your computer to see this."
+        case .kanbanUnavailable:
+            "This computer doesn't have Kanban. Update Hermes to use it."
+        case .kanbanNoBoard:
+            "Make a Kanban board in bighelp first."
+        case .kanbanFailed:
+            "bighelp couldn't add the card. Check that your computer is connected, then try again."
+        case .emptyTitle:
+            "Enter a title for the card."
         }
     }
 }
@@ -103,6 +127,8 @@ struct BighelpShortcutWorkspace {
     let catalog: SessionCatalogStore
     let featureStore: ShellFeatureStore
     let newChatCoordinator: NewChatCoordinator
+    /// The host's group chats; nil where the connection has none.
+    let rooms: BotModeRoomStore?
 
     init(
         appState: AppState,
@@ -110,7 +136,8 @@ struct BighelpShortcutWorkspace {
         runtimeDefaults: any AgentRuntimeDefaultsClient,
         catalog: SessionCatalogStore,
         featureStore: ShellFeatureStore,
-        newChatCoordinator: NewChatCoordinator
+        newChatCoordinator: NewChatCoordinator,
+        rooms: BotModeRoomStore? = nil
     ) {
         self.appState = appState
         self.agents = agents
@@ -118,6 +145,7 @@ struct BighelpShortcutWorkspace {
         self.catalog = catalog
         self.featureStore = featureStore
         self.newChatCoordinator = newChatCoordinator
+        self.rooms = rooms
     }
 
     /// The chat for a session, attached to this workspace's live stream.
@@ -151,7 +179,8 @@ struct BighelpShortcutWorkspace {
             runtimeDefaults: runtime.defaults,
             catalog: runtime.sessions,
             featureStore: runtime.features,
-            newChatCoordinator: runtime.newChat
+            newChatCoordinator: runtime.newChat,
+            rooms: runtime.rooms
         )
     }
 }
@@ -181,6 +210,14 @@ final class BighelpShortcutService: @unchecked Sendable {
         key: BighelpShortcutWorkspaceKey?,
         task: Task<BighelpShortcutWorkspace, Error>
     )?
+    /// Host features outside the workspace stores (Feed, Kanban, the host's
+    /// name). The app binds them; until then they're unavailable.
+    var hostServices = BighelpShortcutHostServices()
+    /// Opens a screen in bighelp the way a widget link does: it waits until
+    /// the host answers. Tests record the links instead.
+    var openLink: @MainActor (URL) -> Void = { BighelpIncomingLinkCenter.shared.open($0) }
+    /// Where Kanban remembers the last board, the same place the app reads.
+    var kanbanDefaults: UserDefaults = .standard
 
     init(
         appState: AppState,
@@ -189,6 +226,7 @@ final class BighelpShortcutService: @unchecked Sendable {
         catalog: SessionCatalogStore,
         featureStore: ShellFeatureStore,
         newChatCoordinator: NewChatCoordinator,
+        botModeRooms: BotModeRoomStore? = nil,
         prepareConnection: @escaping @MainActor () async throws -> Void = {}
     ) {
         self.fallbackWorkspace = BighelpShortcutWorkspace(
@@ -197,7 +235,8 @@ final class BighelpShortcutService: @unchecked Sendable {
             runtimeDefaults: runtimeDefaults,
             catalog: catalog,
             featureStore: featureStore,
-            newChatCoordinator: newChatCoordinator
+            newChatCoordinator: newChatCoordinator,
+            rooms: botModeRooms
         )
         self.prepareConnection = prepareConnection
     }
@@ -416,11 +455,12 @@ final class BighelpShortcutService: @unchecked Sendable {
     /// A new chat started from outside the app (a widget or link). The app
     /// drops its host connection in the background, so wait for a host that
     /// answers (reconnecting once) before creating the chat on it.
-    func openNewChat(agentID: String?) async throws {
-        _ = try await openChat(agentID: agentID)
+    @discardableResult
+    func openNewChat(agentID: String?) async throws -> BighelpShortcutVoiceResult {
+        try await openChat(agentID: agentID).1
     }
 
-    private func openChat(
+    func openChat(
         agentID: String?,
         onAgent: (@MainActor (BighelpShortcutWorkspace, AgentProfile) -> Void)? = nil
     ) async throws -> (BighelpShortcutWorkspace, BighelpShortcutVoiceResult) {
@@ -436,7 +476,7 @@ final class BighelpShortcutService: @unchecked Sendable {
         return (workspace, BighelpShortcutVoiceResult(sessionID: sessionID, agentName: agent.name))
     }
 
-    private func resolveAgent(
+    func resolveAgent(
         explicitID: String?,
         in workspace: BighelpShortcutWorkspace
     ) throws -> AgentProfile {
@@ -453,7 +493,7 @@ final class BighelpShortcutService: @unchecked Sendable {
     /// and try again before anything is sent.
     /// Simultaneous entity queries share one check, so their directory loads
     /// never supersede (and cancel) each other.
-    private func liveWorkspace() async throws -> BighelpShortcutWorkspace {
+    func liveWorkspace() async throws -> BighelpShortcutWorkspace {
         let requestedKey = nativeWorkspaceKey?()
         if let liveCheck {
             if Self.keysCanShare(liveCheck.key, requestedKey) { return try await liveCheck.task.value }

@@ -332,6 +332,8 @@ struct RootShellView: View {
             Task { await currentHostRuntime?.refresh() }
         }
         .modifier(IncomingLinks(open: handleIncomingURL))
+        .modifier(BighelpShortcutParameterUpdates(agents: agents, scheduledTasks: featureStore.scheduledTasks,
+                                                  rooms: botModeRooms, catalog: sessionCatalog))
         .onChange(of: acceptsIncomingLinks) { _, ready in
             if ready { openPendingIncomingChatIfNeeded() }
         }
@@ -1246,6 +1248,18 @@ struct RootShellView: View {
             openKanban(board: board, task: task)
         case .approval(let id):
             openApproval(requestID: id)
+        case .group(let roomID):
+            guard let owner = currentWorkspaceOwner else {
+                actionErrorMessage = "This group is no longer available on the selected host."
+                return
+            }
+            openHostedGroup(roomID, owner: owner, settings: false)
+        case .agents:
+            appState.select(.agents)
+        case .projects:
+            openProjects()
+        case .settings:
+            appState.select(.profile)
         }
     }
 
@@ -1560,14 +1574,15 @@ private extension BighelpIncomingURLRoute {
     /// Routes that open a chat or the agent home need the host's workspace.
     var opensWorkspaceContent: Bool {
         switch self {
-        case .home, .chat, .newChat, .agent, .kanban, .approval: true
-        case .scheduledTasks, .scheduledTask, .sessions, .pairBighelpLink: false
+        case .home, .chat, .newChat, .agent, .kanban, .approval, .group, .agents, .projects: true
+        case .scheduledTasks, .scheduledTask, .sessions, .settings, .pairBighelpLink: false
         }
     }
 }
 
-/// Links, and Handoff from the Watch (what it was showing, opened here).
-/// Its own modifier keeps RootShellView's body small enough to type-check.
+/// Links, Handoff from the Watch (what it was showing, opened here), and
+/// screens Shortcuts open. Its own modifier keeps RootShellView's body small
+/// enough to type-check.
 private struct IncomingLinks: ViewModifier {
     let open: (URL) -> Void
 
@@ -1576,6 +1591,9 @@ private struct IncomingLinks: ViewModifier {
             .onOpenURL(perform: open)
             .onContinueUserActivity(WatchPhoneLink.handoffActivityType) { activity in
                 if let link = activity.userInfo?["url"] as? String, let url = URL(string: link) { open(url) }
+            }
+            .onChange(of: BighelpIncomingLinkCenter.shared.pending, initial: true) { _, link in
+                if let link, BighelpIncomingLinkCenter.shared.consume(link) { open(link.url) }
             }
     }
 }

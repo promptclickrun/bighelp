@@ -528,7 +528,7 @@ struct SpatialAvatarModelTests {
 }
 
 @MainActor
-private final class ShortcutServiceHarness {
+final class ShortcutServiceHarness {
     let state = AppState()
     let agents: AgentDirectoryStore
     let sessionClient: ShortcutSessionCatalogClientFixture
@@ -540,7 +540,9 @@ private final class ShortcutServiceHarness {
     let runtimeDefaults = ShortcutRuntimeDefaultsClientFixture()
     let service: BighelpShortcutService
 
-    init(prepareConnection: @escaping @MainActor () async throws -> Void = {}) async throws {
+    init(prepareConnection: @escaping @MainActor () async throws -> Void = {},
+         scheduledTasks: ScheduledTasksStore? = nil,
+         rooms: BotModeRoomStore? = nil) async throws {
         let agents = AgentDirectoryStore(
             client: ShortcutAgentDirectoryClientFixture(
                 profiles: [.defaultFixture, .financeFixture]
@@ -557,6 +559,8 @@ private final class ShortcutServiceHarness {
             timing: .immediate,
             catalog: catalog,
             agents: agents,
+            botModeRooms: rooms,
+            scheduledTasks: scheduledTasks,
             conversationClient: { [conversation] _, _ in conversation },
             sessionControlMessaging: controls
         )
@@ -575,13 +579,14 @@ private final class ShortcutServiceHarness {
             catalog: catalog,
             featureStore: featureStore,
             newChatCoordinator: newChat,
+            botModeRooms: rooms,
             prepareConnection: prepareConnection
         )
     }
 }
 
 @MainActor
-private final class ShortcutAgentDirectoryClientFixture: AgentDirectoryClient {
+final class ShortcutAgentDirectoryClientFixture: AgentDirectoryClient {
     let profiles: [AgentProfile]
     /// Reads that fail like a dropped host connection before one succeeds.
     var failuresBeforeSuccess = 0
@@ -603,8 +608,8 @@ private final class ShortcutAgentDirectoryClientFixture: AgentDirectoryClient {
 }
 
 @MainActor
-private final class ShortcutSessionCatalogClientFixture: SessionCatalogClient {
-    private var records: [SessionRecord] = []
+final class ShortcutSessionCatalogClientFixture: SessionCatalogClient {
+    var records: [SessionRecord] = []
     private var nextID = 1
     var returnsMetadataOnly = false
 
@@ -625,7 +630,7 @@ private final class ShortcutSessionCatalogClientFixture: SessionCatalogClient {
 }
 
 @MainActor
-private final class ShortcutConversationClientFixture:
+final class ShortcutConversationClientFixture:
     AttachmentConversationClient,
     QueuedConversationClient
 {
@@ -693,7 +698,7 @@ private final class ShortcutConversationClientFixture:
 }
 
 @MainActor
-private final class ShortcutRuntimeDefaultsClientFixture: AgentRuntimeDefaultsClient {
+final class ShortcutRuntimeDefaultsClientFixture: AgentRuntimeDefaultsClient {
     private(set) var loadedModelAgentIDs: [String] = []
 
     func loadDefaults(agentID: String) async throws -> AgentRuntimeDefaults {
@@ -724,7 +729,7 @@ private final class ShortcutRuntimeDefaultsClientFixture: AgentRuntimeDefaultsCl
 }
 
 @MainActor
-private final class ShortcutSessionControlMessagingFixture: BighelpLinkSessionControlMessaging {
+final class ShortcutSessionControlMessagingFixture: BighelpLinkSessionControlMessaging {
     private(set) var selections: [BighelpLinkPickerSelection] = []
 
     func openPicker(_ request: BighelpLinkPickerOpenRequest) async throws -> BighelpLinkPicker {

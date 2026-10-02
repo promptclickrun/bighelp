@@ -457,7 +457,7 @@ final class AgentEditorModel: Identifiable {
             fieldErrors[.role] = "Enter a role or title."
         }
         if draft.summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            fieldErrors[.summary] = "Enter a description."
+            fieldErrors[.summary] = "Enter a vibe."
         }
         if draft.instructions.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             fieldErrors[.instructions] = "Enter instructions."

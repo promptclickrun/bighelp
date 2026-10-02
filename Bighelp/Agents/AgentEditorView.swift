@@ -745,12 +745,12 @@ struct AgentEditorView: View {
             field("Role", prompt: "e.g. Travel planner", text: role, focus: .role,
                   error: model.fieldErrors[.role], identifier: "agent.editor.role")
             VStack(alignment: .leading, spacing: BighelpTokens.space4) {
-                fieldCaption("About")
-                TextField("About", text: summary, prompt: Text("One line about what it does").bighelpFieldHint(theme),
+                fieldCaption("Vibe")
+                TextField("Vibe", text: summary, prompt: Text("One line about what it does").bighelpFieldHint(theme),
                           axis: .vertical)
                     .lineLimit(1...3)
                     .focused($focusedField, equals: .summary)
-                    .accessibilityLabel("About")
+                    .accessibilityLabel("Vibe")
                     .accessibilityIdentifier("agent.editor.summary")
                 if let error = model.fieldErrors[.summary] { recoveryMessage(error) }
             }

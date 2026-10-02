@@ -51,7 +51,7 @@ struct AgentStartPicker: View {
                              identifier: "agent.editor.template.\(template.id)") {
                             model.startFrom(template)
                         }
-                        .accessibilityHint("Fills in its role, about and personality. Your agent's name goes into it.")
+                        .accessibilityHint("Fills in its role, vibe and personality. Your agent's name goes into it.")
                     }
                 }
                 note(model.appliedTemplateID?.hasPrefix("builtin:") == true

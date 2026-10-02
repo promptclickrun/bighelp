@@ -167,9 +167,10 @@ enum BighelpShortcutAttachmentBuilder {
 }
 
 struct SendLoopdyChatIntent: AppIntent {
-    static let title: LocalizedStringResource = "Send a chat with bighelp"
+    static let title: LocalizedStringResource = "Ask an agent"
     static let description = IntentDescription(
-        "Create a new Hermes chat through the selected Hermes host and attach images or files. Wait for response returns the answer to Shortcuts without opening bighelp. Turn it off to send and continue right away."
+        "Starts a new chat with your agent, with any pictures or files you add. Wait for response returns the answer to Shortcuts without opening bighelp. Turn it off to send and continue right away.",
+        categoryName: "Chat"
     )
     static let openAppWhenRun = false
 
@@ -242,14 +243,19 @@ struct SendLoopdyChatIntent: AppIntent {
 extension SendLoopdyChatIntent: ForegroundContinuableIntent {}
 
 struct StartLoopdyVoiceChatIntent: AppIntent {
-    static let title: LocalizedStringResource = "Start a bighelp voice chat"
+    static let title: LocalizedStringResource = "Start voice chat"
     static let description = IntentDescription(
-        "Open a new session with the selected Hermes agent and immediately begin voice mode."
+        "Opens a new chat with your agent and starts talking right away.",
+        categoryName: "Chat"
     )
     static let openAppWhenRun = true
 
     @Parameter(title: "Agent")
     var agent: LoopdyShortcutAgentEntity?
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("Start a voice chat with \(\.$agent)")
+    }
 
     @Dependency private var service: BighelpShortcutService
 
@@ -259,6 +265,11 @@ struct StartLoopdyVoiceChatIntent: AppIntent {
     }
 }
 
+/// The ready-made Shortcuts (Siri, Spotlight and bighelp's page in the
+/// Shortcuts app). An app may have at most 10, so these are the ten people
+/// reach for most; Add Kanban task and Open agent stay ordinary actions.
+/// Phrases with an agent, scheduled task or group chat make one tile each;
+/// `BighelpShortcutParameters` refreshes them when those lists change.
 struct BighelpAppShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
@@ -266,18 +277,95 @@ struct BighelpAppShortcuts: AppShortcutsProvider {
             phrases: [
                 "Send a chat with \(.applicationName)",
                 "Ask an agent with \(.applicationName)",
+                "Ask \(\.$agent) in \(.applicationName)",
             ],
-            shortTitle: "Send a chat",
+            shortTitle: "Ask an agent",
             systemImageName: "message.badge.waveform"
+        )
+        AppShortcut(
+            intent: BighelpNewChatIntent(),
+            phrases: [
+                "Start a new chat in \(.applicationName)",
+                "New chat with \(\.$agent) in \(.applicationName)",
+            ],
+            shortTitle: "New chat",
+            systemImageName: "square.and.pencil"
+        )
+        AppShortcut(
+            intent: BighelpContinueChatIntent(),
+            phrases: [
+                "Continue my last chat in \(.applicationName)",
+                "Continue my chat with \(\.$agent) in \(.applicationName)",
+            ],
+            shortTitle: "Continue last chat",
+            systemImageName: "bubble.left.and.text.bubble.right"
         )
         AppShortcut(
             intent: StartLoopdyVoiceChatIntent(),
             phrases: [
                 "Start a voice chat with \(.applicationName)",
                 "Talk with an agent in \(.applicationName)",
+                "Talk with \(\.$agent) in \(.applicationName)",
             ],
             shortTitle: "Start voice chat",
             systemImageName: "waveform.circle.fill"
+        )
+        AppShortcut(
+            intent: BighelpOpenGroupChatIntent(),
+            phrases: [
+                "Open a group chat in \(.applicationName)",
+                "Open \(\.$group) in \(.applicationName)",
+            ],
+            shortTitle: "Open group chat",
+            systemImageName: "person.3"
+        )
+        AppShortcut(
+            intent: BighelpRunScheduledTaskIntent(),
+            phrases: [
+                "Run a scheduled task in \(.applicationName)",
+                "Run \(\.$task) in \(.applicationName)",
+            ],
+            shortTitle: "Run scheduled task",
+            systemImageName: "play.circle"
+        )
+        AppShortcut(
+            intent: BighelpBoardItemsIntent(),
+            // No phrase names the section: its tiles would be another "Feed",
+            // "Ideas" and "Goals", indistinguishable from Open in bighelp's.
+            phrases: [
+                "Get my Feed from \(.applicationName)",
+                "Read my agent's Feed in \(.applicationName)",
+            ],
+            shortTitle: "Get Feed, Ideas or Goals",
+            systemImageName: "list.bullet.rectangle"
+        )
+        AppShortcut(
+            intent: BighelpHostStatusIntent(),
+            phrases: [
+                "Check my computer in \(.applicationName)",
+                "Is my computer online in \(.applicationName)",
+            ],
+            shortTitle: "Computer status",
+            systemImageName: "desktopcomputer"
+        )
+        AppShortcut(
+            intent: BighelpOpenSectionIntent(),
+            // One phrase names the place: each such phrase makes a full row of tiles.
+            phrases: [
+                "Show \(\.$section) in \(.applicationName)",
+                "Open a page in \(.applicationName)",
+            ],
+            shortTitle: "Open in bighelp",
+            systemImageName: "square.grid.2x2"
+        )
+        AppShortcut(
+            intent: BighelpSwitchAgentIntent(),
+            phrases: [
+                "Switch agents in \(.applicationName)",
+                "Switch to \(\.$agent) in \(.applicationName)",
+            ],
+            shortTitle: "Switch agent",
+            systemImageName: "arrow.left.arrow.right.circle"
         )
     }
 

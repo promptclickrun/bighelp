@@ -60,7 +60,8 @@ struct FloatingTabBar: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var tabChanges = 0
-    @ScaledMetric(relativeTo: .caption2) private var iconSize: CGFloat = 22
+    /// The glyphs keep a 3-pt margin on their 24-pt grid, so 26 draws them about 20pt.
+    @ScaledMetric(relativeTo: .caption2) private var iconSize: CGFloat = 26
     @ScaledMetric(relativeTo: .caption2) private var captionHeight: CGFloat = 28
 
     init(selection: Binding<AppTab>, onNewChat: (() -> Void)? = nil, homeIndicatorSink: CGFloat = 0,
@@ -128,9 +129,7 @@ struct FloatingTabBar: View {
                 selection = tab
             }
         } label: {
-            itemLabel(title: tab.title, symbol: tab.systemImage(selected: isSelected),
-                      identifier: tab.accessibilityIdentifier, selected: isSelected,
-                      showsCaption: showsCaption)
+            itemLabel(tab, selected: isSelected, showsCaption: showsCaption)
                 .overlay(alignment: .topTrailing) {
                     if unread.contains(tab), !isSelected {
                         Circle()
@@ -148,26 +147,25 @@ struct FloatingTabBar: View {
         .accessibilityLabel(tab.title)
         .accessibilityValue(unread.contains(tab) && !isSelected ? "New" : "")
         .accessibilityShowsLargeContentViewer {
-            Label(tab.title, systemImage: tab.systemImage(selected: isSelected))
+            if let glyph = tab.glyph {
+                Label { Text(tab.title) } icon: { Image(uiImage: glyph.image(selected: isSelected)) }
+            } else {
+                Label(tab.title, systemImage: tab.systemImage(selected: isSelected))
+            }
         }
         .accessibilityAddTraits(isSelected ? .isSelected : [])
         .accessibilityIdentifier(tab.accessibilityIdentifier)
     }
 
     // Destinations share the existing neutral surface and equal touch targets.
-    private func itemLabel(
-        title: String, symbol: String, identifier: String, selected: Bool, showsCaption: Bool
-    ) -> some View {
-        VStack(spacing: 4) {
-            Image(systemName: symbol)
-                .resizable()
-                .scaledToFit()
-                .fontWeight(.semibold)
-                .frame(width: BighelpTokens.scaled(min(iconSize, 28)), height: BighelpTokens.scaled(min(iconSize, 28)))
-                .contentTransition(.symbolEffect(.replace))
+    private func itemLabel(_ tab: AppTab, selected: Bool, showsCaption: Bool) -> some View {
+        let identifier = tab.accessibilityIdentifier
+        return VStack(spacing: 4) {
+            AppTabIcon(tab: tab, selected: selected)
+                .frame(width: BighelpTokens.scaled(min(iconSize, 32)), height: BighelpTokens.scaled(min(iconSize, 32)))
                 .accessibilityIdentifier(identifier + ".icon")
             if showsCaption {
-                Text(title)
+                Text(tab.title)
                     .font(.bighelp(.caption2).weight(.semibold))
                     .lineLimit(1)
                     .fixedSize(horizontal: true, vertical: true)
@@ -175,7 +173,9 @@ struct FloatingTabBar: View {
                     .accessibilityIdentifier(identifier + ".label")
             }
         }
-        .foregroundStyle(selected ? (increasedContrast ? Color.primary : theme.action) : Color.secondary)
+        // The theme's ink, not `.secondary`: on glass that turns symbols vibrant
+        // but leaves the drawn glyphs a faint grey.
+        .foregroundStyle(selected ? (increasedContrast ? Color.primary : theme.action) : theme.secondaryText)
         .padding(.horizontal, 4)
         .padding(.vertical, isVerticallyCompact ? 4 : 10)
         .frame(minWidth: BighelpTokens.hitTarget, maxWidth: .infinity, minHeight: BighelpTokens.hitTarget)
@@ -345,8 +345,8 @@ struct VisionTabOrnament: View {
                 Button {
                     selection = tab
                 } label: {
-                    Image(systemName: tab.systemImage(selected: isSelected))
-                        .font(.bighelp(.title2).weight(.semibold))
+                    AppTabIcon(tab: tab, selected: isSelected)
+                        .frame(width: 32, height: 32)
                         .frame(width: 60, height: 60)
                         .background {
                             if isSelected { Circle().fill(.white.opacity(0.22)) }
@@ -391,6 +391,39 @@ struct VisionTabOrnament: View {
     }
 }
 #endif
+
+/// A bottom-bar tab's icon, filling its frame: bighelp's glyph for Chat, Feed,
+/// Ideas and Goals, outlined until selected; Apps keeps its symbol.
+struct AppTabIcon: View {
+    let tab: AppTab
+    let selected: Bool
+
+    var body: some View {
+        if let glyph = tab.glyph {
+            BighelpTabGlyphShape(glyph: glyph, selected: selected)
+        } else {
+            // A symbol fills its frame; the glyphs keep a 3-pt margin on their 24-pt grid.
+            Image(systemName: tab.systemImage(selected: selected))
+                .resizable()
+                .scaledToFit()
+                .fontWeight(.medium) // Close to the glyphs' 1.7-pt line.
+                .scaleEffect(0.78)
+                .contentTransition(.symbolEffect(.replace))
+        }
+    }
+}
+
+extension AppTab {
+    var glyph: BighelpTabGlyph? {
+        switch self {
+        case .sessions: .chat
+        case .feed: .feed
+        case .ideas: .ideas
+        case .goals: .goals
+        default: nil
+        }
+    }
+}
 
 private extension AppTab {
     var title: String {

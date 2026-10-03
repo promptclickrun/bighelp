@@ -51,11 +51,12 @@ extension BighelpWidgetSnapshot.BoardSection {
         }
     }
 
-    var symbol: String {
+    /// The app's tab icon for this board.
+    var glyph: BighelpTabGlyph {
         switch self {
-        case .feed: "newspaper.fill"
-        case .ideas: "lightbulb.fill"
-        case .goals: "target"
+        case .feed: .feed
+        case .ideas: .ideas
+        case .goals: .goals
         }
     }
 
@@ -187,8 +188,12 @@ struct BighelpBoardWidgetView: View {
     #if os(iOS)
     private var rectangular: some View {
         VStack(alignment: .leading, spacing: 1) {
-            Label("\(section.title) · \(board?.agentName ?? "bighelp")", systemImage: section.symbol)
-                .font(.headline).lineLimit(1).widgetAccentable()
+            Label {
+                Text("\(section.title) · \(board?.agentName ?? "bighelp")")
+            } icon: {
+                BighelpTabGlyphShape(glyph: section.glyph, selected: true).frame(width: 20, height: 20)
+            }
+            .font(.headline).lineLimit(1).widgetAccentable()
             if let first = board?.items.first {
                 Text(first.title).font(.caption).lineLimit(2)
             } else {
@@ -205,7 +210,9 @@ struct BighelpBoardWidgetView: View {
             BighelpWidgetAvatar(agentID: board?.agentID, name: board?.agentName ?? "bighelp", diameter: compact ? 22 : 26)
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 4) {
-                    Image(systemName: section.symbol).foregroundStyle(colors.accent).widgetAccentable()
+                    BighelpTabGlyphShape(glyph: section.glyph, selected: true)
+                        .frame(width: 16, height: 16)
+                        .foregroundStyle(colors.accent).widgetAccentable()
                     Text(section.title).foregroundStyle(colors.primary)
                 }
                 .font(.caption.weight(.bold))

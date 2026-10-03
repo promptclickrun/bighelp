@@ -238,11 +238,19 @@ extension Image {
 struct BighelpWidgetSectionTitle: View {
     let title: String
     var symbol: String? = nil
+    /// Feed, Ideas and Goals use the app's tab icon instead of a symbol.
+    var glyph: BighelpTabGlyph? = nil
     @Environment(\.bighelpWidgetColors) private var colors
 
     var body: some View {
         HStack(spacing: 4) {
-            if let symbol { Image(systemName: symbol).foregroundStyle(colors.accent).widgetAccentable() }
+            if let glyph {
+                BighelpTabGlyphShape(glyph: glyph, selected: true)
+                    .frame(width: 14, height: 14)
+                    .foregroundStyle(colors.accent).widgetAccentable()
+            } else if let symbol {
+                Image(systemName: symbol).foregroundStyle(colors.accent).widgetAccentable()
+            }
             Text(title.uppercased()).tracking(0.6).foregroundStyle(colors.secondary)
         }
         .font(.system(size: 10, weight: .bold))

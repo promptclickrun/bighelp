@@ -104,7 +104,7 @@ struct BighelpAgentWidgetView: View {
                     }
                 }
                 if !feed.isEmpty {
-                    BighelpWidgetSectionTitle(title: "Feed", symbol: "newspaper.fill")
+                    BighelpWidgetSectionTitle(title: "Feed", glyph: .feed)
                     ForEach(feed.prefix(snapshot.agentRunningSession == nil ? 3 : 1)) { post in
                         Link(destination: BighelpWidgetSnapshot.agentURL("feed")) {
                             boardRow(emoji: post.icon, symbol: "newspaper", title: post.title, date: post.date)
@@ -138,7 +138,7 @@ struct BighelpAgentWidgetView: View {
                 }
             }
             if !feed.isEmpty {
-                section("Feed", symbol: "newspaper.fill") {
+                section("Feed", glyph: .feed) {
                     ForEach(feed.prefix(snapshot.agentRunningSession == nil ? 3 : 2)) { post in
                         Link(destination: BighelpWidgetSnapshot.agentURL("feed")) {
                             boardRow(emoji: post.icon, symbol: "newspaper", title: post.title, date: post.date)
@@ -147,7 +147,7 @@ struct BighelpAgentWidgetView: View {
                 }
             }
             if !goals.isEmpty {
-                section("Goals", symbol: "target") {
+                section("Goals", glyph: .goals) {
                     ForEach(goals.prefix(feed.isEmpty ? 4 : 2)) { goal in
                         Link(destination: BighelpWidgetSnapshot.agentURL("goals")) { goalRow(goal) }
                     }
@@ -251,10 +251,10 @@ struct BighelpAgentWidgetView: View {
             .widgetAccentable()
     }
 
-    private func section<Content: View>(_ title: String, symbol: String,
+    private func section<Content: View>(_ title: String, glyph: BighelpTabGlyph,
                                         @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            BighelpWidgetSectionTitle(title: title, symbol: symbol)
+            BighelpWidgetSectionTitle(title: title, glyph: glyph)
             content()
         }
     }
@@ -337,11 +337,11 @@ struct BighelpAgentWidgetView: View {
     /// Chat, Feed, Ideas and Goals, like the app's bottom bar.
     private var tabStrip: some View {
         HStack(spacing: 6) {
-            ForEach([("chat", "Chat", "bubble.left.fill"), ("feed", "Feed", "newspaper"),
-                     ("ideas", "Ideas", "lightbulb"), ("goals", "Goals", "target")], id: \.0) { tab in
+            ForEach([("chat", "Chat", BighelpTabGlyph.chat), ("feed", "Feed", .feed),
+                     ("ideas", "Ideas", .ideas), ("goals", "Goals", .goals)], id: \.0) { tab in
                 Link(destination: BighelpWidgetSnapshot.agentURL(tab.0)) {
                     VStack(spacing: 2) {
-                        Image(systemName: tab.2).font(.caption.weight(.semibold))
+                        BighelpTabGlyphShape(glyph: tab.2).frame(width: 18, height: 18)
                         Text(tab.1).font(.system(size: 10, weight: .semibold))
                     }
                     .foregroundStyle(colors.primary)

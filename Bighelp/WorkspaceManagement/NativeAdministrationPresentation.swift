@@ -133,7 +133,7 @@ final class NativeAdministrationPresentation: Identifiable {
     init(destination: WorkspaceDestination, hostName: String, profileID: String,
          servingProfileID: String?, rpc: any DirectHermesRPC, http: any DirectHermesAuthenticatedHTTP,
          owner: WorkspaceOwner, currentOwner sourceOwner: @escaping @MainActor () -> WorkspaceOwner?,
-         connections: WorkspaceConnectionStore, invalidationSource: NativeWorkspaceEventSource,
+         connections: WorkspaceConnectionStore?, invalidationSource: NativeWorkspaceEventSource?,
          stockGit: NativeStockGitProjectPresentation? = nil) {
         let lifetime = Lifetime()
         self.lifetime = lifetime
@@ -206,6 +206,8 @@ final class NativeAdministrationPresentation: Identifiable {
             voice = nil
         }
         invalidationObserver = nil
+        // Demo runs have no host to send updates.
+        guard let connections, let invalidationSource else { return }
         let observer = NativeAdministrationInvalidationObserver(
             connections: connections, expectedSource: invalidationSource,
             presentationOwner: owner, presentationProfileID: profileID,
@@ -245,6 +247,8 @@ final class NativeAdministrationPresentation: Identifiable {
 struct NativeAdministrationDestination: View {
     let presentation: NativeAdministrationPresentation
     let permissionCenter: PermissionCenter
+    /// The host's agents, for Default model's agent picker.
+    var agents: [ModelAdministrationAgent] = []
     let onOpenProviderAccounts: () -> Void
     let onOpenAgentDefaults: () -> Void
 
@@ -293,7 +297,7 @@ struct NativeAdministrationDestination: View {
                     ProviderAccountsView(store: presentation.providerAccounts)
                 case .models:
                     ModelAdministrationView(hostName: presentation.hostName, profileID: presentation.profileID,
-                        client: presentation.models, onOpenProviderAccounts: onOpenProviderAccounts,
+                        client: presentation.models, agents: agents, onOpenProviderAccounts: onOpenProviderAccounts,
                         onOpenAgentDefaults: onOpenAgentDefaults)
                         .toolbar {
                             ToolbarItem(placement: .topBarTrailing) {

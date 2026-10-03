@@ -98,13 +98,8 @@ struct AgentStartPicker: View {
         }
     }
 
-    private func carousel<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(alignment: .top, spacing: BighelpTokens.space12) {
-                content()
-            }
-        }
-        .scrollClipDisabled()
+    private func carousel<Content: View>(@ViewBuilder _ content: @escaping () -> Content) -> some View {
+        BighelpCardRail(content: content)
     }
 
     private func note(_ text: String) -> some View {
@@ -117,39 +112,32 @@ struct AgentStartPicker: View {
     private func card(title: String, subtitle: String, detail: String, systemImage: String, selected: String,
                       identifier: String, action: @escaping () -> Void) -> some View {
         let isSelected = model.appliedTemplateID == selected
-        let ink = isSelected ? theme.actionForeground : theme.primaryText
-        let secondary = isSelected ? theme.actionForeground.opacity(0.85) : theme.secondaryText
         return Button(action: action) {
-            VStack(alignment: .leading, spacing: BighelpTokens.space4) {
-                Image(systemName: isSelected ? "checkmark.circle.fill" : systemImage)
-                    .font(.bighelp(.title3))
-                    .foregroundStyle(isSelected ? theme.actionForeground : theme.action)
-                    .frame(height: 28)
-                    .accessibilityHidden(true)
-                Text(title)
-                    .font(.bighelp(.headline))
-                    .foregroundStyle(ink)
-                    .lineLimit(1)
-                Text(subtitle)
-                    .font(.bighelp(.subheadline).weight(.medium))
-                    .foregroundStyle(secondary)
-                    .lineLimit(2)
-                if !detail.isEmpty {
-                    Text(detail)
-                        .font(.bighelp(.caption))
+            BighelpRailCard(isSelected: isSelected, width: 196, height: 176) { ink, secondary in
+                VStack(alignment: .leading, spacing: BighelpTokens.space4) {
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : systemImage)
+                        .font(.bighelp(.title3))
+                        .foregroundStyle(isSelected ? theme.actionForeground : theme.action)
+                        .frame(height: 28)
+                        .accessibilityHidden(true)
+                    Text(title)
+                        .font(.bighelp(.headline))
+                        .foregroundStyle(ink)
+                        .lineLimit(1)
+                    Text(subtitle)
+                        .font(.bighelp(.subheadline).weight(.medium))
                         .foregroundStyle(secondary)
-                        .lineLimit(3)
+                        .lineLimit(2)
+                    if !detail.isEmpty {
+                        Text(detail)
+                            .font(.bighelp(.caption))
+                            .foregroundStyle(secondary)
+                            .lineLimit(3)
+                    }
+                    Spacer(minLength: 0)
                 }
-                Spacer(minLength: 0)
+                .multilineTextAlignment(.leading)
             }
-            .multilineTextAlignment(.leading)
-            .padding(BighelpTokens.space12)
-            .frame(width: 196, height: 176, alignment: .topLeading)
-            .background(RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(isSelected ? theme.action : theme.incomingMessageBackground))
-            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(isSelected ? Color.clear : theme.border, lineWidth: 1))
-            .contentShape(.rect(cornerRadius: 18))
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(title), \(subtitle)")

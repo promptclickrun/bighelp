@@ -14,7 +14,7 @@ enum ModelAdministrationAssignmentTarget: Identifiable, Equatable {
 
     var title: String {
         switch self {
-        case .main: "Profile Default"
+        case .main: "Default model"
         case .auxiliary(let task): task.replacingOccurrences(of: "_", with: " ").capitalized
         }
     }
@@ -195,11 +195,23 @@ final class ModelAdministrationStore {
     }
 }
 
+/// An agent on the host whose default model the page can show and change.
+struct ModelAdministrationAgent: Identifiable, Equatable {
+    let id: String
+    let name: String
+    let imageURL: URL?
+}
+
 @MainActor
 struct ModelAdministrationView: View {
     @State private var store: ModelAdministrationStore
     @State private var assignmentTarget: ModelAdministrationAssignmentTarget?
     @State private var confirmAuxiliaryReset = false
+    @State private var isAgentRailOpen = false
+    private let client: DirectHermesModelAdministrationClient
+    /// The agent the page opened on; the agent runtime defaults belong to it.
+    private let openedProfileID: String
+    let agents: [ModelAdministrationAgent]
     let onOpenProviderAccounts: (() -> Void)?
     let onOpenAgentDefaults: (() -> Void)?
 
@@ -207,14 +219,30 @@ struct ModelAdministrationView: View {
         hostName: String,
         profileID: String,
         client: DirectHermesModelAdministrationClient,
+        agents: [ModelAdministrationAgent] = [],
         onOpenProviderAccounts: (() -> Void)? = nil,
         onOpenAgentDefaults: (() -> Void)? = nil
     ) {
         _store = State(initialValue: ModelAdministrationStore(
             hostName: hostName, profileID: profileID, client: client
         ))
+        self.client = client
+        openedProfileID = profileID
+        self.agents = agents
         self.onOpenProviderAccounts = onOpenProviderAccounts
         self.onOpenAgentDefaults = onOpenAgentDefaults
+    }
+
+    private var agentName: String {
+        agents.first(where: { $0.id == store.profileID })?.name ?? store.profileID
+    }
+
+    /// Each agent has its own default; the page shows the chosen one's.
+    private func showAgent(_ id: String) {
+        guard id != store.profileID, !store.isBusy else { return }
+        assignmentTarget = nil
+        store.retire()
+        store = ModelAdministrationStore(hostName: store.hostName, profileID: id, client: client)
     }
 
     var body: some View {
@@ -244,9 +272,9 @@ struct ModelAdministrationView: View {
         }
         .navigationTitle("Models")
         .navigationBarTitleDisplayMode(.inline)
-        .task { if store.snapshot == nil { await store.load() } }
+        .task(id: store.profileID) { if store.snapshot == nil { await store.load() } }
         .sheet(item: $assignmentTarget) { target in
-            ModelAdministrationPicker(store: store, target: target) { assignmentTarget = nil }
+            ModelAdministrationPicker(store: store, target: target, agentName: agentName) { assignmentTarget = nil }
                 .bighelpSheetSize(.standard)
         }
         .confirmationDialog("Reset every auxiliary assignment?", isPresented: $confirmAuxiliaryReset, titleVisibility: .visible) {
@@ -260,8 +288,12 @@ struct ModelAdministrationView: View {
 
     private var scopeSection: some View {
         Section {
+            if agents.count > 1 {
+                agentPicker
+            } else {
+                LabeledContent("Agent", value: agentName)
+            }
             LabeledContent("Host", value: store.hostName)
-            LabeledContent("Profile", value: store.profileID)
         } header: {
             Text("Applies to")
         } footer: {
@@ -287,6 +319,72 @@ struct ModelAdministrationView: View {
         }
     }
 
+    /// The chosen agent; tap to see every agent's card and pick another.
+    @ViewBuilder
+    private var agentPicker: some View {
+        Button {
+            withAnimation(.snappy) { isAgentRailOpen.toggle() }
+        } label: {
+            HStack(spacing: BighelpTokens.space12) {
+                Text("Agent")
+                    .foregroundStyle(theme.primaryText)
+                Spacer(minLength: BighelpTokens.space8)
+                if let agent = agents.first(where: { $0.id == store.profileID }) {
+                    AvatarView(stableID: agent.id, displayName: agent.name, imageURL: agent.imageURL, size: 28)
+                        .accessibilityHidden(true)
+                }
+                Text(agentName)
+                    .foregroundStyle(theme.secondaryText)
+                    .lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(.bighelp(.footnote).weight(.semibold))
+                    .foregroundStyle(theme.secondaryText)
+                    .rotationEffect(.degrees(isAgentRailOpen ? 180 : 0))
+                    .accessibilityHidden(true)
+            }
+            .frame(minHeight: BighelpTokens.hitTarget)
+            .contentShape(.rect)
+        }
+        .bighelpPlainButtonStyle()
+        .accessibilityLabel("Agent")
+        .accessibilityValue(agentName)
+        .accessibilityHint(isAgentRailOpen ? "Hides the agents" : "Shows every agent to pick from")
+        .accessibilityIdentifier("models.agent")
+        if isAgentRailOpen {
+            BighelpCardRail {
+                ForEach(agents) { agent in
+                    agentCard(agent)
+                }
+            }
+            .padding(.vertical, BighelpTokens.space4)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("models.agents")
+        }
+    }
+
+    private func agentCard(_ agent: ModelAdministrationAgent) -> some View {
+        let isSelected = agent.id == store.profileID
+        return Button { showAgent(agent.id) } label: {
+            BighelpRailCard(isSelected: isSelected, width: 104, alignment: .top) { ink, _ in
+                VStack(spacing: BighelpTokens.space8) {
+                    AvatarView(stableID: agent.id, displayName: agent.name, imageURL: agent.imageURL, size: 48)
+                    Text(agent.name)
+                        .font(.bighelp(.subheadline).weight(.semibold))
+                        .foregroundStyle(ink)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .bighelpPlainButtonStyle()
+        .disabled(store.isBusy && !isSelected)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(agent.name)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+        .accessibilityIdentifier("models.agent.\(agent.id)")
+    }
+
     private func runtimeSection(_ runtime: DirectHermesRuntimeStatus) -> some View {
         Section("Readiness") {
             LabeledContent("New sessions", value: runtime.isUsable ? "Ready" : "Needs attention")
@@ -295,6 +393,7 @@ struct ModelAdministrationView: View {
             if let onOpenProviderAccounts {
                 Button("Open Provider Keys", action: onOpenProviderAccounts)
                     .frame(minHeight: BighelpTokens.hitTarget)
+                    .accessibilityIdentifier("models.open-provider-keys")
             }
         }
     }
@@ -310,7 +409,7 @@ struct ModelAdministrationView: View {
             ) {
                 assignmentTarget = .main
             }
-            .accessibilityLabel("Choose the profile default model")
+            .accessibilityLabel("Choose \(agentName)'s default model")
             .accessibilityValue(snapshot.info.modelID.isEmpty ? "Not configured"
                                 : ModelNameCatalogStore.shared.displayName(for: snapshot.info.modelID))
             .accessibilityIdentifier("models.main")
@@ -323,7 +422,7 @@ struct ModelAdministrationView: View {
                 Text("Recommended for \(recommendation.providerID): \(recommendation.modelID)")
                     .font(.bighelp(.footnote)).foregroundStyle(.secondary)
             }
-            if let onOpenAgentDefaults {
+            if let onOpenAgentDefaults, store.profileID == openedProfileID {
                 Button("Agent runtime defaults", action: onOpenAgentDefaults)
                     .frame(minHeight: BighelpTokens.hitTarget)
             }
@@ -407,22 +506,25 @@ struct ModelAdministrationView: View {
             }
         }
     }
+
+    @BighelpThemeReader private var theme
 }
 
-/// The chat's model picker for a profile default or an auxiliary task.
+/// The chat's model picker for an agent's default model or an auxiliary task.
 @MainActor
 private struct ModelAdministrationPicker: View {
     let store: ModelAdministrationStore
     let target: ModelAdministrationAssignmentTarget
+    let agentName: String
     let close: () -> Void
 
     var body: some View {
         let current = currentSelection
         BighelpModelPickerSheet(
-            title: target == .main ? "Profile default" : target.title,
+            title: target.title,
             scopeLabel: target == .main
-                ? "New chats on \(store.profileID)"
-                : "Auxiliary task on \(store.profileID)",
+                ? "New chats with \(agentName)"
+                : "Auxiliary task for \(agentName)",
             providers: (store.snapshot?.providers ?? []).map(BighelpLinkModelProvider.init(administration:)),
             currentProviderID: current?.providerID,
             currentModelID: current?.modelID,
@@ -432,7 +534,7 @@ private struct ModelAdministrationPicker: View {
             onClearError: store.clearError,
             onRetry: { Task { await store.refresh() } },
             onSelect: { _, _ in },
-            applyTitle: target == .main ? "Save as profile default" : "Save for this task",
+            applyTitle: target == .main ? "Save as default" : "Save for this task",
             defaultModelTitle: target == .main ? "Not configured" : "Automatic",
             onApply: { draft in
                 guard let providerID = draft.providerID, let modelID = draft.modelID else { return }

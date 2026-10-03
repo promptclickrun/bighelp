@@ -68,6 +68,8 @@ struct RootShellView: View {
     @State private var newChatStartID: UUID?
     @State private var fixtureCanonicalSessions: [String: String] = [:]
     @State var workspaceFixtureGeneration = UUID()
+    /// Demo runs' connection; `-demo-reconnects-on-return` makes each return a reconnect.
+    @State var workspaceFixtureConnection = UUID()
     @State private var cardInteractionStore = BighelpCardInteractionStore()
     /// The all-hosts view asking which host a one-host screen is for.
     @State var fleetGateRequest: FleetDestination?
@@ -192,6 +194,8 @@ struct RootShellView: View {
         .onChange(of: hostRegistry?.onboardingHostID) { _, _ in
             reconcileRestoredHostOnboardingState()
         }
+        .modifier(DemoReconnectOnReturn(scenePhase: scenePhase, connection: $workspaceFixtureConnection,
+                                        isEnabled: usesWorkspaceFixtures))
         .modifier(WorkspacePresentationContinuity(
             owner: currentWorkspaceOwner, registryGeneration: hostRegistry?.generation,
             isHostSettled: nativeRuntime.map { $0.isReady && !$0.isSuspended && !$0.isRefreshing } ?? true,

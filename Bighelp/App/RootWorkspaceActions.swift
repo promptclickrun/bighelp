@@ -23,6 +23,7 @@ extension RootShellView {
                 reason: "Open this feature again after connecting to the selected host and profile.")
         }
     }
+
     func openWorkspaceDestination(_ destination: WorkspaceDestination) {
         _ = presentWorkspaceDestination(destination, reattaching: false)
     }
@@ -49,9 +50,12 @@ extension RootShellView {
         lifecycleCoordinator = nil
         lifecycleProfileID = nil
         lifecyclePresentationID = nil
-        if NativeAdministrationPresentation.supports(destination), !usesWorkspaceFixtures {
+        if opensHostAdministration(destination) {
             var presentation: NativeAdministrationPresentation?
-            if let owner = currentWorkspaceOwner,
+            if usesWorkspaceFixtures {
+                presentation = makeDemoAdministrationPresentation(destination)
+                if presentation == nil, reattaching { return false }
+            } else if let owner = currentWorkspaceOwner,
                let connections = workspaceConnections,
                let direct = connections.hosts.selectedWorkspace?.nativeClient,
                let invalidationSource = connections.nativeInvalidationSource(authority: owner.authority) {
@@ -173,6 +177,23 @@ extension RootShellView {
             appState.open(.workspaceManagement(destination))
         }
         return true
+    }
+
+    /// Demo runs: the same host page on made-up data (`DemoModels`).
+    private func makeDemoAdministrationPresentation(_ destination: WorkspaceDestination) -> NativeAdministrationPresentation? {
+        #if DEBUG
+        guard let owner = administrationOwner else { return nil }
+        let profileID = workspaceAgentID
+        let transport = DemoModels.transport
+        return NativeAdministrationPresentation(
+            destination: destination, hostName: workspaceHostName, profileID: profileID,
+            servingProfileID: profileID, rpc: transport, http: transport, owner: owner, currentOwner: {
+                guard Data(workspaceAgentID.utf8) == Data(profileID.utf8) else { return nil }
+                return administrationOwner
+            }, connections: nil, invalidationSource: nil)
+        #else
+        return nil
+        #endif
     }
 
     private func makeWorkspaceManagementStore() -> WorkspaceManagementStore? {

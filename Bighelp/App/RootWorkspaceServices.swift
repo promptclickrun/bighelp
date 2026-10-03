@@ -8,7 +8,7 @@ extension RootShellView {
         if usesWorkspaceFixtures {
             guard let authority = try? WorkspaceAuthority.fixture(id: demoHosts.selectedHostID ?? "demo") else { return nil }
             return WorkspaceOwner(authority: authority, authenticationGeneration: workspaceFixtureGeneration,
-                                  connectionGeneration: workspaceFixtureGeneration)
+                                  connectionGeneration: workspaceFixtureConnection)
         }
         return nil
     }
@@ -17,6 +17,41 @@ extension RootShellView {
     /// reconnect, including while the connection is on its way back.
     func isCurrentSignIn(_ owner: WorkspaceOwner) -> Bool {
         (currentWorkspaceOwner?.signIn ?? workspaceSignIn) == owner.signIn
+    }
+
+    /// The owner host pages (Default model, Provider Keys, the Nerd Mode tools)
+    /// are opened for. Demo runs stand a direct sign-in in for their fixture one,
+    /// so the demo's Default model page is the real one.
+    var administrationOwner: WorkspaceOwner? {
+        #if DEBUG
+        if usesWorkspaceFixtures { return currentWorkspaceOwner.flatMap(DemoModels.owner(standingInFor:)) }
+        #endif
+        return currentWorkspaceOwner
+    }
+
+    /// The sign-in host pages belong to, kept while the connection is away.
+    var administrationSignIn: WorkspaceSignIn? {
+        if let owner = administrationOwner { return owner.signIn }
+        #if DEBUG
+        if usesWorkspaceFixtures { return workspaceSignIn.flatMap(DemoModels.signIn(standingInFor:)) }
+        #endif
+        return workspaceSignIn
+    }
+
+    /// Host pages with a connection of their own (`NativeAdministrationPresentation`).
+    func opensHostAdministration(_ destination: WorkspaceDestination) -> Bool {
+        guard NativeAdministrationPresentation.supports(destination) else { return false }
+        #if DEBUG
+        // Provider Keys shows `DemoProviderKeys`, but opens like a host's so the
+        // pages under it see what they would with one.
+        if usesWorkspaceFixtures { return destination == .models || destination == .keys }
+        #endif
+        return !usesWorkspaceFixtures
+    }
+
+    /// Default model's agent picker: every agent on this computer.
+    var modelAdministrationAgents: [ModelAdministrationAgent] {
+        agents.profiles.map { ModelAdministrationAgent(id: $0.id, name: $0.name, imageURL: agents.avatarURL(for: $0)) }
     }
 
     var currentWorkspaceCapabilities: WorkspaceCapabilities {

@@ -54,3 +54,29 @@ enum WorkspaceReconnect: Equatable {
         signIn == previous ? .sameSignIn : .boundary
     }
 }
+
+/// Demo runs have no connection to lose. With `-demo-reconnects-on-return`,
+/// coming back from the background is a reconnect, as it is with a host: a new
+/// connection for the same sign-in.
+struct DemoReconnectOnReturn: ViewModifier {
+    static let launchArgument = "-demo-reconnects-on-return"
+
+    let scenePhase: ScenePhase
+    @Binding var connection: UUID
+    let isEnabled: Bool
+
+    @State private var wasInBackground = false
+
+    func body(content: Content) -> some View {
+        content.onChange(of: scenePhase) { _, phase in
+            guard isEnabled, ProcessInfo.processInfo.arguments.contains(Self.launchArgument) else { return }
+            switch phase {
+            case .background: wasInBackground = true
+            case .active where wasInBackground:
+                wasInBackground = false
+                connection = UUID()
+            default: break
+            }
+        }
+    }
+}

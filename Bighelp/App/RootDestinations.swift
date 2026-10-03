@@ -121,12 +121,12 @@ extension RootShellView {
                     }
                 } else if let kind = CapabilitiesManagementKind(destination: destination), !usesWorkspaceFixtures {
                     nativeCapabilitiesDestination(kind, destination: destination)
-                } else if NativeAdministrationPresentation.supports(destination), !usesWorkspaceFixtures {
+                } else if opensHostAdministration(destination) {
                     if let presentation = administrationPresentation,
                        presentation.destination == destination,
-                       isCurrentSignIn(presentation.owner), presentation.profileID == workspaceAgentID {
+                       administrationSignIn == presentation.owner.signIn, presentation.profileID == workspaceAgentID {
                         NativeAdministrationDestination(presentation: presentation,
-                            permissionCenter: permissionCenter,
+                            permissionCenter: permissionCenter, agents: modelAdministrationAgents,
                             onOpenProviderAccounts: { openWorkspaceDestination(.keys) },
                             onOpenAgentDefaults: { openWorkspaceDestination(.profiles) })
                     } else {

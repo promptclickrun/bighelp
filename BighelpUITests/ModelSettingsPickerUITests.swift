@@ -10,7 +10,7 @@ final class ModelSettingsPickerUITests: BighelpUITestCase {
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-test-models-page"]
         app.launch()
 
-        // Profile default: the shared picker, then save.
+        // The default model: the shared picker, then save.
         let main = app.buttons["models.main"]
         XCTAssertTrue(main.waitForExistence(timeout: 10))
         save("01-models-page", app)
@@ -25,8 +25,8 @@ final class ModelSettingsPickerUITests: BighelpUITestCase {
         XCTAssertTrue(sonnet.waitForExistence(timeout: 3))
         sonnet.tap()
         let apply = app.buttons["model-picker.apply"]
-        XCTAssertEqual(apply.label, "Save as profile default")
-        save("02-profile-default-picker", app)
+        XCTAssertEqual(apply.label, "Save as default")
+        save("02-default-model-picker", app)
         apply.tap()
         XCTAssertTrue(surface.waitForNonExistence(timeout: 5))
         XCTAssertTrue((main.value as? String)?.contains("Sonnet 5") == true, String(describing: main.value))

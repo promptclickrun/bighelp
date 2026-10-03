@@ -5,9 +5,9 @@ import UIKit
 extension RootShellView {
     @ViewBuilder
     func routeDestination(_ route: AppRoute) -> some View {
-        if nativeWorkspaceStore != nil, nativeRuntime == nil, !isAccountDeviceRoute(route) {
+        if nativeWorkspaceStore != nil, nativeRuntime == nil {
             ContentUnavailableView("Not available on this host", systemImage: "server.rack",
-                description: Text("This capability is not connected through the selected native host. No request was forwarded through Link."))
+                description: Text("This capability is not connected through the selected native host."))
         } else {
         switch (route, featureStore.preparedModel(for: route)) {
         case (.workspaceActivity, _):
@@ -145,7 +145,7 @@ extension RootShellView {
             ChatDestinationView(
                 model: model,
                 appState: appState,
-                linkDevices: linkDevices,
+                demoHosts: demoHosts,
                 settings: settings,
                 featureStore: featureStore,
                 catalog: sessionCatalog,
@@ -162,8 +162,7 @@ extension RootShellView {
                 sessionOrganizationHostID: sessionOrganizationHostID,
                 responseHapticsCoveredByRoot: isHomeDrawerPresented
                     || isHostStatusPresented
-                    || isHermesWorkspacePresented || isLinkAccountPresented
-                    || pairingSheetRequest != nil || actionErrorMessage != nil,
+                    || isHermesWorkspacePresented || actionErrorMessage != nil,
                 onNewChat: { startNewChat(explicitAgentID: nil) },
                 onStartSession: {
                     startNewChat(explicitAgentID: model.memberIDs.first)
@@ -210,24 +209,6 @@ extension RootShellView {
         case (.approval, .approval(let model)?):
             routeWithWorkspaceMenu {
                 ApprovalDestinationView(model: model)
-            }
-        case (.bighelpLinkDevices, _):
-            routeWithWorkspaceMenu {
-                BighelpLinkDevicesView(
-                    store: linkDevices,
-                    onOpenDevice: { device in
-                        appState.open(.bighelpLinkDevice(id: device.id))
-                    },
-                    onPairDevice: presentPairing
-                )
-            }
-        case (.bighelpLinkDevice(let id), _):
-            routeWithWorkspaceMenu {
-                BighelpLinkDeviceDetailView(
-                    store: linkDevices,
-                    deviceID: id,
-                    onUnpaired: { closeLinkDevice(id: id) }
-                )
             }
         default:
             ContentUnavailableView(

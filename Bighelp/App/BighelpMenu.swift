@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// Hosts the menu can switch between: independently connected hosts, or hosts
-/// paired through bighelp Link.
+/// Hosts the menu can switch between: connected hosts, or demo mode's sample ones.
 struct BighelpMenuHosts {
     struct Host: Identifiable, Equatable {
         let id: String
@@ -21,7 +20,7 @@ struct BighelpMenuHosts {
     var allHosts: AllHosts?
 
     @MainActor
-    static func current(registry: BighelpHostRegistry?, linkDevices: BighelpLinkDeviceStore?) -> BighelpMenuHosts {
+    static func current(registry: BighelpHostRegistry?, demoHosts: DemoHosts?) -> BighelpMenuHosts {
         let add: (() -> Void)? = registry.flatMap { registry in
             registry.canConfigureHosts ? { registry.beginSetup() } : nil
         }
@@ -34,15 +33,12 @@ struct BighelpMenuHosts {
                 add: add
             )
         }
-        if let linkDevices {
-            let paired = BighelpLinkDeviceSections(devices: linkDevices.devices).hosts
-            if !paired.isEmpty {
-                return BighelpMenuHosts(
-                    hosts: paired.map { Host(id: $0.id, name: $0.name, isSelected: $0.id == linkDevices.selectedHostID) },
-                    select: { id in _ = linkDevices.selectHost(id) },
-                    add: add
-                )
-            }
+        if let demoHosts, !demoHosts.hosts.isEmpty {
+            return BighelpMenuHosts(
+                hosts: demoHosts.hosts.map { Host(id: $0.id, name: $0.name, isSelected: $0.id == demoHosts.selectedHostID) },
+                select: { id in _ = demoHosts.selectHost(id) },
+                add: add
+            )
         }
         return BighelpMenuHosts(add: add)
     }
@@ -389,11 +385,11 @@ struct BighelpMenuChatRow: View {
 /// The bighelp lockup in the top bar. Touch and hold it to switch hosts; on
 /// the Mac, click it.
 struct EmberHostSwitcherLockup: View {
-    var linkDevices: BighelpLinkDeviceStore?
+    var demoHosts: DemoHosts?
     @Environment(\.bighelpHostRegistry) private var registry
 
     var body: some View {
-        let hosts = BighelpMenuHosts.current(registry: registry, linkDevices: linkDevices)
+        let hosts = BighelpMenuHosts.current(registry: registry, demoHosts: demoHosts)
         if hosts.hosts.count + (hosts.add == nil ? 0 : 1) > 0 {
             #if targetEnvironment(macCatalyst)
             // A click that does nothing reads as broken on a Mac, where holding is rare.

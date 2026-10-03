@@ -39,7 +39,7 @@ struct ChatDestinationView: View {
     @State private var projectChangesPanelDragStartWidth: CGFloat?
 
     let appState: AppState
-    let linkDevices: BighelpLinkDeviceStore
+    let demoHosts: DemoHosts
     let settings: SettingsStore
     let featureStore: ShellFeatureStore
     let catalog: SessionCatalogStore
@@ -116,7 +116,7 @@ struct ChatDestinationView: View {
     init(
         model: ChatModel,
         appState: AppState,
-        linkDevices: BighelpLinkDeviceStore,
+        demoHosts: DemoHosts,
         settings: SettingsStore,
         featureStore: ShellFeatureStore,
         catalog: SessionCatalogStore,
@@ -148,7 +148,7 @@ struct ChatDestinationView: View {
     ) {
         self.model = model
         self.appState = appState
-        self.linkDevices = linkDevices
+        self.demoHosts = demoHosts
         self.settings = settings
         self.featureStore = featureStore
         self.catalog = catalog
@@ -867,7 +867,7 @@ struct ChatDestinationView: View {
         Group {
             QuickWorkspaceDrawer(
                 content: quickWorkspaceContent,
-                hostDevices: linkDevices,
+                demoHosts: demoHosts,
                 settings: settings,
                 sessionOrganizationAccountID: sessionOrganizationAccountID,
                 sessionOrganizationHostID: sessionOrganizationHostID,
@@ -912,7 +912,7 @@ struct ChatDestinationView: View {
         Group {
             QuickWorkspaceDrawer(
                 content: quickWorkspaceContent,
-                hostDevices: linkDevices,
+                demoHosts: demoHosts,
                 settings: settings,
                 sessionOrganizationAccountID: sessionOrganizationAccountID,
                 sessionOrganizationHostID: sessionOrganizationHostID,

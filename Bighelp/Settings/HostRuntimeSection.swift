@@ -3,7 +3,6 @@ import SwiftUI
 @MainActor
 struct HostRuntimeSection: View {
     let store: HostRuntimeStore?
-    let connectionState: BighelpLinkLiveSocketState?
     let agents: AgentDirectoryStore?
     let theme: BighelpTheme
 
@@ -15,7 +14,6 @@ struct HostRuntimeSection: View {
 
     var body: some View {
         Section {
-            LabeledContent("bighelp Link", value: connectionState.map { SettingsLinkConnectionPresentation(state: $0).title } ?? "Unknown")
             VStack(alignment: .leading, spacing: BighelpTokens.space8) {
                 Text(title).bighelpFont(.label, weight: .semibold)
                 Text(detail).bighelpFont(.body)

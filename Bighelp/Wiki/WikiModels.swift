@@ -1,21 +1,6 @@
 import CryptoKit
 import Foundation
 
-// Wiki helpers stay in the iOS target; shared credentials also build on Watch.
-extension BighelpLinkRuntimeCredentials {
-    /// Opaque local Wiki namespace, not a server account identifier. Never store the key.
-    /// Device replacement, epoch rotation and signing-key rotation do not change it.
-    var wikiAccountID: String {
-        let domain = Data("loopdy.wiki.local-account.v1\0".utf8)
-        return SHA256.hash(data: domain + accountKey).map { String(format: "%02x", $0) }.joined()
-    }
-
-    func wikiOwner(hostID: String, profileID: String) -> WikiOwner {
-        WikiOwner(accountID: wikiAccountID, hostID: hostID, profileID: profileID,
-                  deviceID: deviceID, authorizationEpoch: String(authorizationEpoch))
-    }
-}
-
 struct WikiOwner: Codable, Hashable, Sendable {
     enum Authority: Hashable, Sendable {
         case link(accountID: String, hostID: String, deviceID: String, authorizationEpoch: String)

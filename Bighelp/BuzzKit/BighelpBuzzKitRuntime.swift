@@ -463,7 +463,6 @@ final class BighelpBuzzKitRuntime {
         case .requestFailed(_, let code): return code
         case .invalidResponse: return "identity_invalid_response"
         case .invalidConfiguration: return "identity_invalid_configuration"
-        case .pairingIdentityMismatch: return "identity_pairing_mismatch"
         }
     }
 
@@ -509,7 +508,6 @@ final class BighelpBuzzKitRuntime {
             case .requestFailed(let status, let code): return "link_backend_\(status)_\(code)"
             case .invalidResponse: return "readiness_invalid_response"
             case .invalidConfiguration: return "readiness_invalid_configuration"
-            case .pairingIdentityMismatch: return "readiness_pairing_mismatch"
             }
         }
         if error is DecodingError { return "readiness_decode_failed" }

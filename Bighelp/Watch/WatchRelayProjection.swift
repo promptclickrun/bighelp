@@ -128,10 +128,9 @@ enum WatchRelayProjection {
             }
     }
 
-    /// Only bighelp's own links, and never the retired pairing links.
+    /// Only bighelp's own links.
     static func openableURL(_ string: String) -> URL? {
-        guard let url = URL(string: string), let route = BighelpIncomingURLRoute.parse(url) else { return nil }
-        if case .pairBighelpLink = route { return nil }
+        guard let url = URL(string: string), BighelpIncomingURLRoute.parse(url) != nil else { return nil }
         return url
     }
 

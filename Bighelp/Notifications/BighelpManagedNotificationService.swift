@@ -328,8 +328,6 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
             method: "GET", body: nil, isCurrent: { (try? check()) != nil }))
         try check()
         guard claimed == observed else { throw DirectHermesError.invalidResponse }
-        try await identity.bindWakeRouting(credentials: credentials, grantID: observed.grantId)
-        try check()
         grant = observed; record.grant = grant; record.enabled = true
         record.creationBody = nil
         try ledger.save(record)
@@ -574,27 +572,11 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
     /// Cloud device/account revocation belongs to the existing account flow.
     func retireForAccountBoundary() {
         opening = nil
-        (api as? BighelpLinkAPI)?.invalidateManagedNotificationReadiness()
         for host in registry.hosts {
             retiredHosts.insert(host.notificationScope + ":" + host.hostConnectionID)
             activityRuntime?.retire(host: host)
         }
     }
-    /// Main calls after its eraser successfully removes this ledger's root AND
-    /// managed activity Keychain service, not merely after hiding the account UI.
-    func didEraseAccountData() { ledger.didEraseAccountData() }
-
-    /// Explicit notification-data erase. Host grants and the dedicated installation
-    /// are still authoritatively revoked, but BuzzKit provider availability is not a
-    /// prerequisite for erasing app-owned identity and ledger authority.
-    func eraseNotificationIdentity() async throws {
-        retireForAccountBoundary()
-        try await reconcilePendingRevocations()
-        await buzzKit.retireIdentityForLocalErasure()
-        try await identity.erase()
-        ledger.didEraseAccountData()
-    }
-
     // MARK: Turn off notifications
 
     /// Anything left to turn off: an identity, grants, a host marked enabled,
@@ -750,15 +732,6 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
             try await buzzKit.identify(accountAPI: api, credentials: credentials)
         }
         try requireCurrentNotificationIdentity(credentials)
-        if let grant = ledger.enrollments.lazy.filter({
-            $0.accountID == credentials.deviceID && $0.enabled && !$0.revokePending
-        }).compactMap(\.grant).first(where: {
-            $0.subscriberScope == credentials.subscriberScope && $0.authorizationEpoch == credentials.authorizationEpoch
-                && $0.state == "active" && $0.expiresAt > timestamp
-        }) {
-            try await identity.bindWakeRouting(credentials: credentials, grantID: grant.grantId)
-            try requireCurrentNotificationIdentity(credentials)
-        }
         return .current
     }
     func refreshNotificationRuntime() async throws -> BighelpNotificationRuntimeSnapshot {

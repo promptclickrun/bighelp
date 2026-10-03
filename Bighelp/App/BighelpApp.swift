@@ -23,10 +23,8 @@ struct BighelpApp: App {
     @State private var agentDirectory: AgentDirectoryStore
     private let agentRuntimeDefaults: any AgentRuntimeDefaultsClient
     @State private var botModeRooms: BotModeRoomStore
-    @State private var linkAccount: BighelpLinkAccountStore
-    @State private var linkDevices: BighelpLinkDeviceStore
+    @State private var demoHosts: DemoHosts
     @State private var permissionCenter: PermissionCenter
-    @State private var permissionsOnboarding: PermissionsOnboardingModel
     @State private var sessionCatalog: SessionCatalogStore
     @State private var personalities: PersonalityStore
     @State private var skillsAndTools: SkillsAndToolsStore
@@ -49,7 +47,7 @@ struct BighelpApp: App {
     #if os(visionOS)
     @State private var spatialAvatar: SpatialAvatarModel
     #endif
-    private let requiresLinkAccount: Bool
+    private let usesDemoFixtures: Bool
     private let clearLocalCache: @MainActor () async -> Bool
     @Environment(\.scenePhase) private var scenePhase
 
@@ -112,23 +110,8 @@ struct BighelpApp: App {
         _agentDirectory = State(initialValue: composition.agentDirectory)
         agentRuntimeDefaults = composition.agentRuntimeDefaults
         _botModeRooms = State(initialValue: composition.botModeRooms)
-        _linkAccount = State(initialValue: composition.linkAccount)
         let hostRegistry = DirectHermesApplicationFactory.makeRegistry()
-        hostRegistry.restoreConnectionSelection(deviceID: composition.linkAccount.credentials?.deviceID,
-            authorizationEpoch: composition.linkAccount.credentials?.authorizationEpoch)
-        #if DEBUG
-        if arguments.contains("-force-signed-out-onboarding") {
-            hostRegistry.useIndependentWorkspace()
-        }
-        if !composition.requiresLinkAccount && arguments.contains("-test-no-configured-hosts") {
-            hostRegistry.bind(deviceID: "fixture-account", authorizationEpoch: 1)
-        }
-        #endif
-        let priorAccountClear = composition.linkAccount.onLocalAccountCleared
-        composition.linkAccount.onLocalAccountCleared = {
-            hostRegistry.bind(deviceID: nil, authorizationEpoch: nil)
-            priorAccountClear()
-        }
+        hostRegistry.useIndependentWorkspace()
         _hostRegistry = State(initialValue: hostRegistry)
         var fleet = FleetStore(reader: RegistryFleetReader(registry: hostRegistry))
         #if DEBUG
@@ -200,8 +183,7 @@ struct BighelpApp: App {
         AppDependencyManager.shared.add(dependency: composition.shortcutService)
         let notificationComposition = BighelpManagedNotificationComposition(
             factory: composition.managedNotificationFactory,
-            registry: hostRegistry,
-            account: composition.linkAccount
+            registry: hostRegistry
         )
         _notificationComposition = State(initialValue: notificationComposition)
 
@@ -213,9 +195,8 @@ struct BighelpApp: App {
                 await notificationComposition?.receiveNativeEvent(host, event)
             }
         }
-        _linkDevices = State(initialValue: composition.linkDevices)
+        _demoHosts = State(initialValue: composition.demoHosts)
         _permissionCenter = State(initialValue: composition.permissionCenter)
-        _permissionsOnboarding = State(initialValue: composition.permissionsOnboarding)
         _sessionCatalog = State(initialValue: composition.sessionCatalog)
         _personalities = State(initialValue: composition.personalities)
         _skillsAndTools = State(initialValue: composition.skillsAndTools)
@@ -236,7 +217,7 @@ struct BighelpApp: App {
         _newChatCoordinator = State(initialValue: composition.newChatCoordinator)
         shortcutService = composition.shortcutService
         _reflectiveVisionCamera = State(initialValue: ReflectiveVisionCamera())
-        requiresLinkAccount = composition.requiresLinkAccount
+        usesDemoFixtures = composition.usesDemoFixtures
         clearLocalCache = composition.clearLocalCache
         #if os(visionOS)
         _spatialAvatar = State(initialValue: Self.makeSpatialAvatar(composition, arguments: arguments))
@@ -373,10 +354,8 @@ struct BighelpApp: App {
             agents: native?.agents ?? agentDirectory,
             agentRuntimeDefaults: native?.defaults ?? agentRuntimeDefaults,
             botModeRooms: native?.rooms ?? botModeRooms,
-            linkAccount: linkAccount,
-            linkDevices: linkDevices,
+            demoHosts: demoHosts,
             permissionCenter: permissionCenter,
-            permissionsOnboarding: permissionsOnboarding,
             personalities: native?.personalities ?? personalities,
             skillsAndTools: native?.skillsAndTools ?? skillsAndTools,
             hermesWorkspaces: native?.projects ?? hermesWorkspaces,
@@ -384,7 +363,7 @@ struct BighelpApp: App {
             userIdentity: userIdentity,
             newChatCoordinator: native?.newChat ?? newChatCoordinator,
             shortcutService: shortcutService,
-            requiresLinkAccount: requiresLinkAccount,
+            usesDemoFixtures: usesDemoFixtures,
             clearLocalCache: clearLocalCache,
             nativeRuntime: native,
             nativeWorkspaceError: nativeWorkspaces.errorMessage,
@@ -484,12 +463,6 @@ struct BighelpApp: App {
                 _ = notificationComposition.retryAfterProtectedDataBecomesAvailable()
             }
             .environment(\.directHermesWorkspace, hostRegistry.selectedWorkspace)
-            .onChange(of: linkAccount.credentials, initial: true) { _, credentials in
-                #if DEBUG
-                if !requiresLinkAccount && ProcessInfo.processInfo.arguments.contains("-test-no-configured-hosts") { return }
-                #endif
-                hostRegistry.bind(deviceID: credentials?.deviceID, authorizationEpoch: credentials?.authorizationEpoch)
-            }
             .environment(\.bighelpUIV2Enabled, settings.uiV2Enabled)
             .environment(\.bighelpUIV3Enabled, settings.interfaceVersion == .v3)
             .environment(\.nerdModeEnabled, settings.nerdModeEnabled)
@@ -552,7 +525,7 @@ struct BighelpApp: App {
                     }
                 }
                 #endif
-                if requiresLinkAccount, phase == .background {
+                if !usesDemoFixtures, phase == .background {
                     (native?.features ?? featureStore).flushChatPersistence()
                     // Keep the workspace through a quick trip away; mark the
                     // presentation boundary only if the app stays away.
@@ -655,24 +628,14 @@ struct BighelpApp: App {
     private var usesFixtureWorkspace: Bool {
         // Only synthetic previews use the fixture feature graph. Production
         // chat is selected from the independently authenticated host registry.
-        !requiresLinkAccount && hostRegistry.selectedHostID == nil
+        usesDemoFixtures && hostRegistry.selectedHostID == nil
     }
 
     private var companionAgentScope: String {
-        if let credentials = linkAccount.credentials, let host = hostRegistry.selectedHost {
-            return CompanionSurfaceScope.accountHost(deviceID: credentials.deviceID,
-                authorizationEpoch: credentials.authorizationEpoch, hostID: host.hostConnectionID)
-        }
         #if DEBUG
-        if !requiresLinkAccount { return "fixture-account:fixture-host" }
+        if usesDemoFixtures { return "fixture-account:fixture-host" }
         #endif
-        guard let credentials = linkAccount.credentials,
-              let hostID = linkDevices.selectedHostID else { return "" }
-        return CompanionSurfaceScope.accountHost(
-            deviceID: credentials.deviceID,
-            authorizationEpoch: credentials.authorizationEpoch,
-            hostID: hostID
-        )
+        return ""
     }
 
 }

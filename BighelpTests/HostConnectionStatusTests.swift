@@ -84,27 +84,6 @@ struct HostConnectionStatusTests {
 
         #expect(shown(HostConnectionStatus(dashboardIsConnected: true))! == (.connected, "Connected"))
         #expect(shown(HostConnectionStatus(dashboardIsConnected: false))! == (.reconnecting, "Reconnecting"))
-
-        let link: [(BighelpLinkLiveSocketState, BighelpConnectionPhase, String)] = [
-            (.stopped, .disconnected, "Disconnected"), (.connecting, .connecting, "Connecting"),
-            (.retrying, .reconnecting, "Reconnecting"), (.superseded, .disconnected, "Connection moved"),
-            (.verified, .connected, "Connected"),
-        ]
-        for (state, phase, label) in link {
-            #expect(shown(HostConnectionStatus(link: state))! == (phase, label), "\(state)")
-        }
-
-        #expect(shown(HostConnectionStatus(linkSignedIn: false, devices: [], loadState: .loaded))!
-                == (.disconnected, "Not signed in"))
-        #expect(HostConnectionStatus(linkSignedIn: true, devices: [], loadState: .loading).phase == .connecting)
-        #expect(shown(HostConnectionStatus(linkSignedIn: true, devices: [], loadState: .failed))!
-                == (.disconnected, "Needs attention"))
-        #expect(shown(HostConnectionStatus(linkSignedIn: true, devices: [], loadState: .loaded))!
-                == (.disconnected, "Not paired"))
-        #expect(shown(HostConnectionStatus(linkSignedIn: true, devices: [Self.host(.online)], loadState: .loaded))!
-                == (.connected, "Connected"))
-        #expect(shown(HostConnectionStatus(linkSignedIn: true, devices: [Self.host(.offline)], loadState: .loaded))!
-                == (.disconnected, "Offline"))
     }
 
     @Test func aPluginUpdateIsReconnectingOnlyWhileHermesComesBack() async {
@@ -135,7 +114,7 @@ struct HostConnectionStatusTests {
             HostConnectionStatus(fleet: .loading, hostName: "Studio Mac"),
             HostConnectionStatus(fleet: .ready, hostName: "Studio Mac"),
             HostConnectionStatus(fleetSwitchTo: "Studio Mac", isConnecting: false, hasTried: true),
-            HostConnectionStatus(dashboardIsConnected: false), HostConnectionStatus(link: .retrying),
+            HostConnectionStatus(dashboardIsConnected: false),
         ]
         for status in statuses {
             #expect(status != nil)
@@ -147,11 +126,6 @@ struct HostConnectionStatusTests {
         #expect(blank?.detail?.attempt == nil)
         #expect(blank?.detail?.latencyMilliseconds == nil)
         #expect(blank?.detail?.hermesVersion == nil)
-    }
-
-    private static func host(_ connection: BighelpLinkConnectionState) -> BighelpLinkDevice {
-        BighelpLinkDevice(id: "hermes-host", name: "Hermes Mac", kind: .hermesHost, isCurrentDevice: false,
-                          connection: connection, pushState: .ready, lastSeenAt: nil, revision: 1)
     }
 }
 

@@ -1070,7 +1070,6 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         if ProcessInfo.processInfo.environment["NATIVE_PROBE_AGENT_HOME"] == "1" {
             app.launchArguments += ["-loopdy.home.opens-chat", "YES"]
         }
-        app.launchEnvironment["BIGHELP_TEST_LINK_ORIGIN"] = try XCTUnwrap(config["link_origin"])
         app.launch()
         let getStarted = app.buttons["onboarding.get-started"]
         XCTAssertTrue(getStarted.waitForExistence(timeout: 15))

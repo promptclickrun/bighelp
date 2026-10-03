@@ -54,10 +54,6 @@ final class AppState {
         select(.scheduledTasks)
     }
 
-    func openBighelpLinkDevices() {
-        path = [.bighelpLinkDevices]
-    }
-
     func openInbox() {
         select(.inbox)
     }
@@ -81,18 +77,13 @@ final class AppState {
     }
 
     func resetForHostBoundary() {
-        // Paired-device controls belong to the account and remain useful after
-        // selecting a host (for example, Set as Primary). Host-owned routes do not.
-        let showsOnlyAccountDevices = !path.isEmpty && path.allSatisfy { route in
-            switch route {
-            case .bighelpLinkDevices, .bighelpLinkDevice, .workspaceConnections: true
-            default: false
-            }
-        }
-        if !showsOnlyAccountDevices {
+        // The connections screen stays up while you switch hosts from it.
+        // Host-owned routes do not.
+        let showsOnlyConnections = !path.isEmpty && path.allSatisfy { $0 == .workspaceConnections }
+        if !showsOnlyConnections {
             selectedTab = .sessions
+            path.removeAll()
         }
-        if !showsOnlyAccountDevices { path.removeAll() }
         activeConversationID = nil
         pendingVoiceConversationID = nil
         pendingComposerText = nil

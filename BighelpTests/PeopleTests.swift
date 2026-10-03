@@ -31,12 +31,12 @@ struct PeopleTests {
         #expect(UserIdentity.savedName(long).count == 40)
     }
 
-    @Test func clearingYourNameRemovesIt() async throws {
+    @Test func clearingYourNameRemovesIt() {
         let defaults = UserDefaults(suiteName: "people-\(UUID().uuidString)")!
         let store = UserIdentityStore(defaults: defaults)
-        try await store.saveDisplayName("Colt", to: nil)
+        store.saveDisplayName("Colt")
         #expect(store.identity.name == "Colt")
-        try await store.saveDisplayName("   ", to: nil)
+        store.saveDisplayName("   ")
         #expect(store.identity.name.isEmpty && store.identity.displayName == "You")
     }
 
@@ -52,6 +52,36 @@ struct PeopleTests {
         #expect(performer.payloads.first?["agentId"] == .string("default"))
         name = "  Colt\n"
         await note.note(agentID: "default", storedSessionID: "s1")
+        #expect(performer.payloads.last?["name"] == .string("Colt"))
+    }
+
+    /// The name saved in Settings › Profile is what the plugin's people route
+    /// gets, the way the native runtime wires it.
+    @Test func theNameSavedInSettingsReachesTheHost() async throws {
+        let performer = try SpeakingPerformer()
+        let store = UserIdentityStore(defaults: UserDefaults(suiteName: "people-\(UUID().uuidString)")!)
+        let note = DirectHermesChatSpeakerNote(currentWorkspace: { performer },
+                                               name: { store.identity.name }, personID: { Self.person })
+        store.saveDisplayName("  Colt ")
+        await note.note(agentID: "default", storedSessionID: "s1")
+        #expect(performer.payloads.last?["name"] == .string("Colt"))
+    }
+
+    /// Phones that once had a bighelp account saved extra profile fields with
+    /// the name. The name still loads and still reaches the host.
+    @Test func aNameSavedWithTheRetiredAccountStillReachesTheHost() async throws {
+        let defaults = UserDefaults(suiteName: "people-\(UUID().uuidString)")!
+        defaults.set(Data(#"""
+        {"name":"Colt","avatarFileName":"colt.png","accountProfileRevision":3,
+         "accountAvatar":{"mimeType":"image/png","byteCount":8,"sha256":"aa","encryptedData":"bb"}}
+        """#.utf8), forKey: "loopdy.demo.userIdentity")
+        let store = UserIdentityStore(defaults: defaults)
+        #expect(store.identity.name == "Colt")
+        #expect(store.identity.avatarFileName == "colt.png")
+        let performer = try SpeakingPerformer()
+        await DirectHermesChatSpeakerNote(currentWorkspace: { performer }, name: { store.identity.name },
+                                          personID: { Self.person })
+            .note(agentID: "default", storedSessionID: "s1")
         #expect(performer.payloads.last?["name"] == .string("Colt"))
     }
 

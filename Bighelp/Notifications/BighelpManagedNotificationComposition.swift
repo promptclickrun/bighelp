@@ -63,13 +63,11 @@ final class BighelpManagedNotificationComposition: HostNotificationSetupServing 
     convenience init(
         factory: BighelpManagedNotificationFactory,
         registry: BighelpHostRegistry,
-        account: BighelpLinkAccountStore,
         maximumAutomaticAttempts: Int = 3
     ) {
         self.init(
             isFixture: factory.isFixture,
             registry: registry,
-            account: account,
             maximumAutomaticAttempts: maximumAutomaticAttempts,
             applicationHooks: .live,
             makeIntegration: {
@@ -84,7 +82,6 @@ final class BighelpManagedNotificationComposition: HostNotificationSetupServing 
     init(
         isFixture: Bool,
         registry: BighelpHostRegistry,
-        account: BighelpLinkAccountStore,
         maximumAutomaticAttempts: Int = 3,
         applicationHooks: ApplicationHookInstallers,
         makeIntegration: @escaping @MainActor () throws -> BighelpManagedNotificationIntegration
@@ -95,7 +92,7 @@ final class BighelpManagedNotificationComposition: HostNotificationSetupServing 
         self.makeIntegration = makeIntegration
 
         guard !isFixture else { return }
-        installRootHooks(registry: registry, account: account, applicationHooks: applicationHooks)
+        installRootHooks(registry: registry, applicationHooks: applicationHooks)
         registry.notificationSetup = self
         _ = retryAutomatically(for: .startup)
     }
@@ -232,7 +229,6 @@ final class BighelpManagedNotificationComposition: HostNotificationSetupServing 
 
     private func installRootHooks(
         registry: BighelpHostRegistry,
-        account: BighelpLinkAccountStore,
         applicationHooks: ApplicationHookInstallers
     ) {
         guard rootHookInstallationCount == 0 else { return }
@@ -260,30 +256,6 @@ final class BighelpManagedNotificationComposition: HostNotificationSetupServing 
                 }
             }
             self?.scheduleChatPreparation(host: host, chat: chat)
-        }
-
-        let priorCredentialsWillChange = account.onCredentialsWillChange
-        account.onCredentialsWillChange = { [weak self] in
-            self?.integration?.hooks.retireAccountBoundary()
-            priorCredentialsWillChange()
-        }
-
-        let priorErasureCompleted = account.onLocalAccountErasureCompleted
-        account.onLocalAccountErasureCompleted = { [weak self] in
-            priorErasureCompleted()
-            self?.integration?.hooks.didEraseAccountData()
-        }
-
-        let priorIdentityErasure = account.eraseNotificationIdentityBeforeAccountDeletion
-        account.eraseNotificationIdentityBeforeAccountDeletion = { [weak self] in
-            guard let self else { throw DirectHermesError.secureStorageUnavailable }
-            let integration = try self.requireIntegrationForExplicitAction()
-            guard let owner = self.captureOwner(), self.isCurrent(owner) else {
-                throw DirectHermesError.secureStorageChanged
-            }
-            try await integration.hooks.eraseNotificationIdentity()
-            guard self.isCurrent(owner) else { throw DirectHermesError.secureStorageChanged }
-            try await priorIdentityErasure?()
         }
 
         applicationHooks.installAPNSToken { [weak self] token in

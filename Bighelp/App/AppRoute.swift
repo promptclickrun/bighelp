@@ -19,8 +19,6 @@ enum AppRoute: Hashable {
     case scheduledTask(id: String, agentID: String? = nil)
     case skillsAndTools
     case approval(requestID: String)
-    case bighelpLinkDevices
-    case bighelpLinkDevice(id: String)
     case workspaceActivity
     case workspaceSettings
     case workspaceManagement(WorkspaceDestination)

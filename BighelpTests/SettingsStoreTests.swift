@@ -160,40 +160,6 @@ struct SettingsStoreTests {
             #expect(composition.settings.appearanceContext == appearance)
         }
     }
-    @Test func accountBoundaryClearsEveryInMemoryAccountScopedWorkspaceStore() async {
-        let suiteName = #function
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-        let composition = BighelpAppComposition(
-            arguments: ["bighelp", "-disable-demo-delays"],
-            defaults: defaults,
-            credentialVault: BighelpLinkMemoryCredentialVault()
-        )
-        let route = AppRoute.chat(conversationID: "demo-finance")
-        composition.userIdentity.identity = UserIdentity(
-            name: "Previous account",
-            avatarFileName: "private-avatar.jpg"
-        )
-        composition.agentDirectory.select("avery")
-        #expect(composition.featureStore.prepare(route))
-        composition.appState.activateConversation(id: "demo-finance", source: .quickSwitch)
-
-        composition.linkAccount.onLocalAccountCleared()
-
-        #expect(!composition.requiresLinkAccount)
-        #expect(composition.appState.path.isEmpty)
-        #expect(composition.agentDirectory.profiles.isEmpty)
-        #expect(composition.agentDirectory.selectedAgentID == nil)
-        #expect(composition.sessionCatalog.records.isEmpty)
-        #expect(composition.botModeRooms.rooms.isEmpty)
-        #expect(composition.scheduledTasks.tasks.isEmpty)
-        #expect(composition.personalities.catalog == nil)
-        #expect(composition.linkDevices.devices.isEmpty)
-        #expect(composition.userIdentity.identity == UserIdentity(name: "", avatarFileName: nil))
-        #expect(composition.featureStore.preparedModel(for: route) == nil)
-    }
-
     @Test func appCompositionDeclaresDirectFirstConnectivity() {
         let suiteName = #function
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -205,29 +171,6 @@ struct SettingsStoreTests {
         )
 
         #expect(composition.workspaceConnectivity == .nativeOnly)
-    }
-
-    @Test func forcedSignedOutOnboardingDoesNotDeleteTheSharedCredentialVault() throws {
-        let defaults = UserDefaults(suiteName: #function)!
-        defaults.removePersistentDomain(forName: #function)
-        defer { defaults.removePersistentDomain(forName: #function) }
-
-        let vault = BighelpLinkMemoryCredentialVault()
-        let credentials = BighelpLinkRuntimeCredentials(
-            deviceID: "live-smoke-device",
-            authorizationEpoch: 1,
-            signingPrivateKey: P256.Signing.PrivateKey(),
-            accountKey: Data(repeating: 0x5A, count: 32)
-        )
-        try vault.save(credentials)
-
-        _ = BighelpAppComposition(
-            arguments: ["bighelp", "-use-demo-fixtures", "-force-signed-out-onboarding"],
-            defaults: defaults,
-            credentialVault: vault
-        )
-
-        #expect(try vault.load() == credentials)
     }
 
     @Test func appCompositionAppearanceChangePreservesPreparedRouteIdentity() {
@@ -274,18 +217,14 @@ struct SettingsStoreTests {
         let route = AppRoute.chat(conversationID: "demo-finance")
         #expect(composition.featureStore.prepare(route))
         composition.appState.activateConversation(id: "demo-finance", source: .quickSwitch)
-        let account = composition.linkAccount
-        let devices = composition.linkDevices
+        let demoHosts = composition.demoHosts
         let featureStore = composition.featureStore
-        let accountState = account.state
         let path = composition.appState.path
 
         composition.settings.bubbleColor = .rose
 
-        #expect(composition.linkAccount === account)
-        #expect(composition.linkDevices === devices)
+        #expect(composition.demoHosts === demoHosts)
         #expect(composition.featureStore === featureStore)
-        #expect(composition.linkAccount.state == accountState)
         #expect(composition.appState.path == path)
     }
 
@@ -488,7 +427,6 @@ struct SettingsStoreTests {
 
     @Test func settingsMenuUsesFocusedSubsectionsInsteadOfOneLongForm() {
         #expect(SettingsMenuSection.allCases == [
-            .accountAndDevices,
             .appearance,
             .workspace,
             .agentsAndPersonalities,
@@ -502,8 +440,8 @@ struct SettingsStoreTests {
             .help,
             .watch,
         ])
-        #expect(Set(SettingsMenuSection.allCases.map(\.title)).count == 13)
-        #expect(Set(SettingsMenuSection.allCases.map(\.accessibilityIdentifier)).count == 13)
+        #expect(Set(SettingsMenuSection.allCases.map(\.title)).count == 12)
+        #expect(Set(SettingsMenuSection.allCases.map(\.accessibilityIdentifier)).count == 12)
     }
 
     @Test func currentEdgeGestureChoicesExcludeTheLegacyInboxDestination() {

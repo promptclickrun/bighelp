@@ -16,85 +16,19 @@ struct BighelpLinkWireTests {
         }
     }
 
-    @Test func incomingPairingURLRoutesToTheVerifiedBighelpLinkFlow() {
+    /// The retired pairing links open nothing; chat links still work.
+    @Test func retiredPairingLinksOpenNothing() {
         let commitment = BighelpLinkBase64URL.encode(Data(repeating: 0x2A, count: 32))
-        let payload = "loopdy://link/pair?flow=flow_fixture_0123456789012345&code=ABC234&kc=\(commitment)"
-
-        #expect(
-            BighelpIncomingURLRoute.parse(URL(string: payload)!)
-                == .pairBighelpLink(
-                    BighelpLinkPairingReference(
-                        flowID: "flow_fixture_0123456789012345",
-                        code: "ABC234",
-                        keyCommitment: commitment
-                    )
-                )
-        )
-        #expect(
-            BighelpIncomingURLRoute.parse(
-                URL(string: payload.replacingOccurrences(
-                    of: "loopdy://",
-                    with: "app.loopdy.mobile://"
-                ))!
-            )
-                == .pairBighelpLink(
-                    BighelpLinkPairingReference(
-                        flowID: "flow_fixture_0123456789012345",
-                        code: "ABC234",
-                        keyCommitment: commitment
-                    )
-                )
-        )
+        for value in [
+            "loopdy://link/pair?flow=flow_fixture_0123456789012345&code=ABC234&kc=\(commitment)",
+            "app.loopdy.mobile://link/pair?flow=flow_fixture_0123456789012345&code=ABC234&kc=\(commitment)",
+            "loopdy://link/pair?code=ABC234",
+        ] {
+            #expect(BighelpIncomingURLRoute.parse(URL(string: value)!) == nil)
+        }
         #expect(
             BighelpIncomingURLRoute.parse(URL(string: "loopdy://chat/session_fixture_0001")!)
                 == .chat(sessionID: "session_fixture_0001")
-        )
-        #expect(
-            BighelpIncomingURLRoute.parse(URL(string: "loopdy://link/pair?code=ABC234")!) == nil
-        )
-    }
-
-    @Test func pairingPresentationReplacesAnAlreadyPresentedManualSheetForIncomingLink() {
-        let manual = BighelpLinkPairingSheetRequest(reference: nil)
-        let reference = BighelpLinkPairingReference(
-            flowID: "flow_fixture_0123456789012345",
-            code: "ABC234",
-            keyCommitment: BighelpLinkBase64URL.encode(Data(repeating: 0x2A, count: 32))
-        )
-
-        let incoming = manual.replacing(with: reference)
-
-        #expect(incoming.id != manual.id)
-        #expect(incoming.reference == reference)
-    }
-
-    @Test func qrReferenceRequiresBothTheOpaqueFlowAndHumanCode() {
-        let commitment = BighelpLinkBase64URL.encode(Data(repeating: 0x11, count: 32))
-        let reference = BighelpLinkPairingReference.fromQRPayload(
-            "loopdy://link/pair?flow=flow_fixture_0123456789012345&code=ABC234&kc=\(commitment)"
-        )
-
-        #expect(
-            reference == BighelpLinkPairingReference(
-                flowID: "flow_fixture_0123456789012345",
-                code: "ABC234",
-                keyCommitment: commitment
-            )
-        )
-        #expect(
-            BighelpLinkPairingReference.fromQRPayload(
-                "loopdy://link/pair?code=ABC234"
-            ) == nil
-        )
-        #expect(
-            BighelpLinkPairingReference.fromQRPayload(
-                "loopdy://link/pair?flow=flow_fixture_0123456789012345&code=ABC234"
-            ) == nil
-        )
-        #expect(
-            BighelpLinkPairingReference.fromQRPayload(
-                "loopdy://link/pair?flow=flow_fixture_0123456789012345&code=ABC234&code=DEF567"
-            ) == nil
         )
     }
 

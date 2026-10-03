@@ -551,10 +551,6 @@ extension RootShellView {
                                        canShow: !presentsFirstRunOnboarding && !needsInitialHostSetup))
             .modifier(HomeMenuPresentation(isPresented: $isHomeDrawerPresented, onDismiss: runAfterHomeSheet) {
                 homeDrawer
-                    .task {
-                        // Hosts paired through bighelp Link (no independent hosts yet).
-                        if hostRegistry?.hosts.isEmpty != false, linkDevices.loadState == .idle { await linkDevices.load() }
-                    }
             })
     }
 

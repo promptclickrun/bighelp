@@ -2,8 +2,6 @@ import Foundation
 
 @MainActor
 struct BighelpManagedNotificationFactory {
-    let vault: any BighelpLinkCredentialVault
-    let api: BighelpLinkAPI
     let permissions: PermissionCenter
     let isFixture: Bool
 
@@ -21,10 +19,9 @@ struct BighelpManagedNotificationFactory {
     }
 
     private func makeService(registry: BighelpHostRegistry) throws -> BighelpManagedNotificationService {
-        let broker = BighelpNotificationBrokerClient(legacyAPI: api)
+        let broker = BighelpNotificationBrokerClient()
         let identity = BighelpNotificationIdentityCoordinator(
             vault: BighelpNotificationKeychainIdentityVault(),
-            legacyVault: vault,
             broker: broker
         )
         let service = BighelpManagedNotificationService(identity: identity, api: broker,
@@ -75,9 +72,6 @@ struct BighelpManagedNotificationIntegration {
         let recoverWake: @MainActor (
             @escaping @MainActor () -> Bool
         ) async throws -> Void
-        let retireAccountBoundary: @MainActor () -> Void
-        let didEraseAccountData: @MainActor () -> Void
-        let eraseNotificationIdentity: @MainActor () async throws -> Void
         let didRegisterAPNSToken: @MainActor (Data) -> Void
         let didFailAPNsRegistration: @MainActor (any Error) -> Void
         let openManagedEvent: @MainActor (
@@ -135,16 +129,6 @@ struct BighelpManagedNotificationIntegration {
             // A content-free wake reconciles existing delivery state. It must
             // not re-identify the shared provider and invalidate enrollment.
             recoverWake: recoverDelivery,
-            retireAccountBoundary: {
-                service.retireForAccountBoundary()
-                BighelpBuzzKitRuntime.shared.logout()
-            },
-            didEraseAccountData: {
-                service.didEraseAccountData()
-            },
-            eraseNotificationIdentity: {
-                try await service.eraseNotificationIdentity()
-            },
             didRegisterAPNSToken: { token in
                 BighelpBuzzKitRuntime.shared.noteAPNSToken(token)
             },

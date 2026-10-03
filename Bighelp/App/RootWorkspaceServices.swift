@@ -6,7 +6,7 @@ extension RootShellView {
     var currentWorkspaceOwner: WorkspaceOwner? {
         if workspaceConnections?.isDirectSelected == true { return workspaceConnections?.owner }
         if usesWorkspaceFixtures {
-            guard let authority = try? WorkspaceAuthority.fixture(id: linkDevices.selectedHostID ?? "demo") else { return nil }
+            guard let authority = try? WorkspaceAuthority.fixture(id: demoHosts.selectedHostID ?? "demo") else { return nil }
             return WorkspaceOwner(authority: authority, authenticationGeneration: workspaceFixtureGeneration,
                                   connectionGeneration: workspaceFixtureGeneration)
         }
@@ -37,7 +37,7 @@ extension RootShellView {
 
     var workspaceHostName: String {
         if let host = workspaceConnections?.selectedDirectHost { return host.name }
-        if let id = linkDevices.selectedHostID, let host = linkDevices.device(id: id) { return host.name }
+        if let id = demoHosts.selectedHostID, let host = demoHosts.host(id: id) { return host.name }
         return usesWorkspaceFixtures ? "Demo host" : "Select a host"
     }
 
@@ -46,13 +46,11 @@ extension RootShellView {
     }
 
     var sessionOrganizationAccountID: String? {
-        if !requiresLinkAccount { return "fixture-account" }
-        return linkAccount.credentials?.deviceID
+        usesDemoFixtures ? "fixture-account" : nil
     }
 
     var sessionOrganizationHostID: String? {
-        if !requiresLinkAccount { return "fixture-host" }
-        return linkDevices.selectedHostID
+        usesDemoFixtures ? "fixture-host" : nil
     }
 
     var currentDeviceToolScope: DeviceToolScope? {
@@ -128,7 +126,7 @@ extension RootShellView {
             return owner.authority.cacheScopeID + ":" + owner.authenticationGeneration.uuidString + ":" + owner.connectionGeneration.uuidString
         }
         #if DEBUG
-        if !requiresLinkAccount, ProcessInfo.processInfo.arguments.contains("-voice-settings-fixture") {
+        if usesDemoFixtures, ProcessInfo.processInfo.arguments.contains("-voice-settings-fixture") {
             return "fixture-voice-settings"
         }
         #endif
@@ -140,7 +138,7 @@ extension RootShellView {
             return { currentWorkspaceOwner == owner }
         }
         #if DEBUG
-        if !requiresLinkAccount, ProcessInfo.processInfo.arguments.contains("-voice-settings-fixture") { return { true } }
+        if usesDemoFixtures, ProcessInfo.processInfo.arguments.contains("-voice-settings-fixture") { return { true } }
         #endif
         return { false }
     }
@@ -151,7 +149,7 @@ extension RootShellView {
             return DirectHermesVoiceSettingsClient(workspace: workspace, owner: owner, currentOwner: { currentWorkspaceOwner })
         }
         #if DEBUG
-        if !requiresLinkAccount, ProcessInfo.processInfo.arguments.contains("-voice-settings-fixture") {
+        if usesDemoFixtures, ProcessInfo.processInfo.arguments.contains("-voice-settings-fixture") {
             return voiceSettingsPreview
         }
         #endif
@@ -161,7 +159,7 @@ extension RootShellView {
     var pluginUpdateScope: String? {
         guard nativeWorkspaceStore == nil else { return nil }
         #if DEBUG
-        if !requiresLinkAccount, ProcessInfo.processInfo.arguments.contains("-plugin-update-fixture") {
+        if usesDemoFixtures, ProcessInfo.processInfo.arguments.contains("-plugin-update-fixture") {
             return "fixture-plugin-update"
         }
         #endif
@@ -170,14 +168,14 @@ extension RootShellView {
 
     var pluginUpdateIsCurrent: @MainActor () -> Bool {
         #if DEBUG
-        if !requiresLinkAccount, ProcessInfo.processInfo.arguments.contains("-plugin-update-fixture") { return { true } }
+        if usesDemoFixtures, ProcessInfo.processInfo.arguments.contains("-plugin-update-fixture") { return { true } }
         #endif
         return { false }
     }
 
     var pluginUpdateClient: (any PluginUpdateClient)? {
         #if DEBUG
-        if !requiresLinkAccount, ProcessInfo.processInfo.arguments.contains("-plugin-update-fixture") {
+        if usesDemoFixtures, ProcessInfo.processInfo.arguments.contains("-plugin-update-fixture") {
             return PluginUpdatePreviewClient()
         }
         #endif
@@ -187,7 +185,7 @@ extension RootShellView {
     var hostRuntimeScope: String? {
         guard nativeWorkspaceStore == nil else { return nil }
         #if DEBUG
-        if !requiresLinkAccount,
+        if usesDemoFixtures,
            HostRuntimePreviewClient.scenario(arguments: ProcessInfo.processInfo.arguments) != nil {
             return "fixture-host-runtime"
         }
@@ -206,7 +204,7 @@ extension RootShellView {
         guard let scope = hostRuntimeScope else { return }
         let isCurrent: @MainActor () -> Bool = { hostRuntimeScope == scope }
         #if DEBUG
-        guard !requiresLinkAccount,
+        guard usesDemoFixtures,
               let scenario = HostRuntimePreviewClient.scenario(arguments: ProcessInfo.processInfo.arguments) else { return }
         let store = HostRuntimeStore(scope: scope, client: HostRuntimePreviewClient(scenario: scenario), isCurrent: isCurrent)
         hostRuntime = store

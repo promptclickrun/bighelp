@@ -89,20 +89,8 @@ struct NativeWorkspaceCompositionTests {
         let suite = "loopdy.native-only-composition." + UUID().uuidString
         let preferences = try #require(UserDefaults(suiteName: suite))
         defer { preferences.removePersistentDomain(forName: suite) }
-        let composition = BighelpAppComposition(arguments: ["-use-demo-fixtures"], defaults: preferences,
-                                              credentialVault: BighelpLinkMemoryCredentialVault())
+        let composition = BighelpAppComposition(arguments: ["-use-demo-fixtures"], defaults: preferences)
         #expect(composition.workspaceConnectivity == .nativeOnly)
-    }
-
-    @Test func nativeStartupDoesNotRequireCloudConfiguration() throws {
-        let suite = "loopdy.no-cloud-config." + UUID().uuidString
-        let preferences = try #require(UserDefaults(suiteName: suite))
-        defer { preferences.removePersistentDomain(forName: suite) }
-        for info: [String: Any] in [[:], ["BighelpLinkBaseURL": "invalid"]] {
-            let composition = BighelpAppComposition(arguments: ["-use-demo-fixtures"], defaults: preferences,
-                credentialVault: BighelpLinkMemoryCredentialVault(), infoDictionary: info)
-            #expect(composition.workspaceConnectivity == .nativeOnly)
-        }
     }
 
     @Test func nativeNewSessionControlsDoNotAdoptProfileDefaultsAsCurrentState() throws {

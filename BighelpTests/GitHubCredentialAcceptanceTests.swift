@@ -111,15 +111,15 @@ struct GitHubCredentialAcceptanceTests {
     }
 
     @Test func credentialDerivedHubAccountBridgesOnlyThePinnedGitHubNamespace() async throws {
-        let credentials = BighelpLinkRuntimeCredentials(deviceID: "device-a", authorizationEpoch: 1,
-            signingPrivateKey: P256.Signing.PrivateKey(), accountKey: Data(repeating: 71, count: 32))
-        let wiki = credentials.wikiOwner(hostID: "host-a", profileID: "default")
+        let deviceID = "device-a"
+        let wiki = WikiOwner(accountID: "wiki-account-a", hostID: "host-a", profileID: "default",
+                             deviceID: deviceID, authorizationEpoch: "1")
         let owner = ReferenceHubOwner(accountID: wiki.accountID, hostID: wiki.hostID,
             deviceID: try #require(wiki.deviceID), authorizationEpoch: try #require(wiki.authorizationEpoch),
             sessionID: "session-a", agentID: wiki.profileID, recipientIDs: [wiki.profileID])
         let transport = ReferenceTestGitHubTransport(withResources: true)
         let vault = ReferenceTestGitHubVault()
-        let store = GitHubConnectionStore(ownerID: credentials.deviceID, configuration: nil,
+        let store = GitHubConnectionStore(ownerID: deviceID, configuration: nil,
             transport: transport, vault: vault)
         await store.connectPersonalAccessToken(token)
         store.confirmAccount(userID: 42)
@@ -138,10 +138,10 @@ struct GitHubCredentialAcceptanceTests {
         let snapshot = try #require(preview.options.first?.snapshot)
         let fresh = try await provider.revalidate(owner, snapshot)
         #expect(fresh.anchor == snapshot.anchor)
-        #expect(store.ownerID == credentials.deviceID)
+        #expect(store.ownerID == deviceID)
         #expect(store.selectedCredential?.id == selected.id)
         #expect(store.generation == generation)
-        #expect(vault.values.map(\.scope.ownerID) == [credentials.deviceID])
+        #expect(vault.values.map(\.scope.ownerID) == [deviceID])
 
         // Even an overly permissive caller cannot bypass the explicit account pin.
         let wrong = ReferenceHubOwner(accountID: "other-account", hostID: owner.hostID,
@@ -157,13 +157,12 @@ struct GitHubCredentialAcceptanceTests {
 
     @Test(arguments: ["scope", "generation", "currentOwner", "host", "device", "epoch", "session", "agent", "recipients"])
     func bridgedGitHubReferencesInvalidateChangedAuthority(_ change: String) async throws {
-        let credentials = BighelpLinkRuntimeCredentials(deviceID: "device-a", authorizationEpoch: 1,
-            signingPrivateKey: P256.Signing.PrivateKey(), accountKey: Data(repeating: 71, count: 32))
-        let owner = ReferenceHubOwner(accountID: credentials.wikiAccountID, hostID: "host-a",
-            deviceID: credentials.deviceID, authorizationEpoch: "1", sessionID: "session-a",
+        let deviceID = "device-a"
+        let owner = ReferenceHubOwner(accountID: "wiki-account-a", hostID: "host-a",
+            deviceID: deviceID, authorizationEpoch: "1", sessionID: "session-a",
             agentID: "default", recipientIDs: ["default"])
         let transport = ReferenceTestGitHubTransport(withResources: true)
-        let store = GitHubConnectionStore(ownerID: credentials.deviceID, configuration: nil,
+        let store = GitHubConnectionStore(ownerID: deviceID, configuration: nil,
             transport: transport, vault: ReferenceTestGitHubVault())
         await store.connectPersonalAccessToken(token)
         store.confirmAccount(userID: 42)
@@ -176,7 +175,7 @@ struct GitHubCredentialAcceptanceTests {
         let snapshot = try #require(preview.options.first?.snapshot)
         if change == "scope" {
             store.setOwner("other-device")
-            store.setOwner(credentials.deviceID)
+            store.setOwner(deviceID)
             store.restoreDefaultCredentialIfUnambiguous()
         } else if change == "generation" {
             await store.connectPersonalAccessToken(token + "Replacement")

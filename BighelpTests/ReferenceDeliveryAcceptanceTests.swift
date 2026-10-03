@@ -56,7 +56,6 @@ struct ReferenceDeliveryAcceptanceTests {
         defer { defaults.removePersistentDomain(forName: suite) }
         let composition = BighelpAppComposition(
             arguments: ["bighelp", "-use-demo-fixtures", "-use-multi-host-fixtures"], defaults: defaults)
-        await composition.linkDevices.load()
         // Let initial discovery settle before preparing the old-host composer.
         for _ in 0..<20 { await Task.yield() }
         let session = try await composition.sessionCatalog.createDirect(agentID: "finance")
@@ -67,10 +66,10 @@ struct ReferenceDeliveryAcceptanceTests {
         }
         model.draft = "Belongs only to the original host"
         #expect(model.canSend)
-        let replacement = try #require(composition.linkDevices.devices.first {
-            $0.kind == .hermesHost && $0.id != composition.linkDevices.selectedHostID
+        let replacement = try #require(composition.demoHosts.hosts.first {
+            $0.id != composition.demoHosts.selectedHostID
         })
-        #expect(composition.linkDevices.selectHost(replacement.id))
+        #expect(composition.demoHosts.selectHost(replacement.id))
         // Fixture host changes synchronously retire the previous composer.
         #expect(!model.canSend)
         await model.send()

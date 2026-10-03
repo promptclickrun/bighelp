@@ -31,14 +31,6 @@ enum BighelpLinkLiveSocketError: Error, Equatable, LocalizedError {
     }
 }
 
-enum BighelpLinkLiveSocketState: Equatable, Sendable {
-    case stopped
-    case connecting
-    case verified
-    case retrying
-    case superseded
-}
-
 struct BighelpLinkVoiceAudio: Equatable, Sendable {
     let audio: Data
     let mimeType: String

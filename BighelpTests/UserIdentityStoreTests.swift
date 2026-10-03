@@ -8,35 +8,27 @@ struct UserIdentityStoreTests {
         let defaults = isolatedDefaults()
         let store = UserIdentityStore(defaults: defaults)
 
-        store.identity = UserIdentity(
-            name: "Maya",
-            avatarFileName: "maya.png",
-            accountAvatar: UserProfileAvatar(
-                mimeType: "image/png",
-                byteCount: 8,
-                sha256: "sha256-user-avatar-0001",
-                encryptedData: "encrypted-user-avatar-0001"
-            )
-        )
+        store.identity = UserIdentity(name: "Maya", avatarFileName: "maya.png")
 
         let restored = UserIdentityStore(defaults: defaults)
-        #expect(restored.identity.accountAvatar?.encryptedData == "encrypted-user-avatar-0001")
+        #expect(restored.identity.name == "Maya")
+        #expect(restored.identity.avatarFileName == "maya.png")
     }
 
-    @Test func nameOnlyLocalSavePersistsWithoutAnAccount() async throws {
+    @Test func nameOnlyLocalSavePersistsWithoutAnAccount() {
         let defaults = isolatedDefaults()
         let store = UserIdentityStore(defaults: defaults)
-        try await store.saveDisplayName("  Maya  ", to: nil)
+        store.saveDisplayName("  Maya  ")
         #expect(store.identity.name == "Maya")
         #expect(UserIdentityStore(defaults: defaults).identity.name == "Maya")
     }
 
     /// Your name reaches agents, so saving an empty name removes it on purpose
-    /// ("Remove name" in Settings). A retired Link account still needs one.
-    @Test func savingABlankNameRemovesItWithoutAnAccount() async throws {
+    /// ("Remove name" in Settings).
+    @Test func savingABlankNameRemovesItWithoutAnAccount() {
         let store = UserIdentityStore(defaults: isolatedDefaults())
         store.identity.name = "Maya"
-        try await store.saveDisplayName(" \n ", to: nil)
+        store.saveDisplayName(" \n ")
         #expect(store.identity.name.isEmpty)
         #expect(store.identity.displayName == "You")
     }
@@ -58,7 +50,5 @@ struct UserIdentityStoreTests {
 
         #expect(store.identity.name == "Maya")
         #expect(store.identity.avatarFileName == "maya.png")
-        #expect(store.identity.accountAvatar == nil)
-        #expect(store.identity.accountProfileRevision == 0)
     }
 }

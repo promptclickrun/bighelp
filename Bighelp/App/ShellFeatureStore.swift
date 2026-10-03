@@ -336,7 +336,7 @@ final class ShellFeatureStore {
             scheduledTasks.map(PreparedRouteModel.scheduledTasks)
         case .approval(let requestID):
             approvalModels[requestID].map(PreparedRouteModel.approval)
-        case .skillsAndTools, .bighelpLinkDevices, .bighelpLinkDevice,
+        case .skillsAndTools,
              .workspaceActivity, .workspaceSettings, .workspaceManagement, .workspaceConnections, .workspaceHub,
              .projects, .project, .kanban, .allHostsChats:
             nil
@@ -404,7 +404,7 @@ final class ShellFeatureStore {
             }
             _ = approvalModel(for: request)
             return true
-        case .skillsAndTools, .bighelpLinkDevices, .bighelpLinkDevice,
+        case .skillsAndTools,
              .workspaceActivity, .workspaceSettings, .workspaceManagement, .workspaceConnections, .workspaceHub,
              .projects, .project, .kanban, .allHostsChats:
             return true
@@ -935,39 +935,6 @@ final class ShellFeatureStore {
         if !defersChatPresentation, items.contains(where: { $0.metadata.delivery != "Streaming" }) {
             catalog.flushPersistence()
         }
-    }
-
-    /// Keeps an authenticated generative-UI decode failure visible in the
-    /// conversation as a recoverable diagnostic. The payload itself is never
-    /// copied into the timeline, so malformed cards cannot leak secrets.
-    func acceptExternalPayloadDecodeDiagnostic(
-        _ diagnostic: BighelpLinkPayloadDecodeDiagnostic
-    ) {
-        guard diagnostic.payloadType == "generative.ui",
-              let sessionID = diagnostic.sessionID
-        else { return }
-
-        acceptExternal(
-            [
-                TimelineItem(
-                    id: "loopdy-diagnostic-\(sessionID)-\(diagnostic.category)-\(diagnostic.byteCount)",
-                    role: .assistant,
-                    sender: .system(
-                        id: "loopdy-link",
-                        snapshot: .init(name: "bighelp")
-                    ),
-                    content: .message(
-                        "This interactive card could not be displayed. The conversation is still available in text."
-                    ),
-                    metadata: .init(
-                        source: "bighelp",
-                        freshness: "Just now",
-                        delivery: "Diagnostic"
-                    )
-                ),
-            ],
-            conversationID: sessionID
-        )
     }
 
     func acceptExternalActivity(_ event: ChatActivityEvent, agentID: String? = nil) {

@@ -108,18 +108,18 @@ struct EmberLockup: View {
 /// The brand bar as a leading toolbar item, without a glass capsule on iOS 26.
 /// Touch and hold it to switch hosts.
 struct EmberBrandToolbarItem: ToolbarContent {
-    var linkDevices: BighelpLinkDeviceStore?
+    var demoHosts: DemoHosts?
 
     var body: some ToolbarContent {
         #if compiler(>=6.2) && !os(visionOS) // visionOS toolbars have no shared glass.
         if #available(iOS 26.0, *) {
-            ToolbarItem(placement: .topBarLeading) { EmberHostSwitcherLockup(linkDevices: linkDevices) }
+            ToolbarItem(placement: .topBarLeading) { EmberHostSwitcherLockup(demoHosts: demoHosts) }
                 .sharedBackgroundVisibility(.hidden)
         } else {
-            ToolbarItem(placement: .topBarLeading) { EmberHostSwitcherLockup(linkDevices: linkDevices) }
+            ToolbarItem(placement: .topBarLeading) { EmberHostSwitcherLockup(demoHosts: demoHosts) }
         }
         #else
-        ToolbarItem(placement: .topBarLeading) { EmberHostSwitcherLockup(linkDevices: linkDevices) }
+        ToolbarItem(placement: .topBarLeading) { EmberHostSwitcherLockup(demoHosts: demoHosts) }
         #endif
     }
 }

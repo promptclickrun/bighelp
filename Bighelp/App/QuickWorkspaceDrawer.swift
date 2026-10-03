@@ -226,7 +226,7 @@ struct QuickWorkspaceDrawer: View {
     @State private var draggedSessionSectionKey: SessionSectionKey?
     @State private var lastSessionSectionDropTargetKey: SessionSectionKey?
     let content: QuickWorkspaceContent
-    let hostDevices: BighelpLinkDeviceStore
+    let demoHosts: DemoHosts
     let settings: SettingsStore
     let sessionOrganizationAccountID: String?
     let sessionOrganizationHostID: String?
@@ -274,9 +274,6 @@ struct QuickWorkspaceDrawer: View {
             }
         }
         .onDisappear { resetSectionDrag() }
-        .task {
-            if hostRegistry == nil, hostDevices.loadState == .idle { await hostDevices.load() }
-        }
         .onChange(of: sessionOrganizationAccountID) { _, _ in resetSectionDrag() }
         .onChange(of: sessionOrganizationHostID) { _, _ in resetSectionDrag() }
         .onChange(of: content.organizeByProjects) { _, _ in resetSectionDrag() }
@@ -285,7 +282,7 @@ struct QuickWorkspaceDrawer: View {
     /// The same menu as ☰, with the sidebar's project groups and pinned agents as its recent list.
     private var menu: some View {
         BighelpMenu(
-            hosts: BighelpMenuHosts.current(registry: hostRegistry, linkDevices: hostDevices),
+            hosts: BighelpMenuHosts.current(registry: hostRegistry, demoHosts: demoHosts),
             destinations: BighelpMenuDestinations(
                 onNewChat: onNewChat,
                 onAllChats: onOpenSessions,

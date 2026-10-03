@@ -365,18 +365,6 @@ struct BighelpLinkPushCoordinatorTests {
         await center.activate()
         #expect(opened == ["channel.message:cold-launch"])
     }
-
-    private static let phone = BighelpLinkDevice(
-        id: "phone-1",
-        name: "This iPhone",
-        kind: .phone,
-        isCurrentDevice: true,
-        connection: .online,
-        pushState: nil,
-        pushRevision: 4,
-        lastSeenAt: Date(timeIntervalSince1970: 1_788_000_000),
-        revision: 1
-    )
 }
 
 @MainActor

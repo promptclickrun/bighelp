@@ -44,7 +44,6 @@ struct IndependentHostScopeTests {
         let selected = fixture.registry.selectedHostID
         fixture.registry.bind(deviceID: "cloud-device", authorizationEpoch: 2)
         fixture.registry.bind(deviceID: nil, authorizationEpoch: nil)
-        try BighelpLocalAccountKeychainSecretEraser(accessGroup: nil).erase()
         #expect(fixture.registry.connectionMode == .independent)
         #expect(fixture.registry.selectedHostID == selected)
         #expect(fixture.registry.accountID == nil)
@@ -63,7 +62,6 @@ struct IndependentHostScopeTests {
         #expect(fixture.registry.connectionMode == .independent)
         #expect(fixture.registry.hosts.isEmpty)
         #expect(fixture.registry.selectedHostID == nil)
-        try BighelpLocalAccountKeychainSecretEraser(accessGroup: nil).erase()
         #expect(try Data(contentsOf: legacyFile) == original)
         let legacyVault = DirectHermesKeychainVault(
             service: fixture.service, account: "host-v1.\(saved.host.accountScope).\(saved.host.id.uuidString)"

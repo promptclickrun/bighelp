@@ -117,29 +117,6 @@ extension HostConnectionStatus {
         self = isConnected ? Self(.connected, "Connected") : Self(.reconnecting, "Reconnecting")
     }
 
-    /// The retired bighelp Link socket, still read by Settings.
-    init(link state: BighelpLinkLiveSocketState) {
-        switch state {
-        case .stopped: self.init(.disconnected, "Disconnected")
-        case .connecting: self.init(.connecting, "Connecting")
-        case .retrying: self.init(.reconnecting, "Reconnecting")
-        case .superseded: self.init(.disconnected, "Connection moved")
-        case .verified: self.init(.connected, "Connected")
-        }
-    }
-
-    /// The retired bighelp Link account's paired devices, still in Settings.
-    init(linkSignedIn isSignedIn: Bool, devices: [BighelpLinkDevice], loadState: BighelpLinkLoadState) {
-        guard isSignedIn else { self.init(.disconnected, "Not signed in"); return }
-        switch loadState {
-        case .idle, .loading: self.init(.connecting, "Connecting")
-        case .failed: self.init(.disconnected, "Needs attention")
-        case .loaded:
-            self.init(devices.contains { $0.connection == .online } ? .connected : .disconnected,
-                      BighelpLinkDeviceSummary(devices: devices).title)
-        }
-    }
-
     /// A plugin update waiting for Hermes to come back after its restart; nil
     /// for the update's other steps.
     @MainActor

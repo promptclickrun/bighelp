@@ -2,42 +2,20 @@ import CryptoKit
 import Foundation
 import Security
 
-enum BighelpNotificationCredentialAuthority: String, Codable, Sendable {
-    case legacyAccount
-    case notificationOnly
-}
-
 struct BighelpManagedNotificationCredentials: Equatable {
-    let authority: BighelpNotificationCredentialAuthority
     let deviceID: String
     let authorizationEpoch: Int
     let signingPrivateKey: P256.Signing.PrivateKey
 
     static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.authority == rhs.authority && lhs.deviceID == rhs.deviceID
+        lhs.deviceID == rhs.deviceID
             && lhs.authorizationEpoch == rhs.authorizationEpoch
             && lhs.signingPrivateKey.rawRepresentation == rhs.signingPrivateKey.rawRepresentation
     }
 
-    static func legacy(_ value: BighelpLinkRuntimeCredentials) -> Self {
-        Self(authority: .legacyAccount, deviceID: value.deviceID,
-             authorizationEpoch: value.authorizationEpoch,
-             signingPrivateKey: value.signingPrivateKey)
-    }
-
-    var subscriberScope: String {
-        authority == .legacyAccount ? "account" : "notification-instance"
-    }
+    var subscriberScope: String { "notification-instance" }
 
     func headers(method: String, path: String, body: Data, timestamp: Int, nonce: String) throws -> [String: String] {
-        if authority == .legacyAccount {
-            return try BighelpLinkDeviceSigner(
-                deviceID: deviceID,
-                authorizationEpoch: authorizationEpoch,
-                privateKey: signingPrivateKey
-            ).headers(method: method, path: path, body: String(decoding: body, as: UTF8.self),
-                      timestamp: timestamp, nonce: nonce).headers
-        }
         let digest = BighelpLinkBase64URL.encode(Data(SHA256.hash(data: body)))
         let transcript = [
             "loopdy-notification-device-v1", method.uppercased(), path, deviceID,
@@ -78,11 +56,7 @@ struct BighelpNotificationBootstrapIntent: Equatable {
     ) throws -> Self {
         let requestID = UUID().uuidString.lowercased()
         let nonce = randomBase64URL(count: 24)
-        let publicKey = BighelpLinkDeviceSigner(
-            deviceID: installationID,
-            authorizationEpoch: 1,
-            privateKey: signingPrivateKey
-        ).publicKeySPKI
+        let publicKey = signingPrivateKey.publicKey.spkiBase64URL
         let transcript = [
             "loopdy-notification-bootstrap-v1", "POST", BighelpNotificationBrokerClient.bootstrapPath,
             installationID, requestID, String(now), nonce, publicKey,
@@ -175,7 +149,6 @@ final class BighelpNotificationKeychainIdentityVault: BighelpNotificationIdentit
                 signingPrivateKey: BighelpLinkBase64URL.encode(intent.signingPrivateKey.rawRepresentation),
                 bootstrapBody: intent.body, bootstrapTimestamp: intent.timestamp)
         case .active(let credentials):
-            guard credentials.authority == .notificationOnly else { throw DirectHermesError.invalidCredentials }
             stored = Stored(version: 2, state: .active, installationMarker: marker,
                 installationID: credentials.deviceID, requestID: nil,
                 authorizationEpoch: credentials.authorizationEpoch,
@@ -251,7 +224,7 @@ final class BighelpNotificationKeychainIdentityVault: BighelpNotificationIdentit
             guard let epoch = stored.authorizationEpoch, epoch > 0 else {
                 throw DirectHermesError.savedConnectionInvalid
             }
-            return .active(.init(authority: .notificationOnly, deviceID: stored.installationID,
+            return .active(.init(deviceID: stored.installationID,
                                  authorizationEpoch: epoch, signingPrivateKey: key))
         }
     }
@@ -283,21 +256,17 @@ final class BighelpNotificationKeychainIdentityVault: BighelpNotificationIdentit
 final class BighelpNotificationBrokerClient: BighelpManagedNotificationAccountAPI {
     nonisolated static let bootstrapPath = "/v1/notifications/bootstrap"
     static let currentInstallationPath = "/v1/notifications/installations/current"
-    static let accountBindingPath = "/v1/notifications/installations/current/account-binding"
 
-    private let legacyAPI: BighelpLinkAPI
     private let transport: any BighelpLinkHTTPTransport
     private let now: () -> Date
     private let nonce: () -> String
     private let baseURL = URL(string: "https://link.loopdy.app")!
 
     init(
-        legacyAPI: BighelpLinkAPI,
         transport: any BighelpLinkHTTPTransport = BighelpManagedAccountTransport(),
         now: @escaping () -> Date = Date.init,
         nonce: @escaping () -> String = { BighelpLinkBase64URL.encode(BighelpNotificationBrokerClient.randomBytes(count: 24)) }
     ) {
-        self.legacyAPI = legacyAPI
         self.transport = transport
         self.now = now
         self.nonce = nonce
@@ -312,12 +281,11 @@ final class BighelpNotificationBrokerClient: BighelpManagedNotificationAccountAP
               let epoch = credential["authorizationEpoch"]?.integer, epoch == 1 else {
             throw DirectHermesError.invalidResponse
         }
-        return .init(authority: .notificationOnly, deviceID: intent.installationID,
+        return .init(deviceID: intent.installationID,
                      authorizationEpoch: epoch, signingPrivateKey: intent.signingPrivateKey)
     }
 
     func revokeInstallation(_ credentials: BighelpManagedNotificationCredentials) async throws {
-        guard credentials.authority == .notificationOnly else { return }
         let response = try await signedRequest(
             path: Self.currentInstallationPath, method: "DELETE", body: Data(), credentials: credentials
         )
@@ -328,82 +296,8 @@ final class BighelpNotificationBrokerClient: BighelpManagedNotificationAccountAP
         }
     }
 
-    func bindWakeRouting(
-        accountCredentials: BighelpLinkRuntimeCredentials,
-        notificationCredentials: BighelpManagedNotificationCredentials,
-        grantID: String
-    ) async throws {
-        guard notificationCredentials.authority == .notificationOnly,
-              ManagedNotificationValidation.uuid(grantID) else {
-            throw DirectHermesError.invalidCredentials
-        }
-        let body = try JSONSerialization.data(withJSONObject: [
-            "version": 1,
-            "grantId": grantID,
-        ], options: [.sortedKeys, .withoutEscapingSlashes])
-        let timestamp = Int(now().timeIntervalSince1970)
-        let installationProof = try notificationCredentials.headers(
-            method: "POST", path: Self.accountBindingPath, body: body,
-            timestamp: timestamp, nonce: nonce()
-        )
-        let accountProof = try accountCredentials.signer.headers(
-            method: "POST", path: Self.accountBindingPath,
-            body: String(decoding: body, as: UTF8.self), timestamp: timestamp, nonce: nonce()
-        )
-        var headers = installationProof
-        let accountHeaderNames = [
-            "x-loopdy-device-id": "x-loopdy-account-device-id",
-            "x-loopdy-timestamp": "x-loopdy-account-timestamp",
-            "x-loopdy-nonce": "x-loopdy-account-nonce",
-            "x-loopdy-authorization-epoch": "x-loopdy-account-authorization-epoch",
-            "x-loopdy-signature": "x-loopdy-account-signature",
-        ]
-        for (source, destination) in accountHeaderNames {
-            guard let value = accountProof.headers[source] else {
-                throw DirectHermesError.invalidCredentials
-            }
-            headers[destination] = value
-        }
-        let response = try await request(
-            path: Self.accountBindingPath, method: "POST", body: body, headers: headers
-        )
-        guard response.object?["version"]?.integer == 2,
-              let binding = response.object?["binding"]?.object,
-              binding["installationId"]?.string == notificationCredentials.deviceID,
-              binding["grantId"]?.string == grantID,
-              binding["state"]?.string == "active" else {
-            throw DirectHermesError.invalidResponse
-        }
-    }
-
-    func retireLegacyNotificationAuthority(_ credentials: BighelpManagedNotificationCredentials) async throws {
-        guard credentials.authority == .legacyAccount else { throw DirectHermesError.invalidCredentials }
-        let response = try await managedNotificationRequest(
-            path: BighelpManagedNotificationService.root + "/buzzkit/identity",
-            method: "DELETE",
-            body: nil,
-            credentials: credentials
-        )
-        guard response.object?["version"]?.integer == 1,
-              response.object?["identity"]?.object?["scope"]?.string == "account",
-              response.object?["identity"]?.object?["state"]?.string == "revoked" else {
-            throw DirectHermesError.invalidResponse
-        }
-    }
-
     func managedNotificationRequest(path: String, method: String, body: Data?,
                                     credentials: BighelpManagedNotificationCredentials) async throws -> BighelpJSONValue {
-        if credentials.authority == .legacyAccount {
-            let legacy = BighelpLinkRuntimeCredentials(
-                deviceID: credentials.deviceID,
-                authorizationEpoch: credentials.authorizationEpoch,
-                signingPrivateKey: credentials.signingPrivateKey,
-                accountKey: Data(repeating: 0, count: 32)
-            )
-            return try await legacyAPI.managedNotificationRequest(
-                path: path, method: method, body: body, credentials: legacy
-            )
-        }
         return try await signedRequest(path: path, method: method, body: body ?? Data(), credentials: credentials)
     }
 
@@ -469,23 +363,21 @@ final class BighelpNotificationBrokerClient: BighelpManagedNotificationAccountAP
 @MainActor
 final class BighelpNotificationIdentityCoordinator {
     private let vault: any BighelpNotificationIdentityVault
-    private let legacyVault: any BighelpLinkCredentialVault
     private let broker: BighelpNotificationBrokerClient
     private let now: () -> Date
     private var operationInProgress = false
     private var operationWaiters: [CheckedContinuation<Void, Never>] = []
 
-    init(vault: any BighelpNotificationIdentityVault, legacyVault: any BighelpLinkCredentialVault,
+    init(vault: any BighelpNotificationIdentityVault,
          broker: BighelpNotificationBrokerClient, now: @escaping () -> Date = Date.init) {
         self.vault = vault
-        self.legacyVault = legacyVault
         self.broker = broker
         self.now = now
     }
 
     func current() throws -> BighelpManagedNotificationCredentials? {
         switch try vault.load() {
-        case .current(.active(let credentials)): return try requireInstallationAuthority(credentials)
+        case .current(.active(let credentials)): return credentials
         case .current(.pending(_)), .orphaned(_), .none: return nil
         }
     }
@@ -521,48 +413,16 @@ final class BighelpNotificationIdentityCoordinator {
         }
     }
 
-    func bindWakeRouting(
-        credentials: BighelpManagedNotificationCredentials,
-        grantID: String
-    ) async throws {
-        let notificationCredentials = try requireInstallationAuthority(credentials)
-        guard try current() == notificationCredentials else {
-            throw DirectHermesError.secureStorageChanged
-        }
-        // Notification-only use remains available without a Link account. When
-        // account credentials exist, both authorities must confirm this binding.
-        guard let accountCredentials = try legacyVault.load() else { return }
-        try await broker.bindWakeRouting(
-            accountCredentials: accountCredentials,
-            notificationCredentials: notificationCredentials,
-            grantID: grantID
-        )
-        guard try current() == notificationCredentials,
-              try legacyVault.load() == accountCredentials else {
-            throw DirectHermesError.secureStorageChanged
-        }
-    }
-
     private func resolveForEnrollmentUnserialized() async throws -> BighelpManagedNotificationCredentials {
-        // Every enrollment attempt reasserts retirement for the currently loaded
-        // Link account. The server's durable retirement marker keeps this request
-        // idempotent without deleting the chat credentials that sign it.
-        if let legacy = try legacyVault.load() {
-            try await broker.retireLegacyNotificationAuthority(.legacy(legacy))
-            guard try legacyVault.load() == legacy else {
-                throw DirectHermesError.secureStorageChanged
-            }
-        }
-
         switch try vault.load() {
         case .current(.active(let credentials)):
-            return try requireInstallationAuthority(credentials)
+            return credentials
         case .current(.pending(let intent)):
             return try await complete(intent)
         case .orphaned(let record):
             let credentials: BighelpManagedNotificationCredentials
             switch record {
-            case .active(let value): credentials = try requireInstallationAuthority(value)
+            case .active(let value): credentials = value
             case .pending(let intent): credentials = try await recover(intent, persistRefresh: false)
             }
             try await broker.revokeInstallation(credentials)
@@ -578,7 +438,7 @@ final class BighelpNotificationIdentityCoordinator {
     private func eraseUnserialized() async throws {
         switch try vault.load() {
         case .current(.active(let credentials)), .orphaned(.active(let credentials)):
-            try await broker.revokeInstallation(requireInstallationAuthority(credentials))
+            try await broker.revokeInstallation(credentials)
         case .current(.pending(let intent)):
             let credentials = try await recover(intent)
             try await broker.revokeInstallation(credentials)
@@ -621,15 +481,8 @@ final class BighelpNotificationIdentityCoordinator {
     }
 
     private func complete(_ intent: BighelpNotificationBootstrapIntent) async throws -> BighelpManagedNotificationCredentials {
-        let credentials = try requireInstallationAuthority(await recover(intent))
+        let credentials = try await recover(intent)
         try vault.save(.active(credentials))
-        return credentials
-    }
-
-    private func requireInstallationAuthority(
-        _ credentials: BighelpManagedNotificationCredentials
-    ) throws -> BighelpManagedNotificationCredentials {
-        guard credentials.authority == .notificationOnly else { throw DirectHermesError.invalidCredentials }
         return credentials
     }
 

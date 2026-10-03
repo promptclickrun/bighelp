@@ -17,10 +17,8 @@ struct RootShellView: View {
     let agents: AgentDirectoryStore
     let agentRuntimeDefaults: any AgentRuntimeDefaultsClient
     let botModeRooms: BotModeRoomStore
-    let linkAccount: BighelpLinkAccountStore
-    let linkDevices: BighelpLinkDeviceStore
+    let demoHosts: DemoHosts
     let permissionCenter: PermissionCenter
-    let permissionsOnboarding: PermissionsOnboardingModel
     let personalities: PersonalityStore
     let skillsAndTools: SkillsAndToolsStore
     let hermesWorkspaces: HermesWorkspaceStore
@@ -29,7 +27,7 @@ struct RootShellView: View {
     let newChatCoordinator: NewChatCoordinator
     /// Opens chats asked for from outside the app once the host answers.
     var shortcutService: BighelpShortcutService? = nil
-    let requiresLinkAccount: Bool
+    let usesDemoFixtures: Bool
     let clearLocalCache: @MainActor () async -> Bool
     var nativeRuntime: NativeWorkspaceRuntime? = nil
     var nativeWorkspaceError: String? = nil
@@ -43,15 +41,12 @@ struct RootShellView: View {
     @State var isHostStatusPresented = false
     @State private var actionErrorShowsHostStatus = false
     @State var hostRuntime: HostRuntimeStore?
-    @State var pairingSheetRequest: BighelpLinkPairingSheetRequest?
-    @State private var guidedPairingReference: BighelpLinkPairingReference?
     /// A widget or notification link that arrived before the host answered.
     @State private var pendingIncomingURL: URL?
     /// Opens Agents filtered to one agent's group chats (from the Chats rail's menu).
     @State var agentGroupFilterRequest: String?
     /// Offered as "Try Again" in the error alert.
     @State private var actionErrorRetry: (@MainActor () -> Void)?
-    @State var isLinkAccountPresented = false
     @State var isHermesWorkspacePresented = false
     @State var credentialVault: CredentialVaultModel?
     @State var sessionRestoreRequest: SessionRestoreRequest?
@@ -175,11 +170,6 @@ struct RootShellView: View {
     }
 
     var body: some View {
-        let readiness = readinessPresentation
-        let readinessDriveTrigger = BighelpReadinessDriveTrigger(
-            readiness: readiness.state,
-            link: readiness.linkState
-        )
         agentHomeSheets(rootContent)
         .modifier(CredentialVaultSheet(model: $credentialVault))
         .modifier(FleetSheets(
@@ -297,36 +287,6 @@ struct RootShellView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .background { permissionCenter.deviceTools.invalidateOperations() }
         }
-        .task(id: readinessDriveTrigger) {
-            await permissionsOnboarding.prepare(readiness: readiness.state)
-        }
-        .onChange(of: linkDevices.pairingState) { _, state in
-            guard case .paired = state else { return }
-            guidedPairingReference = nil
-        }
-        .onChange(of: readiness.state) { _, state in
-            if state == .ready { openPendingIncomingChatIfNeeded() }
-        }
-        .onChange(of: linkAccount.state) { _, state in
-            guard BighelpAccountWorkspaceBoundary.shouldClear(
-                account: state,
-                hasCredentials: linkAccount.credentials != nil,
-                needsLocalCleanup: linkAccount.needsLocalCleanup
-            ) else { return }
-            isLinkAccountPresented = false
-            pairingSheetRequest = nil
-            guidedPairingReference = nil
-        }
-        .sheet(isPresented: Binding(
-            get: {
-                nativeWorkspaceStore == nil && !needsInitialHostSetup && permissionsOnboarding.isPrepared
-                    && permissionsOnboarding.shouldPresent(readiness: readiness.state)
-            },
-            set: { if !$0 { permissionsOnboarding.notNow() } }
-        )) {
-            PermissionsOnboardingView(model: permissionsOnboarding)
-                .bighelpSheetSize(.standard)
-        }
         .task(id: hostRuntimeScope) { await prepareHostRuntime() }
         .onChange(of: agents.errorMessage) { _, _ in
             Task { await currentHostRuntime?.refresh() }
@@ -345,14 +305,6 @@ struct RootShellView: View {
     var nativeWorkspaceStore: DirectHermesWorkspaceStore? {
         guard hostRegistry?.isWorkspaceReady == true else { return nil }
         return hostRegistry?.selectedWorkspace
-    }
-
-    var hasConfiguredLinkHost: Bool {
-        #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("-test-no-configured-hosts") { return false }
-        #endif
-        return linkDevices.selectedHostID != nil || linkDevices.primaryHostID != nil
-            || linkDevices.devices.contains { $0.kind == .hermesHost }
     }
 
     @ViewBuilder private var rootContent: some View {
@@ -454,10 +406,9 @@ struct RootShellView: View {
     var needsInitialHostSetup: Bool {
         guard let hostRegistry, hostRegistry.isWorkspaceReady, hostRegistry.errorMessage == nil else { return false }
         #if DEBUG
-        if !requiresLinkAccount && !ProcessInfo.processInfo.arguments.contains("-test-no-configured-hosts") { return false }
+        if usesDemoFixtures && !ProcessInfo.processInfo.arguments.contains("-test-no-configured-hosts") { return false }
         #endif
         return hostRegistry.hosts.isEmpty
-            && (hostRegistry.connectionMode == .independent || !hasConfiguredLinkHost)
     }
 
     private var nativeWorkspace: some View {
@@ -595,7 +546,7 @@ struct RootShellView: View {
                 }
                 // Ember lives only in chrome: the brand bar on root screens.
                 // Touch and hold it to switch hosts.
-                EmberBrandToolbarItem(linkDevices: linkDevices)
+                EmberBrandToolbarItem(demoHosts: demoHosts)
                 if fleetModeOn, [.sessions, .scheduledTasks].contains(appState.selectedTab) { fleetToolbar }
             }
         }
@@ -658,37 +609,6 @@ struct RootShellView: View {
                     }
             }
             .bighelpSheetSize()
-            .presentationDragIndicator(.visible)
-        }
-        .sheet(item: $pairingSheetRequest) { request in
-            NavigationStack {
-                BighelpLinkPairingView(
-                    store: linkDevices,
-                    permissionCenter: permissionCenter,
-                    initialReference: request.reference
-                )
-                .id(request.id)
-            }
-            .bighelpSheetSize(.standard)
-            .presentationDragIndicator(.visible)
-        }
-        .sheet(isPresented: $isLinkAccountPresented) {
-            NavigationStack {
-                BighelpLinkAccountView(
-                    store: linkAccount,
-                    onReady: { isLinkAccountPresented = false },
-                    deviceStore: hostRegistry?.connectionMode == .independent ? nil : linkDevices,
-                    onManageDevices: hostRegistry?.connectionMode == .independent ? nil : {
-                        isLinkAccountPresented = false
-                        appState.open(.bighelpLinkDevices)
-                    },
-                    onOpenDevice: hostRegistry?.connectionMode == .independent ? nil : { device in
-                        isLinkAccountPresented = false
-                        appState.open(.bighelpLinkDevice(id: device.id))
-                    }
-                )
-            }
-            .bighelpSheetSize(.standard)
             .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $isHermesWorkspacePresented) {
@@ -957,16 +877,10 @@ struct RootShellView: View {
     func workspaceSettings(destination: WorkspaceDestination? = nil) -> some View {
         SettingsView(
             settings: settings, focusedDestination: destination, userIdentity: userIdentity,
-            linkAccount: requiresLinkAccount ? linkAccount : nil,
-            linkConnectionState: .stopped, linkDevices: linkDevices,
             agents: agents.profiles, personalities: personalities,
             permissionCenter: permissionCenter,
             onOpenSessions: { leaveSettings { openSessions(filteredTo: nil) } },
             onOpenScheduledTasks: { leaveSettings { openScheduledTasks(filteredTo: nil) } },
-            onOpenBighelpLinkDevices: { leaveSettings { openBighelpLinkDevices() } },
-            onOpenBighelpLinkDevice: { id in leaveSettings { appState.open(.bighelpLinkDevice(id: id)) } },
-            onPairBighelpLinkDevice: { leaveSettings { presentPairing() } },
-            onOpenBighelpLinkAccount: { leaveSettings { isLinkAccountPresented = true } },
             onClearLocalCache: {
                 if let nativeRuntime { return await nativeRuntime.refreshLocalCache() }
                 return await clearLocalCache()
@@ -990,19 +904,12 @@ struct RootShellView: View {
         DashboardView(
             model: featureStore.dashboardModel,
             connection: HostConnectionStatus(dashboardIsConnected: nativeRuntime != nil
-                ? currentWorkspaceOwner != nil : linkReadinessState == .verified),
+                ? currentWorkspaceOwner != nil : dashboardFixtureIsConnected),
             permissionCenter: permissionCenter,
             onInboxItemTap: openDashboardInboxItem,
             onAttentionItemTap: openDashboardAttentionItem,
             onWorkItemTap: openDashboardWorkItem
         )
-    }
-
-    func isAccountDeviceRoute(_ route: AppRoute) -> Bool {
-        switch route {
-        case .bighelpLinkDevices, .bighelpLinkDevice: true
-        default: false
-        }
     }
 
     func routeWithWorkspaceMenu<Content: View>(
@@ -1143,18 +1050,6 @@ struct RootShellView: View {
         appState.openScheduledTasks()
     }
 
-    private func openBighelpLinkDevices() {
-        appState.openBighelpLinkDevices()
-    }
-
-    func presentPairing() {
-        if linkAccount.state == .ready {
-            pairingSheetRequest = BighelpLinkPairingSheetRequest(reference: nil)
-        } else {
-            isLinkAccountPresented = true
-        }
-    }
-
     fileprivate func openErrorPresentations<Content: View>(_ content: Content) -> some View {
         content
             .alert("Unable to open", isPresented: Binding(
@@ -1188,9 +1083,7 @@ struct RootShellView: View {
             .sheet(isPresented: $isHostStatusPresented) {
                 NavigationStack {
                     Form {
-                        HostRuntimeSection(store: currentHostRuntime,
-                                           connectionState: nil,
-                                           agents: agents, theme: theme)
+                        HostRuntimeSection(store: currentHostRuntime, agents: agents, theme: theme)
                     }
                     .scrollContentBackground(.hidden)
                     .background(theme.canvas.ignoresSafeArea())
@@ -1223,9 +1116,6 @@ struct RootShellView: View {
             // Notifications and older links named the Activity inbox. Updates,
             // approvals and questions now live in the agent's chat.
             openHomeChat()
-        case .pairBighelpLink:
-            // The old Link pairing flow is retired; hosts connect directly.
-            return
         case .chat(let sessionID):
             openIncomingChat(sessionID: sessionID)
         case .agent(let tab, let agentID):
@@ -1386,7 +1276,7 @@ struct RootShellView: View {
     /// Widgets, notifications and Shortcuts open once the host answers: its
     /// workspace is loaded and not suspended or reconnecting.
     private var acceptsIncomingLinks: Bool {
-        guard requiresLinkAccount else { return true }
+        guard !usesDemoFixtures else { return true }
         guard let hostRegistry, hostRegistry.isWorkspaceReady, hostRegistry.selectedHostID != nil,
               let nativeRuntime else { return false }
         return nativeRuntime.isReady && !nativeRuntime.isSuspended
@@ -1400,11 +1290,6 @@ struct RootShellView: View {
         }
         // A notification tap resolved before the workspace was ready.
         if let open = BighelpExternalSessionOpenCenter.shared.pending { openExternalSession(open) }
-    }
-
-    func closeLinkDevice(id: String) {
-        guard appState.path.last == .bighelpLinkDevice(id: id) else { return }
-        appState.path.removeLast()
     }
 
     func openScheduledTask(_ task: ScheduledTask) {
@@ -1562,22 +1447,13 @@ struct RootShellView: View {
         openSession(session.summary)
     }
 
-    private var readinessPresentation: BighelpAppReadinessPresentation {
-        BighelpAppReadiness.resolve(
-            account: linkAccount.state,
-            devices: linkDevices.devices,
-            link: linkReadinessState,
-            deviceLoadState: linkDevices.loadState,
-            workspaceWasPreviouslyAdmitted: false
-        )
-    }
-
-    private var linkReadinessState: BighelpAppReadinessLinkState {
+    /// The demo dashboard reads as connected only in the Home work fixture.
+    private var dashboardFixtureIsConnected: Bool {
         #if DEBUG
         let arguments = ProcessInfo.processInfo.arguments
-        if arguments.contains("-use-demo-fixtures") && arguments.contains("-test-home-work") { return .verified }
+        if arguments.contains("-use-demo-fixtures") && arguments.contains("-test-home-work") { return true }
         #endif
-        return .unverified
+        return false
     }
 
     @BighelpThemeReader private var theme
@@ -1589,7 +1465,7 @@ private extension BighelpIncomingURLRoute {
     var opensWorkspaceContent: Bool {
         switch self {
         case .home, .chat, .newChat, .agentChat, .agent, .kanban, .approval, .group, .agents, .projects: true
-        case .scheduledTasks, .scheduledTask, .sessions, .settings, .pairBighelpLink: false
+        case .scheduledTasks, .scheduledTask, .sessions, .settings: false
         }
     }
 }

@@ -29,22 +29,6 @@ private struct WikiFolderPreferences: Codable {
     let folders: [WikiFolderPreference]
 }
 
-/// Non-secret proof derived only while authenticated. Retaining this permits
-/// cleanup retries after the credential vault has been erased, without keys.
-struct WikiAuthenticatedMigration: Sendable {
-    let accountID: String
-    let deviceID: String
-
-    init(credentials: BighelpLinkRuntimeCredentials) throws {
-        guard credentials.accountKey.count == 32,
-              credentials.wikiOwner(hostID: "migration", profileID: "migration").isValid else {
-            throw WikiError.ownerChanged
-        }
-        accountID = credentials.wikiAccountID
-        deviceID = credentials.deviceID
-    }
-}
-
 @MainActor
 protocol WikiPersistence {
     func load(owner: WikiOwner) throws -> WikiLocalState?
@@ -53,14 +37,9 @@ protocol WikiPersistence {
     func loadFolders(owner: WikiOwner) throws -> [WikiFolderPreference]
     func saveFolders(_ folders: [WikiFolderPreference], owner: WikiOwner) throws
     func signOut(accountID: String) throws
-    func migrateAuthenticatedLegacyFolders(_ migration: WikiAuthenticatedMigration) throws
 }
 
 extension WikiPersistence {
-    func migrateAuthenticatedLegacyFolders(credentials: BighelpLinkRuntimeCredentials) throws {
-        try migrateAuthenticatedLegacyFolders(WikiAuthenticatedMigration(credentials: credentials))
-    }
-    func migrateAuthenticatedLegacyFolders(_ migration: WikiAuthenticatedMigration) throws { }
     func signOut(accountID: String) throws { try deleteAccount(accountID: accountID) }
 }
 
@@ -218,45 +197,6 @@ final class WikiLocalPersistence: WikiPersistence {
         }
         try saveFolders(folders, owner: owner)
         return folders
-    }
-
-    /// Inspect only the authenticated device's old namespace. Migrate inert
-    /// selections across its host/profile scopes, never authority or journals.
-    func migrateAuthenticatedLegacyFolders(_ migration: WikiAuthenticatedMigration) throws {
-        try requireBighelpProtectedData(availability)
-        let files = try accountFiles(migration.deviceID).filter {
-            !$0.lastPathComponent.hasPrefix("folders-") && $0.pathExtension == "json"
-        }
-        let sorted = try files.map {
-            ($0, try $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate ?? .distantPast)
-        }.sorted { $0.1 > $1.1 }
-        var visited = Set<String>()
-        for (file, _) in sorted {
-            let state = try JSONDecoder().decode(WikiLocalState.self, from: boundedData(file, limit: maximumBytes))
-            try validate(state)
-            guard !state.owner.isNative, state.owner.accountID == migration.deviceID,
-                  state.owner.deviceID == migration.deviceID,
-                  let epoch = state.owner.authorizationEpoch else { continue }
-            // Used only to address inert preferences, not as current authority.
-            let owner = WikiOwner(accountID: migration.accountID, hostID: state.owner.hostID,
-                profileID: state.owner.profileID, deviceID: migration.deviceID,
-                authorizationEpoch: epoch)
-            let destination = try preferenceFile(owner)
-            guard visited.insert(destination.path).inserted,
-                  !FileManager.default.fileExists(atPath: destination.path) else { continue }
-            let legacyPreferences = try accountDirectory(migration.deviceID)
-                .appendingPathComponent(preferenceFile(state.owner).lastPathComponent)
-            let folders: [WikiFolderPreference]
-            if FileManager.default.fileExists(atPath: legacyPreferences.path) {
-                let value = try JSONDecoder().decode(WikiFolderPreferences.self,
-                    from: boundedData(legacyPreferences, limit: 256 * 1_024))
-                guard value.scope == WikiPreferenceScope(state.owner) else { throw WikiError.ownerChanged }
-                folders = value.folders
-            } else {
-                folders = folderPreferences(from: state)
-            }
-            try saveFolders(folders, owner: owner)
-        }
     }
 
     private func folderPreferences(from state: WikiLocalState) -> [WikiFolderPreference] {

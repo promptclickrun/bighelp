@@ -44,8 +44,6 @@
 	<string>Iv23lixjYOwXssu6ryfg</string>
 	<key>BighelpGitHubInstallationURL</key>
 	<string>https://github.com/apps/loopdy-references/installations/new</string>
-	<key>BighelpLinkBaseURL</key>
-	<string>https://link.loopdy.app</string>
 	<key>BighelpNotificationKeychainGroup</key>
 	<string>$(AppIdentifierPrefix)app.loopdy.mobile.notification</string>
     <!-- Mac updates (Sparkle, BighelpMacUpdater): offered, never installed silently. The feed and each

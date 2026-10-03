@@ -5,70 +5,6 @@ import Testing
 
 @MainActor
 struct WikiNativeTests {
-    @Test func successfulMigrationIsReusedAcrossStartupHostProfileAndAuthorityBinds() {
-        let memory = WikiConnectionMemory()
-        let services = OptionalReferenceServices(workspace: BighelpLinkWorkspaceClient(messaging: WikiOldHostMessaging()),
-            configuration: nil, wikiPersistence: memory)
-        let credentials = BighelpLinkRuntimeCredentials(deviceID: "cache-device", authorizationEpoch: 2,
-            signingPrivateKey: P256.Signing.PrivateKey(), accountKey: Data(repeating: 82, count: 32))
-        for _ in 0..<2 {
-            services.bind(owner: nil, credentials: credentials, accountID: nil, currentOwner: { nil })
-            #expect(memory.migrations.count == 1)
-        }
-        for (host, profile) in [("host-a", "default"), ("host-a", "default"), ("host-b", "default"), ("host-b", "other")] {
-            let owner = credentials.wikiOwner(hostID: host, profileID: profile)
-            services.bind(owner: owner, credentials: credentials, accountID: nil, currentOwner: { owner })
-            #expect(memory.migrations.count == 1)
-            #expect(services.wiki.owner == owner)
-        }
-        let rotated = BighelpLinkRuntimeCredentials(deviceID: credentials.deviceID, authorizationEpoch: 3,
-            signingPrivateKey: P256.Signing.PrivateKey(), accountKey: credentials.accountKey)
-        let owner = rotated.wikiOwner(hostID: "host-b", profileID: "other")
-        services.bind(owner: owner, credentials: rotated, accountID: nil, currentOwner: { owner })
-        #expect(memory.migrations.count == 1)
-        #expect(services.wiki.owner == owner)
-        #expect(services.lifecycleFailure == nil)
-    }
-
-    @Test(arguments: ["account", "device"])
-    func changedAuthenticatedNamespaceRunsMigrationAgain(change: String) {
-        let memory = WikiConnectionMemory()
-        let services = OptionalReferenceServices(workspace: BighelpLinkWorkspaceClient(messaging: WikiOldHostMessaging()),
-            configuration: nil, wikiPersistence: memory)
-        let credentials = BighelpLinkRuntimeCredentials(deviceID: "cache-device", authorizationEpoch: 2,
-            signingPrivateKey: P256.Signing.PrivateKey(), accountKey: Data(repeating: 82, count: 32))
-        services.bind(owner: nil, credentials: credentials, accountID: nil, currentOwner: { nil })
-        let changed = BighelpLinkRuntimeCredentials(deviceID: change == "device" ? "other-device" : credentials.deviceID,
-            authorizationEpoch: 2, signingPrivateKey: P256.Signing.PrivateKey(),
-            accountKey: Data(repeating: change == "account" ? 83 : 82, count: 32))
-        for _ in 0..<2 {
-            services.bind(owner: nil, credentials: changed, accountID: nil, currentOwner: { nil })
-            #expect(memory.migrations.count == 2)
-            #expect(memory.migrations.last?.accountID == changed.wikiAccountID)
-            #expect(memory.migrations.last?.deviceID == changed.deviceID)
-        }
-    }
-
-    @Test func failedMigrationRetriesOnBindAndCachesOnlySuccess() {
-        let memory = WikiConnectionMemory()
-        let services = OptionalReferenceServices(workspace: BighelpLinkWorkspaceClient(messaging: WikiOldHostMessaging()),
-            configuration: nil, wikiPersistence: memory)
-        let credentials = BighelpLinkRuntimeCredentials(deviceID: "cache-device", authorizationEpoch: 2,
-            signingPrivateKey: P256.Signing.PrivateKey(), accountKey: Data(repeating: 82, count: 32))
-        memory.failMigration = true
-        for expectedAttempts in 1...2 {
-            services.bind(owner: nil, credentials: credentials, accountID: nil, currentOwner: { nil })
-            #expect(memory.migrations.count == expectedAttempts)
-            #expect(services.lifecycleFailure != nil)
-        }
-        memory.failMigration = false
-        for _ in 0..<2 {
-            services.bind(owner: nil, credentials: credentials, accountID: nil, currentOwner: { nil })
-            #expect(memory.migrations.count == 3)
-            #expect(services.lifecycleFailure == nil)
-        }
-    }
-
     @Test(arguments: [false, true])
     func historicalJournalsBeyondScopeQuotaCanBeErased(deletingAccount: Bool) throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("wiki-many-scopes-" + UUID().uuidString)
@@ -83,10 +19,7 @@ struct WikiNativeTests {
         let services = OptionalReferenceServices(workspace: BighelpLinkWorkspaceClient(messaging: WikiOldHostMessaging()),
             configuration: nil, wikiPersistence: persistence)
         services.bind(owner: owners[0], accountID: nil, currentOwner: { owners[0] })
-        let base = WikiErasureProbe()
-        let eraser = ReferenceAccountDataEraser(base: base, references: services)
-        if deletingAccount { try eraser.erase() } else { try eraser.eraseForSignOut() }
-        #expect(base.calls == 1)
+        try services.eraseAccountData(preservingWikiFolders: !deletingAccount)
         for (index, owner) in owners.enumerated() {
             #expect(try persistence.load(owner: owner) == nil)
             #expect(try persistence.loadFolders(owner: owner).map(\.folderPath)
@@ -94,58 +27,6 @@ struct WikiNativeTests {
         }
         #expect(try persistence.load(owner: unrelated) != nil)
         #expect(try persistence.loadFolders(owner: unrelated).map(\.folderPath) == ["/private"])
-    }
-
-    @Test func authenticatedMigrationBeyondScopeQuotaRetriesAfterVaultErasure() async throws {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("wiki-many-migrations-" + UUID().uuidString)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let live = directory.appendingPathComponent("Loopdy")
-        let availability = WikiSelectionAvailability()
-        let persistence = WikiLocalPersistence(directory: live.appendingPathComponent("Wiki"),
-            preferencesDirectory: directory.appendingPathComponent("Preferences"), availability: availability)
-        let credentials = BighelpLinkRuntimeCredentials(deviceID: "many-migrations", authorizationEpoch: 2,
-            signingPrivateKey: P256.Signing.PrivateKey(), accountKey: Data(repeating: 81, count: 32))
-        let legacyOwners = try seedHistoricalWikiScopes(persistence, accountID: credentials.deviceID, deviceID: credentials.deviceID)
-        let owners = legacyOwners.map { credentials.wikiOwner(hostID: $0.hostID, profileID: $0.profileID) }
-        try persistence.saveFolders([], owner: owners[0])
-        // An arbitrary foreign namespace must not even be decoded by migration.
-        let foreign = live.appendingPathComponent("Wiki").appendingPathComponent(WikiLimits.digest(Data("foreign".utf8)))
-        try FileManager.default.createDirectory(at: foreign, withIntermediateDirectories: true)
-        try Data("corrupt foreign journal".utf8).write(to: foreign.appendingPathComponent("journal.json"))
-        let services = OptionalReferenceServices(workspace: BighelpLinkWorkspaceClient(messaging: WikiOldHostMessaging()),
-            configuration: nil, wikiPersistence: persistence)
-        let defaults = try #require(UserDefaults(suiteName: UUID().uuidString))
-        let vault = BighelpLinkMemoryCredentialVault()
-        try vault.save(credentials)
-        let store = BighelpLinkAccountStore(api: WikiCleanupAccountAPI(), passkeys: WikiCleanupPasskeys(), vault: vault,
-            localDataEraser: ReferenceAccountDataEraser(
-                base: BighelpLocalAccountDataEraser(dataDirectory: live, defaults: defaults), references: services),
-            deviceName: "Fixture", deviceKind: .phone)
-        store.restore()
-        availability.isProtectedDataAvailable = false
-        services.bind(owner: owners[0], credentials: credentials, accountID: nil, currentOwner: { owners[0] })
-        store.onLocalAccountCleared = {
-            services.invalidate()
-            services.bind(owner: nil, accountID: nil, currentOwner: { nil })
-        }
-        await store.signOut()
-        #expect(try vault.load() == nil)
-        #expect(store.credentials == nil)
-        #expect(store.needsLocalCleanup)
-        availability.isProtectedDataAvailable = true
-        await store.signOut()
-        #expect(!store.needsLocalCleanup)
-        #expect(store.state == .signedOut)
-        #expect(services.lifecycleFailure == nil)
-        #expect(!FileManager.default.fileExists(atPath: live.path))
-        for (index, owner) in owners.enumerated() {
-            #expect(try persistence.load(owner: legacyOwners[index]) == nil)
-            #expect(try persistence.load(owner: owner) == nil)
-            #expect(try persistence.loadFolders(owner: owner).map(\.folderPath) == (index == 0 ? [] : ["/notes"]))
-        }
-        services.bind(owner: owners[0], credentials: credentials, accountID: nil, currentOwner: { owners[0] })
-        try services.eraseAccountData()
-        for owner in owners { #expect(try persistence.loadFolders(owner: owner).isEmpty) }
     }
 
     @Test(arguments: [false, true])
@@ -235,166 +116,6 @@ struct WikiNativeTests {
         }
     }
 
-    @Test func realCredentialWikiNamespaceIgnoresDeviceEpochAndSigningKey() {
-        let key = Data(repeating: 17, count: 32)
-        let first = BighelpLinkRuntimeCredentials(deviceID: "first", authorizationEpoch: 1,
-            signingPrivateKey: P256.Signing.PrivateKey(), accountKey: key)
-        let second = BighelpLinkRuntimeCredentials(deviceID: "second", authorizationEpoch: 9,
-            signingPrivateKey: P256.Signing.PrivateKey(), accountKey: key)
-        let other = BighelpLinkRuntimeCredentials(deviceID: "first", authorizationEpoch: 1,
-            signingPrivateKey: first.signingPrivateKey, accountKey: Data(repeating: 18, count: 32))
-        #expect(first.wikiAccountID == second.wikiAccountID)
-        #expect(first.wikiAccountID != other.wikiAccountID)
-        #expect(first.wikiAccountID != first.deviceID)
-        #expect(first.wikiOwner(hostID: "host", profileID: "default").accountID == second.wikiAccountID)
-        #expect(second.wikiOwner(hostID: "host", profileID: "default").deviceID == "second")
-    }
-
-    @Test func realBindMigratesOnlyAuthenticatedFoldersAndSurvivesRealBaseEraser() throws {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("wiki-real-account-" + UUID().uuidString)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let live = directory.appendingPathComponent("Loopdy")
-        let persistence = WikiLocalPersistence(directory: live.appendingPathComponent("Wiki"),
-            preferencesDirectory: directory.appendingPathComponent("LoopdyWikiPreferences"), availability: WikiSelectionAvailable())
-        let credentials = BighelpLinkRuntimeCredentials(deviceID: "migration-device", authorizationEpoch: 2,
-            signingPrivateKey: P256.Signing.PrivateKey(), accountKey: Data(repeating: 71, count: 32))
-        let owner = credentials.wikiOwner(hostID: "host", profileID: "default")
-        let legacy = WikiOwner(accountID: credentials.deviceID, hostID: "host", profileID: "default",
-            deviceID: credentials.deviceID, authorizationEpoch: "1")
-        let root = WikiRoot(wikiId: "old-grant", name: "Notes", writable: true, sourceKind: "files",
-            generation: String(repeating: "a", count: 32), folderPath: "/notes")
-        try persistence.save(WikiLocalState(owner: legacy,
-            connections: [WikiConnection(owner: legacy, name: "Retained", root: root)], saves: []))
-        let mismatched = WikiOwner(accountID: credentials.deviceID, hostID: "unproven", profileID: "default",
-            deviceID: "not-current-device", authorizationEpoch: "1")
-        try persistence.save(WikiLocalState(owner: mismatched,
-            connections: [WikiConnection(owner: mismatched, name: "Reject", root: root)], saves: []))
-        let services = OptionalReferenceServices(workspace: BighelpLinkWorkspaceClient(messaging: WikiOldHostMessaging()),
-            configuration: nil, wikiPersistence: persistence)
-        // Matches app startup: credentials are available before any host owner.
-        services.bind(owner: nil, credentials: credentials, accountID: nil, currentOwner: { nil })
-        #expect(services.lifecycleFailure == nil)
-        #expect(try persistence.loadFolders(owner: owner).map(\.folderPath) == ["/notes"])
-        #expect(try persistence.load(owner: owner) == nil)
-        #expect(try persistence.loadFolders(owner: credentials.wikiOwner(hostID: "unproven", profileID: "default")).isEmpty)
-        let defaults = try #require(UserDefaults(suiteName: UUID().uuidString))
-        let eraser = ReferenceAccountDataEraser(base: BighelpLocalAccountDataEraser(dataDirectory: live, defaults: defaults), references: services)
-        try eraser.eraseForSignOut()
-        #expect(!FileManager.default.fileExists(atPath: live.path))
-        let replacement = BighelpLinkRuntimeCredentials(deviceID: "replacement", authorizationEpoch: 5,
-            signingPrivateKey: P256.Signing.PrivateKey(), accountKey: credentials.accountKey)
-        let restored = replacement.wikiOwner(hostID: "host", profileID: "default")
-        #expect(try persistence.loadFolders(owner: restored).map(\.name) == ["Retained"])
-        services.bind(owner: nil, credentials: replacement, accountID: nil, currentOwner: { nil })
-        try eraser.erase()
-        #expect(try persistence.loadFolders(owner: restored).isEmpty)
-    }
-
-    @Test func signOutRetriesAuthenticatedMigrationAfterCredentialsAreCleared() async throws {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("wiki-migration-retry-" + UUID().uuidString)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let availability = WikiSelectionAvailability()
-        let persistence = WikiLocalPersistence(directory: directory.appendingPathComponent("Wiki"),
-            preferencesDirectory: directory.appendingPathComponent("Preferences"), availability: availability)
-        let credentials = BighelpLinkRuntimeCredentials(deviceID: "retry-device", authorizationEpoch: 2,
-            signingPrivateKey: P256.Signing.PrivateKey(), accountKey: Data(repeating: 72, count: 32))
-        let owner = credentials.wikiOwner(hostID: "host", profileID: "default")
-        let legacy = WikiOwner(accountID: credentials.deviceID, hostID: "host", profileID: "default",
-            deviceID: credentials.deviceID, authorizationEpoch: "1")
-        let root = WikiRoot(wikiId: "old", name: "Notes", writable: true, sourceKind: "files",
-            generation: String(repeating: "a", count: 32), folderPath: "/notes")
-        try persistence.save(WikiLocalState(owner: legacy,
-            connections: [WikiConnection(owner: legacy, name: "Retained", root: root)], saves: []))
-        let unrelated = WikiOwner(accountID: "unrelated-device", hostID: "host", profileID: "default",
-            deviceID: "unrelated-device", authorizationEpoch: "1")
-        try persistence.save(WikiLocalState(owner: unrelated,
-            connections: [WikiConnection(owner: unrelated, name: "Private", root: root)], saves: []))
-        let services = OptionalReferenceServices(workspace: BighelpLinkWorkspaceClient(messaging: WikiOldHostMessaging()),
-            configuration: nil, wikiPersistence: persistence)
-        let base = WikiErasureProbe()
-        let vault = BighelpLinkMemoryCredentialVault()
-        try vault.save(credentials)
-        let store = BighelpLinkAccountStore(api: WikiCleanupAccountAPI(), passkeys: WikiCleanupPasskeys(), vault: vault,
-            localDataEraser: ReferenceAccountDataEraser(base: base, references: services),
-            deviceName: "Fixture", deviceKind: .phone)
-        store.restore()
-        availability.isProtectedDataAvailable = false
-        services.bind(owner: owner, credentials: credentials, accountID: nil, currentOwner: { owner })
-        #expect(services.lifecycleFailure != nil)
-        store.onLocalAccountCleared = {
-            services.invalidate()
-            services.bind(owner: nil, accountID: nil, currentOwner: { nil })
-        }
-        await store.signOut()
-        #expect(store.credentials == nil)
-        #expect(try vault.load() == nil)
-        #expect(store.needsLocalCleanup)
-        #expect(base.calls == 0)
-        await store.signOut()
-        #expect(store.needsLocalCleanup)
-        #expect(base.calls == 0)
-        availability.isProtectedDataAvailable = true
-        #expect(try persistence.load(owner: legacy) != nil)
-        await store.signOut()
-        #expect(!store.needsLocalCleanup)
-        #expect(store.state == .signedOut)
-        #expect(services.lifecycleFailure == nil)
-        #expect(base.calls == 1)
-        #expect(try persistence.load(owner: legacy) == nil)
-        #expect(try persistence.loadFolders(owner: owner).map(\.name) == ["Retained"])
-        #expect(try persistence.load(owner: unrelated) != nil)
-        let otherCredentials = BighelpLinkRuntimeCredentials(deviceID: "other-device", authorizationEpoch: 1,
-            signingPrivateKey: P256.Signing.PrivateKey(), accountKey: Data(repeating: 73, count: 32))
-        let otherOwner = otherCredentials.wikiOwner(hostID: "host", profileID: "default")
-        services.bind(owner: otherOwner, credentials: otherCredentials, accountID: nil, currentOwner: { otherOwner })
-        #expect(try persistence.loadFolders(owner: otherOwner).isEmpty)
-        try services.eraseAccountData()
-        #expect(try persistence.loadFolders(owner: owner).map(\.name) == ["Retained"])
-        #expect(try persistence.load(owner: unrelated) != nil)
-    }
-
-    @Test(arguments: ["discover", "rename", "removeUnrelated", "rebind"])
-    func openingWikiRetriesMigrationBeforeCreatingPreferencesWithoutRebind(firstOperation: String) async throws {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("wiki-open-retry-" + UUID().uuidString)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let availability = WikiSelectionAvailability()
-        let persistence = WikiLocalPersistence(directory: directory.appendingPathComponent("Wiki"),
-            preferencesDirectory: directory.appendingPathComponent("Preferences"), availability: availability)
-        let credentials = BighelpLinkRuntimeCredentials(deviceID: "open-retry-device", authorizationEpoch: 2,
-            signingPrivateKey: P256.Signing.PrivateKey(), accountKey: Data(repeating: 75, count: 32))
-        let owner = credentials.wikiOwner(hostID: "host", profileID: "default")
-        let legacy = WikiOwner(accountID: credentials.deviceID, hostID: "host", profileID: "default",
-            deviceID: credentials.deviceID, authorizationEpoch: "1")
-        let connection = WikiConnection(owner: legacy, name: "Retained", root: WikiConnectionProbe().root)
-        try persistence.save(WikiLocalState(owner: legacy, connections: [connection], saves: []))
-        let services = OptionalReferenceServices(workspace: BighelpLinkWorkspaceClient(messaging: WikiOldHostMessaging()),
-            configuration: nil, wikiPersistence: persistence)
-        availability.isProtectedDataAvailable = false
-        services.bind(owner: owner, credentials: credentials, accountID: nil, currentOwner: { owner })
-        #expect(services.lifecycleFailure != nil)
-        #expect(throws: (any Error).self) { try services.wiki.restoreLocalState() }
-        availability.isProtectedDataAvailable = true
-        switch firstOperation {
-        case "rename": try services.wiki.renameFolder(id: connection.id, name: "Retained")
-        case "removeUnrelated": try services.wiki.removeFolder(id: UUID())
-        case "rebind": services.bind(owner: owner, credentials: credentials, accountID: nil, currentOwner: { owner })
-        default: break
-        }
-        // The discover case opens Wiki without another bind. The old host
-        // rejects discovery, but local selections must already be safe.
-        do { try await services.wiki.discoverRoots(); Issue.record("Expected old host failure") } catch { }
-        #expect(services.wiki.savedFolders.map(\.name) == ["Retained"])
-        #expect(services.lifecycleFailure == nil)
-        try services.wiki.restoreLocalState()
-        #expect(services.wiki.savedFolders.map(\.id) == [connection.id])
-        let base = WikiErasureProbe()
-        let eraser = ReferenceAccountDataEraser(base: base, references: services)
-        try eraser.eraseForSignOut()
-        #expect(base.calls == 1)
-        #expect(try persistence.load(owner: legacy) == nil)
-        #expect(try persistence.loadFolders(owner: owner).map(\.name) == ["Retained"])
-    }
-
     @Test func preferencePreparationGuardsDirectReadsAndEveryMutationAfterRestore() async throws {
         let client = WikiConnectionProbe()
         let memory = WikiConnectionMemory()
@@ -424,43 +145,6 @@ struct WikiNativeTests {
         #expect(memory.folders.first?.name == "Recovered")
         try store.removeFolder(id: connection.id)
         #expect(memory.folders.isEmpty)
-    }
-
-    @Test(arguments: ["account", "device", "currentOwner"])
-    func authenticatedPreferencePreparationRejectsMismatchedOwner(mismatch: String) throws {
-        let credentials = BighelpLinkRuntimeCredentials(deviceID: "proof-device", authorizationEpoch: 2,
-            signingPrivateKey: P256.Signing.PrivateKey(), accountKey: Data(repeating: 76, count: 32))
-        let authenticatedOwner = credentials.wikiOwner(hostID: "host", profileID: "default")
-        let authenticatedDeviceID = try #require(authenticatedOwner.deviceID)
-        let authenticatedEpoch = try #require(authenticatedOwner.authorizationEpoch)
-        let owner = WikiOwner(accountID: mismatch == "account" ? "other-account" : authenticatedOwner.accountID,
-            hostID: authenticatedOwner.hostID, profileID: authenticatedOwner.profileID,
-            deviceID: mismatch == "device" ? "other-device" : authenticatedDeviceID,
-            authorizationEpoch: authenticatedEpoch)
-        let memory = WikiConnectionMemory()
-        let services = OptionalReferenceServices(workspace: BighelpLinkWorkspaceClient(messaging: WikiOldHostMessaging()),
-            configuration: nil, wikiPersistence: memory)
-        services.bind(owner: owner, credentials: credentials, accountID: nil,
-            currentOwner: { mismatch == "currentOwner" ? nil : owner })
-        #expect(throws: WikiError.ownerChanged) { try services.wiki.restoreLocalState() }
-        #expect(throws: WikiError.ownerChanged) { try services.wiki.removeFolder(id: UUID()) }
-        #expect(services.wiki.savedFolders.isEmpty)
-    }
-
-    @Test func authenticatedMigrationDescriptorRejectsInvalidCredentials() throws {
-        let valid = BighelpLinkRuntimeCredentials(deviceID: "verified-device", authorizationEpoch: 2,
-            signingPrivateKey: P256.Signing.PrivateKey(), accountKey: Data(repeating: 74, count: 32))
-        let migration = try WikiAuthenticatedMigration(credentials: valid)
-        #expect(migration.accountID == valid.wikiAccountID)
-        #expect(migration.deviceID == valid.deviceID)
-        for invalid in [
-            BighelpLinkRuntimeCredentials(deviceID: valid.deviceID, authorizationEpoch: 2,
-                signingPrivateKey: valid.signingPrivateKey, accountKey: Data()),
-            BighelpLinkRuntimeCredentials(deviceID: "", authorizationEpoch: 2,
-                signingPrivateKey: valid.signingPrivateKey, accountKey: valid.accountKey)
-        ] {
-            #expect(throws: WikiError.ownerChanged) { try WikiAuthenticatedMigration(credentials: invalid) }
-        }
     }
 
     @Test func unconfiguredWikiStoreIsInertAndOptional() {
@@ -642,7 +326,7 @@ struct WikiNativeTests {
         #expect(try persistence.loadFolders(owner: client.owner).isEmpty)
     }
 
-    @Test func realReferenceEraserPreservesOnlyFolderChoicesOnSignOutThenDeletesThem() throws {
+    @Test func referenceErasurePreservesOnlyFolderChoicesThenDeletesThem() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("wiki-eraser-" + UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
         let client = WikiConnectionProbe()
@@ -657,10 +341,7 @@ struct WikiNativeTests {
         let references = OptionalReferenceServices(workspace: BighelpLinkWorkspaceClient(messaging: WikiOldHostMessaging()),
             configuration: nil, wikiPersistence: persistence)
         references.bind(owner: client.owner, accountID: client.owner.accountID, currentOwner: { client.owner })
-        let base = WikiErasureProbe()
-        let eraser = ReferenceAccountDataEraser(base: base, references: references)
-        try eraser.eraseForSignOut()
-        #expect(base.calls == 1)
+        try references.eraseAccountData(preservingWikiFolders: true)
         #expect(references.wiki.owner == nil)
         #expect(references.wiki.connections.isEmpty)
         #expect(references.wiki.pendingSaves.isEmpty)
@@ -668,8 +349,7 @@ struct WikiNativeTests {
         #expect(try persistence.load(owner: client.owner) == nil)
         #expect(try persistence.loadFolders(owner: client.owner).map(\.name) == ["Retained"])
         references.bind(owner: client.owner, accountID: client.owner.accountID, currentOwner: { client.owner })
-        try eraser.erase()
-        #expect(base.calls == 2)
+        try references.eraseAccountData()
         #expect(try persistence.loadFolders(owner: client.owner).isEmpty)
     }
 
@@ -766,31 +446,6 @@ private final class WikiSelectionAvailability: BighelpProtectedDataAvailabilityP
     var isProtectedDataAvailable = true
 }
 
-@MainActor private final class WikiCleanupAccountAPI: BighelpLinkAccountAPI {
-    func passkeyOptions(registration: Bool) async throws -> BighelpLinkPasskeyOptions { throw WikiError.unavailable }
-    func verifyPasskey(registration: Bool, flowID: String, response: [String: Any]) async throws -> BighelpLinkAccountSession { throw WikiError.unavailable }
-    func storeAccountKeyEnvelope(_ envelope: String, accessToken: String) async throws { throw WikiError.unavailable }
-    func loadAccountKeyEnvelope(accessToken: String) async throws -> String { throw WikiError.unavailable }
-    func saveAccountProfile(displayName: String, avatar: UserProfileAvatar?, expectedRevision: Int,
-                            credentials: BighelpLinkRuntimeCredentials) async throws -> BighelpLinkAccountProfile { throw WikiError.unavailable }
-    func loadAccountProfile(credentials: BighelpLinkRuntimeCredentials) async throws -> BighelpLinkAccountProfile? { nil }
-    func registerDevice(accessToken: String, credentials: BighelpLinkRuntimeCredentials, name: String,
-                        kind: BighelpLinkDeviceKind) async throws -> BighelpLinkDevice { throw WikiError.unavailable }
-    func revokeCurrentDevice(credentials: BighelpLinkRuntimeCredentials) async throws { }
-    func deleteAccount(accessToken: String) async throws { throw WikiError.unavailable }
-}
-
-@MainActor private final class WikiCleanupPasskeys: BighelpLinkPasskeyAuthorizing {
-    func authorize(registration: Bool, options: [String: Any]) async throws -> BighelpLinkPasskeyAuthorization {
-        throw WikiError.unavailable
-    }
-}
-
-private final class WikiErasureProbe: BighelpLocalAccountDataErasing {
-    var calls = 0
-    func erase() throws { calls += 1 }
-}
-
 private struct WikiSelectionAvailable: BighelpProtectedDataAvailabilityProviding {
     var isProtectedDataAvailable: Bool { true }
 }
@@ -798,12 +453,6 @@ private struct WikiSelectionAvailable: BighelpProtectedDataAvailabilityProviding
 @MainActor private final class WikiConnectionMemory: WikiPersistence {
     var folders: [WikiFolderPreference] = []
     var failFolderSave = false
-    var migrations: [WikiAuthenticatedMigration] = []
-    var failMigration = false
-    func migrateAuthenticatedLegacyFolders(_ migration: WikiAuthenticatedMigration) throws {
-        migrations.append(migration)
-        if failMigration { throw WikiError.quota }
-    }
     func loadFolders(owner: WikiOwner) throws -> [WikiFolderPreference] { folders }
     func saveFolders(_ folders: [WikiFolderPreference], owner: WikiOwner) throws {
         if failFolderSave { throw WikiError.quota }

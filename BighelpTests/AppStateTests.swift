@@ -3,15 +3,15 @@ import Testing
 
 @MainActor
 struct AppStateTests {
-    @Test @MainActor func hostSwitchPreservesAccountDeviceControlsButClearsChatOwnership() {
+    @Test @MainActor func hostSwitchKeepsTheConnectionsScreenButClearsChatOwnership() {
         let state = AppState()
         state.selectedTab = .workspace
         state.activateConversation(id: "old-host-chat", source: .newChat)
         state.requestVoiceMode(for: "old-host-chat")
-        state.path = [.bighelpLinkDevices, .bighelpLinkDevice(id: "host-b")]
+        state.path = [.workspaceConnections]
         state.resetForHostBoundary()
         #expect(state.selectedTab == .workspace)
-        #expect(state.path == [.bighelpLinkDevices, .bighelpLinkDevice(id: "host-b")])
+        #expect(state.path == [.workspaceConnections])
         #expect(state.activeConversationID == nil)
         #expect(state.pendingVoiceConversationID == nil)
     }
@@ -82,17 +82,6 @@ struct AppStateTests {
         #expect(state.activeConversationID == "forked")
     }
 
-    @Test func openingPairedDevicesFromChatReplacesTheChatRoute() {
-        let state = AppState()
-        state.path = [.chat(conversationID: "current")]
-
-        state.openBighelpLinkDevices()
-
-        #expect(state.path == [.bighelpLinkDevices])
-        state.openBighelpLinkDevices()
-        #expect(state.path == [.bighelpLinkDevices])
-    }
-
     @Test func legacyInboxNotificationOpensWorkspaceActivity() {
         let state = AppState()
         state.select(.agents)
@@ -159,12 +148,5 @@ struct AppStateTests {
         state.openScheduledTasks()
         #expect(state.selectedTab == .scheduledTasks)
         #expect(state.path.isEmpty)
-
-        state.path = [
-            .scheduledTasks,
-            .scheduledTask(id: "stale-task")
-        ]
-        state.openBighelpLinkDevices()
-        #expect(state.path == [.bighelpLinkDevices])
     }
 }

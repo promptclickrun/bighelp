@@ -7,8 +7,7 @@ struct BighelpAppComposition {
     static let loadsProductionSessionRepositoryOnInit = true
 
     let workspaceConnectivity: BighelpWorkspaceConnectivity = .nativeOnly
-    /// Historical fixture discriminator; never a production chat account gate.
-    let requiresLinkAccount: Bool
+    let usesDemoFixtures: Bool
     let appState: AppState
     let settings: SettingsStore
     let companion: CompanionStore
@@ -16,10 +15,8 @@ struct BighelpAppComposition {
     let agentDirectory: AgentDirectoryStore
     let agentRuntimeDefaults: any AgentRuntimeDefaultsClient
     let botModeRooms: BotModeRoomStore
-    let linkAccount: BighelpLinkAccountStore
-    let linkDevices: BighelpLinkDeviceStore
+    let demoHosts: DemoHosts
     let permissionCenter: PermissionCenter
-    let permissionsOnboarding: PermissionsOnboardingModel
     let managedNotificationFactory: BighelpManagedNotificationFactory
     let sessionCatalog: SessionCatalogStore
     let scheduledTasks: ScheduledTasksStore
@@ -37,9 +34,7 @@ struct BighelpAppComposition {
 
     init(
         arguments: [String] = ProcessInfo.processInfo.arguments,
-        defaults: UserDefaults = .standard,
-        credentialVault: (any BighelpLinkCredentialVault)? = nil,
-        infoDictionary: [String: Any] = Bundle.main.infoDictionary ?? [:]
+        defaults: UserDefaults = .standard
     ) {
         let usesFixtures = arguments.contains("-disable-demo-delays")
             || arguments.contains("-use-demo-fixtures")
@@ -113,20 +108,9 @@ struct BighelpAppComposition {
         let protectedDataAvailability: any BighelpProtectedDataAvailabilityProviding = usesFixtures
             ? BighelpFixtureProtectedDataAvailability()
             : BighelpSystemProtectedDataAvailability()
-        let legacySocketDataDirectories = BighelpApplicationDataDirectories.legacySocketDirectories(
-            fixtures: usesFixtures
-        )
-        #if DEBUG
-        if arguments.contains("-reset-host-selection-fixture") {
-            defaults.removeObject(forKey: "loopdy.link.selected-host-id")
-            defaults.removeObject(forKey: "loopdy.link.primary-host-id")
-        }
-        #endif
-        let hostSelection = BighelpLinkHostSelectionStore(defaults: defaults)
-        let hostRepositoryScope = BighelpHostRepositoryScope(
-            hostID: hostSelection.selectedHostID
-        )
+        let hostRepositoryScope = BighelpHostRepositoryScope()
         if !usesFixtures {
+            BighelpLinkAccountRetirement.run(defaults: defaults)
             try? BighelpMarketplaceRetirementMigration.run(
                 dataDirectory: dataDirectory,
                 defaults: defaults
@@ -160,21 +144,6 @@ struct BighelpAppComposition {
             defaults: defaults,
             avatarDirectory: dataDirectory.appending(path: "user-avatars", directoryHint: .isDirectory)
         )
-        // Optional notification configuration must never prevent native startup.
-        let linkBaseURL = (try? BighelpRuntimeConfiguration.nativeAcceptanceLinkOrigin(arguments: arguments))
-            ?? (try? BighelpRuntimeConfiguration.linkBaseURL(infoDictionary: infoDictionary))
-        let linkAPI = BighelpLinkAPI(baseURL: linkBaseURL)
-        #if DEBUG
-        let usesEphemeralCredentialVault = arguments.contains("-force-signed-out-onboarding")
-            || acceptanceStorageID != nil
-            || (usesFixtures && HostRuntimePreviewClient.scenario(arguments: arguments) != nil)
-        #else
-        let usesEphemeralCredentialVault = false
-        #endif
-        let linkVault: any BighelpLinkCredentialVault = credentialVault
-            ?? (usesEphemeralCredentialVault
-                ? BighelpLinkMemoryCredentialVault()
-                : BighelpLinkKeychainCredentialVault())
         let hostSelectionChangeRelay = BighelpHostSelectionChangeRelay()
         let unavailable = NativeWorkspaceUnavailableClient()
         let unavailableCatalog = UnavailableAppCatalogClient()
@@ -223,7 +192,7 @@ struct BighelpAppComposition {
             avatarDirectoryProvider: usesFixtures ? nil : {
                 try? agentRepository.scopedAvatarsDirectory()
             },
-            currentHostID: { hostSelection.selectedHostID }
+            currentHostID: { hostRepositoryScope.hostID }
         )
         let usesOverflowStatusRailFixture = usesFixtures
             && arguments.contains("-use-overflow-status-rail-fixture")
@@ -328,49 +297,8 @@ struct BighelpAppComposition {
                 : unavailableCatalog,
             initialAgentID: agentDirectory.resolvedAgent(explicitID: nil)?.id
         )
-        let passkeys: any BighelpLinkPasskeyAuthorizing
-        if #available(iOS 18.0, *) {
-            passkeys = BighelpLinkPasskeyCoordinator()
-        } else {
-            passkeys = BighelpLinkUnavailablePasskeyAuthorizer()
-        }
-        let deviceKind: BighelpLinkDeviceKind = UIDevice.current.userInterfaceIdiom == .pad
-            ? .tablet
-            : .phone
-        let linkAccount = BighelpLinkAccountStore(
-            api: linkAPI,
-            passkeys: passkeys,
-            vault: linkVault,
-            localDataEraser: ReferenceAccountDataEraser(base: BighelpLocalAccountDataEraser(
-                dataDirectory: dataDirectory,
-                additionalDataDirectories: legacySocketDataDirectories + [BighelpManagedNotificationLedger.storageRoot],
-                defaults: defaults,
-                secretEraser: BighelpLocalAccountKeychainSecretEraser()
-            ), references: optionalReferences),
-            eraseUserPreferences: {
-                AgentDirectoryStore.erasePersistedUserPreferences(defaults: defaults)
-                SessionCatalogStore.erasePersistedUserPreferences(defaults: defaults)
-                SettingsStore.eraseSessionSectionPreferences(defaults: defaults)
-            },
-            deviceName: UIDevice.current.name,
-            deviceKind: deviceKind
-        )
-        linkAccount.restore()
-        optionalReferences.bind(owner: nil, credentials: linkAccount.credentials, accountID: linkAccount.credentials?.deviceID,
-                                currentOwner: { nil })
-        let linkDeviceClient: any BighelpLinkDeviceClient = usesFixtures
-            ? BighelpLinkFixtureClient(
-                devices: arguments.contains("-use-multi-host-fixtures")
-                    ? BighelpLinkFixtureClient.multiHostDevices
-                    : BighelpLinkFixtureClient.defaultDevices
-            )
-            : BighelpLinkProductionClient(
-                api: linkAPI,
-                vault: linkVault
-            )
-        let linkDevices = BighelpLinkDeviceStore(
-            client: linkDeviceClient,
-            hostSelection: hostSelection,
+        let demoHosts = DemoHosts(
+            hosts: !usesFixtures ? [] : arguments.contains("-use-multi-host-fixtures") ? DemoHosts.several : DemoHosts.standard,
             onSelectedHostChange: { hostSelectionChangeRelay.send($0) }
         )
         let appleDeviceTools = AppleDeviceToolService()
@@ -409,11 +337,7 @@ struct BighelpAppComposition {
                 await deviceToolCoordinator.handle(request, owner: owner, isCurrent: isCurrent)
             }
         }
-        let permissionsOnboarding = PermissionsOnboardingModel(
-            center: permissionCenter,
-            completion: PermissionsOnboardingCompletion(defaults: defaults)
-        )
-        managedNotificationFactory = BighelpManagedNotificationFactory(vault: linkVault, api: linkAPI,
+        managedNotificationFactory = BighelpManagedNotificationFactory(
             permissions: permissionCenter, isFixture: usesFixtures)
         let personalities = PersonalityStore(
             client: usesFixtures
@@ -504,12 +428,7 @@ struct BighelpAppComposition {
             generatedMediaResolver: nil,
             recentModelHistory: RecentModelHistoryStore(
                 defaults: defaults,
-                scopeID: { [weak linkAccount] in
-                    if usesFixtures { return "demo-models" }
-                    guard let credentials = linkAccount?.credentials,
-                          let hostID = hostRepositoryScope.hostID else { return nil }
-                    return "\(credentials.deviceID):\(hostID)"
-                }
+                scopeID: { usesFixtures ? "demo-models" : nil }
             ),
             midSessionBehavior: { settings.midSessionChatBehavior }
         )
@@ -644,17 +563,15 @@ struct BighelpAppComposition {
         }
 
         self.appState = appState
-        requiresLinkAccount = !usesFixtures
+        usesDemoFixtures = usesFixtures
         self.settings = settings
         self.companion = companion
         self.userIdentity = userIdentity
         self.agentDirectory = agentDirectory
         self.agentRuntimeDefaults = agentRuntimeDefaults
         self.botModeRooms = botModeRooms
-        self.linkAccount = linkAccount
-        self.linkDevices = linkDevices
+        self.demoHosts = demoHosts
         self.permissionCenter = permissionCenter
-        self.permissionsOnboarding = permissionsOnboarding
         self.sessionCatalog = sessionCatalog
         self.scheduledTasks = scheduledTasks
         self.personalities = personalities
@@ -699,35 +616,9 @@ struct BighelpAppComposition {
         clearLocalCache = {
             await localCacheRefreshCoordinator.clearAndRefresh()
         }
-        let clearAccountPresentation: @MainActor () -> Void = {
-            [weak featureStore,
-             weak cachedAgentRuntimeDefaults, weak botModeRooms, weak scheduledTasks,
-             weak personalities, weak skillsAndTools, weak hermesWorkspaces,
-             weak linkDevices, weak agentDirectory, weak userIdentity,
-             weak sessionCatalog, weak appState, weak hostRepositoryScope,
-             weak companion, weak optionalReferences] in
-            optionalReferences?.invalidate()
-            featureStore?.resetForAccountBoundary()
-            cachedAgentRuntimeDefaults?.resetForAccountBoundary()
-            botModeRooms?.configureNativeClient(nil)
-            botModeRooms?.resetForAccountBoundary()
-            scheduledTasks?.resetForAccountBoundary()
-            personalities?.resetForAccountBoundary()
-            skillsAndTools?.resetForAccountBoundary()
-            hermesWorkspaces?.resetForAccountBoundary()
-            linkDevices?.resetForAccountBoundary()
-            agentDirectory?.resetForAccountBoundary()
-            userIdentity?.resetForAccountBoundary()
-            sessionCatalog?.resetForAccountBoundary()
-            companion?.clearAgentOverrides()
-            appState?.resetForAccountBoundary()
-            hostRepositoryScope?.hostID = nil
-        }
-        linkAccount.onLocalAccountCleared = clearAccountPresentation
-        // Device selection belongs only to optional account management/fixtures.
-        // It must not retarget, reset or start native chat.
+        // Only demo mode switches hosts here; real hosts live in BighelpHostRegistry.
         hostSelectionChangeRelay.willChange = { hostID in
-            guard usesFixtures, linkDevices.selectedHostID == hostID else { return }
+            guard usesFixtures, demoHosts.selectedHostID == hostID else { return }
             featureStore.resetForAccountBoundary()
             sessionCatalog.resetForAccountBoundary()
             appState.resetForHostBoundary()
@@ -755,7 +646,6 @@ struct BighelpAppComposition {
                 guard usesFixtures else { throw BighelpShortcutServiceError.connectionUnavailable }
             }
         )
-        Task { await linkAccount.resumePendingAccountDeletion() }
     }
 
     /// Demo voice hears nothing, or (`-test-voice-partial`) a sentence in progress.
@@ -807,21 +697,5 @@ enum BighelpApplicationDataDirectories {
             path: "Loopdy",
             directoryHint: .isDirectory
         )
-    }
-
-    static func legacySocketDirectories(
-        fixtures: Bool,
-        applicationSupport: URL = FileManager.default.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        )[0]
-    ) -> [URL] {
-        guard !fixtures else { return [] }
-        return [
-            applicationSupport.appending(
-                path: "LoopdyDemo",
-                directoryHint: .isDirectory
-            )
-        ]
     }
 }

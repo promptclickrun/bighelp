@@ -167,7 +167,6 @@ final class BighelpManagedNotificationLedger {
     }
     /// Call only after the account eraser has removed storageRoot. This prevents
     /// the retained service from writing an old account's cached rows back later.
-    func didEraseAccountData() { snapshot = Snapshot() }
     /// Turn off notifications: forget every enrollment and Live Activity owner.
     func erase() throws {
         let file = root.appending(path: "owners-v1.json")

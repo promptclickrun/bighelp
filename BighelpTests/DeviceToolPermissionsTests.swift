@@ -6,19 +6,6 @@ import Testing
 struct DeviceToolPermissionsTests {
     private let scope = DeviceToolScope(deviceID: "phone-a", authorizationEpoch: 1, hostID: "host-a")
 
-    @Test func accountErasureRemovesSavedDeviceGrants() throws {
-        let domain = "device-tools-erasure-\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: domain))
-        defer { defaults.removePersistentDomain(forName: domain) }
-        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
-        defaults.set(["calendar", "health"], forKey: scope.storageKey)
-        defaults.set("dark", forKey: "loopdy.appearance.mode")
-        let eraser = BighelpLocalAccountDataEraser(dataDirectory: directory, defaults: defaults)
-        try eraser.erase()
-        #expect(defaults.object(forKey: scope.storageKey) == nil)
-        #expect(defaults.string(forKey: "loopdy.appearance.mode") == "dark")
-    }
-
     @Test func systemPermissionAloneDoesNotEnableAgentAccess() async {
         let fixture = DevicePermissionFixture()
         let store = fixture.makeStore()

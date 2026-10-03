@@ -8,18 +8,11 @@ struct SettingsView: View {
     let focusedDestination: WorkspaceDestination?
     @Bindable var settings: SettingsStore
     @Bindable var userIdentity: UserIdentityStore
-    let linkAccount: BighelpLinkAccountStore?
-    let linkConnectionState: BighelpLinkLiveSocketState?
-    let linkDevices: BighelpLinkDeviceStore
     let agents: [AgentProfile]
     let personalities: PersonalityStore
     let permissionCenter: PermissionCenter
     let onOpenSessions: () -> Void
     let onOpenScheduledTasks: () -> Void
-    let onOpenBighelpLinkDevices: () -> Void
-    let onOpenBighelpLinkDevice: (String) -> Void
-    let onPairBighelpLinkDevice: () -> Void
-    let onOpenBighelpLinkAccount: () -> Void
     let onClearLocalCache: @MainActor () async -> Bool
     let hostRuntime: HostRuntimeStore?
     let agentDirectory: AgentDirectoryStore?
@@ -50,12 +43,9 @@ struct SettingsView: View {
     @FocusState var isDisplayNameFocused: Bool
     @State var displayNameDraft: String
     @State var displayNameBaseline: String
-    @State var isSavingName = false
     @State var isImportingAvatar = false
-    @State var nameSaveError: String?
     @State var nameSaveStatus: String?
     @State var isPersonalitiesPresented = false
-    @State var isAccountControlsPresented = false
     @Environment(\.bighelpHostRegistry) var hostRegistry
     @Environment(\.providerUsage) var providerUsage
     @State var isClearCacheConfirmationPresented = false
@@ -69,20 +59,11 @@ struct SettingsView: View {
         settings: SettingsStore,
         focusedDestination: WorkspaceDestination? = nil,
         userIdentity: UserIdentityStore = UserIdentityStore(),
-        linkAccount: BighelpLinkAccountStore? = nil,
-        linkConnectionState: BighelpLinkLiveSocketState? = nil,
-        linkDevices: BighelpLinkDeviceStore = BighelpLinkDeviceStore(
-            client: BighelpLinkFixtureClient()
-        ),
         agents: [AgentProfile] = [],
         personalities: PersonalityStore = PersonalityStore(client: FixturePersonalityClient()),
         permissionCenter: PermissionCenter = PermissionCenter(),
         onOpenSessions: @escaping () -> Void = {},
         onOpenScheduledTasks: @escaping () -> Void = {},
-        onOpenBighelpLinkDevices: @escaping () -> Void = {},
-        onOpenBighelpLinkDevice: @escaping (String) -> Void = { _ in },
-        onPairBighelpLinkDevice: @escaping () -> Void = {},
-        onOpenBighelpLinkAccount: @escaping () -> Void = {},
         onClearLocalCache: @escaping @MainActor () async -> Bool = { true },
         voiceSettingsScope: String? = nil,
         voiceSettingsClient: (any VoiceSettingsClient)? = nil,
@@ -111,18 +92,11 @@ struct SettingsView: View {
         _userIdentity = Bindable(wrappedValue: userIdentity)
         _displayNameDraft = State(initialValue: userIdentity.identity.name)
         _displayNameBaseline = State(initialValue: userIdentity.identity.name)
-        self.linkAccount = linkAccount
-        self.linkConnectionState = linkConnectionState
-        self.linkDevices = linkDevices
         self.agents = agents
         self.personalities = personalities
         self.permissionCenter = permissionCenter
         self.onOpenSessions = onOpenSessions
         self.onOpenScheduledTasks = onOpenScheduledTasks
-        self.onOpenBighelpLinkDevices = onOpenBighelpLinkDevices
-        self.onOpenBighelpLinkDevice = onOpenBighelpLinkDevice
-        self.onPairBighelpLinkDevice = onPairBighelpLinkDevice
-        self.onOpenBighelpLinkAccount = onOpenBighelpLinkAccount
         self.onClearLocalCache = onClearLocalCache
         self.hostRuntime = hostRuntime
         self.agentDirectory = agentDirectory
@@ -202,14 +176,6 @@ struct SettingsView: View {
             hostPluginUpdate = model
             await model.checkIfNeeded()
         }
-        .task {
-            if hostRegistry?.connectionMode != .independent,
-               (linkAccount?.state == .ready || linkAccount == nil),
-               linkDevices.loadState == .idle {
-                await linkDevices.load()
-            }
-            await loadAccountProfileIfAvailable()
-        }
     }
 
     @ViewBuilder
@@ -280,8 +246,7 @@ struct SettingsView: View {
                     currentConnection
                 }
             } else {
-                HostRuntimeSection(store: hostRuntime, connectionState: linkConnectionState,
-                                   agents: agentDirectory, theme: theme)
+                HostRuntimeSection(store: hostRuntime, agents: agentDirectory, theme: theme)
                 PluginUpdateSection(store: pluginUpdates, theme: theme)
                 connectivity
             }
@@ -396,8 +361,6 @@ struct SettingsView: View {
     @ViewBuilder
     private func destination(for section: SettingsMenuSection) -> some View {
         switch section {
-        case .accountAndDevices:
-            accountAndDevicesPage
         case .workspace:
             settingsPage(title: section.title) {
                 workspace

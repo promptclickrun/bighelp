@@ -6,122 +6,22 @@ import Testing
 @MainActor
 struct BighelpNotificationIdentityInstallationScopeTests {
     @Test
-    func legacyLinkPresenceStillResolvesNotificationOnlyCredentials() async throws {
+    func enrollmentBootstrapsANotificationOnlyInstallation() async throws {
         let notificationVault = MemoryNotificationIdentityVault()
-        let legacyVault = BighelpLinkMemoryCredentialVault()
-        let legacy = BighelpLinkRuntimeCredentials(
-            deviceID: "legacy-account-device",
-            authorizationEpoch: 7,
-            signingPrivateKey: P256.Signing.PrivateKey(),
-            accountKey: Data(repeating: 0x5a, count: 32)
-        )
-        try legacyVault.save(legacy)
         let transport = NotificationBootstrapTransport()
-        let coordinator = makeCoordinator(
-            notificationVault: notificationVault,
-            legacyVault: legacyVault,
-            transport: transport
-        )
+        let coordinator = makeCoordinator(notificationVault: notificationVault, transport: transport)
 
         let credentials = try await coordinator.resolveForEnrollment()
+        let again = try await coordinator.resolveForEnrollment()
 
-        #expect(credentials.authority == .notificationOnly)
         #expect(credentials.subscriberScope == "notification-instance")
-        #expect(credentials.deviceID != legacy.deviceID)
-        #expect(transport.legacyRetirementRequests == 1)
-        #expect(transport.requestOrder == ["retire-legacy", "bootstrap"])
-        #expect(transport.bootstrapRequests == 1)
-        #expect(try legacyVault.load() == legacy, "Notification setup must preserve Link chat credentials")
+        #expect(again == credentials)
+        #expect(transport.requestOrder == ["bootstrap"])
         #expect(try coordinator.current() == credentials)
     }
-
-    @Test
-    func currentDoesNotAuthorizeLegacyLinkCredentialsAsNotificationIdentity() throws {
-        let notificationVault = MemoryNotificationIdentityVault()
-        let legacyVault = BighelpLinkMemoryCredentialVault()
-        try legacyVault.save(.init(
-            deviceID: "legacy-account-device",
-            authorizationEpoch: 3,
-            signingPrivateKey: P256.Signing.PrivateKey(),
-            accountKey: Data(repeating: 0x33, count: 32)
-        ))
-        let coordinator = makeCoordinator(
-            notificationVault: notificationVault,
-            legacyVault: legacyVault,
-            transport: NotificationBootstrapTransport()
-        )
-
-        #expect(try coordinator.current() == nil)
-    }
-
-    @Test
-    func failedLegacyRetirementBlocksReplacementBootstrap() async throws {
-        let notificationVault = MemoryNotificationIdentityVault()
-        let legacyVault = BighelpLinkMemoryCredentialVault()
-        let legacy = BighelpLinkRuntimeCredentials(
-            deviceID: "legacy-account-device",
-            authorizationEpoch: 9,
-            signingPrivateKey: P256.Signing.PrivateKey(),
-            accountKey: Data(repeating: 0x44, count: 32)
-        )
-        try legacyVault.save(legacy)
-        let transport = NotificationBootstrapTransport()
-        transport.legacyRetirementError = DirectHermesError.invalidResponse
-        let coordinator = makeCoordinator(
-            notificationVault: notificationVault,
-            legacyVault: legacyVault,
-            transport: transport
-        )
-
-        await #expect(throws: (any Error).self) {
-            _ = try await coordinator.resolveForEnrollment()
-        }
-        #expect(transport.legacyRetirementRequests == 1)
-        #expect(transport.bootstrapRequests == 0)
-        #expect(notificationVault.value == .none)
-        #expect(try legacyVault.load() == legacy)
-
-        transport.legacyRetirementError = nil
-        let recovered = try await coordinator.resolveForEnrollment()
-        #expect(recovered.authority == .notificationOnly)
-        #expect(transport.legacyRetirementRequests == 2)
-        #expect(transport.bootstrapRequests == 1)
-        #expect(try coordinator.current() == recovered)
-        #expect(try legacyVault.load() == legacy)
-    }
-
-    @Test
-    func everyEnrollmentResolutionRetiresLegacyAuthorityEvenWithActiveInstallation() async throws {
-        let notificationVault = MemoryNotificationIdentityVault()
-        let legacyVault = BighelpLinkMemoryCredentialVault()
-        let legacy = BighelpLinkRuntimeCredentials(
-            deviceID: "legacy-account-device",
-            authorizationEpoch: 11,
-            signingPrivateKey: P256.Signing.PrivateKey(),
-            accountKey: Data(repeating: 0x55, count: 32)
-        )
-        try legacyVault.save(legacy)
-        let transport = NotificationBootstrapTransport()
-        let coordinator = makeCoordinator(
-            notificationVault: notificationVault,
-            legacyVault: legacyVault,
-            transport: transport
-        )
-
-        let first = try await coordinator.resolveForEnrollment()
-        let second = try await coordinator.resolveForEnrollment()
-
-        #expect(second == first)
-        #expect(transport.legacyRetirementRequests == 2)
-        #expect(transport.bootstrapRequests == 1)
-        #expect(transport.requestOrder == ["retire-legacy", "bootstrap", "retire-legacy"])
-        #expect(try legacyVault.load() == legacy, "Repeated retirement must preserve Link chat credentials")
-    }
-
     @Test
     func explicitEnrollmentReplacesOnlyAnAuthoritativelyRevokedInstallation() async throws {
         let revoked = BighelpManagedNotificationCredentials(
-            authority: .notificationOnly,
             deviceID: UUID().uuidString.lowercased(),
             authorizationEpoch: 1,
             signingPrivateKey: P256.Signing.PrivateKey()
@@ -130,7 +30,6 @@ struct BighelpNotificationIdentityInstallationScopeTests {
         let transport = NotificationBootstrapTransport()
         let coordinator = makeCoordinator(
             notificationVault: notificationVault,
-            legacyVault: BighelpLinkMemoryCredentialVault(),
             transport: transport
         )
 
@@ -143,92 +42,12 @@ struct BighelpNotificationIdentityInstallationScopeTests {
     }
 
     @Test
-    func failedLegacyRetirementBlocksExistingInstallationResolution() async throws {
-        let active = BighelpManagedNotificationCredentials(
-            authority: .notificationOnly,
-            deviceID: UUID().uuidString.lowercased(),
-            authorizationEpoch: 1,
-            signingPrivateKey: P256.Signing.PrivateKey()
-        )
-        let original = BighelpNotificationIdentityLoad.current(.active(active))
-        let notificationVault = MemoryNotificationIdentityVault(value: original)
-        let legacyVault = BighelpLinkMemoryCredentialVault()
-        let legacy = BighelpLinkRuntimeCredentials(
-            deviceID: "legacy-account-device",
-            authorizationEpoch: 12,
-            signingPrivateKey: P256.Signing.PrivateKey(),
-            accountKey: Data(repeating: 0x66, count: 32)
-        )
-        try legacyVault.save(legacy)
-        let transport = NotificationBootstrapTransport()
-        transport.legacyRetirementError = DirectHermesError.invalidResponse
-        let coordinator = makeCoordinator(
-            notificationVault: notificationVault,
-            legacyVault: legacyVault,
-            transport: transport
-        )
-
-        await #expect(throws: (any Error).self) {
-            _ = try await coordinator.resolveForEnrollment()
-        }
-
-        #expect(transport.legacyRetirementRequests == 1)
-        #expect(transport.bootstrapRequests == 0)
-        #expect(notificationVault.value == original)
-        #expect(try legacyVault.load() == legacy)
-    }
-
-    @Test
-    func currentRejectsLegacyAuthorityInNotificationVault() throws {
-        let legacy = BighelpManagedNotificationCredentials(
-            authority: .legacyAccount,
-            deviceID: "legacy-account-device",
-            authorizationEpoch: 2,
-            signingPrivateKey: P256.Signing.PrivateKey()
-        )
-        let notificationVault = MemoryNotificationIdentityVault(value: .current(.active(legacy)))
-        let coordinator = makeCoordinator(
-            notificationVault: notificationVault,
-            legacyVault: BighelpLinkMemoryCredentialVault(),
-            transport: NotificationBootstrapTransport()
-        )
-
-        #expect(throws: DirectHermesError.invalidCredentials) {
-            _ = try coordinator.current()
-        }
-    }
-
-    @Test
-    func erasePreservesLegacyAuthorityWhenItCannotSafelyRevoke() async throws {
-        let legacy = BighelpManagedNotificationCredentials(
-            authority: .legacyAccount,
-            deviceID: "legacy-account-device",
-            authorizationEpoch: 2,
-            signingPrivateKey: P256.Signing.PrivateKey()
-        )
-        let original = BighelpNotificationIdentityLoad.current(.active(legacy))
-        let notificationVault = MemoryNotificationIdentityVault(value: original)
-        let coordinator = makeCoordinator(
-            notificationVault: notificationVault,
-            legacyVault: BighelpLinkMemoryCredentialVault(),
-            transport: NotificationBootstrapTransport()
-        )
-
-        await #expect(throws: DirectHermesError.invalidCredentials) {
-            try await coordinator.erase()
-        }
-        #expect(notificationVault.value == original,
-                "Unknown legacy authority must remain durable when authoritative revocation is unavailable")
-    }
-
-    @Test
     func concurrentEnrollmentResolutionsShareOneBootstrap() async throws {
         let notificationVault = MemoryNotificationIdentityVault()
         let transport = NotificationBootstrapTransport()
         transport.suspendBootstrapResponses()
         let coordinator = makeCoordinator(
             notificationVault: notificationVault,
-            legacyVault: BighelpLinkMemoryCredentialVault(),
             transport: transport
         )
 
@@ -261,7 +80,6 @@ struct BighelpNotificationIdentityInstallationScopeTests {
         transport.suspendBootstrapResponses()
         let coordinator = makeCoordinator(
             notificationVault: notificationVault,
-            legacyVault: BighelpLinkMemoryCredentialVault(),
             transport: transport
         )
 
@@ -299,19 +117,12 @@ struct BighelpNotificationIdentityInstallationScopeTests {
     @Test
     func versionLessIdentityErrorBodyStillSurfacesServerCode() async throws {
         let transport = IdentityErrorTransport()
-        let legacyAPI = BighelpLinkAPI(
-            baseURL: URL(string: "https://link.loopdy.app")!,
-            transport: transport,
-            managedNotificationTransport: transport
-        )
         let broker = BighelpNotificationBrokerClient(
-            legacyAPI: legacyAPI,
             transport: transport,
             now: { Date(timeIntervalSince1970: 1_800_000_000) },
             nonce: { "fixture-nonce" }
         )
         let credentials = BighelpManagedNotificationCredentials(
-            authority: .notificationOnly,
             deviceID: UUID().uuidString.lowercased(),
             authorizationEpoch: 1,
             signingPrivateKey: P256.Signing.PrivateKey()
@@ -338,23 +149,15 @@ struct BighelpNotificationIdentityInstallationScopeTests {
 
     private func makeCoordinator(
         notificationVault: MemoryNotificationIdentityVault,
-        legacyVault: BighelpLinkMemoryCredentialVault,
         transport: NotificationBootstrapTransport
     ) -> BighelpNotificationIdentityCoordinator {
-        let legacyAPI = BighelpLinkAPI(
-            baseURL: URL(string: "https://link.loopdy.app")!,
-            transport: transport,
-            managedNotificationTransport: transport
-        )
         let broker = BighelpNotificationBrokerClient(
-            legacyAPI: legacyAPI,
             transport: transport,
             now: { Date(timeIntervalSince1970: 1_800_000_000) },
             nonce: { "fixture-nonce" }
         )
         return BighelpNotificationIdentityCoordinator(
             vault: notificationVault,
-            legacyVault: legacyVault,
             broker: broker,
             now: { Date(timeIntervalSince1970: 1_800_000_000) }
         )
@@ -377,9 +180,7 @@ private final class MemoryNotificationIdentityVault: BighelpNotificationIdentity
 @MainActor
 private final class NotificationBootstrapTransport: BighelpLinkHTTPTransport {
     private(set) var bootstrapRequests = 0
-    private(set) var legacyRetirementRequests = 0
     private(set) var requestOrder: [String] = []
-    var legacyRetirementError: (any Error)?
     private var shouldSuspendBootstrapResponses = false
     private var bootstrapResponseContinuations: [Int: CheckedContinuation<Void, Never>] = [:]
     private var bootstrapRequestWaiters: [(Int, CheckedContinuation<Void, Never>)] = []
@@ -407,25 +208,6 @@ private final class NotificationBootstrapTransport: BighelpLinkHTTPTransport {
     }
 
     func data(for request: URLRequest) async throws -> (Data, HTTPURLResponse) {
-        if request.url?.path == BighelpManagedNotificationService.root + "/buzzkit/identity",
-           request.httpMethod == "DELETE",
-           request.value(forHTTPHeaderField: "x-loopdy-device-id") == "legacy-account-device",
-           let url = request.url,
-           let response = HTTPURLResponse(
-             url: url,
-             statusCode: 200,
-             httpVersion: "HTTP/1.1",
-             headerFields: ["Content-Type": "application/json"]
-           ) {
-            legacyRetirementRequests += 1
-            requestOrder.append("retire-legacy")
-            if let legacyRetirementError { throw legacyRetirementError }
-            let responseBody = try JSONSerialization.data(withJSONObject: [
-                "version": 1,
-                "identity": ["scope": "account", "state": "revoked"],
-            ], options: [.sortedKeys])
-            return (responseBody, response)
-        }
         if request.url?.path == BighelpNotificationBrokerClient.currentInstallationPath,
            request.httpMethod == "DELETE",
            let url = request.url,

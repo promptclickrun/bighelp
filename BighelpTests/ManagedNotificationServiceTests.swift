@@ -6,21 +6,6 @@ import UserNotifications
 @testable import Bighelp
 
 @MainActor struct ManagedNotificationServiceTests {
-    @Test func localErasureAwaitsInjectedRetirementAfterGrantRevocation() async throws {
-        let fixture = try Fixture()
-        defer { fixture.cleanup() }
-        _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
-        try fixture.service.removeLocalEnrollment(host: fixture.host)
-        fixture.provider.onRetirement = {
-            #expect(fixture.account.grant?.state == "revoked")
-            #expect(!fixture.ledger.enrollments.isEmpty)
-            await Task.yield()
-        }
-        try await fixture.service.eraseNotificationIdentity()
-        #expect(fixture.provider.retirements == 1)
-        #expect(fixture.ledger.enrollments.isEmpty)
-    }
-
     @Test func turnOffDeletesHostServiceAndDeviceDataLeavingNothingBehind() async throws {
         let fixture = try Fixture(notificationDeviceID: UUID().uuidString.lowercased())
         defer { fixture.cleanup() }
@@ -118,17 +103,6 @@ import UserNotifications
         #expect(fixture.account.grant?.state == "active")
     }
 
-    @Test func localErasureWithoutHostGrantsDoesNotRequireProviderReadiness() async throws {
-        let fixture = try Fixture()
-        defer { fixture.cleanup() }
-        try await fixture.service.eraseNotificationIdentity()
-        #expect(fixture.provider.retirements == 1)
-        #expect(fixture.provider.registrationRequirements.isEmpty)
-        #expect(fixture.provider.registrations == 0)
-        #expect(fixture.account.requests.isEmpty)
-        #expect(fixture.ledger.enrollments.isEmpty)
-    }
-
     @Test func refreshUsesReadOnlyProviderStatusWhileEnrollmentRequiresCurrentRegistrationReadback() async throws {
         let fixture = try Fixture()
         defer { fixture.cleanup() }
@@ -142,7 +116,7 @@ import UserNotifications
         #expect(fixture.ledger.record(host: fixture.host, profile: "default")?.enabled == true)
     }
 
-    @Test func linkedHostEnrollmentBindsTheDedicatedNotificationInstallation() async throws {
+    @Test func enrollmentUsesTheDedicatedNotificationInstallationWithoutAnAccountBinding() async throws {
         let fixture = try Fixture(notificationDeviceID: "fixture-notification-installation")
         defer { fixture.cleanup() }
 
@@ -160,8 +134,7 @@ import UserNotifications
         #expect(fixture.host.notificationScope != fixture.host.accountScope)
         #expect(fixture.ledger.record(host: fixture.host, profile: "default")?.accountID
                 == "fixture-notification-installation")
-        #expect(fixture.bindingRequests == 1,
-                "Enrollment must explicitly bind the active installation to current Link account authority")
+        #expect(fixture.bindingRequests == 0, "The retired bighelp account is never bound")
     }
 
     @Test func explicitSetupReplacesRevokedProviderIdentityAndCompletesEnrollment() async throws {
@@ -189,19 +162,6 @@ import UserNotifications
         #expect(fixture.provider.identifiedDeviceIDs[0] == original)
         #expect(fixture.provider.identifiedDeviceIDs[1] != original)
         #expect(fixture.host.notificationBinding?.deviceID == fixture.provider.identifiedDeviceIDs[1])
-    }
-
-    @Test func foregroundRecoveryReconfirmsExistingInstallationWakeBinding() async throws {
-        let fixture = try Fixture(notificationDeviceID: "fixture-notification-installation")
-        defer { fixture.cleanup() }
-        _ = try await fixture.service.enroll(
-            host: fixture.host, connection: fixture.connection, isCurrent: { true }
-        )
-
-        _ = try await fixture.service.refreshNotificationIdentity()
-
-        #expect(fixture.bindingRequests == 2,
-                "An upgraded enrolled device must establish the mapping without requiring re-enrollment")
     }
 
     @Test func currentSubscriptionReadbackFailurePreventsGrantAndLedgerEnablement() async throws {
@@ -244,14 +204,11 @@ import UserNotifications
     @Test func notificationCompositionRecoversAndInstallsHooksOnlyOnce() throws {
         let fixture = try Fixture(independent: true)
         defer { fixture.cleanup() }
-        let account = compositionAccount()
-        var priorAccountCalls = 0
-        account.onCredentialsWillChange = { priorAccountCalls += 1 }
         var apnsInstalls = 0
         var openInstalls = 0
         var attempts = 0
         let composition = BighelpManagedNotificationComposition(
-            isFixture: false, registry: fixture.registry, account: account,
+            isFixture: false, registry: fixture.registry,
             applicationHooks: .init(installAPNSToken: { _ in apnsInstalls += 1 },
                                     installAPNSFailure: { _ in },
                                     installWake: { _ in },
@@ -273,8 +230,6 @@ import UserNotifications
         #expect(composition.rootHookInstallationCount == 1)
         #expect(apnsInstalls == 1 && openInstalls == 1)
         let owner = try #require(composition.captureOwner())
-        account.onCredentialsWillChange()
-        #expect(priorAccountCalls == 1)
         fixture.registry.bind(deviceID: "replacement-account", authorizationEpoch: 2)
         #expect(composition.isCurrent(owner), "Link identity changes do not retire an independent host")
         fixture.registry.useLinkedWorkspace()
@@ -306,7 +261,7 @@ import UserNotifications
         var wakeHandler: BighelpLinkWakeCenter.Handler?
         var failureHandler: BighelpAPNSTokenHookCenter.FailureHandler?
         let composition = BighelpManagedNotificationComposition(
-            isFixture: false, registry: fixture.registry, account: compositionAccount(),
+            isFixture: false, registry: fixture.registry,
             applicationHooks: .init(
                 installAPNSToken: { _ in },
                 installAPNSFailure: { failureHandler = $0 },
@@ -338,7 +293,7 @@ import UserNotifications
             service: fixture.service, environment: .sandbox, topic: "app.loopdy.mobile")
         var wake: BighelpLinkWakeCenter.Handler?
         let composition = BighelpManagedNotificationComposition(
-            isFixture: false, registry: fixture.registry, account: compositionAccount(),
+            isFixture: false, registry: fixture.registry,
             applicationHooks: .init(installAPNSToken: { _ in }, installAPNSFailure: { _ in },
                 installWake: { wake = $0 }, installManagedOpen: { _ in }),
             makeIntegration: { BighelpManagedNotificationIntegration(service: fixture.service) })
@@ -358,7 +313,7 @@ import UserNotifications
         let fixture = try Fixture(independent: true)
         defer { fixture.cleanup() }
         let composition = BighelpManagedNotificationComposition(
-            isFixture: false, registry: fixture.registry, account: compositionAccount(),
+            isFixture: false, registry: fixture.registry,
             maximumAutomaticAttempts: 3,
             applicationHooks: .init(installAPNSToken: { _ in }, installAPNSFailure: { _ in },
                                     installWake: { _ in }, installManagedOpen: { _ in }),
@@ -374,14 +329,6 @@ import UserNotifications
         #expect(composition.service == nil)
         #expect(fixture.account.requests.isEmpty)
         #expect(fixture.ledger.enrollments.isEmpty)
-    }
-
-    private func compositionAccount() -> BighelpLinkAccountStore {
-        BighelpLinkAccountStore(
-            api: BighelpLinkAPI(baseURL: nil, transport: NoNetworkTransport()),
-            passkeys: BighelpLinkUnavailablePasskeyAuthorizer(), vault: BighelpLinkMemoryCredentialVault(),
-            deviceName: "Composition fixture", deviceKind: .phone
-        )
     }
 
     @Test func openingChatBeforeNotificationOptInIsANoOp() async throws {
@@ -783,17 +730,6 @@ import UserNotifications
                 ])
                 return (body, response)
             }
-            if request.httpMethod == "DELETE",
-               request.url?.path == BighelpManagedNotificationService.root + "/buzzkit/identity",
-               request.value(forHTTPHeaderField: "x-loopdy-device-id") == "fixture-mobile",
-               let url = request.url,
-               let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil) {
-                let body = try JSONSerialization.data(withJSONObject: [
-                    "version": 1,
-                    "identity": ["scope": "account", "state": "revoked"],
-                ])
-                return (body, response)
-            }
             if request.httpMethod == "POST",
                request.url?.path == "/v1/notifications/installations/current/account-binding",
                request.value(forHTTPHeaderField: "x-loopdy-notification-installation") != nil,
@@ -861,17 +797,15 @@ import UserNotifications
             let suite = "bighelp.test.notifications." + UUID().uuidString
             defaultsSuite = suite
             defaults = UserDefaults(suiteName: suite)!
-            let vault=BighelpLinkMemoryCredentialVault()
-            let credentials=BighelpLinkRuntimeCredentials(deviceID:"fixture-mobile",authorizationEpoch:1,signingPrivateKey:P256.Signing.PrivateKey(),accountKey:Data(repeating:8,count:32))
-            try vault.save(credentials)
+            let deviceID = "fixture-mobile"
             registry=BighelpHostRegistry(root:root.appending(path:"hosts"),keychainService:"app.loopdy.test."+UUID().uuidString)
-            registry.bind(deviceID:credentials.deviceID,authorizationEpoch:1)
+            registry.bind(deviceID:deviceID,authorizationEpoch:1)
             if independent { registry.useIndependentWorkspace() }
             let endpoint=try DirectHermesEndpoint(address:"https://host.example")
             connection = dashboard
                 ? DirectHermesSavedConnection(endpoint: endpoint, authentication: .dashboardSession(token: "fixture-session", automatic: true))
                 : DirectHermesSavedConnection(endpoint:endpoint,authentication:.bearer(accessToken:UUID().uuidString,refreshToken:nil,expiresAt:nil),provider:"basic",userID:"person")
-            let host=BighelpConfiguredHost(id:UUID(),accountScope:try #require(registry.accountScope),accountID:independent ? nil : credentials.deviceID,endpoint:endpoint,principalIdentity:connection.identity,name:"Host", connectionMode: independent ? .independent : nil)
+            let host=BighelpConfiguredHost(id:UUID(),accountScope:try #require(registry.accountScope),accountID:independent ? nil : deviceID,endpoint:endpoint,principalIdentity:connection.identity,name:"Host", connectionMode: independent ? .independent : nil)
             storedHost = host
             struct Snapshot: Encodable { let version:Int; let hosts:[BighelpConfiguredHost];let selected:UUID? }
             let hostRoot = root.appending(path: independent ? "hosts-independent" : "hosts")
@@ -899,21 +833,13 @@ import UserNotifications
             }
             let noNetwork = NoNetworkTransport()
             notificationTransport = noNetwork
-            let broker = BighelpNotificationBrokerClient(
-                legacyAPI: BighelpLinkAPI(
-                    baseURL: URL(string: "https://link.loopdy.app"),
-                    transport: noNetwork,
-                    managedNotificationTransport: noNetwork
-                ),
-                transport: noNetwork
-            )
+            let broker = BighelpNotificationBrokerClient(transport: noNetwork)
             identityVault.value = .current(.active(.init(
-                authority: .notificationOnly,
-                deviceID: notificationDeviceID ?? credentials.deviceID,
-                authorizationEpoch: credentials.authorizationEpoch,
-                signingPrivateKey: credentials.signingPrivateKey
+                deviceID: notificationDeviceID ?? deviceID,
+                authorizationEpoch: 1,
+                signingPrivateKey: P256.Signing.PrivateKey()
             )))
-            let identity = BighelpNotificationIdentityCoordinator(vault: identityVault, legacyVault: vault, broker: broker)
+            let identity = BighelpNotificationIdentityCoordinator(vault: identityVault, broker: broker)
             service=BighelpManagedNotificationService(identity:identity,api:account,requestPermission:{permissionGranted},registry:registry,ledger:ledger,
                 activityKeys:BighelpManagedActivityKeychain(service:"app.loopdy.test.activities."+UUID().uuidString),hostClient:{_ in hostClient},now:{Date(timeIntervalSince1970:1_800_000_100)},buzzKit:providerOverride ?? provider,
                 sealedRecipientKeys:sealedKeys,sealedSenders:sealedSenders,defaults:defaults)

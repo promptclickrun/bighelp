@@ -1147,46 +1147,6 @@ struct ShellFeatureStoreTests {
         // test below verifies the separate durable flush contract.
     }
 
-    @Test func generativeUICardDecodeFailureAddsARecoverableDiagnosticToTheOpenChat() throws {
-        struct BrokenPayload: Decodable {
-            let card: String
-        }
-
-        let plaintext = Data(
-            #"{"type":"generative.ui","sessionId":"session_fixture_0001","agentId":"finance","card":123,"secret":"do not show"}"#.utf8
-        )
-        let decodingError: Error
-        do {
-            _ = try JSONDecoder().decode(BrokenPayload.self, from: plaintext)
-            Issue.record("Expected the diagnostic fixture to fail decoding")
-            return
-        } catch {
-            decodingError = error
-        }
-
-        let diagnostic = BighelpLinkPayloadDecodeDiagnostic(
-            plaintext: plaintext,
-            error: decodingError
-        )
-        let session = record(id: "session_fixture_0001")
-        let harness = makeStore(records: [session])
-        #expect(harness.store.prepare(.chat(conversationID: session.id)))
-
-        harness.store.acceptExternalPayloadDecodeDiagnostic(diagnostic)
-
-        guard case .chat(let model) = harness.store.preparedModel(
-            for: .chat(conversationID: session.id)
-        ) else {
-            Issue.record("Expected prepared Chat model")
-            return
-        }
-        #expect(model.items.last?.sender.kind == .system)
-        #expect(model.items.last?.content == .message(
-            "This interactive card could not be displayed. The conversation is still available in text."
-        ))
-        #expect(harness.catalog.session(id: session.id)?.items.last == model.items.last)
-    }
-
     @Test func responseHapticsUseTheRealUnsolicitedRouteAndSuppressCatchup() throws {
         let session = record(id: "session_haptic_route_fixture_0001")
         let harness = makeStore(records: [session])

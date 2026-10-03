@@ -201,7 +201,7 @@ import UserNotifications
     @Test func readinessRejectsDifferentCredentialsBeforeProviderRequest() async throws {
         let fixture = Fixture()
         try await fixture.identify()
-        let other = BighelpManagedNotificationCredentials(authority: .notificationOnly, deviceID: "other",
+        let other = BighelpManagedNotificationCredentials(deviceID: "other",
             authorizationEpoch: 1, signingPrivateKey: P256.Signing.PrivateKey())
         do {
             _ = try await fixture.runtime.refreshProviderReadiness(accountAPI: fixture.api, credentials: other)
@@ -367,7 +367,7 @@ import UserNotifications
         let sdk = SDK()
         let api = Account()
         let runtime: BighelpBuzzKitRuntime
-        let credentials = BighelpManagedNotificationCredentials(authority: .notificationOnly, deviceID: "fixture-device",
+        let credentials = BighelpManagedNotificationCredentials(deviceID: "fixture-device",
             authorizationEpoch: 1, signingPrivateKey: P256.Signing.PrivateKey())
         let tokenHash = SHA256.hash(data: Data("0102".utf8)).map { String(format: "%02x", $0) }.joined()
         init() {

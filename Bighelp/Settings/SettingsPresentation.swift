@@ -1,39 +1,6 @@
 import Foundation
 
-struct SettingsConnectivityPresentation: Equatable {
-    let showsDirectGatewaySetup: Bool
-    let footer: String
-
-    init(linkAccountState: BighelpLinkAccountState) {
-        showsDirectGatewaySetup = false
-        footer = switch linkAccountState {
-        case .ready:
-            "bighelp Link carries chats, agents, sessions, scheduled tasks, and approvals through your paired Hermes host; no separate gateway address or token is required."
-        case .signedOut, .working, .failed:
-            "Sign in to bighelp Link to connect this app to your authorized Hermes hosts."
-        }
-    }
-}
-
-struct SettingsLinkConnectionPresentation: Equatable, Sendable {
-    let status: HostConnectionStatus
-    let detail: String
-    var title: String { status.label }
-
-    init(state: BighelpLinkLiveSocketState) {
-        status = HostConnectionStatus(link: state)
-        detail = switch state {
-        case .stopped: "bighelp Link will reconnect when your account and paired host are available."
-        case .connecting: "bighelp Link is establishing the secure connection in the background."
-        case .retrying: "bighelp Link is restoring the secure connection in the background."
-        case .superseded: "A newer connection owns this device. Retry only if you want this app to take it back."
-        case .verified: "The secure connection to your paired Hermes host is ready."
-        }
-    }
-}
-
 enum SettingsMenuSection: String, CaseIterable, Identifiable, Equatable, Sendable {
-    case accountAndDevices
     case appearance
     case workspace
     case agentsAndPersonalities
@@ -51,7 +18,6 @@ enum SettingsMenuSection: String, CaseIterable, Identifiable, Equatable, Sendabl
 
     var title: String {
         switch self {
-        case .accountAndDevices: "Account & Devices"
         case .workspace: "Workspace"
         case .agentsAndPersonalities: "Agents & Personalities"
         case .chat: "Chat"
@@ -69,7 +35,6 @@ enum SettingsMenuSection: String, CaseIterable, Identifiable, Equatable, Sendabl
 
     var detail: String {
         switch self {
-        case .accountAndDevices: "Profile, bighelp Link, and paired devices"
         case .workspace: "Sessions, scheduled tasks, and gestures"
         case .agentsAndPersonalities: "Manage how Hermes agents present themselves"
         case .chat: Self.chatDetail
@@ -95,7 +60,6 @@ enum SettingsMenuSection: String, CaseIterable, Identifiable, Equatable, Sendabl
 
     var systemImage: String {
         switch self {
-        case .accountAndDevices: "person.crop.circle.badge.checkmark"
         case .workspace: "rectangle.3.group"
         case .agentsAndPersonalities: "theatermasks"
         case .chat: "bubble.left.and.bubble.right.fill"

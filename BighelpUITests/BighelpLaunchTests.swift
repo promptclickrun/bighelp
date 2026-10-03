@@ -3046,55 +3046,6 @@ final class BighelpLaunchTests: BighelpUITestCase {
     }
 
     @MainActor
-    func testApproveLiveBighelpLinkHostPairing() throws {
-        let environment = ProcessInfo.processInfo.environment
-        guard
-            let code = environment["BIGHELP_PAIR_CODE"]
-                ?? environment["TEST_RUNNER_BIGHELP_PAIR_CODE"],
-            let verificationCode = environment["BIGHELP_PAIR_VERIFICATION_CODE"]
-                ?? environment["TEST_RUNNER_BIGHELP_PAIR_VERIFICATION_CODE"]
-        else {
-            throw XCTSkip("Run explicitly with a short-lived bighelp Link pairing code.")
-        }
-
-        let app = makeApp()
-        app.launch()
-
-        openSettings(in: app)
-
-        let pairDevice = app.buttons["profile.loopdy-link.pair"]
-        let profileScroll = app.scrollViews.firstMatch
-        for _ in 0..<10 where !pairDevice.isHittable {
-            profileScroll.swipeUp()
-        }
-        XCTAssertTrue(pairDevice.waitForExistence(timeout: 3), "Pair a Device is unavailable.")
-        XCTAssertTrue(pairDevice.isHittable, "Pair a Device is obscured by shell chrome.")
-        pairDevice.tap()
-
-        let codeField = app.textFields["link.pairing.code"]
-        XCTAssertTrue(codeField.waitForExistence(timeout: 5), "Pairing code field is unavailable.")
-        codeField.tap()
-        codeField.typeText(code)
-
-        let verificationField = app.textFields["link.pairing.verification-code"]
-        XCTAssertTrue(
-            verificationField.waitForExistence(timeout: 3),
-            "Host verification field is unavailable."
-        )
-        verificationField.tap()
-        verificationField.typeText(verificationCode)
-
-        let submit = app.buttons["link.pairing.submit"]
-        XCTAssertTrue(submit.isHittable, "Pairing submit is obscured by the keyboard or shell chrome.")
-        submit.tap()
-
-        XCTAssertTrue(
-            app.otherElements["link.pairing.success"].waitForExistence(timeout: 30),
-            "The real Hermes host pairing was not confirmed by bighelp Link."
-        )
-    }
-
-    @MainActor
     func testLaunchShowsRootTitle() throws {
         let app = makeApp()
         // The production launch is intentionally gated until the account, paired
@@ -4925,7 +4876,6 @@ final class BighelpLaunchTests: BighelpUITestCase {
         )
 
         for identifier in [
-            "settings.menu.accountAndDevices",
             "settings.menu.workspace",
             "settings.menu.agentsAndPersonalities",
             "settings.menu.chat",
@@ -4951,16 +4901,17 @@ final class BighelpLaunchTests: BighelpUITestCase {
     }
 
     @MainActor
-    func testAccountSettingsClearLocalCacheAndRefreshFreshData() throws {
+    func testHostsSettingsClearLocalCacheAndRefreshFreshData() throws {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures"]
         app.launch()
 
         openSettings(in: app)
 
-        let accountAndDevices = settingsRow("settings.menu.accountAndDevices", in: app)
-        XCTAssertTrue(accountAndDevices.waitForExistence(timeout: 3))
-        accountAndDevices.tap()
+        // Nerd Mode (on in UI tests) keeps Clear Local Cache on the Hosts page.
+        let hosts = settingsRow("settings.menu.connectivityAndNotifications", in: app)
+        XCTAssertTrue(hosts.waitForExistence(timeout: 3))
+        hosts.tap()
 
         let clearCache = app.buttons["settings.account.clear-local-cache"]
         for _ in 0..<6 where !clearCache.isHittable {
@@ -4980,67 +4931,8 @@ final class BighelpLaunchTests: BighelpUITestCase {
             app.swipeUp()
         }
         XCTAssertTrue(status.waitForExistence(timeout: 8))
-        XCTAssertEqual(status.label, "Local cache cleared. Fresh account data is ready.")
+        XCTAssertEqual(status.label, "Local cache cleared. Fresh data is ready.")
         XCTAssertTrue(clearCache.isEnabled)
-    }
-
-    @MainActor
-    func testSidebarLogoLongPressSwitchesInstanceWithoutChangingPrimary() throws {
-        let app = makeApp()
-        app.launchArguments = ["-use-demo-fixtures", "-use-multi-host-fixtures", "-reset-host-selection-fixture"]
-        app.launch()
-        let menu = app.buttons["home.drawer.open"]
-        XCTAssertTrue(menu.waitForExistence(timeout: 5))
-        menu.tap()
-        let logo = app.descendants(matching: .any)["quick-workspace.instance-picker"].firstMatch
-        XCTAssertTrue(logo.waitForExistence(timeout: 3))
-        logo.press(forDuration: 1.1)
-        let studio = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Studio Hermes")).firstMatch
-        XCTAssertTrue(studio.waitForExistence(timeout: 3))
-        studio.tap()
-        XCTAssertTrue(menu.waitForExistence(timeout: 5))
-        menu.tap()
-        XCTAssertTrue(logo.waitForExistence(timeout: 3))
-        logo.press(forDuration: 1.1)
-        let selectedStudio = app.buttons.matching(NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "Studio Hermes", "Selected")).firstMatch
-        XCTAssertTrue(selectedStudio.waitForExistence(timeout: 3))
-        let primaryHome = app.buttons.matching(NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "Home Hermes", "Primary")).firstMatch
-        XCTAssertTrue(primaryHome.exists)
-    }
-
-    @MainActor
-    func testHermesHostsAreSeparatedAndCanSwitchSelectedInstance() throws {
-        let app = makeApp()
-        app.launchArguments = [
-            "-use-demo-fixtures",
-            "-use-multi-host-fixtures",
-            "-reset-host-selection-fixture",
-        ]
-        app.launch()
-
-        openSettings(in: app)
-        let accountAndDevices = settingsRow("settings.menu.accountAndDevices", in: app)
-        XCTAssertTrue(accountAndDevices.waitForExistence(timeout: 3))
-        accountAndDevices.tap()
-        XCTAssertTrue(app.staticTexts["Hosts"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.staticTexts["Connected Devices"].exists)
-        XCTAssertTrue(app.staticTexts["Selected instance"].exists)
-        XCTAssertTrue(app.staticTexts["Primary"].exists)
-
-        let studioHost = app.buttons.matching(
-            NSPredicate(format: "label CONTAINS %@", "Studio Hermes")
-        ).firstMatch
-        XCTAssertTrue(studioHost.waitForExistence(timeout: 3))
-        studioHost.tap()
-
-        let select = app.buttons["link.host.select"]
-        XCTAssertTrue(select.waitForExistence(timeout: 3))
-        XCTAssertEqual(select.label, "Select Instance")
-        select.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["link.host.selected"].waitForExistence(timeout: 3))
-        XCTAssertFalse(select.exists)
-        XCTAssertTrue(app.buttons["link.host.set-primary"].exists)
-        XCTAssertTrue(app.buttons["Unpair this host"].exists)
     }
 
     @MainActor

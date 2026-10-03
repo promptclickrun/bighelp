@@ -21,7 +21,7 @@ extension RootShellView {
     /// ☰'s host row, with the all-hosts switch beside it. Picking one host
     /// while all hosts show means "just this one".
     var fleetMenuHosts: BighelpMenuHosts {
-        var hosts = BighelpMenuHosts.current(registry: hostRegistry, linkDevices: linkDevices)
+        var hosts = BighelpMenuHosts.current(registry: hostRegistry, demoHosts: demoHosts)
         guard fleet != nil else { return hosts }
         let isOn = fleetModeOn
         let select = hosts.select

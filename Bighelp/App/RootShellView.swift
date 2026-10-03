@@ -299,6 +299,7 @@ struct RootShellView: View {
             Task { await currentHostRuntime?.refresh() }
         }
         .modifier(IncomingLinks(open: handleIncomingURL))
+        .modifier(unsentDraftRecovery)
         .modifier(BighelpShortcutParameterUpdates(agents: agents, scheduledTasks: featureStore.scheduledTasks,
                                                   rooms: botModeRooms, catalog: sessionCatalog))
         .onChange(of: acceptsIncomingLinks) { _, ready in

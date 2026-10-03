@@ -344,6 +344,16 @@ final class ShellFeatureStore {
     /// The retained model for a chat, whether or not it is on screen.
     func preparedChatModel(id: String) -> ChatModel? { chatModels[id] }
 
+    /// New chats that haven't sent anything but have text typed: what leaving the app could lose.
+    func unsentNewChatDrafts() -> [(chatID: String, agentID: String, text: String)] {
+        chatModels.compactMap { id, model in
+            guard !model.isBotMode, model.transcriptEntries.isEmpty, model.memberIDs.count == 1,
+                  let agentID = model.memberIDs.first,
+                  !model.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+            return (id, agentID, model.draft)
+        }.sorted { $0.chatID < $1.chatID }
+    }
+
     @discardableResult
     func prepare(_ route: AppRoute) -> Bool {
         switch route {
@@ -654,6 +664,10 @@ final class ShellFeatureStore {
         canonicalSessionReentries.removeValue(forKey: id)?.task.cancel()
         hydratedNavigationModels[id] = nil
         guard let model = chatModels.removeValue(forKey: id) else { return }
+        // A new chat that never sent anything takes its draft with it; offer it back.
+        if !model.isBotMode, model.transcriptEntries.isEmpty {
+            UnsentDraftStore.shared.markLost(chatID: id, latestText: model.draft)
+        }
         // Removing the exact sink first prevents its final flush from writing
         // into a replacement catalog coordinate.
         model.retireResponseHaptics()

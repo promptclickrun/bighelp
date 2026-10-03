@@ -18,6 +18,60 @@ final class HostSignInMatrixUITests: BighelpUITestCase {
         try expectConnected(app)
     }
 
+    /// Leaving the app for a while doesn't cost a new chat its draft, and when the chat is
+    /// still there, coming back doesn't ask to continue anything.
+    @MainActor func testNewChatDraftStaysAfterLeavingTheApp() throws {
+        let app = try beginSetup(mode: "open")
+        let draft = try typeDraftInANewChat(app)
+        XCUIDevice.shared.press(.home)
+        XCTAssertTrue(app.wait(for: .runningBackground, timeout: 10))
+        sleep(90) // past bighelp's 25-second background hold and Hermes' 20-second orphan grace
+        app.activate()
+        let editor = app.textViews["chat.composer.text"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 30))
+        sleep(8) // after reconnecting settles
+        save("open-draft-2-back", app)
+        XCTAssertFalse(app.alerts["Would you like to continue where you left off?"].exists, "Nothing to offer back")
+        XCTAssertFalse(app.staticTexts["Route unavailable"].exists)
+        XCTAssertEqual(editor.value as? String, draft, "The draft is still there")
+    }
+
+    /// When iOS closes bighelp while it's away, the chat is gone but the draft was kept on the
+    /// device: coming back offers to continue it in a new chat with the same agent.
+    @MainActor func testNewChatDraftSurvivesTheAppClosing() throws {
+        let app = try beginSetup(mode: "open")
+        let draft = try typeDraftInANewChat(app)
+        XCUIDevice.shared.press(.home)
+        XCTAssertTrue(app.wait(for: .runningBackground, timeout: 10))
+        sleep(2)
+        app.terminate()
+        app.launch()
+        try continueWhereILeftOff(draft, in: app, name: "open-draft-3-relaunched")
+    }
+
+    @MainActor private func typeDraftInANewChat(_ app: XCUIApplication) throws -> String {
+        let composer = try openFirstChat(app)
+        let draft = "Remind me what we said about the trip budget"
+        composer.tap()
+        composer.typeText(draft)
+        save("open-draft-1-typed", app)
+        return draft
+    }
+
+    @MainActor private func continueWhereILeftOff(_ draft: String, in app: XCUIApplication, name: String) throws {
+        let prompt = app.alerts["Would you like to continue where you left off?"]
+        XCTAssertTrue(prompt.waitForExistence(timeout: 45), "Coming back offers the unsent draft")
+        save(name, app)
+        prompt.buttons["Continue"].tap()
+        let editor = app.textViews["chat.composer.text"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 30), "Continue opens a chat")
+        let kept = NSPredicate(format: "value == %@", draft)
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: kept, object: editor)], timeout: 30),
+                       .completed, "…with the draft in the message box")
+        XCTAssertFalse(app.staticTexts["Route unavailable"].exists)
+        save(name + "-continued", app)
+    }
+
     // MARK: Hermes's username/password provider
 
     @MainActor func testPasswordOnlyHostPrefersUsernameAndPasswordAndChats() throws {

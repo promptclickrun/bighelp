@@ -20,6 +20,26 @@ enum ChatAttachmentError: Error, Equatable, LocalizedError {
     }
 }
 
+extension ChatAttachmentError {
+    /// What to tell the person when a photo or file couldn't be added.
+    static func userMessage(for error: any Error) -> String {
+        if error as? ChatAttachmentError == .unsupportedClient { return error.localizedDescription }
+        if error as? ChatAttachmentError == .unsupportedKind { return DirectHermesFileAttachments.imagesUnavailable }
+        if error as? ChatAttachmentError == .invalidSize {
+            return "Each attachment can be up to 8 MB, with up to 24 MB in one message."
+        }
+        if let imageError = error as? ImageAttachmentPreparer.Error {
+            switch imageError {
+            case .sourceTooLarge, .sourceDimensionsTooLarge, .outputTooLarge:
+                return "That image is still too large after preparation. Choose a smaller photo and try again."
+            case .invalidData, .unsupportedFormat, .processingFailed:
+                break
+            }
+        }
+        return "bighelp could not read that attachment. Choose another file and try again."
+    }
+}
+
 struct ChatAttachment: Identifiable, Codable, Equatable, Sendable {
     /// User-selected uploads retain the established 8 MiB limit.
     static let maximumBytes = 8 * 1_024 * 1_024

@@ -99,13 +99,7 @@ struct ExpandedDraftEditor: View {
                     }
                 }
 
-                if !model.orderedDraftAttachments.isEmpty {
-                    DraftAttachmentStrip(
-                        attachments: model.orderedDraftAttachments,
-                        currentPDFTarget: model.pdfAttachmentTarget,
-                        onRemove: model.removeOrderedDraftAttachment
-                    )
-                }
+                DraftAttachmentRail(model: model, leadingInset: 0)
 
                 if !isCompactHeight { composerActions }
             }
@@ -167,7 +161,7 @@ struct ExpandedDraftEditor: View {
                 action: uiV2Enabled && !model.canSend && !model.isSending ? .send : ChatComposerPrimaryAction.resolve(
                     draft: model.draft,
                     isTurnActive: model.isSending,
-                                hasAttachments: !model.orderedDraftAttachments.isEmpty
+                                hasAttachments: model.hasDraftAttachmentActivity
                 ),
                 isBusy: model.isStopping || model.hasExclusiveMidSessionSubmission,
                 canSend: model.canSend,

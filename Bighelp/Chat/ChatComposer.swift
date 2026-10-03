@@ -63,14 +63,9 @@ struct ChatComposer: View {
                 ReferenceDraftStrip(hub: referenceHub)
             }
 
-            if !model.orderedDraftAttachments.isEmpty {
-                DraftAttachmentStrip(
-                    attachments: model.orderedDraftAttachments,
-                    currentPDFTarget: model.pdfAttachmentTarget,
-                    onRemove: model.removeOrderedDraftAttachment
-                )
+            DraftAttachmentRail(model: model)
                 .padding(.horizontal, BighelpTokens.space4)
-            }
+                .frame(maxWidth: horizontalSizeClass == .regular ? ChatCanvasLayout.regularLaneMaximumWidth : .infinity)
 
             composerFooterLayout {
                 composerStatusRail
@@ -79,6 +74,10 @@ struct ChatComposer: View {
 
                 composerControlRow
                     .frame(maxWidth: horizontalSizeClass == .regular ? ChatCanvasLayout.regularLaneMaximumWidth : .infinity)
+                    #if DEBUG && (targetEnvironment(simulator) || targetEnvironment(macCatalyst))
+                    // On the row, not the tag: an empty tag draws nothing, so its tasks never run.
+                    .task(id: model.conversationID) { await DraftAttachmentRailFixture.seed(model) }
+                    #endif
                     .companionComposerAnchor(.input)
                     .accessibilityElement(children: .contain)
                     .accessibilityIdentifier("chat.composer-shell")
@@ -425,7 +424,7 @@ struct ChatComposer: View {
 
     private var primaryAction: some View {
         AdaptiveComposerActionButton(
-            action: ChatComposerPrimaryAction.resolve(draft: model.draft, isTurnActive: model.isSending, hasAttachments: !model.orderedDraftAttachments.isEmpty),
+            action: ChatComposerPrimaryAction.resolve(draft: model.draft, isTurnActive: model.isSending, hasAttachments: model.hasDraftAttachmentActivity),
             isBusy: model.isStopping || model.hasExclusiveMidSessionSubmission,
             canSend: model.canSend, canStop: model.canStop,
             onVoice: onVoiceTap, onSend: send, onStop: stop,

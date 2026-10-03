@@ -125,68 +125,62 @@ extension ChatDestinationView {
         }
     }
 
+    /// Photos come in one at a time; the tag above the message box shows "Adding 2 of 4…"
+    /// and keeps any that didn't attach, with Try again.
     func importPhotos(_ selections: [PhotosPickerItem]) async {
         defer { photoSelections = [] }
-        for selection in selections {
-            do {
+        guard !selections.isEmpty else { return }
+        attachmentFlow.completeSuccessfulImport()
+        await model.importDraftAttachments(.photos, selections.map { selection in
+            DraftAttachmentLoader(name: nil) {
                 guard let data = try await selection.loadTransferable(type: Data.self) else {
                     throw ChatAttachmentError.invalidSize
                 }
                 let type = selection.supportedContentTypes.first ?? .jpeg
                 let extensionValue = type.preferredFilenameExtension ?? "jpg"
-                let attachment = try ChatAttachmentPreparer().prepare(
+                return try ChatAttachmentPreparer().prepare(
                     id: Self.attachmentID(),
                     fileName: "image-\(UUID().uuidString.lowercased()).\(extensionValue)",
                     mimeType: type.preferredMIMEType ?? "image/jpeg",
                     data: data
                 )
-                try model.addDraftAttachment(attachment)
-            } catch {
-                attachmentErrorMessage = attachmentErrorDescription(error)
-                return
             }
-        }
-        attachmentFlow.completeSuccessfulImport()
+        })
     }
 
     func importFiles(_ result: Result<[URL], any Error>) {
-        do {
-            for url in try result.get() {
-                let didAccess = url.startAccessingSecurityScopedResource()
-                defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
-                let data = try Data(contentsOf: url, options: .mappedIfSafe)
-                let type = try url.resourceValues(forKeys: [.contentTypeKey]).contentType
-                    ?? UTType(filenameExtension: url.pathExtension)
-                    ?? .data
-                let attachment = try ChatAttachmentPreparer().prepare(
-                    id: Self.attachmentID(),
-                    fileName: url.lastPathComponent,
-                    mimeType: type.preferredMIMEType ?? "application/octet-stream",
-                    data: data
-                )
-                try model.addDraftAttachment(attachment)
-            }
-            attachmentFlow.completeSuccessfulImport()
-        } catch {
+        let urls: [URL]
+        do { urls = try result.get() } catch {
             attachmentErrorMessage = attachmentErrorDescription(error)
+            return
+        }
+        guard !urls.isEmpty else { return }
+        attachmentFlow.completeSuccessfulImport()
+        let kind: DraftAttachmentImportKind = urls.allSatisfy {
+            (UTType(filenameExtension: $0.pathExtension)?.conforms(to: .image)) == true
+        } ? .photos : .files
+        Task { @MainActor in
+            await model.importDraftAttachments(kind, urls.map { url in
+                DraftAttachmentLoader(name: url.lastPathComponent) {
+                    let didAccess = url.startAccessingSecurityScopedResource()
+                    defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
+                    let data = try Data(contentsOf: url, options: .mappedIfSafe)
+                    let type = try url.resourceValues(forKeys: [.contentTypeKey]).contentType
+                        ?? UTType(filenameExtension: url.pathExtension)
+                        ?? .data
+                    return try ChatAttachmentPreparer().prepare(
+                        id: Self.attachmentID(),
+                        fileName: url.lastPathComponent,
+                        mimeType: type.preferredMIMEType ?? "application/octet-stream",
+                        data: data
+                    )
+                }
+            })
         }
     }
 
     func attachmentErrorDescription(_ error: any Error) -> String {
-        if error as? ChatAttachmentError == .unsupportedClient { return error.localizedDescription }
-        if error as? ChatAttachmentError == .unsupportedKind { return DirectHermesFileAttachments.imagesUnavailable }
-        if error as? ChatAttachmentError == .invalidSize {
-            return "Each attachment can be up to 8 MB, with up to 24 MB in one message."
-        }
-        if let imageError = error as? ImageAttachmentPreparer.Error {
-            switch imageError {
-            case .sourceTooLarge, .sourceDimensionsTooLarge, .outputTooLarge:
-                return "That image is still too large after preparation. Choose a smaller photo and try again."
-            case .invalidData, .unsupportedFormat, .processingFailed:
-                break
-            }
-        }
-        return "bighelp could not read that attachment. Choose another file and try again."
+        ChatAttachmentError.userMessage(for: error)
     }
 
     static func attachmentID() -> String {

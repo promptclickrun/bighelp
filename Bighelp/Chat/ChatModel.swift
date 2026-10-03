@@ -55,6 +55,10 @@ final class ChatModel {
     /// user added them. `draftAttachments` remains the ordinary-file view used
     /// by existing clients and persisted reference drafts.
     var orderedDraftAttachments: [ChatDraftAttachment] = []
+    /// Photos or files still being read in; Send waits for them.
+    var draftAttachmentImport: DraftAttachmentImportProgress?
+    /// Ones that didn't attach, with why and a way to try again; Send waits for these too.
+    var draftAttachmentFailures: [DraftAttachmentFailure] = []
     var pdfAttachmentReceipts: [DirectHermesPDFAttachmentReceipt] = []
     var isPDFDraftSendInFlight = false
     var referenceSelections: [ReferenceDraftSelection] = []
@@ -389,6 +393,7 @@ final class ChatModel {
         })
         let hasSendableAttachments = !orderedDraftAttachments.isEmpty && attachmentsSupported
         guard !referenceOwnerRetired, referenceSubmission == nil, !referenceSendInFlight,
+              draftAttachmentImport == nil, draftAttachmentFailures.isEmpty,
               !hasExclusiveMidSessionSubmission, !isPDFDraftSendInFlight,
               !hasStalePDFPageSelections,
               attachmentsSupported, hasText || hasSendableAttachments
@@ -411,6 +416,8 @@ final class ChatModel {
         if isAwaitingAuthoritativeSessionAllocation { return "starting the chat on the host" }
         if richDraftRecovery.hasUnexportedChanges { return "saving the draft" }
         if referenceSubmission != nil || referenceSendInFlight { return "a message is still being sent" }
+        if draftAttachmentImport != nil { return "attachments are still being added" }
+        if !draftAttachmentFailures.isEmpty { return "an attachment didn't attach" }
         if orderedDraftAttachments.isEmpty && draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return nil
         }

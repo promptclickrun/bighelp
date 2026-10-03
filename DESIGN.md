@@ -46,6 +46,11 @@ are historical (`docs/ui-v3-design.md`).
   grid, round 2-pt strokes and the brand's dot, with agents drawn as the orb with two eyes. Call sites still name SF
   Symbols; ones without a glyph fall back to the symbol. Edit `glyphs.py`, then run `export_assets.py`.
 - Product type is SF Pro. Root screens use large titles; section captions are small, bold, letterspaced and muted.
+- Attachments in a draft are one small glass tag above the message box, lined up with the field
+  (`DraftAttachmentRail`): the count first, then the kinds ("4 attached · 3 photos, 1 PDF"), with photos leading a
+  stack of up to three thumbnails. One photo says "1 photo"; one file shows its name and size. While photos or files
+  are being read in it says "Adding 2 of 4…" and Send waits; one that couldn't be read says "1 didn't attach" with
+  Try again, and Send waits for that too. Tap the tag for the sheet: open, remove or retry each one.
 
 ## Navigation and simplicity
 

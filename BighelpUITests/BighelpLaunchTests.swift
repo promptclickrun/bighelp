@@ -3877,7 +3877,7 @@ final class BighelpLaunchTests: BighelpUITestCase {
         doneButton.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
 
         XCTAssertTrue(
-            app.scrollViews["chat.draft-attachments"].waitForExistence(timeout: 5),
+            app.descendants(matching: .any)["chat.draft-attachments"].waitForExistence(timeout: 5),
             "The selected photo must return to the draft as a visible attachment."
         )
         XCTAssertTrue(

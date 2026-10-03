@@ -526,6 +526,10 @@ extension RootShellView {
             }
             .onAppear { agentIsland?.onOpen = { openIslandChat() } }
             .task(id: activityAvatarKey) { await shareActivityAvatars() }
+            .modifier(PinnedAgentsWidgetHooks(
+                agents: agents, fleet: fleet, isActive: scenePhase == .active,
+                demo: usesWorkspaceFixtures && workspaceConnections?.isDirectSelected != true
+                    ? (sessionCatalog, featureStore.scheduledTasks) : nil))
             .sheet(isPresented: Binding(get: { profileAgentID != nil }, set: { if !$0 { profileAgentID = nil } }),
                    onDismiss: runAfterHomeSheet) {
                 if let id = profileAgentID, let agent = agents.profiles.first(where: { $0.id == id }) {

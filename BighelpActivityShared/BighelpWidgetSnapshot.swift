@@ -35,6 +35,21 @@ struct BighelpWidgetSnapshot: Codable, Equatable, Sendable {
         let name: String
     }
 
+    /// A pinned agent, for the Pinned Agents widget: its name, the computer it's
+    /// on and its picture in the shared app group. No keys or addresses.
+    struct PinnedAgent: Codable, Equatable, Sendable, Identifiable {
+        let agentID: String
+        let name: String
+        /// The computer's ID in bighelp (a UUID) and the name the person gave it.
+        var hostID: String? = nil
+        var hostName: String? = nil
+        /// Its picture (`BighelpPinnedAvatarStore`); nil shows its initial.
+        var avatarKey: String? = nil
+
+        /// Agent IDs are only unique on one computer.
+        var id: String { (hostID ?? "") + "/" + agentID }
+    }
+
     /// The board of an agent a Feed, Ideas or Goals widget is set to.
     struct AgentBoard: Codable, Equatable, Sendable {
         let agentID: String
@@ -87,6 +102,10 @@ struct BighelpWidgetSnapshot: Codable, Equatable, Sendable {
     var boards: [AgentBoard]? = nil
     var lightPalette: Palette? = nil
     var darkPalette: Palette? = nil
+    /// Pinned agents of the computer in use, in the person's order.
+    var pinnedAgents: [PinnedAgent]? = nil
+    /// Pinned agents of every computer, in the order All agents shows them.
+    var allPinnedAgents: [PinnedAgent]? = nil
 
     static let empty = BighelpWidgetSnapshot(defaultAgentID: nil, defaultAgentName: nil,
                                             sessions: [], tasks: [], generatedAt: .distantPast)
@@ -94,8 +113,12 @@ struct BighelpWidgetSnapshot: Codable, Equatable, Sendable {
     static let appGroup = "group.app.loopdy.mobile.buzzkit"
     static let fileName = "loopdy-widget-snapshot-v1.json"
     static let boardWidgetKinds = ["BighelpFeedWidget", "BighelpIdeasWidget", "BighelpGoalsWidget"]
+    static let pinnedAgentsWidgetKind = "BighelpPinnedAgentsWidget"
     static let widgetKinds = ["LoopdyAgentWidget", "LoopdyActiveSessionsWidget", "LoopdyScheduledTasksWidget",
                               "LoopdyNewChatWidget", "LoopdyActivityFeedWidget"] + boardWidgetKinds
+                              + [pinnedAgentsWidgetKind]
+    /// The most pinned agents the snapshot carries per list (a large widget shows 12).
+    static let maximumPinnedAgents = 24
 
     static var fileURL: URL? {
         FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup)?
@@ -157,6 +180,16 @@ struct BighelpWidgetSnapshot: Codable, Equatable, Sendable {
         components.scheme = "loopdy"; components.host = "new-chat"
         if let agentID { components.queryItems = [URLQueryItem(name: "agent", value: agentID)] }
         return components.url ?? URL(string: "loopdy://new-chat")!
+    }
+
+    /// A chat with one agent: its latest, or a new one. With a computer, bighelp
+    /// switches to it first.
+    static func agentChatURL(agentID: String, hostID: String? = nil) -> URL {
+        var components = URLComponents()
+        components.scheme = "loopdy"; components.host = "agent-chat"
+        components.queryItems = [URLQueryItem(name: "agent", value: agentID)]
+            + (hostID.map { [URLQueryItem(name: "host", value: $0)] } ?? [])
+        return components.url ?? URL(string: "loopdy://agents")!
     }
 
     static let tasksURL = URL(string: "loopdy://tasks")!

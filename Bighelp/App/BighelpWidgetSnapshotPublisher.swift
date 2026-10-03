@@ -17,7 +17,7 @@ final class BighelpWidgetSnapshotPublisher {
     private let interval: Duration
     private let write: (BighelpWidgetSnapshot) -> Void
 
-    init(sessions: SessionCatalogStore, scheduledTasks: ScheduledTasksStore, agents: AgentDirectoryStore,
+    init(sessions: SessionCatalogStore, scheduledTasks: ScheduledTasksStore?, agents: AgentDirectoryStore,
          extras: BighelpWidgetExtras = .shared, interval: Duration = .seconds(2),
          write: @escaping (BighelpWidgetSnapshot) -> Void = BighelpWidgetSnapshotPublisher.persist) {
         self.sessions = sessions; self.scheduledTasks = scheduledTasks; self.agents = agents; self.extras = extras
@@ -92,11 +92,15 @@ final class BighelpWidgetSnapshotPublisher {
         // Only agents on this computer, so another host's boards never reach the Home Screen.
         let agentRows = profiles.prefix(50).map { BighelpWidgetSnapshot.Agent(id: $0.id, name: Self.clip($0.name, 40) ?? "Agent") }
         let boards = extras.agentBoards.values.filter { names[$0.agentID] != nil }.sorted { $0.agentID < $1.agentID }
+        let limit = BighelpWidgetSnapshot.maximumPinnedAgents
         return BighelpWidgetSnapshot(defaultAgentID: defaultAgent?.id, defaultAgentName: defaultAgent?.name,
                                     sessions: Array(sessionRows), tasks: Array(taskRows), generatedAt: .now,
                                     feed: extras.feed, goals: extras.goals, ideas: extras.ideas,
                                     agents: Array(agentRows), boards: boards,
-                                    lightPalette: extras.lightPalette, darkPalette: extras.darkPalette)
+                                    lightPalette: extras.lightPalette, darkPalette: extras.darkPalette,
+                                    // The same check for pins: a switched computer's never show as this one's.
+                                    pinnedAgents: Array(extras.pinnedAgents.filter { names[$0.agentID] != nil }.prefix(limit)),
+                                    allPinnedAgents: Array(extras.allPinnedAgents.prefix(limit)))
     }
 
     private static func status(for record: SessionRecord) -> String {

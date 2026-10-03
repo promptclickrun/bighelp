@@ -69,6 +69,34 @@ extension RootShellView {
         openFleet(.agent(profileID: agent.profileID), on: agent.hostID)
     }
 
+    /// A pinned agent from the widget: its latest chat or a new one, on its own
+    /// computer when the link names one (switching there first, like All agents).
+    func openIncomingAgentChat(agentID: String, hostID: UUID?) {
+        if let hostID, let fleet, hostID != fleet.selectedHostID {
+            guard fleet.hosts.contains(where: { $0.id == hostID }) else {
+                actionErrorMessage = "That computer isn't in bighelp anymore."
+                return
+            }
+            if let known = fleet.snapshots[hostID]?.agents, !known.isEmpty,
+               !known.contains(where: { $0.profileID == agentID }) {
+                actionErrorMessage = "That agent isn't on \(fleet.hostName(hostID)) anymore."
+                return
+            }
+            openFleet(.agent(profileID: agentID), on: hostID)
+            return
+        }
+        let place = hostID.flatMap { id in fleet?.hosts.first { $0.id == id }?.name } ?? "this computer"
+        Task { @MainActor in
+            // Opened as the app starts: the agent list may still be on its way.
+            if agents.profiles.isEmpty { try? await agents.load() }
+            guard agents.profiles.contains(where: { $0.id == agentID }) else {
+                actionErrorMessage = "That agent isn't on \(place) anymore."
+                return
+            }
+            performFleetOpen(.agent(profileID: agentID))
+        }
+    }
+
     func openFleetChat(_ chat: FleetChat) {
         openFleet(.chat(profileID: chat.profileID, storedSessionID: chat.storedSessionID,
                         appSessionID: chat.appSessionID), on: chat.hostID)

@@ -161,8 +161,12 @@ struct BighelpWidgetAvatar: View {
     let name: String
     let diameter: CGFloat
     var pose: BighelpActivityPose? = nil
+    /// A pinned agent's own picture (`BighelpPinnedAvatarStore`), for agents
+    /// that may be on another computer, where `agentID` could name someone else.
+    var avatarKey: String? = nil
 
     @Environment(\.bighelpWidgetColors) private var colors
+    @Environment(\.bighelpPinnedAvatarDirectory) private var pinnedAvatars
 
     var body: some View {
         face
@@ -194,9 +198,14 @@ struct BighelpWidgetAvatar: View {
 
     private var ringGap: CGFloat { max(3, diameter * 0.07) }
 
+    private var picture: UIImage? {
+        if let avatarKey { return BighelpPinnedAvatarStore.image(key: avatarKey, in: pinnedAvatars) }
+        return agentID.flatMap { BighelpActivityAvatarStore.image(agentID: $0) }
+    }
+
     @ViewBuilder
     private var face: some View {
-        if let agentID, let image = BighelpActivityAvatarStore.image(agentID: agentID) {
+        if let image = picture {
             Image(uiImage: image)
                 .resizable()
                 .bighelpWidgetFullColor()

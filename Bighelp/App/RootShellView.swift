@@ -1240,6 +1240,8 @@ struct RootShellView: View {
             }
         case .newChat(let agentID):
             startIncomingNewChat(agentID: agentID)
+        case .agentChat(let agentID, let hostID):
+            openIncomingAgentChat(agentID: agentID, hostID: hostID)
         case .scheduledTasks:
             appState.select(.scheduledTasks)
         case .scheduledTask(let id):
@@ -1586,7 +1588,7 @@ private extension BighelpIncomingURLRoute {
     /// Routes that open a chat or the agent home need the host's workspace.
     var opensWorkspaceContent: Bool {
         switch self {
-        case .home, .chat, .newChat, .agent, .kanban, .approval, .group, .agents, .projects: true
+        case .home, .chat, .newChat, .agentChat, .agent, .kanban, .approval, .group, .agents, .projects: true
         case .scheduledTasks, .scheduledTask, .sessions, .settings, .pairBighelpLink: false
         }
     }

@@ -99,7 +99,12 @@ Chats, Scheduled Tasks, New Chat and Recent Chats share the same look. Tinted an
 system styles. **Kanban** shows cards from the boards, filtered by board, status and agent and grouped by status,
 agent or board; tapping a card opens it in the app. **Feed**, **Ideas** and **Goals** each show one board, for an
 agent picked in the widget or Auto (the agent picked in the app). The app reads only the boards widgets are set to
-(`BighelpWidgetBoardLoader`, a few agents at most) and the widget says so until it has. On Vision Pro the same widgets sit on a wall or table as glass,
+(`BighelpWidgetBoardLoader`, a few agents at most) and the widget says so until it has. **Pinned Agents** is a
+grid of faces with names under them, like contacts: Current Gateway shows the computer in use's pinned agents,
+Multi Gateway every computer's (All agents' pinned row), with a small computer name under each when they're on
+more than one. A tap opens that agent's latest chat or a new one (`loopdy://agent-chat?agent=…&host=…`), switching
+computers first like All agents. Pictures are copied per agent and computer (`BighelpPinnedAvatarStore`), and a
+computer called only by its address shows as "Computer 2". On Vision Pro the same widgets sit on a wall or table as glass,
 without the Lock Screen sizes.
 
 Apps: **Artifacts** lists what the agent made or changed lately, newest first, from one plugin request

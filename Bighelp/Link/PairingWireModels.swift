@@ -17,6 +17,9 @@ enum BighelpIncomingURLRoute: Equatable, Sendable {
     case kanban(board: String?, task: String?)
     /// "loopdy://group/<room>": a group chat hosted on the computer, from Shortcuts.
     case group(roomID: String)
+    /// "loopdy://agent-chat?agent=…&host=…": a chat with one agent, from the
+    /// Pinned Agents widget. With a host, on that computer.
+    case agentChat(agentID: String, hostID: UUID?)
     /// "loopdy://agents", "loopdy://projects", "loopdy://settings": ☰'s pages.
     case agents
     case projects
@@ -67,6 +70,9 @@ enum BighelpIncomingURLRoute: Equatable, Sendable {
                 .flatMap { $0.isEmpty || $0.utf8.count > 96 ? nil : $0 }
             return .agent(tab: ["chat", "feed", "ideas", "goals", "apps"].contains(tab) ? tab : "chat", agentID: agent)
         }
+        if url.host?.lowercased() == "agent-chat" {
+            return parseAgentChat(url)
+        }
         if url.host?.lowercased() == "approval", url.pathComponents.count == 2,
            let id = url.pathComponents.last, !id.isEmpty, id.utf8.count <= 240 {
             return .approval(id: id)
@@ -90,6 +96,20 @@ enum BighelpIncomingURLRoute: Equatable, Sendable {
             !sessionID.isEmpty
         else { return nil }
         return .chat(sessionID: sessionID)
+    }
+
+    /// One agent, and at most one computer given by its ID. Anything odd isn't a link.
+    private static func parseAgentChat(_ url: URL) -> BighelpIncomingURLRoute? {
+        guard url.pathComponents.count <= 1 else { return nil }
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        let agents = items.filter { $0.name == "agent" }, hosts = items.filter { $0.name == "host" }
+        guard agents.count == 1, hosts.count <= 1, let agent = agents[0].value,
+              !agent.isEmpty, agent.utf8.count <= 96,
+              agent == agent.trimmingCharacters(in: .whitespacesAndNewlines),
+              !agent.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains) else { return nil }
+        guard let host = hosts.first else { return .agentChat(agentID: agent, hostID: nil) }
+        guard let value = host.value, value.utf8.count <= 36, let hostID = UUID(uuidString: value) else { return nil }
+        return .agentChat(agentID: agent, hostID: hostID)
     }
 }
 

@@ -2,8 +2,8 @@ import Foundation
 import Observation
 
 /// What the widgets show beyond chats and tasks: the default agent's latest
-/// Feed posts, Ideas and Goals, the boards of agents a widget is set to, and the
-/// colors picked in Settings. The shell keeps it current; the widget snapshot
+/// Feed posts, Ideas and Goals, the boards of agents a widget is set to, pinned
+/// agents, and the colors picked in Settings. The shell keeps it current; the widget snapshot
 /// publisher reads it.
 @MainActor
 @Observable
@@ -17,6 +17,10 @@ final class BighelpWidgetExtras {
     var agentBoards: [String: BighelpWidgetSnapshot.AgentBoard] = [:]
     var lightPalette: BighelpWidgetSnapshot.Palette?
     var darkPalette: BighelpWidgetSnapshot.Palette?
+    /// Pinned agents of the computer in use, and of every computer
+    /// (`BighelpPinnedAgentsWidgetFeed`).
+    var pinnedAgents: [BighelpWidgetSnapshot.PinnedAgent] = []
+    var allPinnedAgents: [BighelpWidgetSnapshot.PinnedAgent] = []
 
     func update(board: AgentBoardStore) {
         let board = Self.board(agentID: board.agentID ?? "", items: board.items)

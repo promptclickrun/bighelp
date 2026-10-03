@@ -1118,7 +1118,7 @@ struct ChatView: View {
     @ViewBuilder
     private var providerUsageMenuItem: some View {
         if let providerUsage, providerUsage.isAvailable {
-            Button("See provider usage", systemImage: "gauge.with.dots.needle.50percent") {
+            Button("Usage", systemImage: "gauge.with.dots.needle.50percent") {
                 providerUsage.show(agentID: model.memberIDs.first ?? "default")
             }
             .accessibilityIdentifier("chat.provider-usage")

@@ -23,6 +23,8 @@ extension RootShellView {
             }
         case (.kanban, _):
             kanbanDestination
+        case (.usage, _):
+            usageDestination
         case (.allHostsChats, _):
             if let fleet {
                 FleetChatsView(fleet: fleet, onOpen: { openFleetChat($0) })

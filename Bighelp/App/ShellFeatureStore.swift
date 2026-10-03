@@ -336,7 +336,7 @@ final class ShellFeatureStore {
             approvalModels[requestID].map(PreparedRouteModel.approval)
         case .skillsAndTools,
              .workspaceActivity, .workspaceSettings, .workspaceManagement, .workspaceConnections, .workspaceHub,
-             .projects, .project, .kanban, .allHostsChats:
+             .projects, .project, .kanban, .usage, .allHostsChats:
             nil
         }
     }
@@ -404,7 +404,7 @@ final class ShellFeatureStore {
             return true
         case .skillsAndTools,
              .workspaceActivity, .workspaceSettings, .workspaceManagement, .workspaceConnections, .workspaceHub,
-             .projects, .project, .kanban, .allHostsChats:
+             .projects, .project, .kanban, .usage, .allHostsChats:
             return true
         }
     }

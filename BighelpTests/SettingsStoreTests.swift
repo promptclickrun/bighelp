@@ -433,15 +433,14 @@ struct SettingsStoreTests {
             .chat,
             .voice,
             .notifications,
-            .providerUsage,
             .permissions,
             .connectivityAndNotifications,
             .companion,
             .help,
             .watch,
         ])
-        #expect(Set(SettingsMenuSection.allCases.map(\.title)).count == 12)
-        #expect(Set(SettingsMenuSection.allCases.map(\.accessibilityIdentifier)).count == 12)
+        #expect(Set(SettingsMenuSection.allCases.map(\.title)).count == 11)
+        #expect(Set(SettingsMenuSection.allCases.map(\.accessibilityIdentifier)).count == 11)
     }
 
     @Test func currentEdgeGestureChoicesExcludeTheLegacyInboxDestination() {

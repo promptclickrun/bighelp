@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// Settings › Provider Usage: which of the computer's providers the Provider
-/// Usage overlay shows. All of them until you hide one; saved on this device.
+/// Usage › Limits › Choose: which of the computer's plans and balances Usage
+/// shows. All of them until you hide one; saved on this device.
 struct ProviderUsageSettingsView: View {
-    @Environment(\.providerUsage) private var store
+    let store: ProviderUsageStore?
     @AppStorage(ProviderUsagePreferences.hiddenKey) private var hiddenRaw = ""
     @BighelpThemeReader private var theme
 
@@ -24,44 +24,38 @@ struct ProviderUsageSettingsView: View {
                                 Text(provider.name)
                             }
                         }
-                        .accessibilityIdentifier("settings.provider-usage.\(provider.id)")
+                        .accessibilityIdentifier("usage.limits.choice.\(provider.id)")
                     }
                 } else {
                     Text(emptyText)
                         .foregroundStyle(theme.secondaryText)
-                        .accessibilityIdentifier("settings.provider-usage.empty")
+                        .accessibilityIdentifier("usage.limits.choice.empty")
                 }
-            } header: {
-                Text("Show in Provider Usage")
             } footer: {
-                Text("The providers set up on your computer. New ones show until you turn them off.")
+                Text("The plans and providers set up on your computer. New ones show until you turn them off.")
             }
             .listRowBackground(theme.surface)
 
             if !hidden.isEmpty {
                 Section {
                     Button("Show All") { hiddenRaw = "" }
-                        .accessibilityIdentifier("settings.provider-usage.show-all")
+                        .accessibilityIdentifier("usage.limits.show-all")
                 }
                 .listRowBackground(theme.surface)
             }
         }
         .scrollContentBackground(.hidden)
         .background(theme.canvas.ignoresSafeArea())
-        .navigationTitle("Provider Usage")
+        .navigationTitle("Show in Usage")
         .navigationBarTitleDisplayMode(.inline)
-        .task {
-            guard let store, store.report == nil else { return }
-            await store.load(refresh: false)
-        }
     }
 
     private var emptyText: String {
         switch store?.state {
-        case .needsPluginUpdate?: "Update the bighelp plugin on your computer to see its providers."
+        case .needsPluginUpdate?: "Update the bighelp plugin on your computer to see its plans."
         case .unavailable(let message)?: message
-        case .loaded?: "No AI tools found on your computer."
-        default: "Looking for providers on your computer…"
+        case .loaded?: "No AI plans found on your computer."
+        default: "Looking for plans on your computer…"
         }
     }
 

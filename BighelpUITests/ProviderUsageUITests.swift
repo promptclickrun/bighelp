@@ -1,117 +1,165 @@
 import XCTest
 
-/// Provider Usage on demo data: the ways in (chat ⋯, ☰), closing it, and
-/// hiding a provider in Settings. The context window's way in is in
-/// ChatContextWindowUITests.
-/// BIGHELP_USAGE_EVIDENCE (TEST_RUNNER_…) saves screenshots.
+/// ☰ › Usage on demo data: it sits right above Settings, opens one page with
+/// plans and limits, the chart, totals and the models behind them, and covers
+/// every computer while All hosts is on. The chat's ⋯ opens the same page.
+/// BIGHELP_USAGE_EVIDENCE (TEST_RUNNER_…) saves screenshots;
+/// BIGHELP_USAGE_APPEARANCE picks light or dark (light by default).
 final class ProviderUsageUITests: BighelpUITestCase {
-    @MainActor
-    func testOpensFromChatMenuAndMainMenu() throws {
-        let app = launchChat(appearance: "light")
-        app.buttons["chat.options"].tap()
-        tap(app.buttons["chat.provider-usage"])
-        let overlay = expectOverlay(app)
-        XCTAssertTrue(app.descendants(matching: .any)["provider-usage.claude"].exists, "Claude card")
-        XCTAssertTrue(app.descendants(matching: .any)["provider-usage.gemini"].exists, "Status cards render")
-        save("usage-1-from-chat-menu", app)
-        app.buttons["provider-usage.close"].tap()
-        XCTAssertTrue(overlay.waitForNonExistence(timeout: 3), "X closes it")
-
-        // ⋯ › Context window › usage is covered by ChatContextWindowUITests.
-
-        openMainMenu(app)
-        let menuRow = app.buttons["menu.usage"]
-        XCTAssertTrue(menuRow.waitForExistence(timeout: 5))
-        for _ in 0..<4 where !menuRow.isHittable { app.swipeUp() }
-        menuRow.tap()
-        _ = expectOverlay(app)
-        // Tapping outside the panel closes it too.
-        app.coordinate(withNormalizedOffset: CGVector(dx: 0.015, dy: 0.5)).tap()
-        XCTAssertTrue(overlay.waitForNonExistence(timeout: 3), "Tapping outside closes it")
-    }
+    private var appearance: String { ProcessInfo.processInfo.environment["BIGHELP_USAGE_APPEARANCE"] ?? "light" }
 
     @MainActor
-    func testDarkAppearanceAndHidingAProviderInSettings() throws {
-        let app = launchChat(appearance: "dark")
-        app.buttons["chat.options"].tap()
-        tap(app.buttons["chat.provider-usage"])
-        _ = expectOverlay(app)
-        save("usage-3-dark", app)
-        app.buttons["provider-usage.close"].tap()
-
-        openMainMenu(app)
-        // Settings sits below the fold in the menu's list; scroll to it.
+    func testUsageOpensFromTheMenuAboveSettings() throws {
+        let app = launch(["-bighelp.hosts.all-hosts", "NO"])
+        openMenu(app)
+        let usage = app.buttons["menu.usage"]
         let settings = app.buttons["menu.settings"]
-        _ = app.buttons["menu.new-chat"].waitForExistence(timeout: 5)
-        for _ in 0..<6 where !(settings.exists && settings.isHittable) { app.swipeUp() }
-        XCTAssertTrue(settings.exists)
-        settings.tap()
-        let row = settingsRow("settings.provider-usage", in: app)
-        for _ in 0..<8 where !(row.exists && row.isHittable) { app.swipeUp() }
-        row.tap()
-        let openRouter = app.switches["settings.provider-usage.openrouter"]
-        XCTAssertTrue(openRouter.waitForExistence(timeout: 10), "Providers are listed")
-        // A saved choice from an earlier run: start from everything shown.
-        let showAll = app.buttons["settings.provider-usage.show-all"]
+        XCTAssertTrue(usage.waitForExistence(timeout: 8), "Usage is in ☰")
+        XCTAssertTrue(usage.isHittable, "on the first screen")
+        XCTAssertLessThan(usage.frame.maxY, settings.frame.minY + 2, "right above Settings")
+        XCTAssertLessThan(app.buttons["menu.scheduled-tasks"].frame.maxY, usage.frame.minY + 2)
+        XCTAssertEqual(app.buttons.matching(identifier: "menu.usage").count, 1, "One Usage, not a second copy under More")
+        save("usage-0-menu-\(appearance)", app)
+        usage.tap()
+
+        let page = expectPage(app)
+        XCTAssertTrue(app.descendants(matching: .any)["provider-usage.claude"].waitForExistence(timeout: 8),
+                      "Plans and limits are on the page")
+        let hero = app.descendants(matching: .any)["usage.hero.value"]
+        XCTAssertTrue(hero.waitForExistence(timeout: 8))
+        XCTAssertTrue(hero.label.hasPrefix("$"), "Cost first when agents spent money: \(hero.label)")
+        save("usage-1-top-\(appearance)", app)
+
+        // Seven days reads again; tokens switch the measure.
+        let week = app.buttons["usage.range.week"]
+        XCTAssertTrue(week.exists)
+        week.tap()
+        XCTAssertTrue(week.isSelected)
+        app.buttons["usage.metric.tokens"].tap()
+        XCTAssertFalse(hero.label.hasPrefix("$"), "Tokens: \(hero.label)")
+        app.buttons["usage.metric.cost"].tap()
+        app.buttons["usage.range.month"].tap()
+
+        // A model charts against everything else; the chip clears it.
+        let model = app.buttons["usage.models.row.claude-opus-5-5"]
+        for _ in 0..<6 where !(model.exists && model.isHittable) { page.swipeUp() }
+        XCTAssertTrue(model.exists, "Models are listed")
+        save("usage-2-models-\(appearance)", app)
+        model.tap()
+        XCTAssertTrue(model.isSelected)
+        let clear = app.buttons["usage.focus.clear"]
+        for _ in 0..<6 where !clearOfHeader(clear, in: app) { page.swipeDown() }
+        XCTAssertTrue(clear.waitForExistence(timeout: 3), "The chart names what it shows")
+        save("usage-3-one-model-\(appearance)", app)
+        clear.tap()
+        XCTAssertFalse(clear.exists)
+
+        // Choose hides a plan here; Show All brings it back.
+        let choose = app.buttons["usage.limits.choose"]
+        for _ in 0..<6 where !clearOfHeader(choose, in: app) { page.swipeDown() }
+        choose.tap()
+        let openRouter = app.switches["usage.limits.choice.openrouter"]
+        XCTAssertTrue(openRouter.waitForExistence(timeout: 5))
+        let showAll = app.buttons["usage.limits.show-all"]
         if showAll.exists { showAll.tap() }
-        XCTAssertEqual(openRouter.value as? String, "1", "Shown until turned off")
         let control = openRouter.switches.firstMatch.exists ? openRouter.switches.firstMatch : openRouter
         control.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
-        let off = expectation(for: NSPredicate(format: "value == %@", "0"), evaluatedWith: openRouter)
-        wait(for: [off], timeout: 3)
-        save("usage-4-settings", app)
-        app.navigationBars.buttons.element(boundBy: 0).tap()
-
-        // Reopen from ☰, wherever Settings left us.
-        let menu = app.buttons.matching(NSPredicate(format: "identifier IN %@", ["home.drawer.open", "chat.menu"])).firstMatch
-        XCTAssertTrue(menu.waitForExistence(timeout: 5))
-        menu.tap()
-        let usage = app.buttons["menu.usage"]
-        XCTAssertTrue(usage.waitForExistence(timeout: 5))
-        for _ in 0..<4 where !usage.isHittable { app.swipeUp() }
-        usage.tap()
-        _ = expectOverlay(app)
-        XCTAssertFalse(app.descendants(matching: .any)["provider-usage.openrouter"].exists, "Hidden provider stays hidden")
-        XCTAssertTrue(app.descendants(matching: .any)["provider-usage.claude"].exists)
-        save("usage-5-openrouter-hidden", app)
+        app.buttons["usage.limits.done"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["provider-usage.claude"].waitForExistence(timeout: 5))
+        // Two plans show at first; the rest are a tap away.
+        let more = app.buttons["usage.limits.more"]
+        XCTAssertTrue(more.waitForExistence(timeout: 3))
+        more.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["provider-usage.copilot"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.descendants(matching: .any)["provider-usage.openrouter"].exists, "Hidden plans stay hidden")
+        save("usage-6-all-plans-\(appearance)", app)
+        choose.tap()
+        XCTAssertTrue(showAll.waitForExistence(timeout: 5))
+        showAll.tap()
+        app.buttons["usage.limits.done"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["provider-usage.openrouter"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.state, .runningForeground)
     }
 
     @MainActor
-    private func launchChat(appearance: String) -> XCUIApplication {
-        let app = makeApp()
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-simple-chat",
-                               "-loopdy.demo.appearance", appearance]
-        app.launch()
+    func testAllHostsAddsUpEveryComputer() throws {
+        let app = launch(["-bighelp.hosts.all-hosts", "NO"])
+        openMenu(app)
+        let allHosts = app.buttons["menu.all-hosts"]
+        XCTAssertTrue(allHosts.waitForExistence(timeout: 5))
+        allHosts.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["fleet.home"].waitForExistence(timeout: 8))
+        openMenu(app)
+        let usage = app.buttons["menu.usage"]
+        XCTAssertTrue(usage.waitForExistence(timeout: 5))
+        XCTAssertLessThan(usage.frame.maxY, app.buttons["menu.settings"].frame.minY + 2, "Above Settings here too")
+        usage.tap()
+        XCTAssertFalse(app.buttons["fleet.gate.host.Home Hermes"].waitForExistence(timeout: 2),
+                       "Usage covers every host, so it doesn't ask which")
+
+        let page = expectPage(app)
+        save("usage-4-all-hosts-\(appearance)", app)
+        let studio = app.buttons["usage.hosts.row.Studio Mac"]
+        for _ in 0..<10 where !(studio.exists && studio.isHittable) { page.swipeUp() }
+        XCTAssertTrue(studio.exists, "Each computer has a row")
+        let office = app.buttons["usage.hosts.row.Office Linux"]
+        XCTAssertTrue(office.exists)
+        XCTAssertTrue(office.label.contains("Couldn't reach"), "A computer out of reach says so: \(office.label)")
+        XCTAssertTrue(app.buttons["usage.agents.row.Rio Tanaka"].exists, "Agents on other computers are counted")
+        save("usage-5-computers-\(appearance)", app)
+        studio.tap()
+        XCTAssertTrue(studio.isSelected)
+    }
+
+    @MainActor
+    func testTheChatMenuOpensTheSamePage() throws {
+        let app = launch(["-preview-simple-chat"])
         let conversation = app.buttons["session.row.demo-finance"]
         XCTAssertTrue(conversation.waitForExistence(timeout: 15))
         conversation.tap()
-        XCTAssertTrue(app.buttons["chat.options"].waitForExistence(timeout: 10))
+        let options = app.buttons["chat.options"]
+        XCTAssertTrue(options.waitForExistence(timeout: 10))
+        options.tap()
+        let usage = app.buttons["chat.provider-usage"]
+        XCTAssertTrue(usage.waitForExistence(timeout: 5))
+        usage.tap()
+        _ = expectPage(app)
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.buttons["chat.options"].waitForExistence(timeout: 5), "Back returns to the chat")
+    }
+
+    // MARK: Helpers
+
+    @MainActor
+    private func launch(_ arguments: [String]) -> XCUIApplication {
+        let app = makeApp()
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-use-multi-host-fixtures",
+                               "-loopdy.demo.appearance", appearance] + arguments
+        app.launch()
         return app
     }
 
-    /// ☰ lives on the chat list; a chat opened from the list shows Back instead.
     @MainActor
-    private func openMainMenu(_ app: XCUIApplication) {
-        let back = app.buttons["chat.back"]
-        if back.exists { back.tap() }
+    private func openMenu(_ app: XCUIApplication) {
         let menu = app.buttons.matching(NSPredicate(format: "identifier IN %@", ["home.drawer.open", "chat.menu"])).firstMatch
-        XCTAssertTrue(menu.waitForExistence(timeout: 5), "☰ menu")
+        XCTAssertTrue(menu.waitForExistence(timeout: 10), "☰ menu")
         menu.tap()
     }
 
+    /// On screen and below the glass header, which takes taps over the page.
     @MainActor
-    private func expectOverlay(_ app: XCUIApplication) -> XCUIElement {
-        let overlay = app.descendants(matching: .any)["provider-usage"].firstMatch
-        XCTAssertTrue(overlay.waitForExistence(timeout: 8), "Provider Usage opens")
-        XCTAssertTrue(app.descendants(matching: .any)["provider-usage.codex"].waitForExistence(timeout: 8), "Cards load")
-        sleep(1)
-        return overlay
+    private func clearOfHeader(_ element: XCUIElement, in app: XCUIApplication) -> Bool {
+        guard element.exists, element.isHittable else { return false }
+        return element.frame.minY > app.navigationBars.firstMatch.frame.maxY
     }
 
     @MainActor
-    private func tap(_ element: XCUIElement) {
-        XCTAssertTrue(element.waitForExistence(timeout: 5))
-        element.tap()
+    private func expectPage(_ app: XCUIApplication) -> XCUIElement {
+        let page = app.descendants(matching: .any)["usage"].firstMatch
+        XCTAssertTrue(page.waitForExistence(timeout: 8), "Usage opens")
+        XCTAssertTrue(app.descendants(matching: .any)["usage.hero"].waitForExistence(timeout: 8), "Usage loads")
+        sleep(1)
+        return page
     }
 
     @MainActor

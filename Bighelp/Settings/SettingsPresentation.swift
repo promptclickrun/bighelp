@@ -7,7 +7,6 @@ enum SettingsMenuSection: String, CaseIterable, Identifiable, Equatable, Sendabl
     case chat
     case voice
     case notifications
-    case providerUsage
     case permissions
     case connectivityAndNotifications
     case companion
@@ -23,7 +22,6 @@ enum SettingsMenuSection: String, CaseIterable, Identifiable, Equatable, Sendabl
         case .chat: "Chat"
         case .voice: "Voice"
         case .notifications: "Notifications"
-        case .providerUsage: "Provider usage"
         case .appearance: "Appearance"
         case .permissions: "Permissions"
         case .connectivityAndNotifications: "Hosts"
@@ -40,7 +38,6 @@ enum SettingsMenuSection: String, CaseIterable, Identifiable, Equatable, Sendabl
         case .chat: Self.chatDetail
         case .voice: "How voice chats sound"
         case .notifications: "Alerts from your agents"
-        case .providerUsage: "Which plans and balances show"
         case .appearance: "Colors, light and dark, chat layout"
         case .permissions: "Microphone, camera, photos and more"
         case .connectivityAndNotifications: "The computers your agents run on"
@@ -65,7 +62,6 @@ enum SettingsMenuSection: String, CaseIterable, Identifiable, Equatable, Sendabl
         case .chat: "bubble.left.and.bubble.right.fill"
         case .voice: "waveform"
         case .notifications: "bell.badge.fill"
-        case .providerUsage: "gauge.with.dots.needle.50percent"
         case .appearance: "paintpalette.fill"
         case .permissions: "hand.raised.fill"
         case .connectivityAndNotifications: "desktopcomputer"
@@ -82,7 +78,6 @@ enum SettingsMenuSection: String, CaseIterable, Identifiable, Equatable, Sendabl
         case .chat: "3F7FD9"
         case .voice: "E0533D"
         case .notifications: "E5484D"
-        case .providerUsage: "2F9E6B"
         case .connectivityAndNotifications: "5B6B7F"
         case .permissions: "3478F6"
         case .watch: "6E6E73"
@@ -97,7 +92,6 @@ enum SettingsMenuSection: String, CaseIterable, Identifiable, Equatable, Sendabl
         switch self {
         case .appearance: "settings.themes"
         case .voice: "settings.chat.voice-settings"
-        case .providerUsage: "settings.provider-usage"
         case .companion: "companion-settings-entry"
         default: "settings.menu.\(rawValue)"
         }

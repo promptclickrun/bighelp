@@ -29,6 +29,8 @@ enum AppRoute: Hashable {
     case project(id: String)
     /// Kanban: the host's boards, worked by its agents.
     case kanban
+    /// Plans, limits and what the agents used (☰ › Usage).
+    case usage
     /// The all-hosts view's chat list: every host's chats.
     case allHostsChats
 }

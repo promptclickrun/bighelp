@@ -291,9 +291,9 @@ struct QuickWorkspaceDrawer: View {
                 onScheduledTasks: onOpenScheduledTasks,
                 onKanban: onOpenKanban,
                 folder: settings.nerdModeEnabled ? (name: activeWorkspaceName, open: onOpenWorkspaces) : nil,
-                onProviderUsage: providerUsage?.isAvailable == true ? { [providerUsage, isEmbedded, agents] in
+                onUsage: providerUsage?.isAvailable == true ? { [providerUsage, isEmbedded, agents] in
                     Task { @MainActor in
-                        // Let the drawer finish closing before the overlay presents.
+                        // Let the drawer finish closing before Usage opens.
                         if !isEmbedded { try? await Task.sleep(for: .milliseconds(350)) }
                         providerUsage?.show(agentID: agents.selectedAgentID ?? "default")
                     }

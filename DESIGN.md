@@ -59,7 +59,7 @@ Chat opens that agent's latest chat with its live avatar big at the top: tap the
 model and reasoning, then Activity, Approvals, Schedules, Identity), tap the name to switch agents or open a group
 chat, and ☰ for everything else. ☰'s first screen fits without
 scrolling: the host as one switcher row on top, then New chat (Group beside it), Agents, Projects, Kanban, Scheduled
-tasks and Settings, then Recent chats with See all. Provider usage, the Secure credential vault and Nerd Mode's folder
+tasks, Usage and Settings, then Recent chats with See all. The Secure credential vault and Nerd Mode's folder
 sit under More at the bottom.
 Keep it that short: a new destination goes where people already look, not on the first screen. A tap on the
 header's compose button starts a new chat with this agent right away; touch and hold picks agents: one is a 1:1
@@ -172,6 +172,14 @@ and color, description and recent use; a project page with **New chat in this pr
 folders. A chat started there runs in the project's folder (Hermes files chats by folder, and the project becomes
 the current one). Folder and Git management stay in Settings › Hermes tools (Nerd Mode). 
 
+**Usage** (☰ › Usage, above Settings) is the one place for what the agents use. Limits come first: each plan,
+limit and balance the plugin finds (Choose hides one), with what the agents used through it in the range. Then 7, 30
+or 90 days of Hermes' own numbers (`/api/analytics/usage` and `/api/analytics/models`, per agent): estimated cost or
+processed tokens per day as bars (tap one for its day), totals with the cache rate, when you use it (weekdays, and
+hours with the plugin's `usage/activity`), and ranked rows by model, by agent and, with All hosts on, by computer.
+Tap a row to chart it against everything else. Chat ⋯ › Usage and the context window open the same page; there is
+no overlay or Settings copy. Subscriptions report no cost, so a host where nothing cost money opens on Tokens.
+
 **Kanban** (☰ › Kanban, above Scheduled tasks) is Hermes' Kanban plugin, shown only when the host has it. Five lanes
 in plain words: Later (triage, to-do, scheduled), Ready (an agent picks these up next), Working (only Hermes starts
 work, so nothing is dropped here), Needs you (blocked or waiting for review) and Done. Cards show who has them with
@@ -190,8 +198,8 @@ to drag them into a new order, kept on this device across hosts), host filter ch
 name, its role and its latest chat, newest first. One big round New chat sits bottom right, above the search bar,
 where a thumb rests. A tap opens that agent's own chat with Back; if it's on another host, the app switches hosts
 first while the list stays up. ☰'s recent chats, All chats and Scheduled tasks then list every host's, each with
-its host's name. Screens that belong to one host (Settings, Agents, Projects, Kanban, Provider usage, the credential
-vault, the folder, New group) ask which host first; Settings' pop-up also leads with **Fleet settings**, one page
+its host's name. Screens that belong to one host (Settings, Agents, Projects, Kanban, the credential
+vault, the folder, New group) ask which host first; Usage instead adds up every host, with a row for each; Settings' pop-up also leads with **Fleet settings**, one page
 for every host: Update Hermes (each host's commits behind), Update bighelp Plugin (each host's version → the new
 one) and Restart Hermes Gateway, all at once with each host's live status and its own Restart when it needs one.
 Each host runs the same flows as its own System page (`HostOperationsStore`, `HostPluginUpdateModel`); hosts that
@@ -206,7 +214,7 @@ Group chats (Hermes hosted rooms / Bot Mode) live in the switcher, ☰ and Agent
 Touch and hold lifts an agent: drag it to reorder (the order is kept per host), or let go to see its actions.
 
 **Settings** is one short list where every row opens one page: you, Assistants (default model, providers,
-personalities), then Appearance, Chat, Voice, Notifications and Provider usage, then Hosts, Permissions, Apple
+personalities), then Appearance, Chat, Voice and Notifications, then Hosts, Permissions, Apple
 Watch, Companion pet and Help. Don't add sections that compete with these; add to the page a row already opens.
 Settings › Default model leads with **Agent**: tap it for a rail of cards, one per agent (picture and name, the
 chosen one filled with the accent, `BighelpRailCard`), and the page shows and changes that agent's own default.

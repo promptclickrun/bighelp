@@ -47,7 +47,6 @@ struct SettingsView: View {
     @State var nameSaveStatus: String?
     @State var isPersonalitiesPresented = false
     @Environment(\.bighelpHostRegistry) var hostRegistry
-    @Environment(\.providerUsage) var providerUsage
     @State var isClearCacheConfirmationPresented = false
     @State var isClearingLocalCache = false
     @State var localCacheStatusMessage: String?
@@ -129,7 +128,7 @@ struct SettingsView: View {
             BighelpDeferredSection { localIdentity }
             BighelpDeferredSection { assistantBasics }
             BighelpDeferredSection {
-                settingsMenuGroup(sections: [.appearance, .chat, .voice, .notifications, .providerUsage])
+                settingsMenuGroup(sections: [.appearance, .chat, .voice, .notifications])
             }
             #if os(visionOS)
             BighelpDeferredSection { SpatialAvatarSettingsSection(settings: settings) }
@@ -377,9 +376,6 @@ struct SettingsView: View {
                               selectedAgentID: agentDirectory?.selectedAgentID,
                               client: voiceSettingsClient, scope: voiceSettingsScope,
                               isCurrent: voiceSettingsIsCurrent)
-        case .providerUsage:
-            // Pushed screens don't reliably inherit the store; hand it over.
-            ProviderUsageSettingsView().environment(\.providerUsage, providerUsage)
         case .companion:
             if let companionStore {
                 CompanionSettingsView(store: companionStore, agents: agents, agentScope: companionAgentScope)

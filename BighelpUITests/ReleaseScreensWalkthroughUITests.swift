@@ -71,19 +71,20 @@ final class ReleaseScreensWalkthroughUITests: BighelpUITestCase {
         }
         save("release-1-chat", app)
 
-        // Provider Usage: the new overlay must open on the phone-sized stack.
+        // Usage: the page, its charts and every section must open on the phone-sized stack.
         app.buttons["chat.options"].tap()
         let usage = app.buttons["chat.provider-usage"]
         XCTAssertTrue(usage.waitForExistence(timeout: 5))
         usage.tap()
-        let overlay = app.descendants(matching: .any)["provider-usage"].firstMatch
-        XCTAssertTrue(overlay.waitForExistence(timeout: 10))
-        let firstCard = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "provider-usage.")).firstMatch
-        _ = firstCard.waitForExistence(timeout: 60)
+        let page = app.descendants(matching: .any)["usage"].firstMatch
+        XCTAssertTrue(page.waitForExistence(timeout: 10))
+        _ = app.descendants(matching: .any)["usage.hero"].waitForExistence(timeout: 60)
         sleep(2)
-        save("release-5-provider-usage", app)
-        app.buttons["provider-usage.close"].tap()
-        XCTAssertTrue(overlay.waitForNonExistence(timeout: 5))
+        save("release-5-usage", app)
+        for _ in 0..<6 { page.swipeUp() }
+        save("release-6-usage-bottom", app)
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(page.waitForNonExistence(timeout: 5))
 
         app.buttons["chat.menu"].tap()
         XCTAssertTrue(app.buttons["menu.done"].waitForExistence(timeout: 5))
@@ -115,12 +116,6 @@ final class ReleaseScreensWalkthroughUITests: BighelpUITestCase {
         save("release-4-chat-layout", app)
         app.navigationBars.buttons.element(boundBy: 0).tap()
 
-        let usageSettings = settingsRow("settings.provider-usage", in: app)
-        for _ in 0..<6 where !(usageSettings.exists && usageSettings.isHittable) { app.swipeUp() }
-        usageSettings.tap()
-        XCTAssertTrue(app.navigationBars["Provider Usage"].waitForExistence(timeout: 10))
-        sleep(2)
-        save("release-6-provider-usage-settings", app)
         XCTAssertEqual(app.state, .runningForeground, "No crash on the phone-sized stack")
     }
 

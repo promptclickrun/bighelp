@@ -110,7 +110,7 @@ final class DemoProviderUsageClient: ProviderUsageClient {
     }
 }
 
-/// Usage for the connected host, and whether the overlay is showing. One per
+/// Plans and limits for the connected host, for the Usage page. One per
 /// host connection; keeps the last result while a refresh runs.
 @MainActor @Observable
 final class ProviderUsageStore {
@@ -126,7 +126,7 @@ final class ProviderUsageStore {
     private(set) var state: State = .idle
     private(set) var report: ProviderUsageReport?
     private(set) var isRefreshing = false
-    var isPresented = false
+
     /// Which agent's view of Hermes to read (its provider comes first).
     private(set) var agentID = "default"
     @ObservationIgnored private var client: (any ProviderUsageClient)?
@@ -149,14 +149,19 @@ final class ProviderUsageStore {
         state = .idle
     }
 
-    /// Opens the overlay for an agent and loads (the host caches for five minutes).
-    func present(agentID: String) {
+    /// Opens the Usage page; the app sets it. Screens that offer Usage (chat ⋯,
+    /// the context window, ☰) call `show(agentID:)` and stay out of navigation.
+    @ObservationIgnored var onOpen: (@MainActor () -> Void)?
+
+    /// Opens Usage with an agent's view of the plans (its provider first) and
+    /// loads them (the host caches for five minutes).
+    func show(agentID: String) {
         if agentID != self.agentID {
             self.agentID = agentID
             report = nil
             state = .idle
         }
-        isPresented = true
+        onOpen?()
         Task { await load(refresh: false) }
     }
 

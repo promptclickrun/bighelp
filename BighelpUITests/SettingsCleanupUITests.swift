@@ -13,7 +13,7 @@ final class SettingsCleanupUITests: BighelpUITestCase {
             openSettings(in: app)
             save("settings-top-\(appearance)", app)
             for row in ["settings.themes", "settings.menu.chat", "settings.chat.voice-settings",
-                        "settings.menu.notifications", "settings.provider-usage",
+                        "settings.menu.notifications",
                         "settings.menu.connectivityAndNotifications", "settings.menu.permissions",
                         "settings.menu.help", "settings.hermes.system", "settings.hermes-tools"] {
                 XCTAssertTrue(settingsRow(row, in: app).exists, row)

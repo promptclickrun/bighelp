@@ -46,9 +46,7 @@ extension RootShellView {
         // Projects, Kanban and Scheduled tasks belong to one host; the all-hosts menu leaves them out.
         destinations.onProjects = nil
         destinations.onKanban = nil
-        if destinations.onProviderUsage != nil {
-            destinations.onProviderUsage = { afterClosingHomeSheets { fleetGate(.providerUsage) } }
-        }
+        // Usage covers every host while all show; no host to pick.
         if destinations.onCredentialVault != nil {
             destinations.onCredentialVault = { afterClosingHomeSheets { fleetGate(.credentialVault) } }
         }
@@ -262,9 +260,6 @@ extension RootShellView {
                 if canOpenProjects { openProjects() } else { actionErrorMessage = "Projects aren't available on this host." }
             case .kanban:
                 if canOpenKanban { openKanban() } else { actionErrorMessage = "Kanban isn't set up on this host." }
-            case .providerUsage:
-                if providerUsage.isAvailable { providerUsage.show(agentID: homeAgent?.id ?? "default") }
-                else { actionErrorMessage = "Provider usage isn't available on this host." }
             case .credentialVault: openCredentialVault()
             case .folder: presentHermesWorkspaces()
             }

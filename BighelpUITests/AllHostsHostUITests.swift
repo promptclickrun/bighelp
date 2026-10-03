@@ -110,15 +110,15 @@ final class AllHostsHostUITests: BighelpUITestCase {
         XCTAssertTrue(options.waitForExistence(timeout: 10))
         options.tap()
         let usage = app.buttons["chat.provider-usage"].firstMatch
-        XCTAssertTrue(usage.waitForExistence(timeout: 10), "Provider usage is in the chat's ⋯ menu")
+        XCTAssertTrue(usage.waitForExistence(timeout: 10), "Usage is in the chat's ⋯ menu")
         usage.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["usage"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.descendants(matching: .any)["provider-usage"].waitForExistence(timeout: 10))
         let failed = app.descendants(matching: .any).matching(
             NSPredicate(format: "label CONTAINS %@", "couldn't be loaded")).firstMatch
         let loaded = app.descendants(matching: .any).matching(
             NSPredicate(format: "identifier BEGINSWITH %@", "provider-usage.")).matching(
-            NSPredicate(format: "NOT identifier IN %@", ["provider-usage.message", "provider-usage.close",
-                                                         "provider-usage.refresh"])).firstMatch
+            NSPredicate(format: "NOT identifier IN %@", ["provider-usage.message"])).firstMatch
         let deadline = Date().addingTimeInterval(30)
         while Date() < deadline, !failed.exists, !loaded.exists { Thread.sleep(forTimeInterval: 0.5) }
         save("fleet-4-usage-in-other-host-chat", app)

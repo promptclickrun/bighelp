@@ -255,7 +255,7 @@ struct ChatComposer: View {
                     .accessibilityIdentifier("chat.composer.menu.model")
                 }
                 if providerUsage?.isAvailable == true {
-                    Button("Provider usage", systemImage: "gauge.with.dots.needle.50percent") { showProviderUsage() }
+                    Button("Usage", systemImage: "gauge.with.dots.needle.50percent") { showProviderUsage() }
                         .accessibilityIdentifier("chat.composer.menu.provider-usage")
                 }
             } label: {

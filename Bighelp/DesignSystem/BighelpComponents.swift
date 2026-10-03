@@ -855,8 +855,8 @@ struct SessionContextTokenPopover: View {
                                 .background(Circle().fill(theme.action.opacity(0.12)))
                         }
                         .bighelpPlainButtonStyle(.circle)
-                        .bighelpIconLabel("Provider usage")
-                        .accessibilityHint("Shows the plans and limits of the AI providers on your computer.")
+                        .bighelpIconLabel("Usage")
+                        .accessibilityHint("Shows your plans and limits and what your agents used.")
                         .accessibilityIdentifier("chat.session-context.provider-usage")
                     }
                 }

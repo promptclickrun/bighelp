@@ -60,18 +60,18 @@ struct BighelpMenuDestinations {
     var onKanban: (() -> Void)? = nil
     /// Nerd Mode: the Hermes project folder chats run in.
     var folder: (name: String, open: () -> Void)?
-    /// Plans and limits of the AI providers on the host.
-    var onProviderUsage: (() -> Void)? = nil
+    /// Usage: plans, limits and what the agents used. None while no computer is connected.
+    var onUsage: (() -> Void)? = nil
     /// Logins, cards and addresses an agent's browser can use (Hermes' vault).
     var onCredentialVault: (() -> Void)? = nil
     var onSettings: () -> Void
 }
 
 /// bighelp's one menu (☰). The first screen is short on purpose: New chat,
-/// Agents, Projects, Kanban, Scheduled tasks and Settings, then recent chats
+/// Agents, Projects, Kanban, Scheduled tasks, Usage and Settings, then recent chats
 /// with See all. With all hosts showing, Agents is All agents and the one-host
 /// places stay out, so each view keeps to its purpose. The host switcher is one
-/// compact row on top; the rest (provider usage, Nerd Mode's folder) waits below the chats.
+/// compact row on top; the rest (the credential vault, Nerd Mode's folder) waits below the chats.
 struct BighelpMenu<Recent: View>: View {
 
     let hosts: BighelpMenuHosts
@@ -117,6 +117,9 @@ struct BighelpMenu<Recent: View>: View {
                 }
                 row("Scheduled tasks", symbol: "calendar.badge.clock", id: "menu.scheduled-tasks",
                     action: destinations.onScheduledTasks)
+            }
+            if let onUsage = destinations.onUsage {
+                row("Usage", symbol: "gauge.with.dots.needle.50percent", id: "menu.usage", action: onUsage)
             }
             row("Settings", symbol: "gearshape", id: "menu.settings", action: destinations.onSettings)
         } header: {
@@ -240,18 +243,13 @@ struct BighelpMenu<Recent: View>: View {
 
     @ViewBuilder
     private var moreSection: some View {
-        if destinations.onProviderUsage != nil || destinations.onCredentialVault != nil
-            || destinations.folder != nil || isVision {
+        if destinations.onCredentialVault != nil || destinations.folder != nil || isVision {
             Section("More") {
                 #if os(visionOS)
                 row("Simple mode", symbol: "figure.stand", id: "menu.simple-mode") {
                     SpatialSimpleMode.enter(spatialAvatar, openWindow: openWindow)
                 }
                 #endif
-                if let onProviderUsage = destinations.onProviderUsage {
-                    row("Provider usage", symbol: "gauge.with.dots.needle.50percent", id: "menu.usage",
-                        action: onProviderUsage)
-                }
                 if let onCredentialVault = destinations.onCredentialVault {
                     row("Secure credential vault", symbol: "lock.shield", id: "menu.vault", action: onCredentialVault)
                 }

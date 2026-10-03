@@ -44,8 +44,9 @@ final class ProviderUsageHostUITests: BighelpUITestCase {
             if usage.waitForExistence(timeout: 3) { break }
             app.tap() // close the menu; the entry shows once the host connects
         } while Date() < deadline
-        XCTAssertTrue(usage.exists, "Provider usage is in the chat's ⋯ menu (\(name))")
+        XCTAssertTrue(usage.exists, "Usage is in the chat's ⋯ menu (\(name))")
         usage.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["usage"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.descendants(matching: .any)["provider-usage"].waitForExistence(timeout: 10))
         let failed = app.descendants(matching: .any)
             .matching(NSPredicate(format: "label CONTAINS %@", "couldn't be loaded")).firstMatch
@@ -56,7 +57,9 @@ final class ProviderUsageHostUITests: BighelpUITestCase {
         save(name, app)
         XCTAssertFalse(failed.exists, "Usage loads (\(name))")
         XCTAssertTrue(loaded.exists, "Usage shows when it was updated (\(name))")
-        app.buttons["provider-usage.close"].firstMatch.tap()
+        // The host's own analytics fill the page too.
+        XCTAssertTrue(app.descendants(matching: .any)["usage.hero"].waitForExistence(timeout: 30), "Hermes usage loads (\(name))")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
     }
 
     @MainActor private func save(_ name: String, _ app: XCUIApplication) {

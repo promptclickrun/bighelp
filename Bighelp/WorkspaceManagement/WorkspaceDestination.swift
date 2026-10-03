@@ -9,8 +9,8 @@ enum WorkspaceDestination: String, CaseIterable, Identifiable, Hashable, Sendabl
     case sessionMaintenance, profileLifecycle
     case instances, security, appearance, tabBar, caching, contact, permissions, watch
 
-    /// Hermes Tools lists the host's tools. This app's own settings live in Settings.
-    static let appMenuCases = allCases.filter { $0 != .wiki && $0 != .tasks && $0.section != .app }
+    /// Hermes Tools lists the host's tools. This app's own settings live in Settings, and usage on ☰ › Usage.
+    static let appMenuCases = allCases.filter { $0 != .wiki && $0 != .tasks && $0 != .usage && $0.section != .app }
 
     var id: Self { self }
 

@@ -90,6 +90,7 @@ struct RootShellView: View {
     @State var agentBoard = AgentBoardStore()
     /// Provider Usage for the connected host; opened from chat ⋯, ☰ and the context window.
     @State var providerUsage = ProviderUsageStore()
+    @State var usage = UsageStore()
     @State var agentMedia = AgentMediaStore()
     @State var profileAgentID: String?
     @State var isAgentSwitcherPresented = false

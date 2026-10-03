@@ -529,11 +529,8 @@ extension RootShellView {
                 await BighelpWidgetBoardLoader.shared.refresh(homeAgentID: homeAgent?.id,
                                                               knownAgentIDs: Set(agents.profiles.map(\.id)))
             }
-            .modifier(ProviderUsageHost(
-                store: providerUsage,
-                hostName: hostRegistry?.hosts.first { $0.id == hostRegistry?.selectedHostID }?.name,
-                onOpenSettings: { isUnifiedSettingsPresented = true }
-            ))
+            .task(id: usageReaderKey) { configureUsage(usageReaderKey) }
+            .environment(\.providerUsage, providerUsage)
             .task(id: hostReactionsKey) { await syncHostReactions(hostReactionsKey) }
             // Widgets show the home agent's Feed and Goals in the app's colors.
             .onChange(of: agentBoard.items, initial: true) { _, _ in BighelpWidgetExtras.shared.update(board: agentBoard) }
@@ -656,8 +653,7 @@ extension RootShellView {
             folder: settings.nerdModeEnabled
                 ? (name: activeHermesWorkspaceName, open: { afterClosingHomeSheets { presentHermesWorkspaces() } })
                 : nil,
-            onProviderUsage: providerUsage.isAvailable
-                ? { afterClosingHomeSheets { providerUsage.show(agentID: homeAgent?.id ?? "default") } } : nil,
+            onUsage: usage.isAvailable ? { afterClosingHomeSheets { showUsage() } } : nil,
             onCredentialVault: canOpenCredentialVault ? { afterClosingHomeSheets { openCredentialVault() } } : nil,
             onSettings: { afterClosingHomeSheets { appState.select(.profile) } }
         )

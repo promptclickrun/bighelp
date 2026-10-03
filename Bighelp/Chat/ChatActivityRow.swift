@@ -132,9 +132,9 @@ struct ChatActivityRow: View {
                                 .accessibilityLabel("Copy \(section.label.lowercased())")
                             }
                         }
-                        ChatToolDetailText(label: section.label, value: section.value,
-                                           identifier: "chat.activity.\(event.eventID).\(section.label.lowercased())",
-                                           isCanonicalPreview: event.contentReference != nil)
+                        ChatToolReadableSection(label: section.label, value: section.value,
+                                                identifier: "chat.activity.\(event.eventID).\(section.label.lowercased())",
+                                                isCanonicalPreview: event.contentReference != nil)
                             .foregroundStyle(theme.secondaryText)
                             .padding(BighelpTokens.space12)
                             .background(
@@ -145,6 +145,7 @@ struct ChatActivityRow: View {
                                 RoundedRectangle(cornerRadius: BighelpTokens.radius12)
                                     .stroke(theme.border, lineWidth: BighelpTokens.hairline)
                             }
+                            .accessibilityElement(children: .contain)
                             .accessibilityIdentifier(
                                 "chat.activity.\(event.eventID).\(section.label.lowercased())"
                             )
@@ -160,7 +161,7 @@ struct ChatActivityRow: View {
             sections.append(("Summary", summary))
         }
         if let arguments = nonempty(event.arguments) {
-            sections.append(("Arguments", arguments))
+            sections.append(("Input", arguments))
         }
         if let result = nonempty(event.result) {
             sections.append(("Result", result))

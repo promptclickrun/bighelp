@@ -92,7 +92,72 @@ struct ChatToolDetailText: View {
     }
 }
 
-private struct ChatToolDetailReader: View {
+/// One section of an unfolded tool call (its input or result), readable:
+/// key facts as label and value, text with real line breaks, long text cut
+/// short with "View full". JSON that can't be made readable, plain text and
+/// Hermes' canonical previews show as before. The raw value stays one tap
+/// away and is what the section's Copy button copies.
+struct ChatToolReadableSection: View {
+    let label: String
+    let value: String
+    let identifier: String
+    var isCanonicalPreview = false
+    @State private var showsRawValue = false
+    @BighelpThemeReader private var theme
+
+    var body: some View {
+        if !isCanonicalPreview, let detail = ChatToolReadableDetail.parse(value) {
+            VStack(alignment: .leading, spacing: BighelpTokens.space8) {
+                ForEach(Array(detail.items.enumerated()), id: \.offset) { index, item in
+                    switch item {
+                    case .fact(let factLabel, let factValue):
+                        fact(factLabel, factValue)
+                    case .block(let blockLabel, let text):
+                        VStack(alignment: .leading, spacing: BighelpTokens.space4) {
+                            if let blockLabel {
+                                Text(blockLabel)
+                                    .font(.bighelp(.caption, weight: .semibold))
+                                    .foregroundStyle(theme.tertiaryText)
+                            }
+                            ChatToolDetailText(label: blockLabel ?? label, value: text,
+                                               identifier: "\(identifier).item-\(index)")
+                        }
+                    }
+                }
+                Button("View raw \(label.lowercased())") { showsRawValue = true }
+                    .font(.bighelp(.caption))
+                    .foregroundStyle(theme.tertiaryText)
+                    .bighelpPlainButtonStyle()
+                    .accessibilityIdentifier(identifier + ".view-raw")
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .sheet(isPresented: $showsRawValue) {
+                ChatToolDetailReader(label: label, value: value)
+                    .bighelpSheetSize(.large)
+            }
+        } else {
+            ChatToolDetailText(label: label, value: value, identifier: identifier,
+                               isCanonicalPreview: isCanonicalPreview)
+        }
+    }
+
+    private func fact(_ label: String, _ value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: BighelpTokens.space8) {
+            Text(label)
+                .font(.bighelp(.caption, weight: .semibold))
+                .foregroundStyle(theme.tertiaryText)
+                .fixedSize()
+            Text(value)
+                .font(.bighelp(.caption, design: .monospaced))
+                .textSelection(.enabled)
+                .lineLimit(3)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+struct ChatToolDetailReader: View {
     let label: String
     let value: String
     @State private var pages: [String] = []

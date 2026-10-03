@@ -224,6 +224,17 @@ final class SettingsStore {
         didSet { defaults.set(allHostsMode, forKey: Keys.allHostsMode) }
     }
 
+    /// Settings › Chat › Open on; nil until picked (the agent's latest chat).
+    var landingScreen: BighelpLandingScreen? {
+        didSet { defaults.set(landingScreen?.rawValue, forKey: BighelpLanding.screenKey) }
+    }
+
+    /// What this launch opens on, read once: a new pick applies next time.
+    let launchLanding: BighelpLandingChoice
+
+    /// Settings › Chat › Start with, per computer (`cacheScopeID` → agent ID).
+    private(set) var startAgentIDs: [String: String]
+
     private let defaults: UserDefaults
 
     init(
@@ -353,6 +364,32 @@ final class SettingsStore {
         )
         nerdModeEnabled = defaults.bool(forKey: Keys.nerdMode, default: false)
         allHostsMode = defaults.bool(forKey: Keys.allHostsMode, default: false)
+        let landing = defaults.string(forKey: BighelpLanding.screenKey).flatMap(BighelpLandingScreen.init(rawValue:))
+        landingScreen = landing
+        let legacyOpensChat = defaults.object(forKey: BighelpLanding.legacyOpensChatKey) == nil
+            ? nil : defaults.bool(forKey: BighelpLanding.legacyOpensChatKey)
+        launchLanding = BighelpLanding.choice(screen: landing, legacyOpensChat: legacyOpensChat)
+        startAgentIDs = (defaults.dictionary(forKey: BighelpLanding.startAgentKey) as? [String: String] ?? [:])
+            .filter { $0.key.utf8.count <= Self.maximumStartAgentKeyLength && $0.value.utf8.count <= Self.maximumStartAgentKeyLength }
+    }
+
+    private static let maximumStartAgentKeyLength = 256
+
+    /// The agent this computer opens with; nil is Automatic.
+    func startAgentID(scope: String?) -> String? {
+        scope.flatMap { startAgentIDs[$0] }
+    }
+
+    func setStartAgentID(_ id: String?, scope: String) {
+        guard scope.utf8.count <= Self.maximumStartAgentKeyLength,
+              (id?.utf8.count ?? 0) <= Self.maximumStartAgentKeyLength else { return }
+        startAgentIDs[scope] = id
+        defaults.set(startAgentIDs, forKey: BighelpLanding.startAgentKey)
+    }
+
+    /// A picked Open on decides, at launch, whether every computer's agents show.
+    func applyLaunchLandingToAllHostsMode() {
+        if let on = BighelpLanding.allHostsMode(for: launchLanding), allHostsMode != on { allHostsMode = on }
     }
 
     /// Themes (Nous, Superpilot and your own, with their logos) were replaced by

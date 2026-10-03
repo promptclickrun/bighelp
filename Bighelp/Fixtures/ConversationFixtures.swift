@@ -374,6 +374,95 @@ enum ConversationFixtures {
                              isActive: true, hasAcceptedMessage: true)
     }
 
+    /// `-test-tool-folders`: tool folders in plain words. A finished turn
+    /// (three folders with narration between them, 2m 14s from the question
+    /// to the answer) folds into "Worked for 2m 14s · 7 steps" with the answer
+    /// below it. Then a turn still running: a finished folder ("Checked your
+    /// calendars"), a note, and a live folder checking GitHub with its calls
+    /// listed under it. Made-up repo, files and results.
+    static var toolFoldersPreview: SessionRecord {
+        let sessionID = "demo-finance"
+        let agent = TimelineSender.agent(id: "finance", snapshot: .init(name: "Avery Park"))
+        let start = Date().addingTimeInterval(-600)
+        func human(_ id: String, _ text: String, _ order: Int, at seconds: TimeInterval) -> TimelineItem {
+            TimelineItem(id: id, role: .human, sender: .user(snapshot: .init(name: "You")), content: .message(text),
+                         metadata: .init(timestamp: start.addingTimeInterval(seconds), sourceOrder: order))
+        }
+        func reply(_ id: String, _ text: String, _ order: Int, at seconds: TimeInterval) -> TimelineItem {
+            TimelineItem(id: id, role: .assistant, sender: agent, content: .message(text),
+                         metadata: .init(timestamp: start.addingTimeInterval(seconds), sourceOrder: order))
+        }
+        func tool(_ id: String, _ turn: String, _ name: String, _ arguments: [String: Any], _ order: Int,
+                  result: Any? = nil, ms: Int? = nil, running: Bool = false) -> ChatActivityEvent {
+            func json(_ value: Any) -> String {
+                let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys, .withoutEscapingSlashes])
+                return data.map { String(decoding: $0, as: UTF8.self) } ?? ""
+            }
+            return ChatActivityEvent(eventID: id, sessionID: sessionID, turnID: turn, kind: .tool,
+                                     lifecycle: running ? .running : .succeeded, title: name, summary: nil,
+                                     detail: nil, occurredAt: order, durationMilliseconds: ms,
+                                     toolCallID: "call-\(id)", toolName: name, arguments: json(arguments),
+                                     result: result.map(json), sourceOrder: order)
+        }
+        func command(_ output: String) -> [String: Any] { ["output": output, "exit_code": 0, "error": NSNull()] }
+        let items = [
+            human("folders-q1", "Can you get the weather app building and check its tests?", 10, at: 0),
+            reply("folders-note-1", "Found the setup guide. Next I'm cloning the repo and running the tests.", 40,
+                  at: 31),
+            reply("folders-note-2", "Tests pass. Next I'm writing up what I found.", 90, at: 118),
+            reply("folders-answer", "The weather app builds and all 42 tests pass. Setup needs Node 22; "
+                  + "I put the steps and two flaky-test notes in **SUMMARY.md**.", 110, at: 134),
+            human("folders-q2", "Thanks! Am I free Thursday afternoon, and are the open GitHub issues triaged?", 120,
+                  at: 300),
+            reply("folders-note-3", "You're free after 3 PM on Thursday. Now checking the GitHub issues.", 140,
+                  at: 318),
+        ]
+        let activity = [
+            tool("folders-t1", "folders-turn-1", "web_search", ["query": "weather app setup node"], 20,
+                 result: ["success": true, "data": ["web": [
+                    ["title": "Weather App setup guide", "url": "https://docs.example.com/weather-app/setup",
+                     "description": "Install Node 22, then npm install and npm test."],
+                    ["title": "Weather App README", "url": "https://github.com/example/weather-app"],
+                 ]]], ms: 1_800),
+            tool("folders-t2", "folders-turn-1", "web_extract",
+                 ["urls": ["https://docs.example.com/weather-app/setup"]], 30,
+                 result: ["content": "Setup\n1. Install Node 22.\n2. npm install\n3. npm test"], ms: 2_400),
+            tool("folders-t3", "folders-turn-1", "terminal",
+                 ["command": "git clone https://github.com/example/weather-app.git", "timeout": 120], 50,
+                 result: command("Cloning into 'weather-app'...\nremote: Enumerating objects: 214, done.\n"
+                                 + "Receiving objects: 100% (214/214), done."), ms: 4_100),
+            tool("folders-t4", "folders-turn-1", "terminal", ["command": "cd weather-app && npm install"], 60,
+                 result: command("added 318 packages in 21s\n\n42 packages are looking for funding"), ms: 22_000),
+            tool("folders-t5", "folders-turn-1", "terminal", ["command": "cd weather-app && npm test"], 70,
+                 result: command("> weather-app@1.4.0 test\n> vitest run\n\n ✓ forecast.test.ts (18)\n"
+                                 + " ✓ units.test.ts (12)\n ✓ cache.test.ts (12)\n\n Test Files  3 passed (3)\n"
+                                 + "      Tests  42 passed (42)\n   Duration  3.84s"), ms: 6_300),
+            tool("folders-t6", "folders-turn-1", "read_file", ["path": "weather-app/notes.md"], 80,
+                 result: ["content": "# Notes\n- cache.test.ts is flaky on slow networks\n- units default to metric",
+                          "total_lines": 3], ms: 300),
+            tool("folders-t7", "folders-turn-1", "write_file",
+                 ["path": "weather-app/SUMMARY.md", "content": "# Summary\nBuilds on Node 22. 42 tests pass."], 100,
+                 result: ["success": true, "bytes_written": 58], ms: 200),
+            tool("folders-t8", "folders-turn-2", "mcp_google_calendar_list_events",
+                 ["calendar": "primary", "date": "2026-10-08"], 130,
+                 result: ["events": [
+                    ["title": "Design review", "start": "10:00", "end": "11:00"],
+                    ["title": "Dentist", "start": "13:30", "end": "14:30"],
+                 ]], ms: 900),
+            tool("folders-t9", "folders-turn-2", "terminal",
+                 ["command": "gh issue list --repo example/weather-app --state open --limit 20"], 150,
+                 result: command("#88  Forecast shows yesterday after midnight  bug, triaged\n"
+                                 + "#91  Add wind gusts  enhancement\n#93  Crash with empty city name  bug"),
+                 ms: 1_700),
+            tool("folders-t10", "folders-turn-2", "terminal",
+                 ["command": "gh issue view 91 --repo example/weather-app --json labels"], 160, running: true),
+        ]
+        return SessionRecord(id: sessionID, kind: .direct, agentIDs: ["finance"], title: "Weather app",
+                             items: items, activityEvents: activity,
+                             activityVisibility: .init(showReasoning: true, showToolCalls: true),
+                             isActive: true, hasAcceptedMessage: true)
+    }
+
     static var thinkingStylePreview: SessionRecord {
         let sessionID = "demo-finance"
         let agent = TimelineSender.agent(id: "finance", snapshot: .init(name: "Avery Park"))

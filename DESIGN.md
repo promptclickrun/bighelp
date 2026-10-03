@@ -174,7 +174,11 @@ name, its role and its latest chat, newest first. One big round New chat sits bo
 where a thumb rests. A tap opens that agent's own chat with Back; if it's on another host, the app switches hosts
 first while the list stays up. ☰'s recent chats, All chats and Scheduled tasks then list every host's, each with
 its host's name. Screens that belong to one host (Settings, Agents, Projects, Kanban, Provider usage, the credential
-vault, the folder, New group) ask which host first. The tab bar hides, ☰ › All agents is home, and the button in the list's top bar
+vault, the folder, New group) ask which host first; Settings' pop-up also leads with **Fleet settings**, one page
+for every host: Update Hermes (each host's commits behind), Update bighelp Plugin (each host's version → the new
+one) and Restart Hermes Gateway, all at once with each host's live status and its own Restart when it needs one.
+Each host runs the same flows as its own System page (`HostOperationsStore`, `HostPluginUpdateModel`); hosts that
+are offline or signed out say so and are skipped (`Bighelp/Fleet/FleetMaintenance.swift`). The tab bar hides, ☰ › All agents is home, and the button in the list's top bar
 turns it off. Other hosts are read at most once a minute over their own saved sign-ins (`Bighelp/Fleet`); one
 that can't be reached says so and keeps showing what it had last time. While it's on and the app is open, every
 host stays connected, so a switch opens the agent's chat at once from the copy saved on the phone while that

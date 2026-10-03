@@ -239,6 +239,7 @@ final class AVAudioEngineVoiceInputLevelSource: VoiceInputLevelSource {
     private var transcript = VoiceTranscriptAccumulator()
     var endsAfterSilence = true
     nonisolated(unsafe) private var interruptionObserver: NSObjectProtocol?
+    nonisolated(unsafe) private var configurationObserver: NSObjectProtocol?
     nonisolated private let audioBufferGate = VoiceAudioBufferGate()
     private lazy var endOfSpeechDetector = VoiceEndOfSpeechDetector { [weak self] in
         self?.finishTurn()
@@ -315,6 +316,7 @@ final class AVAudioEngineVoiceInputLevelSource: VoiceInputLevelSource {
             audioEngine.prepare()
             try audioEngine.start()
             installInterruptionObserver()
+            installConfigurationObserver()
         } catch let error as VoiceInputLevelError {
             stop()
             throw error
@@ -495,6 +497,7 @@ final class AVAudioEngineVoiceInputLevelSource: VoiceInputLevelSource {
     nonisolated private func teardownResources() {
         audioBufferGate.close()?.discard()
         removeInterruptionObserver()
+        removeConfigurationObserver()
         recognitionRequest?.endAudio()
         recognitionTask?.cancel()
         recognitionTask = nil
@@ -550,6 +553,58 @@ final class AVAudioEngineVoiceInputLevelSource: VoiceInputLevelSource {
                 self.stop()
                 callback?(.interrupted, observerGeneration)
             }
+        }
+    }
+
+    /// A car or headset taking over the microphone changes the route under a turn:
+    /// iOS stops the engine and the input may arrive in another format. Without
+    /// picking it up again no more sound came in, so the turn never heard quiet,
+    /// had no words for Send, and stayed listening.
+    private func installConfigurationObserver() {
+        guard configurationObserver == nil else { return }
+        configurationObserver = NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange,
+            object: audioEngine,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.reattachInput() }
+        }
+    }
+
+    /// Listens again on the new input, keeping the words heard so far.
+    func reattachInput() {
+        guard tapInstalled, !isFinishingRecognition, !hasDeliveredFinal else { return }
+        let generation = activeGeneration
+        let inputNode = audioEngine.inputNode
+        inputNode.removeTap(onBus: 0)
+        tapInstalled = false
+        let format = inputNode.inputFormat(forBus: 0)
+        guard format.channelCount > 0, format.sampleRate > 0 else {
+            let callback = onUnavailable
+            stop()
+            callback?(.noInputAvailable, generation)
+            return
+        }
+        // A recognition request takes one format; start a fresh one, keeping the words.
+        if recognitionRequest != nil { restartRecognition(generation: generation) }
+        guard activeGeneration == generation, !isFinishingRecognition else { return }
+        inputNode.installTap(onBus: 0, bufferSize: 1_024, format: format,
+                             block: Self.makeTapCallback(generation: generation, source: self))
+        tapInstalled = true
+        audioEngine.prepare()
+        do {
+            try audioEngine.start()
+        } catch {
+            let callback = onUnavailable
+            stop()
+            callback?(.engineFailed, generation)
+        }
+    }
+
+    nonisolated private func removeConfigurationObserver() {
+        if let configurationObserver {
+            NotificationCenter.default.removeObserver(configurationObserver)
+            self.configurationObserver = nil
         }
     }
 

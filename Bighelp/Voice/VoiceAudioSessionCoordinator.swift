@@ -17,6 +17,12 @@ protocol VoiceAudioSessionControlling: AnyObject, Sendable {
 }
 
 final class SystemVoiceAudioSession: VoiceAudioSessionControlling, @unchecked Sendable {
+    /// A voice chat pauses other audio (music resumes when it ends, through
+    /// `notifyOthersOnDeactivation`) instead of playing it underneath: with the
+    /// microphone on, a car or headset switches to its phone-call channel, and
+    /// music mixed into that sounds like an old radio.
+    static let conversationOptions: AVAudioSession.CategoryOptions = [.defaultToSpeaker, .allowBluetooth]
+
     private let session: AVAudioSession
 
     init(session: AVAudioSession = .sharedInstance()) {
@@ -33,7 +39,7 @@ final class SystemVoiceAudioSession: VoiceAudioSessionControlling, @unchecked Se
             // the speaker, replies were close to inaudible. Video-chat mode is
             // the speakerphone tuning: the same voice-tuned microphone, with
             // replies at speaker volume.
-            try session.setCategory(.playAndRecord, mode: .videoChat, options: [.duckOthers, .defaultToSpeaker])
+            try session.setCategory(.playAndRecord, mode: .videoChat, options: Self.conversationOptions)
         }
     }
 

@@ -44,6 +44,11 @@ final class VoiceEndOfSpeechDetector {
     var silenceLimit: Duration?
     private var hasSpeech = false
     private var accumulatedSilence: Duration = .zero
+    /// Live words so far, and how long they've stayed the same. Road noise can keep
+    /// the microphone from ever sounding quiet; words that stopped still end the turn.
+    private var lastText: String?
+    private var sinceWordsChanged: Duration = .zero
+    private let wordsStoppedGrace: Duration = .seconds(2.5)
     private var talkingTime: Duration = .zero
     private var voiceTime: Duration = .zero
     private var lastWord: String?
@@ -86,11 +91,24 @@ final class VoiceEndOfSpeechDetector {
         hasSpeech = true
         accumulatedSilence = .zero
         lastWord = Self.trailingWord(text)
+        if text != lastText {
+            lastText = text
+            sinceWordsChanged = .zero
+        }
     }
 
     func receiveLevel(_ level: Float, duration: Duration) {
         guard duration > .zero else { return }
         if level >= activityThreshold {
+            // Sound but no new words (only while noisy; real quiet is handled below).
+            if lastText != nil, hasSpeech {
+                sinceWordsChanged += duration
+                if sinceWordsChanged >= requiredSilence + wordsStoppedGrace {
+                    reset()
+                    onEndOfSpeech()
+                    return
+                }
+            }
             accumulatedSilence = .zero
             if countsVoiceAsSpeech {
                 voiceTime += duration
@@ -108,6 +126,8 @@ final class VoiceEndOfSpeechDetector {
 
     func reset() {
         hasSpeech = false
+        lastText = nil
+        sinceWordsChanged = .zero
         accumulatedSilence = .zero
         talkingTime = .zero
         voiceTime = .zero
@@ -196,7 +216,8 @@ final class VoiceTurnRecorder: @unchecked Sendable {
 
     private let url: URL
     private var file: AVAudioFile?
-    private let converter: AVAudioConverter
+    /// Replaced when the input's format changes mid-turn (a car or headset taking over).
+    private var converter: AVAudioConverter
     private let outputFormat: AVAudioFormat
     private(set) var recordedSeconds: Double = 0
 
@@ -219,6 +240,10 @@ final class VoiceTurnRecorder: @unchecked Sendable {
     /// Adds one tap buffer. False once the turn is as long as Hermes accepts.
     func append(_ buffer: AVAudioPCMBuffer) -> Bool {
         guard let file, buffer.frameLength > 0, buffer.format.sampleRate > 0 else { return file != nil }
+        if buffer.format != converter.inputFormat {
+            guard let replacement = AVAudioConverter(from: buffer.format, to: outputFormat) else { return true }
+            converter = replacement
+        }
         let ratio = outputFormat.sampleRate / buffer.format.sampleRate
         let capacity = AVAudioFrameCount((Double(buffer.frameLength) * ratio).rounded(.up)) + 32
         guard let converted = AVAudioPCMBuffer(pcmFormat: outputFormat, frameCapacity: capacity) else { return true }

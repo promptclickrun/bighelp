@@ -34,8 +34,11 @@ struct VoiceTurnCaptureTests {
     @Test func aLongMessageGetsLongerPauses() {
         var ended = 0
         let detector = detector { ended += 1 }
-        detector.receiveTranscript(.init(text: "So here's what I'm thinking about the trip", isFinal: false))
-        talk(detector, seconds: 30)
+        // Words keep coming while someone talks.
+        for second in 0..<30 {
+            detector.receiveTranscript(.init(text: "So here's what I'm thinking about the trip, part \(second)", isFinal: false))
+            talk(detector, seconds: 1)
+        }
         #expect(detector.requiredSilence > .seconds(2.8))
         quiet(detector, seconds: 2.5)
         #expect(ended == 0, "Thirty seconds in, a two-and-a-half second pause is still mid-thought")
@@ -69,9 +72,10 @@ struct VoiceTurnCaptureTests {
 
     @Test func thePauseNeverGrowsPastItsLimit() {
         let detector = detector {}
-        detector.receiveTranscript(.init(text: "and the", isFinal: false))
-        talk(detector, seconds: 120)
-        detector.receiveTranscript(.init(text: "and the", isFinal: false))
+        for second in 0..<120 {
+            detector.receiveTranscript(.init(text: "point \(second) and the", isFinal: false))
+            talk(detector, seconds: 1)
+        }
         #expect(seconds(detector.requiredSilence) == 4.5)
     }
 
@@ -169,5 +173,61 @@ struct VoiceTurnCaptureTests {
         let input = try #require(AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 2))
         let recorder = try VoiceTurnRecorder(inputFormat: input)
         #expect(recorder.finish() == nil)
+    }
+
+    // MARK: In the car
+
+    /// Road noise can keep the microphone from ever going quiet. Once the words stop
+    /// changing for a while, the turn ends anyway.
+    @Test func aNoisyCarStillEndsTheTurnWhenTheWordsStop() {
+        var ended = 0
+        let detector = detector { ended += 1 }
+        detector.receiveTranscript(.init(text: "Remind me to call the dentist", isFinal: false))
+        talk(detector, seconds: 1)
+        detector.receiveTranscript(.init(text: "Remind me to call the dentist tomorrow.", isFinal: false))
+        talk(detector, seconds: 2)
+        #expect(ended == 0, "Still within a pause")
+        talk(detector, seconds: 3)
+        #expect(ended == 1, "Noise all along, but the words stopped")
+    }
+
+    @Test func wordsStillComingKeepTheTurnOpenInNoise() {
+        var ended = 0
+        let detector = detector { ended += 1 }
+        for index in 0..<8 {
+            detector.receiveTranscript(.init(text: "Plan a trip " + String(repeating: "and more ", count: index), isFinal: false))
+            talk(detector, seconds: 1)
+        }
+        #expect(ended == 0)
+    }
+
+    /// The car's microphone arrives with its own format part way into a turn; the recording
+    /// for Hermes keeps every part instead of dropping what came after the switch.
+    @Test func aRecordingKeepsSoundAfterTheFormatChanges() throws {
+        let phone = try #require(AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1))
+        let car = try #require(AVAudioFormat(standardFormatWithSampleRate: 16_000, channels: 1))
+        let recorder = try VoiceTurnRecorder(inputFormat: phone)
+        defer { recorder.discard() }
+        func second(_ format: AVAudioFormat) throws -> AVAudioPCMBuffer {
+            let buffer = try #require(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(format.sampleRate)))
+            buffer.frameLength = buffer.frameCapacity
+            for index in 0..<Int(buffer.frameLength) { buffer.floatChannelData![0][index] = sin(Float(index) * 0.05) * 0.3 }
+            return buffer
+        }
+        _ = recorder.append(try second(phone))
+        let afterPhone = recorder.recordedSeconds
+        _ = recorder.append(try second(car))
+        #expect(afterPhone > 0.9)
+        #expect(recorder.recordedSeconds > afterPhone + 0.9, "The car's sound is recorded too")
+    }
+
+    /// A voice chat stops music rather than playing under it: in the car, music mixed with
+    /// the microphone goes through the car's phone-call channel and sounds like an old radio.
+    @Test func aVoiceChatPausesOtherAudioAndLetsItResume() {
+        let options = SystemVoiceAudioSession.conversationOptions
+        #expect(!options.contains(.duckOthers) && !options.contains(.mixWithOthers)
+                && !options.contains(.interruptSpokenAudioAndMixWithOthers))
+        #expect(options.contains(.defaultToSpeaker), "Still loud on the phone's speaker")
+        #expect(options.contains(.allowBluetooth), "Car and headset microphones work")
     }
 }

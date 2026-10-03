@@ -669,6 +669,15 @@ struct ChatDestinationView: View {
             guard appState.pendingComposerText != nil, model.transcriptEntries.isEmpty, model.draft.isEmpty,
                   let text = appState.consumeComposerText() else { return }
             model.draft = text
+            guard appState.consumeComposerSend() else { return }
+            // A new chat connects a moment after it opens; send once it can, and leave the
+            // text in the message box if it never does.
+            for _ in 0..<60 where !model.canSend {
+                try? await Task.sleep(for: .milliseconds(250))
+                if Task.isCancelled { return }
+            }
+            guard model.canSend, model.draft == text else { return }
+            await model.send()
         }
         .task(id: appState.pendingVoiceConversationID) {
             guard appState.consumeVoiceRequest(for: model.conversationID) else { return }

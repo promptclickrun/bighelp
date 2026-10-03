@@ -33,35 +33,61 @@ final class BoardSwipeBlueprintsUITests: BighelpUITestCase {
         }
     }
 
+    /// A blueprint opens a fill-in page: blanks to fill, then Send to agent starts a new chat
+    /// that sends it, or Edit in message box leaves it there unsent.
     @MainActor
-    func testBlueprintsOnEveryBoardFillTheMessageBox() throws {
+    func testBlueprintsAskForTheBlanksThenSendOrEdit() throws {
         for appearance in ["light", "dark"] {
             let app = launch(appearance: appearance)
-            for (tab, first) in [("tab.feed", "feed-productivity-1"), ("tab.ideas", "ideas-productivity-1"),
-                                 ("tab.goals", "goals-productivity-1")] {
+            for (tab, pick, action) in [("tab.feed", "feed-marketing-1", "send"),
+                                        ("tab.ideas", "ideas-productivity-1", "edit"),
+                                        ("tab.goals", "goals-productivity-1", "send")] {
                 openRootTab(tab, in: app)
                 let entry = app.buttons["board.blueprints"].firstMatch
                 XCTAssertTrue(entry.waitForExistence(timeout: 10), "Blueprints on \(tab)")
                 entry.tap()
                 let sheet = app.descendants(matching: .any)["board.blueprints.sheet"]
                 XCTAssertTrue(sheet.waitForExistence(timeout: 5))
-                XCTAssertTrue(app.staticTexts["Research"].exists || app.buttons["board.blueprint.\(first)"].exists)
                 save("board-blueprints-\(tab)-\(appearance)", app)
                 guard appearance == "light" else {
                     app.buttons["board.blueprints.done"].tap()
                     XCTAssertTrue(sheet.waitForNonExistence(timeout: 5))
                     continue
                 }
-                let blueprint = app.buttons["board.blueprint.\(first)"]
+                let blueprint = app.buttons["board.blueprint.\(pick)"]
+                for _ in 0..<6 where !blueprint.isHittable { sheet.swipeUp() }
                 XCTAssertTrue(blueprint.waitForExistence(timeout: 5))
                 blueprint.tap()
+                let send = app.buttons["board.blueprint.fill.send"]
+                XCTAssertTrue(send.waitForExistence(timeout: 5), "A blueprint opens its fill-in page")
+                if pick == "feed-marketing-1" {
+                    XCTAssertFalse(send.isEnabled, "Send waits until the blank is filled in")
+                    let blank = app.textFields["board.blueprint.fill.blank.0"]
+                    XCTAssertTrue(blank.waitForExistence(timeout: 5))
+                    blank.tap()
+                    blank.typeText("Acme")
+                    XCTAssertTrue(send.isEnabled)
+                }
+                save("board-blueprint-fill-\(tab)", app)
                 let editor = app.textViews["chat.composer.text"]
-                XCTAssertTrue(editor.waitForExistence(timeout: 10), "A blueprint opens a chat")
-                let placed = NSPredicate(format: "value BEGINSWITH %@", firstWords[first] ?? "")
-                XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: placed, object: editor)],
-                                              timeout: 8), .completed, "…with the prompt ready to edit, not sent")
-                XCTAssertFalse(app.descendants(matching: .any)["chat.message.inline-selection"].exists,
-                               "Nothing is sent until the person taps Send")
+                if action == "send" {
+                    send.tap()
+                    let sent = app.descendants(matching: .any)["chat.message.inline-selection"].firstMatch
+                    XCTAssertTrue(sent.waitForExistence(timeout: 20), "Send to agent sends it in a new chat")
+                    if let words = sentWords[pick] {
+                        let shown = NSPredicate(format: "value CONTAINS %@", words)
+                        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: shown, object: sent)],
+                                                      timeout: 8), .completed, "…with the blanks filled in")
+                    }
+                } else {
+                    app.buttons["board.blueprint.fill.edit"].tap()
+                    XCTAssertTrue(editor.waitForExistence(timeout: 10), "Edit opens a chat")
+                    let placed = NSPredicate(format: "value BEGINSWITH %@", "Every 12 hours, look at our recent chats")
+                    XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: placed, object: editor)],
+                                                  timeout: 8), .completed, "…with the prompt ready to edit")
+                    XCTAssertFalse(app.descendants(matching: .any)["chat.message.inline-selection"].exists,
+                                   "Nothing is sent until the person taps Send")
+                }
             }
             app.terminate()
         }
@@ -93,10 +119,9 @@ final class BoardSwipeBlueprintsUITests: BighelpUITestCase {
         }
     }
 
-    private let firstWords = [
-        "feed-productivity-1": "Every weekday at 7am, post a morning brief",
-        "ideas-productivity-1": "Every 12 hours, look at our recent chats",
-        "goals-productivity-1": "Make a goal to keep my inbox under 20 unread",
+    private let sentWords = [
+        "feed-marketing-1": "post what Acme shipped",
+        "goals-productivity-1": "Add a goal to my Goals under Productivity",
     ]
 
     /// Boards are Lists: rows below the fold exist only once scrolled to. Short drags, so a row

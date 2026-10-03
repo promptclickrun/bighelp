@@ -174,6 +174,13 @@ extension RootShellView {
         startNewChat(explicitAgentID: homeAgent?.id)
     }
 
+    /// A filled-in blueprint: a new chat that sends it straight away.
+    func sendToAgent(_ text: String) {
+        appState.pendingComposerText = text
+        appState.pendingComposerSends = true
+        startNewChat(explicitAgentID: homeAgent?.id)
+    }
+
     func switchHomeAgent(to agent: AgentProfile) {
         if fleetModeOn {
             // Stay in the all-hosts view: the agent's chat replaces this one,
@@ -292,6 +299,7 @@ extension RootShellView {
             onProfile: { profileAgentID = agent.id },
             onSwitchAgent: { isAgentSwitcherPresented = true },
             onAsk: askAgent,
+            onSend: sendToAgent,
             onMenu: { isHomeDrawerPresented.toggle() },
             onNewChat: { startHomeChat(with: agent.id) },
             onPickAgents: { presentNewChatPicker(seed: agent.id) },

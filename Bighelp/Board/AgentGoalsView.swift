@@ -6,6 +6,7 @@ struct AgentGoalsView: View {
     let context: AgentBoardContext
     @State private var showsDone = false
     @State private var showsBlueprints = false
+    @State private var fillingBlueprint: BoardBlueprint?
 
     var body: some View {
         let store = context.store
@@ -38,6 +39,7 @@ struct AgentGoalsView: View {
             }
         }
         .boardBlueprints(isPresented: $showsBlueprints, kind: .goal, context: context)
+        .blueprintFill($fillingBlueprint, context: context)
     }
 
     private func sectionTitle(_ title: String) -> some View {
@@ -135,7 +137,7 @@ struct AgentGoalsView: View {
                 Menu {
                     Section("Start from a blueprint") {
                         ForEach(blueprints) { blueprint in
-                            Button(blueprint.text) { context.onAsk(blueprint.text) }
+                            Button(blueprint.text) { fillingBlueprint = blueprint }
                         }
                     }
                 } label: {

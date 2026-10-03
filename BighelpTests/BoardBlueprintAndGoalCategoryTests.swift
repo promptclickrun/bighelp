@@ -74,6 +74,45 @@ struct BoardBlueprintAndGoalCategoryTests {
         #expect(catalog.blueprints(for: .relationships).isEmpty)
     }
 
+    /// Each prompt says where the agent should put what it makes, so a Feed blueprint never
+    /// ends up as a chat reply and a goal lands in its own category.
+    @Test func everyBlueprintNamesWhereTheItemGoes() throws {
+        let catalog = try BoardBlueprintCatalog.bundled()
+        for blueprint in catalog.groups(for: .feed).flatMap(\.blueprints) {
+            #expect(blueprint.text.contains("to my Feed"), "\(blueprint.id)")
+        }
+        for blueprint in catalog.groups(for: .idea).flatMap(\.blueprints) {
+            #expect(blueprint.text.contains("to my Ideas"), "\(blueprint.id)")
+        }
+        for blueprint in catalog.groups(for: .goal).flatMap(\.blueprints) {
+            let category = try #require(blueprint.goalCategory)
+            let place = category == .other ? "to my Goals" : "to my Goals under \(category.groupTitle)"
+            #expect(blueprint.text.contains(place), "\(blueprint.id)")
+        }
+    }
+
+    /// Tapping a blueprint asks for each [blank] like an ad-lib before it's sent.
+    @Test func blueprintBlanksBecomeFieldsAndFillTheSentence() {
+        let adLib = BlueprintAdLib("Every Sunday, post five [videos / posts] about [my niche] to my Feed, under $[50] each, [20] of them.")
+        #expect(adLib.blanks.map(\.hint) == ["videos / posts", "my niche", "50", "20"])
+        #expect(adLib.blanks[0].isChoice && adLib.blanks[0].options == ["videos", "posts"])
+        #expect(adLib.blanks[2].isNumber && adLib.blanks[3].isNumber && !adLib.blanks[1].isNumber)
+        // Choices start on the first option and numbers on their example; text starts empty.
+        #expect(adLib.initialValues == [0: "videos", 1: "", 2: "50", 3: "20"])
+        #expect(!adLib.isComplete(adLib.initialValues), "Send waits for the typed blank")
+        var values = adLib.initialValues
+        values[1] = "  home baking \n"
+        values[0] = "posts"
+        #expect(adLib.isComplete(values))
+        #expect(adLib.filled(values)
+                == "Every Sunday, post five posts about home baking to my Feed, under $50 each, 20 of them.")
+        values[1] = ""
+        #expect(adLib.filled(values).contains("[my niche]"), "An empty blank keeps its brackets")
+        let plain = BlueprintAdLib("Post a recap to my Feed.")
+        #expect(plain.blanks.isEmpty && plain.isComplete([:]) && plain.filled([:]) == "Post a recap to my Feed.")
+        #expect(BlueprintAdLib.value(String(repeating: "x", count: 500))?.count == 200, "Each answer is bounded")
+    }
+
     @Test func blueprintsDecodeLeniently() throws {
         let json = """
         {"source": "x", "pages": [

@@ -13,6 +13,8 @@ struct AgentBoardContext {
     let onSwitchAgent: () -> Void
     /// Opens a chat with this agent with the text ready to send.
     let onAsk: (String) -> Void
+    /// Opens a new chat with this agent and sends the text.
+    let onSend: (String) -> Void
     /// The Chat tab's header controls, so every board has ☰, New chat and ⋯ too.
     let onMenu: () -> Void
     let onNewChat: () -> Void

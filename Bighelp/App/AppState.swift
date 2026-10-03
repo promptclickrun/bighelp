@@ -16,6 +16,8 @@ final class AppState {
     private(set) var pendingVoiceConversationID: String?
     /// Text a board "Ask" or "Discuss" leaves in the next new chat's composer.
     var pendingComposerText: String?
+    /// A blueprint's Send to agent: the next new chat sends `pendingComposerText` once it can.
+    var pendingComposerSends = false
     /// A chat picked from the full chat list keeps Back to that list. The Chat
     /// tab's own chat (auto-opened, ☰ › New chat, the switcher, an agent tapped
     /// on Agents) gets ☰ and the
@@ -88,6 +90,7 @@ final class AppState {
         activeConversationID = nil
         pendingVoiceConversationID = nil
         pendingComposerText = nil
+        pendingComposerSends = false
         chatOpenedFromList = false
     }
 
@@ -97,12 +100,18 @@ final class AppState {
         activeConversationID = nil
         pendingVoiceConversationID = nil
         pendingComposerText = nil
+        pendingComposerSends = false
         chatOpenedFromList = false
     }
 
     func consumeComposerText() -> String? {
         defer { pendingComposerText = nil }
         return pendingComposerText
+    }
+
+    func consumeComposerSend() -> Bool {
+        defer { pendingComposerSends = false }
+        return pendingComposerSends
     }
 
     @discardableResult

@@ -122,6 +122,12 @@ final class DirectHermesWorkspaceStore {
     }
 
     /// Called only when the user opens Direct or explicitly reconnects it.
+    /// Checks the connection still answers; a silent one is replaced at once.
+    func verifyConnection() async {
+        guard isConnected, let client else { return }
+        await client.verifyLiveness()
+    }
+
     func reconnect() async {
         guard !isConnecting, !isConnected else { return }
         let previous = retireConnection()
@@ -155,7 +161,10 @@ final class DirectHermesWorkspaceStore {
                 status = "The saved connection could not be reloaded. Reopen Direct before trying again."
                 return
             }
-            status = DirectHermesConversationClient.safeMessage(error)
+            status = DirectHermesConnectionHint.message(
+                for: DirectHermesHTTP.safeError(error), host: saved?.endpoint.baseURL.host() ?? "",
+                vpnActive: NetworkPathSignature.latest?.vpnActive ?? true)
+                ?? DirectHermesConversationClient.safeMessage(error)
         }
     }
 
@@ -870,5 +879,26 @@ extension EnvironmentValues {
     var directHermesWorkspace: DirectHermesWorkspaceStore? {
         get { self[DirectHermesWorkspaceKey.self] }
         set { self[DirectHermesWorkspaceKey.self] = newValue }
+    }
+}
+
+/// A clearer reason when a computer can't be reached for a reason the person can fix here.
+enum DirectHermesConnectionHint {
+    static func message(for error: DirectHermesError, host: String, vpnActive: Bool) -> String? {
+        switch error {
+        case .connectionFailed, .timedOut: break
+        default: return nil
+        }
+        guard !vpnActive, isTailscale(host) else { return nil }
+        return "Can't reach this computer over Tailscale. Turn on Tailscale on this device, then try again."
+    }
+
+    /// MagicDNS names and Tailscale's 100.64.0.0/10 addresses.
+    static func isTailscale(_ host: String) -> Bool {
+        let host = host.lowercased()
+        if host.hasSuffix(".ts.net") { return true }
+        let parts = host.split(separator: ".").compactMap { UInt8($0) }
+        guard parts.count == 4 else { return false }
+        return parts[0] == 100 && (64...127).contains(parts[1])
     }
 }

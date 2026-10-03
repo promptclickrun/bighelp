@@ -822,21 +822,48 @@ final class DirectHermesClient: DirectHermesRPC, DirectHermesAuthenticatedHTTP,
         // An already dispatched action may still complete; never resend it here.
     }
 
+    /// Every connection is kept awake, whether or not Hermes asked for a heartbeat: proxies
+    /// (Cloudflare closes a connection after 100 quiet seconds), phone networks and Tailscale
+    /// relays drop idle ones without telling either side. A ping that goes unanswered means the
+    /// connection is gone, so it's replaced now rather than when a message times out.
     private func startHeartbeat(epoch: UUID) {
         heartbeatTask?.cancel()
-        guard readyEvent?.payload["heartbeat"]?.boolean == true else { return }
+        let interval = DirectHermesKeepalive.interval(
+            heartbeatAdvertised: readyEvent?.payload["heartbeat"]?.boolean == true)
         heartbeatTask = Task { @MainActor [weak self] in
             while !Task.isCancelled {
-                do { try await Task.sleep(nanoseconds: 15_000_000_000) }
+                do { try await Task.sleep(for: interval) }
                 catch { return }
                 guard let self, self.generation == epoch, self.isConnected else { return }
-                do { _ = try await self.request("gateway.ping", params: [:], timeoutNanoseconds: 15_000_000_000) }
-                catch {
+                do {
+                    _ = try await self.request("gateway.ping", params: [:],
+                                               timeoutNanoseconds: DirectHermesKeepalive.pingTimeoutNanoseconds)
+                } catch {
                     guard self.generation == epoch else { return }
-                    self.closeConnection(DirectHermesHTTP.safeError(error), notify: true)
-                    return
+                    switch DirectHermesKeepalive.outcome(of: error) {
+                    case .alive: continue
+                    case .unsupported: return // It answered; this Hermes just has no ping.
+                    case .dead:
+                        self.closeConnection(DirectHermesHTTP.safeError(error), notify: true)
+                        return
+                    }
                 }
             }
+        }
+    }
+
+    /// A quick check that the connection still answers, after the network changed or the app
+    /// came back. A silent one is replaced right away (the usual automatic reconnect), so the
+    /// next message doesn't wait out a full timeout on a connection that's already gone.
+    func verifyLiveness() async {
+        guard isConnected, !terminallyClosed, automaticRecoveryTask == nil else { return }
+        let epoch = generation
+        do {
+            _ = try await request("gateway.ping", params: [:],
+                                  timeoutNanoseconds: DirectHermesKeepalive.livenessTimeoutNanoseconds)
+        } catch {
+            guard generation == epoch, isConnected, DirectHermesKeepalive.outcome(of: error) == .dead else { return }
+            closeConnection(DirectHermesHTTP.safeError(error), notify: true)
         }
     }
 
@@ -915,5 +942,28 @@ final class DirectHermesClient: DirectHermesRPC, DirectHermesAuthenticatedHTTP,
         } else if notify, hadConnection {
             onDisconnect?(reason)
         }
+    }
+}
+
+/// How a host connection is kept awake and checked.
+enum DirectHermesKeepalive {
+    enum Outcome: Equatable { case alive, unsupported, dead }
+
+    /// Hermes' own heartbeat pace when it asks; a little slower otherwise. Both stay well
+    /// under the idle limits of proxies and phone networks.
+    static func interval(heartbeatAdvertised: Bool) -> Duration {
+        heartbeatAdvertised ? .seconds(15) : .seconds(20)
+    }
+
+    static let pingTimeoutNanoseconds: UInt64 = 15_000_000_000
+    /// A quick check: a live connection answers a ping in well under a second.
+    static let livenessTimeout: Duration = .seconds(4)
+    static var livenessTimeoutNanoseconds: UInt64 { UInt64(livenessTimeout / .milliseconds(1)) * 1_000_000 }
+
+    /// Any answer, even "no such method", proves the connection works.
+    static func outcome(of error: (any Error)?) -> Outcome {
+        guard let error else { return .alive }
+        if case DirectHermesError.rpcRejected = error { return .unsupported }
+        return .dead
     }
 }

@@ -42,6 +42,7 @@ final class WorkspaceConnectionKeeper {
     @ObservationIgnored private var storeProvider: () -> DirectHermesWorkspaceStore? = { nil }
     @ObservationIgnored private var isActive = true
     @ObservationIgnored private var isPathSatisfied = true
+    @ObservationIgnored private var lastPath: NetworkPathSignature?
     @ObservationIgnored private var attempt = 0
     @ObservationIgnored private var loop: Task<Void, Never>?
     @ObservationIgnored private var tracking = 0
@@ -54,8 +55,8 @@ final class WorkspaceConnectionKeeper {
         holdForTesting(ProcessInfo.processInfo.arguments)
         #endif
         monitor.pathUpdateHandler = { [weak self] path in
-            let satisfied = path.status == .satisfied
-            Task { @MainActor [weak self] in self?.pathChanged(satisfied: satisfied) }
+            let signature = NetworkPathSignature(path)
+            Task { @MainActor [weak self] in self?.pathChanged(signature) }
         }
         monitor.start(queue: DispatchQueue(label: "app.loopdy.network-path"))
     }
@@ -79,6 +80,14 @@ final class WorkspaceConnectionKeeper {
         isActive = active
         attempt = 0
         evaluate()
+        // Back in the app within the grace period, the connection is still marked open but
+        // may have died while away; check it before anything is sent on it.
+        if active { verifyConnection() }
+    }
+
+    private func verifyConnection() {
+        guard !isHeldForTesting, let store = storeProvider(), store.isConnected else { return }
+        Task { @MainActor in await store.verifyConnection() }
     }
 
     /// Try now and restart the backoff (opening a saved chat while disconnected).
@@ -89,8 +98,14 @@ final class WorkspaceConnectionKeeper {
         evaluate(tryNow: true)
     }
 
-    private func pathChanged(satisfied: Bool) {
+    private func pathChanged(_ path: NetworkPathSignature) {
         guard !isHeldForTesting else { return }
+        let satisfied = path.satisfied
+        // Wi-Fi to cellular, or a VPN like Tailscale coming up, keeps "online" true but
+        // leaves the old connection dead: check it now.
+        if NetworkPathSignature.needsLivenessCheck(from: lastPath, to: path) { verifyConnection() }
+        lastPath = path
+        NetworkPathSignature.latest = path
         let recovered = satisfied && !isPathSatisfied
         isPathSatisfied = satisfied
         if hasNetwork != satisfied { hasNetwork = satisfied }
@@ -173,4 +188,40 @@ final class WorkspaceConnectionKeeper {
         hasNetwork = hold.network
     }
     #endif
+}
+
+/// What the phone's network looks like, to tell when it changed under a connection.
+struct NetworkPathSignature: Equatable, Sendable {
+    let satisfied: Bool
+    let interfaces: Set<String>
+
+    /// The latest reading, for messages about why a computer can't be reached.
+    @MainActor static var latest: NetworkPathSignature?
+    /// A VPN such as Tailscale shows up as an "other" interface.
+    var vpnActive: Bool { interfaces.contains("other") }
+
+    init(satisfied: Bool, interfaces: Set<String>) {
+        self.satisfied = satisfied
+        self.interfaces = interfaces
+    }
+
+    init(_ path: NWPath) {
+        satisfied = path.status == .satisfied
+        interfaces = Set(path.availableInterfaces.map { interface -> String in
+            switch interface.type {
+            case .wifi: "wifi"
+            case .cellular: "cellular"
+            case .wiredEthernet: "wired"
+            case .loopback: "loopback"
+            case .other: "other"
+            @unknown default: "other"
+            }
+        })
+    }
+
+    /// Online, and either just back online or on different interfaces than before.
+    static func needsLivenessCheck(from old: NetworkPathSignature?, to new: NetworkPathSignature) -> Bool {
+        guard let old, new.satisfied else { return false }
+        return !old.satisfied || old.interfaces != new.interfaces
+    }
 }

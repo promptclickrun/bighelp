@@ -147,7 +147,6 @@ final class CompactChatComposerUITests: BighelpUITestCase {
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
         editor.tap()
         editor.typeText("Keep this session draft.")
-        XCTAssertTrue(app.buttons["chat.session-context"].waitForExistence(timeout: 5))
         XCUIDevice.shared.orientation = .landscapeLeft
         let rotated = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
             app.frame.width > app.frame.height && editor.frame.height > 0

@@ -800,14 +800,12 @@ final class BighelpLaunchTests: BighelpUITestCase {
         }, evaluatedWith: app)
         waitForExpectations(timeout: 10)
         app.activate()
-        let context = app.buttons["chat.session-context"]
-        let canvas = app.descendants(matching: .any)["chat.canvas"].firstMatch
-        XCTAssertTrue(context.waitForExistence(timeout: 5))
-        let rail = app.descendants(matching: .any)["chat.session-status-rail"].firstMatch
-        XCTAssertTrue(rail.exists)
-        XCTAssertEqual(rail.frame.midX, canvas.frame.midX, accuracy: 1,
-                       "The rail's controls must stay centered together")
-        XCTAssertTrue(context.isHittable)
+        // The context window lives in the ⋯ menu, not a rail above the message box.
+        XCTAssertFalse(app.buttons["chat.session-context"].exists)
+        XCTAssertTrue(openContextWindow(in: app).exists)
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(options.waitForExistence(timeout: 5))
         let mode = landscape ? "landscape" : accessibility ? "accessibility" : "portrait"
         saveV2Evidence(app, name: "v3-ipad-centered-rail-\(mode)")
         options.tap()
@@ -881,8 +879,8 @@ final class BighelpLaunchTests: BighelpUITestCase {
         }
         app.launch()
         let picker = app.buttons["chat.session-controls"]
-        let context = app.buttons["chat.session-context"]
-        XCTAssertTrue(context.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["chat.options"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["chat.session-context"].exists, "The context window lives in the ⋯ menu")
         XCUIDevice.shared.orientation = landscape ? .landscapeLeft : .portrait
         let orientationMatches = NSPredicate { _, _ in
             landscape ? app.frame.width > app.frame.height : app.frame.height > app.frame.width
@@ -908,22 +906,12 @@ final class BighelpLaunchTests: BighelpUITestCase {
             }
             XCTAssertFalse(app.buttons["chat.people"].exists)
             if hasContext {
-                XCTAssertTrue(context.isHittable)
-                let primary = app.buttons["chat.voice"]
-                XCTAssertTrue(app.otherElements["chat.session-status-rail"].firstMatch.frame.contains(context.frame))
-                XCTAssertLessThan(context.frame.maxY, primary.frame.minY)
-                XCTAssertEqual(app.buttons.matching(identifier: "chat.session-context").count, 1)
-                XCTAssertEqual(context.frame.width, 44, accuracy: 0.5)
-                XCTAssertEqual(context.frame.height, 44, accuracy: 0.5)
                 XCTAssertGreaterThanOrEqual(picker.frame.minX, app.frame.minX + 16)
-                XCTAssertLessThanOrEqual(context.frame.maxX, canvas.frame.maxX - 16)
-            } else {
-                XCTAssertTrue(context.waitForNonExistence(timeout: 3))
             }
             saveV2Evidence(app, name: "v3-header-center-\(hasContext ? "context" : "new-chat")-\(accessibility ? "accessibility" : "normal")-\(landscape ? "landscape" : "portrait")")
             if hasContext {
                 if !landscape {
-                    context.tap()
+                    XCTAssertTrue(openContextWindow(in: app).exists)
                     XCTAssertTrue(app.staticTexts["Context window"].waitForExistence(timeout: 3))
                     // Isolate each popover so dismissal does not select a model row.
                     app.terminate()

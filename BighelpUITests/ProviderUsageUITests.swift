@@ -1,11 +1,12 @@
 import XCTest
 
-/// Provider Usage on demo data: every way in (chat ⋯, the context window,
-/// ☰ › Go to), closing it, and hiding a provider in Settings.
+/// Provider Usage on demo data: the ways in (chat ⋯, ☰), closing it, and
+/// hiding a provider in Settings. The context window's way in is in
+/// ChatContextWindowUITests.
 /// BIGHELP_USAGE_EVIDENCE (TEST_RUNNER_…) saves screenshots.
 final class ProviderUsageUITests: BighelpUITestCase {
     @MainActor
-    func testOpensFromChatMenuContextWindowAndMainMenu() throws {
+    func testOpensFromChatMenuAndMainMenu() throws {
         let app = launchChat(appearance: "light")
         app.buttons["chat.options"].tap()
         tap(app.buttons["chat.provider-usage"])
@@ -16,15 +17,7 @@ final class ProviderUsageUITests: BighelpUITestCase {
         app.buttons["provider-usage.close"].tap()
         XCTAssertTrue(overlay.waitForNonExistence(timeout: 3), "X closes it")
 
-        let ring = app.buttons["chat.session-context"]
-        if ring.waitForExistence(timeout: 3) {
-            ring.tap()
-            tap(app.buttons["chat.session-context.provider-usage"])
-            _ = expectOverlay(app)
-            save("usage-2-from-context-window", app)
-            app.buttons["provider-usage.close"].tap()
-            XCTAssertTrue(overlay.waitForNonExistence(timeout: 3))
-        }
+        // ⋯ › Context window › usage is covered by ChatContextWindowUITests.
 
         openMainMenu(app)
         let menuRow = app.buttons["menu.usage"]

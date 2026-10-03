@@ -207,7 +207,8 @@ plugin and notifications, with its address and access folded away and Remove at 
 
 Nerd Mode (`settings.nerdModeEnabled`, also the `nerdModeEnabled` environment value) also gates technical detail
 inside everyday screens: the chat ⋯ Advanced submenu, the chat Info sheet's visibility toggles and host details,
-Project Changes, the token-context ring and subagent rail, Skills/Workspace/Session rows in the + sheet, Agent
+Project Changes, the context window (⋯ › Context window, between Model & reasoning and provider usage; nothing sits
+above the message box for it) and the subagent rail, Skills/Workspace/Session rows in the + sheet, Agent
 Studio's Advanced page and templates, the task editor/detail Advanced groups, and the extra sections on
 Settings › Chat. Everyday controls must never live only behind it.
 

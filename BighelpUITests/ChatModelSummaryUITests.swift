@@ -26,10 +26,8 @@ final class ChatModelSummaryUITests: BighelpUITestCase {
     @MainActor
     func testContextPopUpShowsTheModelFirst() {
         let app = launch(appearance: "dark")
-        let ring = app.buttons["chat.session-context"]
-        XCTAssertTrue(ring.waitForExistence(timeout: 10))
-        ring.tap()
-        let popover = app.descendants(matching: .any)["chat.session-context.popover"].firstMatch
+        XCTAssertTrue(app.buttons["chat.options"].firstMatch.waitForExistence(timeout: 10))
+        let popover = openContextWindow(in: app)
         XCTAssertTrue(popover.waitForExistence(timeout: 5))
         let summary = app.buttons["chat.model-summary"]
         XCTAssertTrue(summary.waitForExistence(timeout: 5), "The context pop-up leads with the model")

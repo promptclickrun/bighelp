@@ -233,7 +233,7 @@ final class SimplifiedShellUITests: BighelpUITestCase {
         editor.tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 3))
         XCTAssertTrue(app.buttons["chat.session-controls"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.buttons["chat.session-context"].exists)
+        XCTAssertFalse(app.buttons["chat.session-context"].exists, "The context window lives in the ⋯ menu")
         XCTAssertTrue(app.otherElements["chat.composer-shell"].buttons["chat.session-controls"].exists)
         editor.typeText("Add lunch")
         let draftArrived = XCTNSPredicateExpectation(
@@ -252,31 +252,11 @@ final class SimplifiedShellUITests: BighelpUITestCase {
         app.buttons["model-picker.dismiss"].tap()
         XCTAssertTrue(modelPicker.waitForNonExistence(timeout: 3))
         editor.tap()
-        let keyboard = app.keyboards.firstMatch
         XCTAssertTrue((editor.value as? String)?.contains("Add lunch") == true)
-        let contextButton = app.buttons["chat.session-context"]
-        let composer = app.otherElements["chat.composer-shell"]
-        let contextReady = XCTNSPredicateExpectation(
-            predicate: NSPredicate { _, _ in
-                guard contextButton.exists, contextButton.isHittable, composer.exists,
-                      composer.frame.insetBy(dx: -1, dy: -1).contains(contextButton.frame) else { return false }
-                let softwareKeyboardVisible = keyboard.exists && keyboard.isHittable
-                    && keyboard.frame.intersects(app.frame)
-                return !softwareKeyboardVisible || contextButton.frame.maxY <= keyboard.frame.minY
-            }, object: nil
-        )
-        XCTAssertEqual(XCTWaiter.wait(for: [contextReady], timeout: 3), .completed)
-        XCTAssertGreaterThanOrEqual(contextButton.frame.width, 44)
-        XCTAssertGreaterThanOrEqual(contextButton.frame.height, 44)
-        let contextGeometry = XCTAttachment(string: "Composer: \(composer.frame)\nContext: \(contextButton.exists ? String(describing: contextButton.frame) : "absent")\nContext hittable: \(contextButton.exists && contextButton.isHittable)\nKeyboard: \(keyboard.exists ? String(describing: keyboard.frame) : "absent")\nKeyboard hittable: \(keyboard.exists && keyboard.isHittable)")
-        contextGeometry.name = "chat-context-input-geometry"
-        contextGeometry.lifetime = .keepAlways
-        add(contextGeometry)
-        capture("chat-context-anchor-ready", in: app)
-        contextButton.tap()
-        XCTAssertTrue(app.staticTexts["Context used"].waitForExistence(timeout: 3))
+        // The context window opens from the chat's ⋯ menu and keeps the draft.
+        let context = openContextWindow(in: app)
+        XCTAssertTrue(app.staticTexts["Context window"].waitForExistence(timeout: 3))
         capture("chat-context-sheet", in: app)
-        let context = app.descendants(matching: .any)["chat.session-context.popover"].firstMatch
         XCTAssertTrue(context.exists)
         let outside = app.otherElements["PopoverDismissRegion"].firstMatch
         if outside.exists && outside.isHittable {
@@ -306,7 +286,7 @@ final class SimplifiedShellUITests: BighelpUITestCase {
         editor.tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 3))
         let composer = app.otherElements["chat.composer-shell"]
-        for identifier in ["chat.attachment", "chat.session-controls", "chat.session-context", "chat.voice"] {
+        for identifier in ["chat.attachment", "chat.session-controls", "chat.voice"] {
             let button = app.buttons[identifier]
             XCTAssertTrue(button.exists, identifier)
             XCTAssertTrue(button.isHittable, identifier)

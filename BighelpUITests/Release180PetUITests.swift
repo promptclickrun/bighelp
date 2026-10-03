@@ -118,14 +118,15 @@ final class Release180PetUITests: BighelpUITestCase {
     }
 
     @MainActor
-    func testRestingPetIsImmediatelyLeftOfContextRing() {
+    func testRestingPetSitsOnTheMessageBox() {
         let app = launch(chat: true)
         let pet = app.descendants(matching: .any)["companion-chat"].firstMatch
-        let ring = app.buttons["chat.session-context"]
+        let field = app.descendants(matching: .any)["chat.composer-shell"].firstMatch
         XCTAssertTrue(pet.waitForExistence(timeout: 6))
-        XCTAssertTrue(ring.waitForExistence(timeout: 6))
-        XCTAssertLessThanOrEqual(pet.frame.maxX, ring.frame.minX + 2)
-        XCTAssertLessThan(abs(pet.frame.maxY - ring.frame.maxY), 30)
+        XCTAssertTrue(field.waitForExistence(timeout: 6))
+        // With no context ring above the message box, the pet rests on the message row's top.
+        XCTAssertLessThan(abs(pet.frame.maxY - field.frame.minY), 30)
+        XCTAssertLessThanOrEqual(pet.frame.maxX, field.frame.maxX + 2)
         XCTAssertTrue(app.buttons["chat.attachment"].isHittable)
     }
 

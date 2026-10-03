@@ -23,10 +23,9 @@ final class ChatBuild2UITests: BighelpUITestCase {
             XCTAssertGreaterThanOrEqual(menu.frame.width, 44)
             XCTAssertGreaterThanOrEqual(menu.frame.height, 44)
         }
-        let ring = app.buttons["chat.session-context"]
-        XCTAssertTrue(ring.waitForExistence(timeout: 3))
-        XCTAssertTrue(app.descendants(matching: .any)["chat.session-status-rail"].firstMatch.frame
-            .contains(ring.frame))
+        // The context window left the rail above the message box for the ⋯ menu.
+        XCTAssertFalse(app.buttons["chat.session-context"].exists)
+        XCTAssertTrue(chatMenuItem("chat.context-window", in: app).waitForExistence(timeout: 3))
         let capture = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         capture.name = "unified-glass-header-and-context"
         capture.lifetime = .keepAlways
@@ -50,16 +49,12 @@ final class ChatBuild2UITests: BighelpUITestCase {
     }
 
     @MainActor
-    func testContextUsageLivesInsideComposerAndOpensDetails() throws {
+    func testContextWindowOpensFromTheChatMenu() throws {
         let app = launch()
         let input = app.textViews["chat.composer.text"]
         XCTAssertTrue(input.waitForExistence(timeout: 5))
-        let context = app.buttons["chat.session-context"]
-        XCTAssertTrue(context.waitForExistence(timeout: 3))
-        let rail = app.descendants(matching: .any)["chat.session-status-rail"].firstMatch
-        XCTAssertTrue(rail.frame.contains(context.frame))
-        XCTAssertEqual(app.buttons.matching(identifier: "chat.session-context").count, 1)
-        context.tap()
+        XCTAssertFalse(app.buttons["chat.session-context"].exists, "No context button above the message box")
+        XCTAssertTrue(openContextWindow(in: app).exists)
         XCTAssertTrue(app.staticTexts["Context window"].waitForExistence(timeout: 3))
         for metric in [
             "Latest input", "Latest output", "Latest cached", "Latest request total",

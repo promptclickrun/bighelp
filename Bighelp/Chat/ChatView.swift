@@ -9,6 +9,20 @@ struct ChatSessionControlAccessory {
     let action: () -> Void
 }
 
+/// The ⋯ menu's model group, top to bottom: which model, how full its
+/// context window is, and the plans behind it. A missing part drops its item.
+enum ChatOptionsModelMenuItem: Hashable {
+    case modelAndReasoning
+    case contextWindow
+    case providerUsage
+
+    static func items(hasModelControls: Bool, showsContextWindow: Bool, showsProviderUsage: Bool) -> [Self] {
+        [hasModelControls ? .modelAndReasoning : nil,
+         showsContextWindow ? .contextWindow : nil,
+         showsProviderUsage ? .providerUsage : nil].compactMap { $0 }
+    }
+}
+
 struct ChatHeaderLiveActivityPresentation: Equatable {
     let text: String
     let lineLimit = 1
@@ -154,10 +168,13 @@ struct ChatView: View {
     @State private var isChatVisible = false
 
     @State private var isSessionControlsPresented = false
+    @State private var isContextWindowPresented = false
+    /// Change in the context pop-up: open Model & reasoning once the pop-up is gone.
+    @State private var opensModelControlsAfterContext = false
     #if targetEnvironment(macCatalyst)
     /// The Mac's Model & reasoning pop-up hangs from what opened it: the ⋯
     /// button, or the message box for requests from elsewhere (the context
-    /// ring, chat Info, the agent's profile).
+    /// window, chat Info, the agent's profile).
     private enum SessionControlsOrigin { case options, composer }
     @State private var sessionControlsOrigin = SessionControlsOrigin.options
     @State private var sessionControlsPath: [ChatSessionControlsPage] = []
@@ -1031,6 +1048,7 @@ struct ChatView: View {
                 .frame(minWidth: BighelpTokens.hitTarget, minHeight: BighelpTokens.hitTarget)
             .contentShape(.rect)
         }
+        .background { contextWindowAnchor }
         #if targetEnvironment(macCatalyst)
         // Drawn like the round buttons beside it, not as a Mac pull-down button.
         .menuStyle(.button)
@@ -1040,14 +1058,29 @@ struct ChatView: View {
         #endif
         .accessibilityLabel("Conversation options")
         .accessibilityHint(nerdModeEnabled
-            ? "Go to, file changes, model, usage, this chat, the agent and advanced options"
+            ? "Go to, file changes, model, context window, usage, this chat, the agent and advanced options"
             : "Model, usage, this chat and the agent")
         .accessibilityIdentifier("chat.options")
     }
 
     /// The model shows under its item, so switching starts from knowing which is on.
-    @ViewBuilder
     private var modelMenuItems: some View {
+        let items = ChatOptionsModelMenuItem.items(
+            hasModelControls: sessionControlAccessory != nil || model.runtimeControls != nil,
+            showsContextWindow: contextWindowSnapshot != nil,
+            showsProviderUsage: providerUsage?.isAvailable == true
+        )
+        return ForEach(items, id: \.self) { item in
+            switch item {
+            case .modelAndReasoning: modelAndReasoningMenuItem
+            case .contextWindow: contextWindowMenuItem
+            case .providerUsage: providerUsageMenuItem
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var modelAndReasoningMenuItem: some View {
         if let accessory = sessionControlAccessory {
             Button(action: accessory.action) {
                 Text("Model & reasoning")
@@ -1068,11 +1101,85 @@ struct ChatView: View {
                 || model.isAwaitingAuthoritativeSessionAllocation)
             .accessibilityIdentifier("chat.session-controls")
         }
+    }
+
+    @ViewBuilder
+    private var contextWindowMenuItem: some View {
+        if let context = contextWindowSnapshot {
+            Button(action: openContextWindow) {
+                Text("Context window")
+                Text("\(SessionContextRingPresentation.remainingLabel(usedPercent: context.contextPercent)) left")
+                Image(systemName: "gauge.with.dots.needle.33percent")
+            }
+            .accessibilityIdentifier("chat.context-window")
+        }
+    }
+
+    @ViewBuilder
+    private var providerUsageMenuItem: some View {
         if let providerUsage, providerUsage.isAvailable {
             Button("See provider usage", systemImage: "gauge.with.dots.needle.50percent") {
                 providerUsage.show(agentID: model.memberIDs.first ?? "default")
             }
             .accessibilityIdentifier("chat.provider-usage")
+        }
+    }
+
+    /// Token context is a technical readout: Nerd Mode only, as the ring was.
+    private var contextWindowSnapshot: SessionContextSnapshot? {
+        nerdModeEnabled ? model.sessionContext : nil
+    }
+
+    /// The pop-up hangs from the ⋯ button. The menu has already closed when its
+    /// item runs, so nothing else is presenting.
+    private func openContextWindow() {
+        guard contextWindowSnapshot != nil else { return }
+        dismissKeyboard()
+        isContextWindowPresented = true
+    }
+
+    /// The ⋯ button's anchor for the context pop-up (the same glass pop-up the
+    /// ring above the message box used to open).
+    private var contextWindowAnchor: some View {
+        Color.clear
+            .allowsHitTesting(false)
+            .popover(isPresented: $isContextWindowPresented, arrowEdge: .top) { contextWindowPopover }
+            .accessibilityHidden(true)
+    }
+
+    @ViewBuilder
+    private var contextWindowPopover: some View {
+        if let context = model.sessionContext {
+            let showsUsage = providerUsage?.isAvailable == true
+            SessionContextTokenPopover(
+                snapshot: context,
+                onShowProviderUsage: showsUsage ? { showProviderUsageFromContext() } : nil,
+                runtimeControls: model.runtimeControls,
+                onChangeModel: changeModelFromContext
+            )
+            .presentationCompactAdaptation(.popover)
+            .onDisappear(perform: contextWindowDidClose)
+        }
+    }
+
+    private func changeModelFromContext() {
+        opensModelControlsAfterContext = true
+        isContextWindowPresented = false
+    }
+
+    /// Change in the pop-up opens Model & reasoning once the pop-up is gone.
+    private func contextWindowDidClose() {
+        guard opensModelControlsAfterContext else { return }
+        opensModelControlsAfterContext = false
+        model.requestSessionControls()
+    }
+
+    /// Closes the pop-up first; it and the usage overlay can't show together.
+    private func showProviderUsageFromContext() {
+        isContextWindowPresented = false
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(350))
+            providerUsage?.show(agentID: model.memberIDs.first ?? "default")
         }
     }
 

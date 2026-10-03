@@ -15,14 +15,6 @@ struct SessionStatusRailView: View {
     let tasks: ChatTaskDrawerState?
     let onSelect: (SessionStatusRailKind) -> Void
     let onFittingVerticalDrag: (ChatRailScrollDirection) -> Void
-    var context: SessionContextSnapshot? = nil
-    var isContextPresented: Binding<Bool> = .constant(false)
-    var onContextSelect: (() -> Void)? = nil
-    var onShowProviderUsage: (() -> Void)? = nil
-    var runtimeControls: SessionRuntimeControlModel? = nil
-    var onChangeModel: (() -> Void)? = nil
-    /// Runs once the context pop-up has finished closing.
-    var onContextDismissed: (() -> Void)? = nil
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -40,7 +32,7 @@ struct SessionStatusRailView: View {
             tasks: tasks
         )
         return Group {
-            if !items.isEmpty || context != nil { adaptiveRail(items) }
+            if !items.isEmpty { adaptiveRail(items) }
         }
         .companionComposerAnchor(.railViewport)
     }
@@ -48,12 +40,9 @@ struct SessionStatusRailView: View {
     @ViewBuilder
     private func adaptiveRail(_ items: [SessionStatusRailItem]) -> some View {
         Group {
-            if items.isEmpty {
-                contextControl
-            } else if dynamicTypeSize.isAccessibilitySize {
+            if dynamicTypeSize.isAccessibilitySize {
                 VStack(spacing: 0) {
                     ForEach(items) { compactStatusButton($0) }
-                    contextControl
                 }
             } else if dynamicTypeSize >= .xxxLarge {
                 wrappedRail(items)
@@ -65,7 +54,6 @@ struct SessionStatusRailView: View {
                             compactStatusButton($0)
                                 .fixedSize(horizontal: true, vertical: true)
                         }
-                        contextControl
                     }
                     .fixedSize(horizontal: true, vertical: false)
                     wrappedRail(items)
@@ -74,7 +62,7 @@ struct SessionStatusRailView: View {
         }
         .padding(BighelpTokens.space4)
         // A one-row pill grows into a rounded surface when labels need to wrap.
-        // There is exactly one background, including on iPad and context-only chats.
+        // There is exactly one background, including on iPad.
         .bighelpNavigationGlass(in: RoundedRectangle(cornerRadius: 26))
         .simultaneousGesture(fittingVerticalDragGesture)
         .accessibilityElement(children: .contain)
@@ -87,29 +75,10 @@ struct SessionStatusRailView: View {
     private func wrappedRail(_ items: [SessionStatusRailItem]) -> some View {
         LazyVGrid(
             columns: Array(repeating: GridItem(.flexible(), spacing: BighelpTokens.space4),
-                           count: min(2, max(1, items.count + (context == nil ? 0 : 1)))),
+                           count: min(2, max(1, items.count))),
             spacing: BighelpTokens.space4
         ) {
             ForEach(items) { compactStatusButton($0) }
-            contextControl
-        }
-    }
-
-    @ViewBuilder
-    private var contextControl: some View {
-        if let context {
-            SessionContextRing(snapshot: context) { onContextSelect?() }
-                .popover(
-                    isPresented: isContextPresented,
-                    attachmentAnchor: .rect(.bounds),
-                    arrowEdge: .bottom
-                ) {
-                    SessionContextTokenPopover(snapshot: context, onShowProviderUsage: onShowProviderUsage,
-                                               runtimeControls: runtimeControls, onChangeModel: onChangeModel)
-                        .presentationCompactAdaptation(.popover)
-                        .onDisappear { onContextDismissed?() }
-                }
-                .companionComposerAnchor(.contextRing)
         }
     }
 
@@ -155,7 +124,6 @@ struct SessionStatusRailView: View {
             ForEach(items) { item in
                 fullStatusButton(item)
             }
-            contextControl
         }
         .padding(.horizontal, BighelpTokens.space4)
         .fixedSize(horizontal: true, vertical: false)

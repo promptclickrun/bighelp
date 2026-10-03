@@ -95,6 +95,17 @@ class BighelpUITestCase: XCTestCase {
         return item
     }
 
+    /// ⋯ › Context window (Nerd Mode, a chat with context). Returns the pop-up.
+    @MainActor
+    @discardableResult
+    func openContextWindow(in app: XCUIApplication, timeout: TimeInterval = 8) -> XCUIElement {
+        let item = chatMenuItem("chat.context-window", in: app, timeout: timeout)
+        if item.exists { item.tap() }
+        let popover = app.descendants(matching: .any)["chat.session-context.popover"].firstMatch
+        _ = popover.waitForExistence(timeout: timeout)
+        return popover
+    }
+
     @MainActor
     func openRootTab(_ identifier: String, in app: XCUIApplication, timeout: TimeInterval = 20,
                      file: StaticString = #filePath, line: UInt = #line) {

@@ -149,13 +149,12 @@ final class ChatSixFixesUITests: BighelpUITestCase {
     }
 
     @MainActor
-    func testStatusRailIsOneCompactRowClearOfContextRing() throws {
-        let app = launch()
-        let context = app.buttons["chat.session-context"]
-        XCTAssertTrue(context.waitForExistence(timeout: 5))
+    func testStatusRailIsOneCompactRowWithoutTheContextWindow() throws {
+        let app = launch(["-use-overflow-status-rail-fixture", "-test-v3-session-status"])
         let rail = app.descendants(matching: .any)["chat.session-status-rail"].firstMatch
-        XCTAssertTrue(rail.frame.contains(context.frame))
-        XCTAssertLessThanOrEqual(context.frame.height, 44.5)
+        XCTAssertTrue(rail.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["chat.session-context"].exists, "The context window lives in the ⋯ menu")
+        XCTAssertLessThanOrEqual(app.buttons["chat.session-status.goal"].frame.height, 44.5)
         XCTAssertLessThanOrEqual(rail.frame.maxY,
                                  app.descendants(matching: .any)["chat.composer-shell"].firstMatch.frame.minY)
         XCTAssertGreaterThanOrEqual(rail.frame.minX, app.frame.minX)
@@ -166,9 +165,8 @@ final class ChatSixFixesUITests: BighelpUITestCase {
     func testPhoneShowsAllThreeActivitiesWithoutHorizontalHunting() throws {
         guard UIDevice.current.userInterfaceIdiom == .phone else { throw XCTSkip("Compact phone layout") }
         let app = launch(["-use-overflow-status-rail-fixture", "-test-v3-session-status"])
-        let ring = app.buttons["chat.session-context"]
         XCTAssertTrue(chatNewChatButton(in: app).waitForExistence(timeout: 5))
-        XCTAssertTrue(ring.exists)
+        XCTAssertFalse(app.buttons["chat.session-context"].exists)
         let buttons = ["goal", "subagents", "tasks"].map {
             app.buttons["chat.session-status.\($0)"]
         }
@@ -197,15 +195,13 @@ final class ChatSixFixesUITests: BighelpUITestCase {
         guard UIDevice.current.userInterfaceIdiom == .phone else { throw XCTSkip("Compact phone layout") }
         let app = launch(["-use-overflow-status-rail-fixture", "-test-v3-session-status",
                           "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
-        let ring = app.buttons["chat.session-context"]
         XCTAssertTrue(chatNewChatButton(in: app).waitForExistence(timeout: 5))
-        XCTAssertTrue(ring.exists)
+        XCTAssertFalse(app.buttons["chat.session-context"].exists)
         let buttons = ["goal", "subagents", "tasks"].map {
             app.buttons["chat.session-status.\($0)"]
         }
         let composer = app.descendants(matching: .any)["chat.composer-shell"].firstMatch
         let rail = app.descendants(matching: .any)["chat.session-status-rail"].firstMatch
-        XCTAssertTrue(rail.frame.insetBy(dx: -1, dy: -1).contains(ring.frame))
         for (button, title) in zip(buttons, ["Goal", "Agents", "Tasks"]) {
             XCTAssertTrue(button.isHittable)
             XCTAssertGreaterThanOrEqual(button.frame.minX, app.frame.minX + 12)
@@ -255,9 +251,7 @@ final class ChatSixFixesUITests: BighelpUITestCase {
         let rail = app.descendants(matching: .any)["chat.session-status-rail"].firstMatch
         XCTAssertTrue(rail.waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["chat.session-status.changes"].exists, "File changes live in the ⋯ menu")
-        let ring = app.buttons["chat.session-context"]
-        XCTAssertTrue(ring.exists)
-        XCTAssertTrue(rail.frame.contains(ring.frame))
+        XCTAssertFalse(app.buttons["chat.session-context"].exists, "The context window lives in the ⋯ menu")
         for kind in ["goal", "subagents", "tasks"] {
             let button = app.buttons["chat.session-status.\(kind)"]
             XCTAssertTrue(button.exists)
@@ -275,10 +269,7 @@ final class ChatSixFixesUITests: BighelpUITestCase {
             done.tap()
             XCTAssertTrue(done.waitForNonExistence(timeout: 3))
         }
-        XCTAssertTrue(ring.isHittable)
-        ring.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["chat.session-context.popover"].firstMatch
-            .waitForExistence(timeout: 3))
+        XCTAssertTrue(openContextWindow(in: app).exists, "The context window opens from ⋯")
     }
 
     @MainActor

@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import UIKit
 
 // MARK: - What the agent is doing
 
@@ -104,6 +105,54 @@ struct AgentBoardItem: Identifiable, Equatable, Sendable {
         let url: URL
         let title: String
     }
+    /// A file the agent attached to a Feed post (plugin `native-agent-board-files-v1`). The host
+    /// keeps the path; the app knows the file by its place in the post.
+    struct File: Identifiable, Equatable, Sendable {
+        static let maximumCount = 10
+
+        let index: Int
+        let fileName: String
+        let mimeType: String
+        let byteCount: Int
+        /// When the agent attached it; attaching the same path again is a new version.
+        var addedAt: Date?
+
+        var id: Int { index }
+        var isImage: Bool { mimeType.hasPrefix("image/") }
+
+        var systemImage: String {
+            let ext = URL(fileURLWithPath: fileName).pathExtension.lowercased()
+            if isImage { return "photo" }
+            if mimeType.hasPrefix("video/") { return "film" }
+            if mimeType.hasPrefix("audio/") { return "waveform" }
+            if mimeType == "application/pdf" { return "doc.richtext" }
+            if ["xls", "xlsx", "csv", "tsv", "numbers", "ods"].contains(ext) { return "tablecells" }
+            if ["zip", "gz", "tar"].contains(ext) { return "doc.zipper" }
+            return "doc.text"
+        }
+
+        var sizeText: String { ByteCountFormatter.string(fromByteCount: Int64(byteCount), countStyle: .file) }
+
+        init(index: Int, fileName: String, mimeType: String, byteCount: Int, addedAt: Date? = nil) {
+            self.index = index; self.fileName = fileName; self.mimeType = mimeType
+            self.byteCount = byteCount; self.addedAt = addedAt
+        }
+
+        /// Lenient: hosts differ, so a file this build can't show safely is left out, not the post.
+        init?(json value: BighelpJSONValue) {
+            guard let object = value.object, let index = object["index"]?.integer, (0..<Self.maximumCount).contains(index),
+                  let name = object["fileName"]?.string, (1...180).contains(name.count),
+                  name == name.trimmingCharacters(in: .whitespacesAndNewlines),
+                  name == URL(fileURLWithPath: name).lastPathComponent, !name.hasPrefix("."),
+                  !name.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains),
+                  let mime = object["mimeType"]?.string?.lowercased(), (3...120).contains(mime.count),
+                  mime.contains("/"), mime.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || "!#$&^_.+-/".contains($0)) }),
+                  let size = object["byteCount"]?.integer, (1...ChatAttachment.maximumAgentBytes).contains(size)
+            else { return nil }
+            let added = object["addedAt"]?.integer.flatMap { $0 > 0 ? Date(timeIntervalSince1970: TimeInterval($0)) : nil }
+            self.init(index: index, fileName: name, mimeType: mime, byteCount: size, addedAt: added)
+        }
+    }
 
     let id: String
     let kind: Kind
@@ -115,6 +164,7 @@ struct AgentBoardItem: Identifiable, Equatable, Sendable {
     var note: String
     var links: [Link]
     var pictures: [Picture]
+    var files: [File]
     var source: String
     /// Thumbs up or down. It tells the agent what's worth posting.
     var rating: Rating
@@ -140,11 +190,11 @@ struct AgentBoardItem: Identifiable, Equatable, Sendable {
 
     init(id: String, kind: Kind, title: String, body: String = "", icon: String = "", section: String = "",
          status: String = "", note: String = "", links: [Link] = [], pictures: [Picture] = [],
-         source: String = "", rating: Rating = .none, reason: String = "", read: Bool = true,
+         files: [File] = [], source: String = "", rating: Rating = .none, reason: String = "", read: Bool = true,
          dismissed: Bool = false, category: String = "", createdAt: Date = .now, updatedAt: Date? = nil) {
         self.id = id; self.kind = kind; self.title = title; self.body = body; self.icon = icon
         self.section = section; self.status = status; self.note = note; self.links = links
-        self.pictures = pictures; self.source = source; self.rating = rating; self.reason = reason
+        self.pictures = pictures; self.files = files; self.source = source; self.rating = rating; self.reason = reason
         self.read = read; self.dismissed = dismissed; self.category = category
         self.createdAt = createdAt; self.updatedAt = updatedAt ?? createdAt
     }
@@ -165,13 +215,18 @@ struct AgentBoardItem: Identifiable, Equatable, Sendable {
             if let index = image.object?["index"]?.integer, (0..<6).contains(index) { return .stored(index: index) }
             return nil
         }
+        var files: [File] = []
+        for file in (object["files"]?.array ?? []).compactMap(File.init(json:))
+        where files.count < File.maximumCount && !files.contains(where: { $0.index == file.index }) {
+            files.append(file)
+        }
         func date(_ key: String) -> Date {
             Date(timeIntervalSince1970: TimeInterval(object[key]?.integer ?? 0))
         }
         self.init(id: id, kind: kind, title: title, body: object["body"]?.string ?? "",
                   icon: object["icon"]?.string ?? "", section: object["section"]?.string ?? "",
                   status: object["status"]?.string ?? "", note: object["note"]?.string ?? "",
-                  links: links, pictures: pictures, source: object["source"]?.string ?? "",
+                  links: links, pictures: pictures, files: files, source: object["source"]?.string ?? "",
                   // Plugins before 2.19.0 only know a heart, and have no read state.
                   rating: object["rating"]?.string.flatMap(Rating.init(rawValue:))
                       ?? (object["liked"]?.boolean == true ? .up : .none),
@@ -401,10 +456,19 @@ protocol AgentBoardClient: AnyObject {
     func activity(agentID: String) async throws -> [AgentActivityEntry]
     func approvals(agentID: String) async throws -> [AgentApprovalEntry]
     func identity(agentID: String) async throws -> AgentIdentityDocuments
+    /// Feed posts carry files (`native-agent-board-files-v1`).
+    var supportsFiles: Bool { get }
+    /// One of a post's files, through the attachment routes and this phone's attachment cache.
+    func file(agentID: String, itemID: String, file: AgentBoardItem.File) async throws -> ChatAttachment
 }
 
 extension AgentBoardClient {
     var supportsGoalCategories: Bool { false }
+    var supportsFiles: Bool { false }
+
+    func file(agentID: String, itemID: String, file: AgentBoardItem.File) async throws -> ChatAttachment {
+        throw WorkspaceClientError.unavailable(.unsupportedOperation)
+    }
 }
 
 /// The bighelp plugin's `native-agent-board-v1` routes.
@@ -414,13 +478,25 @@ final class DirectHermesAgentBoardClient: AgentBoardClient {
     private let owner: WorkspaceOwner
     let supportsFeedback: Bool
     let supportsGoalCategories: Bool
+    /// Chat's attachment client: the same chunked download, checks and cache. Only
+    /// given when the plugin serves posts' files.
+    private let files: DirectHermesGeneratedMediaClient?
 
     init(workspace: any WorkspaceOperationPerforming, owner: WorkspaceOwner, supportsFeedback: Bool,
-         supportsGoalCategories: Bool = false) {
+         supportsGoalCategories: Bool = false, files: DirectHermesGeneratedMediaClient? = nil) {
         self.workspace = workspace
         self.owner = owner
         self.supportsFeedback = supportsFeedback
         self.supportsGoalCategories = supportsGoalCategories
+        self.files = files
+    }
+
+    var supportsFiles: Bool { files != nil }
+
+    func file(agentID: String, itemID: String, file: AgentBoardItem.File) async throws -> ChatAttachment {
+        guard let files else { throw WorkspaceClientError.unavailable(.unsupportedOperation) }
+        guard workspace.owner == owner else { throw WorkspaceClientError.ownerChanged }
+        return try await files.boardFile(agentID: agentID, itemID: itemID, file: file)
     }
 
     private func perform(_ operation: WorkspaceOperation, _ payload: [String: BighelpJSONValue]) async throws
@@ -545,8 +621,20 @@ final class AgentBoardStore {
     /// The agent a page asked for while waiting, loaded once connected.
     private var pendingAgentID: String?
 
+    /// A post's file on this phone: not here yet, here, or the host no longer serves it.
+    enum FileState: Equatable { case loading, ready, unavailable }
+    private(set) var fileStates: [String: FileState] = [:]
+    /// Small copies of posts' pictures for the Feed and the post; the full files stay in
+    /// the attachment cache on disk.
+    private(set) var fileThumbnails: [String: UIImage] = [:]
+    /// The file being fetched to open, for its spinner.
+    private(set) var openingFile: String?
+    @ObservationIgnored private var pendingThumbnails: Set<String> = []
+
     var isAvailable: Bool { client != nil }
     var supportsFeedback: Bool { client?.supportsFeedback ?? false }
+    /// Without it (older plugins) posts have no files and Feed works as before.
+    var supportsFiles: Bool { client?.supportsFiles ?? false }
     /// Without it goals have no category and the page says to update the plugin.
     var supportsGoalCategories: Bool { client?.supportsGoalCategories ?? false }
     /// Just deleted, for Undo.
@@ -563,6 +651,7 @@ final class AgentBoardStore {
         self.client = client
         generation &+= 1
         items = []; activity = []; approvals = []; pictures = [:]; identity = nil; recentlyHidden = nil
+        fileStates = [:]; fileThumbnails = [:]; pendingThumbnails = []; openingFile = nil
         state = client == nil ? .unavailable : .idle
         logState = state
         agentID = nil
@@ -735,6 +824,80 @@ final class AgentBoardStore {
         if pictures.count > 60 { pictures.removeAll() }
         pictures[key] = data
         return data
+    }
+
+    // MARK: Files on posts
+
+    /// The post's files this connection can show; none on an older plugin.
+    func visibleFiles(of item: AgentBoardItem) -> [AgentBoardItem.File] {
+        supportsFiles && item.kind == .feed ? item.files : []
+    }
+
+    func fileState(_ item: AgentBoardItem, _ file: AgentBoardItem.File) -> FileState {
+        fileStates[fileKey(item, file)] ?? .loading
+    }
+
+    func thumbnail(_ item: AgentBoardItem, _ file: AgentBoardItem.File) -> UIImage? {
+        fileThumbnails[fileKey(item, file)]
+    }
+
+    func isOpening(_ item: AgentBoardItem, _ file: AgentBoardItem.File) -> Bool {
+        openingFile == fileKey(item, file)
+    }
+
+    /// A picture's small copy, as it scrolls into view. A file the host refused waits
+    /// for a tap to try again.
+    func loadThumbnail(for item: AgentBoardItem, file: AgentBoardItem.File) async {
+        let key = fileKey(item, file)
+        guard file.isImage, supportsFiles, let client, let agentID, fileThumbnails[key] == nil,
+              fileStates[key] != .unavailable, pendingThumbnails.insert(key).inserted else { return }
+        defer { pendingThumbnails.remove(key) }
+        let generation = generation
+        do {
+            let attachment = try await client.file(agentID: agentID, itemID: item.id, file: file)
+            guard generation == self.generation else { return }
+            keep(attachment, key: key)
+        } catch is CancellationError {
+        } catch {
+            guard generation == self.generation else { return }
+            fileStates[key] = .unavailable
+        }
+    }
+
+    /// The whole file, ready for the preview, Save and Share. Opening a file that
+    /// failed before asks the host again.
+    func attachment(for item: AgentBoardItem, file: AgentBoardItem.File) async -> ChatAttachment? {
+        guard supportsFiles, let client, let agentID, item.files.contains(file) else { return nil }
+        let key = fileKey(item, file)
+        let generation = generation
+        openingFile = key
+        defer { if openingFile == key { openingFile = nil } }
+        do {
+            let attachment = try await client.file(agentID: agentID, itemID: item.id, file: file)
+            guard generation == self.generation else { return nil }
+            keep(attachment, key: key)
+            return attachment
+        } catch {
+            guard generation == self.generation, !(error is CancellationError) else { return nil }
+            fileStates[key] = .unavailable
+            return nil
+        }
+    }
+
+    private func keep(_ attachment: ChatAttachment, key: String) {
+        fileStates[key] = .ready
+        guard attachment.mimeType.hasPrefix("image/"), fileThumbnails[key] == nil else { return }
+        guard let image = AgentMediaStore.thumbnail(attachment.data, side: 480) else {
+            fileStates[key] = .unavailable
+            return
+        }
+        if fileThumbnails.count > 60 { fileThumbnails.removeAll() }
+        fileThumbnails[key] = image
+    }
+
+    private func fileKey(_ item: AgentBoardItem, _ file: AgentBoardItem.File) -> String {
+        [agentID ?? "", item.id, String(file.index), file.fileName,
+         String(Int(file.addedAt?.timeIntervalSince1970 ?? 0))].joined(separator: "\u{0}")
     }
 
     /// Optimistic: the change shows at once and rolls back if Hermes refuses it.

@@ -143,6 +143,80 @@ struct DirectHermesNativeAttachmentTests {
         #expect(!http.requests.contains { $0.path.contains("/attachments/") })
     }
 
+    /// A Feed post's file: the phone names the post and the file's place in it, never a
+    /// path; the host answers with an opaque ID that downloads like a chat file, and the
+    /// copy is kept on the phone.
+    @Test func aFeedPostsFileResolvesByPostAndPlaceThenDownloadsInChunks() async throws {
+        let owner = try makeOwner()
+        let http = AttachmentHTTP(features: ["native-agent-attachments-v1", "native-agent-board-v1",
+                                             "native-agent-board-files-v1"])
+        let pdf = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 10, height: 10)).pdfData { $0.beginPage() }
+        http.file = pdf
+        http.chunk = 40
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let workspace = DirectHermesWorkspaceClient(rpc: NoRPC(), http: http, owner: owner,
+                                                    capabilities: .init(owner: owner), currentOwner: { owner })
+        let files = DirectHermesGeneratedMediaClient(workspace: workspace, owner: owner, currentOwner: { owner },
+                                                     cache: AgentAttachmentCache(directory: directory))
+        let board = DirectHermesAgentBoardClient(workspace: workspace, owner: owner, supportsFeedback: true, files: files)
+        #expect(board.supportsFiles)
+        let file = AgentBoardItem.File(index: 1, fileName: "Report.pdf", mimeType: "application/pdf",
+                                       byteCount: pdf.count, addedAt: Date(timeIntervalSince1970: 1_790_000_000))
+        let attachment = try await board.file(agentID: "default", itemID: "lisbon", file: file)
+        #expect(attachment.data == pdf && attachment.fileName == "Report.pdf")
+        let asked = http.requests.filter { !$0.path.hasSuffix("/context") }
+        #expect(asked.first?.path == "/api/plugins/loopdy/native/attachments/board")
+        #expect(asked.first?.body == ["agentId": .string("default"), "itemId": .string("lisbon"), "index": .integer(1)])
+        #expect(asked.dropFirst().allSatisfy { $0.path.hasSuffix("/attachments/fetch") })
+        #expect(asked.count == 1 + (pdf.count + 39) / 40)
+
+        let count = http.requests.count
+        #expect(try await board.file(agentID: "default", itemID: "lisbon", file: file).data == pdf)
+        #expect(http.requests.count == count, "Opened again, it comes from this phone")
+        // Attached again later: a new copy.
+        let newer = AgentBoardItem.File(index: 1, fileName: "Report.pdf", mimeType: "application/pdf",
+                                        byteCount: pdf.count, addedAt: Date(timeIntervalSince1970: 1_790_000_600))
+        _ = try await board.file(agentID: "default", itemID: "lisbon", file: newer)
+        #expect(http.requests.count > count)
+    }
+
+    @Test func aFileTheHostNoLongerServesIsUnavailable() async throws {
+        let owner = try makeOwner()
+        let http = AttachmentHTTP(features: ["native-agent-attachments-v1", "native-agent-board-v1",
+                                             "native-agent-board-files-v1"])
+        http.file = nil
+        let workspace = DirectHermesWorkspaceClient(rpc: NoRPC(), http: http, owner: owner,
+                                                    capabilities: .init(owner: owner), currentOwner: { owner })
+        let files = DirectHermesGeneratedMediaClient(workspace: workspace, owner: owner, currentOwner: { owner })
+        let board = DirectHermesAgentBoardClient(workspace: workspace, owner: owner, supportsFeedback: true, files: files)
+        let file = AgentBoardItem.File(index: 0, fileName: "moved.pdf", mimeType: "application/pdf", byteCount: 9)
+        await #expect(throws: (any Error).self) {
+            _ = try await board.file(agentID: "default", itemID: "lisbon", file: file)
+        }
+        #expect(!http.requests.contains { $0.path.hasSuffix("/attachments/fetch") })
+    }
+
+    @Test func olderPluginsAreNeverAskedForAPostsFiles() async throws {
+        let owner = try makeOwner()
+        let http = AttachmentHTTP(features: ["native-agent-attachments-v1", "native-agent-board-v1"])
+        let workspace = DirectHermesWorkspaceClient(rpc: NoRPC(), http: http, owner: owner,
+                                                    capabilities: .init(owner: owner), currentOwner: { owner })
+        let files = DirectHermesGeneratedMediaClient(workspace: workspace, owner: owner, currentOwner: { owner })
+        let file = AgentBoardItem.File(index: 0, fileName: "plan.pdf", mimeType: "application/pdf", byteCount: 9)
+        // Without the feature the board client gets no file loader at all…
+        let old = DirectHermesAgentBoardClient(workspace: workspace, owner: owner, supportsFeedback: true)
+        #expect(!old.supportsFiles)
+        await #expect(throws: WorkspaceClientError.self) {
+            _ = try await old.file(agentID: "default", itemID: "a", file: file)
+        }
+        // …and the route itself refuses before asking the host.
+        await #expect(throws: WorkspaceClientError.self) {
+            _ = try await files.boardFile(agentID: "default", itemID: "a", file: file)
+        }
+        #expect(!http.requests.contains { $0.path.contains("/attachments/") })
+    }
+
     @Test func inlineAndGluedDirectivesScheduleResolution() {
         #expect(DirectHermesGeneratedMediaClient.hasAttachmentDirectives("See MEDIA:/a/b.pdf now", role: .assistant))
         #expect(DirectHermesGeneratedMediaClient.hasAttachmentDirectives("MEDIA://a/b.mov", role: .assistant))
@@ -198,7 +272,17 @@ private final class AttachmentHTTP: DirectHermesAuthenticatedHTTP, DirectHermesN
         } else {
             headers["X-Loopdy-Request-ID"] = try #require(requestGuard).requestIDHeader
             let body = try #require(request.body)
-            if request.path.hasSuffix("/resolve") {
+            if request.path.hasSuffix("/attachments/board") {
+                guard let data = file else {
+                    let url = try #require(URL(string: "https://fixture.example.test" + request.path))
+                    let missing = try #require(HTTPURLResponse(url: url, statusCode: 404, httpVersion: "HTTP/1.1",
+                                                               headerFields: headers))
+                    return .init(http: missing, body: Data(#"{"error":{"code":"attachment_unavailable"}}"#.utf8))
+                }
+                object = ["attachment": .object(["id": .string(String(repeating: "d", count: 32)),
+                                                 "fileName": .string("Report.pdf"), "mimeType": .string("application/pdf"),
+                                                 "byteCount": .integer(data.count)])]
+            } else if request.path.hasSuffix("/resolve") {
                 let item = try #require(body["items"]?.array?.first?.object)
                 let attachments: [BighelpJSONValue] = file.map { data in
                     [.object(["id": .string(String(repeating: "c", count: 32)), "fileName": .string("Report.pdf"),

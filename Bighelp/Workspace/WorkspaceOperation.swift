@@ -70,6 +70,8 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     case attachmentsFetch = "attachments.fetch"
     /// The newest pictures and videos the agent sent or generated (plugin 2.15+).
     case attachmentsRecent = "attachments.recent"
+    /// One file a Feed post carries, by post and place (plugin `native-agent-board-files-v1`).
+    case attachmentsBoard = "attachments.board"
     case generatedMediaResolve = "generated_media.resolve"
     case approvalPending = "approval.pending"
     case approvalRespond = "approval.respond"

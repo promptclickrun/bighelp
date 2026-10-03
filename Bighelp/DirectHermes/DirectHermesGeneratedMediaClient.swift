@@ -224,6 +224,33 @@ final class DirectHermesGeneratedMediaClient: GeneratedMediaResolving, AgentAtta
         return .init(id: item.id, text: attachments.isEmpty ? item.text : text, attachments: attachments)
     }
 
+    /// One file a Feed post carries (plugin `native-agent-board-files-v1`). The phone names
+    /// the post and the file's place in it, never a path: the host checks the post refers
+    /// to it and applies the same delivery policy as a chat file, then it downloads and is
+    /// kept on this phone like one.
+    func boardFile(agentID: String, itemID: String, file: AgentBoardItem.File) async throws -> ChatAttachment {
+        try checkOwner()
+        let key = AgentAttachmentCache.key(owner.cacheScopeID, agentID, "board", itemID, String(file.index),
+                                           file.fileName, String(Int(file.addedAt?.timeIntervalSince1970 ?? 0)))
+        if let cached = await cache?.entry(for: key)?.attachments.first {
+            try checkOwner()
+            return cached
+        }
+        let response = try await workspace.perform(.attachmentsBoard, payload: [
+            "agentId": .string(agentID), "itemId": .string(itemID), "index": .integer(file.index),
+        ], owner: owner)
+        try checkOwner()
+        guard let meta = response["attachment"]?.object, let id = meta["id"]?.string,
+              let name = meta["fileName"]?.string, let mime = meta["mimeType"]?.string,
+              let size = meta["byteCount"]?.integer, (1...ChatAttachment.maximumAgentBytes).contains(size)
+        else { throw WorkspaceClientError.invalidResponse }
+        let data = try await fetchNative(id, agentID: agentID, size: size)
+        let attachment = try Self.nativeAttachment(id: id, fileName: name, mimeType: mime, data: data)
+        if mime.lowercased().hasPrefix("video/") { try await Self.validateVideo(attachment) }
+        await cache?.store(.init(text: "", attachments: [attachment]), for: key)
+        return attachment
+    }
+
     /// The first chunk tells how big each piece is; the rest download a few
     /// at a time. A piece that fails is asked for again from where it was,
     /// so one dropped request doesn't start the whole file over.

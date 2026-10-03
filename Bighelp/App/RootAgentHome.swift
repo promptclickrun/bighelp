@@ -356,6 +356,7 @@ extension RootShellView {
         let board: WorkspaceAvailability
         let feedback: Bool
         let goalCategories: Bool
+        let files: Bool
         let fixtures: Bool
         /// The selected computer will reconnect by itself (it has a saved sign-in).
         let reconnects: Bool
@@ -370,8 +371,9 @@ extension RootShellView {
         let goalCategories = owner.map {
             currentWorkspaceCapabilities.supports(.agentBoardGoalCategories, owner: $0, profileID: nil)
         } ?? false
+        let files = owner.map { currentWorkspaceCapabilities.supports(.agentBoardFiles, owner: $0, profileID: nil) } ?? false
         return AgentBoardClientKey(owner: owner, board: board, feedback: feedback, goalCategories: goalCategories,
-                                   fixtures: usesWorkspaceFixtures && workspaceConnections?.isDirectSelected != true,
+                                   files: files, fixtures: usesWorkspaceFixtures && workspaceConnections?.isDirectSelected != true,
                                    reconnects: nativeWorkspaceStore?.hasSavedConnection == true)
     }
 
@@ -424,8 +426,12 @@ extension RootShellView {
             guard let owner = key.owner, let workspace = workspaceConnections?.workspace else {
                 return agentBoard.waitForConnection()
             }
+            // Posts' files download like chat files, into the same cache.
+            let files = key.files ? DirectHermesGeneratedMediaClient(
+                workspace: workspace, owner: owner, currentOwner: { [weak workspace] in workspace?.owner },
+                cache: .shared) : nil
             let client = DirectHermesAgentBoardClient(workspace: workspace, owner: owner, supportsFeedback: key.feedback,
-                                                      supportsGoalCategories: key.goalCategories)
+                                                      supportsGoalCategories: key.goalCategories, files: files)
             // Feed, Ideas and Goals widgets set to another agent read its board the same way.
             BighelpWidgetBoardLoader.shared.configure(client: client, scope: owner.cacheScopeID)
             await agentBoard.connect(client: client, scope: owner.cacheScopeID)

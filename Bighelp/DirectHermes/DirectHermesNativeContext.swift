@@ -308,6 +308,10 @@ final class DirectHermesNativePluginClient {
             return Route(path: "groups/activity/poll", feature: "native-room-activity-v1", isMutation: false, maximumResponseBytes: 196_608)
         case .groupActivityClose:
             return Route(path: "groups/activity/close", feature: "native-room-activity-v1", isMutation: true, maximumResponseBytes: 196_608)
+        case .attachmentsBoard:
+            // The host copies the file in before it answers, as for a chat file.
+            return Route(path: "attachments/board", feature: "native-agent-board-files-v1",
+                         isMutation: false, maximumResponseBytes: 16_384, timeout: 60)
         case .attachmentsRecent:
             return Route(path: "attachments/recent", feature: "native-agent-media-v1", isMutation: false,
                          maximumResponseBytes: 196_608)

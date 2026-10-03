@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 /// Demo-mode board: realistic Feed, Ideas, Goals, Activity and Approvals so the
 /// app can be explored (and screenshotted) without a host.
@@ -61,6 +62,18 @@ final class DemoAgentBoardClient: AgentBoardClient {
         throw WorkspaceClientError.unavailable(.unsupportedOperation)
     }
 
+    let supportsFiles = true
+
+    func file(agentID: String, itemID: String, file: AgentBoardItem.File) async throws -> ChatAttachment {
+        let data = switch file.fileName {
+        case DemoBoardFiles.chartName: DemoBoardFiles.chart
+        case DemoBoardFiles.planName: DemoBoardFiles.plan
+        default: throw WorkspaceClientError.rejected(code: "attachment_unavailable")
+        }
+        return try DirectHermesGeneratedMediaClient.nativeAttachment(
+            id: "demo_board_\(itemID)_\(file.index)_files", fileName: file.fileName, mimeType: file.mimeType, data: data)
+    }
+
     func activity(agentID: String) async throws -> [AgentActivityEntry] {
         let rows: [(String, String, AgentActivityKind, Double)] = [
             ("Record grocery delivery", "Logged Saturday's grocery order to memory.", .memory, 18),
@@ -111,7 +124,14 @@ final class DemoAgentBoardClient: AgentBoardClient {
             AgentBoardItem(id: "feed-1", kind: .feed, title: "Lisbon fares dropped 18% for October",
                            body: "Round trips for **October 9–16** are down to $412, the lowest in six weeks. "
                                + "Want me to hold two seats before they climb again?",
-                           icon: "✈️", source: "Flight watch", read: false, createdAt: ago(35)),
+                           icon: "✈️",
+                           files: [
+                               .init(index: 0, fileName: DemoBoardFiles.chartName, mimeType: "image/png",
+                                     byteCount: DemoBoardFiles.chart.count, addedAt: ago(35)),
+                               .init(index: 1, fileName: DemoBoardFiles.planName, mimeType: "application/pdf",
+                                     byteCount: DemoBoardFiles.plan.count, addedAt: ago(35)),
+                           ],
+                           source: "Flight watch", read: false, createdAt: ago(35)),
             AgentBoardItem(id: "feed-2", kind: .feed, title: "Three stories worth your time tonight",
                            body: """
                                ### Tonight's picks
@@ -160,4 +180,61 @@ final class DemoAgentBoardClient: AgentBoardClient {
                            category: "interests", createdAt: ago(60 * 120)),
         ]
     }
+}
+
+/// The demo Flight watch post's files: a fare chart and a one-page trip plan, drawn
+/// on the phone from made-up numbers.
+@MainActor
+enum DemoBoardFiles {
+    static let chartName = "october-fares.png"
+    static let planName = "Lisbon trip options.pdf"
+
+    static let chart: Data = {
+        let fares: [(String, CGFloat)] = [("Sep 1", 498), ("Sep 8", 481), ("Sep 15", 466), ("Sep 22", 437), ("Today", 412)]
+        let size = CGSize(width: 1_200, height: 800)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        return UIGraphicsImageRenderer(size: size, format: format).pngData { context in
+            UIColor(red: 0.97, green: 0.95, blue: 0.91, alpha: 1).setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+            let title: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 54, weight: .bold),
+                                                        .foregroundColor: UIColor(white: 0.15, alpha: 1)]
+            ("Austin → Lisbon, October 9–16" as NSString).draw(at: CGPoint(x: 70, y: 56), withAttributes: title)
+            let label: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 34, weight: .semibold),
+                                                        .foregroundColor: UIColor(white: 0.3, alpha: 1)]
+            for (index, fare) in fares.enumerated() {
+                let height = (fare.1 - 350) * 2.8
+                let bar = CGRect(x: 90 + CGFloat(index) * 215, y: 680 - height, width: 150, height: height)
+                (index == fares.count - 1 ? UIColor.systemTeal : UIColor(white: 0.72, alpha: 1)).setFill()
+                UIBezierPath(roundedRect: bar, cornerRadius: 18).fill()
+                ("$\(Int(fare.1))" as NSString).draw(at: CGPoint(x: bar.minX + 22, y: bar.minY - 50), withAttributes: label)
+                (fare.0 as NSString).draw(at: CGPoint(x: bar.minX + 18, y: 700), withAttributes: label)
+            }
+        }
+    }()
+
+    static let plan: Data = {
+        let page = CGRect(x: 0, y: 0, width: 612, height: 792)
+        return UIGraphicsPDFRenderer(bounds: page).pdfData { context in
+            context.beginPage()
+            let title: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 26, weight: .bold)]
+            let body: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 14)]
+            ("Lisbon trip options" as NSString).draw(at: CGPoint(x: 56, y: 64), withAttributes: title)
+            let lines = [
+                "October 9–16, two travelers (made-up demo fares)",
+                "",
+                "1. Nonstop via Newark: $412 round trip, leaves 6:10 pm",
+                "2. One stop via Toronto: $398 round trip, 3 h 20 min layover",
+                "3. Nonstop, flexible dates: $455 round trip, free changes",
+                "",
+                "Hotel ideas in Alfama: two quiet guesthouses near the castle,",
+                "both under $160 a night with breakfast.",
+                "",
+                "Want me to hold two seats on option 1?",
+            ]
+            for (index, line) in lines.enumerated() {
+                (line as NSString).draw(at: CGPoint(x: 56, y: 120 + CGFloat(index) * 24), withAttributes: body)
+            }
+        }
+    }()
 }

@@ -461,6 +461,7 @@ enum BoardTimeBucket {
 struct AgentFeedView: View {
     let context: AgentBoardContext
     @State private var showsBlueprints = false
+    @State private var openedPost: OpenedFeedPost?
 
     var body: some View {
         let store = context.store
@@ -485,7 +486,7 @@ struct AgentFeedView: View {
                     .accessibilityAddTraits(.isHeader)
                 ForEach(group.items) { item in
                     VStack(spacing: 0) {
-                        FeedPostView(item: item, context: context)
+                        FeedPostView(item: item, context: context) { openedPost = .init(id: item.id) }
                         Divider().overlay(theme.border)
                     }
                     .boardItemSwipe(item, store: store)
@@ -493,6 +494,12 @@ struct AgentFeedView: View {
             }
         }
         .boardBlueprints(isPresented: $showsBlueprints, kind: .feed, context: context)
+        .sheet(item: $openedPost) { post in
+            FeedPostDetailSheet(itemID: post.id, context: context)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .bighelpSheetSize(.standard)
+        }
     }
 
     @BighelpThemeReader private var theme
@@ -501,13 +508,18 @@ struct AgentFeedView: View {
 private struct FeedPostView: View {
     let item: AgentBoardItem
     let context: AgentBoardContext
+    /// Opens the post with its files. Only posts with files open: the Feed already shows
+    /// the rest of a post in full.
+    let onOpen: () -> Void
     @State private var isShowingInfo = false
     @State private var asksWhy = false
     @AppStorage(LinkPreviewPreferences.enabledKey) private var showsLinkPreviews = true
 
     var body: some View {
+        let files = context.store.visibleFiles(of: item)
         HStack(alignment: .top, spacing: BighelpTokens.space12) {
             BoardIcon(icon: item.icon, fallback: "newspaper", size: 44)
+                .modifier(OpensPost(isEnabled: !files.isEmpty, open: onOpen))
             VStack(alignment: .leading, spacing: BighelpTokens.space8) {
                 HStack(alignment: .firstTextBaseline, spacing: BighelpTokens.space8) {
                     Text(item.title)
@@ -517,6 +529,8 @@ private struct FeedPostView: View {
                     Spacer(minLength: 0)
                     UnreadDot(item: item, store: context.store)
                 }
+                // The title opens the post; the text keeps its own links.
+                .modifier(OpensPost(isEnabled: !files.isEmpty, open: onOpen))
                 if !item.body.isEmpty {
                     // Agents write posts in Markdown (bighelp_board): headings, lists, quotes, code
                     // and tables draw as they do in chat.
@@ -532,10 +546,14 @@ private struct FeedPostView: View {
                                 BoardPictureView(item: item, picture: picture, store: context.store)
                                     .frame(width: 220, height: 220)
                                     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                                    .modifier(OpensPost(isEnabled: !files.isEmpty, open: onOpen))
                             }
                         }
                     }
                     .scrollClipDisabled()
+                }
+                if !files.isEmpty {
+                    BoardFilesStrip(item: item, files: files, store: context.store, onOpen: onOpen)
                 }
                 if let previewed = previewedLink {
                     LinkPreviewCard(url: previewed.url, fallbackTitle: previewed.title)
@@ -558,6 +576,7 @@ private struct FeedPostView: View {
         .boardItemActions(item, context: context)
         .modifier(LessLikeThis(isPresented: $asksWhy, item: item, context: context))
         .accessibilityElement(children: .contain)
+        .modifier(OpensPostForVoiceOver(isEnabled: !files.isEmpty, open: onOpen))
         .accessibilityIdentifier("board.feed.post.\(item.id)")
     }
 

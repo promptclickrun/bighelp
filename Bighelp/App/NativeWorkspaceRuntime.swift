@@ -445,7 +445,7 @@ final class NativeWorkspaceRuntime {
     /// Features the bighelp plugin serves (from its `/native/context`), not Hermes itself.
     static let pluginCapabilities: Set<WorkspaceCapability> = [
         .liveVoice, .wikiRead, .wikiEdit, .wikiDisconnect, .cardTemplates, .cards, .forms, .cloudNotifications,
-        .phoneTools, .projectChangesRead, .agentBoard, .agentBoardFeedback, .agentBoardGoalCategories,
+        .phoneTools, .projectChangesRead, .agentBoard, .agentBoardFeedback, .agentBoardGoalCategories, .agentBoardFiles,
     ]
 
     func refresh() async {
@@ -690,6 +690,7 @@ final class NativeWorkspaceRuntime {
                 if context.features.contains("native-agent-board-goal-categories-v1") {
                     supported.insert(.agentBoardGoalCategories)
                 }
+                if context.features.contains("native-agent-board-files-v1") { supported.insert(.agentBoardFiles) }
             }
             pluginFeaturesKnown = true
             try publishCapabilities()

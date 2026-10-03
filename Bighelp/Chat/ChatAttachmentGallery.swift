@@ -171,6 +171,15 @@ struct ChatAttachmentPreviewView: View {
                         .accessibilityValue(saveActivity.isBusy ? "Saving" : "Ready")
                         .accessibilityIdentifier("chat.attachment.save")
                 }
+                // The file under its own name, for Messages, Mail or another app.
+                ToolbarItem(placement: .primaryAction) {
+                    if let previewURL, saveDestination?.canSave == true {
+                        ShareLink(item: previewURL) {
+                            Label("Share", systemImage: "square.and.arrow.up").labelStyle(.iconOnly)
+                        }
+                        .accessibilityIdentifier("chat.attachment.share")
+                    }
+                }
             }
         }
         .task {
@@ -317,7 +326,7 @@ private enum ChatAttachmentSaveAlert: String, Identifiable {
     var offersSettings: Bool { self == .photosPermission }
 }
 
-private struct ChatAttachmentDocument: FileDocument {
+struct ChatAttachmentDocument: FileDocument {
     static var readableContentTypes: [UTType] { [.data] }
     let data: Data
 

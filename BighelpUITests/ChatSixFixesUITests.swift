@@ -202,7 +202,7 @@ final class ChatSixFixesUITests: BighelpUITestCase {
         }
         let composer = app.descendants(matching: .any)["chat.composer-shell"].firstMatch
         let rail = app.descendants(matching: .any)["chat.session-status-rail"].firstMatch
-        for (button, title) in zip(buttons, ["Goal", "Agents", "Tasks"]) {
+        for (button, title) in zip(buttons, ["Goal", "Subagents", "Tasks"]) {
             XCTAssertTrue(button.isHittable)
             XCTAssertGreaterThanOrEqual(button.frame.minX, app.frame.minX + 12)
             XCTAssertTrue(rail.frame.insetBy(dx: -1, dy: -1).contains(button.frame),

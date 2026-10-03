@@ -112,7 +112,7 @@ struct SessionStatusRailView: View {
         .buttonStyle(.plain)
         .companionComposerAnchor(.railLedge(item.kind.rawValue))
         .accessibilityLabel(accessibilityLabel(for: item.kind))
-        .accessibilityHint("Opens details")
+        .accessibilityHint(item.kind == .subagents ? "Shows what each subagent is doing" : "Opens details")
         .accessibilityIdentifier("chat.session-status.\(item.kind.rawValue)")
         .accessibilityValue(item.kind == .subagents
             ? subagentStreamAcceptanceFixture?.readinessValue(displayedSubagents: subagents) ?? ""
@@ -174,7 +174,7 @@ struct SessionStatusRailView: View {
     private func statusTitle(_ kind: SessionStatusRailKind) -> String {
         switch kind {
         case .goal: "Goal"
-        case .subagents: "Agents"
+        case .subagents: "Subagents"
         case .tasks: "Tasks"
         }
     }

@@ -241,7 +241,7 @@ struct ChatComposer: View {
                     } label: {
                         switch item.kind {
                         case .goal: Label("Goal", systemImage: "target")
-                        case .subagents: Label("Agents", systemImage: "person.2")
+                        case .subagents: Label("Subagents", systemImage: "person.2")
                         case .tasks: Label("Tasks", systemImage: "checklist")
                         }
                     }

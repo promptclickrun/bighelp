@@ -14,7 +14,8 @@ HOME and HERMES_HOME, then runs the matching HostSignInMatrixUITests:
   widgets   no sign-in, the app without demo fixtures: home screen widget links
             open the host's chats (WidgetLinkHostUITests; not a default mode)
   features  no sign-in, with the bighelp plugin (--plugin) and a seeded board:
-            Feed/Ideas/Goals feedback and Projects (ProjectsAndBoardHostUITests)
+            Feed/Ideas/Goals feedback and Projects (ProjectsAndBoardHostUITests),
+            and the Apps tab's files with no terminal.cwd set
   update    no sign-in, with an older plugin release installed by Hermes' own
             installer from GitHub: the app finds the latest GitHub Release and
             updates to it (PluginReleaseUpdateHostUITests; needs the internet)
@@ -66,6 +67,7 @@ TESTS = {
               "testWaitingQuestionOpensFocusedWhenReturningToTheApp"],
     "widgets": ["WidgetLinkHostUITests/testRecentChatAndNewChatWidgetLinksOpenChats"],
     "features": ["ProjectsAndBoardHostUITests/testBoardFeedbackAndProjectsOnARealHost",
+                 "ProjectsAndBoardHostUITests/testAppsShowsTheAgentsFilesWithNoWorkingFolderSet",
                  "ProviderUsageHostUITests/testUsageLoadsFromTheChatTheAppOpensWith"],
     "update": ["PluginReleaseUpdateHostUITests/testUpdatesToTheLatestReleaseOnARealHost"],
     "fleet": ["AllHostsHostUITests/testAllHostsListsBothHostsAndOpensTheOther",
@@ -326,6 +328,28 @@ def board_feedback(home: Path) -> dict:
             "all_read": all(row[3] == 1 for key, row in rows.items() if key.startswith("probe-") and key != "probe-trip")}
 
 
+def workspace_agreement(origin: str, token: str) -> dict:
+    """The folder the plugin shares as the agent's files, next to the one Hermes starts new chats in."""
+    import urllib.request
+    import uuid
+
+    def call(path: str, body: dict | None = None, headers: dict | None = None):
+        request = urllib.request.Request(origin + path, data=None if body is None else json.dumps(body).encode(),
+                                         method="GET" if body is None else "POST",
+                                         headers={"X-Hermes-Session-Token": token, "Content-Type": "application/json",
+                                                  **(headers or {})})
+        with urllib.request.urlopen(request, timeout=10) as response:
+            return json.load(response), response.headers
+
+    _, context_headers = call("/api/plugins/loopdy/native/context")
+    scope, _ = call("/api/plugins/loopdy/native/workspace-files/scope", {"path": None},
+                    {"If-Match": context_headers["ETag"], "X-Loopdy-Request-ID": str(uuid.uuid4())})
+    default, _ = call("/api/fs/default-cwd")
+    shared, hermes = scope["workspace"]["root"], default["cwd"]
+    return {"origin": scope["workspace"].get("origin"),
+            "same_folder_as_hermes": os.path.realpath(shared) == os.path.realpath(hermes)}
+
+
 class DelayProxy:
     """Forwards a loopback port to another, holding each chunk for `delay` seconds each way, like a slower
     network (a Tailscale link to another computer). Order is kept; `rate` (bytes a second) limits
@@ -549,6 +573,10 @@ def run_mode(mode: str, args, repo: Path) -> int:
         if mode == "features":
             seed_board(home, args.plugin)
             (project / "garden").mkdir()
+            # No terminal.cwd: the agent works where Hermes was started (the project folder),
+            # and the Apps tab must still show its files.
+            del config["terminal"]["cwd"]
+            (project / "garden-notes.md").write_text("Water the tomatoes on Tuesday.\n")
         (home / "config.yaml").write_text(json.dumps(config))
         session_token, password = secrets.token_urlsafe(32), secrets.token_urlsafe(24)
         env = {k: os.environ[k] for k in ("PATH", "LANG", "TMPDIR") if k in os.environ}
@@ -588,6 +616,7 @@ def run_mode(mode: str, args, repo: Path) -> int:
             probe = {"mode": mode, "address": public.removeprefix("http://"), "session_token": session_token}
             if mode == "features":
                 probe["project_dir"] = str(project / "garden")
+                probe["workspace_file"] = "garden-notes.md"
             if mode in ("password", "sso"):
                 _, _, tokens = exercise_http(origin, "signin-fixture", password)
                 probe.update(username="signin-fixture", password=password, token=tokens["access_token"])
@@ -610,6 +639,7 @@ def run_mode(mode: str, args, repo: Path) -> int:
                 print(json.dumps({"secure_input_saved_on_host": "SECURE_INPUT_FIXTURE=" in saved}), flush=True)
             if mode == "features":
                 print(json.dumps({"board_on_host": board_feedback(home)}), flush=True)
+                print(json.dumps({"workspace_on_host": workspace_agreement(origin, session_token)}), flush=True)
             if mode == "update":
                 print(json.dumps({"plugin_on_host": installed_plugin(home)}), flush=True)
             if mode == "media":

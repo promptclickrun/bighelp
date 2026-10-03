@@ -5,9 +5,12 @@ import XCTest
 extension BighelpUITestCase {
     @MainActor func onboardOpenHost(_ app: XCUIApplication, address: String) throws {
         let start = app.buttons["onboarding.get-started"]
-        XCTAssertTrue(start.waitForExistence(timeout: 20))
-        start.tap()
         let field = app.textFields["host-setup.address"]
+        // The welcome is remembered past one test's run, so a later test can open on the address step.
+        if !field.waitForExistence(timeout: 5) {
+            XCTAssertTrue(start.waitForExistence(timeout: 20))
+            start.tap()
+        }
         XCTAssertTrue(field.waitForExistence(timeout: 10))
         field.tap()
         field.typeText(address)

@@ -138,6 +138,33 @@ final class ProjectsAndBoardHostUITests: BighelpUITestCase {
         save("features-7-project-chats", app)
     }
 
+    /// The host's profile sets no terminal.cwd, so its agent works where Hermes was started.
+    /// The Apps tab still shows the agent's files from there, not "Workspace unavailable".
+    @MainActor
+    func testAppsShowsTheAgentsFilesWithNoWorkingFolderSet() throws {
+        guard let path = ProcessInfo.processInfo.environment["BIGHELP_SIGNIN_PROBE"] else {
+            throw XCTSkip("Run through Scripts/HostSignInMatrixProbe.py --modes features")
+        }
+        let probe = try JSONDecoder().decode([String: String].self, from: Data(contentsOf: URL(fileURLWithPath: path)))
+        guard probe["mode"] == "features", let fileName = probe["workspace_file"] else {
+            throw XCTSkip("This host runs the \(probe["mode"] ?? "?") mode")
+        }
+        let app = makeApp()
+        app.launchArguments = ["-loopdy.home.opens-chat", "YES"]
+        app.launch()
+        try onboardOpenHost(app, address: try XCTUnwrap(probe["address"]))
+        XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 30), "The agent's chat opens")
+        let appsTab = app.buttons["tab.apps"]
+        XCTAssertTrue(appsTab.waitForExistence(timeout: 10))
+        appsTab.tap()
+        let file = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS %@", fileName)).firstMatch
+        let shown = file.waitForExistence(timeout: 30)
+        save("features-8-apps-files", app)
+        XCTAssertTrue(shown, "The agent's file shows in Apps")
+        XCTAssertFalse(app.staticTexts["Workspace unavailable"].exists)
+    }
+
     @MainActor private func save(_ name: String, _ app: XCUIApplication) {
         let shot = XCTAttachment(screenshot: app.screenshot())
         shot.name = name

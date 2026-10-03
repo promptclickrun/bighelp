@@ -110,7 +110,7 @@ final class DeviceToolCoordinator {
         do { try authorize() } catch let error as Failure { return failed(error.code) }
         catch { return failed("unavailable") }
 
-        let mutation = !request.operation.hasSuffix(".list") && request.operation != "health.read"
+        let mutation = !Self.readOperations.contains(request.operation)
         let fingerprint = SHA256.hash(data: encoded).map { String(format: "%02x", $0) }.joined()
         if mutation {
             do {
@@ -175,11 +175,15 @@ final class DeviceToolCoordinator {
         !value.isEmpty && value.utf8.count <= 512 && !value.unicodeScalars.contains { CharacterSet.controlCharacters.contains($0) }
     }
 
+    /// Reads are never journaled: their results (health, events, where someone is) stay off disk.
+    private static let readOperations: Set<String> = ["health.read", "calendar.list", "reminders.list", "location.current"]
+
     private static func capability(for operation: String) -> DeviceToolCapability? {
         switch operation {
         case "health.read": .health
         case "calendar.list", "calendar.create", "calendar.update", "calendar.delete": .calendar
         case "reminders.list", "reminders.create", "reminders.update", "reminders.delete": .reminders
+        case "location.current": .location
         default: nil
         }
     }

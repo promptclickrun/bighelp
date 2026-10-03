@@ -3,8 +3,14 @@ import Observation
 import CryptoKit
 
 enum DeviceToolCapability: String, CaseIterable, Codable, Identifiable, Sendable {
-    case health, calendar, reminders
+    case health, calendar, reminders, location
     var id: String { rawValue }
+
+    /// The plugin feature a host must list before the phone offers this tool.
+    /// Older plugins reject an unknown name in the channel's `enabled` list.
+    var pluginFeature: String? {
+        self == .location ? "native-device-location-v1" : nil
+    }
 }
 
 struct DeviceToolScope: Codable, Hashable, Sendable {

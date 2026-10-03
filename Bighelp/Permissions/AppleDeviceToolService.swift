@@ -79,6 +79,7 @@ final class AppleDeviceToolService {
         "health.read",
         "calendar.list", "calendar.create", "calendar.update", "calendar.delete",
         "reminders.list", "reminders.create", "reminders.update", "reminders.delete",
+        "location.current",
     ]
 
     private let boundary: any AppleDeviceToolNativeBoundary
@@ -123,7 +124,7 @@ final class AppleDeviceToolService {
                     // HealthKit read authorization is intentionally opaque;
                     // never infer a read grant from a status probe.
                     break
-                case .calendar, .reminders:
+                case .calendar, .reminders, .location:
                     let access = await boundary.status(for: capability)
                     switch access {
                     case .available:
@@ -248,6 +249,9 @@ private extension AppleDeviceToolService {
         case "reminders.delete":
             try validateKeys(arguments, allowed: ["id", "expectedRevision"])
             try validateIdentity(arguments)
+        case "location.current":
+            // Where the phone is now; there's nothing for the agent to choose.
+            try validateKeys(arguments, allowed: [])
         default:
             throw AppleDeviceToolError.unsupportedOperation
         }
@@ -258,6 +262,7 @@ private extension AppleDeviceToolService {
         case "health.read": .health
         case "calendar.list", "calendar.create", "calendar.update", "calendar.delete": .calendar
         case "reminders.list", "reminders.create", "reminders.update", "reminders.delete": .reminders
+        case "location.current": .location
         default: nil
         }
     }
@@ -493,13 +498,16 @@ private extension AppleDeviceToolService {
 final class LiveAppleDeviceToolNativeBoundary: AppleDeviceToolNativeBoundary {
     private let healthStore: HKHealthStore
     private let eventStore: EKEventStore
+    private let location: DeviceLocationTool
 
     init(
         healthStore: HKHealthStore = HKHealthStore(),
-        eventStore: EKEventStore = EKEventStore()
+        eventStore: EKEventStore = EKEventStore(),
+        location: DeviceLocationTool? = nil
     ) {
         self.healthStore = healthStore
         self.eventStore = eventStore
+        self.location = location ?? DeviceLocationTool(provider: LiveDeviceLocationProvider())
     }
 
     func status(for capability: DeviceToolCapability) async -> DeviceToolSystemAccess {
@@ -507,6 +515,7 @@ final class LiveAppleDeviceToolNativeBoundary: AppleDeviceToolNativeBoundary {
         case .health: await healthStatus()
         case .calendar: eventKitStatus(.event)
         case .reminders: eventKitStatus(.reminder)
+        case .location: await location.status()
         }
     }
 
@@ -515,6 +524,7 @@ final class LiveAppleDeviceToolNativeBoundary: AppleDeviceToolNativeBoundary {
         case .health: await requestHealth()
         case .calendar: await requestFullCalendarAccess()
         case .reminders: await requestFullReminderAccess()
+        case .location: await location.request()
         }
     }
 
@@ -533,6 +543,7 @@ final class LiveAppleDeviceToolNativeBoundary: AppleDeviceToolNativeBoundary {
         case "reminders.create": try createReminder(arguments, authorize: authorize)
         case "reminders.update": try updateReminder(arguments, authorize: authorize)
         case "reminders.delete": try deleteReminder(arguments, authorize: authorize)
+        case "location.current": try await location.current(authorize: authorize)
         default: throw AppleDeviceToolError.unsupportedOperation
         }
     }

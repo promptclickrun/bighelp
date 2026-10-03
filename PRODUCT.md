@@ -23,7 +23,7 @@ that with sequential direct chats or synthesized multi-agent prompts. Native
 harness work must preserve the Hermes path and the accepted chat experience.
 See [Hermes Bot Mode](docs/HERMES_BOT_MODE.md).
 
-Agents can use iPhone Health, Calendar and Reminders. The
+Agents can use iPhone Health, Calendar, Reminders and Location. The
 [device-tools contract](docs/IPHONE_DEVICE_TOOLS.md) uses
 Hermes' official tool registration and the existing encrypted Link path. Each is
 independently off by default under Permissions. The feature requires the updated

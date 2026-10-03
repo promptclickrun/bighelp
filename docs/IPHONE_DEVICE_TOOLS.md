@@ -19,11 +19,11 @@ in `AppleDeviceToolServiceTests` reproduces that crash before the correction;
 keep the post-fetch authorization check. See Apple's
 [asynchronous reminder retrieval](https://developer.apple.com/documentation/eventkit/retrieving-events-and-reminders).
 
-Permissions contains independent Apple Health, Calendar and Reminders controls.
+Permissions contains independent Apple Health, Calendar, Reminders and Location controls.
 Every control starts off. Enabling one requests its native iOS permission from
 that explicit foreground action. Calendar and Reminders authorize direct reads,
 creation, updates and deletion after enablement, with no per-operation approval.
-Health is read-only. OS permission by itself never enables agent access.
+Health and Location are read-only. OS permission by itself never enables agent access.
 
 Grants are scoped to the current phone, phone authorization epoch and selected
 host. Turning a control off invalidates active work immediately. Switching host,
@@ -111,6 +111,7 @@ are returned only to their active caller, not cached for later retries.
 | `iphone_health` | Read bounded raw samples by type, explicit ISO-8601 start/end and IANA time zone. Maximum 31 days and 200 total records. |
 | `iphone_calendar` | List events in a bounded date range; create; update/delete an exact ID with expected revision. |
 | `iphone_reminders` | List with optional list IDs, completion and undated filters; create; update/delete an exact ID with expected revision. An optional date filter requires start, end and time zone together. |
+| `iphone_location` | `current` only, with no other arguments: where the phone is right now. Needs plugin feature `native-device-location-v1`. |
 
 Health covers steps, walking/running distance, active/basal energy, flights,
 exercise/stand time, sleep, heart rate, resting/walking heart rate, HRV, oxygen
@@ -132,6 +133,35 @@ Reminders accept title, list, start/due date, time zone, notes and priority;
 updates also accept completion. Both native APIs recheck system authorization
 before execution. Neither API is bridged through arbitrary selectors, an
 additional HTTP service or model-supplied executable code.
+
+## Location
+
+`location.current` (`DeviceLocationTool`) returns `latitude` and `longitude`
+(six decimals), `horizontalAccuracyMeters`, an ISO-8601 UTC `timestamp`,
+`precise`, and when Apple can name the spot a `place` with any of `street`,
+`neighborhood`, `city`, `region`, `country` and `postalCode` (each trimmed,
+control characters removed, at most 100 characters). On iPhone, iPad and Mac the
+address comes from `CLGeocoder`, which gives it in parts back to iOS 17; on
+Vision Pro, where that's deprecated, MapKit's `MKReverseGeocodingRequest` names
+only the city and country. A fix takes at most 15 seconds and an address 5.
+
+- The Location switch asks iOS for While Using the App, never Always. Nothing
+  runs in the background; a call while bighelp isn't open fails like the other
+  tools (`device_unavailable` on the phone, `phone_unavailable` on the host).
+- `NSLocationDefaultAccuracyReduced` keeps approximate location the default.
+  When a call finds approximate access, iOS asks once for precise location
+  (`requestTemporaryFullAccuracyAuthorization`, purpose key `AgentRequest` in
+  `NSLocationTemporaryUsageDescriptionDictionary`). The question is asked only
+  after the call is re-authorized (switch, chat, foreground), and the grant is
+  re-checked after it. If the person keeps approximate, `precise` is false, a
+  `note` says it's a rough area, and `place` has no street, neighborhood or
+  postal code.
+- It's a read: never journaled, never kept by the plugin for a retry.
+- Older plugins reject `location` in the channel's `enabled` list, so the phone
+  sends it only when `/native/context` lists `native-device-location-v1`, and
+  Device access says to update the plugin.
+- Demo mode (`-use-demo-fixtures`) answers from `DemoDeviceLocationProvider`, a
+  made-up place, and never asks iOS.
 
 ## Mutation reconciliation
 
@@ -160,7 +190,7 @@ Do not mistake an Info.plist description for permission to add Health writes.
 
 Native suites:
 `DeviceToolPermissionsTests`, `AppleDeviceToolServiceTests`,
-`DeviceToolCoordinatorTests`, `DeviceToolFileJournalTests`,
+`DeviceToolCoordinatorTests`, `DeviceToolFileJournalTests`, `DeviceLocationToolTests`,
 `BighelpLinkDirectedDeviceToolTests`, existing socket/backpressure and account
 erasure suites, and `DeviceToolPermissionsUITests`.
 

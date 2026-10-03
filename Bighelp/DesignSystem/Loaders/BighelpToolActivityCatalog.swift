@@ -98,6 +98,7 @@ enum BighelpToolActivityCatalog {
         "bighelp_render_card": makingCard,
         "bighelp_react_to_message": reacting,
         "bighelp_request_secure_input": make(.glyph(.lock), "Asking for secure input…", "Asked for secure input"),
+        "iphone_location": make(.symbol("location"), "Checking where you are…", "Checked where you are"),
     ]
 
     private static let families: [(String, @Sendable (String) -> BighelpToolActivity)] = [

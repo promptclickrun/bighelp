@@ -129,7 +129,12 @@
     <key>NSCameraUsageDescription</key>
     <string>bighelp uses the camera to scan short-lived pairing codes, power Reflective Vision, and capture photos or scan documents you intentionally attach to chats.</string>
     <key>NSLocationWhenInUseUsageDescription</key>
-    <string>bighelp uses your approximate location, when you choose, to request live local conditions from Apple Weather for Home.</string>
+    <string>bighelp shares your location with your agent only when you allow it and the agent asks, for things like finding places near you.</string>
+    <key>NSLocationTemporaryUsageDescriptionDictionary</key>
+    <dict>
+        <key>AgentRequest</key>
+        <string>Your agent asked where you are, for things like finding places near you. Your exact location is shared this one time.</string>
+    </dict>
     <key>NSLocationDefaultAccuracyReduced</key>
     <true/>
     <key>NSMicrophoneUsageDescription</key>

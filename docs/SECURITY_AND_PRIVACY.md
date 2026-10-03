@@ -13,9 +13,11 @@ policy, App Store disclosure review, or independent security audit.
 
 ## Optional iPhone tools
 
-The next release candidate adds independent, default-off Health, Calendar and
-Reminders controls in Permissions. Health data is read only for the user's health
-and fitness questions. Calendar and Reminders permit direct reads and changes
+The next release candidate adds independent, default-off Health, Calendar,
+Reminders and Location controls in Permissions. Health data is read only for the user's health
+and fitness questions. Location shares where the phone is only when an agent
+asks, with While Using the App access; it's approximate unless the person allows
+precise location for that call. Calendar and Reminders permit direct reads and changes
 after explicit enablement and iOS authorization. Grants belong to the phone, its
 authorization epoch and the selected host. Turning a grant off blocks new and
 in-flight access; it does not revoke the underlying iOS permission.
@@ -359,6 +361,7 @@ should remain short, reviewed, and enforced automatically.
 | Microphone | Voice conversation input | Raw audio remains on device |
 | Speech recognition | Convert speech to text | On-device recognition is required |
 | Photos | Select profile and agent avatars | Images are processed and stored locally |
+| Location (while using the app) | The agent's `iphone_location` tool, after you turn on Location for a host | Asked for when you turn the switch on; approximate unless you allow precise location for a call; sent to that host and its AI provider, never kept by bighelp |
 | Face ID / device authentication | Passkey user verification | Biometric data is handled by the OS |
 | Notifications | Agent alerts | Alert text is encrypted for the recipient device |
 | Live Activities | Agent progress on Lock Screen/Dynamic Island | Shows bounded status plus session and agent labels |

@@ -766,6 +766,7 @@ struct BighelpPluginCapabilitiesSection: View {
                 deviceCapabilityRow(.health, title: "Apple Health", systemImage: "heart")
                 deviceCapabilityRow(.calendar, title: "Calendar", systemImage: "calendar")
                 deviceCapabilityRow(.reminders, title: "Reminders", systemImage: "checklist")
+                deviceCapabilityRow(.location, title: "Location", systemImage: "location")
                 watchCapabilityRow
             }
             .accessibilityIdentifier("settings.plugin-capability.details")

@@ -58,8 +58,9 @@ struct PermissionsSettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityIdentifier("settings.permissions")
         .task {
-            await center.refresh()
+            // Device tools first: their switches depend on it; system rows can follow.
             await center.deviceTools.refresh()
+            await center.refresh()
         }
     }
 
@@ -77,6 +78,7 @@ private struct DeviceToolPermissionRow: View {
         case .health: "Apple Health"
         case .calendar: "Calendar"
         case .reminders: "Reminders"
+        case .location: "Location"
         }
     }
 
@@ -85,6 +87,7 @@ private struct DeviceToolPermissionRow: View {
         case .health: "Answer health and fitness questions using the Health data you choose to share."
         case .calendar: "Read, create, update, and delete events directly after you enable access."
         case .reminders: "Read, create, update, and delete reminders directly after you enable access."
+        case .location: "Share where you are when your agent asks, for things like finding places near you."
         }
     }
 
@@ -100,9 +103,11 @@ private struct DeviceToolPermissionRow: View {
                 VStack(alignment: .leading, spacing: BighelpTokens.space4) {
                     Text(title).bighelpFont(.body, weight: .semibold)
                     Text(detail).bighelpFont(.metadata).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .disabled(!permissions.isEnabled(kind) && (permissions.scope == nil || permissions.requestInFlight != nil))
+            .disabled(!permissions.isEnabled(kind) && (permissions.scope == nil || permissions.requestInFlight != nil
+                || permissions.status(for: kind) == .unavailable))
             .accessibilityIdentifier("permissions.device-tools.\(kind.rawValue)")
 
             if permissions.requestInFlight == kind {
@@ -114,6 +119,9 @@ private struct DeviceToolPermissionRow: View {
                 .accessibilityIdentifier("permissions.device-tools.\(kind.rawValue).settings")
             } else if kind == .health, permissions.isEnabled(kind) {
                 Text("Health controls which data is shared. An empty result can mean no data or access was not granted.")
+                    .bighelpFont(.metadata).foregroundStyle(.secondary)
+            } else if kind == .location, permissions.isEnabled(kind) {
+                Text("Only while bighelp is open. \(BighelpPlatform.isMac ? "macOS" : "iOS") asks before sharing your exact spot; if you keep it approximate, your agent gets a rough area.")
                     .bighelpFont(.metadata).foregroundStyle(.secondary)
             } else if permissions.scope != nil, permissions.status(for: kind) == .unavailable {
                 Text("Unavailable on this device.").bighelpFont(.metadata).foregroundStyle(.secondary)

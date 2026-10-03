@@ -40,7 +40,9 @@ final class NativeDeviceToolSession {
     private let scope: DeviceToolScope
     private let agentID: String
     private let sessionID: String
-    private let enabled: Set<DeviceToolCapability>
+    private var enabled: Set<DeviceToolCapability>
+    /// Tools turned on here that this host's plugin is too old to offer.
+    private(set) var needsNewerPlugin: Set<DeviceToolCapability> = []
     private let isAvailable: @MainActor () -> Bool
     private let handle: Handler
     private let closeCleanupFactory: (@MainActor (String) -> (@MainActor () async -> Void)?)?
@@ -74,6 +76,11 @@ final class NativeDeviceToolSession {
         guard context.features.contains("native-device-tools-v1") else {
             throw WorkspaceClientError.unavailable(.pluginRequired)
         }
+        // An older plugin refuses the whole channel over a tool name it doesn't know.
+        let offered = enabled.filter { $0.pluginFeature.map(context.features.contains) ?? true }
+        needsNewerPlugin = enabled.subtracting(offered)
+        guard !offered.isEmpty else { throw WorkspaceClientError.unavailable(.pluginRequired) }
+        enabled = offered
         self.context = context
         closeCleanup = closeCleanupFactory?(channelID)
         if closeCleanup == nil, let direct = http as? DirectHermesClient,
@@ -146,9 +153,10 @@ final class NativeDeviceToolSession {
         }
     }
 
-    func run() async throws {
+    func run(onConnected: @MainActor () -> Void = {}) async throws {
         do {
             try await connect()
+            onConnected()
             while owns() {
                 try await pollOnce()
                 try await Task.sleep(for: .milliseconds(750))

@@ -60,6 +60,10 @@ extension RootShellView {
             return DeviceToolScope(deviceID: permissionCenter.nativeDeviceID,
                                    authorizationEpoch: 1, hostID: owner.authority.cacheScopeID)
         }
+        // Demo mode's made-up host, so its switches (Location's demo place) can be tried.
+        if usesDemoFixtures {
+            return DeviceToolScope(deviceID: permissionCenter.nativeDeviceID, authorizationEpoch: 1, hostID: "demo-host")
+        }
         return nil
     }
 
@@ -94,11 +98,19 @@ extension RootShellView {
                     && appState.activeConversationID == conversationID
             }, handle: handler)
         permissionCenter.nativeDeviceToolStatus = nil
-        do { try await session.run() }
-        catch {
+        let locationNeedsNewerPlugin = "To share your location, update the bighelp plugin on this computer."
+        do {
+            try await session.run(onConnected: {
+                if session.needsNewerPlugin.contains(.location) {
+                    permissionCenter.nativeDeviceToolStatus = locationNeedsNewerPlugin
+                }
+            })
+        } catch {
             guard !Task.isCancelled, currentWorkspaceOwner == owner,
                   permissions.revision == revision else { return }
-            permissionCenter.nativeDeviceToolStatus = "Device access is not connected. Check the bighelp plugin on this host, then reopen the chat."
+            permissionCenter.nativeDeviceToolStatus = session.needsNewerPlugin == enabled
+                ? locationNeedsNewerPlugin
+                : "Device access is not connected. Check the bighelp plugin on this host, then reopen the chat."
         }
     }
 

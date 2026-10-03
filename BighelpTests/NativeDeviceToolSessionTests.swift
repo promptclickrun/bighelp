@@ -80,6 +80,34 @@ struct NativeDeviceToolSessionTests {
         #expect(fixture.handled == 0)
     }
 
+    @Test func olderPluginNeverHearsAboutLocationButKeepsTheOtherTools() async throws {
+        let fixture = try Fixture()
+        let session = fixture.session(enabled: [.calendar, .location])
+        try await session.connect()
+        #expect(fixture.http.connectedEnabled == ["calendar"])
+        #expect(session.needsNewerPlugin == [.location])
+    }
+
+    @Test func locationAloneOnAnOlderPluginAsksForAnUpdate() async throws {
+        let fixture = try Fixture()
+        let session = fixture.session(enabled: [.location])
+        await #expect(throws: WorkspaceClientError.unavailable(.pluginRequired)) { try await session.connect() }
+        #expect(fixture.http.paths == ["context"])
+        #expect(session.needsNewerPlugin == [.location])
+    }
+
+    @Test func newerPluginGetsLocationAndRunsIt() async throws {
+        let fixture = try Fixture()
+        fixture.http.features.append("native-device-location-v1")
+        fixture.http.request["operation"] = .string("location.current")
+        let session = fixture.session(enabled: [.calendar, .location])
+        try await session.connect()
+        #expect(fixture.http.connectedEnabled == ["calendar", "location"])
+        try await session.pollOnce()
+        #expect(fixture.handled == 1)
+        #expect(session.needsNewerPlugin.isEmpty)
+    }
+
     @Test func duplicateRequestIDsInOnePollBatchAreRejectedAtomically() async throws {
         let fixture = try Fixture()
         fixture.http.duplicateRequest = true
@@ -146,9 +174,9 @@ struct NativeDeviceToolSessionTests {
                 "turnId": .string("turn"), "operation": .string("calendar.list"), "arguments": .object([:]),
                 "sentAt": .integer(Int(Date().timeIntervalSince1970)), "expiresAt": .integer(Int(Date().timeIntervalSince1970) + 60)]
         }
-        func session() -> NativeDeviceToolSession {
+        func session(enabled: Set<DeviceToolCapability> = [.calendar]) -> NativeDeviceToolSession {
             NativeDeviceToolSession(http: http, owner: owner, currentOwner: { self.current ? self.owner : nil },
-                scope: scope, agentID: "default", sessionID: "session", enabled: [.calendar],
+                scope: scope, agentID: "default", sessionID: "session", enabled: enabled,
                 isAvailable: { self.available }, handle: { request, _, _ in
                     self.handled += 1
                     var resultRequest = request
@@ -168,6 +196,7 @@ struct NativeDeviceToolSessionTests {
         var features = ["native-context-v1", "serving-profile-v1", "native-device-tools-v1"]
         var paths: [String] = []
         var results: [[String: BighelpJSONValue]] = []
+        var connectedEnabled: [String] = []
         var beforePollReply: () -> Void = {}
         var beforeConnectReply: () -> Void = {}
         var duplicateRequest = false
@@ -181,6 +210,7 @@ struct NativeDeviceToolSessionTests {
                 "runtimeId": .string("runtime"), "servingProfileId": .string("default"), "principal": .null,
                 "features": .array(features.map(BighelpJSONValue.string))]
             case "device-tools/connect":
+                connectedEnabled = request.body?["enabled"]?.array?.compactMap(\.string) ?? []
                 beforeConnectReply()
                 value = ["channelId": channel, "connected": .boolean(true)]
             case "device-tools/poll":

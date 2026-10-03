@@ -299,12 +299,21 @@ struct BighelpAppComposition {
             onSelectedHostChange: { hostSelectionChangeRelay.send($0) }
         )
         let appleDeviceTools = AppleDeviceToolService()
+        // Demo mode never asks iOS for real data. Location answers from a made-up place.
+        let demoLocation = usesFixtures ? DeviceLocationTool(provider: DemoDeviceLocationProvider()) : nil
         let deviceToolPermissions = DeviceToolPermissions(
-            status: { kind in usesFixtures ? .unavailable : await appleDeviceTools.status(kind) },
-            request: { kind in usesFixtures ? .unavailable : await appleDeviceTools.request(kind) },
-            isForeground: { !usesFixtures && UIApplication.shared.applicationState == .active },
-            readGrants: { defaults.stringArray(forKey: $0) ?? [] },
-            writeGrants: { defaults.set($1, forKey: $0) }
+            status: { kind in
+                if kind == .location, let demoLocation { return await demoLocation.status() }
+                return usesFixtures ? .unavailable : await appleDeviceTools.status(kind)
+            },
+            request: { kind in
+                if kind == .location, let demoLocation { return await demoLocation.request() }
+                return usesFixtures ? .unavailable : await appleDeviceTools.request(kind)
+            },
+            isForeground: { UIApplication.shared.applicationState == .active },
+            // Demo switches last only for the launch.
+            readGrants: { usesFixtures ? [] : defaults.stringArray(forKey: $0) ?? [] },
+            writeGrants: { if !usesFixtures { defaults.set($1, forKey: $0) } }
         )
         let deviceToolCoordinator = DeviceToolCoordinator(
             permissions: deviceToolPermissions,

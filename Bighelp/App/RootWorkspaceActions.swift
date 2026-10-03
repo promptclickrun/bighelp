@@ -328,8 +328,7 @@ extension RootShellView {
         case .openHostStatus:
             isHostStatusPresented = true
         case .openAgentChat(let id):
-            agents.select(id)
-            startNewChat(explicitAgentID: id)
+            openAgentChat(id)
         case .openGroup(let id):
             openHostedGroup(id, owner: request.owner, settings: false)
         case .openGroupSettings(let id):

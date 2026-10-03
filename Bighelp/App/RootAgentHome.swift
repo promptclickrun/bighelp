@@ -61,8 +61,9 @@ extension RootShellView {
     }
 
     /// Every phone chat uses the agent-home look (big live avatar) and the tab
-    /// bar. The Chat tab's own chat gets ☰; a chat picked from the full list or
-    /// opened from somewhere else (Agents, Feed, a task, a deeper page) gets Back.
+    /// bar. The Chat tab's own chat gets ☰, and so does an agent tapped on
+    /// Agents (it becomes that chat). A chat picked from a list or opened about
+    /// something (Feed's Discuss, a task, a deeper page) gets Back to it.
     func homeChrome(for route: AppRoute) -> AgentHomeChrome {
         // The all-hosts view has no home chat: its chats get Back to All agents,
         // never one host's tab bar (Feed, Ideas, Goals would strand you there).
@@ -204,6 +205,18 @@ extension RootShellView {
         if appState.selectedTab != .sessions { appState.select(.sessions) }
         appState.chatOpenedFromList = false
         startNewChat(explicitAgentID: agentID)
+    }
+
+    /// Agents: tapping an agent chats with it. On one computer that's the Chat
+    /// tab's own chat, like New chat: ☰ (which leads back to Agents) and the
+    /// Chat tab lit. The all-hosts view has no home chat and keeps Back.
+    func openAgentChat(_ agentID: String) {
+        guard !fleetModeOn else {
+            agents.select(agentID)
+            startNewChat(explicitAgentID: agentID)
+            return
+        }
+        startHomeChat(with: agentID)
     }
 
     func inviteToGroup(seed: String?) {

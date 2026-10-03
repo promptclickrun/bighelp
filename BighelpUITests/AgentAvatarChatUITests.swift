@@ -62,7 +62,9 @@ final class AgentAvatarChatUITests: BighelpUITestCase {
 
     @MainActor
     private func back(in app: XCUIApplication) {
-        tap(app.buttons["chat.back"])
+        // An agent's chat from Agents is the Chat tab's: ☰ leads back to Agents.
+        tap(app.buttons["chat.menu"])
+        tap(app.buttons["menu.agents"])
         XCTAssertTrue(app.descendants(matching: .any)["agents.screen"].firstMatch.waitForExistence(timeout: 8))
     }
 

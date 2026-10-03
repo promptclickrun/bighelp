@@ -175,10 +175,7 @@ extension RootShellView {
                 },
                 onOpenProjects: canOpenProjects ? { openProjects() } : nil,
                 onOpenKanban: canOpenKanban ? { openKanban() } : nil,
-                onSelectAgent: { agent in
-                    agents.select(agent.id)
-                    startNewChat(explicitAgentID: agent.id)
-                },
+                onSelectAgent: { openAgentChat($0.id) },
                 onOpenAgentSessions: { openSessions(filteredTo: $0) },
                 onOpenApproval: {
                     openApproval(request: $0)

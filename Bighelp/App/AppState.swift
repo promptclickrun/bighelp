@@ -17,7 +17,8 @@ final class AppState {
     /// Text a board "Ask" or "Discuss" leaves in the next new chat's composer.
     var pendingComposerText: String?
     /// A chat picked from the full chat list keeps Back to that list. The Chat
-    /// tab's own chat (auto-opened, ☰ › New chat, the switcher) gets ☰ and the
+    /// tab's own chat (auto-opened, ☰ › New chat, the switcher, an agent tapped
+    /// on Agents) gets ☰ and the
     /// tab bar. Both use the big-avatar header.
     var chatOpenedFromList = false
 

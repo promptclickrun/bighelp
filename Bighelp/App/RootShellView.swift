@@ -502,10 +502,7 @@ struct RootShellView: View {
             AgentsShellView(
                 agents: agents,
                 runtimeDefaultsClient: agentRuntimeDefaults,
-                onSelect: { agent in
-                    agents.select(agent.id)
-                    startNewChat(explicitAgentID: agent.id)
-                },
+                onSelect: { openAgentChat($0.id) },
                 onOpenSessions: { openSessions(filteredTo: $0.id) },
                 onOpenHostStatus: { isHostStatusPresented = true },
                 hostRuntime: currentHostRuntime,

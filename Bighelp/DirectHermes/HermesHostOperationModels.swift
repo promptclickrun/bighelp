@@ -237,6 +237,17 @@ struct HermesUpdateCheck: Equatable, Sendable {
     let commits: [Commit]
 }
 
+extension HermesUpdateCheck {
+    /// "12 commits behind"; Hermes reports -1 when it can't count.
+    var behindText: String {
+        switch commitsBehind {
+        case .some(let count) where count == 1: "1 commit behind"
+        case .some(let count) where count > 1: "\(count.formatted()) commits behind"
+        default: "A newer version is ready"
+        }
+    }
+}
+
 struct HermesUpdateReceiptSummary: Equatable, Sendable {
     let outcome: String
     let startedAt: Date?

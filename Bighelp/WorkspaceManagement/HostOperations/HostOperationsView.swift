@@ -138,7 +138,7 @@ struct HostOperationsView<MoreLinks: View>: View {
             }
             if let check = store.updateCheck {
                 if check.updateAvailable && check.canApply {
-                    BighelpActionRow(title: "Update Hermes", detail: Self.behindText(check.commitsBehind),
+                    BighelpActionRow(title: "Update Hermes", detail: check.behindText,
                                      systemImage: "arrow.down.circle.fill") { confirmsUpdate = true }
                         .disabled(!store.canAct)
                         .accessibilityIdentifier("system.hermes.update")
@@ -146,7 +146,7 @@ struct HostOperationsView<MoreLinks: View>: View {
                     Label {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Update available")
-                            Text("\(Self.behindText(check.commitsBehind)). Update Hermes on your computer.")
+                            Text("\(check.behindText). Update Hermes on your computer.")
                                 .font(.bighelp(.footnote))
                                 .foregroundStyle(.secondary)
                         }
@@ -191,15 +191,6 @@ struct HostOperationsView<MoreLinks: View>: View {
             }
         } header: {
             Text("Hermes")
-        }
-    }
-
-    /// "12 commits behind"; Hermes reports -1 when it can't count.
-    static func behindText(_ commitsBehind: Int?) -> String {
-        switch commitsBehind {
-        case .some(let count) where count == 1: "1 commit behind"
-        case .some(let count) where count > 1: "\(count.formatted()) commits behind"
-        default: "A newer version is ready"
         }
     }
 

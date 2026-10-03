@@ -22,6 +22,8 @@ protocol FleetHostReading: AnyObject {
     func setPlacement(_ placement: AgentListPlacement, hostID: UUID, profileID: String) async throws
     /// Reaches every host for Fleet settings. None hides it.
     func maintenance() -> (any FleetMaintenanceConnecting)?
+    /// A host that isn't the selected one: its agents' usage and its plans and limits.
+    func usage(_ hostID: UUID, name: String, days: Int, refresh: Bool) async -> HostUsage
 }
 
 extension FleetHostReading {

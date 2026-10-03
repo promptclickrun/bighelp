@@ -408,6 +408,8 @@ final class DirectHermesWorkspaceClient: WorkspaceOperationPerforming {
             return try get("/api/tools/toolsets", payload, allowed: ["profile"])
         case .usageSummary:
             return try get("/api/analytics/usage", payload, allowed: ["profile", "days"])
+        case .usageModels:
+            return try get("/api/analytics/models", payload, allowed: ["profile", "days"])
         case .messagingPlatformsList:
             return try get("/api/messaging/platforms", payload, allowed: ["profile"])
         case .systemStatus:

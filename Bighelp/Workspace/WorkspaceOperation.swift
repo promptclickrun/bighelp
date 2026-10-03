@@ -101,6 +101,8 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     case skillsToolsImport = "skills_tools.import"
     case personalitiesList = "personalities.list"
     case usageSummary = "usage.summary"
+    /// Per-model tokens, cache reads and the provider that billed them (`/api/analytics/models`).
+    case usageModels = "usage.models"
     case logsList = "logs.list"
     case memoryGet = "memory.get"
     case toolsetsList = "toolsets.list"
@@ -152,6 +154,8 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     case boardRead = "board.read"
     case boardPromote = "board.promote"
     case usageList = "usage.list"
+    /// Hours of the day, messages and models per day for the Usage page (plugin, `native-usage-activity-v1`).
+    case usageActivity = "usage.activity"
     case peopleSpeaking = "people.speaking"
     case providerSignInList = "provider-sign-in.list"
     case providerSignInStart = "provider-sign-in.start"

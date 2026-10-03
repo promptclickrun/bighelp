@@ -330,6 +330,10 @@ final class DirectHermesNativePluginClient {
             // The host asks every provider before answering: finding them, then up to 20 seconds.
             return Route(path: "usage/list", feature: "native-provider-usage-v1", isMutation: false,
                          maximumResponseBytes: 196_608, timeout: 60)
+        case .usageActivity:
+            // Reads the agent's own sessions; a 90-day range of a busy agent is a few thousand rows.
+            return Route(path: "usage/activity", feature: "native-usage-activity-v1", isMutation: false,
+                         maximumResponseBytes: 1_048_576, timeout: 30)
         case .peopleSpeaking:
             // Sent before each message; a slow host never holds a message for long.
             return Route(path: "people/speaking", feature: "native-people-v1", isMutation: true,

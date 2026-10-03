@@ -65,7 +65,7 @@ final class RegistryFleetReader: FleetHostReading {
 
     /// Runs `body` with a host's workspace client: connected for it when it
     /// wasn't, and let go again after unless the app keeps it.
-    private func withWorkspace<T>(
+    func withWorkspace<T>(
         _ hostID: UUID,
         _ body: @MainActor (DirectHermesWorkspaceClient, WorkspaceOwner, @escaping @MainActor () -> WorkspaceOwner?,
                             DirectHermesClient) async throws -> T

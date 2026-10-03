@@ -32,6 +32,21 @@ final class FleetFixtureReader: FleetHostReading {
         placements[profileID] = placement
     }
 
+    /// Studio Mac's agents worked a little; Office Linux can't be reached.
+    func usage(_ hostID: UUID, name: String, days: Int, refresh: Bool) async -> HostUsage {
+        guard hostID == Self.studioID else {
+            return HostUsage(id: hostID.uuidString, name: name, failure: "Couldn't reach this computer.")
+        }
+        let limits = try? await DemoProviderUsageClient().usage(agentID: "default", refresh: refresh)
+        return HostUsage(id: hostID.uuidString, name: name, agents: [
+            AgentUsage(id: "research", name: "Rio Tanaka", report: UsageFixtures.report(seed: 5, days: days)),
+            AgentUsage(id: "reviewer", name: "Sage Ortiz", report: UsageFixtures.report(seed: 7, days: days)),
+        ], limits: limits.map { report in
+            .loaded(ProviderUsageReport(agentID: report.agentID, fetchedAt: report.fetchedAt, cached: report.cached,
+                                        providers: report.providers.filter { ["claude", "openrouter"].contains($0.id) }))
+        })
+    }
+
     func read(_ hostID: UUID, avatars: FleetAvatarFolder) async throws -> FleetSnapshot {
         guard hostID == Self.studioID else { throw FleetReadError(message: "Couldn't reach this host.") }
         if ProcessInfo.processInfo.arguments.contains("-test-fleet-loading") {

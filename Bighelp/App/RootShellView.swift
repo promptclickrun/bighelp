@@ -905,7 +905,6 @@ struct RootShellView: View {
             model: featureStore.dashboardModel,
             connection: HostConnectionStatus(dashboardIsConnected: nativeRuntime != nil
                 ? currentWorkspaceOwner != nil : dashboardFixtureIsConnected),
-            permissionCenter: permissionCenter,
             onInboxItemTap: openDashboardInboxItem,
             onAttentionItemTap: openDashboardAttentionItem,
             onWorkItemTap: openDashboardWorkItem

@@ -248,7 +248,6 @@ final class ShellFeatureStore {
         userIdentity: UserIdentityStore? = nil,
         scheduledTasks: ScheduledTasksStore? = nil,
         dashboardSource: (any DashboardDataSource)? = nil,
-        dashboardWeatherLoader: (any DashboardWeatherLoading)? = nil,
         dashboardVerifiedConnectionGeneration: @escaping @MainActor () -> UInt64? = { 0 },
         approvalRequestLoader: (any ApprovalRequestLoading)? = nil,
         approvalClient: (any ApprovalClient)? = nil,
@@ -301,7 +300,6 @@ final class ShellFeatureStore {
         }
         dashboardModel = DashboardModel(
             source: dashboardSource ?? DashboardFixtureSource(),
-            weather: dashboardWeatherLoader,
             verifiedConnectionGeneration: dashboardVerifiedConnectionGeneration
         )
         dashboardModel.configureWorkSessions { [weak self] in

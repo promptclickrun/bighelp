@@ -39,7 +39,6 @@ struct BighelpCardSurfaceIntegrationTests {
     @Test func dashboardRanksGenericImportanceAndOmitsOnlyUnpinnedExpiredCards() async throws {
         let now = try #require(ISO8601DateFormatter().date(from: "2026-09-02T14:00:00Z"))
         let source = BighelpCardDashboardSource(snapshot: DashboardSnapshot(
-            weather: nil,
             inbox: [
                 item("normal", card: try document(importance: nil, validUntil: nil)),
                 item("urgent", card: try document(importance: "urgent", validUntil: "2026-09-03T12:00:00Z")),

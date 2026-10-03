@@ -19,14 +19,6 @@ struct DashboardFixtureSource: DashboardDataSource {
         }
 
         return DashboardSnapshot(
-            weather: DashboardWeather(
-                city: "San Francisco",
-                condition: "Sunny",
-                temperature: 61,
-                high: 65,
-                low: 52,
-                systemImage: "sun.max.fill"
-            ),
             inbox: bighelpCards.enumerated().map { index, card in
                 DashboardInboxItem(
                     id: "loopdy-card-gallery-\(index)",

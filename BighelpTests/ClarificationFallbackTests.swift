@@ -189,7 +189,7 @@ private final class FallbackSource: DashboardDataSource, DashboardClarificationC
     func loadDashboard() async throws -> DashboardSnapshot {
         if loadFails { throw Failure.rejected }
         let request = DashboardClarificationRequest(eventID: "clarify-event", requestID: "clarify-request", sessionID: sessionID, question: "Which release channel?", choices: ["TestFlight", "App Store"], allowsCustomResponse: true, isMultiSelect: true, expiresAt: expiresAt)
-        return DashboardSnapshot(weather: nil, inbox: [], attentionItems: dismissedIDs.contains(request.eventID) ? [] : [DashboardAttentionItem(id: request.eventID, title: "Clarification", detail: request.question, urgency: .important, sessionID: request.sessionID, interaction: .clarification(request), createdAt: .now)], completedItems: [], agents: [])
+        return DashboardSnapshot(inbox: [], attentionItems: dismissedIDs.contains(request.eventID) ? [] : [DashboardAttentionItem(id: request.eventID, title: "Clarification", detail: request.question, urgency: .important, sessionID: request.sessionID, interaction: .clarification(request), createdAt: .now)], completedItems: [], agents: [])
     }
     func respond(to request: DashboardClarificationRequest, response: String) async throws -> DashboardClarificationReceipt {
         responses.append(response)

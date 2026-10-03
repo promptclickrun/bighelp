@@ -49,14 +49,10 @@ final class DashboardModel {
 
     private let source: any DashboardDataSource
     @ObservationIgnored private let verifiedConnectionGeneration: @MainActor () -> UInt64?
-    private let weather: (any DashboardWeatherLoading)?
     private let now: () -> Date
     private var accountGeneration: UInt64 = 0
     private var loadGeneration: UInt64 = 0
     private var loadConnectionGeneration: UInt64?
-    private var weatherGeneration: UInt64 = 0
-    private var weatherTask: Task<Void, Never>?
-    private var weatherTimeoutTask: Task<Void, Never>?
     private var externalRefreshTask: Task<Void, Never>?
     private var externalRefreshGeneration: UInt64 = 0
     @ObservationIgnored private var workSessions: @MainActor () -> [SessionRecord] = { [] }
@@ -67,8 +63,6 @@ final class DashboardModel {
     private var resolvedClarificationIDs: Set<String> = []
 
     private(set) var state: DashboardLoadingState = .idle
-    private(set) var weatherState: DashboardWeatherLoadingState = .idle
-    private(set) var currentLocationWeather: DashboardWeather?
     private(set) var snapshot: DashboardSnapshot? {
         didSet {
             let currentRequests = Set((snapshot?.attentionItems ?? []).compactMap { item -> ClarificationDraftKey? in
@@ -87,17 +81,13 @@ final class DashboardModel {
     private(set) var clarificationDeliveryMessages: [String: String] = [:]
     private var requestedFocusUpdateID: String?
 
-    var usesDeviceLocalWeather: Bool { weather != nil }
-
     init(
         source: any DashboardDataSource,
-        weather: (any DashboardWeatherLoading)? = nil,
         verifiedConnectionGeneration: @escaping @MainActor () -> UInt64? = { 0 },
         now: @escaping () -> Date = Date.init
     ) {
         self.source = source
         self.verifiedConnectionGeneration = verifiedConnectionGeneration
-        self.weather = weather
         self.now = now
     }
 
@@ -170,8 +160,7 @@ final class DashboardModel {
             DashboardWorkProjection.isActionable($0, at: now())
         }
         guard attention != current.attentionItems else { return }
-        snapshot = DashboardSnapshot(
-            weather: current.weather, inbox: current.inbox, attentionItems: attention,
+        snapshot = DashboardSnapshot( inbox: current.inbox, attentionItems: attention,
             completedItems: current.completedItems, agents: current.agents
         )
     }
@@ -200,11 +189,8 @@ final class DashboardModel {
                 accountGeneration: accountGeneration,
                 loadGeneration: loadGeneration
             ) else { return }
-            let resolvedSnapshot = snapshotWithProjectedWeather(loadedSnapshot)
+            let resolvedSnapshot = rankedSnapshot(loadedSnapshot)
             snapshot = resolvedSnapshot
-            if weatherState == .idle {
-                _ = startWeatherRefreshIfNeeded()
-            }
             let dismissedIDs = await autoDismissStaleItems(
                 from: resolvedSnapshot,
                 accountGeneration: accountGeneration,
@@ -216,7 +202,6 @@ final class DashboardModel {
             ) else { return }
             if !dismissedIDs.isEmpty, let current = snapshot {
                 snapshot = DashboardSnapshot(
-                    weather: current.weather,
                     inbox: current.inbox.filter { !dismissedIDs.contains($0.id) },
                     attentionItems: current.attentionItems.filter { !dismissedIDs.contains($0.id) },
                     completedItems: current.completedItems,
@@ -237,7 +222,6 @@ final class DashboardModel {
                 // briefly loses the relay. A transient transport failure
                 // must not erase useful inbox and attention content.
                 snapshot = DashboardSnapshot(
-                    weather: weatherAfterRefreshFailure(current),
                     inbox: current.inbox,
                     attentionItems: current.attentionItems,
                     completedItems: current.completedItems,
@@ -253,11 +237,6 @@ final class DashboardModel {
 
     func refresh() async {
         await load()
-    }
-
-    func refreshWeather() async {
-        guard let task = startWeatherRefreshIfNeeded() else { return }
-        await task.value
     }
 
     func refreshAfterExternalChange() async {
@@ -290,19 +269,12 @@ final class DashboardModel {
     }
 
     func resetForAccountBoundary() {
-        weatherTask?.cancel()
-        weatherTask = nil
-        weatherTimeoutTask?.cancel()
-        weatherTimeoutTask = nil
-        weatherGeneration &+= 1
         externalRefreshTask?.cancel()
         externalRefreshTask = nil
         externalRefreshGeneration &+= 1
         accountGeneration &+= 1
         loadGeneration &+= 1
         state = .idle
-        weatherState = .idle
-        currentLocationWeather = nil
         snapshot = nil
         lastUpdatedLabel = "Not updated yet"
         mutationErrorMessage = nil
@@ -380,7 +352,6 @@ final class DashboardModel {
             invalidateInFlightLoad()
             guard let snapshot else { return }
             self.snapshot = DashboardSnapshot(
-                weather: snapshot.weather,
                 inbox: snapshot.inbox.filter { $0.id != id },
                 attentionItems: snapshot.attentionItems,
                 completedItems: snapshot.completedItems,
@@ -397,7 +368,7 @@ final class DashboardModel {
                     accountGeneration: generation,
                     loadGeneration: reconciliationLoadGeneration
                 ) else { return }
-                let resolved = snapshotWithProjectedWeather(refreshed)
+                let resolved = rankedSnapshot(refreshed)
                 snapshot = resolved
                 if !resolved.inbox.contains(where: { $0.id == id }) {
                     mutationErrorMessage = nil
@@ -442,7 +413,6 @@ final class DashboardModel {
             invalidateInFlightLoad()
             guard let snapshot else { return }
             self.snapshot = DashboardSnapshot(
-                weather: snapshot.weather,
                 inbox: snapshot.inbox,
                 attentionItems: snapshot.attentionItems.filter { $0.id != id },
                 completedItems: snapshot.completedItems,
@@ -647,7 +617,6 @@ final class DashboardModel {
             guard generation == accountGeneration else { return }
             guard let current = self.snapshot else { return }
             self.snapshot = DashboardSnapshot(
-                weather: current.weather,
                 inbox: current.inbox.filter { $0.createdAt > cutoff },
                 attentionItems: current.attentionItems,
                 completedItems: current.completedItems,
@@ -675,7 +644,6 @@ final class DashboardModel {
             invalidateInFlightLoad()
             guard let current = self.snapshot else { return }
             self.snapshot = DashboardSnapshot(
-                weather: current.weather,
                 inbox: current.inbox,
                 attentionItems: current.attentionItems.filter { $0.createdAt > cutoff },
                 completedItems: current.completedItems,
@@ -747,7 +715,6 @@ final class DashboardModel {
         invalidateInFlightLoad()
         guard let snapshot else { return }
         self.snapshot = DashboardSnapshot(
-            weather: snapshot.weather,
             inbox: snapshot.inbox,
             attentionItems: snapshot.attentionItems.filter { $0.id != id },
             completedItems: snapshot.completedItems,
@@ -755,7 +722,7 @@ final class DashboardModel {
         )
     }
 
-    private func snapshotWithProjectedWeather(
+    private func rankedSnapshot(
         _ snapshot: DashboardSnapshot
     ) -> DashboardSnapshot {
         let referenceDate = now()
@@ -775,16 +742,7 @@ final class DashboardModel {
                 return left.offset < right.offset
             }
             .map(\.element)
-        let projectedWeather = if usesDeviceLocalWeather {
-            currentLocationWeather
-        } else {
-            snapshot.weather ?? DashboardWeatherProjection.project(
-                from: rankedInbox,
-                now: referenceDate
-            )
-        }
         return DashboardSnapshot(
-            weather: projectedWeather,
             inbox: rankedInbox,
             attentionItems: snapshot.attentionItems.filter {
                 !resolvedClarificationIDs.contains($0.id)
@@ -793,101 +751,6 @@ final class DashboardModel {
             completedItems: snapshot.completedItems,
             agents: snapshot.agents
         )
-    }
-
-    private func weatherAfterRefreshFailure(
-        _ snapshot: DashboardSnapshot
-    ) -> DashboardWeather? {
-        if usesDeviceLocalWeather { return currentLocationWeather }
-        guard snapshot.weather?.cardID != nil else { return snapshot.weather }
-        return DashboardWeatherProjection.project(from: snapshot.inbox, now: now())
-    }
-
-    private func startWeatherRefreshIfNeeded() -> Task<Void, Never>? {
-        guard let weather else { return nil }
-        if let weatherTask { return weatherTask }
-
-        weatherGeneration &+= 1
-        let accountGeneration = self.accountGeneration
-        let weatherGeneration = self.weatherGeneration
-        weatherState = .loading
-
-        let task = Task { [weak self] in
-            do {
-                let liveWeather = try await weather.loadCurrentWeather()
-                guard
-                    !Task.isCancelled,
-                    let self,
-                    self.ownsWeather(
-                        accountGeneration: accountGeneration,
-                        weatherGeneration: weatherGeneration
-                    )
-                else { return }
-                self.finishWeatherRefresh(liveWeather)
-            } catch is CancellationError {
-                return
-            } catch {
-                guard
-                    let self,
-                    self.ownsWeather(
-                        accountGeneration: accountGeneration,
-                        weatherGeneration: weatherGeneration
-                    )
-                else { return }
-                self.finishWeatherRefresh(nil)
-            }
-        }
-        weatherTask = task
-        weatherTimeoutTask?.cancel()
-        weatherTimeoutTask = Task { [weak self] in
-            do {
-                try await Task.sleep(for: .seconds(15))
-            } catch {
-                return
-            }
-            guard
-                let self,
-                self.ownsWeather(
-                    accountGeneration: accountGeneration,
-                    weatherGeneration: weatherGeneration
-                )
-            else { return }
-            self.weatherGeneration &+= 1
-            self.weatherTask?.cancel()
-            self.weatherTask = nil
-            self.weatherTimeoutTask = nil
-            self.applyDeviceWeather(nil)
-        }
-        return task
-    }
-
-    private func finishWeatherRefresh(_ liveWeather: DashboardWeather?) {
-        weatherGeneration &+= 1
-        weatherTimeoutTask?.cancel()
-        weatherTimeoutTask = nil
-        weatherTask = nil
-        applyDeviceWeather(liveWeather)
-    }
-
-    private func applyDeviceWeather(_ liveWeather: DashboardWeather?) {
-        currentLocationWeather = liveWeather
-        weatherState = liveWeather == nil ? .unavailable : .loaded
-        guard let current = snapshot else { return }
-        snapshot = DashboardSnapshot(
-            weather: liveWeather,
-            inbox: current.inbox,
-            attentionItems: current.attentionItems,
-            completedItems: current.completedItems,
-            agents: current.agents
-        )
-    }
-
-    private func ownsWeather(
-        accountGeneration: UInt64,
-        weatherGeneration: UInt64
-    ) -> Bool {
-        accountGeneration == self.accountGeneration
-            && weatherGeneration == self.weatherGeneration
     }
 
     private func ownsLoad(
@@ -944,7 +807,6 @@ final class DashboardModel {
                 left.createdAt > right.createdAt
             } + replaced.filter { !$0.isPinned }
             self.snapshot = DashboardSnapshot(
-                weather: snapshot.weather,
                 inbox: ordered,
                 attentionItems: snapshot.attentionItems,
                 completedItems: snapshot.completedItems,
@@ -980,7 +842,6 @@ final class DashboardModel {
                 left.createdAt > right.createdAt
             } + replaced.filter { !$0.isPinned }
             self.snapshot = DashboardSnapshot(
-                weather: snapshot.weather,
                 inbox: snapshot.inbox,
                 attentionItems: ordered,
                 completedItems: snapshot.completedItems,

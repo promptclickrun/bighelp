@@ -359,7 +359,6 @@ should remain short, reviewed, and enforced automatically.
 | Microphone | Voice conversation input | Raw audio remains on device |
 | Speech recognition | Convert speech to text | On-device recognition is required |
 | Photos | Select profile and agent avatars | Images are processed and stored locally |
-| Approximate location / WeatherKit | Live local weather on Home | Requested only in the foreground after consent; sent to Apple Weather and not persisted by bighelp |
 | Face ID / device authentication | Passkey user verification | Biometric data is handled by the OS |
 | Notifications | Agent alerts | Alert text is encrypted for the recipient device |
 | Live Activities | Agent progress on Lock Screen/Dynamic Island | Shows bounded status plus session and agent labels |
@@ -384,11 +383,6 @@ The app declares:
 - Tracking domains: none
 - Collected data: a linked device identifier used for app functionality
 - Required-reason API use: preferences and elapsed-time measurement
-
-Approximate location is sent only to Apple Weather to service the foreground
-weather request and is not persisted by bighelp. Apple excludes request-only,
-non-retained data and data collected by Apple services from the developer's
-App Privacy collection disclosure.
 
 bighelp does not declare user content as collected by its cloud because the
 current deployed frame-routing path receives authenticated ciphertext, has no

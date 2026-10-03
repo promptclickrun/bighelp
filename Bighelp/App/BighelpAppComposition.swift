@@ -39,9 +39,6 @@ struct BighelpAppComposition {
         let usesFixtures = arguments.contains("-disable-demo-delays")
             || arguments.contains("-use-demo-fixtures")
         let usesCardGallery = usesFixtures && arguments.contains("-use-loopdy-card-gallery")
-        #if DEBUG
-        let homeWeatherFixture = usesFixtures ? HomeWeatherAcceptanceFixture(arguments: arguments) : nil
-        #endif
         bighelpCardDataClient = BighelpCardStaticDataClient()
         let timing: DemoFixtureTiming = .immediate
         let appState = AppState()
@@ -321,11 +318,7 @@ struct BighelpAppComposition {
                 try await appleDeviceTools.execute(operation: operation, arguments: arguments, authorize: authorize)
             }
         )
-        #if DEBUG
-        let permissionCenter = homeWeatherFixture?.permissions ?? PermissionCenter(deviceTools: deviceToolPermissions)
-        #else
         let permissionCenter = PermissionCenter(deviceTools: deviceToolPermissions)
-        #endif
         if let identifier = defaults.string(forKey: "loopdy.native-device-tools.device-id"),
            UUID(uuidString: identifier) != nil {
             permissionCenter.nativeDeviceID = identifier
@@ -390,16 +383,9 @@ struct BighelpAppComposition {
                 bighelpCards: usesCardGallery ? BighelpCardDemoFixtures.documents : []
             )
             : unavailable
-        var dashboardWeatherLoader: (any DashboardWeatherLoading)? = usesFixtures
-            ? nil
-            : AppleDashboardWeatherLoader()
         #if DEBUG
         if let clarificationFixture { dashboardSource = clarificationFixture }
         if let homeWorkFixture { dashboardSource = homeWorkFixture }
-        if let homeWeatherFixture {
-            dashboardSource = homeWeatherFixture
-            dashboardWeatherLoader = homeWeatherFixture
-        }
         #endif
         let featureStore = ShellFeatureStore(
             timing: timing,
@@ -410,7 +396,6 @@ struct BighelpAppComposition {
             userIdentity: userIdentity,
             scheduledTasks: scheduledTasks,
             dashboardSource: dashboardSource,
-            dashboardWeatherLoader: dashboardWeatherLoader,
             dashboardVerifiedConnectionGeneration: { usesFixtures ? 0 : nil },
             conversationClient: conversationClient,
             voiceClient: usesFixtures ? nil : { _, _ in unavailable },

@@ -152,7 +152,6 @@ private final class SuspendedExternalRefreshDashboardSource: DashboardDataSource
 
     private static func snapshot(card: GenerativeUICard?) -> DashboardSnapshot {
         DashboardSnapshot(
-            weather: nil,
             inbox: card.map { card in
                 [DashboardInboxItem(
                     id: "channel.message:new-card",
@@ -207,7 +206,6 @@ private struct NotificationDashboardSource: DashboardDataSource {
             )]
         }
         return DashboardSnapshot(
-            weather: nil,
             inbox: inbox,
             attentionItems: [],
             completedItems: [],
@@ -233,7 +231,6 @@ private struct ClarifyNotificationDashboardSource: DashboardDataSource {
             expiresAt: nil
         )
         return DashboardSnapshot(
-            weather: nil,
             inbox: [],
             attentionItems: includesQuestion ? [DashboardAttentionItem(
                 id: eventID,

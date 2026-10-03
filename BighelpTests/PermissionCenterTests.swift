@@ -4,14 +4,6 @@ import Testing
 
 @MainActor
 struct PermissionCenterTests {
-    @Test func locationDisclosureNamesEveryAppleServiceThatReceivesTheCoordinate() {
-        let disclosure = PermissionKind.locationWhenInUse.purpose
-
-        #expect(disclosure.contains("Apple Weather"))
-        #expect(disclosure.contains("Apple location services"))
-        #expect(!disclosure.contains("only"))
-    }
-
     @Test func refreshReadsEveryStatusWithoutRequestingPermission() async {
         let recorder = PermissionClientRecorder()
         let center = PermissionCenter(
@@ -88,40 +80,6 @@ struct PermissionCenterTests {
         #expect(PermissionAuthorizationState.authorized.statusTitle == "Allowed")
     }
 
-    @Test func exposesGlobalLocationAvailabilityAndReducedAccuracy() async {
-        let recorder = PermissionClientRecorder()
-        recorder.statuses[.locationWhenInUse] = PermissionStatus(
-            authorization: .authorized,
-            location: LocationPermissionDetails(
-                servicesEnabled: true,
-                accuracy: .reduced
-            )
-        )
-        let center = PermissionCenter(
-            clients: recorder.clients,
-            isForeground: { true },
-            openSystemSettings: { }
-        )
-
-        await center.refresh()
-
-        let status = center.status(for: .locationWhenInUse)
-        #expect(status.authorization == .authorized)
-        #expect(status.location?.servicesEnabled == true)
-        #expect(status.location?.accuracy == .reduced)
-        #expect(recorder.locationAcquisitionCount == 0)
-
-        recorder.statuses[.locationWhenInUse] = PermissionStatus(
-            authorization: .restricted,
-            location: LocationPermissionDetails(
-                servicesEnabled: false,
-                accuracy: .unknown
-            )
-        )
-        await center.refresh()
-        #expect(center.recoveryAction(for: .locationWhenInUse) == .openSystemSettings)
-    }
-
     @Test func allowsOnlyOneRequestInFlight() async {
         let recorder = PermissionClientRecorder()
         let deferred = DeferredPermissionStatus()
@@ -135,7 +93,7 @@ struct PermissionCenterTests {
 
         let first = Task { await center.request(.notification) }
         while center.requestInFlight == nil { await Task.yield() }
-        #expect(await center.request(.locationWhenInUse) == false)
+        #expect(await center.request(.camera) == false)
         deferred.resume(.init(authorization: .authorized))
 
         #expect(await first.value)
@@ -239,24 +197,6 @@ struct PermissionCenterTests {
             )
         )
         #expect(notification.detailText == "Alerts On · Sounds Off · Badges Not Supported")
-
-        for authorization in [
-            PermissionAuthorizationState.notDetermined,
-            .denied,
-            .restricted,
-        ] {
-            let unavailableLocation = PermissionRowPresentation(
-                kind: .locationWhenInUse,
-                status: PermissionStatus(
-                    authorization: authorization,
-                    location: LocationPermissionDetails(
-                        servicesEnabled: true,
-                        accuracy: .full
-                    )
-                )
-            )
-            #expect(unavailableLocation.detailText == "Location Services On")
-        }
     }
 
     @Test func contextualDeniedAndRestrictedPermissionsOfferSettingsRecovery() {
@@ -288,7 +228,6 @@ private final class PermissionClientRecorder {
     private(set) var statusKinds: Set<PermissionKind> = []
     private(set) var requestKinds: [PermissionKind] = []
     private(set) var statusCallCount: [PermissionKind: Int] = [:]
-    private(set) var locationAcquisitionCount = 0
 
     var clients: [PermissionKind: PermissionClient] {
         Dictionary(uniqueKeysWithValues: PermissionKind.allCases.map { kind in

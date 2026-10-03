@@ -2056,27 +2056,6 @@ final class BighelpLaunchTests: BighelpUITestCase {
     }
 
     @MainActor
-    func testHomeWeatherSummaryIsCondensedCenteredAndAboveSignals() throws {
-        let app = makeApp()
-        app.launchArguments = ["-use-demo-fixtures"]
-        app.launch()
-
-        let weather = app.descendants(matching: .any).matching(
-            identifier: "dashboard.weather"
-        )
-        let inboxHeader = app.staticTexts["Agent Inbox"]
-        XCTAssertTrue(weather.firstMatch.waitForExistence(timeout: 3))
-        XCTAssertTrue(inboxHeader.exists)
-        let weatherFrame = (0..<weather.count).reduce(CGRect.null) { frame, index in
-            frame.union(weather.element(boundBy: index).frame)
-        }
-        // V3 fills the dashboard's twenty-point horizontal content insets.
-        XCTAssertEqual(weatherFrame.width, app.frame.width - 40, accuracy: 2)
-        XCTAssertEqual(weatherFrame.midX, app.frame.midX, accuracy: 2)
-        XCTAssertLessThan(weatherFrame.maxY, inboxHeader.frame.minY)
-    }
-
-    @MainActor
     func testHomeSignalsExposeManagementActions() throws {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures"]

@@ -24,7 +24,7 @@ final class ClarificationFallbackFixture: DashboardDataSource, DashboardClarific
             isMultiSelect: false,
             expiresAt: expiresAt
         )
-        return DashboardSnapshot(weather: nil, inbox: [], attentionItems: dismissed ? [] : [
+        return DashboardSnapshot(inbox: [], attentionItems: dismissed ? [] : [
             DashboardAttentionItem(id: request.eventID, title: "Clarification needed", detail: request.question,
                                    urgency: .important, sessionID: request.sessionID,
                                    interaction: .clarification(request), createdAt: .now)

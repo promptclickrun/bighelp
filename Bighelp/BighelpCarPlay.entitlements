@@ -10,8 +10,6 @@
     <true/>
     <key>aps-environment</key>
     <string>$(BIGHELP_APS_ENVIRONMENT)</string>
-	<key>com.apple.developer.weatherkit</key>
-	<true/>
 	<key>com.apple.developer.carplay-voice-based-conversation</key>
 	<true/>
 	<key>keychain-access-groups</key>

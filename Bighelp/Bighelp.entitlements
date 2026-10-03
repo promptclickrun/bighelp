@@ -10,8 +10,6 @@
     <true/>
     <key>aps-environment</key>
     <string>$(BIGHELP_APS_ENVIRONMENT)</string>
-	<key>com.apple.developer.weatherkit</key>
-	<true/>
 	<key>keychain-access-groups</key>
 	<array>
 		<string>$(AppIdentifierPrefix)app.loopdy.mobile.notification</string>

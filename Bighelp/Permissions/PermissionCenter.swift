@@ -1,5 +1,4 @@
 @preconcurrency import AVFoundation
-@preconcurrency import CoreLocation
 import Foundation
 import Observation
 import Speech
@@ -8,7 +7,6 @@ import UserNotifications
 
 enum PermissionKind: String, CaseIterable, Identifiable, Sendable {
     case notification
-    case locationWhenInUse
     case camera
     case microphone
     case speech
@@ -18,7 +16,6 @@ enum PermissionKind: String, CaseIterable, Identifiable, Sendable {
     var title: String {
         switch self {
         case .notification: "Notifications"
-        case .locationWhenInUse: "Approximate Location"
         case .camera: "Camera"
         case .microphone: "Microphone"
         case .speech: "Speech Recognition"
@@ -28,7 +25,6 @@ enum PermissionKind: String, CaseIterable, Identifiable, Sendable {
     var systemImage: String {
         switch self {
         case .notification: "bell.badge"
-        case .locationWhenInUse: "location"
         case .camera: "camera"
         case .microphone: "microphone"
         case .speech: "waveform"
@@ -39,8 +35,6 @@ enum PermissionKind: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .notification:
             "Receive proactive updates from your paired Hermes host."
-        case .locationWhenInUse:
-            "Use Apple Weather for live local conditions and Apple location services for the city label. Precise location is not needed."
         case .camera:
             "Scan pairing codes, use Reflective Vision, and attach photos you choose to chats."
         case .microphone:
@@ -98,38 +92,16 @@ struct NotificationPermissionDetails: Equatable, Sendable {
     let badge: PermissionSettingState
 }
 
-enum LocationAccuracyPermission: Equatable, Sendable {
-    case full
-    case reduced
-    case unknown
-
-    var title: String {
-        switch self {
-        case .full: "Precise"
-        case .reduced: "Approximate"
-        case .unknown: "Unavailable"
-        }
-    }
-}
-
-struct LocationPermissionDetails: Equatable, Sendable {
-    let servicesEnabled: Bool
-    let accuracy: LocationAccuracyPermission
-}
-
 struct PermissionStatus: Equatable, Sendable {
     let authorization: PermissionAuthorizationState
     let notification: NotificationPermissionDetails?
-    let location: LocationPermissionDetails?
 
     init(
         authorization: PermissionAuthorizationState,
-        notification: NotificationPermissionDetails? = nil,
-        location: LocationPermissionDetails? = nil
+        notification: NotificationPermissionDetails? = nil
     ) {
         self.authorization = authorization
         self.notification = notification
-        self.location = location
     }
 }
 
@@ -180,9 +152,8 @@ final class PermissionCenter {
     }
 
     convenience init(deviceTools: DeviceToolPermissions? = nil) {
-        let location = BighelpLocationPermissionClient()
         self.init(
-            clients: Self.liveClients(location: location),
+            clients: Self.liveClients(),
             isForeground: { UIApplication.shared.applicationState == .active },
             openSystemSettings: {
                 guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
@@ -273,9 +244,7 @@ final class PermissionCenter {
 }
 
 private extension PermissionCenter {
-    static func liveClients(
-        location: BighelpLocationPermissionClient
-    ) -> [PermissionKind: PermissionClient] {
+    static func liveClients() -> [PermissionKind: PermissionClient] {
         [
             .notification: PermissionClient(
                 status: { await notificationStatus() },
@@ -285,10 +254,6 @@ private extension PermissionCenter {
                     )
                     return await notificationStatus()
                 }
-            ),
-            .locationWhenInUse: PermissionClient(
-                status: { await location.status() },
-                request: { await location.requestWhenInUse() }
             ),
             .camera: PermissionClient(
                 status: { captureStatus(for: .video) },
@@ -390,70 +355,6 @@ private extension PermissionCenter {
     }
 }
 
-@MainActor
-private final class BighelpLocationPermissionClient: NSObject, @preconcurrency CLLocationManagerDelegate {
-    private let manager = CLLocationManager()
-    private var continuation: CheckedContinuation<PermissionStatus, Never>?
-
-    override init() {
-        super.init()
-        manager.delegate = self
-        manager.desiredAccuracy = kCLLocationAccuracyThreeKilometers
-    }
-
-    func status() async -> PermissionStatus {
-        let servicesEnabled = await Task.detached {
-            CLLocationManager.locationServicesEnabled()
-        }.value
-        let authorization: PermissionAuthorizationState = if !servicesEnabled {
-            .restricted
-        } else {
-            switch manager.authorizationStatus {
-            case .notDetermined: .notDetermined
-            case .restricted: .restricted
-            case .denied: .denied
-            case .authorizedAlways, .authorizedWhenInUse: .authorized
-            @unknown default: .restricted
-            }
-        }
-        let accuracy: LocationAccuracyPermission
-        if authorization == .authorized {
-            accuracy = switch manager.accuracyAuthorization {
-            case .fullAccuracy: .full
-            case .reducedAccuracy: .reduced
-            @unknown default: .unknown
-            }
-        } else {
-            accuracy = .unknown
-        }
-        return PermissionStatus(
-            authorization: authorization,
-            location: LocationPermissionDetails(
-                servicesEnabled: servicesEnabled,
-                accuracy: accuracy
-            )
-        )
-    }
-
-    func requestWhenInUse() async -> PermissionStatus {
-        let current = await status()
-        guard current.authorization == .notDetermined else { return current }
-        return await withCheckedContinuation { continuation in
-            self.continuation = continuation
-            manager.requestWhenInUseAuthorization()
-        }
-    }
-
-    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        guard manager.authorizationStatus != .notDetermined else { return }
-        let pending = continuation
-        continuation = nil
-        Task {
-            pending?.resume(returning: await status())
-        }
-    }
-}
-
 enum PermissionRowAction: Equatable, Sendable {
     case none
     case request
@@ -486,11 +387,6 @@ struct PermissionRowPresentation: Equatable, Sendable {
     var detailText: String? {
         if let notification = status.notification {
             return "Alerts \(notification.alert.title) · Sounds \(notification.sound.title) · Badges \(notification.badge.title)"
-        }
-        if let location = status.location {
-            guard location.servicesEnabled else { return "Location Services Off" }
-            guard status.authorization == .authorized else { return "Location Services On" }
-            return "Location Services On · \(location.accuracy.title) accuracy"
         }
         return nil
     }

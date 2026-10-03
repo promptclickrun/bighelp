@@ -3460,7 +3460,6 @@ struct ChatModelTests {
             expiresAt: nil
         )
         let snapshot = DashboardSnapshot(
-            weather: nil,
             inbox: [],
             attentionItems: [
                 DashboardAttentionItem(

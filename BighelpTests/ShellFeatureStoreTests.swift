@@ -2460,6 +2460,6 @@ private final class CatchUpDashboardSource: DashboardDataSource {
     var loadCount = 0
     func loadDashboard() async throws -> DashboardSnapshot {
         loadCount += 1
-        return DashboardSnapshot(weather: nil, inbox: [], attentionItems: [], completedItems: [], agents: [])
+        return DashboardSnapshot(inbox: [], attentionItems: [], completedItems: [], agents: [])
     }
 }

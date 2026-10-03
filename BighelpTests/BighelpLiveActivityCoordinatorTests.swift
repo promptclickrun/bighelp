@@ -367,7 +367,6 @@ private final class NotificationReceiptDashboardSource: DashboardDataSource {
     func loadDashboard() async throws -> DashboardSnapshot {
         loadCount += 1
         return DashboardSnapshot(
-            weather: nil,
             inbox: [],
             attentionItems: loadCount == 1 ? [] : [
                 DashboardAttentionItem(
@@ -396,7 +395,6 @@ private final class SuspendedNotificationDashboardSource: DashboardDataSource {
     func loadDashboard() async throws -> DashboardSnapshot {
         await gate.run()
         return DashboardSnapshot(
-            weather: nil,
             inbox: [],
             attentionItems: [],
             completedItems: [],

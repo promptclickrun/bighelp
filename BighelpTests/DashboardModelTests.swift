@@ -63,66 +63,9 @@ struct DashboardModelTests {
         #expect(DashboardInboxInteractionPolicy.primaryAction == .openSession)
     }
 
-    @Test func unavailableDeviceWeatherDoesNotUseAnInboxForecastForAnotherLocation() async throws {
-        let reference = Date(timeIntervalSince1970: 1_788_000_300)
-        let card = try weatherCard(cardID: String(repeating: "7", count: 32), sourceTimestamp: reference,
-                                   location: "A different city", temperature: 70)
-        let model = DashboardModel(source: FlakyWeatherDashboardSource(card: card),
-                                   weather: WeatherLoaderFixture(result: .success(nil)), now: { reference })
-        await model.load()
-        for _ in 0..<20 { await Task.yield() }
-        #expect(model.snapshot?.weather == nil,
-                "A production location-weather panel must never substitute an agent card's city")
-        #expect(model.snapshot?.inbox.count == 1)
-    }
-
-    @Test func weatherRefreshWorksWithoutAHostSnapshot() async throws {
-        let expected = DashboardWeather(city: "Device city", condition: "Clear", temperature: 61,
-                                        high: 65, low: 52, systemImage: "sun.max.fill")
-        let model = DashboardModel(source: DashboardFixtureSource(shouldFail: true),
-                                   weather: WeatherLoaderFixture(result: .success(expected)))
-        await model.refreshWeather()
-        #expect(model.currentLocationWeather == expected)
-        #expect(model.snapshot == nil)
-    }
-
-    @Test func simultaneousWeatherRefreshesShareOneRequest() async {
-        let loader = CountingDeferredWeatherLoader()
-        let model = DashboardModel(source: DashboardFixtureSource(), weather: loader)
-        let first = Task { await model.refreshWeather() }
-        let second = Task { await model.refreshWeather() }
-        for _ in 0..<100 where loader.loadCount == 0 { await Task.yield() }
-        for _ in 0..<20 { await Task.yield() }
-        #expect(loader.loadCount == 1)
-        loader.finishAll()
-        await first.value
-        await second.value
-    }
-
-    @Test func resetRejectsStandaloneWeatherCompletion() async {
-        let loader = CountingDeferredWeatherLoader()
-        let model = DashboardModel(source: DashboardFixtureSource(), weather: loader)
-        let loading = Task { await model.refreshWeather() }
-        for _ in 0..<100 where loader.loadCount == 0 { await Task.yield() }
-        #expect(loader.loadCount == 1)
-        model.resetForAccountBoundary()
-        loader.finishAll()
-        await loading.value
-        #expect(model.currentLocationWeather == nil)
-        #expect(model.snapshot == nil)
-    }
-
-    @Test func newerSameAccountDashboardLoadOwnsSnapshotAndWeather() async {
+    @Test func newerSameAccountDashboardLoadOwnsSnapshot() async {
         let source = InterleavedDashboardSource()
-        let weather = WeatherLoaderSpy(result: DashboardWeather(
-            city: "Current City",
-            condition: "Clear",
-            temperature: 72,
-            high: 75,
-            low: 60,
-            systemImage: "sun.max.fill"
-        ))
-        let model = DashboardModel(source: source, weather: weather)
+        let model = DashboardModel(source: source)
 
         let olderLoad = Task { await model.load() }
         await source.waitUntilLoadStarts(count: 1)
@@ -135,7 +78,6 @@ struct DashboardModelTests {
         await olderLoad.value
 
         #expect(model.snapshot?.inbox.map(\.title) == ["Newest update"])
-        #expect(weather.loadCount == 1)
     }
 
     @Test func supersededCleanupCannotRemoveAReplacementSignalFromTheNewerLoad() async {
@@ -161,190 +103,6 @@ struct DashboardModelTests {
         #expect(six > five + 80)
     }
 
-    @Test func liveWeatherStartsBeforeStaleSignalCleanupFinishes() async throws {
-        let source = SuspendedCleanupDashboardSource()
-        let weather = WeatherLoaderSpy(result: DashboardWeather(
-            city: "Kansas City, MO",
-            condition: "Mostly Clear",
-            temperature: 80,
-            high: 100,
-            low: 79,
-            systemImage: "sun.max.fill",
-            sourceName: "Apple Weather"
-        ))
-        let model = DashboardModel(source: source, weather: weather)
-
-        let loading = Task { await model.load() }
-        await source.waitUntilCleanupStarts()
-        for _ in 0..<100 where weather.loadCount == 0 {
-            await Task.yield()
-        }
-
-        #expect(weather.loadCount == 1)
-        #expect(model.snapshot?.weather?.city == "Kansas City, MO")
-
-        source.finishCleanup()
-        await loading.value
-    }
-
-    @Test func liveLocationWeatherEnrichesHomeWithoutReplacingHermesDashboardContent() async throws {
-        let base = WeatherEnrichmentBaseSource()
-        let weather = DashboardWeather(
-            city: "Kansas City, MO",
-            condition: "Mostly Clear",
-            temperature: 80,
-            high: 100,
-            low: 79,
-            systemImage: "sun.max.fill",
-            sourceName: "Apple Weather",
-            sourceTimestamp: Date(timeIntervalSince1970: 1_788_000_000)
-        )
-        let model = DashboardModel(
-            source: base,
-            weather: WeatherLoaderFixture(result: .success(weather))
-        )
-
-        await model.load()
-        while model.snapshot?.weather != weather { await Task.yield() }
-        let snapshot = try #require(model.snapshot)
-
-        #expect(snapshot.weather == weather)
-        #expect(snapshot.inbox.map(\.id) == ["hermes-update"])
-        #expect(snapshot.attentionItems.map(\.id) == ["hermes-decision"])
-        #expect(snapshot.completedItems.map(\.id) == ["hermes-completion"])
-    }
-
-    @Test func weatherFailureNeverHidesHermesDashboardAndMutationsStillReachHermes() async throws {
-        let base = WeatherEnrichmentBaseSource()
-        let model = DashboardModel(
-            source: base,
-            weather: WeatherLoaderFixture(result: .failure(WeatherLoaderFixture.Error.unavailable))
-        )
-
-        await model.load()
-        let snapshot = try #require(model.snapshot)
-        await model.setUpdateRead(id: "hermes-update", isRead: true)
-        await model.setUpdatePinned(id: "hermes-update", isPinned: true)
-        await model.dismissUpdate(id: "hermes-update")
-
-        #expect(snapshot.weather == nil)
-        #expect(snapshot.inbox.map(\.id) == ["hermes-update"])
-        let mutation = try #require(base.stateMutation)
-        #expect(mutation.0 == "hermes-update")
-        #expect(mutation.1)
-        #expect(mutation.2)
-        #expect(base.dismissedID == "hermes-update")
-    }
-
-    @Test func hermesRefreshFailureKeepsAlreadyLoadedLiveLocationWeather() async throws {
-        let source = FlakyDashboardSource()
-        let weather = DashboardWeather(
-            city: "Kansas City, MO",
-            condition: "Mostly Clear",
-            temperature: 80,
-            high: 100,
-            low: 79,
-            systemImage: "sun.max.fill",
-            sourceName: "Apple Weather"
-        )
-        let model = DashboardModel(
-            source: source,
-            weather: WeatherLoaderFixture(result: .success(weather))
-        )
-
-        await model.load()
-        while model.snapshot?.weather != weather { await Task.yield() }
-        source.shouldFail = true
-        await model.refresh()
-
-        #expect(model.snapshot?.weather == weather)
-        #expect(model.lastUpdatedLabel == "Could not refresh")
-    }
-
-    @Test func slowLiveWeatherNeverDelaysHermesDashboardAndEnrichesItWhenReady() async {
-        let base = WeatherEnrichmentBaseSource()
-        let weather = DeferredWeatherLoader()
-        let model = DashboardModel(source: base, weather: weather)
-        let loading = Task { await model.load() }
-
-        await weather.waitUntilLoadStarts()
-        await loading.value
-
-        #expect(model.state == .loaded)
-        #expect(model.snapshot?.inbox.map(\.id) == ["hermes-update"])
-
-        let liveWeather = DashboardWeather(
-            city: "Kansas City, MO",
-            condition: "Mostly Clear",
-            temperature: 80,
-            high: 100,
-            low: 79,
-            systemImage: "sun.max.fill",
-            sourceName: "Apple Weather",
-            sourceTimestamp: Date(timeIntervalSince1970: 1_788_000_000)
-        )
-        weather.resume(returning: liveWeather)
-        while model.snapshot?.weather != liveWeather { await Task.yield() }
-
-        #expect(model.snapshot?.inbox.map(\.id) == ["hermes-update"])
-        #expect(model.snapshot?.attentionItems.map(\.id) == ["hermes-decision"])
-        #expect(model.snapshot?.completedItems.map(\.id) == ["hermes-completion"])
-    }
-
-    @Test func accountResetRejectsLiveWeatherFromThePreviousGeneration() async {
-        let weather = DeferredWeatherLoader()
-        let model = DashboardModel(source: WeatherEnrichmentBaseSource(), weather: weather)
-
-        await model.load()
-        await weather.waitUntilLoadStarts()
-        model.resetForAccountBoundary()
-        weather.resume(returning: DashboardWeather(
-            city: "Old account city",
-            condition: "Clear",
-            temperature: 70,
-            high: 75,
-            low: 60,
-            systemImage: "sun.max.fill"
-        ))
-        await weather.waitUntilLoadFinishes()
-        await Task.yield()
-
-        #expect(model.state == .idle)
-        #expect(model.snapshot == nil)
-    }
-
-    @Test func cancelledLocationWaiterDoesNotStrandTheNextWeatherRequest() async throws {
-        let requests = DashboardWeatherLocationRequestPool<Int>()
-        var requestCount = 0
-        let first = Task {
-            try await requests.value {
-                requestCount += 1
-            }
-        }
-        while requests.pendingCount == 0 { await Task.yield() }
-
-        first.cancel()
-        do {
-            _ = try await first.value
-            Issue.record("A cancelled location waiter unexpectedly completed.")
-        } catch is CancellationError {
-            // Expected: cancellation must remove and resume this waiter.
-        }
-        #expect(requests.pendingCount == 0)
-
-        let second = Task {
-            try await requests.value {
-                requestCount += 1
-            }
-        }
-        while requests.pendingCount == 0 { await Task.yield() }
-        #expect(requestCount == 2)
-
-        requests.finish(returning: 42)
-        #expect(try await second.value == 42)
-        #expect(requests.pendingCount == 0)
-    }
-
     @Test func resetInvalidatesAnInFlightRemoteLoad() async {
         let source = DeferredDashboardSource()
         let model = DashboardModel(source: source)
@@ -353,7 +111,6 @@ struct DashboardModelTests {
         await source.waitUntilLoadStarts()
         model.resetForAccountBoundary()
         source.resumeLoad(with: DashboardSnapshot(
-            weather: nil,
             inbox: [DashboardInboxItem(
                 id: "old-account-update",
                 title: "Old account",
@@ -409,132 +166,6 @@ struct DashboardModelTests {
         #expect(model.state == .loaded)
         #expect(model.snapshot == snapshot)
         #expect(model.lastUpdatedLabel == "Could not refresh")
-    }
-
-    @Test func newestValidatedPersistedWeatherCardProjectsIntoTheHomeWeatherSlot() throws {
-        let now = Date(timeIntervalSince1970: 1_800_000_000)
-        let older = try weatherCard(
-            cardID: String(repeating: "1", count: 32),
-            sourceTimestamp: now.addingTimeInterval(-1_800),
-            location: "Older City",
-            temperature: 68
-        )
-        let newest = try weatherCard(
-            cardID: String(repeating: "2", count: 32),
-            sourceTimestamp: now.addingTimeInterval(-300),
-            location: "Kansas City, MO",
-            temperature: 79
-        )
-
-        let projected = try #require(DashboardWeatherProjection.project(
-            from: [
-                DashboardInboxItem(
-                    id: "newer-event",
-                    title: "Forecast",
-                    detail: "Current forecast",
-                    agentName: "Juno",
-                    status: "Now",
-                    card: newest
-                ),
-                DashboardInboxItem(
-                    id: "older-event",
-                    title: "Forecast",
-                    detail: "Older forecast",
-                    agentName: "Juno",
-                    status: "Earlier",
-                    card: older
-                ),
-            ],
-            now: now
-        ))
-
-        #expect(projected.cardID == String(repeating: "2", count: 32))
-        #expect(projected.city == "Kansas City, MO")
-        #expect(projected.condition == "Clear")
-        #expect(projected.temperature == 79)
-        #expect(projected.high == 84)
-        #expect(projected.low == 66)
-        #expect(projected.systemImage == "sun.max.fill")
-        #expect(projected.sourceName == "Fixture Weather Service")
-        #expect(projected.freshness == .fresh)
-    }
-
-    @Test func weatherProjectionUsesSourceTimeAndValidityInsteadOfUntrustedAgeCopy() throws {
-        let now = Date(timeIntervalSince1970: 1_800_000_000)
-        let stale = try weatherCard(
-            cardID: String(repeating: "3", count: 32),
-            sourceTimestamp: now.addingTimeInterval(-3 * 60 * 60),
-            location: "Stale City",
-            temperature: 70,
-            ageSeconds: 1
-        )
-        let expiredByAge = try weatherCard(
-            cardID: String(repeating: "4", count: 32),
-            sourceTimestamp: now.addingTimeInterval(-7 * 60 * 60),
-            location: "Expired City",
-            temperature: 70
-        )
-        let expiredByValidity = try weatherCard(
-            cardID: String(repeating: "5", count: 32),
-            sourceTimestamp: now.addingTimeInterval(-600),
-            location: "Expired Validity",
-            temperature: 70,
-            validUntil: now.addingTimeInterval(-1)
-        )
-
-        #expect(DashboardWeatherProjection.project(
-            from: [weatherItem(id: "stale", card: stale)],
-            now: now
-        )?.freshness == .stale)
-        #expect(DashboardWeatherProjection.project(
-            from: [weatherItem(id: "old", card: expiredByAge)],
-            now: now
-        ) == nil)
-        #expect(DashboardWeatherProjection.project(
-            from: [weatherItem(id: "expired", card: expiredByValidity)],
-            now: now
-        ) == nil)
-    }
-
-    @Test func refreshFailureKeepsProjectedPersistedWeatherVisible() async throws {
-        let now = Date(timeIntervalSince1970: 1_800_000_000)
-        let source = FlakyWeatherDashboardSource(card: try weatherCard(
-            cardID: String(repeating: "6", count: 32),
-            sourceTimestamp: now.addingTimeInterval(-60),
-            location: "Kansas City, MO",
-            temperature: 79
-        ))
-        let model = DashboardModel(source: source, now: { now })
-
-        await model.load()
-        let projected = model.snapshot?.weather
-        source.shouldFail = true
-        await model.refresh()
-
-        #expect(projected?.city == "Kansas City, MO")
-        #expect(model.snapshot?.weather == projected)
-        #expect(model.lastUpdatedLabel == "Could not refresh")
-    }
-
-    @Test func refreshFailureDoesNotKeepAProjectedWeatherCardPastItsMaximumAge() async throws {
-        let sourceTime = Date(timeIntervalSince1970: 1_800_000_000)
-        var clock = sourceTime.addingTimeInterval(60)
-        let source = FlakyWeatherDashboardSource(card: try weatherCard(
-            cardID: String(repeating: "7", count: 32),
-            sourceTimestamp: sourceTime,
-            location: "Kansas City, MO",
-            temperature: 79
-        ))
-        let model = DashboardModel(source: source, now: { clock })
-
-        await model.load()
-        #expect(model.snapshot?.weather != nil)
-        source.shouldFail = true
-        clock = sourceTime.addingTimeInterval(7 * 60 * 60)
-        await model.refresh()
-
-        #expect(model.snapshot?.weather == nil)
-        #expect(model.snapshot?.inbox.map(\.id) == ["weather"])
     }
 
     @Test func individualDismissalRemovesOnlyTheChosenRowAfterHermesAcceptsIt() async {
@@ -850,7 +481,6 @@ private final class ClarificationDashboardSource: DashboardDataSource, Dashboard
             expiresAt: expiresAt
         )
         return DashboardSnapshot(
-            weather: nil,
             inbox: [],
             attentionItems: [DashboardAttentionItem(
                 id: request.eventID,
@@ -883,132 +513,6 @@ private final class ClarificationDashboardSource: DashboardDataSource, Dashboard
 }
 
 @MainActor
-private func weatherItem(id: String, card: GenerativeUICard) -> DashboardInboxItem {
-    DashboardInboxItem(
-        id: id,
-        title: "Forecast",
-        detail: "Weather update",
-        agentName: "Juno",
-        status: "Now",
-        card: card
-    )
-}
-
-private func weatherCard(
-    cardID: String,
-    sourceTimestamp: Date,
-    location: String,
-    temperature: Double,
-    ageSeconds: Int = 300,
-    validUntil: Date? = nil
-) throws -> GenerativeUICard {
-    let formatter = ISO8601DateFormatter()
-    var provenance: [String: Any] = [
-        "source_name": "Fixture Weather Service",
-        "source_timestamp": formatter.string(from: sourceTimestamp),
-        "retrieved_at": formatter.string(from: sourceTimestamp.addingTimeInterval(60)),
-        "cache_status": "live",
-        "age_seconds": ageSeconds,
-    ]
-    if let validUntil {
-        provenance["valid_until"] = formatter.string(from: validUntil)
-    }
-    return try GenerativeUICard.decode([
-        "schema": "loopdy.generative_ui",
-        "version": 2,
-        "component": "weather_forecast",
-        "title": "Forecast",
-        "data": [
-            "location": location,
-            "timezone": "America/Chicago",
-            "units": "us",
-            "current": [
-                "condition_code": "clear",
-                "condition_label": "Clear",
-                "temperature": temperature,
-            ],
-            "periods": [[
-                "id": "today",
-                "label": "Today",
-                "start_at": formatter.string(from: sourceTimestamp),
-                "end_at": formatter.string(from: sourceTimestamp.addingTimeInterval(3_600)),
-                "condition_code": "clear",
-                "condition_label": "Clear",
-                "high": 84,
-                "low": 66,
-                "precipitation_percent": 5,
-            ]],
-        ],
-        "provenance": provenance,
-        "content_hash": String(repeating: "a", count: 64),
-        "created_at": formatter.string(from: sourceTimestamp.addingTimeInterval(60)),
-        "origin": "live",
-        "card_id": cardID,
-    ])
-}
-
-@MainActor
-private final class FlakyWeatherDashboardSource: DashboardDataSource {
-    let card: GenerativeUICard
-    var shouldFail = false
-
-    init(card: GenerativeUICard) {
-        self.card = card
-    }
-
-    func loadDashboard() async throws -> DashboardSnapshot {
-        if shouldFail { throw DashboardFixtureError.unavailable }
-        return DashboardSnapshot(
-            weather: nil,
-            inbox: [weatherItem(id: "weather", card: card)],
-            attentionItems: [],
-            completedItems: [],
-            agents: []
-        )
-    }
-}
-
-@MainActor
-private final class SuspendedCleanupDashboardSource: DashboardDataSource {
-    private var cleanupContinuation: CheckedContinuation<Void, Never>?
-    private var cleanupStarted = false
-
-    func loadDashboard() async throws -> DashboardSnapshot {
-        DashboardSnapshot(
-            weather: nil,
-            inbox: [DashboardInboxItem(
-                id: "closed-update",
-                title: "Closed update",
-                detail: "Cleanup must not block weather.",
-                agentName: "Juno",
-                status: "Complete",
-                isSessionClosed: true,
-                createdAt: Date()
-            )],
-            attentionItems: [],
-            completedItems: [],
-            agents: []
-        )
-    }
-
-    func dismissDashboardEvent(id: String) async throws {
-        cleanupStarted = true
-        await withCheckedContinuation { continuation in
-            cleanupContinuation = continuation
-        }
-    }
-
-    func waitUntilCleanupStarts() async {
-        while !cleanupStarted { await Task.yield() }
-    }
-
-    func finishCleanup() {
-        cleanupContinuation?.resume()
-        cleanupContinuation = nil
-    }
-}
-
-@MainActor
 private final class ManagingDashboardSource: DashboardDataSource {
     struct BulkDismissal: Equatable {
         let types: [String]
@@ -1031,7 +535,6 @@ private final class ManagingDashboardSource: DashboardDataSource {
     func loadDashboard() async throws -> DashboardSnapshot {
         loadCount += 1
         return DashboardSnapshot(
-            weather: nil,
             inbox: [
                 DashboardInboxItem(
                     id: "update-1",
@@ -1104,7 +607,6 @@ private final class DashboardApprovalResponseSource:
 
     func loadDashboard() async throws -> DashboardSnapshot {
         DashboardSnapshot(
-            weather: nil,
             inbox: [],
             attentionItems: [DashboardAttentionItem(
                 id: itemID,
@@ -1146,7 +648,6 @@ private final class ChangingDashboardSource: DashboardDataSource {
     func loadDashboard() async throws -> DashboardSnapshot {
         loadCount += 1
         return DashboardSnapshot(
-            weather: nil,
             inbox: [DashboardInboxItem(
                 id: "update",
                 title: "Update \(loadCount)",
@@ -1170,7 +671,6 @@ private final class FlakyDashboardSource: DashboardDataSource {
             throw DashboardFixtureError.unavailable
         }
         return DashboardSnapshot(
-            weather: nil,
             inbox: [DashboardInboxItem(
                 id: "stable-update",
                 title: "Stable update",
@@ -1192,7 +692,6 @@ private final class RetentionDashboardSource: DashboardDataSource {
 
     func loadDashboard() async throws -> DashboardSnapshot {
         DashboardSnapshot(
-            weather: nil,
             inbox: [
                 DashboardInboxItem(
                     id: "expired-update",
@@ -1243,7 +742,6 @@ private final class ClosedSessionDashboardSource: DashboardDataSource {
 
     func loadDashboard() async throws -> DashboardSnapshot {
         DashboardSnapshot(
-            weather: nil,
             inbox: [
                 DashboardInboxItem(
                     id: "closed-update",
@@ -1300,7 +798,6 @@ private final class TerminalSessionDashboardSource: DashboardDataSource {
 
     func loadDashboard() async throws -> DashboardSnapshot {
         DashboardSnapshot(
-            weather: nil,
             inbox: [DashboardInboxItem(
                 id: "terminal-update",
                 title: "Terminal update",
@@ -1351,124 +848,6 @@ private final class DeferredDashboardSource: DashboardDataSource {
 }
 
 @MainActor
-private final class WeatherEnrichmentBaseSource: DashboardDataSource {
-    var stateMutation: (String, Bool, Bool)?
-    var dismissedID: String?
-
-    func loadDashboard() async throws -> DashboardSnapshot {
-        DashboardSnapshot(
-            weather: nil,
-            inbox: [DashboardInboxItem(
-                id: "hermes-update",
-                title: "Agent update",
-                detail: "Hermes content remains intact",
-                agentName: "Juno",
-                status: "Now"
-            )],
-            attentionItems: [DashboardAttentionItem(
-                id: "hermes-decision",
-                title: "Review",
-                detail: "A decision remains intact",
-                urgency: .important
-            )],
-            completedItems: [DashboardCompletion(
-                id: "hermes-completion",
-                title: "Morning task",
-                detail: "Completed successfully",
-                agentName: "Juno",
-                completedLabel: "Now"
-            )],
-            agents: []
-        )
-    }
-
-    func setDashboardEventState(id: String, isRead: Bool, isPinned: Bool) async throws {
-        stateMutation = (id, isRead, isPinned)
-    }
-
-    func dismissDashboardEvent(id: String) async throws {
-        dismissedID = id
-    }
-}
-
-@MainActor
-private struct WeatherLoaderFixture: DashboardWeatherLoading {
-    enum Error: Swift.Error {
-        case unavailable
-    }
-
-    let result: Result<DashboardWeather?, Swift.Error>
-
-    func loadCurrentWeather() async throws -> DashboardWeather? {
-        try result.get()
-    }
-}
-
-@MainActor
-private final class WeatherLoaderSpy: DashboardWeatherLoading {
-    let result: DashboardWeather?
-    private(set) var loadCount = 0
-
-    init(result: DashboardWeather?) {
-        self.result = result
-    }
-
-    func loadCurrentWeather() async throws -> DashboardWeather? {
-        loadCount += 1
-        return result
-    }
-}
-
-@MainActor
-private final class DeferredWeatherLoader: DashboardWeatherLoading {
-    private var continuation: CheckedContinuation<DashboardWeather?, any Error>?
-    private var loadStarted = false
-    private var loadFinished = false
-
-    func loadCurrentWeather() async throws -> DashboardWeather? {
-        loadStarted = true
-        let weather = try await withCheckedThrowingContinuation { continuation in
-            self.continuation = continuation
-        }
-        loadFinished = true
-        return weather
-    }
-
-    func waitUntilLoadStarts() async {
-        while !loadStarted { await Task.yield() }
-    }
-
-    func waitUntilLoadFinishes() async {
-        while !loadFinished { await Task.yield() }
-    }
-
-    func resume(returning weather: DashboardWeather?) {
-        continuation?.resume(returning: weather)
-        continuation = nil
-    }
-}
-
-@MainActor
-private final class CountingDeferredWeatherLoader: DashboardWeatherLoading {
-    private var continuations: [CheckedContinuation<DashboardWeather?, any Error>] = []
-    private(set) var loadCount = 0
-
-    func loadCurrentWeather() async throws -> DashboardWeather? {
-        loadCount += 1
-        return try await withCheckedThrowingContinuation { continuations.append($0) }
-    }
-
-    func finishAll() {
-        let pending = continuations
-        continuations.removeAll()
-        for continuation in pending {
-            continuation.resume(returning: DashboardWeather(city: "Device city", condition: "Clear",
-                temperature: 61, high: 65, low: 52, systemImage: "sun.max.fill"))
-        }
-    }
-}
-
-@MainActor
 private final class InterleavedDashboardSource: DashboardDataSource {
     private var continuations: [CheckedContinuation<DashboardSnapshot, any Error>] = []
 
@@ -1492,7 +871,6 @@ private final class InterleavedDashboardSource: DashboardDataSource {
 
     private static func snapshot(title: String) -> DashboardSnapshot {
         DashboardSnapshot(
-            weather: nil,
             inbox: [DashboardInboxItem(
                 id: "shared-update",
                 title: title,
@@ -1532,7 +910,6 @@ private final class StaleDismissalDashboardSource: DashboardDataSource {
     }
 
     private static let snapshot = DashboardSnapshot(
-        weather: nil,
         inbox: [
             DashboardInboxItem(
                 id: "update-1",
@@ -1565,7 +942,6 @@ private final class InterleavedCleanupDashboardSource: DashboardDataSource {
         loadCount += 1
         if loadCount == 1 {
             return DashboardSnapshot(
-                weather: nil,
                 inbox: [DashboardInboxItem(
                     id: "shared-update",
                     title: "Closed update",
@@ -1581,7 +957,6 @@ private final class InterleavedCleanupDashboardSource: DashboardDataSource {
             )
         }
         return DashboardSnapshot(
-            weather: nil,
             inbox: [DashboardInboxItem(
                 id: "shared-update",
                 title: "Replacement update",
@@ -1623,7 +998,6 @@ private struct ManySignalsDashboardSource: DashboardDataSource {
 
     func loadDashboard() async throws -> DashboardSnapshot {
         DashboardSnapshot(
-            weather: nil,
             inbox: (1...count).map { index in
                 DashboardInboxItem(
                     id: "update-\(index)",

@@ -80,13 +80,10 @@ struct DashboardView: View {
     @State private var model: DashboardModel
     @State private var greetingDate = Date()
     @State private var isClearAttentionConfirmationPresented = false
-    @State private var hasPreparedDeviceWeather = false
-    @State private var refreshWeatherAfterBackground = false
     @State private var knownAttentionIDs: Set<String>?
     @State private var companionReaction: CompanionReaction = .idle
     @State private var companionReactionTask: Task<Void, Never>?
     let connection: HostConnectionStatus
-    let permissionCenter: PermissionCenter?
     let onInboxItemTap: (DashboardInboxItem) -> Void
     let onAttentionItemTap: (DashboardAttentionItem) -> Void
     let onWorkItemTap: (DashboardWorkItem) -> Void
@@ -94,14 +91,12 @@ struct DashboardView: View {
     init(
         model: DashboardModel,
         connection: HostConnectionStatus = .init(dashboardIsConnected: true),
-        permissionCenter: PermissionCenter? = nil,
         onInboxItemTap: @escaping (DashboardInboxItem) -> Void = { _ in },
         onAttentionItemTap: @escaping (DashboardAttentionItem) -> Void = { _ in },
         onWorkItemTap: @escaping (DashboardWorkItem) -> Void = { _ in }
     ) {
         _model = State(initialValue: model)
         self.connection = connection
-        self.permissionCenter = permissionCenter
         self.onInboxItemTap = onInboxItemTap
         self.onAttentionItemTap = onAttentionItemTap
         self.onWorkItemTap = onWorkItemTap
@@ -136,15 +131,6 @@ struct DashboardView: View {
                 }
                 .listRowSeparator(.hidden)
                 .listRowBackground(theme.canvas)
-                if model.usesDeviceLocalWeather {
-                    DisclosureGroup("Weather") {
-                        deviceWeatherPanel
-                    }
-                    .tint(theme.secondaryText)
-                    .accessibilityElement(children: .contain)
-                    .accessibilityIdentifier("dashboard.weather.disclosure")
-                    .listRowBackground(theme.canvas)
-                }
             }
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
@@ -209,14 +195,6 @@ struct DashboardView: View {
         ) {
             Button("Okay", role: .cancel) { model.clearNotificationOpenMessage() }
         }
-        .task {
-            let isReturningToHome = hasPreparedDeviceWeather
-            hasPreparedDeviceWeather = true
-            async let weatherPreparation: Void = isReturningToHome
-                ? refreshDeviceWeather()
-                : prepareDeviceWeatherIfNeeded()
-            await weatherPreparation
-        }
         .task(id: connection.phase) {
             if model.state == .idle { await model.load() }
         }
@@ -237,12 +215,6 @@ struct DashboardView: View {
         #endif
         .task(id: scenePhase) {
             await refreshGreetingWhileActive()
-        }
-        .onChange(of: scenePhase) { _, phase in
-            if phase == .background { refreshWeatherAfterBackground = true }
-            guard phase == .active, refreshWeatherAfterBackground else { return }
-            refreshWeatherAfterBackground = false
-            Task { await refreshDeviceWeather() }
         }
         .onChange(of: homeAttentionIDs, initial: true) { _, IDs in
             reconcileCompanionAttention(IDs)
@@ -328,14 +300,6 @@ struct DashboardView: View {
             workInFlight(model.workInFlightItems)
             inbox(snapshot.inbox)
             completed(model.presentedCompletedItems)
-            if !model.usesDeviceLocalWeather, let weather = snapshot.weather {
-                DisclosureGroup("Weather") {
-                    self.weather(weather)
-                }
-                .tint(theme.secondaryText)
-                .accessibilityElement(children: .contain)
-                .accessibilityIdentifier("dashboard.weather.disclosure")
-            }
         }
     }
 
@@ -388,41 +352,8 @@ struct DashboardView: View {
         .accessibilityElement(children: .combine)
     }
 
-    private func prepareDeviceWeatherIfNeeded() async {
-        guard model.usesDeviceLocalWeather else { return }
-        if let permissionCenter {
-            await permissionCenter.refresh(.locationWhenInUse)
-            guard permitsLocationWeather(
-                permissionCenter.status(for: .locationWhenInUse).authorization
-            ) else { return }
-        }
-        guard model.weatherState == .idle else { return }
-        await model.refreshWeather()
-    }
-
     private func refreshHome() async {
-        async let dashboardRefresh: Void = model.refresh()
-        async let weatherRefresh: Void = refreshDeviceWeather()
-        await dashboardRefresh
-        await weatherRefresh
-    }
-
-    private func refreshDeviceWeather() async {
-        guard model.usesDeviceLocalWeather else { return }
-        if let permissionCenter {
-            await permissionCenter.refresh(.locationWhenInUse)
-            guard permitsLocationWeather(
-                permissionCenter.status(for: .locationWhenInUse).authorization
-            ) else { return }
-        }
-        await model.refreshWeather()
-    }
-
-    private func permitsLocationWeather(_ authorization: PermissionAuthorizationState) -> Bool {
-        switch authorization {
-        case .authorized, .provisional, .ephemeral: true
-        case .notDetermined, .denied, .restricted: false
-        }
+        await model.refresh()
     }
 
     private func refreshGreetingWhileActive() async {
@@ -436,229 +367,6 @@ struct DashboardView: View {
                 return
             }
             greetingDate = Date()
-        }
-    }
-
-    private var deviceWeatherPanel: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            BighelpShellSection {
-                deviceWeatherPanelContent
-            }
-        }
-        .frame(maxWidth: uiV3Enabled ? .infinity : 320)
-        .frame(maxWidth: .infinity, alignment: .center)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("dashboard.weather")
-    }
-
-    @ViewBuilder
-    private var deviceWeatherPanelContent: some View {
-        if let permissionCenter {
-            let authorization = permissionCenter.status(for: .locationWhenInUse).authorization
-            switch authorization {
-            case .notDetermined:
-                if permissionCenter.requestInFlight == .locationWhenInUse {
-                    weatherLoadingContent
-                } else {
-                    weatherPermissionContent(permissionCenter)
-                }
-            case .denied, .restricted:
-                weatherSettingsContent(permissionCenter)
-            case .authorized, .provisional, .ephemeral:
-                weatherAvailabilityContent
-            }
-        } else {
-            weatherAvailabilityContent
-        }
-    }
-
-    private func weatherPermissionContent(_ permissionCenter: PermissionCenter) -> some View {
-        VStack(alignment: .leading, spacing: BighelpTokens.space12) {
-            Label("Local weather", systemImage: "location.fill")
-                .bighelpFont(.label)
-                .foregroundStyle(theme.primaryText)
-            Text("bighelp uses your device location directly with Apple Weather. It is never sent to Hermes.")
-                .bighelpFont(.body)
-                .foregroundStyle(theme.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-            Button {
-                Task {
-                    guard await permissionCenter.authorizeContextualAccess(.locationWhenInUse) else {
-                        return
-                    }
-                    await model.refreshWeather()
-                }
-            } label: {
-                Label("Enable local weather", systemImage: "location")
-                    .frame(minHeight: BighelpTokens.hitTarget)
-            }
-            .bighelpProminentButtonStyle()
-            .tint(theme.action)
-            .disabled(permissionCenter.requestInFlight != nil)
-            .accessibilityIdentifier("dashboard.weather.enable")
-        }
-    }
-
-    private func weatherSettingsContent(_ permissionCenter: PermissionCenter) -> some View {
-        VStack(alignment: .leading, spacing: BighelpTokens.space12) {
-            Label("Local weather is unavailable", systemImage: "location.slash.fill")
-                .bighelpFont(.label)
-                .foregroundStyle(theme.primaryText)
-            Text("Allow location access in Settings to show current conditions here.")
-                .bighelpFont(.body)
-                .foregroundStyle(theme.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-            Button("Open Settings") {
-                permissionCenter.performRecoveryAction(for: .locationWhenInUse)
-            }
-            .bighelpProminentButtonStyle()
-            .tint(theme.action)
-            .frame(minHeight: BighelpTokens.hitTarget)
-            .accessibilityIdentifier("dashboard.weather.settings")
-        }
-    }
-
-    @ViewBuilder
-    private var weatherAvailabilityContent: some View {
-        if model.weatherState == .loading {
-            weatherLoadingContent
-        } else if let weather = model.currentLocationWeather {
-            weatherReading(weather)
-        } else {
-            switch model.weatherState {
-            case .idle, .loading:
-                weatherLoadingContent
-            case .loaded, .unavailable:
-                weatherRetryContent
-            }
-        }
-    }
-
-    private var weatherLoadingContent: some View {
-        HStack(spacing: BighelpTokens.space12) {
-            ProgressView()
-            VStack(alignment: .leading, spacing: BighelpTokens.space4) {
-                Text("Loading local weather")
-                    .bighelpFont(.label)
-                    .foregroundStyle(theme.primaryText)
-                Text("Getting current conditions from Apple Weather…")
-                    .bighelpFont(.body)
-                    .foregroundStyle(theme.secondaryText)
-            }
-        }
-        .frame(maxWidth: .infinity, minHeight: BighelpTokens.hitTarget, alignment: .leading)
-        .accessibilityIdentifier("dashboard.weather.loading")
-    }
-
-    private var weatherRetryContent: some View {
-        VStack(alignment: .leading, spacing: BighelpTokens.space12) {
-            Label("Local weather is unavailable", systemImage: "cloud.sun.fill")
-                .bighelpFont(.label)
-                .foregroundStyle(theme.primaryText)
-            Text("Current conditions could not be loaded.")
-                .bighelpFont(.body)
-                .foregroundStyle(theme.secondaryText)
-            Button {
-                Task { await model.refreshWeather() }
-            } label: {
-                Label("Try again", systemImage: "arrow.clockwise")
-                    .frame(minHeight: BighelpTokens.hitTarget)
-            }
-            .buttonStyle(.bordered)
-            .accessibilityIdentifier("dashboard.weather.retry")
-        }
-    }
-
-    private func weather(_ weather: DashboardWeather) -> some View {
-        BighelpShellSection {
-            weatherReading(weather)
-        }
-        .accessibilityIdentifier("dashboard.weather")
-        .accessibilityElement(children: .contain)
-    }
-
-    private func weatherReading(_ weather: DashboardWeather) -> some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .center, spacing: BighelpTokens.space16) {
-                weatherDetails(weather)
-                Spacer(minLength: BighelpTokens.space8)
-                temperature(weather)
-            }
-            VStack(alignment: .leading, spacing: BighelpTokens.space16) {
-                weatherDetails(weather)
-                temperature(weather)
-            }
-        }
-    }
-
-    private func weatherDetails(_ weather: DashboardWeather) -> some View {
-        HStack(alignment: .center, spacing: BighelpTokens.space12) {
-            Image(systemName: weather.systemImage)
-                .font(.bighelp(.title2).weight(.semibold))
-                .foregroundStyle(theme.warning)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: BighelpTokens.space4) {
-                Text(weather.city)
-                    .bighelpFont(.label)
-                    .foregroundStyle(theme.primaryText)
-                Text(weather.condition)
-                    .bighelpFont(.body)
-                    .foregroundStyle(theme.secondaryText)
-            }
-        }
-    }
-
-    private func temperature(_ weather: DashboardWeather) -> some View {
-        VStack(alignment: .trailing, spacing: BighelpTokens.space4) {
-            Text("\(weather.temperature)°")
-                .bighelpFont(.display)
-                .monospacedDigit()
-                .foregroundStyle(theme.primaryText)
-            Text("H \(weather.high)°  L \(weather.low)°")
-                .bighelpFont(.metadata)
-                .monospacedDigit()
-                .foregroundStyle(theme.secondaryText)
-            weatherSource(weather)
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("\(weather.temperature) degrees. High \(weather.high), low \(weather.low).")
-    }
-
-    @ViewBuilder
-    private func weatherSource(_ weather: DashboardWeather) -> some View {
-        if let attribution = weather.attribution {
-            HStack(spacing: BighelpTokens.space4) {
-                Link(destination: attribution.legalPageURL) {
-                    AsyncImage(
-                        url: colorScheme == .dark
-                            ? attribution.combinedMarkDarkURL
-                            : attribution.combinedMarkLightURL
-                    ) { phase in
-                        if let image = phase.image {
-                            image.resizable().scaledToFit()
-                        } else {
-                            Text(attribution.serviceName)
-                                .bighelpFont(.metadata)
-                        }
-                    }
-                    .frame(maxWidth: 108, minHeight: 12, maxHeight: 14)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("\(attribution.serviceName) weather attribution")
-                Text("· \(weather.freshness.label)")
-                    .bighelpFont(.metadata)
-                    .foregroundStyle(
-                        weather.freshness == .fresh ? theme.tertiaryText : theme.warning
-                    )
-            }
-        } else if let sourceName = weather.sourceName {
-            Text("\(sourceName) · \(weather.freshness.label)")
-                .bighelpFont(.metadata)
-                .foregroundStyle(
-                    weather.freshness == .fresh ? theme.tertiaryText : theme.warning
-                )
-                .lineLimit(2)
-                .multilineTextAlignment(.trailing)
         }
     }
 

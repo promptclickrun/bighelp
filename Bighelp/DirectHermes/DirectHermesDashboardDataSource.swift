@@ -264,7 +264,6 @@ final class DirectHermesDashboardDataSource: DashboardDataSource,
             .sorted(by: sortInbox)
 
         return DashboardSnapshot(
-            weather: nil,
             inbox: inbox,
             attentionItems: attention
                 .filter { !presentation.dismissedIDs.contains($0.id) }

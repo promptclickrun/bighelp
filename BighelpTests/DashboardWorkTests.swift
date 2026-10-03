@@ -164,7 +164,7 @@ private final class WorkDashboardSource: DashboardDataSource, DashboardClarifica
     var responses: [String] = []
     init(attention: [DashboardAttentionItem] = []) { self.attention = attention }
     func loadDashboard() async throws -> DashboardSnapshot {
-        DashboardSnapshot(weather: nil, inbox: [], attentionItems: attention, completedItems: completed, agents: [])
+        DashboardSnapshot(inbox: [], attentionItems: attention, completedItems: completed, agents: [])
     }
     func dismissDashboardEvent(id: String) async throws { attention.removeAll { $0.id == id } }
     func respond(to request: DashboardClarificationRequest, response: String) async throws -> DashboardClarificationReceipt {

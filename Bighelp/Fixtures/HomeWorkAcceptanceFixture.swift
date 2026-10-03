@@ -58,7 +58,7 @@ final class HomeWorkAcceptanceFixture: DashboardDataSource, DashboardClarificati
                 agentName: "Avery", createdAt: Date.now.addingTimeInterval(-Double(index + 1) * 60),
                 completedLabel: "Completed recently", fallbackTitle: entry.2, fallbackDetail: "Finished")
         }
-        return DashboardSnapshot(weather: nil, inbox: [], attentionItems: dismissed ? [] : [
+        return DashboardSnapshot(inbox: [], attentionItems: dismissed ? [] : [
             DashboardAttentionItem(id: request.eventID, title: "Clarification needed", detail: request.question,
                 urgency: .important, sessionID: Self.clarifyID, agentID: "finance",
                 interaction: .clarification(request), createdAt: Date.now.addingTimeInterval(-30))

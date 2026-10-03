@@ -125,6 +125,75 @@ final class AllHostsHostUITests: BighelpUITestCase {
         XCTAssertFalse(failed.exists, "Usage loads in the other host's chat")
     }
 
+    /// ☰ › Usage with All hosts on, before and after the list switches hosts. It did
+    /// nothing on a real host: the page opened on the host runtime the shell had
+    /// before the selected host's own one arrived (#99).
+    @MainActor func testUsageOpensFromTheMenuWithAllHosts() throws {
+        guard let path = ProcessInfo.processInfo.environment["BIGHELP_SIGNIN_PROBE"] else {
+            throw XCTSkip("Run through Scripts/HostSignInMatrixProbe.py --modes fleet")
+        }
+        probe = try JSONDecoder().decode([String: String].self, from: Data(contentsOf: URL(fileURLWithPath: path)))
+        guard probe["mode"] == "fleet" else { throw XCTSkip("This host runs the \(probe["mode"] ?? "?") mode") }
+        let app = makeApp()
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-test-no-configured-hosts",
+                               "-bighelp.hosts.all-hosts", "NO"]
+        app.launch()
+        try addHost(app, address: try XCTUnwrap(probe["address_a"]), name: "Desk Hermes")
+        let menu = app.buttons["home.drawer.open"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 20))
+        menu.tap()
+        app.buttons["menu.hosts"].tap()
+        app.buttons["menu.host.add"].tap()
+        try addHost(app, address: try XCTUnwrap(probe["address_b"]), name: "Lab Hermes")
+        XCTAssertTrue(menu.waitForExistence(timeout: 20))
+        menu.tap()
+        app.buttons["menu.all-hosts"].tap()
+        XCTAssertTrue(app.navigationBars["All agents"].waitForExistence(timeout: 10))
+        XCTAssertTrue(agent(on: "Desk Hermes", in: app).waitForExistence(timeout: 45))
+
+        func openUsage(_ step: String) {
+            XCTAssertTrue(menu.waitForExistence(timeout: 20), "☰ \(step)")
+            menu.tap()
+            let usage = app.buttons["menu.usage"]
+            XCTAssertTrue(usage.waitForExistence(timeout: 10), "Usage is in ☰ \(step)")
+            usage.tap()
+            let page = app.descendants(matching: .any)["usage"].firstMatch
+            let opened = page.waitForExistence(timeout: 10)
+            save("fleet-usage-\(step.replacingOccurrences(of: " ", with: "-"))", app)
+            XCTAssertTrue(opened, "Usage opens \(step)")
+            guard opened else { return }
+            XCTAssertTrue(app.descendants(matching: .any)["usage.hosts.row.Desk Hermes"].waitForExistence(timeout: 45)
+                || app.descendants(matching: .any)["usage.hero"].exists, "Usage reads every computer \(step)")
+            app.navigationBars.buttons.element(boundBy: 0).tap()
+            XCTAssertTrue(app.navigationBars["All agents"].waitForExistence(timeout: 10), "Back to All agents")
+        }
+
+        openUsage("on the list")
+        // Opening Desk Hermes' agent switches hosts; back on the list, Usage still opens.
+        named("Desk agent", in: app).tap()
+        XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 45), "Desk Hermes' chat opens")
+        app.buttons["chat.back"].firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["All agents"].waitForExistence(timeout: 10))
+        openUsage("after switching hosts")
+
+        // Away long enough for the connections to close, then back.
+        XCUIDevice.shared.press(.home)
+        XCTAssertTrue(app.wait(for: .runningBackground, timeout: 10))
+        sleep(35)
+        app.activate()
+        XCTAssertTrue(app.navigationBars["All agents"].waitForExistence(timeout: 20))
+        XCTAssertTrue(agent(on: "Lab Hermes", in: app).waitForExistence(timeout: 45))
+        openUsage("after coming back")
+
+        // The way people usually get here: the app opens with All hosts already on.
+        app.terminate()
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-test-no-configured-hosts"]
+        app.launch()
+        XCTAssertTrue(app.navigationBars["All agents"].waitForExistence(timeout: 30), "Opens on All agents")
+        XCTAssertTrue(agent(on: "Lab Hermes", in: app).waitForExistence(timeout: 45))
+        openUsage("after opening the app")
+    }
+
     /// Secure input and a question in a chat on the host the all-hosts list switched to.
     /// They were refused at once there, so the agent heard "declined" without the person
     /// ever seeing the pop-up.

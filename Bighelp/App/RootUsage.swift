@@ -4,19 +4,25 @@ import SwiftUI
 /// hosts on it covers every computer; otherwise the one in use.
 extension RootShellView {
     /// What the Usage page reads: the sign-in (a reconnect keeps it), demo data
-    /// or not, and whether All hosts is on.
+    /// or not, whether All hosts is on, and the shell it opens in.
     struct UsageReaderKey: Equatable {
         let signIn: WorkspaceSignIn?
         let fixtures: Bool
         let allHosts: Bool
         let hostID: String
         let hostName: String
+        /// The selected host's navigation and agents come with its runtime, which
+        /// can arrive after its sign-in (opening the app with All hosts on). Opening
+        /// Usage goes through the shell configured last, so a new one configures it
+        /// again; otherwise ☰ › Usage pushed onto a stack nothing showed (#99).
+        let navigation: ObjectIdentifier
     }
 
     var usageReaderKey: UsageReaderKey {
         let fixtures = usesWorkspaceFixtures && workspaceConnections?.isDirectSelected != true
         return UsageReaderKey(signIn: currentWorkspaceOwner?.signIn ?? workspaceSignIn, fixtures: fixtures,
-                              allHosts: fleetModeOn, hostID: usageHostID, hostName: workspaceHostName)
+                              allHosts: fleetModeOn, hostID: usageHostID, hostName: workspaceHostName,
+                              navigation: ObjectIdentifier(appState))
     }
 
     /// The computer in use, as the all-hosts view names it.

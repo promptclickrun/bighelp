@@ -72,6 +72,7 @@ TESTS = {
     "update": ["PluginReleaseUpdateHostUITests/testUpdatesToTheLatestReleaseOnARealHost"],
     "fleet": ["AllHostsHostUITests/testAllHostsListsBothHostsAndOpensTheOther",
               "AllHostsHostUITests/testProviderUsageLoadsInAChatOnTheOtherHost",
+              "AllHostsHostUITests/testUsageOpensFromTheMenuWithAllHosts",
               "AllHostsHostUITests/testSecureInputAndQuestionsWorkInAChatOnTheOtherHost"],
     "media": ["testGeneratedImageStaysAfterTheTurnEnds", "testVaultCodePopUpEntersTheCode",
               "testSaveLoginPopUpSavesTheLogin", "testVaultSavesAndImportsLoginsOnTheHost",
@@ -502,7 +503,8 @@ def run_fleet(args, repo: Path) -> int:
                        "-scheme", "Bighelp", "-destination", f"platform=iOS Simulator,id={args.simulator_id}",
                        "-derivedDataPath", str(args.derived_data), "-parallel-testing-enabled", "NO",
                        "-resultBundlePath", str(args.results / "fleet.xcresult")]
-            command += [f"-only-testing:BighelpUITests/{name}" for name in TESTS["fleet"]]
+            command += [f"-only-testing:BighelpUITests/{name}" for name in TESTS["fleet"]
+                        if not args.only or any(part in name for part in args.only.split(","))]
             with (args.results / "xcodebuild-fleet.log").open("w") as output:
                 result = subprocess.run(command, env=client_env, cwd=repo, stdout=output, stderr=subprocess.STDOUT,
                                         timeout=1500)
@@ -678,6 +680,7 @@ def main():
                         help="fleet and media modes: network delay each way between the app and each host")
     parser.add_argument("--rate-kbps", type=int, default=0,
                         help="media mode: throughput limit between the app and the host, in KiB a second")
+    parser.add_argument("--only", help="fleet mode: run only the tests whose names contain one of these, comma separated")
     args = parser.parse_args()
     args.results.mkdir(parents=True, exist_ok=True)
     repo = Path(__file__).resolve().parents[1]

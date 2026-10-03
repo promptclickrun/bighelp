@@ -272,6 +272,14 @@ final class AgentDirectoryStore {
         return true
     }
 
+    /// Makes the agent the one bighelp opens on, as picking it in the app
+    /// does. An agent chosen as the default earlier still wins over a pick,
+    /// so that one is replaced too.
+    func makeHomeAgent(_ id: String) {
+        select(id)
+        if resolvedAgent(explicitID: nil)?.id != id { setPrimaryAgent(id) }
+    }
+
     @discardableResult
     func clearPrimaryAgent() -> Bool {
         guard primaryAgentID != nil else { return false }

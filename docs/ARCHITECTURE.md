@@ -304,7 +304,9 @@ known session after refreshing the catalog if necessary.
 ## 4. User interface shell
 
 The main shell presents Agents, Sessions, Scheduled Tasks and Workspace.
-Sessions remains the initial landing destination. Activity, preferences,
+Sessions remains the root of the initial landing destination: by default a cold
+launch opens the agent's latest chat on it, and Settings › Chat › Open on can pick
+another screen and agent instead (`BighelpLanding`). Activity, preferences,
 account/device management and connectivity live inside Workspace. New chat is a
 separate action, not another tab. Existing route identities and legacy
 Inbox-to-Activity links remain compatible.

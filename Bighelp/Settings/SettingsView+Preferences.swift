@@ -175,6 +175,44 @@ extension SettingsView {
         #endif
     }
 
+    /// Where bighelp opens when it starts, and with which agent (`BighelpLanding`).
+    private var landing: some View {
+        let screen = settings.landingScreen ?? .lastChat
+        let startAgentID = settings.startAgentID(scope: landingScope).flatMap { id in
+            agents.contains { $0.id == id } ? id : nil
+        }
+        return Section {
+            Picker(selection: Binding(get: { screen }, set: { settings.landingScreen = $0 })) {
+                ForEach(BighelpLandingScreen.allCases) { choice in
+                    Text(choice.title).tag(choice)
+                }
+            } label: {
+                settingLabel("Open on", detail: screen.detail)
+            }
+            .accessibilityIdentifier("settings.landing.screen")
+
+            if screen.offersStartAgent, let scope = landingScope, !agents.isEmpty {
+                Picker(selection: Binding(get: { startAgentID },
+                                          set: { settings.setStartAgentID($0, scope: scope) })) {
+                    Text("Automatic").tag(String?.none)
+                    ForEach(agents) { agent in
+                        Text(agent.name).tag(Optional(agent.id))
+                    }
+                } label: {
+                    settingLabel("Start with", detail: startAgentID == nil
+                                 ? "The agent you used last." : "On this computer.")
+                }
+                .accessibilityIdentifier("settings.landing.agent")
+            }
+        } header: {
+            Text("When bighelp opens")
+        } footer: {
+            Text("Links, widgets and notifications still open what they point to.")
+                .bighelpFont(.metadata)
+        }
+        .listRowBackground(theme.surface)
+    }
+
     private var chatBasics: some View {
         Section {
             #if !targetEnvironment(macCatalyst) // A Mac has no haptics.
@@ -226,6 +264,7 @@ extension SettingsView {
     /// edge swipes behave; everyday toggles stay first.
     var chatPage: some View {
         Form {
+            BighelpDeferredSection { landing }
             BighelpDeferredSection { chatBasics }
             if settings.nerdModeEnabled {
                 BighelpDeferredSection { chatDetailDefaults }

@@ -182,6 +182,11 @@ Touch and hold lifts an agent: drag it to reorder (the order is kept per host), 
 **Settings** is one short list where every row opens one page: you, Assistants (default model, providers,
 personalities), then Appearance, Chat, Voice, Notifications and Provider usage, then Hosts, Permissions, Apple
 Watch, Companion pet and Help. Don't add sections that compete with these; add to the page a row already opens.
+Settings › Chat starts with **When bighelp opens**: Open on (Agents, Agents (multi), Last chat, Feed, Ideas, Goals,
+Kanban, Projects; Last chat, the agent's latest chat, until you pick) and Start with (Automatic, the agent you used
+last, or one of this computer's agents, kept per computer; Agents (multi) has none). It applies when the app starts,
+not when it comes back; a link, widget or notification that opens the app wins, and Kanban or Projects where the
+computer can't open them fall back to Last chat (`BighelpLanding`).
 Host administration — files, gateways/messaging, plugins, MCP, memory, logs, activity — is hidden until **Nerd
 Mode** is on, which adds a Hermes section at the bottom: **System** (Update Hermes with how many commits behind,
 Restart Hermes Gateway, the plugin's Update button, then everything else folded away) and **Hermes tools** (the

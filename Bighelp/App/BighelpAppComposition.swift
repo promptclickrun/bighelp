@@ -58,6 +58,8 @@ struct BighelpAppComposition {
             appState.select(tab)
         }
         let settings = SettingsStore(defaults: defaults)
+        // Built once per launch: Open on picks one computer or all of them.
+        settings.applyLaunchLandingToAllHostsMode()
         let companion = CompanionStore(defaults: defaults)
         #if DEBUG
         if usesFixtures, let index = arguments.firstIndex(of: "-test-companion-adventure"),

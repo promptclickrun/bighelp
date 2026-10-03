@@ -87,9 +87,9 @@ enum SettingsMenuSection: String, CaseIterable, Identifiable, Equatable, Sendabl
 
     private static var chatDetail: String {
         #if targetEnvironment(macCatalyst) // A Mac has no haptics or Dynamic Island.
-        "Reactions and the Return key"
+        "Where it opens, reactions and Return"
         #else
-        "Haptics, reactions and the Dynamic Island"
+        "Where it opens, haptics and reactions"
         #endif
     }
 

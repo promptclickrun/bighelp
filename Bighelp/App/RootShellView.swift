@@ -976,6 +976,7 @@ struct RootShellView: View {
             pluginUpdateScope: pluginUpdateScope, pluginUpdateClient: pluginUpdateClient,
             pluginUpdateIsCurrent: pluginUpdateIsCurrent,
             hostRuntime: currentHostRuntime, agentDirectory: agents,
+            landingScope: currentWorkspaceOwner?.cacheScopeID,
             onOpenWorkspaceDestination: { destination in
                 leaveSettings { openWorkspaceDestination(destination) }
             },
@@ -1208,6 +1209,8 @@ struct RootShellView: View {
 
     private func handleIncomingURL(_ url: URL) {
         guard let route = BighelpIncomingURLRoute.parse(url) else { return }
+        // A link opening the app wins over Settings › Chat › Open on.
+        didAutoOpenHomeChat = true
         // Opened while the app starts or comes back, a link found no workspace
         // ("host unavailable") or opened its chat under an alert. It waits for
         // a host that answers instead; the latest one wins.
@@ -1346,6 +1349,8 @@ struct RootShellView: View {
     /// Managed notifications and Live Activities verify a durable Hermes
     /// coordinate; resolve it through the visible catalog and open that row.
     func openExternalSession(_ open: BighelpExternalSessionOpen) {
+        // A notification opening the app wins over Settings › Chat › Open on.
+        didAutoOpenHomeChat = true
         switch open.target {
         case .catalog(let sessionID):
             guard BighelpExternalSessionOpenCenter.shared.consume(open) else { return }
@@ -1367,6 +1372,13 @@ struct RootShellView: View {
                 actionErrorMessage = "This conversation could not be opened. Try again from Chats."
             }
         }
+    }
+
+    /// A link, widget, Shortcut or notification waiting for the host: the
+    /// launch's landing screen gives way to it.
+    var hasPendingOutsideOpen: Bool {
+        pendingIncomingURL != nil || BighelpIncomingLinkCenter.shared.pending != nil
+            || BighelpExternalSessionOpenCenter.shared.pending != nil
     }
 
     /// Widgets, notifications and Shortcuts open once the host answers: its

@@ -137,12 +137,7 @@ extension BighelpShortcutService {
         guard let profile = workspace.agents.profiles.first(where: { $0.id == agentID }) else {
             throw BighelpShortcutServiceError.agentUnavailable
         }
-        workspace.agents.select(agentID)
-        // An agent chosen as the default earlier still wins over a pick; a
-        // link to an agent's home replaces it, so this does too.
-        if workspace.agents.resolvedAgent(explicitID: nil)?.id != agentID {
-            _ = workspace.agents.setPrimaryAgent(agentID)
-        }
+        workspace.agents.makeHomeAgent(agentID)
         return BighelpShortcutAgent(id: profile.id, name: profile.name, role: profile.role, isDefault: profile.isDefault)
     }
 

@@ -23,6 +23,8 @@ struct SettingsView: View {
     let onClearLocalCache: @MainActor () async -> Bool
     let hostRuntime: HostRuntimeStore?
     let agentDirectory: AgentDirectoryStore?
+    /// The computer Start with is kept for (`cacheScopeID`).
+    let landingScope: String?
     let voiceSettingsScope: String?
     let voiceSettingsClient: (any VoiceSettingsClient)?
     let voiceSettingsIsCurrent: @MainActor () -> Bool
@@ -98,6 +100,7 @@ struct SettingsView: View {
         notificationIsCurrent: @escaping @MainActor () -> Bool = { false },
         hostRuntime: HostRuntimeStore? = nil,
         agentDirectory: AgentDirectoryStore? = nil,
+        landingScope: String? = nil,
         onOpenWorkspaceDestination: ((WorkspaceDestination) -> Void)? = nil,
         onOpenRoute: ((AppRoute) -> Void)? = nil
     ) {
@@ -123,6 +126,7 @@ struct SettingsView: View {
         self.onClearLocalCache = onClearLocalCache
         self.hostRuntime = hostRuntime
         self.agentDirectory = agentDirectory
+        self.landingScope = landingScope
         self.voiceSettingsScope = voiceSettingsScope
         self.voiceSettingsClient = voiceSettingsClient
         self.voiceSettingsIsCurrent = voiceSettingsIsCurrent

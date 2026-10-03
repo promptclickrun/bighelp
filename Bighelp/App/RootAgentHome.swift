@@ -129,15 +129,39 @@ extension RootShellView {
         openSessionSelection(summary)
     }
 
-    /// Opens the home chat once at launch, after saved chats have loaded.
-    func autoOpenHomeChatIfNeeded() {
+    /// Opens Settings › Chat › Open on once at launch, with its Start with
+    /// agent, after saved chats and agents have loaded. False while it waits
+    /// for Kanban's first answer.
+    @discardableResult
+    func openLaunchLandingIfNeeded(kanbanWaitIsOver: Bool = false) -> Bool {
         // Never push under the "Unable to open" alert: iOS drops that push while
-        // the path keeps it, leaving the Chats list with no ☰ or tab bar.
-        guard opensHomeChat, !didAutoOpenHomeChat, actionErrorMessage == nil,
+        // the path keeps it, leaving the Chats list with no ☰ or tab bar. A link,
+        // widget or notification opening the app wins (it marks this done).
+        guard !didAutoOpenHomeChat, actionErrorMessage == nil, !hasPendingOutsideOpen,
               appState.selectedTab == .sessions, appState.path.isEmpty,
-              sessionCatalog.hasLoadedState, currentWorkspaceOwner != nil, homeAgent != nil else { return }
+              sessionCatalog.hasLoadedState, let owner = currentWorkspaceOwner, homeAgent != nil else { return true }
+        let choice = settings.launchLanding
+        let kanban = kanbanAvailability.host == owner.cacheScopeID ? kanbanAvailability.isAvailable : nil
+        guard let destination = BighelpLanding.destination(for: choice, kanbanAvailable: kanban,
+                                                           kanbanWaitIsOver: kanbanWaitIsOver,
+                                                           projectsAvailable: canOpenProjects) else { return false }
         didAutoOpenHomeChat = true
-        openHomeChat()
+        // The all-hosts view opens on its list of agents.
+        guard !fleetModeOn else { return true }
+        if let agentID = BighelpLanding.startAgent(stored: settings.startAgentID(scope: owner.cacheScopeID),
+                                                   agentIDs: agents.profiles.map(\.id), choice: choice),
+           homeAgent?.id != agentID {
+            agents.makeHomeAgent(agentID)
+        }
+        switch destination {
+        case .chatList: break
+        case .homeChat, .allAgents: openHomeChat()
+        case .agents: appState.select(.agents)
+        case .board(let tab): appState.select(tab)
+        case .kanban: openKanban()
+        case .projects: openProjects()
+        }
+        return true
     }
 
     /// "Ask" and "Discuss": a new chat with this agent, the text ready to send.
@@ -390,13 +414,18 @@ extension RootShellView {
     func homeAutoOpen<Content: View>(_ content: Content) -> some View {
         content
             .task(id: HomeAutoOpenKey(loaded: sessionCatalog.hasLoadedState, agentID: homeAgent?.id,
-                                      owner: currentWorkspaceOwner)) {
+                                      owner: currentWorkspaceOwner, kanban: kanbanAvailability.isAvailable)) {
                 // Let the shell register its destinations before pushing.
                 await Task.yield()
-                autoOpenHomeChatIfNeeded()
+                guard !openLaunchLandingIfNeeded() else { return }
+                // Kanban hasn't answered for this computer yet: a new answer
+                // restarts this; none in time opens the default.
+                try? await Task.sleep(for: BighelpLanding.kanbanWait)
+                guard !Task.isCancelled else { return }
+                openLaunchLandingIfNeeded(kanbanWaitIsOver: true)
             }
             .onChange(of: actionErrorMessage == nil) { _, cleared in
-                if cleared { autoOpenHomeChatIfNeeded() }
+                if cleared { openLaunchLandingIfNeeded() }
             }
     }
 
@@ -417,6 +446,7 @@ extension RootShellView {
         let loaded: Bool
         let agentID: String?
         let owner: WorkspaceOwner?
+        let kanban: Bool?
     }
 
     // MARK: Dynamic Island pictures

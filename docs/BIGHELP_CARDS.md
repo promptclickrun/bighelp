@@ -206,17 +206,18 @@ A template bundle is declarative data with `id`, `version`, `name`, `summary`,
 2. The app verifies catalog and bundle integrity, card-version support, the
    embedded card, and parameter schema before an atomic install. A failed update
    leaves the prior version intact; downgrades and hash mismatches are rejected.
-3. Installed templates use account-scoped crash-safe storage, not UserDefaults.
-4. Installation synchronizes the template through account-encrypted bighelp Link
-   operations named `cards.templates.install`. Listing and removal use
-   `cards.templates.list` and `cards.templates.remove`.
-5. The plugin stores templates per profile and exposes generic search, detail,
-   and render tools. Template rendering still ends at the same
+3. Installing sends the template to the host through the plugin's native route
+   `cards/templates/install` (feature `native-card-templates-v1`). Listing and
+   removal use `cards/templates/list` and `cards/templates/remove`.
+4. The plugin stores templates per profile and exposes generic search, detail,
+   and render tools. Agents can also save their own layouts with
+   `bighelp_save_ui_template` (origin `saved`, private to the profile), which
+   search and render treat like installed ones. Template rendering still ends at the same
    `bighelp_render_card` validation boundary (named `loopdy_render_card` before
    plugin 2.20.0).
-6. Parameters can replace declared literal slots only. They cannot replace a
+5. Parameters can replace declared literal slots only. They cannot replace a
    component type, element ID, binding, operation, or renderer-owned field.
-7. Removing a template deletes its install state and synchronization record. It
+6. Removing a template deletes it from the host. It
    does not rewrite cards already stored in transcripts.
 
 Templates never install native code or add new component capabilities. No

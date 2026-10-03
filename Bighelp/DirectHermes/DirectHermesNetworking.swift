@@ -304,6 +304,8 @@ final class DirectHermesClient: DirectHermesRPC, DirectHermesAuthenticatedHTTP,
         openingTask?.cancel()
         openingTask = nil
         closeConnection(.disconnected(outcomeUnknown: false), notify: false)
+        // Cancelling a renewal on its way used to leave the sign-in unusable.
+        await authenticator.settlePendingRenewal(within: .seconds(8))
         authenticator.http.invalidate()
         onEvent = nil
         onDisconnect = nil

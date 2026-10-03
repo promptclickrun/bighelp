@@ -1,0 +1,10 @@
+{
+  "name": "@loopdy/recovered-relay",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/assemble.mjs build",
+    "build:notifications": "node scripts/assemble-notifications.mjs",
+    "recover": "node scripts/assemble.mjs recover"
+  }
+}

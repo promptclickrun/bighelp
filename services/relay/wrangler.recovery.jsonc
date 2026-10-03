@@ -1,0 +1,11 @@
+// Local recovery validation only. This is not a production deployment configuration.
+// Live bindings and credentials are intentionally absent.
+{
+  "$schema": "https://json.schemastore.org/wrangler.json",
+  "name": "loopdy-relay-recovery-check",
+  "main": "dist/worker.js",
+  "no_bundle": true,
+  "compatibility_date": "2026-08-28",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false
+}

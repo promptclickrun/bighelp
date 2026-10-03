@@ -1,0 +1,37 @@
+[
+  {
+    "package": "zod",
+    "version": "4.4.3",
+    "license": "MIT",
+    "file": "zod-4.4.3-LICENSE.txt",
+    "tarball_integrity": "sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ=="
+  },
+  {
+    "package": "@orpc/client",
+    "version": "1.15.0",
+    "license": "MIT",
+    "file": "orpc-client-1.15.0-LICENSE.txt",
+    "tarball_integrity": "sha512-Qt0FdPSGySdQwy83iUWOq+Iqhw2gM9qHtyxfBbcw1mwOz1s4O2BwUFA3ymVTLIRRNYRgPrQLaBZhp8CacqeePg=="
+  },
+  {
+    "package": "@orpc/contract",
+    "version": "1.15.0",
+    "license": "MIT",
+    "file": "orpc-contract-1.15.0-LICENSE.txt",
+    "tarball_integrity": "sha512-zo8+x+5iqnIMrFdcj+ibVgn6dJneWzLNcD3kZQxrJFGFNAFoxvZbwryR5wOdcHkaSCeS3N7Ib2NydU6pihSYmg=="
+  },
+  {
+    "package": "@orpc/shared",
+    "version": "1.15.0",
+    "license": "MIT",
+    "file": "orpc-shared-1.15.0-LICENSE.txt",
+    "tarball_integrity": "sha512-A3/JE7pQYSrrRm6/WYJxV3GBhpMdJRPM3h47slQtWBUZe9Sao5En5WBc4tISGQNP2emcez6qIvDziSgD2T+img=="
+  },
+  {
+    "package": "@orpc/standard-server",
+    "version": "1.15.0",
+    "license": "MIT",
+    "file": "orpc-standard-server-1.15.0-LICENSE.txt",
+    "tarball_integrity": "sha512-bje/xn6thDqJY/JQ7xoOjmD1KWE4FsyZOPgnPxwqTZLx/r00stRhLuFvk1hDEGj9UlG7NLZEijDVx0wqvcyDzA=="
+  }
+]

@@ -1,9 +1,9 @@
 # AGENTS.md: working on the bighelp iPhone app
 
 This guide is for AI agents and people picking up work on bighelp. It covers how we work, where things live, and the
-traps that have already cost us time. Read it before you change anything. Some things apply only to the maintainer's
-own checkout: if `docs/MAINTAINER_NOTES.md` exists, it covers releases, the maintainer's hosts and private services.
-It isn't in the public mirror.
+traps that have already cost us time. Read it before you change anything. Release steps, the maintainer's own hosts
+and service deploys are covered by private notes kept outside the repo; agents on the maintainer's machine are told
+where they are.
 
 ## What bighelp is
 
@@ -70,7 +70,8 @@ change in both repos.
 | `Bighelp/Hosts/`, `Bighelp/LiveActivity/`, `Bighelp/Notifications/`, `Bighelp/Shortcuts/` | Host setup, Live Activities, notifications, App Intents |
 | `BighelpTests/` (Swift Testing), `BighelpUITests/` (XCUITest) | Tests. The UI test base class `BighelpUITestCase` is in `ReferenceHubUITests.swift` |
 | `BighelpVisionUITests/` | Vision Pro UI tests, run with the `BighelpVision` scheme |
-| `Scripts/` | Real-host probes, logo export, CI helpers, public mirror publishing |
+| `Scripts/` | Real-host probes, logo export, CI helpers, Mac release |
+| `services/` | Cloudflare Workers: the notification service (`link`, behind `link.loopdy.app`), the recovered relay and the provider logo site. Only the maintainer deploys them |
 | `Design/AvatarKit/` | Source of the avatar characters (`tools/build.py`, `tools/export_native.py`) |
 | `docs/` | Contracts and deep dives. Start with `ARCHITECTURE.md`, `NATIVE_TRANSPORT.md`, `DEVELOPMENT.md` |
 
@@ -477,5 +478,5 @@ New code uses Bighelp names. Don't "finish" the rename on this list.
   - new features
   - bug fixes
   - anything they need to do, like updating the plugin
-- The public mirror is made from committed files by `Scripts/publish-public.py`, which only the maintainer runs. It
-  leaves out private paths and refuses to publish mentions of private infrastructure.
+- **This repo is where the work happens.** There's no private copy or mirror. Every change has an issue and lands
+  through a squash-merged PR that closes it, so each TestFlight build's issues and PRs are here when it's uploaded.

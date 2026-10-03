@@ -3,8 +3,7 @@
 ## Product boundary
 
 bighelp supports Hermes and is building its own bighelp Native harness. Neither
-path replaces the other. The Goose-based iOS/Companion runtime in
-[issue #25](https://github.com/promptclickrun/bighelp-ios/issues/25) remains under
+path replaces the other. The Goose-based iOS/Companion runtime remains under
 development; the local Bot Mode fixture runner is not that production engine.
 
 For Hermes hosts, Hermes owns room membership, routing, task execution,

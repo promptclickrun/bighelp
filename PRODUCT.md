@@ -14,8 +14,7 @@ bighelp is a native client for conversations with agents, including model select
 
 bighelp supports Hermes and is also building **bighelp Native**, its own native
 harness for iOS and Companion. These are complementary product paths.
-The planned Goose-based Native runtime is tracked in
-[issue #25](https://github.com/promptclickrun/bighelp-ios/issues/25); it is not a
+The planned Goose-based Native runtime is not a
 working production engine in this release. Shared presentation, persistence and
 harness interfaces are foundations, not evidence that Native execution works.
 

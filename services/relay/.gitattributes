@@ -1,0 +1,2 @@
+# Treat recovered bytes as source text for diffs, without checkout conversion.
+/src/recovered/*.js -text -filter -ident -working-tree-encoding

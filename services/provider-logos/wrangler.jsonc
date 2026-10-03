@@ -1,0 +1,14 @@
+{
+  "name": "loopdy-provider-logos",
+  "compatibility_date": "2026-09-06",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    { "pattern": "logos.loopdy.app", "custom_domain": true }
+  ],
+  "assets": {
+    "directory": "../../.build/provider-logos-public",
+    "html_handling": "none",
+    "not_found_handling": "none"
+  }
+}

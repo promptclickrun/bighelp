@@ -2,8 +2,8 @@
 # Posts a Mac build from Scripts/release-mac.sh on the public repo, promptclickrun/bighelp, as
 # mac-v<version>-<build> marked Latest, with the DMG, its .sha256 and appcast.xml. Installed
 # copies read releases/latest/download/appcast.xml (Info.plist SUFeedURL), so this is what
-# offers them the update. Run it after Scripts/publish-public.py has pushed this build's
-# source to the public main: the tag points at that main.
+# offers them the update. Run it after this build's PR is merged to main: the tag points at
+# that main.
 # Usage: Scripts/publish-mac-public.sh [--dry-run]
 # Reads release-mac.sh's output (BIGHELP_MAC_RELEASE_DIR, /tmp/bighelp-mac-release) and its
 # DerivedData (Sparkle's tools). Needs the Sparkle key in the login Keychain and gh signed in.
@@ -62,7 +62,7 @@ xcrun stapler validate -q "$dmg" || fail "$name isn't notarized and stapled."
 # The public main must already carry this build, and the tag must be new.
 public_build=$(gh api "repos/$public/contents/project.yml" --jq .content | base64 -d |
   awk '/CURRENT_PROJECT_VERSION:/ { print $2; exit }')
-[[ $public_build == "$build" ]] || fail "The public main is at build $public_build, not $build: run Scripts/publish-public.py first."
+[[ $public_build == "$build" ]] || fail "The public main is at build $public_build, not $build: merge this build's PR first."
 ! gh release view "$tag" -R "$public" >/dev/null 2>&1 || fail "$tag already exists on $public."
 
 { cat "$out/notes.md"; print "\n\nSHA-256: \`$(awk '{ print $1 }' "$dmg.sha256")\`"; } > "$out/public-notes.md"

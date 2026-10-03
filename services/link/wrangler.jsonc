@@ -1,0 +1,55 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "loopdy-link",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-28",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "link.loopdy.app", "custom_domain": true }],
+  "observability": { "enabled": false },
+  "send_metrics": false,
+  "dependencies_instrumentation": { "enabled": false },
+  "limits": { "cpu_ms": 1000 },
+  // BuzzKit secrets stay out of source. Before this Worker can serve or revoke
+  // provider identities, rotate the tenant identity secret, update
+  // BUZZKIT_IDENTITY_SECRET, then set the secret binding
+  // BUZZKIT_IDENTITY_SECRET_GENERATION=notification-instance-v2. Runtime checks
+  // reject every BuzzKit operation when that cutover marker is absent or stale.
+  "vars": {
+    "LINK_RETAINED_FRAME_LIMIT": "65536",
+    "LINK_RETAINED_BYTE_LIMIT": "536870912",
+    "APPLE_APP_ID": "ZWDGY4GYX9.app.loopdy.mobile",
+    "PASSKEY_RP_ID": "link.loopdy.app",
+    "PASSKEY_ORIGIN": "https://link.loopdy.app"
+  },
+  "d1_databases": [
+    {
+      "binding": "ACCOUNTS",
+      "database_name": "loopdy-link-accounts",
+      "database_id": "6089ec53-f517-44b5-a567-67fa7d65a667",
+      "migrations_dir": "./migrations"
+    },
+    {
+      "binding": "MARKETPLACE_RETIREMENT",
+      "database_name": "loopdy-marketplace",
+      "database_id": "e85783bd-3993-497a-87c8-2fb81297b480",
+      "migrations_dir": "./marketplace-migrations"
+    }
+  ],
+
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "USER_LINKS",
+        "class_name": "UserLink"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["UserLink"]
+    }
+  ]
+}

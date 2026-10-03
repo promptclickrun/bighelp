@@ -33,11 +33,12 @@ jobs:
           repository: NousResearch/hermes-agent
           ref: 5bd439d3ed4ae5f099857813383389dcd0ab4369
           path: .ci/hermes
-      # The Hermes plugin lives in promptclickrun/bighelp-plugin; test the revision the app pins.
+      # The Hermes plugin lives in promptclickrun/bighelp-plugin. The app installs its latest
+      # release on hosts, and releases come from main.
       - uses: actions/checkout@v4
         with:
           repository: promptclickrun/bighelp-plugin
-          ref: fb5b5ba41b1f997fd2058a5c6aa1a1ac4d30b099
+          ref: main
           path: .ci/plugin
       - uses: actions/setup-python@v5
         with:

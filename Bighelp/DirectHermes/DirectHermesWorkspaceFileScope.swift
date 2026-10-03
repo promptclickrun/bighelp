@@ -1,7 +1,9 @@
 import Foundation
 
 /// A workspace file boundary accepted only after the authenticated bighelp plugin
-/// proves the serving profile's explicit `terminal.cwd` and locked file policy.
+/// proves the serving profile's working folder and locked file policy. The plugin
+/// finds that folder the way Hermes does: `terminal.cwd`, or Hermes' own default
+/// when it isn't set (its `workspace.origin` says which).
 /// The owner includes both authentication and connection generations.
 struct DirectHermesWorkspaceFileScope: Equatable, Sendable {
     enum ManagedPolicy: Equatable, Sendable {
@@ -21,8 +23,9 @@ struct DirectHermesWorkspaceFileScope: Equatable, Sendable {
 
 
     /// Builds a production scope only from the authenticated bighelp plugin's
-    /// configured-workspace projection. Unlike Hermes' stock default-cwd
-    /// response, this contract cannot represent a process-cwd fallback.
+    /// workspace projection, never from Hermes' stock default-cwd response: the
+    /// plugin refuses defaults that aren't the agent's own folder (the disk root,
+    /// Hermes' own folders) and keeps Hermes' folders out of every listing.
     static func pluginReported(
         workspaceListing: [String: BighelpJSONValue],
         owner: WorkspaceOwner

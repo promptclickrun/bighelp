@@ -81,7 +81,7 @@ struct DirectHermesManagedFilesTests {
         #expect(http.requests.last?.path == "/api/plugins/loopdy/native/workspace-files/scope")
     }
 
-    /// The host says why it can't share files (here: no working folder set);
+    /// The host says why it can't share files (here: no working folder of its own);
     /// people see that reason, not "did not prove a workspace".
     @Test func hostsReasonForNoWorkspaceReachesPeople() async throws {
         let owner = try makeOwner()
@@ -97,6 +97,42 @@ struct DirectHermesManagedFilesTests {
             #expect(error.localizedDescription.contains("no working folder"))
             #expect(ConfiguredWorkspaceArtifactsView.message(for: error).contains("no working folder"))
         }
+    }
+
+    /// Each reason the plugin can't share an agent's files is said plainly, not
+    /// as "the host changed" or "update the plugin".
+    @Test(arguments: [
+        (409, "workspace_in_container", "inside a container"),
+        (409, "workspace_on_remote", "another computer"),
+        (501, "workspace_windows_unsupported", "Windows"),
+        (409, "workspace_hermes_folder", "Hermes's own folder"),
+        (409, "workspace_not_configured", "working folder of its own"),
+    ])
+    func hostsReasonsForFilesItCantShareReachPeople(status: Int, code: String, wording: String) async throws {
+        let owner = try makeOwner()
+        let http = ManagedFilesTestHTTP()
+        http.refusal = (status, code, "The plugin's own wording.")
+        let client = DirectHermesManagedFilesClient(http: http, owner: owner, currentOwner: { owner })
+        do {
+            _ = try await client.workspaceScope()
+            Issue.record("The host refused, so there is no scope")
+        } catch {
+            #expect(error as? WorkspaceClientError == .rejected(code: code))
+            #expect(ConfiguredWorkspaceArtifactsView.message(for: error).contains(wording))
+            #expect(!ConfiguredWorkspaceArtifactsView.message(for: error).contains("Update it"))
+        }
+    }
+
+    /// The plugin reports the folder Hermes itself gives the agent when no
+    /// terminal.cwd is set, and says so in `origin`.
+    @Test func hermesDefaultWorkingFolderIsAccepted() async throws {
+        let owner = try makeOwner()
+        let http = ManagedFilesTestHTTP()
+        http.origin = "default"
+        http.result = listing(root: http.root)
+        let client = DirectHermesManagedFilesClient(http: http, owner: owner, currentOwner: { owner })
+        #expect(try await client.workspaceScope().root == http.root)
+        #expect(try await client.list().files.map(\.name) == ["result.txt"])
     }
 
     /// An older plugin without workspace files reads as "update the plugin".
@@ -147,6 +183,8 @@ private final class ManagedFilesTestHTTP: DirectHermesAuthenticatedHTTP, DirectH
     var cwdResponse: BighelpJSONValue?
     var refusal: (status: Int, code: String, message: String)?
     var sharesWorkspaceFiles = true
+    /// How the plugin found the folder; older plugins send no origin.
+    var origin: String?
     var onRequest: (@MainActor () -> Void)?
     func request(_ request: DirectHermesHTTPRequest) async throws -> BighelpJSONValue {
         requests.append(request)
@@ -182,7 +220,10 @@ private final class ManagedFilesTestHTTP: DirectHermesAuthenticatedHTTP, DirectH
                 configured = value
             } else { configured = root }
             object = request.path.hasSuffix("/list") ? result.object ?? [:] : ["entries": .array([])]
-            object["workspace"] = .object(["root": .string(configured), "source": .string("terminal.cwd"), "profileId": .string("default")])
+            var workspace: [String: BighelpJSONValue] = ["root": .string(configured), "source": .string("terminal.cwd"),
+                                                         "profileId": .string("default")]
+            if let origin { workspace["origin"] = .string(origin) }
+            object["workspace"] = .object(workspace)
             object["path"] = .string(configured)
             object["root"] = .string(configured)
             object["locked_root"] = .string(configured)

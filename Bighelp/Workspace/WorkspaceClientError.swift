@@ -32,7 +32,16 @@ enum WorkspaceClientError: Error, Equatable, LocalizedError, Sendable {
     static func workspaceFilesMessage(_ code: String?) -> String? {
         switch code {
         case "workspace_not_configured":
-            "This agent has no working folder set on its computer. Set terminal.cwd for it in Hermes, then try again."
+            "This agent has no working folder of its own on its computer. Set terminal.cwd for it in Hermes, then try again."
+        case "workspace_in_container":
+            "This agent works inside a container, so its files aren't on the computer bighelp can read."
+        case "workspace_on_remote":
+            "This agent works on another computer over SSH, so its files aren't on the computer bighelp can read."
+        case "workspace_windows_unsupported":
+            "bighelp can't show an agent's files from a Windows computer yet."
+        case "workspace_hermes_folder":
+            "This agent's working folder is Hermes's own folder, which holds its settings and keys, so bighelp won't "
+                + "show it. Give the agent a folder of its own (terminal.cwd in Hermes), then try again."
         case "workspace_unavailable":
             "This agent's working folder is missing on its computer, or Hermes can't open it."
         case "workspace_config_invalid":

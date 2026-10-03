@@ -31,6 +31,11 @@ final class DirectHermesKeychainVault: DirectHermesCredentialVault {
     /// Retired owners cannot recreate credentials after account erasure.
     func invalidate() { isValid = false; stagedConnection = nil }
     private let maximumRecordBytes = 65_536
+    /// Readable after the phone's first unlock, so a wake from the host's plugin can renew
+    /// a rotating sign-in while the phone is locked. Still this device only, never synced.
+    private static let accessibility = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly as String
+    /// Older builds saved sign-ins readable only while unlocked; they move over when read.
+    private static let unlockedOnly = kSecAttrAccessibleWhenUnlockedThisDeviceOnly as String
 
     init() { service = "app.loopdy.mobile.direct-hermes"; account = "standalone-current-v1" }
 
@@ -63,9 +68,14 @@ final class DirectHermesKeychainVault: DirectHermesCredentialVault {
         guard status == errSecSuccess, let item = result as? [String: Any],
               let data = item[kSecValueData as String] as? Data,
               data.count <= maximumRecordBytes,
-              item[kSecAttrAccessible as String] as? String == kSecAttrAccessibleWhenUnlockedThisDeviceOnly as String,
+              let accessible = item[kSecAttrAccessible as String] as? String,
+              [Self.accessibility, Self.unlockedOnly].contains(accessible),
               (item[kSecAttrSynchronizable as String] as? Bool ?? false) == false else {
             throw DirectHermesError.secureStorageUnavailable
+        }
+        if accessible == Self.unlockedOnly {
+            // Best effort: it's read again next time if this doesn't take.
+            _ = SecItemUpdate(query as CFDictionary, [kSecAttrAccessible as String: Self.accessibility] as CFDictionary)
         }
         guard let connection = try? JSONDecoder().decode(DirectHermesSavedConnection.self, from: data) else {
             throw DirectHermesError.savedConnectionInvalid
@@ -86,7 +96,7 @@ final class DirectHermesKeychainVault: DirectHermesCredentialVault {
         if stagesUntilCommit { stagedConnection = connection; return }
         let attributes: [String: Any] = [
             kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+            kSecAttrAccessible as String: Self.accessibility,
             kSecAttrSynchronizable as String: false
         ]
         var status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)

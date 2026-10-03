@@ -659,6 +659,17 @@ final class DirectHermesAuthenticator {
         try await verifyModeAndSession()
     }
 
+    /// Renews a saved rotating sign-in without connecting, when a wake from the host's
+    /// plugin arrives while bighelp is closed.
+    func renew(_ saved: DirectHermesSavedConnection) async throws {
+        try saved.validate()
+        guard saved.endpoint == http.endpoint, case .bearer(_, _?, _) = saved.authentication else {
+            throw DirectHermesError.savedConnectionInvalid
+        }
+        savedConnection = saved
+        try await refresh()
+    }
+
     #if DEBUG
     func adoptForTesting(_ saved: DirectHermesSavedConnection) { savedConnection = saved }
     #endif

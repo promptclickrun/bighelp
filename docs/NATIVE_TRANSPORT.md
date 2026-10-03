@@ -27,7 +27,14 @@ used only for explicitly enabled notifications and Live Activities, which BuzzKi
   An ungated dashboard bootstraps its existing session token from the exact
   endpoint's inert HTML, just as the dashboard does; this does not create a
   provider identity or change server authentication. Provider accounts retain
-  strict provider/user identity. All credentials remain in the iOS Keychain.
+  strict provider/user identity. All credentials remain in the iOS Keychain,
+  on this device only, readable after its first unlock.
+- Rotating sign-ins (the Nous Portal's renewal token lasts a day) are renewed
+  while bighelp is closed: the plugin asks the notification service for a quiet
+  push (`bighelp_wake`, `renew-sign-in`) every eight hours, and the app renews
+  each computer that isn't connected (`renewSignInWhileAway`). A live connection
+  renews its own, and reconnecting waits for a renewal on its way. iOS may delay
+  or drop quiet pushes, and never delivers them to a force-quit app.
 - Hermes owns sessions, turns, tools, approvals, model state and recovery. An
   uncertain native submission remains in its existing local journal; reconnect
   does not resend it or switch to a cloud queue.

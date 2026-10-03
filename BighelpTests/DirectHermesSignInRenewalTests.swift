@@ -1,5 +1,6 @@
 import Foundation
 import Network
+import Security
 import Testing
 @testable import Bighelp
 
@@ -185,6 +186,91 @@ struct DirectHermesSignInRenewalTests {
         _ = try? await request.value
     }
 
+    // MARK: Renewing while bighelp is closed
+
+    private func saved(port: UInt16, refresh: String?) throws -> DirectHermesSavedConnection {
+        let endpoint = try DirectHermesEndpoint(address: "http://127.0.0.1:\(port)", allowPrivateHTTP: true)
+        return DirectHermesSavedConnection(endpoint: endpoint, authentication: .bearer(
+            accessToken: Self.oldToken, refreshToken: refresh, expiresAt: Date().addingTimeInterval(3_600)),
+            provider: "basic", userID: "fixture")
+    }
+
+    /// The host's plugin wakes the phone every few hours with a quiet push, so a rotating
+    /// sign-in (the Nous Portal's lasts a day) is renewed even if bighelp stays closed.
+    @Test func aWakeRenewsTheSavedSignInWithoutConnecting() async throws {
+        let host = try ScriptedHermes { request in
+            request.path == "/auth/native/refresh" ? Self.renewed("refresh-2") : .status(500)
+        }
+        let vault = MemoryVault(try saved(port: try await host.start(), refresh: "refresh-1"))
+        let store = DirectHermesWorkspaceStore(vault: vault)
+
+        #expect(await store.renewSignInWhileAway())
+
+        #expect(host.paths == ["/auth/native/refresh"])
+        #expect(Self.refreshToken(vault.stored) == "refresh-2", "The new sign-in is saved for next time")
+    }
+
+    @Test func aWakeLeavesASignInWithNothingToRenewAlone() async throws {
+        let host = try ScriptedHermes { _ in .status(500) }
+        let saved = try saved(port: try await host.start(), refresh: nil)
+        let vault = MemoryVault(saved)
+
+        #expect(await !DirectHermesWorkspaceStore(vault: vault).renewSignInWhileAway())
+        #expect(await !DirectHermesWorkspaceStore(vault: MemoryVault(nil)).renewSignInWhileAway())
+
+        #expect(host.paths.isEmpty)
+        #expect(vault.stored == saved)
+    }
+
+    @Test func theRenewalWakeIsAQuietPushTheWakeCenterAnswers() async {
+        let grant = "11111111-1111-4111-8111-111111111111"
+        let wake: [AnyHashable: Any] = [
+            "aps": ["content-available": 1],
+            "bighelp_wake": ["version": 1, "type": "renew-sign-in", "grantId": grant],
+        ]
+        #expect(BighelpSignInWake.isRenewal(wake))
+        #expect(!BighelpSignInWake.isRenewal(["aps": ["alert": ["body": "x"], "content-available": 1],
+                                               "bighelp_wake": ["version": 1, "type": "renew-sign-in"]]))
+        #expect(!BighelpSignInWake.isRenewal(["aps": ["content-available": 1],
+                                               "bighelp_wake": ["version": 2, "type": "renew-sign-in"]]))
+        #expect(!BighelpSignInWake.isRenewal(["aps": ["content-available": 1],
+                                               "bighelp_wake": ["version": 1, "type": "other"]]))
+
+        let center = BighelpLinkWakeCenter()
+        var wakes = 0
+        center.install { wakes += 1; return true }
+        #expect(await center.receive(wake) == .newData)
+        #expect(wakes == 1)
+    }
+
+    /// A wake can arrive while the phone is locked, so a saved sign-in must be readable then.
+    /// One saved by an older build (readable only while unlocked) moves over when it's next read.
+    @Test func savedSignInsCanBeRenewedWhileThePhoneIsLocked() throws {
+        let service = "app.loopdy.direct-test.locked-" + UUID().uuidString
+        let saved = try saved(port: 9, refresh: "refresh-1")
+        let base: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+                                   kSecAttrService as String: service, kSecAttrAccount as String: "host",
+                                   kSecAttrSynchronizable as String: false]
+        defer { SecItemDelete(base as CFDictionary) }
+        var older = base
+        older[kSecValueData as String] = try JSONEncoder().encode(saved)
+        older[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+        #expect(SecItemAdd(older as CFDictionary, nil) == errSecSuccess)
+        func accessibility() -> String? {
+            var query = base
+            query[kSecReturnAttributes as String] = true
+            var result: CFTypeRef?
+            guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess else { return nil }
+            return (result as? [String: Any])?[kSecAttrAccessible as String] as? String
+        }
+
+        let vault = DirectHermesKeychainVault(service: service, account: "host")
+        #expect(try vault.load() == saved)
+        #expect(accessibility() == kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly as String)
+        try vault.save(saved)
+        #expect(accessibility() == kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly as String)
+    }
+
     @Test func deviceAccessOnlyAsksForARestartWhenThePluginRouteIsMissing() {
         let restart = HostPluginFeatureSection.unreachableMessage(WorkspaceClientError.unavailable(.pluginRequired))
         let signIn = HostPluginFeatureSection.unreachableMessage(WorkspaceClientError.authenticationRequired)
@@ -313,4 +399,13 @@ private final class Counter: @unchecked Sendable {
     private let lock = NSLock()
     private var value = 0
     func next() -> Int { lock.withLock { value += 1; return value } }
+}
+
+@MainActor
+private final class MemoryVault: DirectHermesCredentialVault {
+    private(set) var stored: DirectHermesSavedConnection?
+    init(_ stored: DirectHermesSavedConnection?) { self.stored = stored }
+    func load() throws -> DirectHermesSavedConnection? { stored }
+    func save(_ connection: DirectHermesSavedConnection) throws { stored = connection }
+    func delete() throws { stored = nil }
 }

@@ -64,6 +64,7 @@ final class DirectHermesWorkspaceStore {
     @ObservationIgnored private var chats: [String: DirectHermesChat] = [:]
     @ObservationIgnored private var earlyEvents: [DirectHermesEvent] = []
     @ObservationIgnored private var isOpening = false
+    @ObservationIgnored private var awayRenewal: Task<Bool, Never>?
     @ObservationIgnored private var attemptedApprovalPresentationAcknowledgements = Set<Data>()
 
     var securePromptPresentation: Binding<DirectHermesSecurePrompt?> {
@@ -128,7 +129,29 @@ final class DirectHermesWorkspaceStore {
         await client.verifyLiveness()
     }
 
+    /// The host's plugin wakes the phone every few hours with a quiet push, so a rotating
+    /// sign-in (the Nous Portal's lasts a day) is renewed even while bighelp stays closed.
+    /// A live connection renews its own, so this only runs while there's none.
+    func renewSignInWhileAway() async -> Bool {
+        guard !isConnected, !isConnecting, awayRenewal == nil else { return false }
+        let task = Task { @MainActor [vault] () -> Bool in
+            guard let saved = try? vault.load(), case .bearer(_, _?, _) = saved.authentication else { return false }
+            let authenticator = DirectHermesAuthenticator(endpoint: saved.endpoint)
+            defer { authenticator.http.invalidate() }
+            authenticator.persistRotation = { old, replacement in
+                guard try vault.load() == old else { throw DirectHermesError.secureStorageChanged }
+                try vault.save(replacement)
+            }
+            return (try? await authenticator.renew(saved)) != nil
+        }
+        awayRenewal = task
+        defer { awayRenewal = nil }
+        return await task.value
+    }
+
     func reconnect() async {
+        // A renewal from a wake may be on its way; connect with the sign-in it saves.
+        if let awayRenewal { _ = await awayRenewal.value }
         guard !isConnecting, !isConnected else { return }
         let previous = retireConnection()
         let owner = generation

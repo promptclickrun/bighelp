@@ -251,6 +251,20 @@ enum BighelpBuzzKitWakePayload {
     }
 }
 
+/// The quiet push the host's plugin sends every few hours so the phone renews its
+/// sign-in while bighelp is closed. It carries nothing but what it asks for.
+enum BighelpSignInWake {
+    static func isRenewal(_ userInfo: [AnyHashable: Any]) -> Bool {
+        guard let aps = BighelpNotificationPayloadValue.dictionary(userInfo["aps"]),
+              BighelpNotificationPayloadValue.integer(aps["content-available"]) == 1,
+              aps["alert"] == nil,
+              let wake = BighelpNotificationPayloadValue.dictionary(userInfo["bighelp_wake"]),
+              BighelpNotificationPayloadValue.integer(wake["version"]) == 1,
+              wake["type"] as? String == "renew-sign-in" else { return false }
+        return true
+    }
+}
+
 @MainActor
 final class BighelpLinkWakeCenter {
     static let shared = BighelpLinkWakeCenter()
@@ -263,7 +277,7 @@ final class BighelpLinkWakeCenter {
     }
 
     func receive(_ userInfo: [AnyHashable: Any]) async -> UIBackgroundFetchResult {
-        guard BighelpBuzzKitWakePayload.isWake(userInfo) else { return .noData }
+        guard BighelpBuzzKitWakePayload.isWake(userInfo) || BighelpSignInWake.isRenewal(userInfo) else { return .noData }
         guard let handler else { return .failed }
         do {
             return try await handler() ? .newData : .noData

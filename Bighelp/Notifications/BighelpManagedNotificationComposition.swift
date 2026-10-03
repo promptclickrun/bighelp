@@ -293,14 +293,25 @@ final class BighelpManagedNotificationComposition: HostNotificationSetupServing 
     /// reconcile, not a data delivery: report no new data rather than .failed
     /// so iOS does not throttle future wakes for a wake the app handled.
     private func handleLinkWake() async -> Bool {
-        guard let integration, let owner = captureOwner(), isCurrent(owner) else { return false }
+        let renewed = await renewSignInsWhileAway()
+        guard let integration, let owner = captureOwner(), isCurrent(owner) else { return renewed }
         do {
             try await integration.hooks.recoverWake { !Task.isCancelled && self.isCurrent(owner) }
         } catch {
             // A failed recovery is still a handled wake; fall through to the
             // truthful no-new-data result instead of .failed.
         }
-        return false
+        return renewed
+    }
+
+    /// Renews every computer's rotating sign-in that isn't connected right now.
+    private func renewSignInsWhileAway() async -> Bool {
+        guard let registry else { return false }
+        var renewed = false
+        for host in registry.hosts {
+            if await registry.workspace(for: host).renewSignInWhileAway() { renewed = true }
+        }
+        return renewed
     }
 
     private func scheduleChatPreparation(host: BighelpConfiguredHost, chat: DirectHermesChat) {

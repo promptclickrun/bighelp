@@ -79,6 +79,76 @@ final class AgentsUITests: BighelpUITestCase {
         XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 10))
     }
 
+    /// On one computer every chat keeps the bottom bar, however Agents opened
+    /// it: the pinned avatar, a new chat from the agent's row, or one of its
+    /// existing chats. Only the chat's own Back replaces ☰.
+    @MainActor
+    func testChatsOpenedFromAgentsKeepTheTabBar() {
+        XCUIDevice.shared.orientation = .portrait
+        let app = makeApp()
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays"]
+        app.launch()
+        let directory = app.descendants(matching: .any)["agents.screen"].firstMatch
+
+        openAgents(in: app)
+        let avatar = app.descendants(matching: .any)["agents.featured.finance"].firstMatch
+        XCTAssertTrue(avatar.waitForExistence(timeout: 8))
+        avatar.tap()
+        assertChatKeepsTabBar("The avatar's chat", in: app)
+
+        openAgents(in: app)
+        let row = app.buttons["agent.travel"]
+        for _ in 0..<6 where !(row.exists && row.isHittable) { directory.swipeUp() }
+        XCTAssertTrue(row.isHittable)
+        row.tap()
+        assertChatKeepsTabBar("A new chat", in: app)
+
+        openAgents(in: app)
+        let more = app.buttons["agent.finance.more"]
+        for _ in 0..<6 where !(more.exists && more.isHittable) { directory.swipeUp() }
+        more.tap()
+        let chats = app.buttons["agent.finance.sessions"]
+        for _ in 0..<6 where !(chats.exists && chats.isHittable) {
+            app.descendants(matching: .any)["agent.actions.list"].firstMatch.swipeUp()
+        }
+        chats.tap()
+        let session = app.buttons["session.row.demo-finance"]
+        XCTAssertTrue(session.waitForExistence(timeout: 8))
+        session.tap()
+        assertChatKeepsTabBar("An existing chat", in: app)
+
+        // The bar works from there: Feed leaves the chat.
+        app.buttons["tab.feed"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["board.feed"].firstMatch.waitForExistence(timeout: 8))
+    }
+
+    @MainActor
+    private func assertChatKeepsTabBar(_ chat: String, in app: XCUIApplication,
+                                       file: StaticString = #filePath, line: UInt = #line) {
+        let composer = app.descendants(matching: .any)["chat.composer-shell"].firstMatch
+        XCTAssertTrue(composer.waitForExistence(timeout: 10), "\(chat) didn't open", file: file, line: line)
+        XCTAssertTrue(app.buttons["chat.back"].waitForExistence(timeout: 5), "\(chat) has Back", file: file, line: line)
+        // A new chat can focus the message box; the bar hides under the keyboard.
+        if app.keyboards.firstMatch.exists {
+            app.tables["chat.timeline"].swipeDown()
+            _ = app.keyboards.firstMatch.waitForNonExistence(timeout: 3)
+        }
+        let feed = app.buttons["tab.feed"], chatTab = app.buttons["tab.sessions"]
+        XCTAssertTrue(feed.waitForExistence(timeout: 5) && feed.isHittable,
+                      "\(chat) is missing the tab bar", file: file, line: line)
+        if chatTab.exists {
+            XCTAssertLessThanOrEqual(composer.frame.maxY, chatTab.frame.minY + 1,
+                                     "\(chat): the message box sits above the tab bar", file: file, line: line)
+        }
+        // Evidence: BIGHELP_TABBAR_EVIDENCE (TEST_RUNNER_BIGHELP_TABBAR_EVIDENCE) names a folder.
+        if let folder = ProcessInfo.processInfo.environment["BIGHELP_TABBAR_EVIDENCE"] {
+            try? FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
+            let name = chat.lowercased().replacingOccurrences(of: " ", with: "-").replacingOccurrences(of: "'", with: "")
+            try? app.screenshot().pngRepresentation
+                .write(to: URL(fileURLWithPath: folder).appendingPathComponent("agents-\(name).png"))
+        }
+    }
+
     @MainActor
     func testGroupGesturesAndRenameMenu() {
         let app = launch()

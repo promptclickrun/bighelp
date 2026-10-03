@@ -50,7 +50,11 @@ final class FloatingTabBarUITests: BighelpUITestCase {
         let app = launch(version: "v3", appearance: "light")
         app.buttons["root.new-chat"].tap()
         XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 10))
-        XCTAssertFalse(app.otherElements["primary-navigation"].exists)
+        // The chat draws its own bar under the message box; the root's doesn't stay behind.
+        let bars = app.otherElements.matching(identifier: "primary-navigation")
+        XCTAssertEqual(bars.count, 1)
+        let composer = app.descendants(matching: .any)["chat.composer-shell"].firstMatch
+        XCTAssertLessThanOrEqual(composer.frame.maxY, bars.firstMatch.frame.minY + 1)
     }
 
     /// On Chats, New chat sits centered above the tabs instead of squeezing

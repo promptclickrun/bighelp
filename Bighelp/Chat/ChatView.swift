@@ -549,8 +549,8 @@ struct ChatView: View {
                             #if targetEnvironment(macCatalyst)
                             .popover(isPresented: sessionControlsPresented(from: .composer)) { macSessionControls }
                             #endif
-                        // The Chat tab keeps its bottom bar under the composer.
-                        if homeChrome.isEnabled, homeChrome.isHome, let selection = homeChrome.tabSelection,
+                        // Chats keep the bottom bar under the composer.
+                        if homeChrome.isEnabled, homeChrome.showsTabBar, let selection = homeChrome.tabSelection,
                            !isDraftFocused, !BighelpPlatform.usesTabOrnament {
                             FloatingTabBar(selection: selection,
                                            homeIndicatorSink: FloatingTabBar.homeIndicatorSink(forBottomInset: bottomSafeArea),
@@ -563,8 +563,8 @@ struct ChatView: View {
             }
             .toolbar(.hidden, for: .navigationBar)
             #if os(visionOS)
-            // The agent's own chat keeps Vision Pro's tab strip beside the window.
-            .ornament(visibility: homeChrome.isEnabled && homeChrome.isHome && homeChrome.tabSelection != nil
+            // Chats keep Vision Pro's tab strip beside the window.
+            .ornament(visibility: homeChrome.isEnabled && homeChrome.showsTabBar && homeChrome.tabSelection != nil
                           ? .visible : .hidden,
                       attachmentAnchor: .scene(.leading), contentAlignment: .trailing) {
                 if let selection = homeChrome.tabSelection {

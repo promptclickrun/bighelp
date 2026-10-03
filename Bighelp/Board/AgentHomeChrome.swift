@@ -1,12 +1,14 @@
 import SwiftUI
 
-/// Hooks the Chat tab gives a chat so it can draw the agent-home look: the
+/// Hooks the shell gives a chat so it can draw the agent-home look: the
 /// big live avatar, the ☰ drawer, New chat, and the bottom bar under the composer.
-/// Chats opened from anywhere else keep the regular header.
 struct AgentHomeChrome {
     var isEnabled = false
-    /// The Chat tab's first page: ☰ and the tab bar. Otherwise Back.
+    /// The Chat tab's first page: ☰. Otherwise Back.
     var isHome = true
+    /// The tab bar under the message box. Every chat on one computer has it,
+    /// whether it's the Chat tab's own or opened from the list, Agents or Feed.
+    var showsTabBar = false
     var onMenu: @MainActor () -> Void = {}
     var onProfile: @MainActor (String) -> Void = { _ in }
     var onSwitchAgent: @MainActor () -> Void = {}

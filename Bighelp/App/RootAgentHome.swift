@@ -60,9 +60,9 @@ extension RootShellView {
         openHomeChat(replacing: true)
     }
 
-    /// Every phone chat uses the agent-home look (big live avatar). The Chat
-    /// tab's own chat gets ☰ and the tab bar; a chat picked from the full list
-    /// or opened from somewhere else (Feed, a task, a deeper page) gets Back.
+    /// Every phone chat uses the agent-home look (big live avatar) and the tab
+    /// bar. The Chat tab's own chat gets ☰; a chat picked from the full list or
+    /// opened from somewhere else (Agents, Feed, a task, a deeper page) gets Back.
     func homeChrome(for route: AppRoute) -> AgentHomeChrome {
         // The all-hosts view has no home chat: its chats get Back to All agents,
         // never one host's tab bar (Feed, Ideas, Goals would strand you there).
@@ -71,6 +71,7 @@ extension RootShellView {
         return AgentHomeChrome(
             isEnabled: true,
             isHome: isHome,
+            showsTabBar: !fleetModeOn,
             onMenu: { isHomeDrawerPresented.toggle() },
             onProfile: { profileAgentID = $0 },
             onSwitchAgent: { isAgentSwitcherPresented = true },
@@ -99,8 +100,10 @@ extension RootShellView {
 
     /// Opens the home agent's latest direct chat, or a new one.
     func openHomeChat(replacing: Bool = false) {
-        // Already there: tapping Chat again keeps the chat as it is.
-        if !replacing, appState.selectedTab == .sessions, appState.path.count == 1, case .chat = appState.path[0] { return }
+        // Already there: tapping Chat again keeps the chat as it is. A chat
+        // with Back (picked from the list) isn't the home chat; Chat leaves it.
+        if !replacing, appState.selectedTab == .sessions, appState.path.count == 1, !appState.chatOpenedFromList,
+           case .chat = appState.path[0] { return }
         guard let agent = homeAgent else {
             appState.select(.sessions)
             return

@@ -74,8 +74,9 @@ it out (chasing a brain while thinking, code streaming from its laptop, fixing a
 planes…). The status bar hides while it shows, and the app moves down (root `additionalSafeAreaInsets`) so nothing
 is covered. Tap for a compact pill, touch and hold to open the chat. Settings › Chat › Agent in the Dynamic Island
 turns it off. Outside the app the Live Activity shows the agent's picture and the same icon (the plugin sends only
-a fixed category). Every phone chat uses this big-avatar header; only the Chat tab's first page has ☰ and the tab
-bar, any other chat (from the list, Feed, a task) has Back. Chat Info lives in ⋯ › People & Chat, and the line under
+a fixed category). Every phone chat uses this big-avatar header and keeps the tab bar under its message box (All
+agents' chats excepted); only the Chat tab's first page has ☰, any other chat (from the list, Agents, Feed, a task)
+has Back. Chat Info lives in ⋯ › People & Chat, and the line under
 the name says "Updating…" while a chat reloads from Hermes. iPad works the same way, with no always-open sidebar:
 ☰ slides the menu in from the leading edge, and chats use the width of the screen. On Vision Pro bighelp always
 starts in its own window. The tabs sit in a strip beside the window (`VisionTabOrnament`), clear of the system's

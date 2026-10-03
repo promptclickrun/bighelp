@@ -18,15 +18,15 @@ struct CardBackgroundView: View {
         ZStack {
             LinearGradient(colors: look.sky.map(\.color), startPoint: .top, endPoint: .bottom)
             look.scrim.color.opacity(look.scrimOpacity)
+            // Not animating removes the clock altogether rather than pausing it.
             if animates, let scene = background.scene {
-                TimelineView(.animation(minimumInterval: CardWeatherPainter.frameInterval(scene), paused: !animates)) { timeline in
+                TimelineView(.animation(minimumInterval: CardWeatherPainter.frameInterval(scene))) { timeline in
                     Canvas { context, size in
                         CardWeatherPainter.draw(in: &context, size: size,
                                                 time: timeline.date.timeIntervalSinceReferenceDate,
                                                 scene: scene, background: background, look: look)
                     }
                 }
-                .transition(.opacity)
             }
         }
         .clipped()

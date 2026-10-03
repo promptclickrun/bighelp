@@ -173,7 +173,9 @@ folders. A chat started there runs in the project's folder (Hermes files chats b
 the current one). Folder and Git management stay in Settings › Hermes tools (Nerd Mode). 
 
 **Usage** (☰ › Usage, above Settings) is the one place for what the agents use. Limits come first: each plan,
-limit and balance the plugin finds (Choose hides one), with what the agents used through it in the range. Then 7, 30
+limit and balance the plugin finds (Choose hides one), with what the agents used through it in the range. With
+several computers (All hosts on) a menu beside Choose shows the computer in use, another one, or All computers, where
+each computer's plans sit under its own name; it changes only Limits and is remembered on the device. Then 7, 30
 or 90 days of Hermes' own numbers (`/api/analytics/usage` and `/api/analytics/models`, per agent): estimated cost or
 processed tokens per day as bars (tap one for its day), totals with the cache rate, when you use it (weekdays, and
 hours with the plugin's `usage/activity`), and ranked rows by model, by agent and, with All hosts on, by computer.

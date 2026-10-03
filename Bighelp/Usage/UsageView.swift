@@ -13,16 +13,18 @@ struct UsageView: View {
 
     @State private var selectedDay: String?
     @State private var isChoosingProviders = false
+    /// Which computers' plans Limits shows (`UsageLimitsComputers.Choice`).
+    @AppStorage(UsageLimitsComputers.choiceKey) private var limitsChoice = "current"
     @BighelpThemeReader private var theme
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: BighelpTokens.space24) {
-                if let providerUsage, providerUsage.isAvailable || !limitHosts.isEmpty {
+                if let providerUsage, providerUsage.isAvailable || limitsComputers.offersChoice {
                     BighelpDeferredSection {
-                        UsageLimitsSection(store: providerUsage, otherHosts: limitHosts, summary: store.summary,
-                                           selectedHostID: selectedHostID, selectedHostName: selectedHostName,
-                                           range: store.range, onChoose: { isChoosingProviders = true })
+                        UsageLimitsSection(store: providerUsage, computers: limitsComputers, summary: store.summary,
+                                           range: store.range, onChoose: { isChoosingProviders = true },
+                                           onPickComputers: { limitsChoice = $0 })
                     }
                 }
                 rangePicker
@@ -64,9 +66,10 @@ struct UsageView: View {
         }
     }
 
-    /// Other computers' plans and limits, while All hosts shows them.
-    private var limitHosts: [HostUsage] {
-        store.hosts.filter { $0.id != selectedHostID && $0.limits != nil }
+    /// The computer in use and, while All hosts is on, the others.
+    private var limitsComputers: UsageLimitsComputers {
+        UsageLimitsComputers(selectedID: selectedHostID, selectedName: selectedHostName, hosts: store.hosts,
+                             saved: limitsChoice)
     }
 
     private var refreshButton: some View {

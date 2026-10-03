@@ -2,16 +2,16 @@ import SwiftUI
 
 /// Usage › Limits: each plan, limit and balance the computers' providers report
 /// (bighelp plugin, `native-provider-usage-v1`), with what the agents used
-/// through it in the range beside it.
+/// through it in the range beside it. With several computers a menu picks one
+/// or all; all of them show each computer's plans under its own name.
 struct UsageLimitsSection: View {
     let store: ProviderUsageStore
-    /// Other computers' limits, with All hosts on.
-    let otherHosts: [HostUsage]
+    let computers: UsageLimitsComputers
     let summary: UsageSummary?
-    let selectedHostID: String
-    let selectedHostName: String?
     let range: UsageRange
     let onChoose: () -> Void
+    /// Saves a `UsageLimitsComputers.Choice`.
+    let onPickComputers: (String) -> Void
 
     @AppStorage(ProviderUsagePreferences.hiddenKey) private var hiddenRaw = ""
     @State private var showsAll = false
@@ -20,26 +20,39 @@ struct UsageLimitsSection: View {
     private static let shortList = 1
 
     private var hidden: Set<String> { ProviderUsagePreferences.hidden(hiddenRaw) }
-    private var showsHostNames: Bool { !otherHosts.isEmpty }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             UsageCaption(title: "Limits") {
-                if store.report?.providers.isEmpty == false {
-                    Button("Choose", action: onChoose)
-                        .font(.bighelp(.footnote).weight(.semibold))
-                        .foregroundStyle(theme.action)
-                        .frame(minHeight: 28)
-                        .bighelpPlainButtonStyle(.rounded(BighelpTokens.radius8))
-                        .accessibilityHint("Choose which plans and balances show here.")
-                        .accessibilityIdentifier("usage.limits.choose")
+                HStack(spacing: BighelpTokens.space16) {
+                    if computers.offersChoice { computerMenu }
+                    if canChoose {
+                        Button("Choose", action: onChoose)
+                            .font(.bighelp(.footnote).weight(.semibold))
+                            .foregroundStyle(theme.action)
+                            .frame(minHeight: 28)
+                            .bighelpPlainButtonStyle(.rounded(BighelpTokens.radius8))
+                            .accessibilityHint("Choose which plans and balances show here.")
+                            .accessibilityIdentifier("usage.limits.choose")
+                    }
                 }
             }
-            VStack(spacing: BighelpTokens.space12) {
-                selectedHost
-                ForEach(otherHosts, id: \.id) { host in otherHost(host) }
+            VStack(alignment: .leading, spacing: BighelpTokens.space12) {
+                ForEach(computers.shown) { computer in
+                    VStack(alignment: .leading, spacing: BighelpTokens.space12) {
+                        if computers.showsNames { heading(computer) }
+                        if computer.isSelected {
+                            selectedHost(name: computer.name)
+                        } else if let usage = computer.usage {
+                            otherHost(usage)
+                        }
+                    }
+                    .padding(.top, computers.showsNames && computer.id != computers.shown.first?.id
+                             ? BighelpTokens.space12 : 0)
+                }
             }
-            if let updated = ProviderUsagePresentation.updatedText(store.report?.fetchedAt) {
+            if computers.shown.contains(where: \.isSelected),
+               let updated = ProviderUsagePresentation.updatedText(store.report?.fetchedAt) {
                 Text(updated)
                     .font(.bighelp(.footnote))
                     .foregroundStyle(theme.tertiaryText)
@@ -51,9 +64,80 @@ struct UsageLimitsSection: View {
         .accessibilityIdentifier("provider-usage")
     }
 
+    /// Choose hides a provider on every computer; it shows once there's one to hide.
+    private var canChoose: Bool {
+        computers.shown.contains { computer in
+            if computer.isSelected { return store.report?.providers.isEmpty == false }
+            if case .loaded(let report)? = computer.usage?.limits { return !report.providers.isEmpty }
+            return false
+        }
+    }
+
+    private var computerMenu: some View {
+        Menu {
+            Button { onPickComputers(UsageLimitsComputers.Choice.all.saved) } label: {
+                if computers.choice == .all {
+                    Label("All computers", systemImage: "checkmark")
+                } else {
+                    Text("All computers")
+                }
+            }
+            Section {
+                ForEach(computers.computers) { computer in
+                    Button { onPickComputers(UsageLimitsComputers.saved(for: computer)) } label: {
+                        if computers.isChosen(computer) {
+                            Label(computer.name, systemImage: "checkmark")
+                        } else {
+                            Text(computer.name)
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: BighelpTokens.space4) {
+                Image(systemName: "desktopcomputer")
+                Text(computers.title)
+                    .lineLimit(1)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.bighelp(.caption2).weight(.semibold))
+            }
+            .font(.bighelp(.footnote).weight(.semibold))
+            .foregroundStyle(theme.action)
+            .frame(minHeight: 28)
+            .contentShape(.rect)
+        }
+        .textCase(nil)
+        .accessibilityLabel("Computer: \(computers.title)")
+        .accessibilityHint("Shows plans and limits for one computer or all of them.")
+        .accessibilityIdentifier("usage.limits.computer")
+    }
+
+    /// The computer's name over its plans, so a Claude card plainly belongs to it.
+    private func heading(_ computer: UsageLimitsComputers.Computer) -> some View {
+        HStack(spacing: BighelpTokens.space8) {
+            Image(systemName: "desktopcomputer")
+                .font(.bighelp(.subheadline).weight(.semibold))
+                .foregroundStyle(theme.secondaryText)
+                .accessibilityHidden(true)
+            Text(computer.name)
+                .font(.bighelp(.headline))
+                .foregroundStyle(theme.primaryText)
+                .lineLimit(1)
+            if computer.isSelected {
+                Text("In use")
+                    .font(.bighelp(.footnote))
+                    .foregroundStyle(theme.tertiaryText)
+            }
+        }
+        .padding(.horizontal, BighelpTokens.space20)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+        .accessibilityIdentifier("usage.limits.host.\(computer.name)")
+    }
+
     @ViewBuilder
-    private var selectedHost: some View {
-        let hostName = selectedHostName
+    private func selectedHost(name: String) -> some View {
+        let hostName: String? = computers.offersChoice ? name : nil
         if store.isAvailable {
             if case .unavailable(let message) = store.state, store.report != nil {
                 Label(message, systemImage: "exclamationmark.triangle")
@@ -73,8 +157,9 @@ struct UsageLimitsSection: View {
                 } else {
                     // The provider in use first; the rest wait a tap away so usage stays in view.
                     ForEach(showsAll ? providers : Array(providers.prefix(Self.shortList))) { provider in
-                        UsageLimitCard(provider: provider, hostName: showsHostNames ? hostName : nil,
-                                       used: summary?.agentsUse(of: provider, hostID: selectedHostID), range: range)
+                        UsageLimitCard(provider: provider,
+                                       used: summary?.agentsUse(of: provider, hostID: computers.computers[0].id),
+                                       range: range)
                     }
                     if providers.count > Self.shortList {
                         Button(showsAll ? "Show fewer" : "Show \(providers.count - Self.shortList) more") {
@@ -92,6 +177,8 @@ struct UsageLimitsSection: View {
             } else {
                 UsageMessageCard(title: "Checking your plans…", isLoading: true)
             }
+        } else {
+            UsageMessageCard(title: "Connect to \(name) to see its plans and limits.")
         }
     }
 
@@ -99,16 +186,23 @@ struct UsageLimitsSection: View {
     private func otherHost(_ host: HostUsage) -> some View {
         switch host.limits {
         case .loaded(let report)?:
-            ForEach(ProviderUsagePresentation.visible(report.providers, hidden: hidden)) { provider in
-                UsageLimitCard(provider: provider, hostName: host.name,
-                               used: summary?.agentsUse(of: provider, hostID: host.id), range: range)
+            let providers = ProviderUsagePresentation.visible(report.providers, hidden: hidden)
+            if report.providers.isEmpty {
+                UsageMessageCard(title: "No AI plans found on \(host.name).")
+            } else if providers.isEmpty {
+                UsageMessageCard(title: "Every plan is hidden.", action: ("Choose", onChoose))
+            } else {
+                ForEach(providers) { provider in
+                    UsageLimitCard(provider: provider, used: summary?.agentsUse(of: provider, hostID: host.id),
+                                   range: range)
+                }
             }
         case .needsPluginUpdate?:
             UsageMessageCard(title: "Update the bighelp plugin on \(host.name) to see its plans and limits.")
         case .unavailable(let message)?:
             UsageMessageCard(title: host.name, detail: message)
         case nil:
-            EmptyView()
+            UsageMessageCard(title: host.name, detail: host.failure ?? "Its plans and limits couldn't be read.")
         }
     }
 }
@@ -117,8 +211,6 @@ struct UsageLimitsSection: View {
 /// agents used through it.
 struct UsageLimitCard: View {
     let provider: ProviderUsage
-    /// The computer it's on, with several.
-    let hostName: String?
     let used: UsageAmount?
     let range: UsageRange
     @Environment(\.openURL) private var openURL
@@ -152,15 +244,10 @@ struct UsageLimitCard: View {
                                providerName: provider.name, context: .chatQuickChoice, size: 22)
                 .frame(width: 28, height: 28)
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 0) {
-                Text(provider.name)
-                    .font(.bighelp(.headline))
-                    .foregroundStyle(theme.primaryText)
-                    .lineLimit(1)
-                if let hostName {
-                    Text(hostName).font(.bighelp(.caption)).foregroundStyle(theme.tertiaryText).lineLimit(1)
-                }
-            }
+            Text(provider.name)
+                .font(.bighelp(.headline))
+                .foregroundStyle(theme.primaryText)
+                .lineLimit(1)
             Spacer(minLength: BighelpTokens.space8)
             if provider.activeInHermes { UsageBadge(text: "In use") }
             if let plan = provider.plan { UsageBadge(text: plan) }

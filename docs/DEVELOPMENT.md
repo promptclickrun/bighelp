@@ -118,7 +118,7 @@ xcodebuild test \
 
 The unit targets use Swift Testing. The iOS UI target uses XCUITest. Tests cover
 feature models, persistence/migrations, protocol validation, cryptography,
-passkeys, device management, socket sequencing, push, Live Activities, voice,
+push, Live Activities, voice,
 navigation, and accessibility-facing presentation.
 
 Use the smallest relevant test target while iterating. The hosted release gate
@@ -296,14 +296,12 @@ fixture content synthetic and never copy production data into tests.
 
 ## Runtime configuration
 
-The optional notification service uses an HTTPS origin supplied through the
-`BighelpLinkBaseURL` Info.plist setting. URL validation rejects embedded
-credentials and non-origin path/query/fragment components.
+The notification service's address (`https://link.loopdy.app`) is fixed in
+`BighelpNotificationBrokerClient`.
 
 Configure Apple capabilities for:
 
 - Push notifications
-- Associated web credentials for passkeys
 - Shared Keychain access between the app and notification service extension
 - Live Activities
 
@@ -490,7 +488,7 @@ from immediate selection. Preserve the chat performance gate alongside this work
 For composer ownership or account recovery changes, run these actual suites:
 `ReferenceDeliveryAcceptanceTests`, `ReferenceNativeEditorAcceptanceTests`,
 `ReferenceHubTests`, `ChatModelTests`, `ShellFeatureStoreTests`,
-`BighelpLinkAccountStoreTests` and `BighelpAppReadinessTests`. Confirm the selectors
+and `BighelpAppStartupTests`. Confirm the selectors
 execute tests. Preserve failure evidence before fixing the implementation.
 
 The mounted reference tests must retain ordinary text through provider loss,

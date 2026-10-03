@@ -172,10 +172,8 @@ Home may appear from cached admission before the host is ready. Dashboard loads
 must wait for the verified connection and reject results from a replaced
 connection. Navigation cancellation must not become a visible load failure.
 
-Account & Devices presents Hosts and Connected Devices. Selecting an instance
-and setting the primary instance are separate actions. Long-pressing the bighelp
-logo in every workspace sidebar presents the same loaded host selection state;
-choosing a host must not silently change the primary preference.
+Long-pressing the bighelp logo in every workspace sidebar presents the same
+loaded host selection state.
 
 
 ## Composer and recovery ownership

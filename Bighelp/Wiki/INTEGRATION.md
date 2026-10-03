@@ -25,7 +25,7 @@ Initialization does not read disk or call the host. `restoreLocalState()` loads 
 
 Folder preferences contain only ID, label and absolute path, scoped by stable account + host + profile. The bounded OS-protected preference file survives relaunch and sign-out. First use migrates the newest matching legacy `WikiLocalState`; an empty preferences file prevents removed paths resurrecting from older snapshots. `renameFolder(id:name:)` and `removeFolder(id:)` persist even when a folder is unavailable. Failed reconnects retain choices for explicit retry.
 
-`ReferenceAccountDataEraser.eraseForSignOut()` invalidates active clients and erases drafts, save journals and provider credentials while preserving Wiki folder preferences. `erase()` is explicit account deletion and removes those preferences too. `BighelpLinkAccountStore` dispatches the distinct lifecycle reason, retaining deletion intent if cleanup needs retry.
+`OptionalReferenceServices.eraseAccountData(preservingWikiFolders: true)` invalidates active clients and erases drafts, save journals and provider credentials while preserving Wiki folder preferences; without it, those preferences go too.
 
 ## Surfaces
 

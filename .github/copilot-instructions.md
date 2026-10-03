@@ -96,7 +96,6 @@ Follow established repository architecture, not a generic MVVM template from ano
 
 - Swift language mode: 6.0.
 - Minimum deployment target: iOS 17.
-- Passkey account creation/sign-in uses the iOS 18 passkey PRF extension and must report unavailability correctly on older systems.
 - Use SwiftUI and Observation patterns already present in the repository.
 - Preserve strict concurrency and actor isolation. Do not silence concurrency failures with unsafe annotations.
 - Every affected flow must be complete on iPhone and iPad in portrait and landscape.

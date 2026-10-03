@@ -26,9 +26,10 @@ bighelp has five important trust boundaries:
 
 1. **The iOS app** owns the user interface, local cache, device credentials,
    content encryption, notification decryption, and ActivityKit presentation.
-2. **The optional bighelp account service** owns passkey account and device
-   management. Retained pairing and notification cryptography do not provide
-   a production chat route or select the native host.
+2. **The notification service** (`link.loopdy.app`) issues this install's
+   notification-only identity. The old bighelp account, passkeys and Link
+   pairing are gone from the app; nothing here provides a chat route or
+   selects the native host.
 3. **The authorized Hermes host** authenticates native workspace access and
    owns agent execution and session state. Native host authority is independent
    of optional cloud account credentials and account deletion.
@@ -194,8 +195,8 @@ The top-level objects include:
 - `SessionCatalogStore` for remote catalog synchronization and local cache.
 - `BotModeRoomStore` for multi-agent room state.
 - `ScheduledTasksStore` for scheduled work.
-- `BighelpLinkAccountStore` and `BighelpLinkDeviceStore` for account and device
-  administration.
+- `DemoHosts` for demo mode's sample computers (real ones live in
+  `BighelpHostRegistry`).
 - `DirectHermesConversationClient` and `NativeWorkspaceSessionBridge` for native
   request/stream handling and authoritative history reconciliation.
 - `ShellFeatureStore` for route-scoped model creation and retention.
@@ -757,8 +758,8 @@ Boundaries are intentionally strict:
 - UI models commit authoritative results instead of treating optimistic server
   state as authoritative.
 
-The test suite covers models, persistence, migration, crypto, passkeys, native
-transport state, API validation, pairing, push, Live Activities, voice, navigation,
+The test suite covers models, persistence, migration, crypto, native
+transport state, API validation, push, Live Activities, voice, navigation,
 Bot Mode, scheduling, and UI launch configurations.
 
 Chat changes additionally follow the
@@ -791,16 +792,13 @@ Keep those records, grants and authorization epochs intact. Native uses its
 separate versioned enrollment/catalog contract; never relabel it as Hermes.
 Service rollback must preserve forward-migrated storage and v1 compatibility.
 
-`BighelpLinkAccountStore.restoreForRecovery` preserves valid in-memory credentials
-and account presentation during transient protected-data/keychain reads. A
-recovery generation prevents a cancelled or superseded read from replacing newer
-state. An authoritative missing credential still signs out; a real failure with
-no usable credentials remains visible.
+Phones that once signed in to the retired bighelp account lose its leftover
+keys and pairing choices once, at launch (`BighelpLinkAccountRetirement`).
 
 The obsolete `BighelpAccountRefreshCoordinator` and cloud-socket host switch are
 removed. Native selection owns connection generations and replaces consumers
 only at the native authority boundary. `BighelpHostSelectionChangeRelay` remains
-for optional account-management fixtures: it synchronously retires fixture
+for demo mode's host switch (`DemoHosts`): it synchronously retires fixture
 models and changes their cache scope. It cannot retarget production native chat.
 
 ### Quick Workspace overview

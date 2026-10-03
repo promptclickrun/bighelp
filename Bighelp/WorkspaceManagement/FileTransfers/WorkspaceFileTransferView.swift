@@ -117,7 +117,7 @@ struct WorkspaceFileTransferView: View {
         Section("Location") {
             LabeledContent("Host", value: store.hostName)
             LabeledContent("Workspace folder") {
-                Text(store.workspaceRoot ?? "Discovering from host…")
+                Text(store.workspaceRootLabel)
                     .font(.bighelp(.caption).monospaced())
                     .multilineTextAlignment(.trailing)
                     .textSelection(.enabled)
@@ -174,7 +174,7 @@ struct WorkspaceFileTransferView: View {
                     store.workspaceRoot == nil ? "Workspace folder unavailable" : "No managed files",
                     systemImage: "folder",
                     description: Text(store.workspaceRoot == nil
-                        ? "bighelp must confirm this host’s configured default directory and managed-files policy before showing files."
+                        ? "bighelp shows files only from the folder this agent works in, and this computer hasn't confirmed it."
                         : "Upload a file or create a folder inside this host’s configured workspace.")
                 )
             }

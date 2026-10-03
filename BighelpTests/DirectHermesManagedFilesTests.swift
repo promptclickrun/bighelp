@@ -94,8 +94,8 @@ struct DirectHermesManagedFilesTests {
             Issue.record("The host refused, so there is no scope")
         } catch {
             #expect(error as? WorkspaceClientError == .rejected(code: "workspace_not_configured"))
-            #expect(error.localizedDescription.contains("no working folder"))
-            #expect(ConfiguredWorkspaceArtifactsView.message(for: error).contains("no working folder"))
+            #expect(error.localizedDescription.contains("isn't its own"))
+            #expect(ConfiguredWorkspaceArtifactsView.message(for: error).contains("isn't its own"))
         }
     }
 
@@ -106,7 +106,7 @@ struct DirectHermesManagedFilesTests {
         (409, "workspace_on_remote", "another computer"),
         (501, "workspace_windows_unsupported", "Windows"),
         (409, "workspace_hermes_folder", "Hermes's own folder"),
-        (409, "workspace_not_configured", "working folder of its own"),
+        (409, "workspace_not_configured", "isn't its own"),
     ])
     func hostsReasonsForFilesItCantShareReachPeople(status: Int, code: String, wording: String) async throws {
         let owner = try makeOwner()
@@ -121,6 +121,84 @@ struct DirectHermesManagedFilesTests {
             #expect(ConfiguredWorkspaceArtifactsView.message(for: error).contains(wording))
             #expect(!ConfiguredWorkspaceArtifactsView.message(for: error).contains("Update it"))
         }
+    }
+
+    /// Hosted Hermes (the Nous Portal) runs the agent in its own folder; there the
+    /// fix is a workspace folder, so people aren't sent to edit terminal.cwd.
+    @Test(arguments: ["workspace_hermes_folder", "workspace_not_configured"])
+    func hermesFolderReasonsOfferTheWorkspaceFolderFix(code: String) async throws {
+        let owner = try makeOwner()
+        let http = ManagedFilesTestHTTP()
+        http.refusal = (409, code, "The plugin's own wording.")
+        let client = DirectHermesManagedFilesClient(http: http, owner: owner, currentOwner: { owner })
+        do {
+            _ = try await client.workspaceScope()
+            Issue.record("The host refused, so there is no scope")
+        } catch {
+            let message = ConfiguredWorkspaceArtifactsView.message(for: error)
+            #expect(message.contains("“workspace”"))
+            #expect(!message.contains("terminal.cwd"))
+        }
+    }
+
+    /// A plugin from before hosted Hermes' workspace folder was found (an older
+    /// one, or a new one Hermes hasn't restarted to load) refuses the same way;
+    /// people are told to update or restart, not to change Hermes' settings.
+    @Test(arguments: ["workspace_hermes_folder", "workspace_not_configured"])
+    func olderOrUnrestartedPluginSaysToUpdateOrRestart(code: String) async throws {
+        let owner = try makeOwner()
+        let http = ManagedFilesTestHTTP()
+        http.findsHermesWorkspace = false
+        http.refusal = (409, code, "Set an absolute terminal.cwd for this profile before opening workspace files.")
+        let client = DirectHermesManagedFilesClient(http: http, owner: owner, currentOwner: { owner })
+        do {
+            _ = try await client.workspaceScope()
+            Issue.record("The host refused, so there is no scope")
+        } catch {
+            #expect(error as? WorkspaceClientError == .rejected(code: WorkspaceClientError.workspacePluginOutdated))
+            let message = ConfiguredWorkspaceArtifactsView.message(for: error)
+            #expect(message.contains("restart Hermes"))
+            #expect(message.contains("Plugin version"))
+            #expect(!message.contains("terminal.cwd"))
+        }
+    }
+
+    /// Other reasons don't depend on the plugin's age and keep their own words.
+    @Test func olderPluginStillSaysContainerReasons() async throws {
+        let owner = try makeOwner()
+        let http = ManagedFilesTestHTTP()
+        http.findsHermesWorkspace = false
+        http.refusal = (409, "workspace_in_container", "The plugin's own wording.")
+        let client = DirectHermesManagedFilesClient(http: http, owner: owner, currentOwner: { owner })
+        await #expect(throws: WorkspaceClientError.rejected(code: "workspace_in_container")) {
+            _ = try await client.workspaceScope()
+        }
+    }
+
+    /// The workspace folder in hosted Hermes' own folder is the agent's workspace.
+    @Test func hermesWorkspaceFolderIsAccepted() async throws {
+        let owner = try makeOwner()
+        let http = ManagedFilesTestHTTP()
+        http.origin = "hermes-workspace"
+        http.result = listing(root: http.root)
+        let client = DirectHermesManagedFilesClient(http: http, owner: owner, currentOwner: { owner })
+        #expect(try await client.workspaceScope().root == http.root)
+        #expect(try await client.list().files.map(\.name) == ["result.txt"])
+    }
+
+    /// The folder settings screen stops saying it's still looking once the host
+    /// has said why there's no folder.
+    @Test func folderSettingsSayTheFolderIsUnavailableAfterARefusal() async throws {
+        let owner = try makeOwner()
+        let http = ManagedFilesTestHTTP()
+        http.refusal = (409, "workspace_hermes_folder", "The plugin's own wording.")
+        let client = DirectHermesManagedFilesClient(http: http, owner: owner, currentOwner: { owner })
+        let store = WorkspaceFileTransferStore(hostName: "Fixture", client: client, isCurrent: { true })
+        #expect(store.workspaceRootLabel == "Finding it…")
+        await store.refresh()
+        #expect(store.workspaceRoot == nil)
+        #expect(store.workspaceRootLabel == "Unavailable")
+        #expect(store.errorMessage?.contains("Hermes's own folder") == true)
     }
 
     /// The plugin reports the folder Hermes itself gives the agent when no
@@ -183,6 +261,8 @@ private final class ManagedFilesTestHTTP: DirectHermesAuthenticatedHTTP, DirectH
     var cwdResponse: BighelpJSONValue?
     var refusal: (status: Int, code: String, message: String)?
     var sharesWorkspaceFiles = true
+    /// Plugins since hosted Hermes' workspace folder was found advertise it.
+    var findsHermesWorkspace = true
     /// How the plugin found the folder; older plugins send no origin.
     var origin: String?
     var onRequest: (@MainActor () -> Void)?
@@ -202,7 +282,8 @@ private final class ManagedFilesTestHTTP: DirectHermesAuthenticatedHTTP, DirectH
                 "runtimeId": .string("fixture-runtime"), "servingProfileId": .string("default"),
                 "principal": .object(["provider": .string("test"), "userId": .string("files"), "displayName": .null]),
                 "features": .array([.string("native-context-v1"), .string("serving-profile-v1")]
-                    + (sharesWorkspaceFiles ? [.string("native-workspace-files-v1")] : []))]
+                    + (sharesWorkspaceFiles ? [.string("native-workspace-files-v1")] : [])
+                    + (sharesWorkspaceFiles && findsHermesWorkspace ? [.string("native-workspace-hermes-home-v1")] : []))]
         } else if let refusal {
             // The plugin's own error reply, as Hermes sends it.
             object = ["error": .object(["code": .string(refusal.code), "message": .string(refusal.message),

@@ -27,12 +27,22 @@ enum WorkspaceClientError: Error, Equatable, LocalizedError, Sendable {
         }
     }
 
+    /// The app's own code for a plugin that can't find hosted Hermes' workspace
+    /// folder: an older one, or a new one Hermes hasn't restarted to load.
+    static let workspacePluginOutdated = "bighelp_workspace_plugin_outdated"
+
     /// The plugin's reasons it can't share an agent's files, said plainly, each
     /// with what to fix on the computer. Nil for any other refusal.
     static func workspaceFilesMessage(_ code: String?) -> String? {
         switch code {
+        case workspacePluginOutdated:
+            "bighelp needs the newest bighelp plugin on this computer to find this agent's folder. Update it in "
+                + "Settings, under this computer's Plugin version. If it's already up to date, restart Hermes to "
+                + "finish the update, then try again."
         case "workspace_not_configured":
-            "This agent has no working folder of its own on its computer. Set terminal.cwd for it in Hermes, then try again."
+            "This agent's chats start in a folder that isn't its own, like Hermes's program folder or the "
+                + "computer's top folder, so bighelp won't show it. Make a folder named “workspace” in the agent's "
+                + "Hermes folder, or choose a working folder for the agent in Hermes, then try again."
         case "workspace_in_container":
             "This agent works inside a container, so its files aren't on the computer bighelp can read."
         case "workspace_on_remote":
@@ -40,8 +50,8 @@ enum WorkspaceClientError: Error, Equatable, LocalizedError, Sendable {
         case "workspace_windows_unsupported":
             "bighelp can't show an agent's files from a Windows computer yet."
         case "workspace_hermes_folder":
-            "This agent's working folder is Hermes's own folder, which holds its settings and keys, so bighelp won't "
-                + "show it. Give the agent a folder of its own (terminal.cwd in Hermes), then try again."
+            "This agent works in Hermes's own folder, which holds its settings and keys, so bighelp won't show it. "
+                + "Make a folder named “workspace” in it for the agent's files, then try again."
         case "workspace_unavailable":
             "This agent's working folder is missing on its computer, or Hermes can't open it."
         case "workspace_config_invalid":

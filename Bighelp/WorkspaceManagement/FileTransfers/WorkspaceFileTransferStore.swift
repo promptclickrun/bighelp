@@ -43,6 +43,8 @@ final class WorkspaceFileTransferStore {
 
     var ownsScope: Bool { !isRetired && isCurrent() && client.ownsScope }
     var workspaceRoot: String? { client.scopePath }
+    /// Once the host has said why there's no folder, stop saying it's still looking.
+    var workspaceRootLabel: String { workspaceRoot ?? (errorMessage == nil ? "Finding it…" : "Unavailable") }
     var canRefresh: Bool { ownsScope && !isLoading && !isTransferring }
     var canAct: Bool { canRefresh && workspaceRoot != nil }
     var supportsLargeTransfers: Bool { client.supportsBinaryTransfers }

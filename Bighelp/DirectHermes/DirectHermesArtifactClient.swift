@@ -7,6 +7,10 @@ import Foundation
 final class DirectHermesArtifactClient: WorkspaceOperationPerforming {
     private static let feature = "native-workspace-files-v1"
     private static let recentFeature = "native-workspace-recent-v1"
+    /// Plugins that find hosted Hermes' workspace folder (the agent works in Hermes' home).
+    private static let hermesHomeFeature = "native-workspace-hermes-home-v1"
+    /// Refusals an older or not yet restarted plugin gives on hosted Hermes.
+    private static let hermesHomeRefusals: Set<String> = ["workspace_not_configured", "workspace_hermes_folder"]
     private let http: any DirectHermesNativeHTTP
     private let capturedOwner: WorkspaceOwner
     private let currentOwner: @MainActor () -> WorkspaceOwner?
@@ -123,7 +127,14 @@ final class DirectHermesArtifactClient: WorkspaceOperationPerforming {
             if [401, 403, 412, 428].contains(response.http.statusCode) {
                 _ = try? await native.loadContext(force: true)
             }
-            throw responseError(response)
+            let error = responseError(response)
+            // Without the feature the plugin can't find hosted Hermes' workspace
+            // folder, so its "set terminal.cwd" reason is the wrong fix.
+            if case .rejected(let code?) = error, Self.hermesHomeRefusals.contains(code),
+               !context.features.contains(Self.hermesHomeFeature) {
+                throw WorkspaceClientError.rejected(code: WorkspaceClientError.workspacePluginOutdated)
+            }
+            throw error
         }
         guard response.http.value(forHTTPHeaderField: "X-Loopdy-Request-ID") == guardValue.requestIDHeader,
               DirectHermesNativeRequestGuard.contextTag(response.http.value(forHTTPHeaderField: "ETag")) == guardValue.etag,

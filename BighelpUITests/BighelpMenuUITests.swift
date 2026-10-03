@@ -29,6 +29,10 @@ final class BighelpMenuUITests: BighelpUITestCase {
             XCTAssertTrue(app.buttons[id].isHittable, "\(id) shows without scrolling")
         }
         XCTAssertLessThan(app.buttons["menu.agents"].frame.minY, app.buttons["menu.settings"].frame.minY)
+        XCTAssertLessThan(app.buttons["menu.new-chat"].frame.minY, app.buttons["menu.agents"].frame.minY,
+                          "New chat first, then Agents")
+        XCTAssertFalse(app.buttons["menu.new-group"].exists, "Group chats start from New chat's own picker")
+        XCTAssertFalse(app.buttons["menu.all-agents"].exists, "One host: Agents is this host's")
         XCTAssertLessThan(app.buttons["menu.settings"].frame.maxY, app.buttons["menu.chats"].frame.minY,
                           "Recent chats come after the places you go")
         hostSwitcher.tap()

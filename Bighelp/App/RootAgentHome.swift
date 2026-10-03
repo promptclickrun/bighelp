@@ -597,7 +597,6 @@ extension RootShellView {
                     startNewChat(explicitAgentID: homeAgent?.id)
                 }
             },
-            onNewGroup: newGroupChatAction == nil ? nil : { afterClosingHomeSheets { inviteToGroup(seed: nil) } },
             onAllChats: { afterClosingHomeSheets { appState.select(.sessions) } },
             onProjects: canOpenProjects ? { afterClosingHomeSheets { openProjects() } } : nil,
             onAgents: { afterClosingHomeSheets { appState.select(.agents) } },

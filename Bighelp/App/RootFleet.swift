@@ -43,15 +43,9 @@ extension RootShellView {
         destinations.onAllChats = { afterClosingHomeSheets { openFleetChats() } }
         destinations.onAgents = { afterClosingHomeSheets { fleetGate(.agents) } }
         destinations.onSettings = { afterClosingHomeSheets { fleetGate(.settings) } }
-        if destinations.onNewGroup != nil {
-            destinations.onNewGroup = { afterClosingHomeSheets { fleetGate(.newGroup) } }
-        }
-        if destinations.onProjects != nil {
-            destinations.onProjects = { afterClosingHomeSheets { fleetGate(.projects) } }
-        }
-        if destinations.onKanban != nil {
-            destinations.onKanban = { afterClosingHomeSheets { fleetGate(.kanban) } }
-        }
+        // Projects, Kanban and Scheduled tasks belong to one host; the all-hosts menu leaves them out.
+        destinations.onProjects = nil
+        destinations.onKanban = nil
         if destinations.onProviderUsage != nil {
             destinations.onProviderUsage = { afterClosingHomeSheets { fleetGate(.providerUsage) } }
         }
@@ -245,7 +239,6 @@ extension RootShellView {
                 else { actionErrorMessage = "Provider usage isn't available on this host." }
             case .credentialVault: openCredentialVault()
             case .folder: presentHermesWorkspaces()
-            case .newGroup: inviteToGroup(seed: nil)
             }
         }
     }

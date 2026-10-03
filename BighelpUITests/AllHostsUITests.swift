@@ -64,9 +64,18 @@ final class AllHostsUITests: BighelpUITestCase {
         pickHome.tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
 
-        // ☰ › All agents is the way back.
+        // ☰ › Agents is All agents here, right under New chat. One-host places (Projects,
+        // Kanban, Scheduled tasks) and the one-host Agents row aren't in this menu.
         menu.tap()
-        app.buttons["menu.all-agents"].tap()
+        let agentsRow = app.buttons["menu.all-agents"]
+        XCTAssertTrue(agentsRow.waitForExistence(timeout: 5))
+        XCTAssertEqual(agentsRow.label, "Agents")
+        XCTAssertLessThan(app.buttons["menu.new-chat"].frame.minY, agentsRow.frame.minY, "New chat comes first")
+        for hidden in ["menu.agents", "menu.projects", "menu.kanban", "menu.scheduled-tasks", "menu.new-group"] {
+            XCTAssertFalse(app.buttons[hidden].exists, "\(hidden) isn't in the all-hosts menu")
+        }
+        save("menu-all-hosts", app)
+        agentsRow.tap()
         XCTAssertTrue(app.navigationBars["All agents"].waitForExistence(timeout: 5))
 
         // Off again: one host, its own chat list.

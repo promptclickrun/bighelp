@@ -113,6 +113,51 @@ RGB values, font names, font sizes, frames, coordinates, blur radii, arbitrary
 SF Symbol names, or SwiftUI modifiers. Version 1 images are bundled symbols or
 assets only; remote image decoding is not supported.
 
+## Weather backgrounds
+
+A `card` element may carry an animated weather background beside its `props`:
+
+```json
+"card": {
+  "type": "card",
+  "props": { "title": "Sample Bay", "subtitle": "Heavy rain" },
+  "background": { "scene": "rain", "intensity": "heavy", "time_of_day": "night" },
+  "children": ["now"]
+}
+```
+
+`scene` is `none`, `clear`, `partly_cloudy`, `overcast`, `rain`, `thunderstorm`,
+`snow`, `fog` or `wind`; `intensity` is `light`, `moderate` (default) or
+`heavy`; `time_of_day` is `day` (default), `dusk` or `night`. The plugin rejects
+a background on any other element, inside `props`, or with extra keys.
+
+It sits beside `props` so app builds from before it, which ignore element keys
+they don't know but reject unknown props, still show the card, just without
+the weather. No plugin feature flag is needed.
+
+The app (`CardBackground`, `CardBackgroundView`) reads only the root card's
+background, and parses it leniently:
+
+- No background, `scene: none`, or a background it can't read: the card's usual
+  surface, drawn exactly as before.
+- An unknown scene: a still, neutral gradient for the time of day. Unknown
+  intensity or time of day: `moderate` or `day`. Each unknown value is logged
+  once per launch. Extra keys are ignored.
+- Otherwise the scene's gradient, a scrim, and the scene's animation on top,
+  clipped to the card. The card's content is drawn in the dark color scheme
+  and never knows the background is there.
+- The scrim is set per scene and time so primary and secondary text keep 4.5:1
+  over the brightest sky, with every glow, cloud, mist and lightning flash at
+  full strength (`CardBackgroundTests`). Rain, snowflakes, stars and gusts are a
+  few points wide; even right behind a letter, primary text keeps 4.5:1.
+- The animation is one `Canvas` under a `TimelineView` (30 or 24 frames a
+  second), with particle counts capped by intensity (96 at most). It runs only
+  while the card is on screen, the app is in front, and Reduce Motion and Low
+  Power Mode are off. Otherwise, and in Copy as Image, the card shows its still
+  gradient.
+- `-use-demo-fixtures -test-weather-cards` opens a chat with one card per
+  scene; `-test-weather-cards-plain` shows the same cards without backgrounds.
+
 ## Bindings, expressions, and formatting
 
 A component value in build 3 uses the literal binding form:

@@ -55,6 +55,55 @@ enum WorkspaceReconnect: Equatable {
     }
 }
 
+/// What a host page (Default model, Provider Keys, a Nerd Mode tool) shows,
+/// given the connection it was opened with. Every reconnect is a new owner;
+/// judging pages by the whole owner turned coming back to the app into
+/// "Reopen this feature".
+enum WorkspaceScreenAvailability: Equatable {
+    /// Its connection is the live one.
+    case current
+    /// Same computer and sign-in: the connection is on its way back, or is
+    /// back and the page is about to get it.
+    case reconnecting
+    /// Another computer or sign-in.
+    case unavailable
+
+    static func of(openedFor owner: WorkspaceOwner, current: WorkspaceOwner?,
+                   signIn: WorkspaceSignIn?) -> Self {
+        if current == owner { return .current }
+        return (current?.signIn ?? signIn) == owner.signIn ? .reconnecting : .unavailable
+    }
+
+    /// Still this computer's page: keep it, don't ask to open it again.
+    var keepsScreen: Bool { self != .unavailable }
+}
+
+/// The host pages open in the navigation stack, one per destination. There
+/// used to be one slot, so Provider Keys opened from Default model replaced
+/// Default model's page, and going back found it gone.
+struct WorkspaceOpenScreens<Screen> {
+    private(set) var screens: [WorkspaceDestination: Screen] = [:]
+
+    subscript(destination: WorkspaceDestination) -> Screen? { screens[destination] }
+
+    var destinations: Set<WorkspaceDestination> { Set(screens.keys) }
+
+    /// Returns the page it replaces, to retire.
+    @discardableResult
+    mutating func open(_ screen: Screen, for destination: WorkspaceDestination) -> Screen? {
+        screens.updateValue(screen, forKey: destination)
+    }
+
+    /// Returns the pages no longer in the stack, to retire.
+    mutating func keep(only open: Set<WorkspaceDestination>) -> [Screen] {
+        let closed = screens.filter { !open.contains($0.key) }
+        for destination in closed.keys { screens[destination] = nil }
+        return Array(closed.values)
+    }
+
+    mutating func removeAll() -> [Screen] { keep(only: []) }
+}
+
 /// Demo runs have no connection to lose. With `-demo-reconnects-on-return`,
 /// coming back from the background is a reconnect, as it is with a host: a new
 /// connection for the same sign-in.

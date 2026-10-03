@@ -52,8 +52,9 @@ struct RootShellView: View {
     @State var sessionRestoreRequest: SessionRestoreRequest?
     @State var sessionRestoreTask: Task<Void, Never>?
     @State var managementStore: WorkspaceManagementStore?
-    @State var capabilitiesPresentation: NativeCapabilitiesPresentation?
-    @State var administrationPresentation: NativeAdministrationPresentation?
+    /// Host pages open in the stack, one per destination (`WorkspaceOpenScreens`).
+    @State var capabilitiesPresentations = WorkspaceOpenScreens<NativeCapabilitiesPresentation>()
+    @State var administrationPresentations = WorkspaceOpenScreens<NativeAdministrationPresentation>()
     @State var lifecycleCoordinator: NativeWorkspaceLifecycleCoordinator?
     @State var lifecycleProfileID: String?
     @State var lifecyclePresentationID: UUID?
@@ -196,6 +197,7 @@ struct RootShellView: View {
         }
         .modifier(DemoReconnectOnReturn(scenePhase: scenePhase, connection: $workspaceFixtureConnection,
                                         isEnabled: usesWorkspaceFixtures))
+        .onChange(of: appState.path) { _, _ in retireClosedWorkspacePresentations() }
         .modifier(WorkspacePresentationContinuity(
             owner: currentWorkspaceOwner, registryGeneration: hostRegistry?.generation,
             isHostSettled: nativeRuntime.map { $0.isReady && !$0.isSuspended && !$0.isRefreshing } ?? true,
@@ -376,9 +378,8 @@ struct RootShellView: View {
     private func closeWorkspacePresentations() {
         managementStore?.retire()
         managementStore = nil
-        capabilitiesPresentation = nil
-        administrationPresentation?.retire()
-        administrationPresentation = nil
+        _ = capabilitiesPresentations.removeAll()
+        for page in administrationPresentations.removeAll() { page.retire() }
         workspaceProfileEditor = nil
         lifecycleCoordinator = nil
         lifecycleProfileID = nil

@@ -112,6 +112,28 @@ struct WorkspaceUnavailableView: View {
     }
 }
 
+/// A host page while its computer reconnects (after you come back to the
+/// app): it comes back by itself, so there's nothing to reopen.
+struct WorkspaceReconnectingView: View {
+    let destination: WorkspaceDestination
+    let hostName: String
+
+    var body: some View {
+        ContentUnavailableView {
+            Label {
+                Text(destination.title)
+            } icon: {
+                ProgressView()
+            }
+        } description: {
+            Text("Reconnecting to \(hostName)…")
+        }
+        .navigationTitle(destination.title)
+        .navigationBarTitleDisplayMode(.inline)
+        .accessibilityIdentifier("workspace.reconnecting.\(destination.rawValue)")
+    }
+}
+
 struct WorkspaceDocumentationView: View {
     var body: some View {
         List {

@@ -5,22 +5,78 @@ import UIKit
 extension RootShellView {
     @ViewBuilder
     func nativeCapabilitiesDestination(_ kind: CapabilitiesManagementKind, destination: WorkspaceDestination) -> some View {
-        if let presentation = capabilitiesPresentation,
-           presentation.kind == kind, isCurrentSignIn(presentation.owner),
-           workspaceAgentID == presentation.profileID {
-            CapabilitiesManagementView(kind: kind, hostName: workspaceHostName,
-                profileName: workspaceProfileName, dependencies: presentation.dependencies)
-                .id(presentation.id)
-                .toolbar {
-                    if kind == .skills {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Button("Edit Skills") { appState.open(.skillsAndTools) }
+        let presentation = capabilitiesPresentations[destination]
+        switch presentation.map({ availability(of: $0.owner, profileID: $0.profileID, current: currentWorkspaceOwner,
+                                               signIn: workspaceSignIn) }) ?? .unavailable {
+        case .current:
+            if let presentation {
+                CapabilitiesManagementView(kind: kind, hostName: workspaceHostName,
+                    profileName: workspaceProfileName, dependencies: presentation.dependencies)
+                    .id(presentation.id)
+                    .toolbar {
+                        if kind == .skills {
+                            ToolbarItem(placement: .topBarTrailing) {
+                                Button("Edit Skills") { appState.open(.skillsAndTools) }
+                            }
                         }
                     }
-                }
-        } else {
+            }
+        case .reconnecting:
+            WorkspaceReconnectingView(destination: destination, hostName: workspaceHostName)
+        case .unavailable:
             WorkspaceUnavailableView(destination: destination, hostName: workspaceHostName,
                 reason: "Open this feature again after connecting to the selected host and profile.")
+        }
+    }
+
+    /// Default model, Provider Keys and the other host pages. Leaving the app
+    /// reconnects; the page waits for the connection instead of asking to be
+    /// opened again (`WorkspaceScreenAvailability`).
+    @ViewBuilder
+    func hostAdministrationDestination(_ destination: WorkspaceDestination) -> some View {
+        let presentation = administrationPresentations[destination]
+        switch presentation.map({ availability(of: $0.owner, profileID: $0.profileID, current: administrationOwner,
+                                               signIn: administrationSignIn) }) ?? .unavailable {
+        case .current:
+            if let presentation {
+                NativeAdministrationDestination(presentation: presentation,
+                    permissionCenter: permissionCenter, agents: modelAdministrationAgents,
+                    onOpenProviderAccounts: { openWorkspaceDestination(.keys) },
+                    onOpenAgentDefaults: { openWorkspaceDestination(.profiles) })
+            }
+        case .reconnecting:
+            WorkspaceReconnectingView(destination: destination, hostName: workspaceHostName)
+        case .unavailable:
+            WorkspaceUnavailableView(destination: destination, hostName: workspaceHostName,
+                reason: "Reopen this feature after connecting to the selected host and profile.")
+        }
+    }
+
+    /// A page opened for another agent is not this one's.
+    private func availability(of owner: WorkspaceOwner, profileID: String, current: WorkspaceOwner?,
+                              signIn: WorkspaceSignIn?) -> WorkspaceScreenAvailability {
+        guard Data(profileID.utf8) == Data(workspaceAgentID.utf8) else { return .unavailable }
+        return .of(openedFor: owner, current: current, signIn: signIn)
+    }
+
+    /// The workspace pages in the navigation stack, bottom first.
+    var openWorkspaceDestinations: [WorkspaceDestination] {
+        appState.path.compactMap { route in
+            if case .workspaceManagement(let destination) = route { return destination }
+            return nil
+        }
+    }
+
+    /// Pages that left the stack let go of their connection; the ones still
+    /// in it (under Provider Keys, say) keep theirs.
+    func retireClosedWorkspacePresentations() {
+        let open = Set(openWorkspaceDestinations)
+        for page in administrationPresentations.keep(only: open) { page.retire() }
+        _ = capabilitiesPresentations.keep(only: open)
+        if open.isDisjoint(with: [.sessionMaintenance, .profileLifecycle]), lifecycleCoordinator != nil {
+            lifecycleCoordinator = nil
+            lifecycleProfileID = nil
+            lifecyclePresentationID = nil
         }
     }
 
@@ -28,17 +84,34 @@ extension RootShellView {
         _ = presentWorkspaceDestination(destination, reattaching: false)
     }
 
-    /// After a reconnect to the same computer, the Nerd Mode screen on top gets
-    /// the new connection in place, instead of asking to be opened again.
+    /// After a reconnect to the same computer, every host page in the stack gets
+    /// the new connection in place, not just the one on top (Default model under
+    /// Provider Keys), instead of asking to be opened again.
     /// False: the host isn't all the way back yet, so try again later.
     func reattachWorkspacePresentations() -> Bool {
-        guard administrationPresentation != nil || capabilitiesPresentation != nil
-                || managementStore != nil || lifecycleCoordinator != nil,
-              let destination = appState.path.reversed().compactMap({ route -> WorkspaceDestination? in
-                  if case .workspaceManagement(let destination) = route { return destination }
-                  return nil
-              }).first else { return true }
-        return presentWorkspaceDestination(destination, reattaching: true)
+        let open = openWorkspaceDestinations
+        guard !open.isEmpty else { return true }
+        var reattached = true
+        for destination in Set(open) where opensHostAdministration(destination)
+            || (CapabilitiesManagementKind(destination: destination) != nil && !usesWorkspaceFixtures) {
+            let owner = administrationPresentations[destination]?.owner ?? capabilitiesPresentations[destination]?.owner
+            if let owner, owner == administrationOwner || owner == currentWorkspaceOwner { continue }
+            reattached = presentWorkspaceDestination(destination, reattaching: true) && reattached
+        }
+        if lifecycleCoordinator != nil,
+           let destination = open.last(where: { $0 == .sessionMaintenance || $0 == .profileLifecycle }) {
+            reattached = openLifecycleDestination(destination, reattaching: true) && reattached
+        }
+        // Of the rest, only the management list keeps a connection of its own.
+        if managementStore != nil {
+            if let store = makeWorkspaceManagementStore() {
+                managementStore?.retire()
+                managementStore = store
+            } else {
+                reattached = false
+            }
+        }
+        return reattached
     }
 
     /// Opens a workspace screen, or (`reattaching`) gives the one already open
@@ -47,9 +120,6 @@ extension RootShellView {
         if destination == .sessionMaintenance || destination == .profileLifecycle {
             return openLifecycleDestination(destination, reattaching: reattaching)
         }
-        lifecycleCoordinator = nil
-        lifecycleProfileID = nil
-        lifecyclePresentationID = nil
         if opensHostAdministration(destination) {
             var presentation: NativeAdministrationPresentation?
             if usesWorkspaceFixtures {
@@ -92,10 +162,8 @@ extension RootShellView {
             } else if reattaching {
                 return false
             }
-            managementStore?.retire()
-            managementStore = nil
-            administrationPresentation?.retire()
-            administrationPresentation = presentation
+            // Opening one page leaves the ones under it alone.
+            if let presentation { administrationPresentations.open(presentation, for: destination)?.retire() }
             if !reattaching { appState.open(.workspaceManagement(destination)) }
             return true
         }
@@ -122,20 +190,11 @@ extension RootShellView {
             } else if reattaching {
                 return false
             }
-            managementStore?.retire()
-            managementStore = nil
-            capabilitiesPresentation = presentation
+            if let presentation { capabilitiesPresentations.open(presentation, for: destination) }
             if !reattaching { appState.open(.workspaceManagement(destination)) }
             return true
         }
-        if reattaching {
-            // Of the rest, only the management list keeps a connection of its own.
-            guard managementStore != nil else { return true }
-            guard let store = makeWorkspaceManagementStore() else { return false }
-            managementStore?.retire()
-            managementStore = store
-            return true
-        }
+        if reattaching { return true }
         switch destination {
         case .activity:
             appState.open(.workspaceActivity)
@@ -316,10 +375,6 @@ extension RootShellView {
                         appState.openSessions()
                     }
                 })
-            managementStore?.retire()
-            managementStore = nil
-            administrationPresentation?.retire()
-            administrationPresentation = nil
             lifecycleCoordinator = coordinator
             lifecycleProfileID = workspaceAgentID
             lifecyclePresentationID = presentationID

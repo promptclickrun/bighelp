@@ -1,8 +1,33 @@
 import XCTest
 
-/// Settings › Default model on demo data.
+/// Settings › Default model on demo data. It used to turn into "Reopen this
+/// feature after connecting to the selected host and profile." after a trip to
+/// Provider Keys and back, or after leaving the app and coming back.
 /// Screenshots go to BIGHELP_UI_EVIDENCE (TEST_RUNNER_BIGHELP_UI_EVIDENCE) when set.
 final class DefaultModelUITests: BighelpUITestCase {
+    @MainActor
+    func testDefaultModelSurvivesProviderKeysAndComingBack() {
+        let app = makeApp()
+        app.launchArguments += ["-use-demo-fixtures", "-disable-demo-delays", "-demo-reconnects-on-return"]
+        app.launch()
+        openDefaultModel(in: app)
+
+        openProviderKeysFromDefaultModel(in: app)
+        goBack(in: app)
+        assertDefaultModelWorks(in: app, "after Provider Keys and back")
+
+        // Leaving the app reconnects; the page is still there when you're back.
+        leaveAndComeBack(app)
+        assertDefaultModelWorks(in: app, "after leaving the app and coming back")
+
+        // And from Provider Keys, which is on top when you leave.
+        openProviderKeysFromDefaultModel(in: app)
+        leaveAndComeBack(app)
+        XCTAssertTrue(app.navigationBars["Provider Keys"].waitForExistence(timeout: 5))
+        goBack(in: app)
+        assertDefaultModelWorks(in: app, "after leaving from Provider Keys and going back")
+    }
+
     /// Pick an agent from the rail of cards to see and change its own default.
     @MainActor
     func testEachAgentsDefaultModelFromTheAgentRail() {

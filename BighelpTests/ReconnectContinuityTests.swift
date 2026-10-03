@@ -28,6 +28,63 @@ struct WorkspaceReconnectTests {
     }
 }
 
+/// Settings › Default model said "Reopen this feature after connecting to the
+/// selected host and profile." after Provider Keys and back, or after leaving
+/// the app: it judged its page by the whole connection, and kept one page slot.
+struct WorkspaceScreenAvailabilityTests {
+    private let signIn = UUID()
+    private func owner(_ computer: String = "computer-1", signIn: UUID? = nil) throws -> WorkspaceOwner {
+        WorkspaceOwner(authority: try .fixture(id: computer), authenticationGeneration: signIn ?? self.signIn,
+                       connectionGeneration: UUID())
+    }
+
+    @Test func aReconnectKeepsThePage() throws {
+        let opened = try owner()
+        let reconnected = WorkspaceOwner(authority: opened.authority, authenticationGeneration: signIn,
+                                         connectionGeneration: UUID())
+        #expect(opened != reconnected, "A reconnect is a new owner")
+        let availability = WorkspaceScreenAvailability.of(openedFor: opened, current: reconnected, signIn: opened.signIn)
+        #expect(availability == .reconnecting)
+        #expect(availability.keepsScreen)
+    }
+
+    @Test func whileTheConnectionIsAwayThePageWaits() throws {
+        let opened = try owner()
+        let availability = WorkspaceScreenAvailability.of(openedFor: opened, current: nil, signIn: opened.signIn)
+        #expect(availability == .reconnecting)
+        #expect(availability.keepsScreen)
+    }
+
+    @Test func theSameConnectionIsCurrent() throws {
+        let opened = try owner()
+        #expect(WorkspaceScreenAvailability.of(openedFor: opened, current: opened, signIn: opened.signIn) == .current)
+    }
+
+    @Test func anotherComputerOrSignInIsNot() throws {
+        let opened = try owner()
+        let otherComputer = try owner("computer-2")
+        let signedInAgain = try owner(signIn: UUID())
+        for current in [otherComputer, signedInAgain] {
+            let availability = WorkspaceScreenAvailability.of(openedFor: opened, current: current, signIn: current.signIn)
+            #expect(availability == .unavailable)
+            #expect(!availability.keepsScreen)
+        }
+        #expect(WorkspaceScreenAvailability.of(openedFor: opened, current: nil, signIn: nil) == .unavailable)
+    }
+
+    @Test func providerKeysOnTopKeepsDefaultModelBeneath() {
+        var screens = WorkspaceOpenScreens<String>()
+        #expect(screens.open("models page", for: .models) == nil)
+        #expect(screens.open("keys page", for: .keys) == nil, "Opening Provider Keys replaces nothing")
+        #expect(screens[.models] == "models page", "Default model is still there to go back to")
+        #expect(screens.keep(only: [.models]) == ["keys page"], "Going back retires Provider Keys only")
+        #expect(screens[.models] == "models page")
+        #expect(screens.open("new models page", for: .models) == "models page", "A reconnect replaces it in place")
+        #expect(screens.removeAll() == ["new models page"])
+        #expect(screens.destinations.isEmpty)
+    }
+}
+
 /// The pill under the Dynamic Island says what the connection is doing,
 /// without getting in the way.
 struct ConnectionIslandRulesTests {

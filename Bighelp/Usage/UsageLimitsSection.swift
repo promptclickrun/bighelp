@@ -213,6 +213,9 @@ struct UsageLimitCard: View {
     let provider: ProviderUsage
     let used: UsageAmount?
     let range: UsageRange
+    /// A shared copy of the page: nothing to tap, and resets counted from when it was made.
+    var isExport = false
+    var now: Date?
     @Environment(\.openURL) private var openURL
     @BighelpThemeReader private var theme
 
@@ -228,7 +231,7 @@ struct UsageLimitCard: View {
                     .foregroundStyle(theme.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            if used != nil || provider.manageURL != nil {
+            if used != nil || (provider.manageURL != nil && !isExport) {
                 Rectangle().fill(theme.separator).frame(height: 1)
                 footer
             }
@@ -259,7 +262,7 @@ struct UsageLimitCard: View {
         ForEach(provider.windows) { window in
             let color = ProviderUsagePresentation.barColor(for: provider, window: window, theme: theme)
             let left = ProviderUsagePresentation.percentText(window.leftPercent)
-            let reset = ProviderUsagePresentation.resetText(window.resetsAt)
+            let reset = ProviderUsagePresentation.resetText(window.resetsAt, now: now ?? .now)
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .firstTextBaseline) {
                     Text(window.label)
@@ -337,7 +340,7 @@ struct UsageLimitCard: View {
                     .accessibilityIdentifier("provider-usage.\(provider.id).agents-used")
             }
             Spacer(minLength: 0)
-            if let url = provider.manageURL {
+            if let url = provider.manageURL, !isExport {
                 Button {
                     openURL(url)
                 } label: {

@@ -158,6 +158,30 @@ final class ProviderUsageUITests: BighelpUITestCase {
         XCTAssertEqual(any.matching(identifier: "provider-usage.claude").count, 1)
     }
 
+    /// Share, top right: PDF, PNG, HTML and CSV, each to the system share sheet.
+    @MainActor
+    func testShareOffersFourFormats() throws {
+        let app = launch(["-bighelp.hosts.all-hosts", "YES"])
+        openMenu(app)
+        app.buttons["menu.usage"].tap()
+        _ = expectPage(app)
+        let share = app.buttons["usage.share"]
+        XCTAssertTrue(share.waitForExistence(timeout: 8))
+        XCTAssertTrue(share.isEnabled, "Something to share once usage loads")
+        XCTAssertLessThan(app.buttons["usage.refresh"].frame.minX - share.frame.minX, 200, "Top right, beside Refresh")
+        share.tap()
+        for title in ["PDF", "Image (PNG)", "Web page (HTML)", "Spreadsheet (CSV)"] {
+            XCTAssertTrue(app.buttons[title].waitForExistence(timeout: 5), "\(title) is offered")
+        }
+        save("usage-9-share-\(appearance)", app)
+        app.buttons["PDF"].tap()
+        // The system share sheet, with the file ready to send.
+        let sheet = app.otherElements["ActivityListView"]
+        let named = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Usage, ")).firstMatch
+        XCTAssertTrue(sheet.waitForExistence(timeout: 15) || named.waitForExistence(timeout: 5), "The share sheet opens")
+        save("usage-10-share-sheet-\(appearance)", app)
+    }
+
     @MainActor
     func testOneComputerHasNoLimitsMenu() throws {
         let app = launch(["-bighelp.hosts.all-hosts", "NO"])

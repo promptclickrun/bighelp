@@ -181,6 +181,10 @@ processed tokens per day as bars (tap one for its day), totals with the cache ra
 hours with the plugin's `usage/activity`), and ranked rows by model, by agent and, with All hosts on, by computer.
 Tap a row to chart it against everything else. Chat ⋯ › Usage and the context window open the same page; there is
 no overlay or Settings copy. Subscriptions report no cost, so a host where nothing cost money opens on Tokens.
+Share (top right, beside Refresh) sends the page as a PDF (paged, never cutting a card in two), a PNG (one tall
+picture), a web page (one file, inline styles and SVG charts, nothing loaded) or a CSV (one table of full-precision
+numbers: days, models, agents, computers, totals, limits), always light, in the range, Cost or Tokens and Limits
+computers on screen, with every row listed and the date range and time it was made at the top.
 
 **Kanban** (☰ › Kanban, above Scheduled tasks) is Hermes' Kanban plugin, shown only when the host has it. Five lanes
 in plain words: Later (triage, to-do, scheduled), Ready (an agent picks these up next), Working (only Hermes starts

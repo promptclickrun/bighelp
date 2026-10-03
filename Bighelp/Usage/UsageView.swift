@@ -15,6 +15,8 @@ struct UsageView: View {
     @State private var isChoosingProviders = false
     /// Which computers' plans Limits shows (`UsageLimitsComputers.Choice`).
     @AppStorage(UsageLimitsComputers.choiceKey) private var limitsChoice = "current"
+    @AppStorage(ProviderUsagePreferences.hiddenKey) private var hiddenProviders = ""
+    @Environment(\.appAppearance) private var appearance
     @BighelpThemeReader private var theme
 
     var body: some View {
@@ -42,8 +44,11 @@ struct UsageView: View {
         .navigationTitle("Usage")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) { shareMenu }
             ToolbarItem(placement: .topBarTrailing) { refreshButton }
         }
+        // Exports are only for the share sheet.
+        .onDisappear { UsageExporter.removeAll() }
         .refreshable { await refresh() }
         .task {
             await store.load(refresh: false)
@@ -89,6 +94,33 @@ struct UsageView: View {
         .keyboardShortcut("r")
         #endif
         .accessibilityIdentifier("usage.refresh")
+    }
+
+    /// PDF, PNG and HTML show the page as it is (range, Cost or Tokens, the
+    /// computers in Limits); CSV has the numbers. Written when shared.
+    @ViewBuilder
+    private var shareMenu: some View {
+        let snapshot = UsageExportSnapshot.make(store: store, providerUsage: providerUsage, computers: limitsComputers,
+                                                hidden: ProviderUsagePreferences.hidden(hiddenProviders))
+        Menu {
+            if let snapshot {
+                Section("Share as") {
+                    ForEach(UsageExportFormat.allCases) { format in
+                        ShareLink(item: UsageExportItem(format: format, snapshot: snapshot, appearance: appearance),
+                                  preview: SharePreview("Usage, \(snapshot.dateRangeText)")) {
+                            Label(format.title, systemImage: format.symbol)
+                        }
+                        .accessibilityIdentifier("usage.share.\(format.rawValue)")
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: "square.and.arrow.up")
+                .bighelpToolbarIcon()
+        }
+        .disabled(snapshot == nil)
+        .bighelpIconLabel("Share")
+        .accessibilityIdentifier("usage.share")
     }
 
     private func refresh() async {

@@ -40,7 +40,7 @@ final class NativeSubagentProductionUITests: BighelpUITestCase {
 
         let rail = app.buttons["chat.session-status.subagents"]
         XCTAssertTrue(rail.waitForExistence(timeout: 60),
-                      "A native subagent start event must surface the Agents rail.")
+                      "A native subagent start event must surface the Subagents rail.")
         capture("real-subagent-rail-running-2102", app, directory: artifactDirectory)
 
         rail.tap()
@@ -48,13 +48,11 @@ final class NativeSubagentProductionUITests: BighelpUITestCase {
             format: "identifier BEGINSWITH %@", "subagent.native.roster."
         ))
         XCTAssertTrue(nativeRows.firstMatch.waitForExistence(timeout: 15),
-                      "The Agents roster must render the authoritative native delegation.")
+                      "The Subagents roster must render the authoritative native delegation.")
         let nativeRow = nativeRows.firstMatch
         XCTAssertTrue(nativeRow.isHittable)
-        XCTAssertTrue(nativeRow.label.localizedCaseInsensitiveContains("subagent"),
-                      "The roster must expose the native task status.")
-        XCTAssertTrue(nativeRow.label.localizedCaseInsensitiveContains("active"),
-                      "The child must remain active while it waits.")
+        XCTAssertTrue(nativeRow.label.localizedCaseInsensitiveContains("working"),
+                      "The child must show as working while it waits.")
         XCTAssertTrue(
             nativeRow.label.localizedCaseInsensitiveContains("delegate")
                 || nativeRow.label.localizedCaseInsensitiveContains("wait")
@@ -81,7 +79,7 @@ final class NativeSubagentProductionUITests: BighelpUITestCase {
                       "The real parent turn must finish before checking terminal rail state.")
         capture("real-subagent-before-terminal-check-2102", app, directory: artifactDirectory)
         XCTAssertTrue(rail.waitForNonExistence(timeout: 20),
-                      "The active Agents rail must settle after the native delegation completes.")
+                      "The active Subagents rail must settle after the native delegation completes.")
         capture("real-subagent-completed-2102", app, directory: artifactDirectory)
 
         app.terminate()
@@ -129,7 +127,7 @@ final class NativeSubagentProductionUITests: BighelpUITestCase {
     private func dismissSheet(_ app: XCUIApplication) {
         let grabber = app.buttons["Sheet Grabber"]
         XCTAssertTrue(grabber.waitForExistence(timeout: 10),
-                      "The Agents roster must expose a native sheet dismissal handle.")
+                      "The Subagents roster must expose a native sheet dismissal handle.")
         guard grabber.exists else { return }
         grabber.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(
             forDuration: 0.1,
@@ -141,7 +139,7 @@ final class NativeSubagentProductionUITests: BighelpUITestCase {
         XCTAssertEqual(
             XCTWaiter.wait(for: [closed], timeout: 10),
             .completed,
-            "The Agents roster must close before observing the completed reply."
+            "The Subagents roster must close before observing the completed reply."
         )
     }
 

@@ -26,16 +26,6 @@ private final class NativeControlLoadingFixture: BighelpLinkSessionControlMessag
 @MainActor
 @Suite(.serialized)
 struct NativeWorkspaceCompositionTests {
-    @Test func nativeSubagentNavigationUsesTheCatalogIdentityAndRejectsAmbiguity() {
-        let row = SessionRecord(id: "scoped-child", kind: .direct, agentIDs: ["default"],
-                                title: "Child", remoteStoredID: "stored-child")
-        #expect(NativeSubagentNavigation.recordID(childStoredID: "stored-child", records: [row]) == "scoped-child")
-        #expect(NativeSubagentNavigation.recordID(childStoredID: "missing", records: [row]) == nil)
-        let other = SessionRecord(id: "other-profile-child", kind: .direct, agentIDs: ["other"],
-                                  title: "Other child", remoteStoredID: "stored-child")
-        #expect(NativeSubagentNavigation.recordID(childStoredID: "stored-child", records: [row, other]) == nil)
-    }
-
     @Test func retainedHistoryFailureDoesNotPreventCurrentOrLaterChatRecovery() async throws {
         var recovered: [String] = []
         let failed = try await NativeWorkspaceSessionRecovery.recover(

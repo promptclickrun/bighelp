@@ -185,6 +185,8 @@ final class ChatModel {
     /// is guaranteed to exist. Keep that live status separate from the
     /// persisted Link roster so missing child navigation never invents a route.
     var nativeSubagents: [NativeSubagentRailItem] = []
+    /// What each helper did, kept after it finishes so its canvas can show the end.
+    var subagentCanvases = SubagentCanvasLedger()
     var activityVisibility: ChatActivityVisibility {
         didSet {
             rebuildTranscript()

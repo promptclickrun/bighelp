@@ -100,6 +100,7 @@ extension ChatModel {
     func reconcileNativeSubagents(_ items: [NativeSubagentRailItem]) {
         guard !referenceOwnerRetired, !isBotMode else { return }
         nativeSubagents = items
+        subagentCanvases.seed(items)
     }
 
     /// Sends voice work without changing the user's composer or retry intent.

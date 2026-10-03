@@ -141,14 +141,3 @@ enum SessionSubagentDetailPresentation: Equatable {
         }
     }
 }
-
-/// Native events name the stored child; navigation uses the catalog's scoped
-/// visible identity. A missing or ambiguous row stays a status card.
-enum NativeSubagentNavigation {
-    static func recordID(childStoredID: String?, records: [SessionRecord]) -> String? {
-        guard let childStoredID, !childStoredID.isEmpty else { return nil }
-        let matches = records.filter { $0.remoteStoredID == childStoredID }
-        guard matches.count == 1 else { return nil }
-        return matches[0].id
-    }
-}

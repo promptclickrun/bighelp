@@ -3,9 +3,14 @@ import SwiftUI
 struct SessionSubagentRosterSheet: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.dismiss) private var dismiss
-    let subagents: [SessionSubagentSnapshot]
-    let nativeSubagents: [NativeSubagentRailItem]
+    /// Read live from the chat, so rows and an open canvas update as helpers work.
+    let model: ChatModel
     let sessionCatalog: SessionCatalogStore?
+
+    private var subagents: [SessionSubagentSnapshot] { model.sessionSubagents }
+    /// Every helper this chat has seen, running or finished, so a finished
+    /// helper stays open to the end of its story.
+    private var nativeSubagents: [SubagentCanvasState] { model.subagentCanvases.ordered }
 
     var body: some View {
         let totalSubagents = subagents.count + nativeSubagents.count
@@ -19,7 +24,7 @@ struct SessionSubagentRosterSheet: View {
                         )
                         .font(.bighelp(.headline))
                         .foregroundStyle(theme.primaryText)
-                        Text("Open a subagent to follow its persisted session and live activity.")
+                        Text("Tap one to watch it work.")
                             .font(.bighelp(.subheadline))
                             .foregroundStyle(theme.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)
@@ -82,86 +87,52 @@ struct SessionSubagentRosterSheet: View {
                     sessionCatalog: sessionCatalog
                 )
             }
+            .navigationDestination(for: SubagentCanvasRoute.self) { route in
+                SubagentCanvasView(model: model, subagentID: route.id)
+            }
         }
     }
 
-    @ViewBuilder
-    private func nativeSubagentRow(_ subagent: NativeSubagentRailItem) -> some View {
-        if let childSessionID = NativeSubagentNavigation.recordID(
-            childStoredID: subagent.childSessionID, records: sessionCatalog?.records ?? []
-        ) {
-            NavigationLink {
-                // startedAt is presentation metadata only; navigation is
-                // authorized by the real child session coordinate above.
-                SessionSubagentDetailView(
-                    subagent: SessionSubagentSnapshot(
-                        id: subagent.id,
-                        sessionID: childSessionID,
-                        parentID: subagent.parentID,
-                        role: "subagent",
-                        goal: subagent.goal,
-                        startedAt: subagent.startedAt ?? 0
-                    ),
-                    sessionCatalog: sessionCatalog
-                )
-            } label: {
-                nativeSubagentCard(subagent, showsNavigation: true)
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("subagent.native.roster.\(subagent.id)")
-        } else {
-            nativeSubagentCard(subagent, showsNavigation: false)
-                .accessibilityIdentifier("subagent.native.roster.\(subagent.id)")
-        }
-    }
-
-    private func nativeSubagentCard(
-        _ subagent: NativeSubagentRailItem,
-        showsNavigation: Bool
-    ) -> some View {
-        HStack(alignment: .top, spacing: BighelpTokens.space12) {
-            BighelpThinkingOrb(scenario: .working, scale: .inline)
-                .frame(width: 22, height: 22)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: BighelpTokens.space4) {
-                Text(subagent.goal)
-                    .bighelpFont(.label)
-                    .foregroundStyle(theme.primaryText)
-                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
-                    .truncationMode(.tail)
-                Text(nativeSubagentStatus(subagent))
-                    .bighelpFont(.body)
-                    .foregroundStyle(theme.secondaryText)
-                    .multilineTextAlignment(.leading)
-                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
-                    .truncationMode(.tail)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            if showsNavigation {
+    private func nativeSubagentRow(_ subagent: SubagentCanvasState) -> some View {
+        NavigationLink(value: SubagentCanvasRoute(id: subagent.id)) {
+            HStack(alignment: .top, spacing: BighelpTokens.space12) {
+                SubagentPhaseGlyph(phase: subagent.phase)
+                    .frame(width: 22, height: 22)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: BighelpTokens.space4) {
+                    Text(subagent.goal.isEmpty ? "Subagent task" : subagent.goal)
+                        .bighelpFont(.label)
+                        .foregroundStyle(theme.primaryText)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                        .truncationMode(.tail)
+                    Text(nativeSubagentStatus(subagent))
+                        .bighelpFont(.body)
+                        .foregroundStyle(theme.secondaryText)
+                        .multilineTextAlignment(.leading)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                        .truncationMode(.tail)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 Image(systemName: "chevron.right")
                     .font(.bighelp(.caption).weight(.semibold))
                     .foregroundStyle(theme.tertiaryText)
                     .accessibilityHidden(true)
             }
+            .padding(BighelpTokens.space16)
+            .contentShape(.rect)
+            .bighelpSurface(.card)
         }
-        .padding(BighelpTokens.space16)
-        .contentShape(.rect)
-        .bighelpSurface(.card)
-        .accessibilityLabel("\(subagent.goal), \(nativeSubagentStatus(subagent))")
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(subagent.goal.isEmpty ? "Subagent task" : subagent.goal), \(nativeSubagentStatus(subagent))")
+        .accessibilityHint("Shows what it's doing")
+        .accessibilityIdentifier("subagent.native.roster.\(subagent.id)")
     }
 
-    private func nativeSubagentStatus(_ subagent: NativeSubagentRailItem) -> String {
-        let state: String = switch subagent.lifecycle {
-        case .running: "Active subagent"
-        case .succeeded: "Completed subagent"
-        case .failed: "Failed subagent"
-        case .cancelled: "Cancelled subagent"
-        case .recorded: "Saved subagent; outcome unavailable"
-        }
-        if let toolCount = subagent.toolCount, toolCount > 0 {
-            return "\(state) · \(toolCount) \(toolCount == 1 ? "tool" : "tools")"
-        }
-        return state
+    /// "Working · Reading notes.md…", "Done · Read 2 files, ran tests".
+    private func nativeSubagentStatus(_ subagent: SubagentCanvasState) -> String {
+        let status = SubagentCanvasView.statusLine(for: subagent)
+        guard subagent.isFinished, let summary = subagent.stepSummary else { return status }
+        return subagent.phase == .done ? "Done · \(summary)" : "\(status) · \(summary)"
     }
 
     @BighelpThemeReader private var theme

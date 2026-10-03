@@ -145,6 +145,9 @@ extension DirectHermesConversationClient {
         if let nativeSubagent = change.nativeSubagent {
             publishNativeSubagent(nativeSubagent)
         }
+        if event.type.hasPrefix("subagent.") {
+            model?.acceptSubagentEvent(type: event.type, payload: event.payload, from: self)
+        }
         if change.terminal {
             latestSpinnerActivity = nil
             if let observedDurationItem {

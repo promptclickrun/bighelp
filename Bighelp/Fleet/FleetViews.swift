@@ -673,10 +673,34 @@ struct FleetHostPicker: View {
     let destination: FleetDestination
     let onPick: (UUID) -> Void
     @Environment(\.dismiss) private var dismiss
+    @State private var detent: PresentationDetent = .medium
 
     var body: some View {
         NavigationStack {
             List {
+                if destination == .settings, let maintenance = fleet.maintenance() {
+                    Section {
+                        NavigationLink {
+                            FleetSettingsView(store: maintenance)
+                                .onAppear { detent = .large }
+                        } label: {
+                            HStack(spacing: BighelpTokens.space12) {
+                                BighelpIconTile(systemName: "square.stack.3d.up.fill", tint: Color(hex: "5B6B7F"))
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Fleet settings")
+                                        .font(.bighelp(.body).weight(.semibold))
+                                        .foregroundStyle(theme.primaryText)
+                                    Text("Update and restart every host at once")
+                                        .font(.bighelp(.footnote))
+                                        .foregroundStyle(theme.secondaryText)
+                                }
+                            }
+                            .frame(minHeight: BighelpTokens.hitTarget)
+                            .contentShape(.rect)
+                        }
+                        .accessibilityIdentifier("fleet.gate.fleet-settings")
+                    }
+                }
                 Section {
                     ForEach(fleet.hosts) { host in
                         Button { onPick(host.id) } label: {
@@ -716,8 +740,9 @@ struct FleetHostPicker: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.medium, .large], selection: $detent)
         .presentationDragIndicator(.visible)
+        .bighelpSheetSize(.standard)
         .accessibilityIdentifier("fleet.gate")
     }
 

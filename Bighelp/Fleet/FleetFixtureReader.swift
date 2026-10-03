@@ -18,6 +18,7 @@ final class FleetFixtureReader: FleetHostReading {
     }
 
     func select(_ hostID: UUID) {}
+    func maintenance() -> (any FleetMaintenanceConnecting)? { FleetMaintenanceFixture.demo() }
     func canOpen(_ hostID: UUID) -> Bool { hostID == Self.homeID }
     /// Demo hosts keep pins on screen only.
     func setPinned(_ pinned: Bool, hostID: UUID, profileID: String) -> Bool { true }

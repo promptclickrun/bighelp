@@ -20,9 +20,12 @@ protocol FleetHostReading: AnyObject {
     func setPinned(_ pinned: Bool, hostID: UUID, profileID: String) -> Bool
     /// Saves an agent's section or hidden state on a host that isn't selected.
     func setPlacement(_ placement: AgentListPlacement, hostID: UUID, profileID: String) async throws
+    /// Reaches every host for Fleet settings. None hides it.
+    func maintenance() -> (any FleetMaintenanceConnecting)?
 }
 
 extension FleetHostReading {
+    func maintenance() -> (any FleetMaintenanceConnecting)? { nil }
     func keepConnected(_ hostID: UUID) async {}
     func setPlacement(_ placement: AgentListPlacement, hostID: UUID, profileID: String) async throws {
         throw WorkspaceClientError.unavailable(.unsupportedHost)
@@ -103,6 +106,8 @@ final class FleetStore {
     /// Live pictures already copied in, by their file on the host's own folder.
     @ObservationIgnored private var copiedAvatars: [String: String] = [:]
     @ObservationIgnored private let saveDelay: Duration
+    /// Fleet settings, kept while the app runs so updates carry on after its page closes.
+    @ObservationIgnored private var maintenanceStore: FleetMaintenanceStore?
 
     /// How long a read host counts as current.
     static let freshness: TimeInterval = 60
@@ -137,6 +142,15 @@ final class FleetStore {
     func hostName(_ id: UUID) -> String { hosts.first { $0.id == id }?.name ?? "Host" }
     func canOpen(_ hostID: UUID) -> Bool { reader.canOpen(hostID) }
     func select(_ hostID: UUID) { reader.select(hostID); syncHosts() }
+
+    /// Fleet settings for every host; nil when the hosts can't be reached for it.
+    func maintenance() -> FleetMaintenanceStore? {
+        if let maintenanceStore { return maintenanceStore }
+        guard let connector = reader.maintenance() else { return nil }
+        let store = FleetMaintenanceStore(connector: connector)
+        maintenanceStore = store
+        return store
+    }
 
     /// Follows the configured hosts: a removed host's saved snapshot goes too.
     func syncHosts() {

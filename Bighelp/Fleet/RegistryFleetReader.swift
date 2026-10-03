@@ -16,6 +16,8 @@ final class RegistryFleetReader: FleetHostReading {
 
     func select(_ hostID: UUID) { registry.select(hostID) }
 
+    func maintenance() -> (any FleetMaintenanceConnecting)? { RegistryFleetMaintenance(registry: registry) }
+
     /// Opens a host's connection ahead of a switch, while the all-hosts view
     /// keeps other hosts connected.
     func keepConnected(_ hostID: UUID) async {

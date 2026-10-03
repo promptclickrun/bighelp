@@ -23,3 +23,6 @@ xcuserdata/
 
 # Per-developer signing and service keys
 Config/Local.xcconfig
+
+# Local Workers runtime state from service tests
+.wrangler/

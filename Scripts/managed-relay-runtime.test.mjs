@@ -14,7 +14,7 @@ const sleep = ms => new Promise(resolve=>setTimeout(resolve,ms));
 
 test("real relay binding queues encrypted alerts, rich updates and revocation fences", {timeout:60000}, async () => {
   const generated=spawnSync(process.env.HERMES_PYTHON || path.join(process.env.HOME,".hermes/hermes-agent/.venv/bin/python"),
-    ["-B","services/relay/test/generate-fixture.py"],{cwd:root,encoding:"utf8",env:{...process.env,PYTHONPATH:path.join(root,"plugins/loopdy")}});
+    ["-B","services/relay/test/generate-fixture.py"],{cwd:root,encoding:"utf8",env:{...process.env,PYTHONPATH:process.env.BIGHELP_PLUGIN_DIR || path.join(root,".ci/plugin")}});
   assert.equal(generated.status,0,generated.stderr);
   const f=JSON.parse(generated.stdout);
   const delivered=[];
@@ -31,7 +31,7 @@ test("real relay binding queues encrypted alerts, rich updates and revocation fe
     catch(error) { return Response.json({error:error.message},{status:409}); }
   }};`;
   const mf=new Miniflare(convertV4MiniflareOptions({host:"127.0.0.1",port:0,logRequests:false,workers:[
-    {name:"entry",modules:true,script:proxy,compatibilityDate:"2026-08-28",serviceBindings:{RELAY:{name:"relay",entrypoint:"BighelpLinkEnrollment"}}},
+    {name:"entry",modules:true,script:proxy,compatibilityDate:"2026-08-28",serviceBindings:{RELAY:{name:"relay",entrypoint:"LoopdyLinkEnrollment"}}},
     {name:"relay",modules:true,script:await readFile(path.join(root,"services/relay/dist/worker-notifications.js"),"utf8"),
       compatibilityDate:"2026-08-28",compatibilityFlags:["nodejs_compat"],
       d1Databases:{DB:"fixture-relay-database"},queueProducers:{DELIVERY_QUEUE:"fixture-relay-deliveries"},

@@ -53,6 +53,7 @@ extension ChatModel {
         hasDirtyPersistence = false
         isReplacingReferenceDraft = true
         draft = ""
+        replyDraft = nil
         draftAttachments = []
         orderedDraftAttachments = []
         referenceSelections = []
@@ -251,11 +252,11 @@ extension ChatModel {
         guard !referenceOwnerRetired, let onReferenceStateChange, let onSessionChange else {
             throw ReferenceCanonicalSendError.persistenceUnavailable
         }
-        onSessionChange(canonicalReferenceDraft, items.filter {
+        onSessionChange(persistedDraft, items.filter {
             !pendingIndependentMessageIDs.contains($0.id)
         }, activityLedger, activityVisibility)
-        try onReferenceStateChange(canonicalReferenceDraft, referenceState)
-        lastReferenceCheckpoint = (Data(canonicalReferenceDraft.utf8), referenceState)
+        try onReferenceStateChange(persistedDraft, referenceState)
+        lastReferenceCheckpoint = (Data(persistedDraft.utf8), referenceState)
         hasDirtyPersistence = false
     }
 
@@ -373,14 +374,15 @@ extension ChatModel {
         let acceptedItems = pendingIndependentMessageIDs.isEmpty
             ? items
             : items.filter { !pendingIndependentMessageIDs.contains($0.id) }
-        onSessionChange?(canonicalReferenceDraft, acceptedItems, activityLedger, activityVisibility)
+        let savedDraft = persistedDraft
+        onSessionChange?(savedDraft, acceptedItems, activityLedger, activityVisibility)
         if referencePersistenceNeeded, let onReferenceStateChange, !referenceOwnerRetired {
-            let draftBytes = Data(canonicalReferenceDraft.utf8)
+            let draftBytes = Data(savedDraft.utf8)
             let state = referenceState
             guard lastReferenceCheckpoint?.draft != draftBytes
                     || lastReferenceCheckpoint?.state != state else { return }
             do {
-                try onReferenceStateChange(canonicalReferenceDraft, state)
+                try onReferenceStateChange(savedDraft, state)
                 lastReferenceCheckpoint = (draftBytes, state)
             } catch {
                 hasDirtyPersistence = true

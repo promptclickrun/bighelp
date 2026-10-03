@@ -136,6 +136,11 @@ Ideas or Goals), **Navigation** (Open in bighelp) and **Agents** (Switch agent, 
 ready-made Shortcuts, the most an app may have, with a tile per agent, scheduled task, group chat or place.
 Actions that open a screen hand bighelp a `loopdy://` link, so they wait for the host like a widget tap.
 
+Touch and hold a message (right-click on the Mac) for Reply: "Replying to Avery: …" sits above the message box with
+✕ to cancel and is saved with the draft. The sent message shows the quote small above its bubble, also after the chat
+reloads from Hermes, and the agent reads which message it answers (`ChatReplyQuote`; see
+[Native chat transport](docs/NATIVE_TRANSPORT.md)).
+
 Reactions use Hermes' own: the app saves them with `message.react`, and with Settings › Chat › "Agents see your
 reactions" on (the host's `display.message_reactions`), Hermes tells the agent at its next turn. The app sends no
 note or turn of its own. Agents tapback through the plugin's `bighelp_react_to_message`. A reply that is only a

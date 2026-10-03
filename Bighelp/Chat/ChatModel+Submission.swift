@@ -176,6 +176,7 @@ extension ChatModel {
         }
         if restoresDraft {
             draft = ""
+            replyDraft = nil
             draftAttachments = []
             orderedDraftAttachments = []
         }
@@ -430,6 +431,7 @@ extension ChatModel {
         appendProjectedMessage(human)
         if restoresDraft {
             draft = ""
+            replyDraft = nil
             draftAttachments = []
             orderedDraftAttachments = []
         }
@@ -786,7 +788,7 @@ struct ChatOutgoingMessage {
     let isComposerDraft: Bool
 
     init(composerOf model: ChatModel) {
-        message = model.draft
+        message = model.outgoingDraftText
         attachments = model.draftAttachments
         orderedAttachments = model.orderedDraftAttachments
         slashSelection = model.activeSlashCommand

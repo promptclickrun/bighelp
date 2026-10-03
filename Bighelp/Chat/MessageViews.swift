@@ -50,7 +50,11 @@ struct TimelineSenderResolver {
 
     func accessibilityDescription(for item: TimelineItem) -> String {
         let description: String
-        if item.role == .assistant, case .message(let text) = item.content {
+        if item.role == .human, case .message(let text) = item.content,
+           let reply = ChatReplyQuote.split(text) {
+            // The quote above the bubble speaks for itself.
+            description = reply.body
+        } else if item.role == .assistant, case .message(let text) = item.content {
             let prose = ReferenceCodec.decode(text).prose
             let projection = ChatCardMessageProjection(source: prose, role: .assistant)
             let hasOnlyText = projection.segments.allSatisfy { if case .markdown = $0 { true } else { false } }
@@ -100,6 +104,8 @@ struct TimelineItemView: View {
     let messageReaction: NativeMessageReactionPresentation?
     let onMessageReaction: ((String?) -> Void)?
     let mentionIdentities: [ChatMentionIdentity]
+    let onReply: (() -> Void)?
+    let replyAgentName: String
 
     init(
         item: TimelineItem,
@@ -110,7 +116,9 @@ struct TimelineItemView: View {
         showsSenderName: Bool = false,
         messageReaction: NativeMessageReactionPresentation? = nil,
         onMessageReaction: ((String?) -> Void)? = nil,
-        mentionIdentities: [ChatMentionIdentity] = []
+        mentionIdentities: [ChatMentionIdentity] = [],
+        onReply: (() -> Void)? = nil,
+        replyAgentName: String = ""
     ) {
         self.item = item
         self.onApprovalTap = onApprovalTap
@@ -121,6 +129,8 @@ struct TimelineItemView: View {
         self.messageReaction = messageReaction
         self.onMessageReaction = onMessageReaction
         self.mentionIdentities = mentionIdentities
+        self.onReply = onReply
+        self.replyAgentName = replyAgentName
     }
 
     var body: some View {
@@ -175,7 +185,9 @@ struct TimelineItemView: View {
                         metadata: item.metadata,
                         reactionPresentation: messageReaction,
                         onReaction: onMessageReaction,
-                        mentionIdentities: mentionIdentities
+                        mentionIdentities: mentionIdentities,
+                        onReply: onReply,
+                        replyAgentName: replyAgentName
                     )
                 }
             case .budgetSummary(let summary):

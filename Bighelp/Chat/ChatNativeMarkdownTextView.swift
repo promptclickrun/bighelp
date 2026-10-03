@@ -66,6 +66,7 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
     let onSelect: () -> Void
     let onFork: (() -> Void)?
     let onReact: (() -> Void)?
+    var onReply: (() -> Void)? = nil
     var textScale: CGFloat = 1
     var mentionIdentities: [ChatMentionIdentity] = []
 
@@ -73,7 +74,7 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
 
     func makeCoordinator() -> Coordinator {
         Coordinator(openURL: openURL, copyActionLabel: copyActionLabel, onCopy: onCopy,
-            onSelect: onSelect, onFork: onFork, onReact: onReact)
+            onSelect: onSelect, onFork: onFork, onReact: onReact, onReply: onReply)
     }
 
     func makeUIView(context: Context) -> UITextView {
@@ -123,9 +124,12 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
         context.coordinator.onSelect = onSelect
         context.coordinator.onFork = onFork
         context.coordinator.onReact = onReact
+        context.coordinator.onReply = onReply
         view.tintColor = UIColor(theme.action)
         view.accessibilityCustomActions = (onReact.map { action in
             [UIAccessibilityCustomAction(name: "React") { _ in action(); return true }]
+        } ?? []) + (onReply.map { action in
+            [UIAccessibilityCustomAction(name: "Reply") { _ in action(); return true }]
         } ?? []) + [
             UIAccessibilityCustomAction(name: copyActionLabel) { _ in onCopy(); return true }
         ] + (BighelpPlatform.isMac ? [] : [  // Mac text is selectable with the pointer.
@@ -194,15 +198,18 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
         var onSelect: () -> Void
         var onFork: (() -> Void)?
         var onReact: (() -> Void)?
+        var onReply: (() -> Void)?
 
         init(openURL: OpenURLAction, copyActionLabel: String, onCopy: @escaping () -> Void,
-             onSelect: @escaping () -> Void, onFork: (() -> Void)?, onReact: (() -> Void)?) {
+             onSelect: @escaping () -> Void, onFork: (() -> Void)?, onReact: (() -> Void)?,
+             onReply: (() -> Void)?) {
             self.openURL = openURL
             self.copyActionLabel = copyActionLabel
             self.onCopy = onCopy
             self.onSelect = onSelect
             self.onFork = onFork
             self.onReact = onReact
+            self.onReply = onReply
         }
 
         func textView(
@@ -227,6 +234,14 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
                         image: UIImage(systemName: "face.smiling")
                     ) { [weak self] _ in
                         self?.onReact?()
+                    })
+                }
+                if onReply != nil {
+                    actions.append(UIAction(
+                        title: "Reply",
+                        image: UIImage(systemName: "arrowshape.turn.up.left")
+                    ) { [weak self] _ in
+                        self?.onReply?()
                     })
                 }
                 actions.append(UIAction(

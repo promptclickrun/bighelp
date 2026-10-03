@@ -1267,6 +1267,18 @@ struct ChatView: View {
         }
     }
 
+    /// Long-press › Reply: the composer quotes the message and the keyboard opens.
+    func startReply(to item: TimelineItem) {
+        model.reply(to: item, senderName: senderResolver.display(for: item.sender).name)
+        composerFocusTask?.cancel()
+        composerFocusTask = Task { @MainActor in
+            // The message menu is still closing; the keyboard rises after it.
+            do { try await Task.sleep(for: .milliseconds(350)) } catch { return }
+            guard !Task.isCancelled else { return }
+            isDraftFocused = true
+        }
+    }
+
     private func scheduleComposerFocusIfRequested(_ request: Int) {
         guard request > 0 else { return }
         composerFocusTask?.cancel()

@@ -698,7 +698,7 @@ final class ShellFeatureStore {
             // Publish its latest sink, not the older value returned across await.
             let model = flight.model
             if !model.hasPendingIndependentMessageSubmission {
-                catalog.updateChatSnapshot(draft: model.canonicalReferenceDraft, items: model.items,
+                catalog.updateChatSnapshot(draft: model.persistedDraft, items: model.items,
                     activityEvents: model.activityLedger.allEvents, activityVisibility: model.activityVisibility, for: id)
             }
             // The model's normal checkpoint excludes provisional independent
@@ -825,7 +825,7 @@ final class ShellFeatureStore {
                 || model.referenceSubmission != nil
                 || !model.draftAttachments.isEmpty
                 || catalog.persistenceErrorMessage != nil
-                || record.map({ Data($0.draft.utf8) }) != Data(model.canonicalReferenceDraft.utf8)
+                || record.map({ Data($0.draft.utf8) }) != Data(model.persistedDraft.utf8)
                 || record?.referenceState != model.referenceState
             if cannotEvict { protected.insert(id) }
             else if !protected.contains(id) { idleNativeIDs.append(id) }

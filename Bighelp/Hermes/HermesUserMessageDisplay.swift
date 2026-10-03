@@ -48,11 +48,12 @@ enum HermesUserMessageDisplay {
     }
 
     /// One-line chat list preview: attachment references read as "Photo" or
-    /// "Attachment" instead of host paths.
+    /// "Attachment" instead of host paths, and a reply shows its own words.
     static func preview(_ raw: String, attachments: [ChatAttachment] = []) -> String {
         var photos = attachments.contains { $0.kind == .image }
         var files = !attachments.isEmpty
-        let words = text(raw).components(separatedBy: "\n").filter { line in
+        let shown = text(raw)
+        let words = (ChatReplyQuote.split(shown)?.body ?? shown).components(separatedBy: "\n").filter { line in
             if line.hasPrefix("@image:") { photos = true; return false }
             if line.hasPrefix("@file:") { files = true; return false }
             return true

@@ -58,6 +58,9 @@ private struct ChatBubbleWidthLayout: Layout {
 @MainActor
 final class ChatMessageContentCache {
     final class Projection {
+        let source: String
+        /// The message a person's message answers, drawn above it instead of its quote line.
+        let reply: ChatReplyQuote?
         let references: ReferenceDecodedMessage
         let document: MarkdownDocument
         let cardProjection: ChatCardMessageProjection
@@ -68,7 +71,10 @@ final class ChatMessageContentCache {
         let isStreaming: Bool
 
         init(_ source: String, role: TimelineRole, isStreaming: Bool = false) {
-            references = ReferenceCodec.decode(source)
+            self.source = source
+            let reply = role == .human ? ChatReplyQuote.split(source) : nil
+            self.reply = reply?.quote
+            references = ReferenceCodec.decode(reply?.body ?? source)
             document = MarkdownDocument(references.prose)
             cardProjection = ChatCardMessageProjection(source: references.prose, role: role, isStreaming: isStreaming)
             self.role = role
@@ -80,7 +86,7 @@ final class ChatMessageContentCache {
 
     func project(_ source: String, role: TimelineRole = .assistant, isStreaming: Bool = false) -> Projection {
         if let current, current.role == role, current.isStreaming == isStreaming,
-           current.references.source.utf8.elementsEqual(source.utf8) {
+           current.source.utf8.elementsEqual(source.utf8) {
             return current
         }
         let projection = Projection(source, role: role, isStreaming: isStreaming)
@@ -102,6 +108,10 @@ struct MessageBubble: View {
     let reactionPresentation: NativeMessageReactionPresentation?
     let onReaction: ((String?) -> Void)?
     let mentionIdentities: [ChatMentionIdentity]
+    /// Long-press › Reply: quotes this message in the composer.
+    let onReply: (() -> Void)?
+    /// Who "your previous message" is in a reply drawn above this message.
+    let replyAgentName: String
 
     @State private var isSelectingText = false
     @State private var isCopied = false
@@ -123,7 +133,9 @@ struct MessageBubble: View {
         metadata: TimelineMetadata? = nil,
         reactionPresentation: NativeMessageReactionPresentation? = nil,
         onReaction: ((String?) -> Void)? = nil,
-        mentionIdentities: [ChatMentionIdentity] = []
+        mentionIdentities: [ChatMentionIdentity] = [],
+        onReply: (() -> Void)? = nil,
+        replyAgentName: String = ""
     ) {
         self.messageID = messageID
         self.role = role
@@ -137,6 +149,8 @@ struct MessageBubble: View {
         self.reactionPresentation = reactionPresentation
         self.onReaction = onReaction
         self.mentionIdentities = mentionIdentities
+        self.onReply = onReply
+        self.replyAgentName = replyAgentName
     }
 
     private var isStreaming: Bool {
@@ -166,6 +180,9 @@ struct MessageBubble: View {
         let presentation = ChatMessagePresentation.resolve(role: role, delivery: delivery)
         VStack(alignment: role == .human ? .trailing : .leading,
                spacing: uiV3Enabled ? BighelpTokens.space4 : 0) {
+            if let reply = projection.reply {
+                ChatReplyQuoteView(quote: reply, agentName: replyAgentName, alignsTrailing: role == .human)
+            }
             messageInteractionSurface(
                 ChatBubbleWidthLayout(
                     maximumWidthFraction: uiV3Enabled
@@ -317,6 +334,9 @@ struct MessageBubble: View {
                 .accessibilityAction(named: copyActionLabel) {
                     copyMessage(interaction)
                 }
+                .accessibilityAction(named: "Reply") {
+                    onReply?()
+                }
                 #if !targetEnvironment(macCatalyst)
                 .accessibilityAction(named: "Select text") {
                     isSelectingText = true
@@ -343,6 +363,11 @@ struct MessageBubble: View {
                 isReactionPickerPresented = true
             } label: {
                 Label("React", systemImage: "face.smiling")
+            }
+        }
+        if let onReply {
+            Button(action: onReply) {
+                Label("Reply", systemImage: "arrowshape.turn.up.left")
             }
         }
         Button {
@@ -421,6 +446,7 @@ struct MessageBubble: View {
                 onSelect: { isSelectingText = true },
                 onFork: onFork,
                 onReact: canReact ? { isReactionPickerPresented = true } : nil,
+                onReply: onReply,
                 textScale: (isInterimReply ? ChatInterimReplyStyle.textScale : 1) * chatTextSize.scale,
                 mentionIdentities: mentionIdentities
             )
@@ -500,6 +526,7 @@ struct MessageBubble: View {
                             onSelect: { isSelectingText = true },
                             onFork: onFork,
                             onReact: canReact ? { isReactionPickerPresented = true } : nil,
+                            onReply: onReply,
                             mentionIdentities: mentionIdentities
                         )
                     } else {

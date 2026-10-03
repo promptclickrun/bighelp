@@ -280,10 +280,11 @@ extension ChatModel {
             }
             try appendValidated(receipt.response.items)
             pdfAttachmentReceipts = receipt.pdfAttachments
-            if Data(draft.utf8) == Data(message.utf8),
+            if Data(outgoingDraftText.utf8) == Data(message.utf8),
                draftAttachments == ordinaryAttachments,
                orderedDraftAttachments == orderedAttachments {
                 draft = ""
+                replyDraft = nil
                 draftAttachments = []
                 orderedDraftAttachments = []
             }

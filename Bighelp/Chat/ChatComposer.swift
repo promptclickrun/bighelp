@@ -60,6 +60,13 @@ struct ChatComposer: View {
                 ReferenceDraftStrip(hub: referenceHub)
             }
 
+            if let reply = model.replyDraft {
+                ChatReplyDraftBar(quote: reply, agentName: agentName) { model.replyDraft = nil }
+                    .padding(.horizontal, BighelpTokens.space4)
+                    .frame(maxWidth: horizontalSizeClass == .regular ? ChatCanvasLayout.regularLaneMaximumWidth : .infinity)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+
             DraftAttachmentRail(model: model)
                 .padding(.horizontal, BighelpTokens.space4)
                 .frame(maxWidth: horizontalSizeClass == .regular ? ChatCanvasLayout.regularLaneMaximumWidth : .infinity)
@@ -105,6 +112,7 @@ struct ChatComposer: View {
         .animation(reduceMotion ? nil : .easeInOut(duration: BighelpTokens.stateDuration), value: model.nativeSubagents)
         .animation(reduceMotion ? nil : .easeInOut(duration: BighelpTokens.stateDuration), value: model.goalRailState)
         .animation(reduceMotion ? nil : .easeInOut(duration: BighelpTokens.stateDuration), value: model.sessionContext)
+        .animation(reduceMotion ? nil : .easeInOut(duration: BighelpTokens.stateDuration), value: model.replyDraft)
         .onChange(of: model.taskDrawer) { _, tasks in
             if tasks == nil, presentedStatus == .tasks {
                 presentedStatus = nil
@@ -551,6 +559,11 @@ struct ChatComposer: View {
         guard model.canSend else { return }
         if !keepsFocus { dismissComposerKeyboard() }
         if !referenceHub.selected.isEmpty {
+            // A reference send keeps its exact reviewed bytes, so a quote line can't ride along.
+            guard model.replyDraft == nil else {
+                referenceHub.showMessage("A reply can't include references yet. Cancel the reply or remove the references.")
+                return
+            }
             prepareReferenceSend(behavior: behavior)
             return
         }

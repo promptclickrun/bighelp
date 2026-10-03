@@ -38,6 +38,14 @@ used only for explicitly enabled notifications and Live Activities, which BuzzKi
 - Hermes owns sessions, turns, tools, approvals, model state and recovery. An
   uncertain native submission remains in its existing local journal; reconnect
   does not resend it or switch to a cloud queue.
+- A reply to a message (long-press › Reply) has no field in `prompt.submit`, so
+  it travels in the message text the way Hermes hands replies from other
+  platforms to the model: a first line `[Replying to your previous message: "…"]`
+  (or `my previous message`, or a name in group chats), a blank line, then the
+  text (`ChatReplyQuote`). The quote is one line of at most 500 characters with
+  `@` handles disarmed. Because it is the message's own text, Hermes' saved
+  history keeps it, and the app reads it back to draw the reply above the bubble.
+  The draft saves its reply the same way.
 
 ## Optional delivery
 

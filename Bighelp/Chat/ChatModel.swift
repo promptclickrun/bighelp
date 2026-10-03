@@ -25,6 +25,12 @@ final class ChatModel {
 
     var draft = "" {
         didSet {
+            // A sent reply put back after a failure, or a saved draft, comes
+            // back as its quote line plus text: show the reply again.
+            if !isReplacingReferenceDraft, let reply = ChatReplyQuote.split(draft) {
+                draft = reply.body
+                replyDraft = reply.quote
+            }
             if !isReplacingReferenceDraft, Data(oldValue.utf8) != Data(draft.utf8) {
                 referenceCanonicalSource = nil
                 referenceDraftID = nil
@@ -46,6 +52,14 @@ final class ChatModel {
             } else {
                 persistSession()
             }
+        }
+    }
+    /// The message the draft answers. It is sent, and saved with the draft, as
+    /// a quote line before the text (`ChatReplyQuote`).
+    var replyDraft: ChatReplyQuote? {
+        didSet {
+            guard oldValue != replyDraft, !isReplacingReferenceDraft else { return }
+            persistSession()
         }
     }
     var slashCommandLoadTrigger: Bool { draft.hasPrefix("/") }
@@ -324,6 +338,10 @@ final class ChatModel {
         nextTranscriptOrder = orderedContent.nextOrder
         botModeRoomStore?.ensurePresentationOrder(atLeast: orderedContent.nextOrder)
         activityVisibility = initialActivityVisibility
+        // A saved reply rides before an ordinary draft; reference drafts keep their exact bytes.
+        let savedReply = sourceSession?.referenceState == nil ? ChatReplyQuote.split(initialDraft) : nil
+        let initialDraft = savedReply?.body ?? initialDraft
+        replyDraft = savedReply?.quote
         let restoredReferences = ReferenceCanonicalState.restoredDraft(initialDraft,
             state: sourceSession?.referenceState)
         draft = restoredReferences.source

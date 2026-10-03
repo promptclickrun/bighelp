@@ -41,13 +41,14 @@ extension ChatModel {
     /// turn keeps its own state; Stop still stops everything.
     func sendBotModeFollowUp() async {
         guard let roomID = botModeRoomID, let botModeRoomStore, acceptsBotModeFollowUp else { return }
-        let message = draft
-        guard !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        guard !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        let message = outgoingDraftText
         guard orderedDraftAttachments.isEmpty else {
             failureMessage = "This Hermes room accepts text only. Remove the attachments before sending."
             return
         }
         draft = ""
+        replyDraft = nil
         failureMessage = nil
         do {
             try await botModeRoomStore.send(text: message, roomID: roomID, senderSnapshot: currentUserSnapshot)
@@ -707,7 +708,10 @@ extension ChatModel {
             retryRequest = nil
         }
         if failureMessage == recovery.failureMessage { failureMessage = nil }
-        if draft.utf8.elementsEqual(recovery.message.utf8) { draft = "" }
+        if outgoingDraftText.utf8.elementsEqual(recovery.message.utf8) {
+            draft = ""
+            replyDraft = nil
+        }
         nativeBotModeSendRecovery = nil
     }
 

@@ -283,7 +283,9 @@ extension ChatView {
                 onMessageReaction: nativeReaction == nil ? nil : { emoji in
                     setMessageReaction(emoji, for: item)
                 },
-                mentionIdentities: model.messageMentionIdentities
+                mentionIdentities: model.messageMentionIdentities,
+                onReply: { startReply(to: item) },
+                replyAgentName: agentName
             )
             .id(entry.id)
         case .activity(let turn):

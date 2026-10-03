@@ -122,10 +122,15 @@ struct AgentBoardItem: Identifiable, Equatable, Sendable {
     var reason: String
     var read: Bool
     var dismissed: Bool
+    /// A goal's category as the plugin stored it; empty for none (plugins before 3.5).
+    var category: String
     var createdAt: Date
     var updatedAt: Date
 
     enum Rating: String, Sendable { case up, down, none }
+
+    /// Nil for goals without one, or with a name this build doesn't know: they show under Other.
+    var goalCategory: GoalCategory? { GoalCategory(stored: category) }
 
     var liked: Bool { rating == .up }
     var isDone: Bool { status == "done" }
@@ -136,11 +141,11 @@ struct AgentBoardItem: Identifiable, Equatable, Sendable {
     init(id: String, kind: Kind, title: String, body: String = "", icon: String = "", section: String = "",
          status: String = "", note: String = "", links: [Link] = [], pictures: [Picture] = [],
          source: String = "", rating: Rating = .none, reason: String = "", read: Bool = true,
-         dismissed: Bool = false, createdAt: Date = .now, updatedAt: Date? = nil) {
+         dismissed: Bool = false, category: String = "", createdAt: Date = .now, updatedAt: Date? = nil) {
         self.id = id; self.kind = kind; self.title = title; self.body = body; self.icon = icon
         self.section = section; self.status = status; self.note = note; self.links = links
         self.pictures = pictures; self.source = source; self.rating = rating; self.reason = reason
-        self.read = read; self.dismissed = dismissed
+        self.read = read; self.dismissed = dismissed; self.category = category
         self.createdAt = createdAt; self.updatedAt = updatedAt ?? createdAt
     }
 
@@ -172,7 +177,110 @@ struct AgentBoardItem: Identifiable, Equatable, Sendable {
                       ?? (object["liked"]?.boolean == true ? .up : .none),
                   reason: object["reason"]?.string ?? "", read: object["read"]?.boolean ?? true,
                   dismissed: object["dismissed"]?.boolean ?? false,
+                  category: object["category"]?.string ?? "",
                   createdAt: date("createdAt"), updatedAt: date("updatedAt"))
+    }
+}
+
+/// What a goal is about. The plugin keeps the same fixed list
+/// (`native-agent-board-goal-categories-v1`); "Something else" is stored as `other`.
+enum GoalCategory: String, CaseIterable, Identifiable, Sendable {
+    case health, relationships, finance, career, interests, productivity, other
+
+    var id: String { rawValue }
+
+    /// Lenient: hosts differ, so an empty or unknown name is no category.
+    init?(stored: String) {
+        self.init(rawValue: stored.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
+    }
+
+    /// In the Create a goal list.
+    var title: String { self == .other ? "Something else" : groupTitle }
+
+    /// Over the goals in it.
+    var groupTitle: String {
+        switch self {
+        case .health: "Health"
+        case .relationships: "Relationships"
+        case .finance: "Finance"
+        case .career: "Career"
+        case .interests: "Interests"
+        case .productivity: "Productivity"
+        case .other: "Other"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .health: "heart"
+        case .relationships: "person.2"
+        case .finance: "dollarsign"
+        case .career: "building.2"
+        case .interests: "paintpalette"
+        case .productivity: "laptopcomputer"
+        case .other: "circle"
+        }
+    }
+
+    /// What Create a goal puts in the message box. It names the category so the agent files the goal there.
+    var prompt: String {
+        let ask = "Ask me a few quick questions about what I'm after, then make a plan"
+        let goal = switch self {
+        case .health: "a health goal"
+        case .relationships: "a relationship goal"
+        case .finance: "a money goal"
+        case .career: "a career goal"
+        case .interests: "a goal for one of my interests"
+        case .productivity: "a productivity goal"
+        case .other: "a goal"
+        }
+        let place = self == .other ? "my Goals" : "my Goals under \(groupTitle)"
+        return "I'd like to set \(goal). \(ask) and add it to \(place)."
+    }
+
+    /// Goals by category in the list's order, keeping their order within each. Goals without a
+    /// category (or with one this build doesn't know) go under Other.
+    static func grouped(_ goals: [AgentBoardItem]) -> [(category: GoalCategory, items: [AgentBoardItem])] {
+        let byCategory = Dictionary(grouping: goals) { $0.goalCategory ?? .other }
+        return allCases.compactMap { category in
+            byCategory[category].map { (category, $0) }
+        }
+    }
+}
+
+/// Swipe left on a Feed, Ideas or Goals item, and the last action in its long-press menu.
+/// Each hides the item with Undo; the words follow what the plugin records for each kind.
+struct BoardDismissAction: Equatable {
+    let kind: AgentBoardItem.Kind
+
+    init(kind: AgentBoardItem.Kind) { self.kind = kind }
+
+    var title: String {
+        switch kind {
+        // Clearing a read post isn't a thumbs down.
+        case .feed: "Clear"
+        // The plugin remembers a "not now" so the agent doesn't offer it again for a while.
+        case .idea: "Not now"
+        case .goal: "Remove"
+        }
+    }
+
+    var systemImage: String {
+        switch kind {
+        case .feed: "xmark"
+        case .idea: "clock.arrow.circlepath"
+        case .goal: "minus.circle"
+        }
+    }
+
+    var isDestructive: Bool { kind == .goal }
+
+    func undoMessage(for title: String) -> String {
+        switch kind {
+        case .feed: "Cleared “\(title)”"
+        case .idea: "Not now: “\(title)”"
+        case .goal: "Removed “\(title)”"
+        }
     }
 }
 
@@ -283,6 +391,8 @@ struct AgentBoardChange: Equatable, Sendable {
 protocol AgentBoardClient: AnyObject {
     /// Thumbs down, reasons, read state and idea → goal (plugin 2.19.0).
     var supportsFeedback: Bool { get }
+    /// Goals carry a category (`native-agent-board-goal-categories-v1`).
+    var supportsGoalCategories: Bool { get }
     func items(agentID: String) async throws -> [AgentBoardItem]
     func update(agentID: String, itemID: String, change: AgentBoardChange) async throws -> AgentBoardItem
     func markRead(agentID: String, itemIDs: [String]) async throws
@@ -293,17 +403,24 @@ protocol AgentBoardClient: AnyObject {
     func identity(agentID: String) async throws -> AgentIdentityDocuments
 }
 
+extension AgentBoardClient {
+    var supportsGoalCategories: Bool { false }
+}
+
 /// The bighelp plugin's `native-agent-board-v1` routes.
 @MainActor
 final class DirectHermesAgentBoardClient: AgentBoardClient {
     private let workspace: any WorkspaceOperationPerforming
     private let owner: WorkspaceOwner
     let supportsFeedback: Bool
+    let supportsGoalCategories: Bool
 
-    init(workspace: any WorkspaceOperationPerforming, owner: WorkspaceOwner, supportsFeedback: Bool) {
+    init(workspace: any WorkspaceOperationPerforming, owner: WorkspaceOwner, supportsFeedback: Bool,
+         supportsGoalCategories: Bool = false) {
         self.workspace = workspace
         self.owner = owner
         self.supportsFeedback = supportsFeedback
+        self.supportsGoalCategories = supportsGoalCategories
     }
 
     private func perform(_ operation: WorkspaceOperation, _ payload: [String: BighelpJSONValue]) async throws
@@ -430,6 +547,8 @@ final class AgentBoardStore {
 
     var isAvailable: Bool { client != nil }
     var supportsFeedback: Bool { client?.supportsFeedback ?? false }
+    /// Without it goals have no category and the page says to update the plugin.
+    var supportsGoalCategories: Bool { client?.supportsGoalCategories ?? false }
     /// Just deleted, for Undo.
     private(set) var recentlyHidden: AgentBoardItem?
     var feed: [AgentBoardItem] { items.filter { $0.kind == .feed && !$0.dismissed } }
@@ -563,6 +682,11 @@ final class AgentBoardStore {
         await mutate(item) { $0.dismissed = true } send: { client, agent in
             try await client.update(agentID: agent, itemID: item.id, change: .init(dismissed: true))
         }
+    }
+
+    /// Swipe left, or the long-press menu's Clear, Not now or Remove (`BoardDismissAction`).
+    func dismiss(_ item: AgentBoardItem) async {
+        await hide(item)
     }
 
     func undoHide() async {

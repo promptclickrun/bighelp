@@ -23,6 +23,8 @@ enum WorkspaceCapability: String, CaseIterable, Sendable {
     case agentBoard
     /// Thumbs down, reasons, read state and idea → goal (plugin 2.19.0).
     case agentBoardFeedback
+    /// Goals carry a category from a fixed list (plugin `native-agent-board-goal-categories-v1`).
+    case agentBoardGoalCategories
 }
 
 enum WorkspaceUnavailableReason: String, Equatable, Sendable {

@@ -1,0 +1,305 @@
+{
+  "source": "https://bighelp.app/quick-start",
+  "pages": [
+    {
+      "page": "feed",
+      "groups": [
+        {
+          "id": "productivity",
+          "title": "Productivity",
+          "prompts": [
+            {
+              "id": "feed-productivity-1",
+              "text": "Every weekday at 7am, post a morning brief to my Feed: today's calendar, anything urgent in my inbox and the weather."
+            },
+            {
+              "id": "feed-productivity-2",
+              "text": "Every Friday at 4pm, post a recap to my Feed of what we got done this week and what's still open."
+            },
+            {
+              "id": "feed-productivity-3",
+              "text": "Every evening at 6, post the emails that still need a reply from me. Remove the previous day's post when you add the new one."
+            }
+          ]
+        },
+        {
+          "id": "marketing",
+          "title": "Marketing",
+          "prompts": [
+            {
+              "id": "feed-marketing-1",
+              "text": "Every Monday at 8am, post what [competitor] shipped or announced last week to my Feed, with links."
+            },
+            {
+              "id": "feed-marketing-2",
+              "text": "Every morning, check Reddit, Hacker News and the web for new mentions of [my brand] and post anything worth seeing."
+            },
+            {
+              "id": "feed-marketing-3",
+              "text": "Every Thursday, post three trends in [my industry] worth reacting to, and one line on why each matters."
+            }
+          ]
+        },
+        {
+          "id": "content",
+          "title": "Content creation",
+          "prompts": [
+            {
+              "id": "feed-content-1",
+              "text": "Every Sunday evening, post five video ideas to my Feed based on what's trending in [my niche] this week."
+            },
+            {
+              "id": "feed-content-2",
+              "text": "Every weekday morning, post one thing in [my niche] worth writing about today, with an opening line I could use."
+            },
+            {
+              "id": "feed-content-3",
+              "text": "Once a week, post the comments and questions on my latest [videos / posts] that deserve an answer."
+            }
+          ]
+        },
+        {
+          "id": "personal",
+          "title": "Personal life",
+          "prompts": [
+            {
+              "id": "feed-personal-1",
+              "text": "Every evening at 8, post what's coming up tomorrow: appointments, the weather and anything I need to bring."
+            },
+            {
+              "id": "feed-personal-2",
+              "text": "Every Saturday at 9am, post three things to do in [my city] this weekend."
+            },
+            {
+              "id": "feed-personal-3",
+              "text": "Twice a day, check my email for shipping updates and post to my Feed when a package changes status."
+            }
+          ]
+        },
+        {
+          "id": "research",
+          "title": "Research",
+          "prompts": [
+            {
+              "id": "feed-research-1",
+              "text": "Every evening at 7, post the three most important AI news stories from the last 24 hours, in plain language."
+            },
+            {
+              "id": "feed-research-2",
+              "text": "Every Monday, post one new paper or long read about [topic], with a five-sentence summary."
+            },
+            {
+              "id": "feed-research-3",
+              "text": "Every weekday at 8:15am, post the pre-market moves for [my stock list], with one line on why each moved."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "page": "ideas",
+      "groups": [
+        {
+          "id": "productivity",
+          "title": "Productivity",
+          "prompts": [
+            {
+              "id": "ideas-productivity-1",
+              "text": "Every 12 hours, look at our recent chats and post Ideas for things you could take off my plate."
+            },
+            {
+              "id": "ideas-productivity-2",
+              "text": "Look at my calendar for next week and post Ideas for meetings I could skip, shorten or prepare for."
+            },
+            {
+              "id": "ideas-productivity-3",
+              "text": "Go through my inbox and post Ideas for newsletters I could unsubscribe from and filters you could set up."
+            }
+          ]
+        },
+        {
+          "id": "marketing",
+          "title": "Marketing",
+          "prompts": [
+            {
+              "id": "ideas-marketing-1",
+              "text": "Look at [my website] and post five Ideas to make the home page convert better."
+            },
+            {
+              "id": "ideas-marketing-2",
+              "text": "Every Monday, post three marketing experiments for [my product] that I could finish in a day each."
+            },
+            {
+              "id": "ideas-marketing-3",
+              "text": "Read the latest reviews of [my app / business] and post Ideas for fixes or replies that would win people over."
+            }
+          ]
+        },
+        {
+          "id": "content",
+          "title": "Content creation",
+          "prompts": [
+            {
+              "id": "ideas-content-1",
+              "text": "Take my latest [blog post / video] and post Ideas for turning it into short posts, a thread and a newsletter."
+            },
+            {
+              "id": "ideas-content-2",
+              "text": "Post Ideas for a four-week content plan for [my channel], one per week, each with a working title."
+            },
+            {
+              "id": "ideas-content-3",
+              "text": "Every Sunday, look at which of my posts did best this week and post Ideas for follow-ups."
+            }
+          ]
+        },
+        {
+          "id": "personal",
+          "title": "Personal life",
+          "prompts": [
+            {
+              "id": "ideas-personal-1",
+              "text": "Look through my email for subscriptions and recurring charges, and post Ideas for what I could cancel or downgrade."
+            },
+            {
+              "id": "ideas-personal-2",
+              "text": "Post Ideas for a date night in [my city] this month, with places that take reservations."
+            },
+            {
+              "id": "ideas-personal-3",
+              "text": "[Name]'s birthday is on [date]. Post three gift Ideas you could order for me, each under $[50]."
+            }
+          ]
+        },
+        {
+          "id": "research",
+          "title": "Research",
+          "prompts": [
+            {
+              "id": "ideas-research-1",
+              "text": "Based on the tools and accounts you can reach, post Ideas for things you could automate for me."
+            },
+            {
+              "id": "ideas-research-2",
+              "text": "I'm thinking about [buying a car / switching phone plans]. Post Ideas for the comparisons you could research for me."
+            },
+            {
+              "id": "ideas-research-3",
+              "text": "Using what you know about me, post Ideas for side projects that fit my skills and free time."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "page": "goals",
+      "groups": [
+        {
+          "id": "productivity",
+          "title": "Productivity",
+          "prompts": [
+            {
+              "id": "goals-productivity-1",
+              "text": "Make a goal to keep my inbox under 20 unread. Check it each evening and update the status.",
+              "goalCategory": "productivity"
+            },
+            {
+              "id": "goals-productivity-2",
+              "text": "Track my [project] deadline on [date]. Keep the status on what's left and how many days remain.",
+              "goalCategory": "productivity"
+            },
+            {
+              "id": "goals-productivity-3",
+              "text": "Make a goal: no work after 6pm on weekdays. Keep it in mind when you suggest things.",
+              "goalCategory": "productivity"
+            }
+          ]
+        },
+        {
+          "id": "marketing",
+          "title": "Marketing",
+          "prompts": [
+            {
+              "id": "goals-marketing-1",
+              "text": "Make a goal to reach [1,000] newsletter subscribers by [date]. Keep the current count in the status and suggest Ideas that help.",
+              "goalCategory": "career"
+            },
+            {
+              "id": "goals-marketing-2",
+              "text": "Track our launch on [date]. Keep the status on what's done and what's left, and tell me if anything slips.",
+              "goalCategory": "career"
+            },
+            {
+              "id": "goals-marketing-3",
+              "text": "Keep an eye on [my app's rating / my Google reviews] and update the status when it changes.",
+              "goalCategory": "career"
+            }
+          ]
+        },
+        {
+          "id": "content",
+          "title": "Content creation",
+          "prompts": [
+            {
+              "id": "goals-content-1",
+              "text": "Make a goal to publish one [video / post] a week. Update the status when I ship, and suggest an Idea when I fall behind.",
+              "goalCategory": "interests"
+            },
+            {
+              "id": "goals-content-2",
+              "text": "Make a goal to grow my [channel] to [5,000] subscribers by [month], and keep the latest count in the status.",
+              "goalCategory": "career"
+            },
+            {
+              "id": "goals-content-3",
+              "text": "Track my drafts: keep a count of what's in progress and what I should finish next.",
+              "goalCategory": "productivity"
+            }
+          ]
+        },
+        {
+          "id": "personal",
+          "title": "Personal life",
+          "prompts": [
+            {
+              "id": "goals-personal-1",
+              "text": "Make a goal to lose [20] lbs by summer. Keep it in mind when you suggest meals, gyms or habits.",
+              "goalCategory": "health"
+            },
+            {
+              "id": "goals-personal-2",
+              "text": "Track my order from [store]. Update the status when it changes, and mark it done when it arrives.",
+              "goalCategory": "other"
+            },
+            {
+              "id": "goals-personal-3",
+              "text": "Make a goal to save $[5,000] for a trip to [place] by [month]. Update the status when I tell you what I've saved.",
+              "goalCategory": "finance"
+            }
+          ]
+        },
+        {
+          "id": "research",
+          "title": "Research",
+          "prompts": [
+            {
+              "id": "goals-research-1",
+              "text": "Make a goal to learn [Spanish / Swift] this year. Suggest one small thing to practice each week.",
+              "goalCategory": "interests"
+            },
+            {
+              "id": "goals-research-2",
+              "text": "Track the price of [item] and update the status when it drops below $[amount].",
+              "goalCategory": "finance"
+            },
+            {
+              "id": "goals-research-3",
+              "text": "Make a goal to read [20] books this year. Update the count when I tell you I've finished one.",
+              "goalCategory": "interests"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

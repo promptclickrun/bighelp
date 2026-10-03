@@ -7,6 +7,7 @@ final class DemoAgentBoardClient: AgentBoardClient {
     private var itemsByAgent: [String: [AgentBoardItem]] = [:]
     private let now: Date
     let supportsFeedback = true
+    let supportsGoalCategories = true
 
     init(now: Date = .now) {
         self.now = now
@@ -144,13 +145,19 @@ final class DemoAgentBoardClient: AgentBoardClient {
                            status: "active", note: "Out for delivery; arriving between 5 and 6 pm.", createdAt: ago(40)),
             AgentBoardItem(id: "goal-2", kind: .goal, title: "Lawn care visit", icon: "🌿", section: "tracking",
                            status: "active", note: "Saturday 9–10 am on the family calendar; crew time not confirmed.",
-                           createdAt: ago(60 * 20)),
+                           category: "other", createdAt: ago(60 * 20)),
             AgentBoardItem(id: "goal-3", kind: .goal, title: "8 hours of sleep on weeknights", icon: "😴",
                            section: "goal", status: "active", note: "Monday's nudge went out; next one Sunday at 10:30.",
-                           createdAt: ago(60 * 70)),
+                           category: "health", createdAt: ago(60 * 70)),
             AgentBoardItem(id: "goal-4", kind: .goal, title: "Save $2,000 for the Lisbon trip", icon: "💶",
                            section: "goal", status: "active", note: "$1,340 saved; on pace for mid-October.",
-                           createdAt: ago(60 * 90)),
+                           category: "finance", createdAt: ago(60 * 90)),
+            AgentBoardItem(id: "goal-5", kind: .goal, title: "Walk 8,000 steps a day", icon: "👟", section: "goal",
+                           status: "active", note: "6,900 a day this week; two short walks would close the gap.",
+                           category: "health", createdAt: ago(60 * 100)),
+            AgentBoardItem(id: "goal-6", kind: .goal, title: "Finish the Swift course", icon: "🧑‍💻", section: "goal",
+                           status: "active", note: "Lesson 9 of 14; next one Thursday evening.",
+                           category: "interests", createdAt: ago(60 * 120)),
         ]
     }
 }

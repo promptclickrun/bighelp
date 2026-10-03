@@ -334,6 +334,7 @@ extension RootShellView {
         /// Unknown until the plugin's features arrive after each (re)connect.
         let board: WorkspaceAvailability
         let feedback: Bool
+        let goalCategories: Bool
         let fixtures: Bool
         /// The selected computer will reconnect by itself (it has a saved sign-in).
         let reconnects: Bool
@@ -345,7 +346,10 @@ extension RootShellView {
         let feedback = owner.map {
             currentWorkspaceCapabilities.supports(.agentBoardFeedback, owner: $0, profileID: nil)
         } ?? false
-        return AgentBoardClientKey(owner: owner, board: board, feedback: feedback,
+        let goalCategories = owner.map {
+            currentWorkspaceCapabilities.supports(.agentBoardGoalCategories, owner: $0, profileID: nil)
+        } ?? false
+        return AgentBoardClientKey(owner: owner, board: board, feedback: feedback, goalCategories: goalCategories,
                                    fixtures: usesWorkspaceFixtures && workspaceConnections?.isDirectSelected != true,
                                    reconnects: nativeWorkspaceStore?.hasSavedConnection == true)
     }
@@ -399,7 +403,8 @@ extension RootShellView {
             guard let owner = key.owner, let workspace = workspaceConnections?.workspace else {
                 return agentBoard.waitForConnection()
             }
-            let client = DirectHermesAgentBoardClient(workspace: workspace, owner: owner, supportsFeedback: key.feedback)
+            let client = DirectHermesAgentBoardClient(workspace: workspace, owner: owner, supportsFeedback: key.feedback,
+                                                      supportsGoalCategories: key.goalCategories)
             // Feed, Ideas and Goals widgets set to another agent read its board the same way.
             BighelpWidgetBoardLoader.shared.configure(client: client, scope: owner.cacheScopeID)
             await agentBoard.connect(client: client, scope: owner.cacheScopeID)

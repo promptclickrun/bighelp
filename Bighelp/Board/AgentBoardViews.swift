@@ -23,34 +23,43 @@ struct AgentBoardContext {
 
 // MARK: - Shared pieces
 
-private struct BoardScroll<Content: View>: View {
+/// A board page. A List, not a ScrollView: only List rows get swipe actions, so Feed, Ideas and
+/// Goals items can swipe left to dismiss. Each view `content` lists is its own row.
+struct BoardScroll<Content: View>: View {
     let context: AgentBoardContext
     let title: String?
     let identifier: String
     /// Items on this page; they count as read once it has been open a moment.
     var seen: [AgentBoardItem] = []
+    /// Shows Blueprints beside the title.
+    var onBlueprints: (() -> Void)?
     @ViewBuilder let content: () -> Content
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: BighelpTokens.space16) {
-                AgentHeroHeader(agentID: context.agentID, displayName: context.agentName,
-                                imageURL: context.imageURL, activity: context.activity,
-                                onAvatarTap: context.onProfile, onNameTap: context.onSwitchAgent)
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, BighelpTokens.space8)
-                if let title {
-                    Text(title)
-                        .font(.bighelp(.largeTitle).weight(.bold))
-                        .foregroundStyle(theme.primaryText)
-                        .accessibilityAddTraits(.isHeader)
+        GeometryReader { geometry in
+            // The page keeps a 720-point column on iPad and the Mac; rows still swipe from the edge.
+            let side = max(BighelpTokens.space20, (geometry.size.width - 720) / 2 + BighelpTokens.space20)
+            List {
+                Group {
+                    AgentHeroHeader(agentID: context.agentID, displayName: context.agentName,
+                                    imageURL: context.imageURL, activity: context.activity,
+                                    onAvatarTap: context.onProfile, onNameTap: context.onSwitchAgent)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, BighelpTokens.space8)
+                    if title != nil || onBlueprints != nil {
+                        titleRow
+                    }
+                    content()
                 }
-                content()
+                .listRowInsets(EdgeInsets(top: BighelpTokens.space8, leading: side, bottom: BighelpTokens.space8,
+                                          trailing: side))
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
             }
-            .padding(.horizontal, BighelpTokens.space20)
-            .padding(.bottom, 120)
-            .frame(maxWidth: 720)
-            .frame(maxWidth: .infinity)
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .environment(\.defaultMinListRowHeight, 0)
+            .contentMargins(.bottom, 120, for: .scrollContent)
         }
         .scrollIndicators(.hidden)
         .overlay(alignment: .top) { AgentBoardHeaderButtons(context: context) }
@@ -79,6 +88,21 @@ private struct BoardScroll<Content: View>: View {
         .accessibilityIdentifier(identifier)
     }
 
+    private var titleRow: some View {
+        HStack(alignment: .center, spacing: BighelpTokens.space8) {
+            if let title {
+                Text(title)
+                    .font(.bighelp(.largeTitle).weight(.bold))
+                    .foregroundStyle(theme.primaryText)
+                    .accessibilityAddTraits(.isHeader)
+            }
+            Spacer(minLength: BighelpTokens.space8)
+            if let onBlueprints {
+                BoardBlueprintsButton(action: onBlueprints)
+            }
+        }
+    }
+
     @BighelpThemeReader private var theme
 }
 
@@ -87,8 +111,9 @@ enum BoardFeedbackReason {
     static let all = ["Not relevant", "Too frequent", "Already knew", "Wrong timing"]
 }
 
-/// Long press on a Feed, Ideas or Goals item, and the same actions for
-/// VoiceOver: only the ones that fit the item's kind.
+/// Long press (right-click on the Mac) on a Feed, Ideas or Goals item, and the same actions for
+/// VoiceOver: only the ones that fit the item's kind. The last one is the item's dismiss
+/// (`BoardDismissAction`), the same as swiping left.
 private struct BoardItemActions: ViewModifier {
     let item: AgentBoardItem
     let context: AgentBoardContext
@@ -146,7 +171,10 @@ private struct BoardItemActions: ViewModifier {
         if includesShare {
             ShareLink(item: item.shareText) { Label("Share", systemImage: "square.and.arrow.up") }
         }
-        Button("Delete", systemImage: "trash", role: .destructive) { Task { await store.hide(item) } }
+        let dismiss = BoardDismissAction(kind: item.kind)
+        Button(dismiss.title, systemImage: dismiss.systemImage, role: dismiss.isDestructive ? .destructive : nil) {
+            Task { await store.dismiss(item) }
+        }
     }
 }
 
@@ -168,14 +196,39 @@ private struct LessLikeThis: ViewModifier {
     }
 }
 
+/// Swipe left on a board item to clear it (Feed), say not now (Ideas) or remove it (Goals),
+/// with Undo. Swipe actions belong to a List row, so this goes on the row's outermost view.
+private struct BoardItemSwipe: ViewModifier {
+    let item: AgentBoardItem
+    let store: AgentBoardStore
+
+    func body(content: Content) -> some View {
+        let dismiss = BoardDismissAction(kind: item.kind)
+        content.swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button(role: dismiss.isDestructive ? .destructive : nil) {
+                Task { await store.dismiss(item) }
+            } label: {
+                Label(dismiss.title, systemImage: dismiss.systemImage)
+            }
+            .tint(dismiss.isDestructive ? theme.danger : (item.kind == .idea ? theme.warning : .gray))
+        }
+    }
+
+    @BighelpThemeReader private var theme
+}
+
 extension View {
-    fileprivate func boardItemActions(_ item: AgentBoardItem, context: AgentBoardContext) -> some View {
+    func boardItemActions(_ item: AgentBoardItem, context: AgentBoardContext) -> some View {
         modifier(BoardItemActions(item: item, context: context))
+    }
+
+    func boardItemSwipe(_ item: AgentBoardItem, store: AgentBoardStore) -> some View {
+        modifier(BoardItemSwipe(item: item, store: store))
     }
 }
 
 /// Something the person hasn't seen yet.
-private struct UnreadDot: View {
+struct UnreadDot: View {
     let item: AgentBoardItem
     let store: AgentBoardStore
 
@@ -192,14 +245,14 @@ private struct UnreadDot: View {
     @BighelpThemeReader private var theme
 }
 
-/// "Deleted" with Undo, for a few seconds after a delete.
+/// "Cleared", "Not now" or "Removed" with Undo, for a few seconds after.
 private struct BoardUndoBar: View {
     let item: AgentBoardItem
     let store: AgentBoardStore
 
     var body: some View {
         HStack(spacing: BighelpTokens.space12) {
-            Text("Deleted “\(item.title)”")
+            Text(BoardDismissAction(kind: item.kind).undoMessage(for: item.title))
                 .font(.bighelp(.subheadline).weight(.medium))
                 .foregroundStyle(theme.primaryText)
                 .lineLimit(1)
@@ -234,6 +287,7 @@ private struct BoardEmptyState: View {
     let agentName: String
     let onAsk: (String) -> Void
     let identifier: String
+    var onBlueprints: (() -> Void)?
 
     var body: some View {
         VStack(spacing: BighelpTokens.space12) {
@@ -268,6 +322,9 @@ private struct BoardEmptyState: View {
             .tint(theme.action)
             .foregroundStyle(theme.actionForeground)
             .accessibilityIdentifier(identifier + ".ask")
+            if let onBlueprints {
+                BoardBlueprintsButton(action: onBlueprints)
+            }
         }
         .frame(maxWidth: 420)
         .frame(maxWidth: .infinity)
@@ -278,7 +335,7 @@ private struct BoardEmptyState: View {
     @BighelpThemeReader private var theme
 }
 
-private struct BoardIcon: View {
+struct BoardIcon: View {
     let icon: String
     let fallback: String
     var size: CGFloat = 40
@@ -300,7 +357,7 @@ private struct BoardIcon: View {
     @BighelpThemeReader private var theme
 }
 
-private struct BoardStateBanner: View {
+struct BoardStateBanner: View {
     let state: AgentBoardStore.LoadState
     let context: AgentBoardContext
     /// For the agent: plugins before 3.0.0 only know the command's old name.
@@ -345,6 +402,8 @@ private struct BoardStateBanner: View {
                     Label("Ask \(context.agentName)", systemImage: "bubble.left.and.text.bubble.right")
                         .frame(minHeight: BighelpTokens.hitTarget)
                 }
+                // Only the button takes the tap in a List row.
+                .buttonStyle(.borderless)
                 .accessibilityIdentifier("board.plugin-required.ask")
             }
             .font(.bighelp(.subheadline).weight(.semibold))
@@ -399,18 +458,22 @@ enum BoardTimeBucket {
 
 struct AgentFeedView: View {
     let context: AgentBoardContext
+    @State private var showsBlueprints = false
 
     var body: some View {
         let store = context.store
-        BoardScroll(context: context, title: nil, identifier: "board.feed", seen: store.feed) {
+        let isEmpty = store.feed.isEmpty && store.state == .loaded
+        BoardScroll(context: context, title: nil, identifier: "board.feed", seen: store.feed,
+                    onBlueprints: isEmpty ? nil : { showsBlueprints = true }) {
             BoardStateBanner(state: store.state, context: context)
-            if store.feed.isEmpty, store.state == .loaded {
+            if isEmpty {
                 BoardEmptyState(
                     symbol: "newspaper",
                     title: "Your feed is quiet",
                     message: "Tell \(context.agentName) what you'd like to hear about. Posts show up here when they're ready.",
                     example: "Every evening, post the top three AI stories to my feed.",
-                    agentName: context.agentName, onAsk: context.onAsk, identifier: "board.feed.empty")
+                    agentName: context.agentName, onAsk: context.onAsk, identifier: "board.feed.empty",
+                    onBlueprints: { showsBlueprints = true })
             }
             ForEach(BoardTimeBucket.grouped(store.feed), id: \.title) { group in
                 Text(group.title)
@@ -419,11 +482,15 @@ struct AgentFeedView: View {
                     .padding(.top, BighelpTokens.space8)
                     .accessibilityAddTraits(.isHeader)
                 ForEach(group.items) { item in
-                    FeedPostView(item: item, context: context)
-                    Divider().overlay(theme.border)
+                    VStack(spacing: 0) {
+                        FeedPostView(item: item, context: context)
+                        Divider().overlay(theme.border)
+                    }
+                    .boardItemSwipe(item, store: store)
                 }
             }
         }
+        .boardBlueprints(isPresented: $showsBlueprints, kind: .feed, context: context)
     }
 
     @BighelpThemeReader private var theme
@@ -477,6 +544,8 @@ private struct FeedPostView: View {
                         Label(link.title.isEmpty ? (link.url.host() ?? "Open link") : link.title, systemImage: "link")
                             .font(.bighelp(.subheadline).weight(.medium))
                     }
+                    // Only the link takes the tap in a List row.
+                    .buttonStyle(.borderless)
                     .tint(theme.action)
                 }
                 actions
@@ -565,9 +634,9 @@ private struct FeedPostView: View {
                             .font(.bighelp(.caption))
                             .foregroundStyle(.secondary)
                     }
-                    Button("Delete this post", role: .destructive) {
+                    Button("Clear this post") {
                         isShowingInfo = false
-                        Task { await context.store.hide(item) }
+                        Task { await context.store.dismiss(item) }
                     }
                     .padding(.top, BighelpTokens.space4)
                 }
@@ -618,18 +687,22 @@ struct BoardPictureView: View {
 struct AgentIdeasView: View {
     let context: AgentBoardContext
     @State private var selected: AgentBoardItem?
+    @State private var showsBlueprints = false
 
     var body: some View {
         let store = context.store
-        BoardScroll(context: context, title: "Ideas", identifier: "board.ideas", seen: store.ideas) {
+        let isEmpty = store.ideas.isEmpty && store.state == .loaded
+        BoardScroll(context: context, title: "Ideas", identifier: "board.ideas", seen: store.ideas,
+                    onBlueprints: isEmpty ? nil : { showsBlueprints = true }) {
             BoardStateBanner(state: store.state, context: context)
-            if store.ideas.isEmpty, store.state == .loaded {
+            if isEmpty {
                 BoardEmptyState(
                     symbol: "lightbulb",
                     title: "No ideas yet",
                     message: "Ask \(context.agentName) to suggest things it could do for you. Ideas it proposes land here.",
                     example: "Look through my week and suggest a few things you could take off my plate.",
-                    agentName: context.agentName, onAsk: context.onAsk, identifier: "board.ideas.empty")
+                    agentName: context.agentName, onAsk: context.onAsk, identifier: "board.ideas.empty",
+                    onBlueprints: { showsBlueprints = true })
             }
             ForEach(sections(store.ideas), id: \.title) { section in
                 if !section.title.isEmpty {
@@ -639,14 +712,18 @@ struct AgentIdeasView: View {
                         .padding(.top, BighelpTokens.space8)
                 }
                 ForEach(section.items) { idea in
-                    Button { selected = idea } label: { ideaRow(idea) }
-                        .buttonStyle(.plain)
-                        .boardItemActions(idea, context: context)
-                        .accessibilityIdentifier("board.idea.\(idea.id)")
-                    Divider().overlay(theme.border)
+                    VStack(spacing: 0) {
+                        Button { selected = idea } label: { ideaRow(idea) }
+                            .buttonStyle(.plain)
+                            .boardItemActions(idea, context: context)
+                            .accessibilityIdentifier("board.idea.\(idea.id)")
+                        Divider().overlay(theme.border)
+                    }
+                    .boardItemSwipe(idea, store: store)
                 }
             }
         }
+        .boardBlueprints(isPresented: $showsBlueprints, kind: .idea, context: context)
         .sheet(item: $selected) { idea in
             IdeaDetailSheet(idea: idea, context: context)
                 .presentationDetents([.medium, .large])
@@ -769,132 +846,6 @@ private struct IdeaDetailSheet: View {
             .accessibilityIdentifier("board.idea.close")
         }
         #endif
-    }
-
-    @BighelpThemeReader private var theme
-}
-
-// MARK: - Goals
-
-struct AgentGoalsView: View {
-    let context: AgentBoardContext
-    @State private var expanded: Set<String> = []
-
-    var body: some View {
-        let goals = context.store.goals
-        BoardScroll(context: context, title: "Goals", identifier: "board.goals", seen: goals) {
-            BoardStateBanner(state: context.store.state, context: context)
-            if goals.isEmpty, context.store.state == .loaded {
-                BoardEmptyState(
-                    symbol: "checkmark.circle",
-                    title: "Nothing tracked yet",
-                    message: "Tell \(context.agentName) about a goal, or something to keep an eye on. It keeps a short status here.",
-                    example: "Help me get 8 hours of sleep on weeknights, and keep an eye on it.",
-                    agentName: context.agentName, onAsk: context.onAsk, identifier: "board.goals.empty")
-            }
-            section("Tracking", color: .green, key: "tracking",
-                    items: goals.filter { $0.isTracking && !$0.isDone })
-            section("Goals", color: .blue, key: "goal",
-                    items: goals.filter { !$0.isTracking && !$0.isDone })
-            section("Done", color: .gray, key: "done", items: goals.filter(\.isDone), collapsedLimit: 0)
-            if context.store.state == .loaded {
-                Button {
-                    context.onAsk("I'd like to set a goal: ")
-                } label: {
-                    Label("Create a goal", systemImage: "plus")
-                        .font(.bighelp(.body).weight(.semibold))
-                        .foregroundStyle(theme.primaryText)
-                        .frame(minHeight: BighelpTokens.hitTarget)
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("board.goals.create")
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func section(_ title: String, color: Color, key: String, items: [AgentBoardItem],
-                         collapsedLimit: Int = 4) -> some View {
-        if !items.isEmpty {
-            let showsAll = expanded.contains(key)
-            let visible = showsAll ? items : Array(items.prefix(collapsedLimit))
-            HStack(spacing: BighelpTokens.space8) {
-                Circle().fill(color).frame(width: 8, height: 8)
-                    .padding(6)
-                    .background(Circle().fill(color.opacity(0.18)))
-                Text(title)
-                    .font(.bighelp(.headline))
-                    .foregroundStyle(color)
-            }
-            .padding(.top, BighelpTokens.space8)
-            .accessibilityAddTraits(.isHeader)
-            ForEach(visible) { goal in goalRow(goal) }
-            if items.count > visible.count {
-                Button {
-                    withAnimation(.snappy) { _ = expanded.insert(key) }
-                } label: {
-                    Label(visible.isEmpty ? "Show \(items.count) done" : "Show \(items.count - visible.count) more",
-                          systemImage: "ellipsis")
-                        .font(.bighelp(.subheadline).weight(.medium))
-                        .foregroundStyle(theme.secondaryText)
-                        .frame(minHeight: BighelpTokens.hitTarget)
-                }
-                .buttonStyle(.plain)
-            }
-            Divider().overlay(theme.border)
-        }
-    }
-
-    private func goalRow(_ goal: AgentBoardItem) -> some View {
-        HStack(alignment: .top, spacing: BighelpTokens.space12) {
-            Button {
-                Task { await context.store.setDone(goal, !goal.isDone) }
-            } label: {
-                Image(systemName: goal.isDone ? "checkmark.square.fill" : "square")
-                    .font(.bighelp(.title2))
-                    .foregroundStyle(goal.isDone ? theme.action : theme.secondaryText)
-                    .frame(width: 30, height: BighelpTokens.hitTarget)
-                    .contentShape(.rect)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(goal.isDone ? "Mark \(goal.title) not done" : "Mark \(goal.title) done")
-            .accessibilityIdentifier("board.goal.toggle.\(goal.id)")
-            VStack(alignment: .leading, spacing: 2) {
-                Text(goal.title)
-                    .font(.bighelp(.headline))
-                    .foregroundStyle(theme.primaryText)
-                    .strikethrough(goal.isDone)
-                if !goal.note.isEmpty {
-                    Text(goal.note)
-                        .font(.bighelp(.subheadline))
-                        .foregroundStyle(theme.secondaryText)
-                }
-            }
-            .padding(.top, 10)
-            Spacer(minLength: 0)
-            UnreadDot(item: goal, store: context.store)
-                .padding(.top, 18)
-            Menu {
-                Button("Discuss", systemImage: "bubble.left") { context.onAsk("About my goal “\(goal.title)”: ") }
-                Button(goal.isDone ? "Mark not done" : "Mark done", systemImage: "checkmark") {
-                    Task { await context.store.setDone(goal, !goal.isDone) }
-                }
-                Button("Delete", systemImage: "trash", role: .destructive) {
-                    Task { await context.store.hide(goal) }
-                }
-            } label: {
-                Image(systemName: "ellipsis")
-                    .rotationEffect(.degrees(90))
-                    .font(.bighelp(.body).weight(.semibold))
-                    .foregroundStyle(theme.secondaryText)
-                    .frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
-            }
-            .accessibilityLabel("More for \(goal.title)")
-        }
-        .contentShape(.rect)
-        .boardItemActions(goal, context: context)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("board.goal.\(goal.id)")
     }
 
     @BighelpThemeReader private var theme

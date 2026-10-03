@@ -77,7 +77,8 @@ final class ProjectsAndBoardUITests: BighelpUITestCase {
             XCTAssertTrue(app.buttons["Copy"].waitForExistence(timeout: 5), "The long-press menu opens")
             XCTAssertTrue(app.buttons["Mark as unread"].exists || app.buttons["Mark as read"].exists)
             save("board-3-long-press", app)
-            app.buttons["Delete"].tap()
+            // A Feed post's menu ends with Clear, the same as swiping it left.
+            app.buttons["Clear"].tap()
             XCTAssertTrue(app.buttons["board.undo"].waitForExistence(timeout: 5))
             XCTAssertTrue(post.waitForNonExistence(timeout: 5))
             save("board-4-undo", app)

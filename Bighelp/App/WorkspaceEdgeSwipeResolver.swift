@@ -26,4 +26,11 @@ enum WorkspaceEdgeSwipeResolver {
 
         return nil
     }
+
+    /// Feed, Ideas and Goals rows swipe left to dismiss. The trailing strip sat over the right
+    /// end of every row and took those drags first (opening New chat), so it steps aside there.
+    /// A chat pushed over a board keeps it.
+    static func trailingEdgeIsActive(tab: AppTab, pathIsEmpty: Bool) -> Bool {
+        !(pathIsEmpty && [.feed, .ideas, .goals].contains(tab))
+    }
 }

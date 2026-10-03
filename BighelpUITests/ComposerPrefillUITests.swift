@@ -10,8 +10,12 @@ final class ComposerPrefillUITests: BighelpUITestCase {
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.demo.appearance", "dark"]
         app.launch()
         openRootTab("tab.goals", in: app)
-        let create = app.buttons["board.goals.create"]
-        XCTAssertTrue(create.waitForExistence(timeout: 10))
+        // Create a goal › Something else.
+        let create = app.buttons["board.goals.create.other"]
+        XCTAssertTrue(app.descendants(matching: .any)["board.goals"].waitForExistence(timeout: 10))
+        // Goals is a List: the row exists once scrolled to.
+        for _ in 0..<8 where !(create.exists && create.isHittable) { app.swipeUp() }
+        XCTAssertTrue(create.waitForExistence(timeout: 5))
         create.tap()
         let editor = app.textViews["chat.composer.text"]
         XCTAssertTrue(editor.waitForExistence(timeout: 10))

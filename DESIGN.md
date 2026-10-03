@@ -147,9 +147,20 @@ with the plugin's `bighelp_board` tool, often from a scheduled job it sets up. F
 with chat's renderer (`MarkdownMessageView`): headings, lists, quotes, code and tables. Nothing runs on the user's AI
 provider by itself. Every item has a long-press menu (and the same VoiceOver actions) with only what fits
 it: thumbs up/down on Feed (a thumbs down may ask "Less like this?" with quick reasons, never required), "Turn
-into a goal" and "Start a chat" on Ideas, done/active on Goals, and read/unread, Copy, Share and Delete everywhere.
-Delete hides with Undo. New items carry a dot, and a dot on the Feed, Ideas or Goals tab says something there is
-unseen. The agent reads the ratings and reasons before it posts (plugin 2.19.0).
+into a goal" and "Start a chat" on Ideas, done/active on Goals, and read/unread, Copy and Share everywhere. It ends
+with the item's dismiss, which is also a swipe left on the item: **Clear** a Feed post, **Not now** for an idea
+(the plugin remembers it), **Remove** a goal. Each hides with Undo (`BoardDismissAction`). The boards are Lists so
+rows can swipe, and the root's right-edge New chat strip steps aside on them. New items carry a dot, and a dot on
+the Feed, Ideas or Goals tab says something there is unseen. The agent reads the ratings and reasons before it
+posts (plugin 2.19.0).
+**Blueprints** (beside the page title, and in the empty state) are the 45 starter prompts from
+bighelp.app/quick-start, bundled (`BoardBlueprints.json`), 15 per page in five topics. A tap opens a new chat
+with that agent and the prompt in the message box to fill in its [brackets]; nothing runs until Send.
+**Goals** shows Tracking (the active goals by category: Health, Relationships, Finance, Career, Interests,
+Productivity, Other; "Nothing is being tracked yet" when empty), Done, then **Create a goal**: one row per
+category with a +, which starts a chat asking the agent to plan a goal in that category (touch and hold for that
+category's blueprints). Goals carry the category in the plugin (`native-agent-board-goal-categories-v1`); without
+it every goal shows under Other and the page says to update the plugin.
 
 **Projects** (☰ › Projects) are Hermes projects shown the way Claude shows them: cards with the project's emoji
 and color, description and recent use; a project page with **New chat in this project**, its chats and its

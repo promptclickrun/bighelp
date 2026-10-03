@@ -750,7 +750,9 @@ struct RootShellView: View {
             .contentShape(Rectangle())
             // Below the header row, so ☰ and ⋯ in the corners (Feed, Ideas, Goals, Apps) keep their taps.
             .padding(.top, HeaderButtonMetrics.glass + 2 * HeaderButtonMetrics.slop + BighelpTokens.space8)
-            .allowsHitTesting(action != .none && !isHomeDrawerPresented)
+            .allowsHitTesting(action != .none && !isHomeDrawerPresented
+                && (side == .left || WorkspaceEdgeSwipeResolver.trailingEdgeIsActive(
+                    tab: appState.selectedTab, pathIsEmpty: appState.path.isEmpty)))
             .highPriorityGesture(
                 DragGesture(minimumDistance: 12, coordinateSpace: .local)
                     .onEnded { value in

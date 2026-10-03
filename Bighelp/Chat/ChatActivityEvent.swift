@@ -145,7 +145,10 @@ struct ChatActivityEvent: Identifiable, Codable, Equatable, Sendable {
             case "skill_view":
                 return nonemptyArgument("name", in: argumentObject ?? [:]).flatMap(safeCollapsedIdentifier)
             case "terminal":
-                return nonemptyArgument("command", in: argumentObject ?? [:]).flatMap(commandExecutableName)
+                guard let command = nonemptyArgument("command", in: argumentObject ?? [:]),
+                      let executable = commandExecutableName(command) else { return nil }
+                // `cd app && npm test` names npm, the program that does the work.
+                return ChatCommandPhrase.isSetup(executable) ? ChatCommandPhrase.program(for: command) : executable
             case "execute_code":
                 let arguments = argumentObject ?? [:]
                 return (nonemptyArgument("executable", in: arguments) ?? nonemptyArgument("name", in: arguments))
@@ -167,7 +170,13 @@ struct ChatActivityEvent: Identifiable, Codable, Equatable, Sendable {
     /// The collapsed row as VoiceOver reads it: the words, what they name, and
     /// an outcome worth hearing ("Failed").
     func collapsedAccessibilityLabel(status: String?) -> String {
-        [presentationTitle, presentationDetail, collapsedPresentationSummary, status]
+        // The same words the step line shows ("Reading notes.md…").
+        let words = switch kind {
+        case .tool, .subagent: lifecycle == .running ? toolPhrase.live : toolPhrase.past
+        case .reasoning, .botHandoff: presentationTitle
+        }
+        let detail = presentationDetail.flatMap { words.contains($0) ? nil : $0 }
+        return [words, detail, collapsedPresentationSummary, status]
             .compactMap { value in
                 guard let value else { return nil }
                 let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)

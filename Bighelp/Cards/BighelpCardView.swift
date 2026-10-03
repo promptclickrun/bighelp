@@ -23,12 +23,14 @@ extension EnvironmentValues {
 struct BighelpCardView: View {
     let card: BighelpCardDocument
     private let renderer: BighelpCardRenderer
+    private let background: CardBackground?
     @State private var updatedAt: Date?
     @Environment(\.scenePhase) private var scenePhase
 
     init(card: BighelpCardDocument) {
         self.card = card
         renderer = BighelpCardRenderer(card: card)
+        background = renderer.isValid ? CardBackground.of(card) : nil
     }
 
     var body: some View {
@@ -43,7 +45,7 @@ struct BighelpCardView: View {
             .foregroundStyle(.secondary)
         }
         .padding()
-        .background(Color(uiColor: .secondarySystemBackground))
+        .modifier(BighelpCardSurface(background: background))
         .clipShape(RoundedRectangle(cornerRadius: BighelpCardDesignTokens.cornerRadius))
         .overlay {
             RoundedRectangle(cornerRadius: BighelpCardDesignTokens.cornerRadius)
@@ -68,6 +70,35 @@ struct BighelpCardView: View {
         return updatedAt == nil
             ? "arrow.trianglehead.2.clockwise.rotate.90"
             : "checkmark.circle.fill"
+    }
+}
+
+/// The card's usual surface, or its weather. Over weather the content is drawn
+/// in the dark color scheme (white text); the scrim keeps that readable.
+private struct BighelpCardSurface: ViewModifier {
+    let background: CardBackground?
+
+    func body(content: Content) -> some View {
+        if let background {
+            content
+                .environment(\.colorScheme, .dark)
+                .modifier(CardBackgroundInk())
+                .background { CardBackgroundView(background: background) }
+        } else {
+            content.background(Color(uiColor: .secondarySystemBackground))
+        }
+    }
+}
+
+/// Vision Pro gives the whole app one fixed ink, dark in a light window. Over
+/// weather the card's text is white with grey secondary text, as on iPhone.
+private struct CardBackgroundInk: ViewModifier {
+    func body(content: Content) -> some View {
+        #if os(visionOS)
+        content.foregroundStyle(Color.white, Color(red: 235 / 255, green: 235 / 255, blue: 245 / 255).opacity(0.6))
+        #else
+        content
+        #endif
     }
 }
 

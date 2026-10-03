@@ -49,12 +49,14 @@ final class ChatActivityDisclosureStore {
         }
     }
 
-    func isExpanded(_ turn: ChatActivityTurn) -> Bool {
+    /// A folder the agent is still working on (`isLive`) lists its calls as
+    /// they happen, then closes once it's finished, unless the reader chose.
+    func isExpanded(_ turn: ChatActivityTurn, isLive: Bool = false) -> Bool {
         let choices = turn.events.compactMap { trailChoices[key(for: $0)] }
         // Event-keyed choices survive segment regrouping and canonical event-ID changes.
         if choices.contains(true) { return true }
         if choices.contains(false) { return false }
-        return turn.events.contains { isExpanded($0) }
+        return isLive || turn.events.contains { isExpanded($0) }
     }
 
     func setExpanded(_ expanded: Bool, for turn: ChatActivityTurn) {

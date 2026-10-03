@@ -6,7 +6,8 @@ import UIKit
 /// native layout as messages, so there is no separately estimated live tail.
 enum ChatCanvasRow: Identifiable, Equatable {
     case transcript(ChatTurnDisplayRow)
-    case workTrailHeader(ChatActivityTurn)
+    /// A folder of tool calls. `isLive`: the agent is still working on it.
+    case workTrailHeader(ChatActivityTurn, isLive: Bool)
     case activityDetail(ChatActivityEvent)
     case workTrailEnd(String)
     case earlierMessage(TimelineItem)
@@ -26,7 +27,7 @@ enum ChatCanvasRow: Identifiable, Equatable {
     var id: String {
         switch self {
         case .transcript(let row): row.id
-        case .workTrailHeader(let turn): "work-trail:\(turn.id)"
+        case .workTrailHeader(let turn, _): "work-trail:\(turn.id)"
         case .activityDetail(let event): "activity-detail:\(event.id)"
         case .workTrailEnd(let id): "work-trail-end:\(id)"
         case .earlierMessage(let item): "earlier:\(item.id)"
@@ -53,7 +54,8 @@ enum ChatCanvasRow: Identifiable, Equatable {
         case (.transcript(.entry(let a)), .transcript(.entry(let b))): a == b
         case (.transcript(.completed(let a)), .transcript(.completed(let b))):
             a.id == b.id && a.entries == b.entries && a.elapsedSeconds == b.elapsedSeconds && a.stepCount == b.stepCount
-        case (.workTrailHeader(let a), .workTrailHeader(let b)): a == b
+                && a.summary == b.summary
+        case (.workTrailHeader(let a, let liveA), .workTrailHeader(let b, let liveB)): a == b && liveA == liveB
         case (.activityDetail(let a), .activityDetail(let b)): a == b
         case (.workTrailEnd(let a), .workTrailEnd(let b)): a == b
         case (.earlierMessage(let a), .earlierMessage(let b)): a == b
@@ -77,18 +79,26 @@ enum ChatCanvasRow: Identifiable, Equatable {
 /// boundary. A hundred consecutive tools must not become one giant view tree.
 @MainActor
 enum ChatCanvasTranscriptProjection {
-    static func rows(from displayRows: [ChatTurnDisplayRow], disclosures: ChatActivityDisclosureStore) -> [ChatCanvasRow] {
+    static func rows(from displayRows: [ChatTurnDisplayRow], disclosures: ChatActivityDisclosureStore,
+                     isSending: Bool = false) -> [ChatCanvasRow] {
         var result: [ChatCanvasRow] = []
+        // While a turn runs, the folder at its tail is the work in progress:
+        // the agent hasn't moved on to text, thinking or another folder yet.
+        var tailEntryID: String?
+        if isSending, case .entry(let entry)? = displayRows.last, case .activity = entry { tailEntryID = entry.id }
         func append(_ entry: ChatTranscriptEntry) {
             guard case .activity(let turn) = entry else {
                 result.append(.transcript(.entry(entry)))
                 return
             }
-            for segment in ChatActivityTurnPresentation(turn: turn).segments {
+            let segments = ChatActivityTurnPresentation(turn: turn).segments
+            for (index, segment) in segments.enumerated() {
                 switch segment {
                 case .workTrail(let trail):
-                    result.append(.workTrailHeader(trail))
-                    if disclosures.isExpanded(trail) {
+                    let isTail = entry.id == tailEntryID && index == segments.count - 1
+                    let isLive = isSending && (isTail || trail.events.contains { $0.lifecycle == .running })
+                    result.append(.workTrailHeader(trail, isLive: isLive))
+                    if disclosures.isExpanded(trail, isLive: isLive) {
                         result += trail.events.map(ChatCanvasRow.activityDetail)
                         result.append(.workTrailEnd(trail.id))
                     }
@@ -111,7 +121,7 @@ enum ChatCanvasTranscriptProjection {
                 // Keep the existing accessible disclosure control, with its
                 // expanded content projected as sibling native rows.
                 let header = ChatCompletedTurn(id: turn.id, entries: [], elapsedSeconds: turn.elapsedSeconds,
-                                               stepCount: turn.stepCount)
+                                               stepCount: turn.stepCount, summary: turn.summary)
                 result.append(.transcript(.completed(header)))
                 if disclosures.isCompletedTurnExpanded(turn.id) {
                     turn.expandedEntries.forEach(append)

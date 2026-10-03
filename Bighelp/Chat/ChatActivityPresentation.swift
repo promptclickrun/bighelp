@@ -41,11 +41,15 @@ enum ChatActivityPresentation {
         case .running, .recorded: nil
         case .succeeded: duration(event.durationMilliseconds)
         }
+        let phrase = event.toolPhrase
+        let label = event.lifecycle == .running ? phrase.live : phrase.past
+        // The detail names what the words don't already ("Running tests…  swift").
+        let detail = event.presentationDetail.flatMap { label.contains($0) ? nil : $0 }
         return BighelpActivityStep(
             id: event.id,
             glyph: event.presentationActivity.glyph,
-            label: event.presentationTitle,
-            detail: event.presentationDetail,
+            label: label,
+            detail: detail,
             meta: outcome,
             isRunning: event.lifecycle == .running,
             metaIsFailure: event.lifecycle == .failed
@@ -63,17 +67,24 @@ enum ChatActivityPresentation {
         return seconds < 60 ? "\(seconds)s" : "\(seconds / 60)m \(seconds % 60)s"
     }
 
-    /// Where a run of tool calls is. Live: the newest running call's words,
-    /// or what the turn waits on. Ended: how its last call ended.
-    static func trailPhase(for events: [ChatActivityEvent], waiting: ChatActivityWaiting? = nil) -> BighelpActivityPhase {
+    /// Where a folder of tool calls is. Running: the newest running call in
+    /// plain words ("Reading notes.md…"), or what the turn waits on. Live
+    /// between calls (`isLive`, the folder is still the turn's newest work):
+    /// thinking. Ended: what it did ("Read 2 files, ran tests"), or how it
+    /// ended when that went wrong. It never says "Done" while the agent works.
+    static func trailPhase(for events: [ChatActivityEvent], waiting: ChatActivityWaiting? = nil,
+                           isLive: Bool = false) -> BighelpActivityPhase {
         if let running = events.last(where: { $0.lifecycle == .running }) {
             if let waiting { return .waitingForApproval(label: waiting.label) }
-            return .working(running.presentationActivity)
+            let phrase = running.toolPhrase
+            return .working(BighelpToolActivity(glyph: running.presentationActivity.glyph,
+                                                label: phrase.live, doneLabel: phrase.past))
         }
+        if isLive { return .thinking }
         switch events.last?.lifecycle {
         case .failed: return .failed
         case .cancelled: return .stopped
-        default: return .done(elapsed: nil)
+        default: return .finished(ChatToolSummary.summary(of: events) ?? BighelpToolActivityCatalog.fallback.doneLabel)
         }
     }
 
@@ -107,7 +118,7 @@ enum ChatActivityPresentation {
     static func liveLabel(for events: [ChatActivityEvent]) -> String? {
         let running = events.filter { $0.lifecycle == .running && $0.isPresentable }
         if let tool = running.last(where: { $0.kind == .tool || $0.kind == .subagent }) {
-            return tool.presentationTitle
+            return tool.toolPhrase.live
         }
         return running.contains { $0.kind == .reasoning } ? BighelpToolActivityCatalog.thinking.label : nil
     }

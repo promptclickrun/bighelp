@@ -29,7 +29,7 @@ struct DirectHermesHistoryProjectionTests {
         #expect(visual.tone == .secondary)
         #expect(!visual.shimmers)
         let phase = ChatActivityPresentation.trailPhase(for: [recordedEvent])
-        #expect(phase == .done(elapsed: nil))
+        #expect(phase == .finished("Ran a command"))
         #expect(!phase.isLive)
         #expect(!ChatActivityPresentation.step(for: recordedEvent).isRunning)
         let record = SessionRecord(id: "recorded-session", kind: .direct, agentIDs: ["default"],

@@ -52,12 +52,17 @@ struct SessionReopenReplayTests {
             let installed = dataSource.snapshot().itemIdentifiers
             let display = ChatCompletedTurnProjection.rows(from: model.transcriptEntries, isSending: model.isSending,
                 enabled: true, activityEvents: model.activityLedger.allEvents)
-            var expected = ChatCanvasTranscriptProjection.rows(from: display, disclosures: model.activityDisclosures).map(\.id)
-            let tailHasRunningActivity: Bool = {
+            var expected = ChatCanvasTranscriptProjection.rows(from: display, disclosures: model.activityDisclosures,
+                                                               isSending: model.isSending).map(\.id)
+            // A tool folder at the live tail stands in for the waiting bubble.
+            let tailIsWorkFolder: Bool = {
                 guard case .activity(let turn)? = model.transcriptEntries.last else { return false }
-                return turn.events.contains { $0.lifecycle == .running }
+                if turn.events.contains(where: { $0.lifecycle == .running }) { return true }
+                guard model.activityVisibility.showToolCalls,
+                      case .workTrail? = ChatActivityTurnPresentation(turn: turn).segments.last else { return false }
+                return true
             }()
-            if model.isSending && !tailHasRunningActivity { expected.append("chat-pending") }
+            if model.isSending && !tailIsWorkFolder { expected.append("chat-pending") }
             expected.append("chat-bottom")
             #expect(installed == expected)
             #expect(model.draft == "Unsent replay draft")

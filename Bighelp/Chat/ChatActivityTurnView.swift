@@ -90,6 +90,8 @@ struct ChatActivityTurnPresentation {
 struct ChatActivityTurnView: View {
     let turn: ChatActivityTurn
     let senderResolver: TimelineSenderResolver
+    /// This is the newest work of a turn still running: its last folder is live.
+    let isLive: Bool
     let onDisclosureChange: () -> Void
     @Environment(\.chatActivityDisclosureStore) private var inheritedDisclosures
     @State private var localDisclosures = ChatActivityDisclosureStore()
@@ -97,10 +99,12 @@ struct ChatActivityTurnView: View {
     init(
         turn: ChatActivityTurn,
         senderResolver: TimelineSenderResolver = TimelineSenderResolver(),
+        isLive: Bool = false,
         onDisclosureChange: @escaping () -> Void = {}
     ) {
         self.turn = turn
         self.senderResolver = senderResolver
+        self.isLive = isLive
         self.onDisclosureChange = onDisclosureChange
     }
 
@@ -123,6 +127,8 @@ struct ChatActivityTurnView: View {
                 case .workTrail(let workTrail):
                     ChatWorkTrailCard(
                         turn: workTrail,
+                        isLive: isLive && (segment.id == presentation.segments.last?.id
+                            || workTrail.events.contains { $0.lifecycle == .running }),
                         onDisclosureChange: onDisclosureChange
                     )
                 }

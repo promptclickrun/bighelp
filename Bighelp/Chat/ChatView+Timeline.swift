@@ -17,7 +17,8 @@ extension ChatView {
             if model.isBotMode, model.timelineEvents.contains(where: { $0.kind == .botModeStarted }) {
                 rows.append(.divider("Group chat started"))
             }
-            rows += ChatCanvasTranscriptProjection.rows(from: displayedTranscriptRows, disclosures: model.activityDisclosures)
+            rows += ChatCanvasTranscriptProjection.rows(from: displayedTranscriptRows, disclosures: model.activityDisclosures,
+                                                        isSending: model.isSending)
         }
         if let status = model.botModeStatus { rows.append(.botStatus(status)) }
         rows += model.pendingBotModeApprovals.map(ChatCanvasRow.botApproval)
@@ -106,9 +107,9 @@ extension ChatView {
     private func canvasRowContent(_ row: ChatCanvasRow) -> some View {
         switch row {
         case .transcript(let row): transcriptRow(row)
-        case .workTrailHeader(let turn):
-            ChatWorkTrailCard(turn: turn, rendersExpandedEvents: false, waiting: activityWaiting(for: turn),
-                              onDisclosureChange: beginDisclosureReview)
+        case .workTrailHeader(let turn, let isLive):
+            ChatWorkTrailCard(turn: turn, rendersExpandedEvents: false, isLive: isLive,
+                              waiting: activityWaiting(for: turn), onDisclosureChange: beginDisclosureReview)
         case .activityDetail(let event):
             ChatActivityRow(event: event, onDisclosureChange: beginDisclosureReview)
                 .modifier(ChatToolDetailStyle())
@@ -223,7 +224,8 @@ extension ChatView {
         switch row {
         case .bottom: 0
         // An unfolded trail's steps hang from one unbroken line.
-        case .workTrailHeader(let turn): model.activityDisclosures.isExpanded(turn) ? 0 : BighelpTokens.space8
+        case .workTrailHeader(let turn, let isLive):
+            model.activityDisclosures.isExpanded(turn, isLive: isLive) ? 0 : BighelpTokens.space8
         case .activityDetail: 0
         default: chatDensity.messageSpacing
         }
@@ -331,7 +333,11 @@ extension ChatView {
         // Scanning the whole ledger lets old running events suppress a new
         // response, even after a newer human/assistant message is on screen.
         guard case .activity(let turn)? = model.transcriptEntries.last else { return true }
-        return !turn.events.contains { $0.lifecycle == .running }
+        if turn.events.contains(where: { $0.lifecycle == .running }) { return false }
+        // A tool folder at the tail already shimmers while the agent works out its next step.
+        guard model.activityVisibility.showToolCalls,
+              case .workTrail? = ChatActivityTurnPresentation(turn: turn).segments.last else { return true }
+        return false
     }
     var chatClarifications: [DashboardAttentionItem] {
         ChatClarificationProjection.items(

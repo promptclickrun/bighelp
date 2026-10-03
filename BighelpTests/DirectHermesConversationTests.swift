@@ -1938,7 +1938,7 @@ struct DirectHermesConversationTests {
         #expect(reasoning.lifecycle == .succeeded)
         #expect(!model.activityDisclosures.isExpanded(reasoning))
         let trails = rows.compactMap { row -> ChatActivityTurn? in
-            guard case .workTrailHeader(let turn) = row else { return nil }
+            guard case .workTrailHeader(let turn, _) = row else { return nil }
             return turn
         }
         #expect(trails.flatMap(\.events).map(\.kind) == [.tool])

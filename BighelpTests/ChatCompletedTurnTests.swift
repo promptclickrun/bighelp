@@ -243,7 +243,8 @@ struct ChatCompletedTurnTests {
         let rows = ChatCompletedTurnProjection.rows(from: entries, isSending: false, enabled: true)
         guard case .completed(let turn) = rows[1] else { Issue.record("Missing fold"); return }
         #expect(turn.elapsedSeconds == nil)
-        #expect(turn.label == "Done")
+        // No real time: it says what the turn did, never a bare "Done".
+        #expect(turn.label == "Called a tool")
         #expect(ChatCompletedTurn(id: "zero", entries: [], elapsedSeconds: 0).label == "Worked for less than a second")
     }
 
@@ -308,12 +309,8 @@ struct ChatCompletedTurnTests {
             return
         }
         #expect(fold.label == "Worked for 8s")
-        guard fold.expandedEntries.count == 1, case .activity(let merged)? = fold.expandedEntries.first else {
-            Issue.record("Expected merged activity")
-            return
-        }
-        #expect(merged.id == "first")
-        #expect(merged.events.map(\.eventID) == ["first", "second", "third"])
+        // Unfolded, each folder is as it was during the turn, in order.
+        #expect(fold.expandedEntries.map(\.id) == ["activity:first", "activity:second", "activity:third"])
     }
 
     @Test func backToBackReasoningSharesOneThinkingRow() {
@@ -366,7 +363,7 @@ struct ChatCompletedTurnTests {
         #expect(!store.isExpanded(reasoning: [reasoning("x", running: false)]), "Finished thinking starts closed")
     }
 
-    @Test func expandedFoldDrawsReasoningAcrossInterimMessagesAsOneGroup() {
+    @Test func expandedFoldKeepsReasoningGroupsAsTheyWere() {
         func reasoning(_ id: String) -> ChatTranscriptEntry {
             .activity(ChatActivityTurn(id: id, events: [ChatActivityEvent(
                 eventID: id, sessionID: "session", turnID: "turn", kind: .reasoning, lifecycle: .succeeded,
@@ -381,7 +378,8 @@ struct ChatCompletedTurnTests {
         let store = ChatActivityDisclosureStore()
         store.setCompletedTurnExpanded(true, id: "completed-turn:activity:r1")
         let canvas = ChatCanvasTranscriptProjection.rows(from: rows, disclosures: store)
-        #expect(canvas.filter { $0.id.contains("card:") }.count == 1)
+        // As they were in the turn: the message outside the fold had split them.
+        #expect(canvas.filter { $0.id.contains("card:") }.count == 2)
     }
 
     @Test func streamingMessagePreventsPrematureFoldingDuringIdleGap() {

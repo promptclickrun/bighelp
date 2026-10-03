@@ -4036,7 +4036,8 @@ struct ChatModelTests {
 
         #expect(ChatActivityPresentation.trailPhase(for: [runningTool]).isLive)
         #expect(!ChatActivityPresentation.trailPhase(for: [completedTool]).isLive)
-        #expect(ChatActivityPresentation.trailPhase(for: [completedTool]) == .done(elapsed: nil))
+        // A finished folder says what it did (an unnamed tool here), never a bare "Done".
+        #expect(ChatActivityPresentation.trailPhase(for: [completedTool]) == .finished("Called a tool"))
         #expect(ChatActivityPresentation.stepCount(of: [runningReasoning]) == 0)
     }
 

@@ -20,7 +20,7 @@ struct RecordedActivityTests {
         #expect(visual.tone == .secondary)
         #expect(!visual.shimmers)
         let phase = ChatActivityPresentation.trailPhase(for: [event])
-        #expect(phase == .done(elapsed: nil))
+        #expect(phase == .finished("Ran a command"))
         #expect(!phase.isLive)
         #expect(!ChatActivityPresentation.step(for: event).isRunning)
         let record = SessionRecord(id: "recorded-session", kind: .direct, agentIDs: ["default"],

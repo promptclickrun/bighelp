@@ -13,6 +13,9 @@ enum BighelpActivityPhase: Equatable, Sendable {
     case done(elapsed: TimeInterval?)
     /// Thinking that finished: "Thought for 6s", from its recorded time.
     case thought(elapsed: TimeInterval?)
+    /// Work that finished, in the caller's own past-tense words ("Read 2
+    /// files, ran tests"), with the check.
+    case finished(String)
     /// The work was stopped before it finished.
     case stopped
     /// The work ended on an error, in the danger color.
@@ -21,7 +24,7 @@ enum BighelpActivityPhase: Equatable, Sendable {
     var isLive: Bool {
         switch self {
         case .thinking, .working: true
-        case .waitingForApproval, .done, .thought, .stopped, .failed: false
+        case .waitingForApproval, .done, .thought, .finished, .stopped, .failed: false
         }
     }
 }
@@ -77,6 +80,7 @@ enum BighelpActivitySummary {
         case .waitingForApproval(let label): label
         case .done(let elapsed): doneLabel(elapsed: elapsed)
         case .thought(let elapsed): thoughtLabel(elapsed: elapsed)
+        case .finished(let summary): summary
         case .stopped: "Stopped"
         case .failed: "Hit a snag"
         }
@@ -87,7 +91,7 @@ enum BighelpActivitySummary {
         case .thinking: .thinking
         case .working(let activity): activity.glyph
         case .waitingForApproval: .glyph(.shield)
-        case .done: .done
+        case .done, .finished: .done
         case .thought: .thinking
         case .stopped: .symbol("stop.circle")
         case .failed: .symbol("exclamationmark.triangle")
@@ -253,7 +257,7 @@ struct BighelpActivityRow: View {
 
     private var headerGlyph: some View {
         let color: Color = switch phase {
-        case .done: theme.success
+        case .done, .finished: theme.success
         case .waitingForApproval: theme.warning
         case .failed: theme.danger
         case .thinking, .working, .thought, .stopped: theme.tertiaryText

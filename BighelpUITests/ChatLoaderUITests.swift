@@ -24,18 +24,17 @@ final class ChatLoaderUITests: BighelpUITestCase {
             XCTAssertEqual(picture.value as? String ?? "", "")
             save("loader-chat-tail-\(appearance)", app)
 
-            // The live run says what it's doing now and counts its steps.
+            // The live run says what it's doing now, counts its steps and
+            // lists them as they happen.
             let live = trail(in: app, labelPrefix: "Browsing the web…")
             reveal(live, in: timeline)
             XCTAssertTrue(live.label.contains("2 steps"), live.label)
-            XCTAssertEqual(live.value as? String, "Collapsed")
-            save("loader-chat-live-\(appearance)", app)
-            live.tap()
             XCTAssertEqual(live.value as? String, "Expanded")
+            save("loader-chat-live-\(appearance)", app)
             let finishedStep = app.buttons["chat.activity.loader-t4"]
             let runningStep = app.buttons["chat.activity.loader-t5"]
             XCTAssertTrue(finishedStep.waitForExistence(timeout: 5))
-            XCTAssertTrue(finishedStep.label.hasPrefix("Browsed the web"), finishedStep.label)
+            XCTAssertTrue(finishedStep.label.hasPrefix("Opened stays.example"), finishedStep.label)
             XCTAssertTrue(runningStep.label.hasPrefix("Browsing the web…"), runningStep.label)
             save("loader-chat-live-steps-\(appearance)", app)
             // A step still unfolds its full details in place.
@@ -53,7 +52,8 @@ final class ChatLoaderUITests: BighelpUITestCase {
             let thought = app.buttons["chat.activity.loader-r1"]
             XCTAssertTrue(thought.waitForExistence(timeout: 5))
             XCTAssertEqual(thought.label, "Thought for 2s")
-            let doneTrail = trail(in: app, labelPrefix: "Done")
+            // A finished folder says what it did, never "Done".
+            let doneTrail = trail(in: app, labelPrefix: "Searched the web, browsed the web, wrote Kyoto plan.md")
             XCTAssertTrue(doneTrail.waitForExistence(timeout: 5))
             XCTAssertTrue(doneTrail.label.contains("3 steps"), doneTrail.label)
             doneTrail.tap()

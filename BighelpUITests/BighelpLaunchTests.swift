@@ -588,7 +588,7 @@ final class BighelpLaunchTests: BighelpUITestCase {
     }
 
     @MainActor
-    func testLiveThinkingCardShowsNativeTextOutsideCollapsedTools() throws {
+    func testLiveThinkingCardShowsNativeTextOutsideTheLiveToolFolder() throws {
         let app = makeApp()
         app.launchArguments = [
             "-use-demo-fixtures", "-disable-demo-delays", "-start-chat", "-preview-ui-v3",
@@ -602,15 +602,16 @@ final class BighelpLaunchTests: BighelpUITestCase {
         XCTAssertEqual(thinking.value as? String, "Expanded")
         let content = app.staticTexts["Visible reasoning token"]
         XCTAssertTrue(content.waitForExistence(timeout: 3), "Native reasoning text must be visible before the turn finishes.")
+        // The running tool's folder lists its calls as they happen.
         let tools = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "chat.work-trail.")).firstMatch
         XCTAssertTrue(tools.exists)
-        XCTAssertEqual(tools.value as? String, "Collapsed")
+        XCTAssertEqual(tools.value as? String, "Expanded")
         XCTAssertFalse(tools.label.contains("Reasoning"))
-        saveV2Evidence(app, name: "live-thinking-with-closed-tools")
+        saveV2Evidence(app, name: "live-thinking-with-live-tools")
         thinking.tap()
         XCTAssertEqual(thinking.value as? String, "Collapsed")
         XCTAssertTrue(content.waitForNonExistence(timeout: 3))
-        XCTAssertEqual(tools.value as? String, "Collapsed")
+        XCTAssertEqual(tools.value as? String, "Expanded", "Closing the thinking leaves the tool folder alone")
         thinking.tap()
         XCTAssertTrue(content.waitForExistence(timeout: 3))
     }

@@ -325,8 +325,9 @@ private struct SessionSubagentDetailView: View {
                     .padding(BighelpTokens.space16)
                     .bighelpSurface(.card)
             } else {
+                let entries = transcriptEntries(for: record)
                 LazyVStack(alignment: .leading, spacing: BighelpTokens.space16) {
-                    ForEach(transcriptEntries(for: record)) { entry in
+                    ForEach(entries) { entry in
                         switch entry {
                         case .message(let item):
                             TimelineItemView(
@@ -334,7 +335,7 @@ private struct SessionSubagentDetailView: View {
                                 onApprovalTap: { _ in }
                             )
                         case .activity(let turn):
-                            ChatActivityTurnView(turn: turn)
+                            ChatActivityTurnView(turn: turn, isLive: record.isActive && entry.id == entries.last?.id)
                         }
                     }
                 }

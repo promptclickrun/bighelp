@@ -9,29 +9,27 @@ struct ChatCompletedTurn: Identifiable {
     let elapsedSeconds: TimeInterval?
     /// The tool calls and helper agents the turn ran, shown or hidden.
     var stepCount = 0
+    /// What the turn did ("Searched the web, read 2 files"), for a turn
+    /// without a recorded time. Nil when it has one.
+    var summary: String?
 
-    /// The fold's content in order. Work on either side of a message left
-    /// outside the fold reads as one run; notes folded with the work (tool
-    /// calls hidden) keep their place between it.
-    @MainActor var expandedEntries: [ChatTranscriptEntry] {
-        var result: [ChatTranscriptEntry] = []
-        for entry in entries {
-            if case .activity(let turn) = entry, case .activity(let previous)? = result.last {
-                result[result.count - 1] = .activity(ChatActivityTurn(id: previous.id, events: previous.events + turn.events))
-            } else {
-                result.append(entry)
-            }
-        }
-        return result
-    }
+    /// The fold's content in order: each folder and note as it was during
+    /// the turn, so unfolding shows the same steps the reader watched.
+    var expandedEntries: [ChatTranscriptEntry] { entries }
 
     var foldsMessages: Bool {
         entries.contains { if case .message = $0 { true } else { false } }
     }
 
-    /// "Worked for 14s" from the turn's recorded time, or "Done" without one.
-    var label: String {
-        BighelpActivitySummary.doneLabel(elapsed: elapsedSeconds)
+    /// "Worked for 2m 14s" from the turn's real time; without one, what it
+    /// did. Never a bare "Done".
+    var label: String { BighelpActivitySummary.label(for: phase) }
+
+    var phase: BighelpActivityPhase {
+        if let elapsedSeconds, elapsedSeconds.isFinite, (0..<31_536_000).contains(elapsedSeconds) {
+            return .done(elapsed: elapsedSeconds)
+        }
+        return .finished(summary ?? "Worked on it")
     }
 }
 
@@ -134,13 +132,16 @@ enum ChatCompletedTurnProjection {
                 }
             }
             if let foldPosition, let first = folded.first {
+                let elapsed = elapsed(work, startedAt: startedAt, startOrder: startOrder, endOrder: endOrder,
+                                      activityEvents: activityEvents)
+                let steps = steps(folded, startOrder: startOrder, endOrder: endOrder, activityEvents: activityEvents)
                 turnRows.insert(.completed(ChatCompletedTurn(
                     id: "completed-turn:\(first.id)",
                     entries: folded,
-                    elapsedSeconds: elapsed(work, startedAt: startedAt, startOrder: startOrder,
-                                            endOrder: endOrder, activityEvents: activityEvents),
-                    stepCount: stepCount(folded, startOrder: startOrder, endOrder: endOrder,
-                                         activityEvents: activityEvents)
+                    elapsedSeconds: elapsed,
+                    stepCount: steps.count,
+                    // Only a turn without a real time needs the words.
+                    summary: elapsed == nil ? ChatToolSummary.summary(of: steps) : nil
                 )), at: foldPosition)
             }
             rows.append(contentsOf: turnRows)
@@ -161,32 +162,34 @@ enum ChatCompletedTurnProjection {
         return rows
     }
 
-    /// Steps the fold stands for: its own tool calls and helper agents, plus
-    /// the turn's work the chat hides (Show tool calls off), from the ledger by
-    /// turn or by order. Generated pictures stay outside the fold and the count.
-    private static func stepCount(
+    /// Steps the fold stands for, in order: its own tool calls and helper
+    /// agents, plus the turn's work the chat hides (Show tool calls off), from
+    /// the ledger by turn or by order. Generated pictures stay outside the
+    /// fold and the count.
+    private static func steps(
         _ folded: [ChatTranscriptEntry], startOrder: Int?, endOrder: Int?, activityEvents: [ChatActivityEvent]
-    ) -> Int {
+    ) -> [ChatActivityEvent] {
         func isStep(_ event: ChatActivityEvent) -> Bool {
             (event.kind == .tool || event.kind == .subagent) && GeneratedMediaProjection.kind(for: event) == nil
         }
-        var steps = Set<String>()
+        var steps: [ChatActivityEvent] = []
+        var seen = Set<String>()
         var turnIDs = Set<String>()
         for entry in folded {
             guard case .activity(let turn) = entry else { continue }
             for event in turn.events {
                 turnIDs.insert(event.turnID)
-                if isStep(event) { steps.insert(event.id) }
+                if isStep(event), seen.insert(event.id).inserted { steps.append(event) }
             }
         }
-        for event in activityEvents where isStep(event) {
+        for event in activityEvents where isStep(event) && !seen.contains(event.id) {
             var inOrder = false
             if let startOrder, let order = event.sourceOrder {
                 inOrder = order >= startOrder && endOrder.map { order < $0 } != false
             }
-            if turnIDs.contains(event.turnID) || inOrder { steps.insert(event.id) }
+            if turnIDs.contains(event.turnID) || inOrder, seen.insert(event.id).inserted { steps.append(event) }
         }
-        return steps.count
+        return steps
     }
 
     private static func elapsed(
@@ -243,7 +246,7 @@ struct ChatCompletedTurnView<Content: View>: View {
         let id = turn.id
         VStack(alignment: .leading, spacing: BighelpTokens.space12) {
             BighelpActivityRow(
-                phase: .done(elapsed: turn.elapsedSeconds),
+                phase: turn.phase,
                 stepCount: turn.stepCount,
                 detailsBelow: true,
                 isExpanded: Binding(get: { disclosures.isCompletedTurnExpanded(id) },

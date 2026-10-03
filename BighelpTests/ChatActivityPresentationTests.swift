@@ -60,13 +60,14 @@ struct ChatActivityPresentationTests {
         let running = [tool("a", name: "read_file"), tool("b", name: "browser_navigate", lifecycle: .running)]
         #expect(ChatActivityPresentation.trailPhase(for: running)
                 == .working(BighelpToolActivityCatalog.activity(forTool: "browser_navigate")))
-        #expect(ChatActivityPresentation.trailPhase(for: [tool("a", name: "read_file")]) == .done(elapsed: nil))
+        // Finished: what it did, never a bare "Done".
+        #expect(ChatActivityPresentation.trailPhase(for: [tool("a", name: "read_file")]) == .finished("Read a file"))
         #expect(ChatActivityPresentation.trailPhase(for: [tool("a", name: "read_file", lifecycle: .failed)]) == .failed)
         #expect(ChatActivityPresentation.trailPhase(for: [tool("a", name: "read_file", lifecycle: .cancelled)]) == .stopped)
         // A failure the agent recovered from isn't how the run ended.
         #expect(ChatActivityPresentation.trailPhase(for: [
             tool("a", name: "terminal", lifecycle: .failed), tool("b", name: "terminal"),
-        ]) == .done(elapsed: nil))
+        ]) == .finished("Ran 2 commands"))
         #expect(ChatActivityPresentation.stepCount(of: running + [thought("r")]) == 2)
     }
 
@@ -78,7 +79,7 @@ struct ChatActivityPresentationTests {
                 == "Waiting for your answer")
         // A finished trail never waits.
         #expect(ChatActivityPresentation.trailPhase(for: [tool("t", name: "terminal")], waiting: .approval)
-                == .done(elapsed: nil))
+                == .finished("Ran a command"))
         // Hermes' requests decide; with none, only a running secure input request waits.
         #expect(ChatActivityWaiting.resolve(prompts: [], events: running) == nil)
         let secure = tool("s", name: "bighelp_request_secure_input", lifecycle: .running)

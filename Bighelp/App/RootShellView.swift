@@ -337,10 +337,7 @@ struct RootShellView: View {
                 }
                 else { nativeWorkspace }
             } else if let registry = hostRegistry, registry.connectionMode == .independent, !usesWorkspaceFixtures {
-                Form {
-                    BighelpConfiguredHostsSection(registry: registry)
-                }
-                .navigationTitle("Instances")
+                BighelpHostsPage(registry: registry)
             } else if usesWorkspaceFixtures {
                 workspace
             } else {
@@ -1516,14 +1513,9 @@ private struct NativeWorkspaceStatusView: View {
             BighelpConnectionPill(phase: status.phase, label: status.label)
             if status.phase != .connecting {
                 Button("Reconnect", action: reconnect)
-                if let registry {
-                    NavigationLink("Instances") {
-                        Form { BighelpConfiguredHostsSection(registry: registry) }
-                            .navigationTitle("Instances")
-                    }
-                }
             }
         }
         .accessibilityIdentifier("native-workspace.connecting")
+        .toolbar { BighelpHostsToolbarLink(registry: registry) }
     }
 }

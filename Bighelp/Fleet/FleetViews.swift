@@ -461,8 +461,10 @@ struct FleetConnectingView: View {
                 .accessibilityIdentifier("fleet.connecting")
             }
             .background(BighelpThemeCanvas(theme: theme).ignoresSafeArea())
+            .toolbar { BighelpHostsToolbarLink(registry: registry) }
     }
 
+    @Environment(\.bighelpHostRegistry) private var registry
     @BighelpThemeReader private var theme
 }
 

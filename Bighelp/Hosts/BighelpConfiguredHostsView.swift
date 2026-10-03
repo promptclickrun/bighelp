@@ -1,5 +1,32 @@
 import SwiftUI
 
+/// The Hosts screen: every computer, each a tap from its page.
+@MainActor
+struct BighelpHostsPage: View {
+    let registry: BighelpHostRegistry
+
+    var body: some View {
+        Form { BighelpConfiguredHostsSection(registry: registry) }
+            .navigationTitle("Hosts")
+    }
+}
+
+/// Top left while a computer connects or can't be reached: Hosts, to switch
+/// to another one or fix this one without waiting.
+@MainActor
+struct BighelpHostsToolbarLink: ToolbarContent {
+    let registry: BighelpHostRegistry?
+
+    var body: some ToolbarContent {
+        if let registry {
+            ToolbarItem(placement: .topBarLeading) {
+                NavigationLink("Hosts") { BighelpHostsPage(registry: registry) }
+                    .accessibilityIdentifier("connection.hosts")
+            }
+        }
+    }
+}
+
 /// Your computers: the one in use first-class, each one a tap from its page.
 @MainActor
 struct BighelpConfiguredHostsSection: View {

@@ -60,7 +60,7 @@ enum WorkspaceDestination: String, CaseIterable, Identifiable, Hashable, Sendabl
         case .config: "Configuration"
         case .system: "System"
         case .documentation: "Documentation"
-        case .instances: "Instances"
+        case .instances: "Hosts"
         case .security: "Security"
         case .appearance: "Look & Feel"
         case .tabBar: "Tab Bar"

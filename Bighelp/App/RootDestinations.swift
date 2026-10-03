@@ -47,8 +47,7 @@ extension RootShellView {
         case (.workspaceConnections, _):
             routeWithWorkspaceMenu {
                 if let hostRegistry {
-                    Form { BighelpConfiguredHostsSection(registry: hostRegistry) }
-                        .navigationTitle("Instances")
+                    BighelpHostsPage(registry: hostRegistry)
                         .accessibilityIdentifier("workspace.connections")
                 } else {
                     WorkspaceUnavailableView(destination: .instances, hostName: workspaceHostName,

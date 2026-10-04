@@ -1,0 +1,17 @@
+{
+  "name": "bighelp-avatars",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "build": "node scripts/build.mjs",
+    "deploy": "npm run build && wrangler deploy"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "2.6.2",
+    "fast-xml-parser": "5.11.2",
+    "paper": "0.12.18",
+    "wrangler": "4.147.0"
+  }
+}

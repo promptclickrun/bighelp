@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "sets": [
+    {
+      "id": "bighelp",
+      "name": "bighelp",
+      "category": "bighelp",
+      "startsAt": null,
+      "expiresAt": null
+    },
+    {
+      "id": "pocket-curios",
+      "name": "Pocket Curios",
+      "category": "bighelp",
+      "startsAt": null,
+      "expiresAt": null
+    },
+    {
+      "id": "faces",
+      "name": "Faces",
+      "category": "faces",
+      "startsAt": null,
+      "expiresAt": null
+    },
+    {
+      "id": "shapes",
+      "name": "Shapes",
+      "category": "shapes",
+      "startsAt": null,
+      "expiresAt": null
+    },
+    {
+      "id": "halloween",
+      "name": "Halloween",
+      "category": "seasonal",
+      "startsAt": null,
+      "expiresAt": "2026-11-03T00:00:00-06:00"
+    }
+  ]
+}

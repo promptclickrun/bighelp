@@ -1,0 +1,52 @@
+[
+  {
+    "id": "halloween-pumpkin",
+    "name": "Pumpkin",
+    "file": "halloween-pumpkin.svg"
+  },
+  {
+    "id": "halloween-ghost",
+    "name": "Ghost",
+    "file": "halloween-ghost.svg"
+  },
+  {
+    "id": "halloween-witch",
+    "name": "Witch",
+    "file": "halloween-witch.svg"
+  },
+  {
+    "id": "halloween-bat",
+    "name": "Bat",
+    "file": "halloween-bat.svg"
+  },
+  {
+    "id": "halloween-mummy",
+    "name": "Mummy",
+    "file": "halloween-mummy.svg"
+  },
+  {
+    "id": "halloween-candy-corn",
+    "name": "Candy Corn",
+    "file": "halloween-candy-corn.svg"
+  },
+  {
+    "id": "halloween-frankenbot",
+    "name": "Frankenbot",
+    "file": "halloween-frankenbot.svg"
+  },
+  {
+    "id": "halloween-skull",
+    "name": "Skull",
+    "file": "halloween-skull.svg"
+  },
+  {
+    "id": "halloween-black-cat",
+    "name": "Black Cat",
+    "file": "halloween-black-cat.svg"
+  },
+  {
+    "id": "halloween-vampire",
+    "name": "Vampire",
+    "file": "halloween-vampire.svg"
+  }
+]

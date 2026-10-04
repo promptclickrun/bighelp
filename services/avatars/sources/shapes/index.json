@@ -1,0 +1,74 @@
+[
+  {
+    "file" : "shape-circle.svg",
+    "id" : "shape-circle",
+    "name" : "Circle",
+    "nativeLook" : {
+      "shape" : "circle",
+      "style" : "shape"
+    }
+  },
+  {
+    "file" : "shape-blob.svg",
+    "id" : "shape-blob",
+    "name" : "Wobble",
+    "nativeLook" : {
+      "shape" : "blob",
+      "style" : "shape"
+    }
+  },
+  {
+    "file" : "shape-squircle.svg",
+    "id" : "shape-squircle",
+    "name" : "Rounded",
+    "nativeLook" : {
+      "shape" : "squircle",
+      "style" : "shape"
+    }
+  },
+  {
+    "file" : "shape-pill.svg",
+    "id" : "shape-pill",
+    "name" : "Pill",
+    "nativeLook" : {
+      "shape" : "pill",
+      "style" : "shape"
+    }
+  },
+  {
+    "file" : "shape-triangle.svg",
+    "id" : "shape-triangle",
+    "name" : "Triangle",
+    "nativeLook" : {
+      "shape" : "triangle",
+      "style" : "shape"
+    }
+  },
+  {
+    "file" : "shape-hexagon.svg",
+    "id" : "shape-hexagon",
+    "name" : "Hexagon",
+    "nativeLook" : {
+      "shape" : "hexagon",
+      "style" : "shape"
+    }
+  },
+  {
+    "file" : "shape-cloud.svg",
+    "id" : "shape-cloud",
+    "name" : "Cloud",
+    "nativeLook" : {
+      "shape" : "cloud",
+      "style" : "shape"
+    }
+  },
+  {
+    "file" : "shape-drop.svg",
+    "id" : "shape-drop",
+    "name" : "Drop",
+    "nativeLook" : {
+      "shape" : "drop",
+      "style" : "shape"
+    }
+  }
+]

@@ -1,0 +1,187 @@
+{
+  "bighelp-biggie": {
+    "p": "#F28B32",
+    "s": "#F7C84A",
+    "ink": "#F5F2EF"
+  },
+  "bighelp-bubs": {
+    "p": "#7B52E0",
+    "ink": "#F5F2EF"
+  },
+  "bighelp-scout": {
+    "p": "#2F6FEB",
+    "s": "#DCEBFF",
+    "a": "#F7C84A",
+    "ink": "#F5F2EF"
+  },
+  "bighelp-echo": {
+    "p": "#E0457B",
+    "s": "#C9B6FF",
+    "a": "#9A6BFF",
+    "ink": "#F5F2EF"
+  },
+  "bighelp-tock": {
+    "p": "#0E9E97",
+    "s": "#F7C84A",
+    "a": "#D99A00",
+    "ink": "#F5F2EF"
+  },
+  "bighelp-stack": {
+    "p": "#22A565",
+    "s": "#1E7A4E",
+    "a": "#145C3A",
+    "ink": "#F5F2EF"
+  },
+  "bighelp-patch": {
+    "p": "#5B6B7F",
+    "s": "#1C1A19",
+    "a": "#22A565",
+    "ink": "#F5F2EF"
+  },
+  "bighelp-errand": {
+    "p": "#D33F42",
+    "s": "#5B6B7F",
+    "a": "#F7C84A",
+    "ink": "#F5F2EF"
+  },
+  "bighelp-snooze": {
+    "p": "#4B3B8F",
+    "s": "#C9B6FF",
+    "ink": "#F5F2EF"
+  },
+  "bighelp-spark": {
+    "p": "#F7C84A",
+    "s": "#A39B95",
+    "a": "#857D77",
+    "ink": "#1C1A19"
+  },
+  "halloween-pumpkin": {
+    "p": "#F28C3C",
+    "s": "#E2772B",
+    "a": "#7DAE4F",
+    "ink": "#1A0F12"
+  },
+  "halloween-ghost": {
+    "p": "#EEE8F3",
+    "ink": "#1A0F12"
+  },
+  "halloween-witch": {
+    "p": "#CB52D6",
+    "s": "#2B1E3A",
+    "a": "#F28C3C",
+    "ink": "#4A3F3A"
+  },
+  "halloween-bat": {
+    "p": "#6A5890",
+    "s": "#4A3C66",
+    "a": "#E5D8C6",
+    "ink": "#4A3F3A"
+  },
+  "halloween-mummy": {
+    "p": "#E9DEC8",
+    "s": "#CDBE9F",
+    "a": "#3A2A2E",
+    "ink": "#F2E9D8"
+  },
+  "halloween-candy-corn": {
+    "p": "#F28C3C",
+    "s": "#F6F1E6",
+    "a": "#F6C945",
+    "ink": "#1A0F12"
+  },
+  "halloween-frankenbot": {
+    "p": "#8CC68B",
+    "s": "#9A9AA2",
+    "a": "#2B2A30",
+    "ink": "#1A0F12"
+  },
+  "halloween-skull": {
+    "p": "#F1ECE2",
+    "s": "#C9C1B2",
+    "ink": "#1A0F12"
+  },
+  "halloween-black-cat": {
+    "p": "#4A4258",
+    "s": "#E7A3B5",
+    "a": "#F6D35B",
+    "ink": "#1A0F12"
+  },
+  "halloween-vampire": {
+    "p": "#DCD2EA",
+    "s": "#B8344A",
+    "a": "#2B1E3A",
+    "ink": "#1A0F12"
+  },
+  "face-cloud": {
+    "p": "#008cde",
+    "ink": "#081018"
+  },
+  "face-organic": {
+    "p": "#008cde",
+    "ink": "#081018"
+  },
+  "face-round": {
+    "p": "#008cde",
+    "ink": "#081018"
+  },
+  "face-sun": {
+    "p": "#008cde",
+    "ink": "#081018"
+  },
+  "face-hexagon": {
+    "p": "#008cde",
+    "ink": "#081018"
+  },
+  "face-nub": {
+    "p": "#008cde",
+    "ink": "#081018"
+  },
+  "face-droplet": {
+    "p": "#008cde",
+    "ink": "#081018"
+  },
+  "face-triangle": {
+    "p": "#008cde",
+    "ink": "#081018"
+  },
+  "face-boxy": {
+    "p": "#008cde",
+    "ink": "#081018"
+  },
+  "face-capsule": {
+    "p": "#008cde",
+    "ink": "#081018"
+  },
+  "shape-drop": {
+    "p": "#8b5cf6",
+    "ink": "#000000"
+  },
+  "shape-pill": {
+    "p": "#8b5cf6",
+    "ink": "#000000"
+  },
+  "shape-hexagon": {
+    "p": "#8b5cf6",
+    "ink": "#000000"
+  },
+  "shape-circle": {
+    "p": "#8b5cf6",
+    "ink": "#000000"
+  },
+  "shape-blob": {
+    "p": "#8b5cf6",
+    "ink": "#000000"
+  },
+  "shape-squircle": {
+    "p": "#8b5cf6",
+    "ink": "#000000"
+  },
+  "shape-triangle": {
+    "p": "#8b5cf6",
+    "ink": "#000000"
+  },
+  "shape-cloud": {
+    "p": "#8b5cf6",
+    "ink": "#000000"
+  }
+}

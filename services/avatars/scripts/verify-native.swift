@@ -21,10 +21,10 @@ struct NativeKitProbe {
         var checked = 0
         for character in kit.characters {
             var palette = AvatarKitColors(character: character)
-            func render(_ palette: AvatarKitColors) throws -> Data {
+            func render(_ palette: AvatarKitColors, frame: AvatarKitFrame = AvatarKitFrame(animates: false)) throws -> Data {
                 let renderer = ImageRenderer(content: Canvas { context, size in
                     AvatarKitRenderer.draw(character, kit: kit, colors: palette,
-                                           frame: AvatarKitFrame(animates: false), in: context, size: size)
+                                           frame: frame, in: context, size: size)
                 }.frame(width: 256, height: 256))
                 guard let image = renderer.cgImage,
                       let png = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]) else {
@@ -38,6 +38,13 @@ struct NativeKitProbe {
             precondition(original != changed, "Primary color is not editable for \(character.id)")
             try original.write(to: output.appendingPathComponent("\(character.id)-original.png"))
             try changed.write(to: output.appendingPathComponent("\(character.id)-custom.png"))
+            if character.id.hasPrefix("bighelp-") || character.id.hasPrefix("halloween-") {
+                for state in kit.states {
+                    let first = try render(palette, frame: AvatarKitFrame(state: state, time: 0.17))
+                    let second = try render(palette, frame: AvatarKitFrame(state: state, time: 0.73))
+                    precondition(first != second, "Animation does not change for \(character.id)/\(state)")
+                }
+            }
             checked += 1
         }
         print("PASS: decoded and rendered \(checked) characters with the app's AvatarKit decoder and renderer; primary-color override changes every rendered PNG.")

@@ -13,6 +13,20 @@ validateSets(sets);
 const avatars = [], ids = new Set(), characters = [];
 const palettes = JSON.parse(await readFile(path.join(root, 'sources/palettes.json'), 'utf8'));
 const kitSettings = JSON.parse(await readFile(path.join(root, 'sources/kit-settings.json'), 'utf8'));
+const staticKitSettings = structuredClone(kitSettings);
+const authored = new Map();
+for (const [setId, file] of [['bighelp', 'helpers'], ['halloween', 'halloween']]) {
+  const pack = JSON.parse(await readFile(path.join(root, `sources/packs/${file}.json`), 'utf8'));
+  if (pack.version !== 1 || pack.characters.length !== 10) throw new Error('Invalid authored pack');
+  for (const key of ['version', 'states', 'themes', 'keyframes']) {
+    if (file === 'helpers') kitSettings[key] = pack[key];
+    else if (JSON.stringify(kitSettings[key]) !== JSON.stringify(pack[key])) throw new Error(`Conflicting pack ${key}`);
+  }
+  for (const character of pack.characters) {
+    if (authored.has(character.id)) throw new Error('Duplicate authored ID');
+    authored.set(character.id, { setId, character });
+  }
+}
 await mkdir(path.join(root, 'public/assets'), { recursive: true });
 async function asset(bytes, extension) {
   const sha256 = createHash('sha256').update(bytes).digest('hex');
@@ -41,9 +55,11 @@ for (const set of sets) {
     validateSVG(svg);
     const png = renderPNG(svg);
     if (!palettes[entry.id]?.p) throw new Error(`Missing primary palette: ${entry.id}`);
-    const character = convertCharacter(svg, entry, palettes[entry.id]);
+    const supplied = authored.get(entry.id);
+    if (['bighelp', 'halloween'].includes(set.id) && supplied?.setId !== set.id) throw new Error(`Missing authored character ${entry.id}`);
+    const character = supplied?.character ?? convertCharacter(svg, entry, palettes[entry.id]);
     characters.push(character);
-    const kit = await asset(JSON.stringify({ ...kitSettings, characters: [character] }), 'json');
+    const kit = await asset(JSON.stringify({ ...(supplied ? kitSettings : staticKitSettings), characters: [character] }), 'json');
     avatars.push({ id: entry.id, name: entry.name, setId: set.id, category: set.category,
       startsAt: set.startsAt, expiresAt: set.expiresAt,
       ...(entry.role ? { role: entry.role } : {}),

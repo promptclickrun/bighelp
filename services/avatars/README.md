@@ -65,15 +65,18 @@ bundled `Bighelp/Resources/AvatarKit.json`:
 The arrays above illustrate field types; live responses contain the actual themes and characters.
 The combined response additionally has `nextChangeAt` and `revision`, ignored by the existing decoder.
 Character IDs exactly match discovery IDs. Each character has `name`, `role`, `family: "classic"`,
-`look: 0`, `colors` and a native geometry `tree`. Coordinates are normalized into the renderer's 200×200
-art space. These are converted static SVGs, not newly authored per-state animations. Their idle style
-is the fallback for other states. A rig/body wrapper supports the existing whole-character motion path.
+a numeric `look`, `colors` and a native geometry `tree`. Coordinates are normalized into the renderer's 200×200
+art space. The official bighelp and Halloween characters come unchanged from the supplied authored packs in
+`sources/packs/`, including all seven states and shared animation keyframes. Faces and Shapes remain
+static conversions. Their idle style is the fallback for other states. Legacy SVG/PNG assets remain
+source previews; render the JSON for authoritative authored appearance and state-aware previews.
 
 Colors are not baked into a raster. Editable fills/strokes use `@p`, `@s`, `@a`, `@ink` slots with the
 original colors in `character.colors`. Primary `@p` is present on every avatar. Some accents/highlights
 remain literal to preserve the supplied artwork. A primary-color change affects primary surfaces;
 secondary/accent surfaces keep their own colors unless the app changes those slots too, as with the
-existing kit's colorway behavior. Slot assignments are explicit in `sources/palettes.json`.
+existing kit's colorway behavior. Converted Faces/Shapes slot assignments are explicit in `sources/palettes.json`; authored packs carry
+their own palette tokens and defaults and bypass SVG conversion.
 
 Candy Corn's SVG clipping is flattened into ordinary paths at build time. The existing native renderer
 does not need new clip support. Native Shape triangle raster/kit viewports retain its overhanging apex.
@@ -142,6 +145,12 @@ refused. Use the offset appropriate for that date, including daylight saving cha
 cron, AI job or deployment is needed at the cutoff itself.
 
 To add artwork:
+
+For official bighelp or Halloween updates, replace the corresponding reviewed JSON in `sources/packs/`.
+The build preserves character trees and shared animation settings exactly; conflicting settings fail.
+The native probe also checks every authored character animates in each of its seven states.
+
+For SVG-derived collections:
 
 1. Add a collection to `sets.json` and reviewed SVGs under `sources/<set-id>/`.
 2. Add its `index.json` entries `{id, name, role?, file}`. Keep IDs stable and globally unique.

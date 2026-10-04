@@ -9,6 +9,8 @@ struct BoardBlueprint: Identifiable, Hashable, Sendable {
     let text: String
     /// Goals blueprints: the category the goal belongs in.
     let goalCategory: GoalCategory?
+    /// Who shared it, for community blueprints from the catalog.
+    var credit: String? = nil
 }
 
 struct BoardBlueprintGroup: Identifiable, Equatable, Sendable {
@@ -25,7 +27,10 @@ struct BoardBlueprintGroup: Identifiable, Equatable, Sendable {
 struct BoardBlueprintCatalog: Sendable {
     private let pages: [AgentBoardItem.Kind: [BoardBlueprintGroup]]
 
-    static let shared: BoardBlueprintCatalog = (try? bundled()) ?? BoardBlueprintCatalog(pages: [:])
+    /// The catalog's blueprints when there are some, otherwise the bundled ones. Observed, so a
+    /// refresh shows without a relaunch.
+    @MainActor static var shared: BoardBlueprintCatalog { TemplateCatalogStore.shared.blueprints }
+    static let empty = BoardBlueprintCatalog(pages: [:])
 
     static func bundled(_ bundle: Bundle = .main) throws -> BoardBlueprintCatalog {
         guard let url = bundle.url(forResource: "BoardBlueprints", withExtension: "json") else {
@@ -39,6 +44,7 @@ struct BoardBlueprintCatalog: Sendable {
     /// Lenient like host data: unknown pages and keys are ignored, blank prompts and empty
     /// groups dropped, and an unknown goal category is none.
     init(data: Data) throws {
+        guard data.count <= 1_048_576 else { throw CocoaError(.fileReadTooLarge) }
         let file = try JSONDecoder().decode(File.self, from: data)
         var pages: [AgentBoardItem.Kind: [BoardBlueprintGroup]] = [:]
         for page in file.pages {
@@ -54,7 +60,8 @@ struct BoardBlueprintCatalog: Sendable {
                     let text = prompt.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                     guard let id = prompt.id, !id.isEmpty, !text.isEmpty else { return nil }
                     return BoardBlueprint(id: id, text: text,
-                                          goalCategory: prompt.goalCategory.flatMap(GoalCategory.init(stored:)))
+                                          goalCategory: prompt.goalCategory.flatMap(GoalCategory.init(stored:)),
+                                          credit: Self.credit(prompt.credit))
                 }
                 guard let id = group.id, !blueprints.isEmpty else { return nil }
                 return BoardBlueprintGroup(id: id, title: group.title ?? id, blueprints: blueprints)
@@ -62,6 +69,13 @@ struct BoardBlueprintCatalog: Sendable {
             pages[kind, default: []] += groups
         }
         self.pages = pages
+    }
+
+    /// A community username ("@sam" or "sam"), or nil when it isn't one.
+    static func credit(_ value: String?) -> String? {
+        guard var name = value?.trimmingCharacters(in: .whitespacesAndNewlines) else { return nil }
+        if name.hasPrefix("@") { name.removeFirst() }
+        return name.range(of: "^[A-Za-z0-9_.-]{1,39}$", options: .regularExpression) == nil ? nil : name
     }
 
     func groups(for kind: AgentBoardItem.Kind) -> [BoardBlueprintGroup] { pages[kind] ?? [] }
@@ -92,6 +106,7 @@ struct BoardBlueprintCatalog: Sendable {
         let id: String?
         let text: String?
         let goalCategory: String?
+        let credit: String?
     }
 }
 
@@ -220,6 +235,15 @@ struct BoardBlueprintsSheet: View {
                             .accessibilityAddTraits(.isHeader)
                     }
                 }
+                Section {
+                    Link(destination: TemplateCatalogPolicy.submitURL) {
+                        Label("Share yours", systemImage: "square.and.arrow.up")
+                    }
+                    .listRowBackground(theme.surface)
+                    .accessibilityIdentifier("board.blueprints.share")
+                } footer: {
+                    Text("Send a blueprint on bighelp.app. Approved ones show up here for everyone.")
+                }
             }
             .scrollContentBackground(.hidden)
             .background(theme.canvas.ignoresSafeArea())
@@ -249,11 +273,18 @@ struct BoardBlueprintsSheet: View {
 
     private func row(_ blueprint: BoardBlueprint) -> some View {
         HStack(alignment: .top, spacing: BighelpTokens.space12) {
-            Text(Self.highlighted(blueprint.text, placeholder: theme.action))
-                .font(.bighelp(.body))
-                .foregroundStyle(theme.primaryText)
-                .multilineTextAlignment(.leading)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(Self.highlighted(blueprint.text, placeholder: theme.action))
+                    .font(.bighelp(.body))
+                    .foregroundStyle(theme.primaryText)
+                    .multilineTextAlignment(.leading)
+                if let credit = blueprint.credit {
+                    Text(verbatim: "by @\(credit)")
+                        .font(.bighelp(.caption))
+                        .foregroundStyle(theme.tertiaryText)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
             Image(systemName: "arrow.up.right")
                 .font(.bighelp(.footnote).weight(.semibold))
                 .foregroundStyle(theme.secondaryText)

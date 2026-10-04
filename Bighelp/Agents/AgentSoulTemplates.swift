@@ -13,9 +13,15 @@ struct AgentSoulTemplate: Identifiable, Equatable, Sendable {
     /// The hard case it's written to handle well, shown on its card.
     let strength: String
     let systemImage: String
+    /// A catalog template's personality text, carried inline; bundled ones read their file.
+    var inlineSoul: String? = nil
+    /// Who shared a community template, shown as "by @credit".
+    var credit: String? = nil
+    var isCommunity = false
 
     /// The personality text with `{{agent_name}}` still in it.
     var soul: String? {
+        if let inlineSoul { return inlineSoul }
         guard let url = Bundle.main.url(forResource: "soul-\(id)", withExtension: "md"),
               let text = try? String(contentsOf: url, encoding: .utf8) else { return nil }
         return text
@@ -23,7 +29,10 @@ struct AgentSoulTemplate: Identifiable, Equatable, Sendable {
 
     var about: String { voice + "." }
 
-    static let all: [AgentSoulTemplate] = [
+    /// The catalog's templates when there are some, otherwise the bundled ones.
+    @MainActor static var all: [AgentSoulTemplate] { TemplateCatalogStore.shared.agentTemplates }
+
+    static let bundled: [AgentSoulTemplate] = [
         .init(id: "anchor", title: "Anchor", profile: "Everyday generalist", voice: "Warm, direct, adaptable",
               strength: "Helps with vague requests without turning simple tasks into an interview.",
               systemImage: "sun.max"),
@@ -74,7 +83,7 @@ struct AgentSoulTemplate: Identifiable, Equatable, Sendable {
               systemImage: "book"),
     ]
 
-    static func template(_ id: String) -> AgentSoulTemplate? { all.first { $0.id == id } }
+    @MainActor static func template(_ id: String) -> AgentSoulTemplate? { all.first { $0.id == id } }
 }
 
 /// The `{{agent_name}}` placeholder in personality text.

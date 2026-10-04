@@ -511,6 +511,7 @@ struct BighelpApp: App {
                 // Opening bighelp is "I've seen it": the icon badge goes away.
                 await BighelpAppBadge.clear()
                 await providerLogoStore?.refreshIfNeeded()
+                await TemplateCatalogStore.shared.refreshIfNeeded()
             }
             .task(id: settings.reflectiveVisionEnabled) {
                 await BighelpProactiveNotificationOpenCenter.shared.activate()

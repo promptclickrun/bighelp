@@ -47,6 +47,7 @@ struct AgentStartPicker: View {
                 carousel {
                     ForEach(AgentSoulTemplate.all) { template in
                         card(title: template.title, subtitle: template.profile, detail: template.strength,
+                             credit: template.isCommunity ? template.credit : nil,
                              systemImage: template.systemImage, selected: "builtin:\(template.id)",
                              identifier: "agent.editor.template.\(template.id)") {
                             model.startFrom(template)
@@ -57,6 +58,11 @@ struct AgentStartPicker: View {
                 note(model.appliedTemplateID?.hasPrefix("builtin:") == true
                      ? "Its personality is in Instructions below, with your agent's name filled in."
                      : "Each is a full personality. Pick one, then give your agent its name.")
+                Link(destination: TemplateCatalogPolicy.submitURL) {
+                    Label("Share yours", systemImage: "square.and.arrow.up")
+                        .font(.bighelp(.footnote).weight(.semibold))
+                }
+                .accessibilityIdentifier("agent.editor.templates.share")
             case .saved:
                 if library.templates.isEmpty {
                     note("No saved templates yet. Save one from an agent's Edit screen or by holding it in Agents.")
@@ -109,7 +115,8 @@ struct AgentStartPicker: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    private func card(title: String, subtitle: String, detail: String, systemImage: String, selected: String,
+    private func card(title: String, subtitle: String, detail: String, credit: String? = nil,
+                      systemImage: String, selected: String,
                       identifier: String, action: @escaping () -> Void) -> some View {
         let isSelected = model.appliedTemplateID == selected
         return Button(action: action) {
@@ -132,7 +139,13 @@ struct AgentStartPicker: View {
                         Text(detail)
                             .font(.bighelp(.caption))
                             .foregroundStyle(secondary)
-                            .lineLimit(3)
+                            .lineLimit(credit == nil ? 3 : 2)
+                    }
+                    if let credit {
+                        Text(verbatim: "by @\(credit)")
+                            .font(.bighelp(.caption2))
+                            .foregroundStyle(secondary)
+                            .lineLimit(1)
                     }
                     Spacer(minLength: 0)
                 }

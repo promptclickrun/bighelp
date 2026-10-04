@@ -1,0 +1,11 @@
+{
+  "route": "workflows/publish",
+  "request": {
+    "workflowId": "wf_8c1d2e3f4a5b6c7d",
+    "draftVersion": 6
+  },
+  "response": {
+    "workflowId": "wf_8c1d2e3f4a5b6c7d",
+    "revision": 4
+  }
+}

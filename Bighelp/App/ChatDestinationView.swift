@@ -65,6 +65,7 @@ struct ChatDestinationView: View {
     /// ☰ lists Projects and Kanban when the host has them.
     let onOpenProjects: (() -> Void)?
     let onOpenKanban: (() -> Void)?
+    let onOpenWorkflows: (() -> Void)?
     let onSelectAgent: (AgentProfile) -> Void
     let onOpenAgentSessions: (String) -> Void
     let onOpenApproval: (ApprovalRequest) -> Void
@@ -142,6 +143,7 @@ struct ChatDestinationView: View {
         onOpenScheduledTasks: @escaping () -> Void,
         onOpenProjects: (() -> Void)? = nil,
         onOpenKanban: (() -> Void)? = nil,
+        onOpenWorkflows: (() -> Void)? = nil,
         onSelectAgent: @escaping (AgentProfile) -> Void,
         onOpenAgentSessions: @escaping (String) -> Void,
         onOpenApproval: @escaping (ApprovalRequest) -> Void,
@@ -177,6 +179,7 @@ struct ChatDestinationView: View {
         self.onOpenScheduledTasks = onOpenScheduledTasks
         self.onOpenProjects = onOpenProjects
         self.onOpenKanban = onOpenKanban
+        self.onOpenWorkflows = onOpenWorkflows
         self.onSelectAgent = onSelectAgent
         self.onOpenAgentSessions = onOpenAgentSessions
         self.onOpenApproval = onOpenApproval
@@ -908,6 +911,7 @@ struct ChatDestinationView: View {
                 },
                 onOpenProjects: onOpenProjects.map { open in { dismissWorkspace(); open() } },
                 onOpenKanban: onOpenKanban.map { open in { dismissWorkspace(); open() } },
+                onOpenWorkflows: onOpenWorkflows.map { open in { dismissWorkspace(); open() } },
                 onOpenWorkspaces: openHermesWorkspaces,
                 onSelectAgent: { agent in
                     dismissWorkspace()
@@ -952,6 +956,7 @@ struct ChatDestinationView: View {
                 },
                 onOpenProjects: onOpenProjects.map { open in { closeVoiceAnd(open) } },
                 onOpenKanban: onOpenKanban.map { open in { closeVoiceAnd(open) } },
+                onOpenWorkflows: onOpenWorkflows.map { open in { closeVoiceAnd(open) } },
                 onOpenWorkspaces: {
                     closeVoiceAnd { presentHermesWorkspacePicker() }
                 },

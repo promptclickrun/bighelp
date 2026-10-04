@@ -1,0 +1,62 @@
+{
+  "route": "workflows/runs/events",
+  "request": {
+    "runId": "run_3f9a1c2e4b5d6f70",
+    "after": 0,
+    "limit": 100
+  },
+  "response": {
+    "events": [
+      {
+        "seq": 1,
+        "at": "2026-10-04T09:29:58Z",
+        "kind": "run_planned",
+        "stageKey": null,
+        "attempt": null,
+        "text": "Run 12 is waiting for a free slot."
+      },
+      {
+        "seq": 2,
+        "at": "2026-10-04T09:30:01Z",
+        "kind": "stage_launched",
+        "stageKey": "research",
+        "attempt": 1,
+        "text": "Research the topic started with research."
+      },
+      {
+        "seq": 3,
+        "at": "2026-10-04T09:30:02Z",
+        "kind": "stage_running",
+        "stageKey": "research",
+        "attempt": 1,
+        "text": "Research the topic is running."
+      },
+      {
+        "seq": 4,
+        "at": "2026-10-04T09:36:40Z",
+        "kind": "stage_checking",
+        "stageKey": "research",
+        "attempt": 1,
+        "text": "Checking what Research the topic handed off."
+      },
+      {
+        "seq": 5,
+        "at": "2026-10-04T09:36:40Z",
+        "kind": "stage_accepted",
+        "stageKey": "research",
+        "attempt": 1,
+        "text": "Research the topic is done."
+      },
+      {
+        "seq": 6,
+        "at": "2026-10-04T09:36:42Z",
+        "kind": "stage_launched",
+        "stageKey": "draft",
+        "attempt": 1,
+        "text": "Write the draft started with writer."
+      }
+    ],
+    "cursor": 6,
+    "hasMore": false
+  }
+}

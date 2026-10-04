@@ -1,0 +1,16 @@
+{
+  "route": "workflows/artifacts/read",
+  "request": {
+    "runId": "run_10a1b2c3d4e5f606",
+    "sha256": "4f1c0d6b2e8a7f3c9d5e1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d9a2e",
+    "offset": 0,
+    "length": 38
+  },
+  "response": {
+    "sha256": "4f1c0d6b2e8a7f3c9d5e1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d9a2e",
+    "offset": 0,
+    "total": 5214,
+    "data": "IyBDaGVja2xpc3RzIGZvciBzbWFsbCB0ZWFtcwoKVGV4dC4uLgo=",
+    "done": false
+  }
+}

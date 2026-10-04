@@ -104,6 +104,9 @@ struct RootShellView: View {
     @State var kanbanModel: KanbanBoardModel?
     @State var kanbanAvailability = KanbanAvailability()
     @State var kanbanTaskToOpen: String?
+    /// The connected computer's Workflows (☰ › Workflows), when its plugin has them.
+    @State var workflowsStore: WorkflowsStore?
+    @State var workflowsAvailability = WorkflowsAvailability()
     #if os(visionOS)
     @Environment(\.openWindow) var openWindow
     #endif

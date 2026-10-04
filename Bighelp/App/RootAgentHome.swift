@@ -540,6 +540,7 @@ extension RootShellView {
             .task(id: agentBoardClientKey) { await configureAgentBoard(agentBoardClientKey) }
             .task(id: providerUsageKey) { configureProviderUsage(providerUsageKey) }
             .task(id: agentBoardClientKey) { await configureKanban(agentBoardClientKey) }
+            .task(id: agentBoardClientKey) { await configureWorkflows(agentBoardClientKey) }
             // Loads the home agent's board up front, so new Feed, Ideas and Goals
             // items show as dots on the tab bar before the tab is opened.
             .task(id: BoardPreloadKey(client: agentBoardClientKey, agentID: homeAgent?.id)) {
@@ -673,6 +674,7 @@ extension RootShellView {
             onAgents: { afterClosingHomeSheets { appState.select(.agents) } },
             onScheduledTasks: { afterClosingHomeSheets { openScheduledTasks(filteredTo: nil) } },
             onKanban: canOpenKanban ? { afterClosingHomeSheets { openKanban() } } : nil,
+            onWorkflows: canOpenWorkflows ? { afterClosingHomeSheets { openWorkflows() } } : nil,
             folder: settings.nerdModeEnabled
                 ? (name: activeHermesWorkspaceName, open: { afterClosingHomeSheets { presentHermesWorkspaces() } })
                 : nil,

@@ -244,6 +244,7 @@ struct QuickWorkspaceDrawer: View {
     let onOpenScheduledTasks: () -> Void
     var onOpenProjects: (() -> Void)? = nil
     var onOpenKanban: (() -> Void)? = nil
+    var onOpenWorkflows: (() -> Void)? = nil
     let onOpenWorkspaces: () -> Void
     let onSelectAgent: (AgentProfile) -> Void
     let onOpenMore: () -> Void
@@ -292,6 +293,7 @@ struct QuickWorkspaceDrawer: View {
                 onAgents: onOpenAgents,
                 onScheduledTasks: onOpenScheduledTasks,
                 onKanban: onOpenKanban,
+                onWorkflows: onOpenWorkflows,
                 folder: settings.nerdModeEnabled ? (name: activeWorkspaceName, open: onOpenWorkspaces) : nil,
                 onUsage: providerUsage?.isAvailable == true ? { [providerUsage, isEmbedded, agents] in
                     Task { @MainActor in

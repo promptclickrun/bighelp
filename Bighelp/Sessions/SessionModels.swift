@@ -308,6 +308,14 @@ struct SessionRecord: Identifiable, Codable, Equatable, Sendable {
         remoteSource?.caseInsensitiveCompare("cron") == .orderedSame
     }
 
+    /// A workflow stage's own session. It belongs to its run, not to the chat
+    /// lists: Sessions, recents and widgets leave it out.
+    var isWorkflowSession: Bool {
+        remoteSource?.caseInsensitiveCompare(Self.workflowSource) == .orderedSame
+    }
+
+    static let workflowSource = "workflow"
+
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(String.self, forKey: .id)

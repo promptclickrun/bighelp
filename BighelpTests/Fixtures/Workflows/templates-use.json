@@ -1,0 +1,31 @@
+{
+  "route": "workflows/templates/use",
+  "request": {
+    "templateId": "research-draft-review"
+  },
+  "response": {
+    "workflowId": "wf_1a2b3c4d5e6f7081",
+    "draftVersion": 1,
+    "validation": {
+      "valid": true,
+      "host": false,
+      "issues": [
+        {
+          "code": "role_unbound",
+          "message": "Choose an agent for Researcher.",
+          "severity": "error"
+        },
+        {
+          "code": "role_unbound",
+          "message": "Choose an agent for Writer.",
+          "severity": "error"
+        },
+        {
+          "code": "role_unbound",
+          "message": "Choose an agent for Reviewer.",
+          "severity": "error"
+        }
+      ]
+    }
+  }
+}

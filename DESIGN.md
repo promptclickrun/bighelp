@@ -59,8 +59,8 @@ it is always open and names each tab under its icon. In a chat, Chat is the lit 
 Chat opens that agent's latest chat with its live avatar big at the top: tap the avatar for its profile (This chat's
 model and reasoning, then Activity, Approvals, Schedules, Identity), tap the name to switch agents or open a group
 chat, and ☰ for everything else. ☰'s first screen fits without
-scrolling: the host as one switcher row on top, then New chat (Group beside it), Agents, Projects, Kanban, Scheduled
-tasks, Usage and Settings, then Recent chats with See all. The Secure credential vault and Nerd Mode's folder
+scrolling: the host as one switcher row on top, then New chat (Group beside it), Agents, Projects, Kanban, Workflows,
+Scheduled tasks, Usage and Settings, then Recent chats with See all. The Secure credential vault and Nerd Mode's folder
 sit under More at the bottom.
 Keep it that short: a new destination goes where people already look, not on the first screen. A tap on the
 header's compose button starts a new chat with this agent right away; touch and hold picks agents: one is a 1:1
@@ -199,6 +199,21 @@ and search sit at the top. New cards default to Later, which spends nothing; Aut
 the AI provider. On iPhone the board opens on Needs you as one lane at a time; iPad shows all five. Vision Pro opens
 the board in its own glass window beside bighelp: look at a card, pinch and drag it, and it lifts toward you while
 the lane under it lights up.
+
+**Workflows** (☰ › Workflows, after Kanban) are the bighelp plugin's: stages that agents run one at a time on the
+computer, with your sign-off at the end. The row shows only when the host's plugin has them
+(`native-workflows-v1`) and never while All hosts is on; an older plugin gets "Update the bighelp plugin to use
+Workflows". Home leads with the service line, then Waiting for you (Review or Later), Active runs (All runs), Your
+workflows (Run, or Set up while a role has no agent) and Templates. Build the flow is a vertical list of stages
+with the review loop drawn beside it; a stage opens its editor (Setup, Output, Limits) as a large sheet, and a stage
+with the terminal says so in warning colors. Nothing runs until you tap Run. At regular width the workflow opens as
+a read-only canvas with an inspector inside the page. A run shows each stage's time, Cancel and Try again; Sign-off
+shows how the run got here, the reviewer's notes and the exact file (Read, or Changes from the last version), then
+Ask for changes or Approve, stacked on iPhone and side by side on iPad. Approving names the file by a short
+fingerprint (4f1c…9a2e) and never publishes anything: the file comes to you with Share and Save to Files. The Mac
+shows all runs as a three-column monitor (runs with filters, the run, and an inspector). Token counts, attempts,
+full fingerprints, the service's heartbeat and the events log are Nerd Mode only. Stage chats (source `workflow`)
+stay out of Sessions, recents and widgets.
 
 **All hosts** (the stack button beside ☰'s host switcher) turns home into one list of every agent on every
 host, like Messages: pinned agents up top as big pictures with their name and role (no host name; touch and hold

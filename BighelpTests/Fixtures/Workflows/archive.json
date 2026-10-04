@@ -1,0 +1,10 @@
+{
+  "route": "workflows/archive",
+  "request": {
+    "workflowId": "wf_8c1d2e3f4a5b6c7d"
+  },
+  "response": {
+    "workflowId": "wf_8c1d2e3f4a5b6c7d",
+    "archived": true
+  }
+}

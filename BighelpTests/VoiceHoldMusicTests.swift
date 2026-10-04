@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import Testing
 @testable import Bighelp
@@ -126,6 +127,29 @@ struct VoiceHoldMusicTests {
         #expect(music.isPlaying && coordinator.claimCount == 1)
         music.stop()
         try await Task.sleep(for: .milliseconds(200))
+    }
+
+    /// A reply from Hermes' default voice (Edge TTS, en-US-AriaNeural) measures -21.7 dBFS RMS
+    /// (-20.3 LUFS). The loop must be easy to hear next to it, and still a little under it.
+    @Test func theLoopPlaysALittleUnderAReply() throws {
+        let url = try #require(Bundle.main.url(forResource: AVAudioPlayerHoldMusic.resourceName, withExtension: "wav"))
+        let file = try AVAudioFile(forReading: url)
+        let buffer = try #require(AVAudioPCMBuffer(pcmFormat: file.processingFormat,
+                                                   frameCapacity: AVAudioFrameCount(file.length)))
+        try file.read(into: buffer)
+        let samples = try #require(buffer.floatChannelData?[0])
+        let count = Int(buffer.frameLength)
+        var sum = 0.0
+        var peak: Float = 0
+        for index in 0..<count {
+            sum += Double(samples[index] * samples[index])
+            peak = max(peak, abs(samples[index]))
+        }
+        let rms = 10 * log10(sum / Double(count)) + 20 * log10(Double(AVAudioPlayerHoldMusic.volume))
+        let replyRMS = -21.7
+        #expect(rms < replyRMS, "Under the reply: \(rms) dBFS")
+        #expect(rms > replyRMS - 3, "Easy to hear next to the reply: \(rms) dBFS")
+        #expect(peak < 0.5, "Room left before it clips: \(peak)")
     }
 
     private func settle() async {

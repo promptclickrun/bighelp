@@ -159,6 +159,7 @@ struct WorkflowSignoffView: View {
                 }
                 .accessibilityElement(children: .combine)
             }
+            if isWaiting {
             HStack(spacing: BighelpTokens.space8) {
                 Image(systemName: "circle")
                     .foregroundStyle(theme.action)
@@ -169,6 +170,7 @@ struct WorkflowSignoffView: View {
                 Text("you")
                     .font(.bighelp(.caption))
                     .foregroundStyle(theme.action)
+            }
             }
         }
         .accessibilityIdentifier("workflows.signoff.history")
@@ -206,29 +208,50 @@ struct WorkflowSignoffView: View {
     // MARK: The file
 
     private func fileHeader(_ signoff: WorkflowSignoff) -> some View {
-        HStack(spacing: BighelpTokens.space8) {
+        let name = HStack(spacing: BighelpTokens.space8) {
             Image(systemName: "doc.text")
                 .foregroundStyle(BighelpTokens.Palette.violet)
             VStack(alignment: .leading, spacing: 0) {
                 Text(signoff.artifactName)
                     .font(.bighelp(.subheadline).monospaced())
+                    .lineLimit(1)
                 Text([signoff.artifactWords.map { "\($0.formatted()) words" }, "Markdown"].compactMap { $0 }.joined(separator: " · "))
                     .font(.bighelp(.caption))
                     .foregroundStyle(theme.secondaryText)
+                    .lineLimit(1)
             }
-            Spacer(minLength: BighelpTokens.space8)
-            if model.previousText != nil {
-                Picker("Show", selection: $showsChanges) {
-                    Text("Read").tag(false)
-                    Text("Changes from v\(max(1, signoff.artifactIteration - 1))").tag(true)
+        }
+        .layoutPriority(1)
+        return Group {
+            if sizeClass == .regular {
+                HStack(spacing: BighelpTokens.space8) {
+                    name
+                    Spacer(minLength: BighelpTokens.space8)
+                    modePicker(signoff)
                 }
-                .bighelpSegmentedPicker()
-                .fixedSize()
-                .accessibilityIdentifier("workflows.signoff.mode")
+            } else {
+                VStack(alignment: .leading, spacing: BighelpTokens.space8) {
+                    name
+                    modePicker(signoff)
+                }
             }
         }
         .padding(.horizontal, BighelpTokens.space16)
         .padding(.vertical, BighelpTokens.space12)
+    }
+
+    @ViewBuilder
+    private func modePicker(_ signoff: WorkflowSignoff) -> some View {
+        if model.previousText != nil {
+            Picker("Show", selection: $showsChanges) {
+                Text("Read").tag(false)
+                Text("Changes from v\(model.detail?.previousVersion(of: signoff)?.iteration ?? max(1, signoff.artifactIteration - 1))")
+                    .tag(true)
+            }
+            .bighelpSegmentedPicker()
+            .fixedSize()
+            .accessibilityIdentifier("workflows.signoff.mode")
+        }
     }
 
     @ViewBuilder
@@ -279,11 +302,12 @@ struct WorkflowSignoffView: View {
                         .foregroundStyle(theme.warning)
                         .accessibilityIdentifier("workflows.signoff.message")
                 }
-                ViewThatFits(in: .horizontal) {
+                if sizeClass == .regular {
                     HStack(spacing: BighelpTokens.space8) {
                         notesField(signoff)
                         buttons(signoff)
                     }
+                } else {
                     VStack(alignment: .leading, spacing: BighelpTokens.space8) {
                         notesField(signoff)
                         HStack(spacing: BighelpTokens.space8) { buttons(signoff) }
@@ -321,13 +345,17 @@ struct WorkflowSignoffView: View {
     @ViewBuilder
     private func buttons(_ signoff: WorkflowSignoff) -> some View {
         let ready = model.signoffText != nil && !model.isWorking
-        Button("Ask for changes") { decide(.changes) }
+        Button { decide(.changes) } label: {
+            Text("Ask for changes").frame(maxWidth: sizeClass == .regular ? nil : .infinity)
+        }
             .buttonStyle(.bordered)
             .disabled(!ready || notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             .frame(minHeight: BighelpTokens.hitTarget)
             .accessibilityIdentifier("workflows.signoff.changes")
-        Button("Approve v\(signoff.artifactIteration)") { decide(.approve) }
-            .buttonStyle(.borderedProminent)
+        Button { decide(.approve) } label: {
+            Text("Approve v\(signoff.artifactIteration)").frame(maxWidth: sizeClass == .regular ? nil : .infinity)
+        }
+            .workflowProminent(theme)
             .disabled(!ready)
             .bighelpDefaultAction()
             .frame(minHeight: BighelpTokens.hitTarget)

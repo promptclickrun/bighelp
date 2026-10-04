@@ -225,7 +225,7 @@ final class DemoWorkflowsClient: WorkflowsClient {
             run.summary.state = .succeeded
             run.summary.stageState = .accepted
             run.summary.stagesDone = run.summary.stageCount
-            run.history.append(.init(index: run.history.count, stageKey: stageKey, title: "Sign-off",
+            run.history.append(.init(index: run.history.count, stageKey: stageKey, title: "Approved by you",
                                      iteration: run.iteration, outcome: "approved", agentID: nil, durationMs: nil, notes: []))
             log(&run, "approved", stageKey, "Approved \(currentFile(run)?.name ?? "the file") · sha256 \(WorkflowSHA.short(artifactSHA256))")
         case .changes:
@@ -512,7 +512,7 @@ final class DemoWorkflowsClient: WorkflowsClient {
         let older = run(11, triage, .succeeded, stage: 1, minutesAgo: 60 * 30)
         var failed = run(10, rdr, .failed, stage: 2, minutesAgo: 60 * 50,
                          failure: .init(stageKey: "check", code: "contract_word_range",
-                                        message: "The draft had 412 words. This workflow needs 700 to 1,100."))
+                                        message: "The draft had 98 words. This workflow needs 150 to 1,100."))
         failed.summary.stageState = .failed
         var cancelled = run(9, Workflow(id: "wf-captions", definition: Self.photoCaptions, revision: 1, draftVersion: 1,
                                         hasDraft: false, bindings: [:]), .cancelled, stage: 1, minutesAgo: 60 * 70)
@@ -561,9 +561,9 @@ final class DemoWorkflowsClient: WorkflowsClient {
                          "minutes": .integer(20)]),
                 .object(["key": .string("check"), "kind": .string("check"), "title": .string("Check draft"),
                          "rules": .array([
-                            .object(["rule": .string("word_range"), "of": .string("draft.draft"),
-                                     "min": .integer(700), "max": .integer(1_100)]),
-                            .object(["rule": .string("has_title"), "of": .string("draft.draft")]),
+                            .object(["type": .string("word_range"), "of": .string("draft.draft"),
+                                     "min": .integer(150), "max": .integer(1_100)]),
+                            .object(["type": .string("has_title"), "of": .string("draft.draft")]),
                          ])]),
                 .object(["key": .string("review"), "kind": .string("agent"), "title": .string("Review"),
                          "role": .string("reviewer"),
@@ -613,7 +613,7 @@ final class DemoWorkflowsClient: WorkflowsClient {
                          "role": .string("captioner"), "instructions": .string("Write one caption per photo."),
                          "outputs": .array([.object(["name": .string("captions"), "type": .string("markdown_file")])])]),
                 .object(["key": .string("check"), "kind": .string("check"), "title": .string("Check captions"),
-                         "rules": .array([.object(["rule": .string("not_empty"), "of": .string("caption.captions")])])]),
+                         "rules": .array([.object(["type": .string("not_empty"), "of": .string("caption.captions")])])]),
                 .object(["key": .string("review"), "kind": .string("agent"), "title": .string("Review"),
                          "role": .string("checker"), "instructions": .string("Check names and places."),
                          "outputs": .array([.object(["name": .string("decision"), "type": .string("decision"),

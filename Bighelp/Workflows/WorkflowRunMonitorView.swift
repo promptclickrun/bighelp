@@ -116,7 +116,11 @@ struct WorkflowRunMonitorView: View {
             runModel?.setOnScreen(false)
         }
         .onChange(of: list.runs) { _, runs in
-            if isWide, selected == nil, let first = runs.first { select(first.id) }
+            // Start on the run that's doing something, as the design does.
+            if isWide, selected == nil,
+               let first = runs.first(where: { [.running, .checkingOutput, .launched].contains($0.state) }) ?? runs.first {
+                select(first.id)
+            }
         }
     }
 
@@ -147,8 +151,7 @@ struct WorkflowRunMonitorView: View {
 
     private var runsColumn: some View {
         VStack(alignment: .leading, spacing: BighelpTokens.space12) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: BighelpTokens.space8) {
+            WorkflowFlowLayout(spacing: BighelpTokens.space8) {
                     ForEach(WorkflowRunFilter.allCases) { filter in
                         let count = list.counts[filter]
                         Button {
@@ -167,9 +170,8 @@ struct WorkflowRunMonitorView: View {
                         .accessibilityAddTraits(list.filter == filter ? .isSelected : [])
                         .accessibilityIdentifier("workflows.monitor.filter.\(filter.rawValue)")
                     }
-                }
-                .padding(.horizontal, BighelpTokens.space16)
             }
+            .padding(.horizontal, BighelpTokens.space16)
             if list.runs.isEmpty, list.state != .loaded {
                 WorkflowLoadStateView(state: list.state) { Task { await list.load() } }
             } else if list.runs.isEmpty {
@@ -254,7 +256,7 @@ struct WorkflowRunMonitorView: View {
                         HStack(spacing: BighelpTokens.space12) {
                             WorkflowStageIcon(kind: .signoff, size: 32)
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Sign off on \(run.stageTitle ?? "the result")")
+                                Text("Ready for your sign-off")
                                     .font(.bighelp(.subheadline).weight(.semibold))
                                 Text("Run \(run.number)")
                                     .font(.bighelp(.caption))
@@ -262,7 +264,7 @@ struct WorkflowRunMonitorView: View {
                             }
                             Spacer(minLength: 0)
                             Button("Review") { context.open(.workflowSignoff(runID: run.id)) }
-                                .buttonStyle(.borderedProminent)
+                                .workflowProminent(theme)
                                 .accessibilityIdentifier("workflows.monitor.review")
                         }
                         .workflowCard(theme, padding: BighelpTokens.space12)

@@ -133,6 +133,14 @@ extension View {
             }
     }
 
+    /// The main action: the app's action color with its own text color, which
+    /// stays readable in dark mode (the system's white on a light tint doesn't).
+    func workflowProminent(_ theme: BighelpTheme) -> some View {
+        buttonStyle(.borderedProminent)
+            .tint(theme.action)
+            .foregroundStyle(theme.actionForeground)
+    }
+
     /// A small rounded chip ("research.brief", "Terminal").
     func workflowChip(_ theme: BighelpTheme, tint: Color? = nil) -> some View {
         self
@@ -242,7 +250,7 @@ struct WorkflowGraph: View {
     var select: ((String) -> Void)?
     @BighelpThemeReader private var theme
 
-    private let tile: CGFloat = 60
+    private let tile: CGFloat = 56
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
@@ -289,7 +297,7 @@ struct WorkflowGraph: View {
     private func connector(done: Bool) -> some View {
         Rectangle()
             .fill(done ? theme.success : theme.border)
-            .frame(width: 28, height: 2)
+            .frame(width: 16, height: 2)
     }
 
     private func nodeView(_ node: Node) -> some View {
@@ -333,7 +341,7 @@ struct WorkflowGraph: View {
                         .foregroundStyle(theme.secondaryText)
                 }
                 .lineLimit(1)
-                .frame(width: 104)
+                .frame(width: 88)
             }
             .contentShape(Rectangle())
         }

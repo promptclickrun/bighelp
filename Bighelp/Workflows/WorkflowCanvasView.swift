@@ -193,7 +193,7 @@ struct WorkflowCanvasView: View {
                             .font(.bighelp(.body).weight(.semibold))
                             .frame(maxWidth: .infinity, minHeight: BighelpTokens.hitTarget - 8)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .workflowProminent(theme)
                     .accessibilityIdentifier("workflows.canvas.edit")
                 }
                 .padding(BighelpTokens.space20)

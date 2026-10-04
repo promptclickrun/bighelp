@@ -303,7 +303,7 @@ struct WorkflowFlowView: View {
                     .font(.bighelp(.body).weight(.semibold))
                     .frame(minWidth: 96, minHeight: BighelpTokens.hitTarget - 8)
             }
-            .buttonStyle(.borderedProminent)
+            .workflowProminent(theme)
             .disabled(!model.canRun)
             .accessibilityIdentifier("workflows.flow.run")
         }
@@ -333,11 +333,16 @@ struct WorkflowTitle: View {
                 .font(.bighelp(.headline))
                 .lineLimit(1)
             if let line = validityLine {
-                Label(line.text, systemImage: line.valid ? "checkmark" : "exclamationmark.triangle")
-                    .font(.bighelp(.caption))
-                    .foregroundStyle(line.valid ? theme.success : theme.warning)
-                    .lineLimit(1)
-                    .accessibilityIdentifier("workflows.flow.validity")
+                // A Label in the toolbar shows only its icon; spell it out.
+                HStack(spacing: BighelpTokens.space4) {
+                    Image(systemName: line.valid ? "checkmark" : "exclamationmark.triangle")
+                    Text(line.text)
+                }
+                .font(.bighelp(.caption))
+                .foregroundStyle(line.valid ? theme.success : theme.warning)
+                .lineLimit(1)
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("workflows.flow.validity")
             }
         }
     }
@@ -474,11 +479,18 @@ struct WorkflowRunSheet: View {
                 TextEditor(text: binding).frame(minHeight: 120)
             }
         case .number:
-            TextField(input.label, text: binding, prompt: Text(input.label).bighelpFieldHint(theme))
-                .keyboardType(.numberPad)
+            LabeledContent(input.label) {
+                TextField(input.label, text: binding, prompt: Text("Number").bighelpFieldHint(theme))
+                    .keyboardType(.numberPad)
+                    .multilineTextAlignment(.trailing)
+            }
         case .text:
-            TextField(input.label, text: binding, prompt: Text(input.label).bighelpFieldHint(theme))
-                .accessibilityIdentifier("workflows.run-sheet.\(input.key)")
+            LabeledContent(input.label) {
+                TextField(input.label, text: binding, prompt: Text(input.required ? "Required" : "Optional")
+                    .bighelpFieldHint(theme))
+                    .multilineTextAlignment(.trailing)
+                    .accessibilityIdentifier("workflows.run-sheet.\(input.key)")
+            }
         }
     }
 

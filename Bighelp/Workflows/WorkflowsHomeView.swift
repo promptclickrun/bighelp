@@ -168,7 +168,7 @@ struct WorkflowsHomeView: View {
                 HStack(alignment: .top, spacing: BighelpTokens.space12) {
                     WorkflowStageIcon(kind: .signoff, size: 40)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Sign off on \(run.stageTitle ?? "the result")")
+                        Text("Ready for your sign-off")
                             .font(.bighelp(.headline))
                             .foregroundStyle(theme.primaryText)
                         Text("\(run.workflowName) · Run \(run.number)")
@@ -187,14 +187,16 @@ struct WorkflowsHomeView: View {
             .bighelpPlainButtonStyle()
             .accessibilityIdentifier("workflows.waiting.\(run.id)")
             HStack(spacing: BighelpTokens.space8) {
-                Button("Later") { withAnimation(.snappy) { store.setAside(run) } }
-                    .buttonStyle(.bordered)
-                    .frame(maxWidth: .infinity)
-                    .accessibilityIdentifier("workflows.waiting.later")
-                Button("Review") { context.open(.workflowSignoff(runID: run.id)) }
-                    .buttonStyle(.borderedProminent)
-                    .frame(maxWidth: .infinity)
-                    .accessibilityIdentifier("workflows.waiting.review")
+                Button { withAnimation(.snappy) { store.setAside(run) } } label: {
+                    Text("Later").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier("workflows.waiting.later")
+                Button { context.open(.workflowSignoff(runID: run.id)) } label: {
+                    Text("Review").frame(maxWidth: .infinity)
+                }
+                .workflowProminent(theme)
+                .accessibilityIdentifier("workflows.waiting.review")
             }
             .controlSize(.large)
             .font(.bighelp(.body).weight(.semibold))

@@ -74,15 +74,17 @@ struct WorkflowRunContent: View {
                     .accessibilityIdentifier("workflows.run.message")
             }
             BighelpDeferredSection { banner }
+            // The monitor shows the stages as a graph; the page lists them.
             if showsGraph {
                 BighelpDeferredSection { graph }
+            } else {
+                BighelpDeferredSection { stageRail }
             }
-            BighelpDeferredSection { stageRail }
             if let current = currentStage, run.state.isWorking {
                 BighelpDeferredSection { currentStageCard(current) }
             }
             BighelpDeferredSection { files }
-            if context.isNerdMode {
+            if context.isNerdMode, !model.events.isEmpty || detail.stages.contains(where: { !$0.attempts.isEmpty }) {
                 BighelpDeferredSection { nerdDetails }
             }
             Text("Runs keep going when you close the app.")
@@ -106,13 +108,10 @@ struct WorkflowRunContent: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: BighelpTokens.space8) {
-            HStack(alignment: .firstTextBaseline, spacing: BighelpTokens.space8) {
-                Text(run.workflowName)
-                    .font(.bighelp(.title2).weight(.bold))
-                    .foregroundStyle(theme.primaryText)
-                WorkflowStatePill(state: run.state)
-                Spacer(minLength: 0)
-            }
+            Text(run.workflowName)
+                .font(.bighelp(.title2).weight(.bold))
+                .foregroundStyle(theme.primaryText)
+            WorkflowStatePill(state: run.state)
             Text(headerLine)
                 .font(.bighelp(.subheadline))
                 .foregroundStyle(theme.secondaryText)
@@ -122,7 +121,7 @@ struct WorkflowRunContent: View {
                     Button { Task { await model.perform(.retry) } } label: {
                         Label("Try again", systemImage: "arrow.clockwise")
                     }
-                    .buttonStyle(.borderedProminent)
+                    .workflowProminent(theme)
                     .accessibilityIdentifier("workflows.run.retry")
                 }
                 if model.canDo(.cancel) {
@@ -167,7 +166,7 @@ struct WorkflowRunContent: View {
                 }
                 Spacer(minLength: 0)
                 Button("Review") { context.open(.workflowSignoff(runID: run.id)) }
-                    .buttonStyle(.borderedProminent)
+                    .workflowProminent(theme)
                     .font(.bighelp(.body).weight(.semibold))
                     .bighelpDefaultAction()
                     .accessibilityIdentifier("workflows.run.review")

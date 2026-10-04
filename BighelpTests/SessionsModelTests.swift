@@ -39,7 +39,7 @@ struct SessionsModelTests {
                           hasAcceptedMessage: true)
         }
         let model = SessionsModel(fixtures: records, calendar: Calendar(identifier: .gregorian))
-        #expect(model.filteredSections.map(\.title) == ["Chats"])
+        #expect(model.filteredSections.map(\.title) == ["Sessions"])
         #expect(model.filteredSections.flatMap(\.sessions).map(\.id) == ["z", "a", "m"])
         model.query = "Find m"
         #expect(model.filteredSections.flatMap(\.sessions).map(\.id) == ["m"])
@@ -61,7 +61,7 @@ struct SessionsModelTests {
             record("normal", created: 5, updated: 5),
         ]
         let drawer = QuickWorkspaceContent(recentSessions: records.map(\.summary), organizeByProjects: true)
-        #expect(drawer.sessionGroups.map(\.title) == ["Active Chats", "Pinned", "Project"])
+        #expect(drawer.sessionGroups.map(\.title) == ["Active Sessions", "Pinned", "Project"])
         #expect(drawer.sessionGroups.map { $0.sessions.map(\.id) } == [
             ["old-pin-active", "old-active", "new-active"], ["new-pin"], ["normal"],
         ])
@@ -452,7 +452,7 @@ struct SessionsModelTests {
             now: Self.fixtureDate
         )
 
-        #expect(model.filteredSections.map(\.title) == ["Chats"])
+        #expect(model.filteredSections.map(\.title) == ["Sessions"])
         #expect(model.filteredSections.map { $0.sessions.map(\.id) } == [["today", "yesterday", "earlier"]])
     }
 
@@ -479,7 +479,7 @@ struct SessionsModelTests {
             now: Self.fixtureDate
         )
 
-        #expect(model.filteredSections.map(\.title) == ["Active Chats", "Chats"])
+        #expect(model.filteredSections.map(\.title) == ["Active Sessions", "Sessions"])
         #expect(model.filteredSections.map { $0.sessions.map(\.id) } == [
             ["active-newer", "active-older"],
             ["inactive-newest", "inactive-older"],
@@ -500,7 +500,7 @@ struct SessionsModelTests {
             now: Self.fixtureDate
         )
 
-        #expect(model.filteredSections.map(\.title) == ["Active Chats"])
+        #expect(model.filteredSections.map(\.title) == ["Active Sessions"])
         #expect(model.filteredSections.flatMap(\.sessions).map(\.id) == [parent.id])
     }
 
@@ -524,7 +524,7 @@ struct SessionsModelTests {
             now: Self.fixtureDate
         )
 
-        #expect(model.filteredSections.map(\.title) == ["Active Chats", "Pinned", "Chats"])
+        #expect(model.filteredSections.map(\.title) == ["Active Sessions", "Pinned", "Sessions"])
         #expect(model.filteredSections.map { $0.sessions.map(\.id) } == [
             ["active-pinned"],
             ["older-pinned"],
@@ -579,7 +579,7 @@ struct SessionsModelTests {
         let sections = model.filteredSections(organizeByProjects: true)
 
         #expect(sections.map(\.title) == [
-            "Active Chats", "Pinned", "bighelp iOS", "Hermes Infrastructure", "Unassigned",
+            "Active Sessions", "Pinned", "bighelp iOS", "Hermes Infrastructure", "Unassigned",
         ])
         #expect(sections.map { $0.sessions.map(\.id) } == [
             ["active"],

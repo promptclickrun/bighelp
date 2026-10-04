@@ -408,12 +408,23 @@ final class DirectHermesNativePluginClient {
         guard currentOwner() == owner, owner.authority.kind == .direct else { throw WorkspaceClientError.ownerChanged }
     }
 
+    /// Plugin codes for "this computer can't do that at all", sent before any work starts.
+    static let refusedBeforeStartingCodes: Set<String> = ["runner_unavailable", "workflows_unavailable", "store_unavailable"]
+
+    static func refusedBeforeStarting(_ response: DirectHermesHTTP.Response) -> Bool {
+        guard let code = (try? response.object())?["error"]?.object?["code"]?.string else { return false }
+        return refusedBeforeStartingCodes.contains(code)
+    }
+
     private func responseError(_ response: DirectHermesHTTP.Response, mutation: Bool) -> WorkspaceClientError {
         switch response.http.statusCode {
         case 401, 403: return .authenticationRequired
         case 412: return .conflict
         case 413: return .capacityExceeded
         case 428: return .unavailable(.unsupportedOperation)
+        case 503 where Self.refusedBeforeStarting(response):
+            // The plugin says so before it does anything, so the outcome is known.
+            return .rejected(code: (try? response.object())?["error"]?.object?["code"]?.string ?? "")
         case 500...599: return mutation ? .outcomeUnknown : .transportUnavailable
         default: break
         }

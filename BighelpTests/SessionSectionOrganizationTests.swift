@@ -12,9 +12,9 @@ struct SessionSectionOrganizationTests {
         let running = SessionSectionOrganizer.sections(
             from: [ordinary, runningPin, working], organizeByProjects: false)
         #expect(running.map(\.key) == [.active, .sessions])
-        #expect(running.first?.title == "Active Chats")
+        #expect(running.first?.title == "Active Sessions")
         #expect(running.first?.sessions.map(\.id) == ["working", "pin"])
-        #expect(running.last?.title == "Chats")
+        #expect(running.last?.title == "Sessions")
         #expect(Set(running.flatMap(\.sessions).map(\.id)).count == 3)
 
         let settled = summary("working", created: 20, project: "work")
@@ -211,7 +211,7 @@ struct SessionSectionOrganizationTests {
         let ordinary = (0..<8).map { summary("normal-\($0)", created: TimeInterval(100 - $0), project: "p") }
         let sessions = ordinary + [summary("pin", created: 1, pinned: true), summary("active", created: 2, active: true)]
         let content = QuickWorkspaceContent(recentSessions: sessions, organizeByProjects: true)
-        #expect(content.sessionGroups.prefix(2).map(\.title) == ["Active Chats", "Pinned"])
+        #expect(content.sessionGroups.prefix(2).map(\.title) == ["Active Sessions", "Pinned"])
         #expect(content.recentSessions.contains { $0.id == "pin" })
         #expect(content.recentSessions.contains { $0.id == "active" })
         #expect(Set(content.recentSessions.map(\.id)).count == content.recentSessions.count)

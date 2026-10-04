@@ -249,6 +249,8 @@ struct NativeAdministrationDestination: View {
     let permissionCenter: PermissionCenter
     /// The host's agents, for Default model's agent picker.
     var agents: [ModelAdministrationAgent] = []
+    /// Reads and saves each agent's reasoning default (Default model › Reasoning).
+    var reasoningDefaults: (any AgentRuntimeDefaultsClient)?
     let onOpenProviderAccounts: () -> Void
     let onOpenAgentDefaults: () -> Void
 
@@ -297,7 +299,8 @@ struct NativeAdministrationDestination: View {
                     ProviderAccountsView(store: presentation.providerAccounts)
                 case .models:
                     ModelAdministrationView(hostName: presentation.hostName, profileID: presentation.profileID,
-                        client: presentation.models, agents: agents, onOpenProviderAccounts: onOpenProviderAccounts,
+                        client: presentation.models, agents: agents, reasoningDefaults: reasoningDefaults,
+                        onOpenProviderAccounts: onOpenProviderAccounts,
                         onOpenAgentDefaults: onOpenAgentDefaults)
                         .toolbar {
                             ToolbarItem(placement: .topBarTrailing) {

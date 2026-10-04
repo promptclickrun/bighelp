@@ -41,6 +41,7 @@ extension RootShellView {
             if let presentation {
                 NativeAdministrationDestination(presentation: presentation,
                     permissionCenter: permissionCenter, agents: modelAdministrationAgents,
+                    reasoningDefaults: agentRuntimeDefaults,
                     onOpenProviderAccounts: { openWorkspaceDestination(.keys) },
                     onOpenAgentDefaults: { openWorkspaceDestination(.profiles) })
             }

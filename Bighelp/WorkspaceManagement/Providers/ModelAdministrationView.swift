@@ -196,6 +196,51 @@ final class ModelAdministrationStore {
 }
 
 /// An agent on the host whose default model the page can show and change.
+/// Default model › Reasoning: how hard agents think before answering in new chats. Every agent by
+/// default, or just the one picked above. Hermes keeps it per agent (`agent.reasoning_effort`), so
+/// "every agent" saves it on each, through the same verified path as Agent Studio.
+@MainActor @Observable
+final class ModelReasoningDefaults {
+    private(set) var current: String?
+    private(set) var isSaving = false
+    private(set) var message: String?
+    var appliesToEveryAgent = true
+
+    @ObservationIgnored private let client: any AgentRuntimeDefaultsClient
+
+    init(client: any AgentRuntimeDefaultsClient) { self.client = client }
+
+    func load(agentID: String) async {
+        current = try? await client.loadDefaults(agentID: agentID).mainChats.reasoningEffort
+    }
+
+    /// Returns how many agents now use it.
+    @discardableResult
+    func set(_ value: String, agentID: String, every agentIDs: [String]) async -> Int {
+        guard !isSaving else { return 0 }
+        isSaving = true
+        defer { isSaving = false }
+        let targets = appliesToEveryAgent && !agentIDs.isEmpty ? agentIDs : [agentID]
+        var saved = 0
+        for target in targets {
+            do {
+                var defaults = try await client.loadDefaults(agentID: target)
+                if defaults.mainChats.reasoningEffort != value {
+                    defaults.mainChats.reasoningEffort = value
+                    try await client.saveDefaults(defaults, agentID: target)
+                }
+                saved += 1
+            } catch {}
+        }
+        await load(agentID: agentID)
+        let title = AgentReasoningOption.all.first { $0.value == value }?.title ?? value
+        message = saved == targets.count
+            ? (targets.count == 1 ? "Reasoning is \(title) for new chats." : "Reasoning is \(title) for every agent's new chats.")
+            : "Saved for \(saved) of \(targets.count) agents. Try again for the rest."
+        return saved
+    }
+}
+
 struct ModelAdministrationAgent: Identifiable, Equatable {
     let id: String
     let name: String
@@ -214,15 +259,18 @@ struct ModelAdministrationView: View {
     let agents: [ModelAdministrationAgent]
     let onOpenProviderAccounts: (() -> Void)?
     let onOpenAgentDefaults: (() -> Void)?
+    @State private var reasoning: ModelReasoningDefaults?
 
     init(
         hostName: String,
         profileID: String,
         client: DirectHermesModelAdministrationClient,
         agents: [ModelAdministrationAgent] = [],
+        reasoningDefaults: (any AgentRuntimeDefaultsClient)? = nil,
         onOpenProviderAccounts: (() -> Void)? = nil,
         onOpenAgentDefaults: (() -> Void)? = nil
     ) {
+        _reasoning = State(initialValue: reasoningDefaults.map(ModelReasoningDefaults.init(client:)))
         _store = State(initialValue: ModelAdministrationStore(
             hostName: hostName, profileID: profileID, client: client
         ))
@@ -253,6 +301,7 @@ struct ModelAdministrationView: View {
                     statusSections
                     if let snapshot = store.snapshot {
                         mainModelSection(snapshot)
+                        if let reasoning { reasoningSection(reasoning) }
                         if let runtime = snapshot.runtime { runtimeSection(runtime) }
                         modelCapabilitiesSection(snapshot)
                         if let auxiliary = snapshot.auxiliary { auxiliarySection(auxiliary) }
@@ -272,7 +321,11 @@ struct ModelAdministrationView: View {
         }
         .navigationTitle("Models")
         .navigationBarTitleDisplayMode(.inline)
-        .task(id: store.profileID) { if store.snapshot == nil { await store.load() } }
+        .task(id: store.profileID) {
+            async let reasoningLoad: Void? = reasoning?.load(agentID: store.profileID)
+            if store.snapshot == nil { await store.load() }
+            _ = await reasoningLoad
+        }
         .sheet(item: $assignmentTarget) { target in
             ModelAdministrationPicker(store: store, target: target, agentName: agentName) { assignmentTarget = nil }
                 .bighelpSheetSize(.standard)
@@ -426,6 +479,43 @@ struct ModelAdministrationView: View {
                 Button("Agent runtime defaults", action: onOpenAgentDefaults)
                     .frame(minHeight: BighelpTokens.hitTarget)
             }
+        }
+    }
+
+    private func reasoningSection(_ reasoning: ModelReasoningDefaults) -> some View {
+        Section {
+            Picker(selection: Binding(
+                get: { reasoning.current ?? "" },
+                set: { value in
+                    Task { await reasoning.set(value, agentID: store.profileID, every: agents.map(\.id)) }
+                })) {
+                ForEach(AgentReasoningOption.all) { option in
+                    Text(option.title).tag(option.value)
+                }
+            } label: {
+                Text("Reasoning")
+            }
+            .disabled(reasoning.current == nil || reasoning.isSaving)
+            .accessibilityIdentifier("models.reasoning")
+            if agents.count > 1 {
+                Picker("Applies to", selection: Binding(get: { reasoning.appliesToEveryAgent },
+                                                        set: { reasoning.appliesToEveryAgent = $0 })) {
+                    Text("Every agent").tag(true)
+                    Text(agentName).tag(false)
+                }
+                .accessibilityIdentifier("models.reasoning.scope")
+            }
+            if reasoning.isSaving {
+                ProgressView("Saving…")
+            } else if let message = reasoning.message {
+                Label(message, systemImage: "checkmark.circle")
+                    .font(.bighelp(.footnote))
+                    .accessibilityIdentifier("models.reasoning.saved")
+            }
+        } header: {
+            Text("Reasoning")
+        } footer: {
+            Text("How hard agents think before answering in new chats. A running chat changes from its own model control.")
         }
     }
 

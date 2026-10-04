@@ -493,6 +493,55 @@ struct ShellFeatureStoreTests {
         #expect(!model.hasPreviousHistory)
     }
 
+    /// Hermes saves a chat only on its first message. A new chat retired with its draft (its
+    /// unsaved session is gone) hands back its agent and text so the screen can open a fresh
+    /// chat in its place, instead of "Route unavailable".
+    @Test func aRetiredChatThatNeverSentHandsBackItsAgentAndDraft() {
+        let session = record(id: "session_unsent_draft_0001")
+        let harness = makeStore(records: [session])
+        var retired: [[String]] = []
+        harness.store.onUnsentChatRetired = { id, agent, text in retired.append([id, agent, text]) }
+        let route = AppRoute.chat(conversationID: session.id)
+        #expect(harness.store.prepare(route))
+        guard case .chat(let model) = harness.store.preparedModel(for: route) else {
+            Issue.record("Expected prepared Chat model")
+            return
+        }
+        model.draft = "Remind me about the trip budget"
+        #expect(harness.store.unsentChat(id: session.id)?.agentID == "finance")
+        #expect(harness.store.unsentChat(id: session.id)?.text == "Remind me about the trip budget")
+
+        harness.store.retireNavigationSession(id: session.id)
+
+        #expect(retired == [[session.id, "finance", "Remind me about the trip budget"]])
+        #expect(harness.store.unsentChat(id: session.id) == nil)
+    }
+
+    @Test func aRetiredChatWithMessagesIsNotReplacedByAFreshOne() async throws {
+        let catalog = SessionCatalogStore(client: DemoSessionCatalogClient())
+        let store = ShellFeatureStore(timing: .immediate, catalog: catalog)
+        var retired = 0
+        store.onUnsentChatRetired = { _, _, _ in retired += 1 }
+        try await catalog.load()
+        let session = try await catalog.refreshExistingSession(id: "demo-tool-folder-anchor")
+        let route = AppRoute.chat(conversationID: session.id)
+        #expect(store.prepare(route))
+        guard case .chat(let model) = store.preparedModel(for: route) else {
+            Issue.record("Expected prepared Chat model")
+            return
+        }
+        model.beginHistoryHydration(from: session)
+        _ = try await catalog.hydrateInitialPage(id: session.id)
+        #expect(store.prepare(route))
+        model.finishHistoryHydration(hasPreviousHistory: catalog.hasPreviousHistory(id: session.id))
+        #expect(!model.transcriptEntries.isEmpty)
+        #expect(store.unsentChat(id: session.id) == nil, "It has sent messages")
+
+        store.retireNavigationSession(id: session.id)
+
+        #expect(retired == 0)
+    }
+
     @Test func savedSessionNavigationRefreshesBeforePresentingRouteOwnedHydration() {
         #expect(SessionRestorePresentationPolicy.opensCachedSessionBeforeHydration)
         let route = AppRoute.chat(conversationID: "session-route-owned-0001")

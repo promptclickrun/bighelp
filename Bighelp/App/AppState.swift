@@ -7,6 +7,12 @@ enum ConversationActivationSource: Sendable {
     case fork
 }
 
+struct SuspendedChat: Equatable {
+    let chatID: String
+    let agentID: String
+    let text: String
+}
+
 @MainActor
 @Observable
 final class AppState {
@@ -16,6 +22,9 @@ final class AppState {
     private(set) var pendingVoiceConversationID: String?
     /// Text a board "Ask" or "Discuss" leaves in the next new chat's composer.
     var pendingComposerText: String?
+    /// The open chat's agent and text when the app left, while that chat had sent nothing.
+    /// Hermes saves a chat only on its first message, so it can be gone on return.
+    var suspendedChat: SuspendedChat?
     /// A blueprint's Send to agent: the next new chat sends `pendingComposerText` once it can.
     var pendingComposerSends = false
     /// A chat picked from the full chat list keeps Back to that list. The Chat

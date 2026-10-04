@@ -60,6 +60,9 @@ final class ShellFeatureStore {
     let scheduledTasks: ScheduledTasksStore?
     /// Voices and microphone for group chats' team calls; nil hides the call.
     var teamCallServices: (any TeamCallServices)?
+    /// A new chat that never sent anything was retired (Hermes dropped its unsaved session):
+    /// its ID, agent and draft, so the screen showing it can open a fresh chat in its place.
+    var onUnsentChatRetired: (@MainActor (String, String, String) -> Void)?
     private var chatModels: [String: ChatModel] = [:]
     private let navigationWorkspaceOwner: (@MainActor () -> WorkspaceOwner?)?
     private let nativeWarmSessionIsCurrent: @MainActor (SessionRecord, ChatModel) -> Bool
@@ -344,14 +347,12 @@ final class ShellFeatureStore {
     /// The retained model for a chat, whether or not it is on screen.
     func preparedChatModel(id: String) -> ChatModel? { chatModels[id] }
 
-    /// New chats that haven't sent anything but have text typed: what leaving the app could lose.
-    func unsentNewChatDrafts() -> [(chatID: String, agentID: String, text: String)] {
-        chatModels.compactMap { id, model in
-            guard !model.isBotMode, model.transcriptEntries.isEmpty, model.memberIDs.count == 1,
-                  let agentID = model.memberIDs.first,
-                  !model.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
-            return (id, agentID, model.draft)
-        }.sorted { $0.chatID < $1.chatID }
+    /// A chat's agent and text, while it's never sent anything: what a fresh session needs to
+    /// take its place if Hermes drops it while the app is away.
+    func unsentChat(id: String) -> (agentID: String, text: String)? {
+        guard let model = chatModels[id], !model.isBotMode, model.transcriptEntries.isEmpty,
+              model.memberIDs.count == 1, let agentID = model.memberIDs.first else { return nil }
+        return (agentID, model.draft)
     }
 
     @discardableResult
@@ -664,9 +665,10 @@ final class ShellFeatureStore {
         canonicalSessionReentries.removeValue(forKey: id)?.task.cancel()
         hydratedNavigationModels[id] = nil
         guard let model = chatModels.removeValue(forKey: id) else { return }
-        // A new chat that never sent anything takes its draft with it; offer it back.
-        if !model.isBotMode, model.transcriptEntries.isEmpty {
-            UnsentDraftStore.shared.markLost(chatID: id, latestText: model.draft)
+        // A new chat that never sent anything: the screen showing it opens a fresh one in its place.
+        if !model.isBotMode, model.transcriptEntries.isEmpty, model.memberIDs.count == 1,
+           let agentID = model.memberIDs.first {
+            onUnsentChatRetired?(id, agentID, model.draft)
         }
         // Removing the exact sink first prevents its final flush from writing
         // into a replacement catalog coordinate.

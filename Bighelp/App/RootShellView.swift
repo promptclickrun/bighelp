@@ -247,6 +247,7 @@ struct RootShellView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             connectionKeeper.setActive(phase == .active)
+            if phase == .background { rememberOpenChat() }
             if phase == .background, let store = nativeWorkspaceStore {
                 // Closed only if the app stays away; a Shortcut still running keeps it.
                 BighelpBackgroundGrace.shared.begin("connection") { [weak store] in
@@ -299,7 +300,7 @@ struct RootShellView: View {
             Task { await currentHostRuntime?.refresh() }
         }
         .modifier(IncomingLinks(open: handleIncomingURL))
-        .modifier(unsentDraftRecovery)
+        .onAppear { watchForLostChats() }
         .modifier(BighelpShortcutParameterUpdates(agents: agents, scheduledTasks: featureStore.scheduledTasks,
                                                   rooms: botModeRooms, catalog: sessionCatalog))
         .onChange(of: acceptsIncomingLinks) { _, ready in

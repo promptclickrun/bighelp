@@ -59,8 +59,7 @@ from DirectHermesStreamingProbe import SyntheticModel  # noqa: E402
 from DirectHermesAuthenticationProbe import exercise_http  # noqa: E402
 
 TESTS = {
-    "open": ["testOpenHostConnectsFromTheAddressAlone", "testNewChatDraftStaysAfterLeavingTheApp",
-             "testNewChatDraftSurvivesTheAppClosing"],
+    "open": ["testOpenHostConnectsFromTheAddressAlone", "testNewChatDraftStaysAfterLeavingTheApp"],
     "password": ["testPasswordOnlyHostPrefersUsernameAndPasswordAndChats", "testWrongPasswordIsExplained",
                  "testAccessToken", "testBrowserSignInThroughHermesLoginPage"],
     "sso": ["testSingleSignOnThroughIdentityProvider"],

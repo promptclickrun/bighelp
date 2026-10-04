@@ -4,6 +4,45 @@ import XCTest
 @testable import Bighelp
 
 final class DirectHermesManagementLiveTests: XCTestCase {
+    /// What Settings › System and Fleet read, against a stock host as it ships: a git install far
+    /// behind, its gateway stopped (Hermes sends nulls for the gateway's state then).
+    @MainActor
+    func testHostOperationsReadsAgainstIsolatedStockHost() async throws {
+        guard let path = ProcessInfo.processInfo.environment["DIRECT_PROBE_CONFIG"] else {
+            throw XCTSkip("Requires the disposable stock-host fixture.")
+        }
+        let config = try JSONDecoder().decode([String: String].self, from: Data(contentsOf: URL(fileURLWithPath: path)))
+        guard config["fixture_only"] == "true", config["address"]?.hasPrefix("http://127.0.0.1:") == true else {
+            throw XCTSkip("This probe is restricted to its disposable loopback host.")
+        }
+        let vault = DirectHermesKeychainVault(service: "app.loopdy.management-proof." + UUID().uuidString)
+        defer { try? vault.delete() }
+        let transport = try await DirectHermesClient.connect(address: XCTUnwrap(config["address"]),
+            auth: .token(XCTUnwrap(config["token"])), allowPrivateHTTP: true, vault: vault)
+        let owner = WorkspaceOwner(authority: try XCTUnwrap(transport.savedConnection.workspaceAuthority),
+            authenticationGeneration: UUID(), connectionGeneration: UUID())
+        let current: @MainActor () -> WorkspaceOwner? = { owner }
+        let operations = DirectHermesHostOperationsClient(rpc: transport, http: transport, owner: owner, currentOwner: current)
+        let checks: [(String, @MainActor () async throws -> Void)] = [
+            ("Overview", { _ = try await operations.overview(profileID: "default") }),
+            ("System statistics", { _ = try await operations.systemStats() }),
+            ("Egress state", { _ = try await operations.egressStatus() }),
+            ("Update check", { _ = try await operations.checkForUpdate(force: true) }),
+            ("Update receipt", { _ = try await operations.latestUpdateReceipt() }),
+            ("Checkpoints", { _ = try await operations.checkpoints() }),
+            ("Gateway migration plan", { _ = try await operations.gatewayMigrationPlan() }),
+            ("Shell hooks", { _ = try await operations.shellHooks() }),
+        ]
+        for (name, check) in checks {
+            do {
+                try await check()
+                print("HOST_OPERATIONS_READ_PASS \(name)")
+            } catch {
+                XCTFail("\(name) failed: \(String(reflecting: error))")
+            }
+        }
+    }
+
     @MainActor
     func testReadOnlyManagementAgainstIsolatedStockHost() async throws {
         guard let path = ProcessInfo.processInfo.environment["DIRECT_PROBE_CONFIG"] else {

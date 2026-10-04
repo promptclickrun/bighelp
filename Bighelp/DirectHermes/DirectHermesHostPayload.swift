@@ -106,51 +106,99 @@ enum DirectHermesHostPayload: DirectHermesPayloadDecoding {
         )
     }
 
-    static func updateSummary(_ value: BighelpJSONValue) throws -> HermesUpdateReceiptSummary {
+    /// `/api/status`. Hermes leaves the gateway's fields null while it's stopped or runs under
+    /// another profile, so only the version is required: a missing part hides one row, not the
+    /// whole System page.
+    static func overview(_ value: BighelpJSONValue) throws -> HermesHostOverview {
         let row = try object(value)
+        let componentRows = (try? object(row["components"] ?? .object([:]))) ?? [:]
+        let components = componentRows.prefix(128).compactMap { key, value -> HermesHostOverview.Component? in
+            guard let id = try? safeIdentifier(key, maximumBytes: 128), let component = try? object(value) else {
+                return nil
+            }
+            return .init(id: id, status: (try? optionalText(component["status"], maximumBytes: 128)) ?? "unknown")
+        }.sorted { $0.id.localizedStandardCompare($1.id) == .orderedAscending }
+        let gatewayRunning = try optionalBoolean(row["gateway_running"]) ?? false
+        let gatewayComponentState = componentRows["gateway"]
+            .flatMap { try? object($0) }
+            .flatMap { try? optionalText($0["state"], maximumBytes: 128) }
         return .init(
-            outcome: try text(row["outcome"], maximumBytes: 32),
-            startedAt: date(try optionalText(row["started_at"], maximumBytes: 128)),
-            finishedAt: date(try optionalText(row["finished_at"], maximumBytes: 128)),
-            preUpdateSHA: try optionalSHA(row["pre_sha"]),
-            postUpdateSHA: try optionalSHA(row["post_sha"]),
-            postUpdateVersion: try optionalText(row["post_version"], maximumBytes: 128),
-            fleetStates: try strings(row["fleet_states"], maximum: 32, maximumBytes: 64)
+            version: try text(row["version"], maximumBytes: 128),
+            releaseDate: try optionalText(row["release_date"], maximumBytes: 128),
+            gatewayRunning: gatewayRunning,
+            gatewayState: try optionalText(row["gateway_state"], maximumBytes: 128)
+                ?? gatewayComponentState ?? (gatewayRunning ? "running" : "stopped"),
+            gatewayBusy: try optionalBoolean(row["gateway_busy"]) ?? false,
+            gatewayDrainable: try optionalBoolean(row["gateway_drainable"]) ?? false,
+            gatewayMode: try optionalText(row["gateway_mode"], maximumBytes: 64) ?? "none",
+            gatewaySharedWith: try strings(row["gateway_shared_with"], maximum: 128, maximumBytes: 128),
+            activeAgents: try optionalInteger(row["active_agents"], range: 0...1_000_000) ?? 0,
+            activeSessions: try optionalInteger(row["active_sessions"], range: 0...1_000_000) ?? 0,
+            restartDrainTimeout: try optionalNumber(row["restart_drain_timeout"], range: 0...86_400) ?? 0,
+            overall: try optionalText(row["overall"], maximumBytes: 64) ?? "unknown",
+            components: components
         )
     }
 
+    /// The compact summary beside a receipt. Hermes sends null when it couldn't build one, and
+    /// commit IDs can be empty; either way the receipt itself still counts.
+    static func updateSummary(_ value: BighelpJSONValue, receipt: [String: BighelpJSONValue] = [:]) throws
+        -> HermesUpdateReceiptSummary {
+        guard let row = try? object(value) else {
+            return .init(
+                outcome: (try? optionalText(receipt["outcome"], maximumBytes: 32)) ?? "unknown",
+                startedAt: date((try? optionalText(receipt["started_at"], maximumBytes: 128)) ?? nil),
+                finishedAt: date((try? optionalText(receipt["finished_at"], maximumBytes: 128)) ?? nil),
+                preUpdateSHA: nil, postUpdateSHA: nil, postUpdateVersion: nil, fleetStates: []
+            )
+        }
+        return .init(
+            outcome: try optionalText(row["outcome"], maximumBytes: 32)
+                ?? (try? optionalText(receipt["outcome"], maximumBytes: 32)) ?? "unknown",
+            startedAt: date(try optionalText(row["started_at"], maximumBytes: 128)),
+            finishedAt: date(try optionalText(row["finished_at"], maximumBytes: 128)),
+            preUpdateSHA: lenientSHA(row["pre_sha"]),
+            postUpdateSHA: lenientSHA(row["post_sha"]),
+            postUpdateVersion: try optionalText(row["post_version"], maximumBytes: 128),
+            fleetStates: (try? strings(row["fleet_states"], maximum: 32, maximumBytes: 64)) ?? []
+        )
+    }
+
+    /// `hermes update`'s receipt. Rows that don't read are left out rather than failing the
+    /// update check that comes with it.
     static func updateReceipt(_ value: BighelpJSONValue) throws -> HermesUpdateReceipt {
         let envelope = try object(value)
         let receipt = try object(envelope["receipt"] ?? .null)
-        let summary = try updateSummary(envelope["summary"] ?? .null)
-        let schema = try integer(receipt["schema"], range: 1...1)
-        let steps = try array(receipt["steps"], maximum: 500).enumerated().map { index, value in
-            let row = try object(value)
+        let summary = try updateSummary(envelope["summary"] ?? .null, receipt: receipt)
+        let schema = try optionalInteger(receipt["schema"], range: 1...1_000) ?? 1
+        let steps = ((try? array(receipt["steps"], maximum: 500)) ?? []).enumerated().compactMap { index, value in
+            guard let row = try? object(value), let name = try? text(row["name"], maximumBytes: 256),
+                  let succeeded = try? boolean(row["ok"]) else { return nil as HermesUpdateReceipt.Step? }
             return HermesUpdateReceipt.Step(
-                index: index,
-                name: try text(row["name"], maximumBytes: 256),
-                succeeded: try boolean(row["ok"]),
-                occurredAt: date(try optionalText(row["at"], maximumBytes: 128))
+                index: index, name: name, succeeded: succeeded,
+                occurredAt: date((try? optionalText(row["at"], maximumBytes: 128)) ?? nil)
             )
         }
-        let skips = try array(receipt["skips"], maximum: 500).enumerated().map { index, value in
-            let row = try object(value)
+        let skips = ((try? array(receipt["skips"], maximum: 500)) ?? []).enumerated().compactMap { index, value in
+            guard let row = try? object(value), let name = try? text(row["name"], maximumBytes: 256) else {
+                return nil as HermesUpdateReceipt.Skip?
+            }
             return HermesUpdateReceipt.Skip(
-                index: index,
-                name: try text(row["name"], maximumBytes: 256),
-                occurredAt: date(try optionalText(row["at"], maximumBytes: 128))
+                index: index, name: name,
+                occurredAt: date((try? optionalText(row["at"], maximumBytes: 128)) ?? nil)
             )
         }
-        let fleet = try array(receipt["fleet"], maximum: 128).map { value in
-            let row = try object(value)
+        let fleet = ((try? array(receipt["fleet"], maximum: 128)) ?? []).compactMap { value in
+            guard let row = try? object(value),
+                  let name = try? text(row["profile"], maximumBytes: 128),
+                  let profile = try? safeIdentifier(name, maximumBytes: 128),
+                  let state = try? text(row["state"], maximumBytes: 64) else { return nil as HermesUpdateReceipt.FleetMember? }
             return HermesUpdateReceipt.FleetMember(
-                profile: try safeIdentifier(try text(row["profile"], maximumBytes: 128), maximumBytes: 128),
-                codeSHA: try optionalSHA(row["code_sha"]),
-                codeVersion: try optionalText(row["code_version"], maximumBytes: 128),
-                state: try text(row["state"], maximumBytes: 64)
+                profile: profile, codeSHA: lenientSHA(row["code_sha"]),
+                codeVersion: (try? optionalText(row["code_version"], maximumBytes: 128)) ?? nil, state: state
             )
         }
-        let gateway = try object(receipt["gateway_restart"] ?? .object([:]))
+        let gateway = (try? object(receipt["gateway_restart"] ?? .object([:]))) ?? [:]
         let incomplete: Bool?
         if gateway.isEmpty { incomplete = nil }
         else { incomplete = gateway["incomplete"]?.boolean }
@@ -158,6 +206,11 @@ enum DirectHermesHostPayload: DirectHermesPayloadDecoding {
             schema: schema, summary: summary, steps: steps, skips: skips,
             fleet: fleet, gatewayRestartIncomplete: incomplete
         )
+    }
+
+    /// A commit ID when it is one; empty or odd values (Hermes writes "" when it couldn't tell) are nil.
+    static func lenientSHA(_ value: BighelpJSONValue?) -> String? {
+        (try? optionalSHA(value)) ?? nil
     }
 
     static func sha(_ value: BighelpJSONValue?) throws -> String {

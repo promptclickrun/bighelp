@@ -6,35 +6,10 @@ extension DirectHermesHostOperationsClient {
         let query = try profileID.map {
             [URLQueryItem(name: "profile", value: try DirectHermesHostPayload.profile($0))]
         } ?? []
-        let object = try DirectHermesHostPayload.object(try await json(
+        return try DirectHermesHostPayload.overview(try await json(
             .init(path: "/api/status", method: .get, query: query, maximumResponseBytes: 256 * 1_024),
             feature: "host status"
         ))
-        let componentObject = try DirectHermesHostPayload.object(object["components"] ?? .object([:]))
-        guard componentObject.count <= 128 else { throw HostOperationsError.invalidResponse }
-        let components = try componentObject.map { key, value -> HermesHostOverview.Component in
-            let row = try DirectHermesHostPayload.object(value)
-            return .init(
-                id: try DirectHermesHostPayload.safeIdentifier(key, maximumBytes: 128),
-                status: try DirectHermesHostPayload.text(row["status"], maximumBytes: 128)
-            )
-        }.sorted { $0.id.localizedStandardCompare($1.id) == .orderedAscending }
-
-        return .init(
-            version: try DirectHermesHostPayload.text(object["version"], maximumBytes: 128),
-            releaseDate: try DirectHermesHostPayload.optionalText(object["release_date"], maximumBytes: 128),
-            gatewayRunning: try DirectHermesHostPayload.boolean(object["gateway_running"]),
-            gatewayState: try DirectHermesHostPayload.text(object["gateway_state"], maximumBytes: 128),
-            gatewayBusy: try DirectHermesHostPayload.boolean(object["gateway_busy"]),
-            gatewayDrainable: try DirectHermesHostPayload.boolean(object["gateway_drainable"]),
-            gatewayMode: try DirectHermesHostPayload.text(object["gateway_mode"], maximumBytes: 64),
-            gatewaySharedWith: try DirectHermesHostPayload.strings(object["gateway_shared_with"], maximum: 128, maximumBytes: 128),
-            activeAgents: try DirectHermesHostPayload.integer(object["active_agents"], range: 0...1_000_000),
-            activeSessions: try DirectHermesHostPayload.integer(object["active_sessions"], range: 0...1_000_000),
-            restartDrainTimeout: try DirectHermesHostPayload.number(object["restart_drain_timeout"], range: 0...86_400),
-            overall: try DirectHermesHostPayload.text(object["overall"], maximumBytes: 64),
-            components: components
-        )
     }
 
     func systemStats() async throws -> HermesSystemStats {

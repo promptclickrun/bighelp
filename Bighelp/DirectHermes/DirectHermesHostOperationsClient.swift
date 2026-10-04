@@ -82,7 +82,7 @@ final class DirectHermesHostOperationsClient: HermesHostActionStatusClient {
         } else {
             correlation = .pendingIdentity
         }
-        let updateSummary = try object["receipt"].map(DirectHermesHostPayload.updateSummary)
+        let updateSummary = try object["receipt"].map { try DirectHermesHostPayload.updateSummary($0) }
         return .init(
             action: receipt.action, phase: phase, processID: pid,
             actionID: actionID, correlation: correlation,

@@ -1,0 +1,24 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "bighelp-catalog",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-22",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "catalog.bighelp.app", "custom_domain": true }],
+  "observability": { "enabled": true },
+  "send_metrics": false,
+  "limits": { "cpu_ms": 200 },
+  // Secrets, set with `wrangler secret put <NAME>` (see README › Develop and deploy):
+  // TURNSTILE_SECRET (the "bighelp Template Catalog submit" widget), ACCESS_TEAM_DOMAIN and
+  // ACCESS_AUD_REVIEW (the review Access app). The team domain names the account owner, so it stays
+  // out of this public repo.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "bighelp-catalog",
+      "database_id": "da7d9678-bc63-472b-be94-ce9bdd01ec07",
+      "migrations_dir": "./migrations"
+    }
+  ]
+}

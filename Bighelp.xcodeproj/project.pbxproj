@@ -1187,6 +1187,7 @@
 		F05608BEE6FF8381FB17A894 /* SessionMaintenanceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 401D0D342478A78D54E3644D /* SessionMaintenanceStore.swift */; };
 		F0854C20EBD5AEFDD27B8BF3 /* WikiRecoveryWork.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44CF3CAEB4FD4B78F984FF5E /* WikiRecoveryWork.swift */; };
 		F08CD5D4DE40EFBC72178493 /* DirectHermesLocalRecoveryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88FBB20C1E68270DDFA90BCA /* DirectHermesLocalRecoveryView.swift */; };
+		F0AD0020E69F586FEB91B60A /* NotificationChatRoutingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD6FD6401E7772A4E6F302CD /* NotificationChatRoutingTests.swift */; };
 		F0FAF8A1CC9DADBDDCC8275A /* BighelpBuzzKitRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FB7E0EB692CC87455A9E67B /* BighelpBuzzKitRuntime.swift */; };
 		F11176EB450930F8E8E983DC /* BighelpNotificationGrouping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 284257AC13E13E5859B88C21 /* BighelpNotificationGrouping.swift */; };
 		F1562FA78D50387FF05BA312 /* DirectHermesVoiceClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 156C32372A4D91EB1456BAB2 /* DirectHermesVoiceClientTests.swift */; };
@@ -2249,6 +2250,7 @@
 		ACFD343C02B210E5028EAECA /* ChatCapabilityControlSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatCapabilityControlSheet.swift; sourceTree = "<group>"; };
 		AD099D1782E37EF7351F4BA0 /* ComposerReturnKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerReturnKey.swift; sourceTree = "<group>"; };
 		AD1C877CBBFBA2516F7DC78C /* ChatModel+Attachments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ChatModel+Attachments.swift"; sourceTree = "<group>"; };
+		AD6FD6401E7772A4E6F302CD /* NotificationChatRoutingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationChatRoutingTests.swift; sourceTree = "<group>"; };
 		ADBA5038A7DACA3C8A70AE75 /* ChatComposerActionButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatComposerActionButton.swift; sourceTree = "<group>"; };
 		ADCC3B055B82A96326367C2B /* HermesFolderPath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesFolderPath.swift; sourceTree = "<group>"; };
 		ADFF00C55265678FAB02CD2C /* WorkspaceOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceOperation.swift; sourceTree = "<group>"; };
@@ -3681,6 +3683,7 @@
 				CFD2EB9171DAF6783C60499D /* NativeWorkspaceSessionBridgeTests.swift */,
 				796D456E65153197E2D8FF67 /* NewChatCoordinatorTests.swift */,
 				D7300A82F304603F649DDD43 /* NotificationBundleConfigurationTests.swift */,
+				AD6FD6401E7772A4E6F302CD /* NotificationChatRoutingTests.swift */,
 				9D991F2297EDB2BF848F9013 /* NotificationGroupingTests.swift */,
 				F2038A52DC5309296BB3CB20 /* NotificationPresentationTests.swift */,
 				D733A935B040D1310BC2E6A6 /* PendingHostCredentialTests.swift */,
@@ -6169,6 +6172,7 @@
 				E7F94962F9DE60E9D5ED47D0 /* NativeWorkspaceSessionBridgeTests.swift in Sources */,
 				F748D31409E3D5790C8B3F97 /* NewChatCoordinatorTests.swift in Sources */,
 				88ED87F9AC0696EC231467DF /* NotificationBundleConfigurationTests.swift in Sources */,
+				F0AD0020E69F586FEB91B60A /* NotificationChatRoutingTests.swift in Sources */,
 				3B730B548D32F133E176F612 /* NotificationGroupingTests.swift in Sources */,
 				ED69174309D4579A06E663A3 /* NotificationPresentationTests.swift in Sources */,
 				5F0B8C5D04DD1928B9A2878A /* PendingHostCredentialTests.swift in Sources */,

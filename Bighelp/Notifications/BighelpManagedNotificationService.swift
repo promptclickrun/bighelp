@@ -468,6 +468,20 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
 
     /// The event coordinate comes from the BuzzKit/APNs payload, but authority is
     /// re-established from the local grant ledger and authenticated host readback.
+    /// The computer an alert came from, from what's saved on the phone (its grant), without asking it.
+    func host(forEvent eventID: String, eventType: String) -> BighelpConfiguredHost? {
+        let pieces = eventID.split(separator: ":", omittingEmptySubsequences: false)
+        guard pieces.count == 2, ManagedNotificationValidation.eventTypes.contains(eventType) else { return nil }
+        let matches = ledger.enrollments.filter { record in
+            record.enabled && !record.revokePending && record.grant?.grantId == String(pieces[0])
+                && record.grant?.eventTypes.contains(eventType) == true
+        }
+        guard matches.count == 1, let record = matches.first else { return nil }
+        return registry.hosts.first {
+            $0.notificationScope == record.accountScope && $0.hostConnectionID == record.hostConnectionID
+        }
+    }
+
     func openVerifiedEvent(eventID: String, eventType: String,
                            isCurrent: @escaping @MainActor () -> Bool) async throws -> DirectHermesChat {
         let pieces = eventID.split(separator: ":", omittingEmptySubsequences: false)

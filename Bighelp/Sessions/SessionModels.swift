@@ -557,3 +557,16 @@ extension SessionCatalogClient {
 
     func resetForAccountBoundary() {}
 }
+
+extension SessionRecord {
+    /// The saved one-agent chat a notification names by `ManagedNotificationValidation.sessionReference`.
+    static func matching(reference: String, profileID: String, in records: [SessionRecord]) -> SessionRecord? {
+        let matches = records.filter { record in
+            record.kind == .direct && record.agentIDs == [profileID]
+                && record.remoteStoredID.map {
+                    ManagedNotificationValidation.sessionReference(profile: profileID, session: $0) == reference
+                } == true
+        }
+        return matches.count == 1 ? matches[0] : nil
+    }
+}

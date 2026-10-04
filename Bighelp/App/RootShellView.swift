@@ -309,6 +309,10 @@ struct RootShellView: View {
         .onChange(of: BighelpExternalSessionOpenCenter.shared.pending, initial: true) { _, open in
             if let open { openExternalSession(open) }
         }
+        // A tapped alert from a cold start: its chat opens as soon as the saved list is read.
+        .onChange(of: sessionCatalog.records.count) { _, _ in
+            if let open = BighelpExternalSessionOpenCenter.shared.pending { openExternalSession(open) }
+        }
     }
 
     var nativeWorkspaceStore: DirectHermesWorkspaceStore? {
@@ -1251,6 +1255,9 @@ struct RootShellView: View {
             guard BighelpExternalSessionOpenCenter.shared.consume(open) else { return }
             handleIncomingURL(BighelpWidgetSnapshot.chatURL(sessionID))
             return
+        case .reference(let profileID, let reference):
+            openNotifiedChat(open, profileID: profileID, reference: reference)
+            return
         case .stored:
             break
         }
@@ -1266,6 +1273,27 @@ struct RootShellView: View {
             } catch {
                 actionErrorMessage = "This conversation could not be opened. Try again from Chats."
             }
+        }
+    }
+
+    /// A tapped alert's chat. Saved on the phone, it opens at once from its saved history and
+    /// catches up when the host answers; a chat the phone hasn't seen yet waits for the host's list.
+    private func openNotifiedChat(_ open: BighelpExternalSessionOpen, profileID: String, reference: String) {
+        guard nativeRuntime != nil || usesDemoFixtures else { return }
+        if let record = SessionRecord.matching(reference: reference, profileID: profileID, in: sessionCatalog.records) {
+            guard BighelpExternalSessionOpenCenter.shared.consume(open) else { return }
+            openSession(record.summary)
+            return
+        }
+        guard acceptsIncomingLinks, BighelpExternalSessionOpenCenter.shared.consume(open) else { return }
+        Task { @MainActor in
+            try? await sessionCatalog.load(requireAuthoritativeRefresh: true)
+            guard let record = SessionRecord.matching(reference: reference, profileID: profileID,
+                                                      in: sessionCatalog.records) else {
+                actionErrorMessage = "This conversation is no longer on your computer."
+                return
+            }
+            openSession(record.summary)
         }
     }
 
@@ -1467,8 +1495,10 @@ private extension BighelpIncomingURLRoute {
     /// Routes that open a chat or the agent home need the host's workspace.
     var opensWorkspaceContent: Bool {
         switch self {
-        case .home, .chat, .newChat, .agentChat, .agent, .kanban, .approval, .group, .agents, .projects: true
-        case .scheduledTasks, .scheduledTask, .sessions, .settings: false
+        case .home, .chat, .newChat, .agentChat, .kanban, .approval, .group, .projects: true
+        // Feed, Ideas, Goals and Agents show their saved items and refresh themselves; waiting for
+        // the host before even switching tabs made these links feel broken.
+        case .agent, .agents, .scheduledTasks, .scheduledTask, .sessions, .settings: false
         }
     }
 }

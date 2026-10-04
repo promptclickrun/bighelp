@@ -349,6 +349,17 @@ final class BighelpManagedNotificationComposition: HostNotificationSetupServing 
             registry?.notificationSetupError = "This managed notification did not contain a valid event type. No conversation was opened."
             return
         }
+        // Straight to the chat: the alert names its computer (its grant), agent and chat, and the
+        // phone already has that chat saved. Asking the host first took seconds and failed whenever
+        // the app reconnected meanwhile.
+        if let reference = open.sessionReference, let profile = open.agentID,
+           let host = integration.service.host(forEvent: open.eventID, eventType: type), let registry {
+            if registry.selectedHostID != host.id { registry.select(host.id) }
+            if registry.selectedHostID == host.id {
+                BighelpExternalSessionOpenCenter.shared.request(profileID: profile, sessionReference: reference)
+                return
+            }
+        }
         do {
             let chat = try await integration.hooks.openManagedEvent(open.eventID, type) {
                 !Task.isCancelled && self.isCurrent(owner)

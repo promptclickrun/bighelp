@@ -117,6 +117,9 @@ struct BighelpProactiveNotificationOpen: Equatable, Sendable {
     let sessionID: String?
     let agentID: String?
     private(set) var hostGrantID: String? = nil
+    /// The alert's chat as a digest of agent and session (`ManagedNotificationValidation.sessionReference`):
+    /// enough to open it from the phone's saved chat list without asking the host.
+    private(set) var sessionReference: String? = nil
 
     init?(userInfo: [String: String]) {
         guard
@@ -160,6 +163,9 @@ struct BighelpProactiveNotificationOpen: Equatable, Sendable {
             sessionID = nil
             agentID = BighelpNotificationPayloadValue.dictionary(payload["agent"])?["id"] as? String
             hostGrantID = grantID
+            sessionReference = (payload["sessionReference"] as? String).flatMap {
+                $0.range(of: "^[A-Za-z0-9_-]{43}$", options: .regularExpression) == nil ? nil : $0
+            }
             return
         }
         return nil

@@ -10,7 +10,11 @@ struct ConfiguredWorkspaceArtifactsView: View {
     let performer: any WorkspaceOperationPerforming
     let currentOwner: @MainActor () -> WorkspaceOwner?
     var isEmbedded = false
+    /// Offered when Hermes can't find the agent's folder.
+    var folderChooser: WorkspaceFolderChooser?
     @State private var scope: DirectHermesWorkspaceFileScope?
+    @State private var canChooseFolder = false
+    @State private var isChoosingFolder = false
     @State private var scopeClient: DirectHermesManagedFilesClient?
     @State private var artifactClient: DirectHermesArtifactClient?
     @State private var isLoading = true
@@ -31,8 +35,19 @@ struct ConfiguredWorkspaceArtifactsView: View {
                 } description: {
                     Text(errorMessage ?? "The host has not confirmed its configured workspace.")
                 } actions: {
+                    if canChooseFolder, folderChooser != nil {
+                        Button("Choose Workspace Folder") { isChoosingFolder = true }
+                            .buttonStyle(.borderedProminent)
+                            .accessibilityIdentifier("workspace.choose-folder")
+                    }
                     Button("Try Again") { Task { await loadScope() } }
                 }
+            }
+        }
+        .sheet(isPresented: $isChoosingFolder) {
+            if let folderChooser {
+                WorkspaceFolderPicker(chooser: folderChooser) { Task { await loadScope() } }
+                    .bighelpSheetSize(.standard)
             }
         }
         .navigationTitle(isEmbedded ? "" : "Artifacts")
@@ -76,6 +91,7 @@ struct ConfiguredWorkspaceArtifactsView: View {
             scopeClient = nil
             artifactClient = nil
             errorMessage = Self.message(for: error)
+            canChooseFolder = WorkspaceFolderChooser.canFix(error)
         }
     }
 }

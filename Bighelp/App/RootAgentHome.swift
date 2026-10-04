@@ -332,6 +332,14 @@ extension RootShellView {
         ]
     }
 
+    /// Picks the agent's workspace folder when Hermes can't find one: the profile Files reads from.
+    func workspaceFolderChooser(owner: WorkspaceOwner) -> WorkspaceFolderChooser? {
+        guard let client = workspaceConnections?.workspace as? DirectHermesWorkspaceClient,
+              let profile = client.nativeContext?.servingProfileID ?? homeAgent?.id
+        else { return nil }
+        return .live(client: client, owner: owner, profileID: profile)
+    }
+
     @ViewBuilder
     var appsArtifacts: some View {
         if let owner = currentWorkspaceOwner, let performer = workspaceConnections?.workspace,
@@ -339,7 +347,7 @@ extension RootShellView {
             ConfiguredWorkspaceArtifactsView(
                 hostName: workspaceHostName, owner: owner, http: direct, performer: performer,
                 currentOwner: { workspaceConnections?.workspace === performer ? currentWorkspaceOwner : nil },
-                isEmbedded: true
+                isEmbedded: true, folderChooser: workspaceFolderChooser(owner: owner)
             )
             .id(owner)
         } else {

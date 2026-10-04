@@ -70,7 +70,8 @@ extension RootShellView {
                             owner: owner,
                             http: direct,
                             performer: performer,
-                            currentOwner: { workspaceConnections?.workspace === performer ? currentWorkspaceOwner : nil }
+                            currentOwner: { workspaceConnections?.workspace === performer ? currentWorkspaceOwner : nil },
+                            folderChooser: workspaceFolderChooser(owner: owner)
                         )
                         .id(owner)
                     } else {

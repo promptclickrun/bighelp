@@ -271,6 +271,13 @@ final class DirectHermesWorkspaceClient: WorkspaceOperationPerforming {
                payload["scope"] == nil {
                 return .rpc(operation.rawValue, payload)
             }
+            // The agent's working folder, picked in Files when Hermes can't find its workspace: a full
+            // path on the host, never a session's.
+            if operation == .configSet, payload["key"]?.string == "terminal.cwd", payload["session_id"] == nil,
+               payload["scope"] == nil, let path = payload["value"]?.string, path.hasPrefix("/"),
+               path.utf8.count <= 4_096, !path.unicodeScalars.contains(where: { $0.value < 0x20 }) {
+                return .rpc(operation.rawValue, payload)
+            }
             guard let key = payload["key"]?.string, ["reasoning", "model"].contains(key),
                   payload["scope"] == nil || payload["scope"] == .string("global")
                     || (payload["scope"] == .string("session") && payload["session_id"]?.string != nil),

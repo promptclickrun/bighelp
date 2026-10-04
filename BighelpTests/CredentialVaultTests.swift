@@ -20,32 +20,88 @@ struct CredentialVaultTests {
     }
 
     @Test func aLoginIsSentTheWayHermesStoresIt() throws {
-        let request = try CredentialVault.request(for: .login(site: "example.com/login", identifier: " sam@example.com ",
+        let requests = try CredentialVault.requests(for: .login(sites: ["example.com/login"], identifier: " sam@example.com ",
             password: "made-up-pass", authenticatorKey: "JBSWY3DPEHPK3PXP")).get()
+        let request = try #require(requests.first)
+        #expect(requests.count == 1)
         #expect(request["kind"] == .string("login"))
-        #expect(request["label"] == .string("example.com"))
+        #expect(request["label"] == .string("example.com"), "Named for the site unless given a name")
         #expect(request["origin"] == .string("https://example.com"))
         #expect(request["secret"] == .object(["identifier_type": .string("email"), "identifier": .string("sam@example.com"),
                                              "password": .string("made-up-pass"), "otp_secret": .string("JBSWY3DPEHPK3PXP")]))
     }
 
     @Test func aCardKeepsOnlyItsLastDigitsInTheLabel() throws {
-        let request = try CredentialVault.request(for: .card(name: "Sam Example", number: "4242 4242 4242 4242",
-            month: "3", year: "29", securityCode: "123", postalCode: "")).get()
+        let request = try #require(try CredentialVault.requests(for: .card(name: "Sam Example", number: "4242 4242 4242 4242",
+            month: "3", year: "29", securityCode: "123", postalCode: "")).get().first)
         #expect(request["label"] == .string("Card ending 4242"))
+        #expect(request["origin"] == nil)
         #expect(request["secret"]?.object?["card_number"] == .string("4242424242424242"))
         #expect(request["secret"]?.object?["exp_month"] == .string("03"))
         #expect(request["secret"]?.object?["exp_year"] == .string("2029"))
         #expect(request["secret"]?.object?["billing_postal_code"] == nil)
     }
 
+    /// Hermes fills a card or address only on a site it's linked to, one site per saved copy.
+    @Test func aNamedCardIsSavedOncePerSite() throws {
+        let requests = try CredentialVault.requests(for: .card(label: " Everyday Visa ",
+            sites: ["shop.example.org", "", "https://parts.example.net/checkout", "SHOP.example.org"],
+            name: "", number: "4242424242424242", month: "12", year: "2031", securityCode: "123", postalCode: "")).get()
+        #expect(requests.map { $0["origin"] } == [.string("https://shop.example.org"), .string("https://parts.example.net")])
+        #expect(requests.allSatisfy { $0["label"] == .string("Everyday Visa ending 4242") })
+        let address = try CredentialVault.requests(for: .address(label: "", sites: ["shop.example.org"], line1: "1 Main St",
+            line2: "", city: "Springfield", state: "", postalCode: "00000", country: "US")).get()
+        #expect(address.first?["label"] == .string("Address"))
+        #expect(address.first?["origin"] == .string("https://shop.example.org"))
+        let login = try CredentialVault.requests(for: .login(label: "Work email", sites: ["mail.example.com", "example.com"],
+            identifier: "sam", password: "made-up-pass", authenticatorKey: "")).get()
+        #expect(login.count == 2 && login.allSatisfy { $0["label"] == .string("Work email") })
+    }
+
     @Test func incompleteItemsSayWhatsMissing() {
-        #expect(CredentialVault.request(for: .login(site: "example.com", identifier: "", password: "x",
-                                                    authenticatorKey: "")).failure == .identifier)
-        #expect(CredentialVault.request(for: .card(name: "", number: "4242", month: "1", year: "2030",
-                                                   securityCode: "123", postalCode: "")).failure == .cardNumber)
-        #expect(CredentialVault.request(for: .address(label: "Home", line1: "1 Main St", line2: "", city: "",
+        #expect(CredentialVault.requests(for: .login(sites: ["example.com"], identifier: "", password: "x",
+                                                     authenticatorKey: "")).failure == .identifier)
+        #expect(CredentialVault.requests(for: .login(sites: [""], identifier: "sam", password: "x",
+                                                     authenticatorKey: "")).failure == .site, "A login needs a site")
+        #expect(CredentialVault.requests(for: .card(sites: ["not a site"], name: "", number: "4242424242424242",
+            month: "1", year: "2030", securityCode: "123", postalCode: "")).failure == .site)
+        #expect(CredentialVault.requests(for: .card(name: "", number: "4242", month: "1", year: "2030",
+                                                    securityCode: "123", postalCode: "")).failure == .cardNumber)
+        #expect(CredentialVault.requests(for: .address(label: "Home", line1: "1 Main St", line2: "", city: "",
             state: "", postalCode: "00000", country: "US")).failure == .address)
+    }
+
+    @Test func copiesOfOneItemShowAsOneWithItsSites() async {
+        let model = CredentialVaultModel(service: DemoCredentialVaultService(),
+                                         agents: [.init(id: "default", name: "Default")], agentID: "default")
+        await model.load()
+        let cards = model.groups.filter { $0.kind == .payment }
+        let everyday = cards.first { $0.label == "Everyday Visa ending 4242" }
+        #expect(everyday?.sites == ["shop.example.org", "parts.example.net"])
+        #expect(everyday?.typedLabel == "Everyday Visa")
+        #expect(everyday?.isUsable == true)
+        let unlinked = cards.first { $0.label == "Card ending 1881" }
+        #expect(unlinked?.isUsable == false, "A card with no site can't be filled anywhere")
+        #expect(unlinked?.typedLabel == "")
+    }
+
+    @Test func editingReplacesTheOldCopiesOnlyOnceTheNewOnesAreSaved() async throws {
+        let model = CredentialVaultModel(service: DemoCredentialVaultService(),
+                                         agents: [.init(id: "default", name: "Default")], agentID: "default")
+        await model.load()
+        let old = try #require(model.groups.first { $0.label == "Card ending 1881" })
+        let saved = await model.save(.card(label: "Travel card", sites: ["air.example.com"], name: "",
+            number: "5555555555551881", month: "4", year: "2030", securityCode: "321", postalCode: ""), replacing: old)
+        #expect(saved)
+        #expect(!model.items.contains { $0.id == old.id })
+        let renamed = model.groups.first { $0.label == "Travel card ending 1881" }
+        #expect(renamed?.sites == ["air.example.com"])
+
+        let before = model.items.count
+        let refused = await model.save(.card(label: "Broken", name: "", number: "12", month: "4", year: "2030",
+                                             securityCode: "321", postalCode: ""), replacing: renamed)
+        #expect(!refused)
+        #expect(model.items.count == before, "A failed edit keeps what was there")
     }
 
     @Test func savingAddsTheItemForTheChosenAgentAndListsIt() async {
@@ -55,7 +111,7 @@ struct CredentialVaultTests {
                                          agentID: "juniper")
         await model.load()
         #expect(model.state == .ready)
-        let saved = await model.save(.login(site: "example.com", identifier: "sam", password: "made-up-pass",
+        let saved = await model.save(.login(sites: ["example.com"], identifier: "sam", password: "made-up-pass",
                                             authenticatorKey: ""))
         #expect(saved)
         #expect(model.items.map(\.label).contains("example.com"))

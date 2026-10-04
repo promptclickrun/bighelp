@@ -75,12 +75,70 @@ struct CredentialVaultSource: Identifiable, Equatable, Sendable {
 }
 
 /// A new item, typed on this device. Its secrets exist only in this value
-/// until it's sent once.
+/// until it's sent once. `label` is the name people and agents see; `sites` are
+/// where an agent may use it (Hermes fills cards and addresses only on a site
+/// they're linked to).
 enum CredentialVaultEntry {
-    case login(site: String, identifier: String, password: String, authenticatorKey: String)
-    case card(name: String, number: String, month: String, year: String, securityCode: String, postalCode: String)
-    case address(label: String, line1: String, line2: String, city: String, state: String,
+    case login(label: String = "", sites: [String], identifier: String, password: String, authenticatorKey: String)
+    case card(label: String = "", sites: [String] = [], name: String, number: String, month: String, year: String,
+              securityCode: String, postalCode: String)
+    case address(label: String, sites: [String] = [], line1: String, line2: String, city: String, state: String,
                  postalCode: String, country: String)
+}
+
+/// Saved copies of one item. Hermes binds each local item to a single site, so an item used on
+/// several sites is saved once per site under the same name; the vault shows them as one.
+struct CredentialVaultGroup: Identifiable, Equatable {
+    let items: [CredentialVaultItem]
+
+    var id: String { items[0].id }
+    var kind: CredentialVaultItem.Kind { items[0].kind }
+    var label: String { items[0].label }
+    var identifier: String? { items[0].identifier }
+    var isLocal: Bool { items[0].isLocal }
+    var source: String { items[0].source }
+    var generatesCodes: Bool { items.contains(where: \.generatesCodes) }
+    /// Sites by host, in the order they were saved.
+    var sites: [String] {
+        var seen = Set<String>()
+        return items.compactMap { $0.origin.flatMap { URLComponents(string: $0)?.host ?? $0 } }
+            .filter { seen.insert($0).inserted }
+    }
+    /// Whether an agent can use it at all: cards and addresses need a site.
+    var isUsable: Bool { kind == .login || !sites.isEmpty }
+
+    /// The name as typed, without what bighelp adds ("ending 4242", a login's default host).
+    var typedLabel: String {
+        switch kind {
+        case .payment:
+            guard let range = label.range(of: #" ?ending \d{4}$"#, options: .regularExpression) else { return label }
+            let name = String(label[..<range.lowerBound])
+            return name == "Card" ? "" : name
+        case .login: return sites.first == label ? "" : label
+        case .address: return label == "Address" ? "" : label
+        }
+    }
+
+    var kindTitle: String {
+        switch kind {
+        case .login: "Login"
+        case .payment: "Card"
+        case .address: "Address"
+        }
+    }
+
+    /// Local copies with the same kind, name and username are one item; anything from a password
+    /// manager stays as it is.
+    static func grouped(_ items: [CredentialVaultItem]) -> [CredentialVaultGroup] {
+        var order: [String] = []
+        var groups: [String: [CredentialVaultItem]] = [:]
+        for item in items {
+            let key = item.isLocal ? "\(item.kind.rawValue)\u{1F}\(item.label)\u{1F}\(item.identifier ?? "")" : "id:" + item.id
+            if groups[key] == nil { order.append(key) }
+            groups[key, default: []].append(item)
+        }
+        return order.compactMap { groups[$0].map(CredentialVaultGroup.init(items:)) }
+    }
 }
 
 enum CredentialVault {
@@ -97,12 +155,39 @@ enum CredentialVault {
         return scheme + "://" + host + (parts.port.map { ":\($0)" } ?? "")
     }
 
-    /// What Hermes stores for a new item, or a plain reason it can't be saved.
-    static func request(for entry: CredentialVaultEntry) -> Result<[String: BighelpJSONValue], EntryProblem> {
+    static let maximumSites = 10
+
+    /// The sites typed, as origins without repeats; empty boxes are skipped.
+    static func origins(from sites: [String]) -> Result<[String], EntryProblem> {
+        var origins: [String] = []
+        for typed in sites where !typed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            guard let origin = origin(from: typed) else { return .failure(.site) }
+            if !origins.contains(origin) { origins.append(origin) }
+        }
+        guard origins.count <= maximumSites else { return .failure(.tooManySites) }
+        return .success(origins)
+    }
+
+    /// What Hermes stores for a new item, one request per site, or a plain reason it can't be saved.
+    static func requests(for entry: CredentialVaultEntry) -> Result<[[String: BighelpJSONValue]], EntryProblem> {
         func field(_ value: String) -> String { value.trimmingCharacters(in: .whitespacesAndNewlines) }
+        func named(_ label: String, limit: Int = 120) -> String? {
+            let name = field(label)
+            return name.isEmpty ? nil : String(name.prefix(limit))
+        }
+        func perSite(_ base: [String: BighelpJSONValue], _ sites: [String]) -> Result<[[String: BighelpJSONValue]], EntryProblem> {
+            Self.origins(from: sites).map { targets in
+                targets.isEmpty ? [base] : targets.map { base.merging(["origin": .string($0)]) { _, new in new } }
+            }
+        }
         switch entry {
-        case .login(let site, let identifier, let password, let authenticatorKey):
-            guard let origin = origin(from: site) else { return .failure(.site) }
+        case .login(let label, let sites, let identifier, let password, let authenticatorKey):
+            let targets: [String]
+            switch Self.origins(from: sites) {
+            case .success(let value): targets = value
+            case .failure(let problem): return .failure(problem)
+            }
+            guard let first = targets.first else { return .failure(.site) }
             let name = field(identifier)
             guard !name.isEmpty, name.utf8.count <= 512 else { return .failure(.identifier) }
             guard !password.isEmpty, password.utf8.count <= 4_096 else { return .failure(.password) }
@@ -116,10 +201,10 @@ enum CredentialVault {
                 guard key.utf8.count <= 2_048 else { return .failure(.authenticatorKey) }
                 secret["otp_secret"] = .string(key)
             }
-            let host = URLComponents(string: origin)?.host ?? origin
-            return .success(["kind": .string("login"), "label": .string(host), "origin": .string(origin),
-                             "secret": .object(secret)])
-        case .card(let name, let number, let month, let year, let securityCode, let postalCode):
+            let title = named(label) ?? URLComponents(string: first)?.host ?? first
+            return .success(targets.map { ["kind": .string("login"), "label": .string(title), "origin": .string($0),
+                                           "secret": .object(secret)] })
+        case .card(let label, let sites, let name, let number, let month, let year, let securityCode, let postalCode):
             let digits = number.filter(\.isNumber)
             guard (12...19).contains(digits.count), digits.count == number.filter({ !$0.isWhitespace && $0 != "-" }).count
             else { return .failure(.cardNumber) }
@@ -135,9 +220,10 @@ enum CredentialVault {
             ]
             if !field(name).isEmpty { secret["cardholder_name"] = .string(String(field(name).prefix(200))) }
             if !field(postalCode).isEmpty { secret["billing_postal_code"] = .string(String(field(postalCode).prefix(20))) }
-            return .success(["kind": .string("payment"), "label": .string("Card ending \(digits.suffix(4))"),
-                             "secret": .object(secret)])
-        case .address(let label, let line1, let line2, let city, let state, let postalCode, let country):
+            // The last digits stay in the name so the person and Hermes' "fill this card?" know which card.
+            let title = "\(named(label, limit: 100) ?? "Card") ending \(digits.suffix(4))"
+            return perSite(["kind": .string("payment"), "label": .string(title), "secret": .object(secret)], sites)
+        case .address(let label, let sites, let line1, let line2, let city, let state, let postalCode, let country):
             let required = [field(line1), field(city), field(postalCode), field(country)]
             guard required.allSatisfy({ !$0.isEmpty && $0.utf8.count <= 300 }) else { return .failure(.address) }
             var secret: [String: BighelpJSONValue] = [
@@ -146,17 +232,18 @@ enum CredentialVault {
             ]
             if !field(line2).isEmpty { secret["address_line2"] = .string(String(field(line2).prefix(300))) }
             if !field(state).isEmpty { secret["state"] = .string(String(field(state).prefix(100))) }
-            let name = field(label).isEmpty ? "Address" : String(field(label).prefix(120))
-            return .success(["kind": .string("address"), "label": .string(name), "secret": .object(secret)])
+            return perSite(["kind": .string("address"), "label": .string(named(label) ?? "Address"),
+                            "secret": .object(secret)], sites)
         }
     }
 
     enum EntryProblem: Error, Equatable {
-        case site, identifier, password, authenticatorKey, cardNumber, expiry, securityCode, address
+        case site, tooManySites, identifier, password, authenticatorKey, cardNumber, expiry, securityCode, address
 
         var message: String {
             switch self {
-            case .site: "Enter the site's address, like example.com."
+            case .site: "Enter each site's address, like example.com."
+            case .tooManySites: "Link up to \(CredentialVault.maximumSites) sites."
             case .identifier: "Enter the email or username you sign in with."
             case .password: "Enter the password."
             case .authenticatorKey: "That authenticator key is too long."
@@ -234,29 +321,47 @@ final class CredentialVaultModel: Identifiable {
         }
     }
 
-    /// Sends a new item once. Returns whether Hermes saved it.
-    func save(_ entry: CredentialVaultEntry) async -> Bool {
+    var groups: [CredentialVaultGroup] { CredentialVaultGroup.grouped(items) }
+
+    /// Sends a new item once per site. Editing replaces the old copies, which go only after every new
+    /// one is saved, so a failed edit never loses what was there. Returns whether all were saved.
+    func save(_ entry: CredentialVaultEntry, replacing old: CredentialVaultGroup? = nil) async -> Bool {
         guard !isWorking else { return false }
-        let request: [String: BighelpJSONValue]
-        switch CredentialVault.request(for: entry) {
-        case .success(let value): request = value
+        let requests: [[String: BighelpJSONValue]]
+        switch CredentialVault.requests(for: entry) {
+        case .success(let value): requests = value
         case .failure(let problem):
             message = problem.message
             return false
         }
         isWorking = true
         defer { isWorking = false }
-        do {
-            _ = try await service.call("vault.add", params: profile.merging(request) { _, new in new })
-            message = nil
-            await load()
-            return true
-        } catch {
-            message = Self.isUnsupported(error)
-                ? "This needs a newer Hermes on your computer."
-                : "Hermes couldn't save that. Check the details and try again."
-            return false
+        var saved = 0
+        for request in requests {
+            do {
+                _ = try await service.call("vault.add", params: profile.merging(request) { _, new in new })
+                saved += 1
+            } catch {
+                message = Self.isUnsupported(error)
+                    ? "This needs a newer Hermes on your computer."
+                    : saved == 0 ? "Hermes couldn't save that. Check the details and try again."
+                    : "Saved for \(saved) of \(requests.count) sites. Try the rest again."
+                await load()
+                return false
+            }
         }
+        if let old {
+            for item in old.items where item.isLocal {
+                _ = try? await service.call("vault.remove", params: profile.merging(["id": .string(item.id)]) { _, new in new })
+            }
+        }
+        message = nil
+        await load()
+        return true
+    }
+
+    func remove(_ group: CredentialVaultGroup) async {
+        for item in group.items { await remove(item) }
     }
 
     private(set) var importProgress: (done: Int, total: Int)?
@@ -275,8 +380,9 @@ final class CredentialVaultModel: Identifiable {
             if !login.authenticatorKey.isEmpty { keys.append("") }
             var saved = false
             for key in keys where !saved {
-                guard case .success(let request) = CredentialVault.request(for: .login(site: login.origin,
-                    identifier: login.identifier, password: login.password, authenticatorKey: key)) else { continue }
+                guard case .success(let requests) = CredentialVault.requests(for: .login(sites: [login.origin],
+                    identifier: login.identifier, password: login.password, authenticatorKey: key)),
+                      let request = requests.first else { continue }
                 saved = (try? await service.call("vault.add", params: profile.merging(request) { _, new in new })) != nil
             }
             if saved { imported += 1 } else { failed += 1 }
@@ -359,6 +465,12 @@ final class DemoCredentialVaultService: CredentialVaultService {
                  "origin": .string("https://example.com"), "identifier": .string("sam@example.com"),
                  "backend": .string("local"), "has_otp": .boolean(true)]),
         .object(["id": .string("demo-address"), "kind": .string("address"), "label": .string("Home"),
+                 "origin": .string("https://shop.example.org"), "backend": .string("local")]),
+        .object(["id": .string("demo-card-1"), "kind": .string("payment"), "label": .string("Everyday Visa ending 4242"),
+                 "origin": .string("https://shop.example.org"), "backend": .string("local")]),
+        .object(["id": .string("demo-card-2"), "kind": .string("payment"), "label": .string("Everyday Visa ending 4242"),
+                 "origin": .string("https://parts.example.net"), "backend": .string("local")]),
+        .object(["id": .string("demo-card-3"), "kind": .string("payment"), "label": .string("Card ending 1881"),
                  "backend": .string("local")]),
     ]
     private var managerUnlocked = false

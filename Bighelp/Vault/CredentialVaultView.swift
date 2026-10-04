@@ -8,7 +8,8 @@ struct CredentialVaultView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var isAdding = false
     @State private var unlocking: CredentialVaultSource?
-    @State private var removing: CredentialVaultItem?
+    @State private var removing: CredentialVaultGroup?
+    @State private var editing: CredentialVaultGroup?
     @State private var isPickingFile = false
     @State private var found: FoundLogins?
 
@@ -77,6 +78,7 @@ struct CredentialVaultView: View {
             .refreshable { await model.load() }
             .task { await model.load() }
             .sheet(isPresented: $isAdding) { CredentialVaultAddView(model: model).bighelpSheetSize(.standard) }
+            .sheet(item: $editing) { CredentialVaultAddView(model: model, editing: $0).bighelpSheetSize(.standard) }
             .sheet(item: $unlocking) { source in
                 CredentialVaultUnlockView(model: model, source: source).bighelpSheetSize(.compact)
             }
@@ -92,7 +94,9 @@ struct CredentialVaultView: View {
                     removing = nil
                 }
             } message: {
-                Text("Your agent won't be able to use it anymore.")
+                Text((removing?.sites.count ?? 0) > 1
+                     ? "It's removed from all \(removing?.sites.count ?? 0) sites. Your agent won't be able to use it anymore."
+                     : "Your agent won't be able to use it anymore.")
             }
         }
     }
@@ -104,16 +108,19 @@ struct CredentialVaultView: View {
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("vault.empty")
             }
-            ForEach(model.items) { item in
-                row(item)
+            ForEach(model.groups) { group in
+                Button { if group.isLocal { editing = group } } label: { row(group) }
+                    .buttonStyle(.plain)
+                    .disabled(!group.isLocal)
                     .swipeActions {
-                        if item.isLocal {
-                            Button("Remove", role: .destructive) { removing = item }
+                        if group.isLocal {
+                            Button("Remove", role: .destructive) { removing = group }
                         }
                     }
                     .contextMenu {
-                        if item.isLocal {
-                            Button("Remove", systemImage: "trash", role: .destructive) { removing = item }
+                        if group.isLocal {
+                            Button("Edit", systemImage: "pencil") { editing = group }
+                            Button("Remove", systemImage: "trash", role: .destructive) { removing = group }
                         }
                     }
             }
@@ -133,7 +140,7 @@ struct CredentialVaultView: View {
         } header: {
             Text("Saved for \(model.agentName)")
         } footer: {
-            Text("Import a CSV export from Apple Passwords, Chrome, 1Password, Bitwarden, LastPass, Firefox and most other password managers.")
+            Text("Tap an item to rename it or change its sites. Cards and addresses work only on the sites they're linked to. Import a CSV export from Apple Passwords, Chrome, 1Password, Bitwarden, LastPass, Firefox and most other password managers.")
         }
     }
 
@@ -153,23 +160,36 @@ struct CredentialVaultView: View {
         }
     }
 
-    private func row(_ item: CredentialVaultItem) -> some View {
+    private func row(_ group: CredentialVaultGroup) -> some View {
         Label {
             VStack(alignment: .leading, spacing: 2) {
-                Text(item.label)
-                let detail = [item.identifier, item.kind == .login ? host(item.origin) : nil,
-                              item.generatesCodes ? "Makes its own codes" : nil,
-                              item.isLocal ? nil : "From \(sourceName(item.source))"]
-                    .compactMap { $0 }.filter { !$0.isEmpty && $0 != item.label }
-                if !detail.isEmpty {
-                    Text(detail.joined(separator: " · ")).bighelpFont(.metadata).foregroundStyle(.secondary)
+                Text(group.label)
+                    .foregroundStyle(.primary)
+                let detail = [group.kindTitle, group.identifier,
+                              group.generatesCodes ? "Makes its own codes" : nil,
+                              group.isLocal ? nil : "From \(sourceName(group.source))"]
+                    .compactMap { $0 }.filter { !$0.isEmpty && $0 != group.label }
+                Text(detail.joined(separator: " · ")).bighelpFont(.metadata).foregroundStyle(.secondary)
+                if !group.sites.isEmpty, group.sites != [group.label] {
+                    Text(group.sites.joined(separator: ", "))
+                        .bighelpFont(.metadata)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .accessibilityLabel("Used on \(group.sites.joined(separator: ", "))")
+                } else if !group.isUsable {
+                    Text("Not linked to a site, so your agent can't use it yet. Tap to link one.")
+                        .bighelpFont(.metadata)
+                        .foregroundStyle(.orange)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(.rect)
         } icon: {
-            Image(systemName: item.kind.symbol)
+            Image(systemName: group.kind.symbol)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("vault.item.\(item.id)")
+        .accessibilityHint(group.isLocal ? "Opens it to rename it or change its sites" : "")
+        .accessibilityIdentifier("vault.item.\(group.id)")
     }
 
     @ViewBuilder
@@ -225,10 +245,13 @@ private struct CredentialVaultAddView: View {
     }
 
     let model: CredentialVaultModel
+    /// An item being changed: its name and sites come back, its secrets are typed again.
+    var editing: CredentialVaultGroup?
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @State private var kind = Kind.login
-    @State private var site = ""
+    @State private var label = ""
+    @State private var sites = [""]
     @State private var identifier = ""
     @State private var password = ""
     @State private var authenticatorKey = ""
@@ -239,7 +262,6 @@ private struct CredentialVaultAddView: View {
     @State private var year = ""
     @State private var securityCode = ""
     @State private var postalCode = ""
-    @State private var addressLabel = ""
     @State private var line1 = ""
     @State private var line2 = ""
     @State private var city = ""
@@ -249,24 +271,33 @@ private struct CredentialVaultAddView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section {
-                    Picker("Kind", selection: $kind) {
-                        ForEach(Kind.allCases) { Text($0.rawValue).tag($0) }
+                if editing == nil {
+                    Section {
+                        Picker("Kind", selection: $kind) {
+                            ForEach(Kind.allCases) { Text($0.rawValue).tag($0) }
+                        }
+                        .bighelpSegmentedPicker()
+                        .accessibilityIdentifier("vault.kind")
                     }
-                    .pickerStyle(.segmented)
-                    .accessibilityIdentifier("vault.kind")
+                } else {
+                    Section {
+                        Text("For your security, bighelp never reads back what's saved. Enter the \(secretWords) again to save your changes; the old copy goes once the new one is saved.")
+                            .foregroundStyle(.secondary)
+                    }
                 }
+                nameSection
                 switch kind {
                 case .login: loginFields
                 case .card: cardFields
                 case .address: addressFields
                 }
+                sitesSection
                 if let message = model.message {
                     Section { Text(message).foregroundStyle(.secondary) }
                 }
             }
             .bighelpFormSurface()
-            .navigationTitle("Add to vault")
+            .navigationTitle(editing == nil ? "Add to vault" : "Edit \(kind.rawValue.lowercased())")
             .navigationBarTitleDisplayMode(.inline)
             .interactiveDismissDisabled(model.isWorking)
             .toolbar {
@@ -283,18 +314,89 @@ private struct CredentialVaultAddView: View {
                         .accessibilityIdentifier("vault.save")
                 }
             }
-            .onAppear { model.message = nil }
+            .onAppear {
+                model.message = nil
+                if let editing { fill(from: editing) }
+            }
             .onChange(of: scenePhase) { _, phase in if phase != .active { clear() } }
             .onDisappear { clear() }
         }
     }
 
+    private var secretWords: String {
+        switch kind {
+        case .login: "password"
+        case .card: "card details"
+        case .address: "address"
+        }
+    }
+
+    private var nameSection: some View {
+        Section {
+            TextField(namePrompt, text: $label)
+                .accessibilityIdentifier("vault.label")
+        } header: {
+            Text("Name")
+        } footer: {
+            Text("What you and your agent call it.")
+        }
+    }
+
+    private var namePrompt: String {
+        switch kind {
+        case .login: "Like Work email (optional)"
+        case .card: "Like Everyday Visa (optional)"
+        case .address: "Like Home or Office"
+        }
+    }
+
+    /// Where an agent may use it, one site per box.
+    private var sitesSection: some View {
+        Section {
+            ForEach(sites.indices, id: \.self) { index in
+                HStack {
+                    TextField(index == 0 ? "Website, like example.com" : "Another website", text: $sites[index])
+                        .keyboardType(.URL)
+                        .textContentType(.URL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .accessibilityIdentifier(index == 0 ? "vault.site" : "vault.site.\(index)")
+                    if sites.count > 1 {
+                        Button {
+                            sites.remove(at: index)
+                        } label: {
+                            Image(systemName: "minus.circle.fill").foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Remove this site")
+                    }
+                }
+            }
+            if sites.count < CredentialVault.maximumSites {
+                Button("Add another site", systemImage: "plus") { sites.append("") }
+                    .foregroundStyle(.tint)
+                    .accessibilityIdentifier("vault.add-site")
+            }
+        } header: {
+            Text(kind == .login ? "Sites" : "Use on these sites")
+        } footer: {
+            Text(sitesFooter)
+        }
+    }
+
+    private var sitesFooter: String {
+        switch kind {
+        case .login:
+            "Only these sites can use this login. With an authenticator key (the setup code or otpauth link), Hermes makes the sites' one-time codes itself."
+        case .card:
+            "Your agent can fill this card only on these sites, like the stores you shop at, and Hermes asks you first every time."
+        case .address:
+            "Your agent can fill this address only on these sites, like the stores that ship to it."
+        }
+    }
+
     private var loginFields: some View {
         Section {
-            TextField("Website, like example.com", text: $site)
-                .keyboardType(.URL)
-                .textContentType(.URL)
-                .accessibilityIdentifier("vault.site")
             TextField("Email or username", text: $identifier)
                 .keyboardType(.emailAddress)
                 .accessibilityIdentifier("vault.username")
@@ -314,8 +416,6 @@ private struct CredentialVaultAddView: View {
                     .foregroundStyle(.tint)
                     .accessibilityIdentifier("vault.add-authenticator")
             }
-        } footer: {
-            Text("Only that site can use this login. With an authenticator key (the setup code or otpauth link), Hermes makes the site's one-time codes itself.")
         }
         .textInputAutocapitalization(.never)
         .autocorrectionDisabled()
@@ -338,15 +438,12 @@ private struct CredentialVaultAddView: View {
                 .privacySensitive()
             TextField("Billing postal code (optional)", text: $postalCode)
                 .textContentType(.postalCode)
-        } footer: {
-            Text("Hermes asks you before it fills a card on any page.")
         }
         .autocorrectionDisabled()
     }
 
     private var addressFields: some View {
         Section {
-            TextField("Name, like Home", text: $addressLabel)
             TextField("Street address", text: $line1).textContentType(.streetAddressLine1)
             TextField("Apartment, suite (optional)", text: $line2).textContentType(.streetAddressLine2)
             TextField("City", text: $city).textContentType(.addressCity)
@@ -360,19 +457,31 @@ private struct CredentialVaultAddView: View {
     private func save() {
         let entry: CredentialVaultEntry = switch kind {
         case .login:
-            .login(site: site, identifier: identifier, password: password, authenticatorKey: authenticatorKey)
+            .login(label: label, sites: sites, identifier: identifier, password: password,
+                   authenticatorKey: authenticatorKey)
         case .card:
-            .card(name: cardName, number: cardNumber, month: month, year: year, securityCode: securityCode,
-                  postalCode: postalCode)
+            .card(label: label, sites: sites, name: cardName, number: cardNumber, month: month, year: year,
+                  securityCode: securityCode, postalCode: postalCode)
         case .address:
-            .address(label: addressLabel, line1: line1, line2: line2, city: city, state: state,
+            .address(label: label, sites: sites, line1: line1, line2: line2, city: city, state: state,
                      postalCode: postalCode, country: country)
         }
         Task {
-            guard await model.save(entry) else { return }
+            guard await model.save(entry, replacing: editing) else { return }
             clear()
             dismiss()
         }
+    }
+
+    private func fill(from group: CredentialVaultGroup) {
+        kind = switch group.kind {
+        case .login: .login
+        case .payment: .card
+        case .address: .address
+        }
+        label = group.typedLabel
+        identifier = group.identifier ?? ""
+        sites = group.sites.isEmpty ? [""] : group.sites
     }
 
     private func clear() {

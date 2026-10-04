@@ -226,11 +226,9 @@ The app installs and offers the plugin's latest
 
 ## Internal release automation
 
-Before shipping persistence or catch-up changes, run `SessionCatalogStoreTests`,
-`ShellFeatureStoreTests`, and
-`BighelpLaunchTests/testOpeningHomeWithCompletedHistoryAndQueuedDeliveryRemainsResponsive`.
-The idle Home fixture measures queued final answers and subagent rosters with no
-active turn. Passing active-stream tests alone does not cover this path. Retain
+Before shipping persistence or catch-up changes, run `SessionCatalogStoreTests` and
+`ShellFeatureStoreTests`. Passing active-stream tests alone does not cover queued final
+answers and subagent rosters with no active turn. Retain
 the metric attachment and exact before/after source identity; see
 [idle startup reliability](IDLE_STARTUP_RELIABILITY.md).
 
@@ -507,10 +505,8 @@ Do not fix this by revoking devices, changing keys or coercing Native to Hermes.
 After deployment, verify the live signed account profile and device list; source
 tests alone do not establish successful iPhone sign-in.
 
-Run `BighelpLaunchTests/testQuickWorkspaceCompactNavigationKeepsMenusAndPreviewRowsVisible`
-and `BighelpLaunchTests/testQuickWorkspaceCapsPinnedPreviewAndOpensAllAgentsRoute`
-for drawer changes. Inspect their screenshots as well as geometry and hit-target
-assertions. Keep navigation before the bounded pinned-agent preview and sessions;
+For drawer changes, run `BighelpMenuUITests` and look at the drawer on screen, light and
+dark, checking hit targets as well as layout. Keep navigation before the bounded pinned-agent preview and sessions;
 verify the full Agents route remains reachable with more pins than the preview.
 
 For scheduler compatibility, run the bighelp plugin contract, workspace-control

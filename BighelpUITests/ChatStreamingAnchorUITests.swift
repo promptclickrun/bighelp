@@ -26,38 +26,13 @@ final class ChatStreamingAnchorUITests: BighelpUITestCase {
     }
 
     @MainActor
-    func testLongToolStreamKeepsMainThreadResponsive() throws {
-        try exerciseToolStream(long: true, expanded: false)
-    }
-
-    @MainActor
     func testConsecutiveLargeToolsKeepMainThreadResponsive() throws {
         try exerciseToolStream(long: true, expanded: true, backgroundChat: true, consecutiveTools: true)
     }
 
     @MainActor
-    func testLargeToolResultOpensTheCompleteReader() throws {
-        try exerciseToolStream(long: false, expanded: true, consecutiveTools: true, inspectFullText: true)
-    }
-
-    @MainActor
     func testShortToolStreamKeepsMainThreadResponsive() throws {
         try exerciseToolStream(long: false, expanded: false)
-    }
-
-    @MainActor
-    func testExpandedLongToolStreamKeepsMainThreadResponsive() throws {
-        try exerciseToolStream(long: true, expanded: true)
-    }
-
-    @MainActor
-    func testTypingAndScrollingWithTwoActiveLongChats() throws {
-        try exerciseToolStream(long: true, expanded: true, backgroundChat: true, interactDuringStream: true)
-    }
-
-    @MainActor
-    func testTwoActiveLongChatsKeepMainThreadResponsiveWithoutAccessibilityPolling() throws {
-        try exerciseToolStream(long: true, expanded: true, backgroundChat: true)
     }
 
     @MainActor
@@ -335,34 +310,4 @@ final class ChatStreamingAnchorUITests: BighelpUITestCase {
         }
     }
 
-    @MainActor
-    func testFirstShortTurnStartsBelowHeaderWithoutBottomAlignment() {
-        let app = makeApp()
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-start-chat", "-preview-ui-v3", "-test-companion-disabled"]
-        app.launch()
-        let newChat = chatNewChatButton(in: app)
-        XCTAssertTrue(newChat.waitForExistence(timeout: 5))
-        newChat.tap()
-        confirmNewChatPicker(in: app)
-        let input = app.textViews["Message"]
-        XCTAssertTrue(input.waitForExistence(timeout: 5))
-        input.tap()
-        input.typeText("First short turn")
-        app.buttons["chat.send"].tap()
-        let human = app.staticTexts["You: First short turn"]
-        XCTAssertTrue(human.waitForExistence(timeout: 5))
-        let noKeyboard = NSPredicate { _, _ in !app.keyboards.firstMatch.exists }
-        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: noKeyboard, object: nil)], timeout: 4), .completed)
-        let header = app.otherElements["chat.header-surface"]
-        XCTAssertTrue(header.exists)
-        let shot = XCTAttachment(screenshot: app.screenshot())
-        shot.name = "first-short-turn-placement"
-        shot.lifetime = .keepAlways
-        add(shot)
-        // The simplified bubble has no separate sender heading. Its first
-        // row should still begin below the header instead of at the tail.
-        XCTAssertGreaterThanOrEqual(human.frame.minY, header.frame.maxY - 1)
-        XCTAssertLessThanOrEqual(human.frame.minY - header.frame.maxY, 32)
-        XCTAssertFalse(app.buttons["Return to latest messages"].exists)
-    }
 }

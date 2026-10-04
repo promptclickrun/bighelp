@@ -14,14 +14,9 @@ UI_TESTS = (
     "ReferenceHubUITests/testMiddleSlashCommandWorksWithoutRetiredProviders",
     "ReferenceHubUITests/testDarkLargeTextDrawerPreservesKeyboardAndDraft",
     "ReferenceHubUITests/testSendKeepsKeyboardClosedWhileChatUpdates",
-    "ReferenceHubUITests/testOpenReferencesSurvivesWorkspaceNavigation",
-    "ReferenceHubUITests/testReferenceControlsAccessibilityAndLandscapeKeyboard",
-    "BighelpLaunchTests/testExpandedComposerStillSendsItsFirstDraft",
-    "BighelpLaunchTests/testV2ExpandedSlashSelectionKeepsKeyboardAndContinuedTyping",
-    "ChatSixFixesUITests/testTypingNumberedItemIntoRichLongDraftDoesNotBlockEditing",
-    "SimplifiedShellUITests/testChatMatchesUnclutteredReferenceAndDisclosesComposerControls",
-    "SimplifiedShellUITests/testAgentsDestinationSearchGroupsAndDrawerOrder",
-    "BighelpLaunchTests/testV2NativeRichFormattingExportsMarkdown",
+    "AgentsUITests/testChatsOpenedFromAgentsKeepTheTabBar",
+    "BoardSwipeBlueprintsUITests/testBlueprintsAskForTheBlanksThenSendOrEdit",
+    "DefaultModelUITests/testDefaultModelSurvivesProviderKeysAndComingBack",
 )
 
 

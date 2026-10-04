@@ -52,7 +52,7 @@ final class SharedTests: BighelpUITestCase {
         self.assertEqual(len(assigned), len(set(assigned)))
         self.assertEqual(set(assigned), set(selectors(root)))
         self.assertIn(
-            "-only-testing:BighelpUITests/SimplifiedShellUITests/testChatMatchesUnclutteredReferenceAndDisclosesComposerControls",
+            "-only-testing:BighelpUITests/AgentsUITests/testLastRowClearsSearchAndNavigationInPortraitAndLandscape",
             shards["ui-ipad"],
         )
 

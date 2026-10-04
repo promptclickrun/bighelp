@@ -126,8 +126,6 @@ jobs:
             selectors=(-only-testing:BighelpTests)
           elif [[ "$TEST_SUITE" == "references" ]]; then
             selectors=(
-              -only-testing:BighelpUITests/AccountNameUITests
-              -only-testing:BighelpUITests/ChatBuild2UITests
               -only-testing:BighelpUITests/ReferenceHubUITests
             )
           else

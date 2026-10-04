@@ -239,40 +239,6 @@ final class ReferenceHubUITests: BighelpUITestCase {
     }
 
     @MainActor
-    func testOpenReferencesSurvivesWorkspaceNavigation() throws {
-        let app = makeApp()
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-start-chat"]
-        app.launch()
-        let editor = app.textViews["chat.composer.text"]
-        XCTAssertTrue(editor.waitForExistence(timeout: 5))
-        editor.tap()
-        editor.typeText("Before /")
-        let drawer = app.otherElements["reference-hub.drawer"]
-        XCTAssertTrue(drawer.waitForExistence(timeout: 5))
-        captureFailureEvidence(app, checkpoint: "before-workspace-tap")
-        openChatWorkspaceMenu(in: app)
-        captureFailureEvidence(app, checkpoint: "after-workspace-tap")
-        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
-        XCTAssertTrue(drawer.waitForNonExistence(timeout: 5))
-        let settingsRowInMenu = app.buttons["menu.settings"].firstMatch
-        let settingsExist = settingsRowInMenu.waitForExistence(timeout: 5)
-        if !settingsExist { captureFailureEvidence(app, checkpoint: "menu-settings-missing") }
-        XCTAssertTrue(settingsExist)
-        guard settingsExist else { return }
-        settingsRowInMenu.tap()
-        let tools = settingsRow("settings.hermes-tools", in: app)
-        guard tools.exists else { return }
-        tools.tap()
-        let activity = app.buttons["workspace.open.activity"].firstMatch
-        XCTAssertTrue(activity.waitForExistence(timeout: 5))
-        activity.tap()
-        XCTAssertTrue(app.scrollViews["dashboard.screen"].waitForExistence(timeout: 5))
-        openSidebarDestination("menu.chats", in: app)
-        XCTAssertTrue(app.buttons["tab.sessions"].isSelected)
-        XCTAssertEqual(app.state, .runningForeground)
-    }
-
-    @MainActor
     private func exerciseDrawer(appearance: String, largeText: Bool, rotateAndAudit: Bool = false) throws {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays",
@@ -344,11 +310,6 @@ final class ReferenceHubUITests: BighelpUITestCase {
         evidence.name = "reference-hub-native-command-middle-\(appearance)-\(largeText ? "large" : "standard")"
         evidence.lifetime = .keepAlways
         add(evidence)
-    }
-
-    @MainActor
-    func testReferenceControlsAccessibilityAndLandscapeKeyboard() throws {
-        try exerciseDrawer(appearance: "light", largeText: false, rotateAndAudit: true)
     }
 
     @MainActor

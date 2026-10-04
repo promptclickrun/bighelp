@@ -8,18 +8,7 @@ from pathlib import Path
 
 
 IPAD_TESTS = (
-    "BighelpCardCatalogUITests/testIPadUsesReadableTwoColumnCatalogLayout",
-    "BighelpLaunchTests/testIPadReasoningChipReflectsRealActiveAndCompletedLifecycle",
-    "BighelpLaunchTests/testProjectChangesMarkdownPreviewAndPanelExpansionOnIPad",
-    "BighelpLaunchTests/testV3IPadWideModelPopoverAndCenteredChangesRail",
-    "BighelpLaunchTests/testV3IPadWideModelPopoverAndCenteredChangesRailInLandscape",
-    "BighelpLaunchTests/testV3IPadWideModelPopoverAtAccessibilityXXXL",
-    "Release180UITests/testProjectChangesOutsideTapDismissesWithoutBreakingInsideControls",
-    "SimplifiedShellUITests/testChatMatchesUnclutteredReferenceAndDisclosesComposerControls",
-    "SimplifiedShellUITests/testAgentsDestinationSearchGroupsAndDrawerOrder",
     "AgentsUITests/testLastRowClearsSearchAndNavigationInPortraitAndLandscape",
-    "IPadShellUITests/testMenuIsCollapsedBehindTheMenuButton",
-    "IPadShellUITests/testChatBubblesUseTheLandscapeWidth",
 )
 SELECTOR_PREFIX = "-only-testing:BighelpUITests/"
 

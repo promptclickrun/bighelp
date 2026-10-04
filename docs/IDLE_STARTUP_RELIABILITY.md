@@ -44,8 +44,8 @@ Treat these as app investigation evidence, not an iOS-version explanation.
 discovery/termination, exact persisted readback, and SwiftUI observation during
 catch-up. `ShellFeatureStoreTests` covers automatic dashboard reload coalescing.
 
-`BighelpLaunchTests/testOpeningHomeWithCompletedHistoryAndQueuedDeliveryRemainsResponsive`
-launches Home with 62 synthetic completed chats and 3,000 retained tool events,
+The measurements below came from a UI fixture (since retired with the old launch UI tests) that
+launched Home with 62 synthetic completed chats and 3,000 retained tool events,
 then delivers 120 historical answers and 120 start/end subagent rosters through
 the production feature store. It starts no chat. The probe samples the app's
 main queue and display callbacks, then checks menu/settings navigation. XCTest

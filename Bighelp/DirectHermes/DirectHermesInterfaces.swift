@@ -309,7 +309,8 @@ enum DirectHermesError: Error, LocalizedError, Sendable, Equatable {
     case redirectRefused, invalidResponse, messageTooLarge, tooManyRequests, notConnected
     case connectionFailed, tlsRequired, rateLimited, serverUnavailable
     case browserAuthenticationUnavailable, nativeTokenExchangeUncertain
-    case invalidAccessCredentials, cloudflareAccessDenied
+    case invalidAccessCredentials, cloudflareAccessDenied, hostNameRefused
+    case webPageInsteadOfHermes(throughCloudflare: Bool)
     case disconnected(outcomeUnknown: Bool)
     case timedOut(outcomeUnknown: Bool)
     case cancelled(outcomeUnknown: Bool)
@@ -340,6 +341,12 @@ enum DirectHermesError: Error, LocalizedError, Sendable, Equatable {
         case .redirectRefused: "The host redirected the connection. Enter its final HTTPS address instead."
         case .invalidAccessCredentials: "Enter the Cloudflare Access client ID and client secret from your service token."
         case .cloudflareAccessDenied: "Cloudflare Access didn't let bighelp through. Check the service token's client ID and secret, and that your Access policy allows it (Service Auth)."
+        case .hostNameRefused:
+            "Hermes turned bighelp away because it answers only to its local address. In Hermes, set dashboard.public_url to this https:// address and set up a Hermes sign-in, then restart Hermes."
+        case .webPageInsteadOfHermes(let throughCloudflare):
+            throughCloudflare
+                ? "Cloudflare answered with a web page instead of Hermes. Check that your Access policy allows the service token (Service Auth) and that the tunnel sends this address to Hermes."
+                : "This address answered with a web page instead of Hermes. Check the address and port."
         case .invalidResponse: "The host returned an unsupported or invalid response."
         case .messageTooLarge: "The host message exceeds this client's safe size limit."
         case .tooManyRequests: "Too many host requests are pending. Wait before trying again."

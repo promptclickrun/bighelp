@@ -54,6 +54,25 @@ that service token." Check the Client ID and Secret, that the token hasn't
 expired or been revoked, and that the application has the Service Auth policy
 above.
 
+**If bighelp says Hermes turned it away** ("it answers only to its local
+address"), Cloudflare Access let the token through, but Hermes refused the
+request. A Cloudflare Tunnel sends the public host name to Hermes, and a
+Hermes that listens only on `127.0.0.1` accepts only its local name. Tell
+Hermes its public address in `config.yaml`, then restart Hermes:
+
+```yaml
+dashboard:
+  public_url: "https://hermes.example.com"
+```
+
+Hermes then asks for a sign-in on that address, so set up a Hermes username
+and password or another sign-in provider first. bighelp shows the sign-in
+step after the Cloudflare Access step.
+
+**If bighelp says Cloudflare answered with a web page**, the answer did not
+come from Hermes. Check the Service Auth policy above, and check that the
+tunnel sends the host name to the Hermes dashboard port (9119 by default).
+
 **Browser sign-in:** Hermes's browser sign-in option opens Safari, which
 doesn't carry the service token, so Cloudflare Access shows its own login
 there. Sign in to Cloudflare Access in that browser too, or use a Hermes

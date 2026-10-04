@@ -420,6 +420,22 @@ final class DirectHermesHTTP {
         return type.hasPrefix("text/html") && response.value(forHTTPHeaderField: "CF-RAY") != nil
     }
 
+    /// Something other than Hermes' status answered: Hermes' own guard against a
+    /// host name it doesn't know (a Cloudflare Tunnel or proxy passes the public
+    /// name on), or a web page. Only fixed text reaches the person, never the body.
+    static func requireHermesAnswer(_ response: Response) throws {
+        let status = response.http.statusCode
+        let type = response.http.value(forHTTPHeaderField: "Content-Type")?.lowercased() ?? ""
+        if status == 400, type.hasPrefix("application/json"),
+           (try? response.object())?["detail"]?.string?.hasPrefix("Invalid Host header") == true {
+            throw DirectHermesError.hostNameRefused
+        }
+        // 401, 403 and 5xx pages keep their own meaning (a gate, an outage).
+        guard type.hasPrefix("text/html"), (200...299).contains(status) || status == 400 else { return }
+        throw DirectHermesError.webPageInsteadOfHermes(
+            throughCloudflare: response.http.value(forHTTPHeaderField: "CF-RAY") != nil)
+    }
+
     static func requireSuccess(_ response: Response) throws {
         switch response.http.statusCode {
         case 200...299: return
@@ -494,6 +510,7 @@ final class DirectHermesAuthenticator {
 
     private func discoverAuthentication(enrichProviders: Bool) async throws -> DirectHermesAuthenticationDiscovery {
         let response = try await http.send(route: "/api/status")
+        try DirectHermesHTTP.requireHermesAnswer(response)
         try DirectHermesHTTP.requireSuccess(response)
         let status = try response.object()
         guard let authRequired = status["auth_required"]?.boolean else {
@@ -515,7 +532,7 @@ final class DirectHermesAuthenticator {
         }
 
         let flows: [String]
-        if let advertisedFlows = status["auth_flows"] {
+        if let advertisedFlows = status["auth_flows"], advertisedFlows != .null {
             guard let rawFlows = advertisedFlows.array, rawFlows.count <= 32 else {
                 throw DirectHermesError.invalidResponse
             }

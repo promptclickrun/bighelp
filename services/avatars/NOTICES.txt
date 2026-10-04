@@ -2,6 +2,9 @@ bighelp public avatar catalog
 
 Faces and Shapes are exported from the app renderers.
 Halloween and official bighelp mascot artwork were supplied by the bighelp maintainer for publication.
+Pocket Curios is original first-party artwork approved by the bighelp maintainer,
+authored with the Apache-2.0 bighelp avatar-pack tools. Native JSON is the editable
+source; its SVG/PNG assets are derived idle previews.
 
 blobatar
 Upstream: https://github.com/Alain00/blobatar (npm package "blobatar" 2.0.0)

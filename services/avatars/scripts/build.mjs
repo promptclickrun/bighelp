@@ -15,9 +15,10 @@ const palettes = JSON.parse(await readFile(path.join(root, 'sources/palettes.jso
 const kitSettings = JSON.parse(await readFile(path.join(root, 'sources/kit-settings.json'), 'utf8'));
 const staticKitSettings = structuredClone(kitSettings);
 const authored = new Map();
-for (const [setId, file] of [['bighelp', 'helpers'], ['halloween', 'halloween']]) {
+const authoredPacks = [['bighelp', 'helpers', 10], ['halloween', 'halloween', 10], ['pocket-curios', 'pocket-curios', 20]];
+for (const [setId, file, count] of authoredPacks) {
   const pack = JSON.parse(await readFile(path.join(root, `sources/packs/${file}.json`), 'utf8'));
-  if (pack.version !== 1 || pack.characters.length !== 10) throw new Error('Invalid authored pack');
+  if (pack.version !== 1 || pack.characters.length !== count) throw new Error('Invalid authored pack');
   for (const key of ['version', 'states', 'themes', 'keyframes']) {
     if (file === 'helpers') kitSettings[key] = pack[key];
     else if (JSON.stringify(kitSettings[key]) !== JSON.stringify(pack[key])) throw new Error(`Conflicting pack ${key}`);
@@ -54,9 +55,9 @@ for (const set of sets) {
     const svg = await readFile(path.join(folder, entry.file), 'utf8');
     validateSVG(svg);
     const png = renderPNG(svg);
-    if (!palettes[entry.id]?.p) throw new Error(`Missing primary palette: ${entry.id}`);
     const supplied = authored.get(entry.id);
-    if (['bighelp', 'halloween'].includes(set.id) && supplied?.setId !== set.id) throw new Error(`Missing authored character ${entry.id}`);
+    if (authoredPacks.some(([setId]) => setId === set.id) && supplied?.setId !== set.id) throw new Error(`Missing authored character ${entry.id}`);
+    if (!(supplied?.character.colors ?? palettes[entry.id])?.p) throw new Error(`Missing primary palette: ${entry.id}`);
     const character = supplied?.character ?? convertCharacter(svg, entry, palettes[entry.id]);
     characters.push(character);
     const kit = await asset(JSON.stringify({ ...(supplied ? kitSettings : staticKitSettings), characters: [character] }), 'json');

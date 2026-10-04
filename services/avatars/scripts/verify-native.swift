@@ -38,7 +38,7 @@ struct NativeKitProbe {
             precondition(original != changed, "Primary color is not editable for \(character.id)")
             try original.write(to: output.appendingPathComponent("\(character.id)-original.png"))
             try changed.write(to: output.appendingPathComponent("\(character.id)-custom.png"))
-            if character.id.hasPrefix("bighelp-") || character.id.hasPrefix("halloween-") {
+            if character.id.hasPrefix("bighelp-") || character.id.hasPrefix("halloween-") || character.id.hasPrefix("pocket-curios-") {
                 for state in kit.states {
                     let first = try render(palette, frame: AvatarKitFrame(state: state, time: 0.17))
                     let second = try render(palette, frame: AvatarKitFrame(state: state, time: 0.73))

@@ -22,6 +22,7 @@ paths return 404. Do not give the app Cloudflare credentials or cookies.
 | Category ID | Label | Set ID | Count | Expiry |
 |---|---|---|---:|---|
 | bighelp | bighelp | bighelp | 10 | none |
+| bighelp | bighelp | pocket-curios | 20 | none |
 | faces | Faces | faces | 10 | none |
 | shapes | Shapes | shapes | 8 | none |
 | seasonal | Seasonal | halloween | 10 | 2026-11-03T00:00:00-06:00 |
@@ -66,10 +67,12 @@ The arrays above illustrate field types; live responses contain the actual theme
 The combined response additionally has `nextChangeAt` and `revision`, ignored by the existing decoder.
 Character IDs exactly match discovery IDs. Each character has `name`, `role`, `family: "classic"`,
 a numeric `look`, `colors` and a native geometry `tree`. Coordinates are normalized into the renderer's 200×200
-art space. The official bighelp and Halloween characters come unchanged from the supplied authored packs in
+art space. The official bighelp, Pocket Curios and Halloween characters come unchanged from the supplied authored packs in
 `sources/packs/`, including all seven states and shared animation keyframes. Faces and Shapes remain
 static conversions. Their idle style is the fallback for other states. Legacy SVG/PNG assets remain
 source previews; render the JSON for authoritative authored appearance and state-aware previews.
+Pocket Curios SVG/PNG previews are derived from its native idle JSON with the backdrop disc off.
+Its 20 characters are permanent additions under the first-party bighelp category, with no expiry.
 
 Colors are not baked into a raster. Editable fills/strokes use `@p`, `@s`, `@a`, `@ink` slots with the
 original colors in `character.colors`. Primary `@p` is present on every avatar. Some accents/highlights
@@ -146,7 +149,12 @@ cron, AI job or deployment is needed at the cutoff itself.
 
 To add artwork:
 
-For official bighelp or Halloween updates, replace the corresponding reviewed JSON in `sources/packs/`.
+For official bighelp, Pocket Curios or Halloween updates, replace the corresponding reviewed JSON in `sources/packs/`.
+For new authored collections, register the set/file/count in `scripts/build.mjs`, add `sets.json`
+metadata and `sources/<set-id>/index.json`, then add static idle SVG previews. Use the authored
+JSON palette directly, not a second entry in `sources/palettes.json`. Remove fully transparent
+state-only groups from static SVG previews (sleeping Z text is invisible at idle); never remove
+them from the native JSON. Extend the authored equality test and native animation probe for the new set.
 The build preserves character trees and shared animation settings exactly; conflicting settings fail.
 The native probe also checks every authored character animates in each of its seven states.
 

@@ -1,0 +1,122 @@
+[
+  {
+    "id": "pocket-curios-spindle",
+    "name": "Spindle",
+    "role": "Connects loose threads",
+    "file": "pocket-curios-spindle.svg"
+  },
+  {
+    "id": "pocket-curios-drizzle",
+    "name": "Drizzle",
+    "role": "Helps things grow",
+    "file": "pocket-curios-drizzle.svg"
+  },
+  {
+    "id": "pocket-curios-zephyr",
+    "name": "Zephyr",
+    "role": "Follows fresh ideas",
+    "file": "pocket-curios-zephyr.svg"
+  },
+  {
+    "id": "pocket-curios-riff",
+    "name": "Riff",
+    "role": "Finds the rhythm",
+    "file": "pocket-curios-riff.svg"
+  },
+  {
+    "id": "pocket-curios-skipper",
+    "name": "Skipper",
+    "role": "Keeps you afloat",
+    "file": "pocket-curios-skipper.svg"
+  },
+  {
+    "id": "pocket-curios-nori",
+    "name": "Nori",
+    "role": "Packs a snack",
+    "file": "pocket-curios-nori.svg"
+  },
+  {
+    "id": "pocket-curios-pogo",
+    "name": "Pogo",
+    "role": "Bounces back quickly",
+    "file": "pocket-curios-pogo.svg"
+  },
+  {
+    "id": "pocket-curios-tally",
+    "name": "Tally",
+    "role": "Makes numbers behave",
+    "file": "pocket-curios-tally.svg"
+  },
+  {
+    "id": "pocket-curios-locket",
+    "name": "Locket",
+    "role": "Keeps your secrets",
+    "file": "pocket-curios-locket.svg"
+  },
+  {
+    "id": "pocket-curios-crumb",
+    "name": "Crumb",
+    "role": "Warms things up",
+    "file": "pocket-curios-crumb.svg"
+  },
+  {
+    "id": "pocket-curios-glint",
+    "name": "Glint",
+    "role": "Lights the way",
+    "file": "pocket-curios-glint.svg"
+  },
+  {
+    "id": "pocket-curios-pippa",
+    "name": "Pippa",
+    "role": "Picks the good stuff",
+    "file": "pocket-curios-pippa.svg"
+  },
+  {
+    "id": "pocket-curios-flick",
+    "name": "Flick",
+    "role": "Starts something good",
+    "file": "pocket-curios-flick.svg"
+  },
+  {
+    "id": "pocket-curios-fable",
+    "name": "Fable",
+    "role": "Remembers the story",
+    "file": "pocket-curios-fable.svg"
+  },
+  {
+    "id": "pocket-curios-doodle",
+    "name": "Doodle",
+    "role": "Colors outside lines",
+    "file": "pocket-curios-doodle.svg"
+  },
+  {
+    "id": "pocket-curios-tether",
+    "name": "Tether",
+    "role": "Brings things together",
+    "file": "pocket-curios-tether.svg"
+  },
+  {
+    "id": "pocket-curios-miso",
+    "name": "Miso",
+    "role": "Holds it together",
+    "file": "pocket-curios-miso.svg"
+  },
+  {
+    "id": "pocket-curios-sprig",
+    "name": "Sprig",
+    "role": "Grows through anything",
+    "file": "pocket-curios-sprig.svg"
+  },
+  {
+    "id": "pocket-curios-pebble",
+    "name": "Pebble",
+    "role": "Finds your balance",
+    "file": "pocket-curios-pebble.svg"
+  },
+  {
+    "id": "pocket-curios-quill",
+    "name": "Quill",
+    "role": "Gets words flowing",
+    "file": "pocket-curios-quill.svg"
+  }
+]

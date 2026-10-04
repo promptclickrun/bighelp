@@ -243,6 +243,34 @@ struct SettingsView: View {
 
     /// Settings › Hosts: your computers, then the selected one's plugin with
     /// Update as the obvious button. Connection details are for Nerd Mode.
+    /// Settings › System: the computer in use's System screen (its computers, update Hermes and
+    /// the plugin, restart the gateway, Additional settings); its computers alone while it's
+    /// offline, so another can still be picked or added.
+    @ViewBuilder
+    private var systemPage: some View {
+        if let hostRegistry, hostRegistry.selectedHostID != nil {
+            SystemSettingsPage(registry: hostRegistry) {
+                hostsPage
+            } extras: {
+                if settings.nerdModeEnabled {
+                    NavigationLink {
+                        settingsPage(title: "Connection") {
+                            currentConnection
+                            BighelpPluginCapabilitiesSection(connections: workspaceConnections,
+                                                             permissionCenter: permissionCenter,
+                                                             showsPluginSummary: false)
+                            localCache
+                        }
+                    } label: {
+                        Label("Connection & plugin features", systemImage: "point.3.connected.trianglepath.dotted")
+                    }
+                }
+            }
+        } else {
+            hostsPage
+        }
+    }
+
     private var hostsPage: some View {
         let pluginUpdate = selectedHostPluginUpdate.flatMap { $0.state == .notInstalled ? nil : $0 }
         return settingsPage(title: SettingsMenuSection.connectivityAndNotifications.title) {
@@ -411,7 +439,7 @@ struct SettingsView: View {
         case .watch:
             settingsPage(title: section.title) { appleWatch }
         case .connectivityAndNotifications:
-            hostsPage
+            systemPage
         }
     }
 

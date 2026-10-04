@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// Settings › System: update Hermes, restart its gateway and update the
-/// bighelp plugin up top; the rest is folded away below.
+/// Settings › System, laid out like Fleet settings for the computer in use: its computers,
+/// then update Hermes, the bighelp plugin and restart the gateway; everything else waits in
+/// Additional settings, folded away.
 @MainActor
 struct HostOperationsView<MoreLinks: View>: View {
     @Bindable var store: HostOperationsStore
@@ -12,6 +13,7 @@ struct HostOperationsView<MoreLinks: View>: View {
     @State private var drainTarget: Bool?
     @State private var confirmsMigration = false
     @State private var confirmsUpdate = false
+    @State private var showsAdditional = false
     @State private var pluginUpdate: HostPluginUpdateModel?
     @Environment(\.bighelpHostRegistry) private var hostRegistry
 
@@ -22,20 +24,20 @@ struct HostOperationsView<MoreLinks: View>: View {
 
     var body: some View {
         List {
+            if let hostRegistry, !hostRegistry.hosts.isEmpty {
+                BighelpConfiguredHostsSection(registry: hostRegistry)
+            }
             messageSections
             hermesSection
+            if let pluginUpdate, pluginUpdate.state != .notInstalled {
+                HostPluginUpdateSection(model: pluginUpdate)
+            }
             if let overview = store.overview {
                 gatewaySection(overview)
             } else if store.isLoading {
                 Section { ProgressView("Loading…") }
             }
-            if let pluginUpdate, pluginUpdate.state != .notInstalled {
-                HostPluginUpdateSection(model: pluginUpdate)
-            }
-            actionSection
-            detailsSection
-            destinationsSection
-            unavailableSection
+            additionalSettings
         }
         .listStyle(.insetGrouped)
         .bighelpFormSurface()
@@ -172,23 +174,6 @@ struct HostOperationsView<MoreLinks: View>: View {
             }
             .disabled(!store.canAct)
             .accessibilityIdentifier("system.hermes.check")
-            if let receipt = store.updateReceipt {
-                DisclosureGroup("Last update") {
-                    LabeledContent("Result", value: receipt.summary.outcome.capitalized)
-                    if let version = receipt.summary.postUpdateVersion {
-                        LabeledContent("Version", value: version)
-                    }
-                    if let finished = receipt.summary.finishedAt {
-                        LabeledContent("Finished", value: finished.formatted(date: .abbreviated, time: .shortened))
-                    }
-                    ForEach(receipt.steps.prefix(100)) { step in
-                        Label(step.name, systemImage: step.succeeded ? "checkmark.circle" : "xmark.circle")
-                    }
-                    ForEach(receipt.fleet.prefix(50)) { member in
-                        LabeledContent(member.profile, value: member.state.capitalized)
-                    }
-                }
-            }
         } header: {
             Text("Hermes")
         }
@@ -222,29 +207,6 @@ struct HostOperationsView<MoreLinks: View>: View {
                     .accessibilityIdentifier("system.gateway.start")
             }
 
-            DisclosureGroup("More gateway controls") {
-                if overview.gatewayRunning {
-                    Button("Stop Gateway", systemImage: "stop.fill", role: .destructive) {
-                        gatewayCommand = .stop
-                    }
-                    .disabled(!store.canAct || overview.gatewayBusy)
-                }
-                if overview.gatewayState == "draining" {
-                    Button("Accept New Messages", systemImage: "arrow.uturn.backward") { drainTarget = false }
-                        .disabled(!store.canAct)
-                } else if overview.gatewayDrainable {
-                    Button("Pause New Messages", systemImage: "hourglass") { drainTarget = true }
-                        .disabled(!store.canAct)
-                }
-                LabeledContent("Mode", value: overview.gatewayMode.capitalized)
-                if !overview.gatewaySharedWith.isEmpty {
-                    LabeledContent("Serving profiles", value: overview.gatewaySharedWith.joined(separator: ", "))
-                }
-                if let plan = store.migrationPlan {
-                    migrationPlan(plan)
-                }
-            }
-            .accessibilityIdentifier("system.gateway.more")
         } header: {
             Text("Messaging gateway")
         }
@@ -283,63 +245,119 @@ struct HostOperationsView<MoreLinks: View>: View {
         }
     }
 
-    // MARK: Details
+    // MARK: Additional settings
 
-    private var detailsSection: some View {
+    /// Everything past update and restart, folded away like Fleet settings keeps it.
+    private var additionalSettings: some View {
         Section {
-            DisclosureGroup("Details") {
-                LabeledContent("Host", value: store.hostName)
-                LabeledContent("Profile", value: store.profileID)
-                if let overview = store.overview {
-                    LabeledContent("Overall", value: overview.overall.capitalized)
-                    ForEach(overview.components) { component in
-                        LabeledContent(component.id.replacingOccurrences(of: "_", with: " ").capitalized,
-                                       value: component.status.capitalized)
-                    }
-                }
-                if let check = store.updateCheck {
-                    LabeledContent("Install method", value: check.installMethod)
-                }
-            }
-            .accessibilityIdentifier("system.details")
-        }
-    }
-
-    private var destinationsSection: some View {
-        Section("Advanced") {
-            NavigationLink {
-                HostDiagnosticsView(store: store)
+            DisclosureGroup(isExpanded: $showsAdditional) {
+                if let overview = store.overview { gatewayControls(overview) }
+                if let receipt = store.updateReceipt { lastUpdate(receipt) }
+                recentActions
+                details
+                advancedLinks
+                unavailable
             } label: {
-                Label("Diagnostics & Egress", systemImage: "stethoscope")
+                Label("Additional settings", systemImage: "slider.horizontal.3")
             }
-            NavigationLink {
-                HostBackupView(store: store)
-            } label: {
-                Label("Backups & Checkpoints", systemImage: "externaldrive")
-            }
-            NavigationLink {
-                HostImportView(store: store)
-            } label: {
-                Label("Import Backup", systemImage: "square.and.arrow.down")
-            }
-            NavigationLink {
-                HostHooksView(store: store)
-            } label: {
-                Label("Shell Hooks", systemImage: "terminal")
-            }
-            NavigationLink {
-                RawConfigurationView(store: store.rawConfiguration)
-            } label: {
-                Label("Raw Configuration", systemImage: "lock.doc")
-            }
-            moreLinks
+            .accessibilityIdentifier("system.additional")
         }
     }
 
     @ViewBuilder
-    private var actionSection: some View {
+    private func gatewayControls(_ overview: HermesHostOverview) -> some View {
+        if overview.gatewayRunning {
+            Button("Stop Gateway", systemImage: "stop.fill", role: .destructive) {
+                gatewayCommand = .stop
+            }
+            .disabled(!store.canAct || overview.gatewayBusy)
+        }
+        if overview.gatewayState == "draining" {
+            Button("Accept New Messages", systemImage: "arrow.uturn.backward") { drainTarget = false }
+                .disabled(!store.canAct)
+        } else if overview.gatewayDrainable {
+            Button("Pause New Messages", systemImage: "hourglass") { drainTarget = true }
+                .disabled(!store.canAct)
+        }
+        LabeledContent("Gateway mode", value: overview.gatewayMode.capitalized)
+        if !overview.gatewaySharedWith.isEmpty {
+            LabeledContent("Serving profiles", value: overview.gatewaySharedWith.joined(separator: ", "))
+        }
+        if let plan = store.migrationPlan {
+            migrationPlan(plan)
+        }
+    }
+
+    private func lastUpdate(_ receipt: HermesUpdateReceipt) -> some View {
+            DisclosureGroup("Last update") {
+                LabeledContent("Result", value: receipt.summary.outcome.capitalized)
+                if let version = receipt.summary.postUpdateVersion {
+                    LabeledContent("Version", value: version)
+                }
+                if let finished = receipt.summary.finishedAt {
+                    LabeledContent("Finished", value: finished.formatted(date: .abbreviated, time: .shortened))
+                }
+                ForEach(receipt.steps.prefix(100)) { step in
+                    Label(step.name, systemImage: step.succeeded ? "checkmark.circle" : "xmark.circle")
+                }
+                ForEach(receipt.fleet.prefix(50)) { member in
+                    LabeledContent(member.profile, value: member.state.capitalized)
+                }
+            }
+    }
+
+    private var details: some View {
+        DisclosureGroup("Details") {
+            LabeledContent("Host", value: store.hostName)
+            LabeledContent("Profile", value: store.profileID)
+            if let overview = store.overview {
+                LabeledContent("Overall", value: overview.overall.capitalized)
+                ForEach(overview.components) { component in
+                    LabeledContent(component.id.replacingOccurrences(of: "_", with: " ").capitalized,
+                                   value: component.status.capitalized)
+                }
+            }
+            if let check = store.updateCheck {
+                LabeledContent("Install method", value: check.installMethod)
+            }
+        }
+        .accessibilityIdentifier("system.details")
+    }
+
+    @ViewBuilder
+    private var advancedLinks: some View {
+        NavigationLink {
+            HostDiagnosticsView(store: store)
+        } label: {
+            Label("Diagnostics & Egress", systemImage: "stethoscope")
+        }
+        NavigationLink {
+            HostBackupView(store: store)
+        } label: {
+            Label("Backups & Checkpoints", systemImage: "externaldrive")
+        }
+        NavigationLink {
+            HostImportView(store: store)
+        } label: {
+            Label("Import Backup", systemImage: "square.and.arrow.down")
+        }
+        NavigationLink {
+            HostHooksView(store: store)
+        } label: {
+            Label("Shell Hooks", systemImage: "terminal")
+        }
+        NavigationLink {
+            RawConfigurationView(store: store.rawConfiguration)
+        } label: {
+            Label("Raw Configuration", systemImage: "lock.doc")
+        }
+        moreLinks
+    }
+
+    @ViewBuilder
+    private var recentActions: some View {
         if !store.actionReceipts.isEmpty {
-            Section("Recent actions") {
+            DisclosureGroup("Recent actions") {
                 ForEach(store.actionReceipts) { receipt in
                     VStack(alignment: .leading, spacing: BighelpTokens.space8) {
                         HStack {
@@ -361,13 +379,11 @@ struct HostOperationsView<MoreLinks: View>: View {
     }
 
     @ViewBuilder
-    private var unavailableSection: some View {
+    private var unavailable: some View {
         if !store.unavailableFeatures.isEmpty {
-            Section {
-                DisclosureGroup("Not available on this host (\(store.unavailableFeatures.count))") {
-                    ForEach(store.unavailableFeatures, id: \.self) { feature in
-                        Label(feature, systemImage: "nosign")
-                    }
+            DisclosureGroup("Not available on this host (\(store.unavailableFeatures.count))") {
+                ForEach(store.unavailableFeatures, id: \.self) { feature in
+                    Label(feature, systemImage: "nosign")
                 }
             }
         }

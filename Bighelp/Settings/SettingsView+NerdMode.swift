@@ -57,12 +57,6 @@ extension SettingsView {
     /// (updating Hermes, restarting its gateway) one tap away.
     var hermesSection: some View {
         Section {
-            if let onOpenWorkspaceDestination {
-                routeRow("System", detail: "Update Hermes, restart the gateway",
-                         symbol: "server.rack", tint: Color(hex: "5B6B7F"), identifier: "settings.hermes.system") {
-                    onOpenWorkspaceDestination(.system)
-                }
-            }
             if let onOpenRoute {
                 routeRow("Hermes tools", detail: "Files, skills, memory, logs and more",
                          symbol: "square.grid.2x2.fill", identifier: "settings.hermes-tools") {

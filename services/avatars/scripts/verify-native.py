@@ -2,6 +2,7 @@
 """Exercise unchanged app decoder/renderer on isolated Mac Swift; no app build."""
 import io
 import json
+import os
 import pathlib
 import shlex
 import subprocess
@@ -11,7 +12,12 @@ import sys
 service = pathlib.Path(__file__).resolve().parent.parent
 repo = service.parent.parent
 output = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else service / '.wrangler/native-probe'
-ssh = ['ssh', '-F', '/opt/data/.ssh/config', 'mac']
+# A Mac with Swift, reached over SSH: AVATAR_SWIFT_HOST (required) and AVATAR_SSH_CONFIG (optional).
+host = os.environ.get('AVATAR_SWIFT_HOST', '').strip()
+if not host:
+    sys.exit('Set AVATAR_SWIFT_HOST to an SSH host (a Mac with Swift). AVATAR_SSH_CONFIG is optional.')
+ssh = ['ssh'] + (['-F', os.environ['AVATAR_SSH_CONFIG']] if os.environ.get('AVATAR_SSH_CONFIG') else []) \
+    + ['-o', 'ConnectTimeout=30', host]
 remote = subprocess.check_output(ssh + ['mktemp -d "${TMPDIR:-/tmp/}avatar-native.XXXXXX"'], text=True).strip()
 q = shlex.quote(remote)
 archive = io.BytesIO()

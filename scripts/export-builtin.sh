@@ -2,7 +2,7 @@
 set -euo pipefail
 # Requires Python 3 locally and macOS Swift remotely; no app or Mac repo builds.
 # Run from anywhere: bash scripts/export-builtin.sh
-# Optional transport configuration: AVATAR_SSH_CONFIG and AVATAR_SWIFT_HOST.
+# Needs AVATAR_SWIFT_HOST (an SSH host with macOS Swift). AVATAR_SSH_CONFIG is optional.
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 python3 - "$ROOT" <<'PY'
 import hashlib, io, json, math, os, pathlib, re, shlex, subprocess, sys, tarfile
@@ -27,8 +27,12 @@ for fragment in [
     assert fragment in view, f'Native drawing changed; review exporter: {fragment}'
 kinds = re.search(r'case (round[^\n]+)', blob).group(1).split(', ')
 shapes = re.findall(r'"([^"]+)"', re.search(r'static let pickerShapes = \[([^\]]+)\]', shape).group(1))
-ssh = ['ssh', '-F', os.environ.get('AVATAR_SSH_CONFIG', '/opt/data/.ssh/config'),
-       '-o', 'ConnectTimeout=30', os.environ.get('AVATAR_SWIFT_HOST', 'mac')]
+# A Mac with Swift, reached over SSH: AVATAR_SWIFT_HOST (required) and AVATAR_SSH_CONFIG (optional).
+host = os.environ.get('AVATAR_SWIFT_HOST', '').strip()
+if not host:
+    sys.exit('Set AVATAR_SWIFT_HOST to an SSH host (a Mac with Swift). AVATAR_SSH_CONFIG is optional.')
+ssh = ['ssh'] + (['-F', os.environ['AVATAR_SSH_CONFIG']] if os.environ.get('AVATAR_SSH_CONFIG') else []) \
+    + ['-o', 'ConnectTimeout=30', host]
 remote = subprocess.check_output(ssh + ['mktemp -d "${TMPDIR:-/tmp/}bighelp-avatars.XXXXXX"'], text=True).strip()
 assert re.fullmatch(r'/[A-Za-z0-9_./-]+/bighelp-avatars\.[A-Za-z0-9]+', remote), 'Unexpected remote temp directory'
 qremote = shlex.quote(remote)

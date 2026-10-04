@@ -181,7 +181,7 @@ The service is independent of the template catalog.
 - From repo root, `bash scripts/export-builtin.sh`: isolated Mac Swift export of existing Faces/Shapes,
   checked against the app's frozen face hashes and shape/eye vectors. Does not build/change the app.
 - `python3 scripts/verify-native.py <output-directory>` from this service: compiles the app's unchanged
-  AvatarKit decoder/renderer in an isolated Mac probe over the configured SSH alias. Decodes and renders
+  AvatarKit decoder/renderer in an isolated Mac probe over SSH (`AVATAR_SWIFT_HOST`, optional `AVATAR_SSH_CONFIG`). Decodes and renders
   every character, overrides primary to magenta and verifies each rendered image changes. PNGs permit
   visual comparisons. It uses a test-only hex Color adapter instead of unrelated app dependencies.
 - `node scripts/verify-live.mjs`: fetches both feeds plus every referenced JSON/SVG/PNG, checks IDs,

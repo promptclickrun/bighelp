@@ -470,6 +470,9 @@ struct BighelpApp: App {
                         && hostRegistry.generation == generation
                 }
             }
+            .modifier(BighelpLiveAlertsWhileOpen(
+                isOpen: scenePhase == .active || BighelpPlatform.isMac, isEnabled: !usesDemoFixtures,
+                connections: workspaceConnections, composition: notificationComposition))
             .onReceive(NotificationCenter.default.publisher(
                 for: UIApplication.protectedDataDidBecomeAvailableNotification
             )) { _ in

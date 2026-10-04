@@ -342,6 +342,16 @@ final class DirectHermesNativePluginClient {
             // Sent before each message; a slow host never holds a message for long.
             return Route(path: "people/speaking", feature: "native-people-v1", isMutation: true,
                          maximumResponseBytes: 16_384, timeout: 5)
+        // The host holds a listen up to 25 seconds; the rest is the trip there and back.
+        case .liveAlertsListen:
+            return Route(path: "alerts/listen", feature: BighelpLiveAlertListener.feature, isMutation: false,
+                         maximumResponseBytes: 1_048_576, timeout: 40)
+        case .liveAlertsAck:
+            return Route(path: "alerts/ack", feature: BighelpLiveAlertListener.feature, isMutation: false,
+                         maximumResponseBytes: 16_384, timeout: 5)
+        case .liveAlertsStop:
+            return Route(path: "alerts/stop", feature: BighelpLiveAlertListener.feature, isMutation: false,
+                         maximumResponseBytes: 16_384, timeout: 5)
         case .providerSignInList:
             // Claude Code answers its own status check on the host (a few seconds at most).
             return Route(path: "provider-sign-in/list", feature: "native-provider-sign-in-v1", isMutation: false,

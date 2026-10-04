@@ -461,6 +461,19 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
         try ledger.save(current)
     }
 
+    /// This device's grants on a computer that can send it sealed alerts straight
+    /// away while bighelp is open: on, current, with its key registered and the
+    /// computer's signing key pinned here.
+    func liveAlertGrants(host: BighelpConfiguredHost) -> [BighelpLiveAlertListener.Grant] {
+        ledger.enrollments.compactMap { record -> BighelpLiveAlertListener.Grant? in
+            guard record.accountScope == host.notificationScope, record.hostConnectionID == host.hostConnectionID,
+                  record.enabled, !record.revokePending, let grant = record.grant, grant.state == "active",
+                  grant.expiresAt > timestamp, let keyID = record.sealedRecipientKeyID,
+                  (try? sealedSenders.sender(grantID: grant.grantId, now: timestamp)) != nil else { return nil }
+            return BighelpLiveAlertListener.Grant(grantID: grant.grantId, recipientKeyID: keyID)
+        }
+    }
+
     func receive(host: BighelpConfiguredHost, event: DirectHermesEvent) async {
         guard (try? credentials(for: host)) != nil else { return }
         await nativeEventObserver?(host, event)

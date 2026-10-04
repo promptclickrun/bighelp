@@ -20,19 +20,15 @@ final class NotificationService: BuzzKitNotificationService, @unchecked Sendable
             super.didReceive(Self.grouped(request), withContentHandler: contentHandler)
             return
         }
-        content.title = opened.title
-        content.body = opened.body
         // The app keeps alerts for the chat on screen quiet by reading the chat from
         // the push data. Older services send it only as the thread.
-        if !request.content.threadIdentifier.isEmpty, var loopdy = content.userInfo["loopdy"] as? [String: Any],
-           (loopdy["sessionReference"] as? String)?.isEmpty ?? true {
-            loopdy["sessionReference"] = request.content.threadIdentifier
-            var userInfo = content.userInfo
-            userInfo["loopdy"] = loopdy
-            content.userInfo = userInfo
+        BighelpSealedAlertPresentation.apply(opened, eventType: sealed.eventType, to: content,
+                                             arrivedThread: request.content.threadIdentifier)
+        let eventID = sealed.envelope.eventID
+        // bighelp was open and showed this one straight from the host already.
+        if BighelpRecentAlerts.shared.contains(eventID) {
+            BighelpSealedAlertPresentation.quietRepeat(content)
         }
-        BighelpNotificationGrouping.apply(to: content, eventType: sealed.eventType, agentName: opened.title)
-        let chat = BighelpNotificationGrouping.chat(of: content.userInfo)
         setPending((contentHandler, content.copy() as? UNNotificationContent ?? content))
         let box = UncheckedBox((request: request, content: content))
         // The picture comes from the phone's cache after the first alert. A first
@@ -43,9 +39,8 @@ final class NotificationService: BuzzKitNotificationService, @unchecked Sendable
         let identifier = request.identifier
         Task {
             // This chat's earlier replies are old news now.
-            if let chat {
-                await BighelpNotificationGrouping.removeSuperseded(by: eventType, chat: chat, keeping: identifier)
-            }
+            await BighelpSealedAlertPresentation.clearOlder(for: box.value.content, eventType: eventType,
+                                                            eventID: eventID, keeping: identifier)
             if let file = await Self.value(of: avatar, within: .milliseconds(1500)),
                let attachment = try? UNNotificationAttachment(identifier: "bk.image", url: file) {
                 box.value.content.attachments = [attachment]

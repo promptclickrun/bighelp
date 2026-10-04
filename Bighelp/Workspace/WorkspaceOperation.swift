@@ -159,6 +159,10 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     /// Hours of the day, messages and models per day for the Usage page (plugin, `native-usage-activity-v1`).
     case usageActivity = "usage.activity"
     case peopleSpeaking = "people.speaking"
+    /// Instant alerts while bighelp is open (plugin, `native-live-alerts-v1`).
+    case liveAlertsListen = "alerts.listen"
+    case liveAlertsAck = "alerts.ack"
+    case liveAlertsStop = "alerts.stop"
     case providerSignInList = "provider-sign-in.list"
     case providerSignInStart = "provider-sign-in.start"
     case providerSignInStatus = "provider-sign-in.status"

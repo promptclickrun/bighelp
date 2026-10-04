@@ -16,6 +16,7 @@ export interface TemplateRow {
   submitter_username: string | null;
   status_token_hash: string | null;
   submitter_ip_hash: string | null;
+  submitter_github_id: string | null;
   created_at: string;
   updated_at: string;
   reviewed_at: string | null;
@@ -38,6 +39,7 @@ export function reviewView(row: TemplateRow) {
     submitterName: row.submitter_name,
     submitterUsername: row.submitter_username,
     submitterEmail: row.submitter_email,
+    submitterGithubId: row.submitter_github_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     reviewedAt: row.reviewed_at,
@@ -122,6 +124,25 @@ export async function submitterLoad(db: D1Database, email: string, ipHash: strin
   return { pending: row?.pending ?? 0, byEmail: row?.byEmail ?? 0, byNetwork: row?.byNetwork ?? 0 };
 }
 
+/** Pending submissions from one GitHub account, and how many it sent since `since`. */
+export async function githubLoad(db: D1Database, githubId: string, since: string) {
+  const row = await db.prepare(
+    `SELECT
+       SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending,
+       SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) AS recent
+     FROM templates WHERE submitter_github_id = ?`,
+  ).bind(since, githubId).first<{ pending: number | null; recent: number | null }>();
+  return { pending: row?.pending ?? 0, recent: row?.recent ?? 0 };
+}
+
+/** Community submissions waiting for review, from every submitter. */
+export async function pendingCommunityCount(db: D1Database): Promise<number> {
+  const row = await db.prepare(
+    "SELECT COUNT(*) AS count FROM templates WHERE status = 'pending' AND source = 'community'",
+  ).first<{ count: number }>();
+  return row?.count ?? 0;
+}
+
 export async function insert(
   db: D1Database,
   input: {
@@ -130,7 +151,10 @@ export async function insert(
     status: TemplateStatus;
     source: TemplateSource;
     creditName: string | null;
-    submitter?: { name: string; username: string; email: string; statusTokenHash: string; ipHash: string };
+    /** Web form submitters give a name and email; agent submitters are known by their GitHub ID. */
+    submitter?: {
+      name?: string; username: string; email?: string; githubId?: string; statusTokenHash: string; ipHash?: string;
+    };
     now: string;
     reviewedBy?: string;
   },
@@ -138,14 +162,14 @@ export async function insert(
   const reviewed = input.status === "pending" ? null : input.now;
   await db.prepare(
     `INSERT INTO templates (id, kind, status, source, payload, credit_name, submitter_email, submitter_name,
-       submitter_username, status_token_hash, submitter_ip_hash, created_at, updated_at, reviewed_at, reviewed_by,
-       sort_key)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       submitter_username, status_token_hash, submitter_ip_hash, submitter_github_id, created_at, updated_at,
+       reviewed_at, reviewed_by, sort_key)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
     input.id, input.template.kind, input.status, input.source, JSON.stringify(input.template.payload),
     input.creditName, input.submitter?.email ?? null, input.submitter?.name ?? null,
     input.submitter?.username ?? null, input.submitter?.statusTokenHash ?? null, input.submitter?.ipHash ?? null,
-    input.now, input.now, reviewed, input.reviewedBy ?? null, Date.parse(input.now) / 1000,
+    input.submitter?.githubId ?? null, input.now, input.now, reviewed, input.reviewedBy ?? null, Date.parse(input.now) / 1000,
   ).run();
 }
 

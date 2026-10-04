@@ -13,6 +13,8 @@ Needs a Cloudflare Access service token for the review app, in the environment o
   catalog-review edit ID FIELD=VALUE ...     (e.g. vibe="Calm, organized" symbol=airplane)
   catalog-review publish FILE.json           (reviewer-authored template, approved at once)
   catalog-review delete ID
+  catalog-review ban GITHUB_ID [--note TEXT]  (stops that account's agent submissions and signs out its installs)
+  catalog-review unban GITHUB_ID
 """
 
 import argparse
@@ -71,7 +73,12 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 def summary(item: dict) -> str:
-    who = (f"@{item['submitterUsername']} <{item['submitterEmail']}>" if item.get("submitterEmail") else item.get("source"))
+    if item.get("submitterGithubId"):
+        who = f"@{item['submitterUsername']} (github:{item['submitterGithubId']})"
+    elif item.get("submitterEmail"):
+        who = f"@{item['submitterUsername']} <{item['submitterEmail']}>"
+    else:
+        who = item.get("source")
     where = f"{item.get('board')}/{item.get('category')}" if item["kind"] == "blueprint" else item.get("category")
     return f"{item['id']:<22} {item['status']:<9} {item['kind']:<9} {where:<20} {who:<28} {item['title']}"
 
@@ -99,6 +106,10 @@ def main() -> None:
     edit.add_argument("fields", nargs="+", metavar="FIELD=VALUE")
     publish = sub.add_parser("publish")
     publish.add_argument("file", type=Path)
+    ban = sub.add_parser("ban")
+    ban.add_argument("github_id")
+    ban.add_argument("--note")
+    sub.add_parser("unban").add_argument("github_id")
     args = parser.parse_args()
     load_env(args.env_file)
 
@@ -119,6 +130,11 @@ def main() -> None:
         result = call("DELETE", f"/review/templates/{args.id}")
     elif args.command in ("approve", "reject", "unpublish"):
         result = call("POST", f"/review/templates/{args.id}/{args.command}", {"note": args.note} if args.note else {})
+    elif args.command in ("ban", "unban"):
+        if not args.github_id.isdigit():
+            sys.exit("Use the numeric GitHub user ID (shown as github:<id> in list).")
+        body = {"note": args.note} if getattr(args, "note", None) else {}
+        result = call("POST", f"/review/accounts/{args.github_id}/{args.command}", body)
     elif args.command == "edit":
         fields = dict(field.split("=", 1) for field in args.fields)
         result = call("PATCH", f"/review/templates/{args.id}", fields)

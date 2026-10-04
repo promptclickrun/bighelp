@@ -45,7 +45,7 @@ with the same ids (`feed-productivity-1`…, `anchor`…), so the app can match 
 - `POST /submit/templates`: a blueprint or agent body plus `submitterName`, `username`, `email` and
   `turnstileToken` (from the Turnstile widget). Returns 201 `{ id, status: "pending", statusToken }`.
   400 `{ error, field }` on bad input, 403 if Turnstile fails, 429 at 10 pending or 10 a day per email,
-  or 20 a day per network.
+  20 a day per network, or once 200 community templates are waiting across everyone.
 - `POST /submit/status` `{ tokens: [statusToken, ...] }`: `{ submissions: [{ id, kind, title, status,
   reviewNote (rejected only), createdAt }] }`. The site keeps each receipt in the browser's storage.
   Only a hash of the receipt is stored.
@@ -54,6 +54,21 @@ The username is the public credit. Name and email are visible only to reviewers.
 they link one person's submissions together. The network limit uses an HMAC of the IP address, never the
 address itself.
 
+**Agents (through the bighelp plugin, after a one-time GitHub sign-in):**
+
+The plugin signs the person in with GitHub's device flow (OAuth App under `promptclickrun`, no scopes),
+then trades the GitHub token for an install token. Limits count per numeric GitHub user ID, so reinstalling
+the plugin or adding hosts doesn't add any.
+
+- `POST /agent/register` `{ githubToken }`: the Worker calls GitHub's `GET /user` once and forgets the token.
+  201 `{ token, login, dailyLimit }`. 401 if GitHub refuses the token, 403 if the account is younger than
+  30 days or banned. Only a SHA-256 of the install token is stored, with the GitHub ID and login.
+- `POST /agent/revoke` with `Authorization: Bearer <token>`: `{ revoked }`.
+- `POST /submit/agent/templates` with `Authorization: Bearer <token>`: the same template body as the web
+  form, no name, email or Turnstile. 201 `{ id, status: "pending", statusToken, credit, remainingToday }`.
+  401 if the install isn't signed in (or its account was banned), 429 at 5 a day or 10 pending per GitHub
+  account, or when the queue is full. The GitHub login is the public credit. Status works like the web form.
+
 **Reviewers (`/review`, Access service token or the maintainer's login):**
 
 - `GET /review/templates?status=pending|approved|rejected|all&kind=&limit=`
@@ -61,6 +76,8 @@ address itself.
 - `POST /review/templates/:id/approve|reject|unpublish` with `{ note }`; reject requires a note,
   which the submitter sees
 - `POST /review/templates`: publish a reviewer-written template straight away
+- `POST /review/accounts/:githubId/ban` `{ note }` / `unban`: a ban signs out every install of that GitHub
+  account and blocks it from signing in again
 
 ## Reviewing
 
@@ -73,6 +90,7 @@ catalog-review show bp-1234abcd-5678
 catalog-review edit agent-… vibe="Calm, organized" symbol=airplane
 catalog-review approve agent-…
 catalog-review reject bp-… --note "Too close to an existing blueprint."
+catalog-review ban 12345678 --note "Spam"   # GitHub user ID, shown as github:<id> in list
 ```
 
 Raw HTTP works too: send the two `CF-Access-Client-Id` / `CF-Access-Client-Secret` headers. A bad token

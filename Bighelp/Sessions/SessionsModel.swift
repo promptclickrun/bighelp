@@ -135,7 +135,7 @@ struct SessionDaySection: Identifiable, Equatable {
 
         var title: String {
             switch self {
-            case .active: "Active Chats"
+            case .active: "Active Sessions"
             case .pinned: "Pinned"
             case .sessions: "Sessions"
             case .today: "Today"

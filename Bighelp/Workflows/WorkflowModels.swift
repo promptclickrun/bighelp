@@ -1207,6 +1207,8 @@ enum WorkflowWords {
         case "check_failed": "The result didn't pass this workflow's checks."
         case "storage_full": "Your computer is out of room for workflow files."
         case "storage_unavailable", "store_unavailable": "Your computer can't open its workflow files right now."
+        case "runner_unavailable": "Your computer can't run workflow stages. Update Hermes, then try again."
+        case "workflows_unavailable": "Workflows aren't on for this computer. Update the bighelp plugin."
         case "workflow_not_found", "run_not_found": "This isn't on your computer any more."
         case "queue_full": "Too many runs are waiting to start. Try again when some have finished."
         case "inputs_invalid": "Some of the details for this run aren't right. Check them and try again."

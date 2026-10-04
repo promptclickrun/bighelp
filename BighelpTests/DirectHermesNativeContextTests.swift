@@ -217,6 +217,29 @@ struct DirectHermesNativeContextTests {
         #expect(http.calls.count == 2)
     }
 
+    @Test func aRefusalBeforeAnyWorkIsKnownNotUnknown() async throws {
+        let owner = try owner()
+        let http = HTTP()
+        var code = "runner_unavailable"
+        http.handler = { request, guardValue in
+            if guardValue != nil {
+                return try self.response(request, status: 503, body: [
+                    "error": .object(["code": .string(code), "message": .string("details")]),
+                ])
+            }
+            return try self.response(request, body: self.context())
+        }
+        let client = DirectHermesNativePluginClient(http: http, owner: owner, currentOwner: { owner })
+        await #expect(throws: WorkspaceClientError.rejected(code: "runner_unavailable")) {
+            try await client.perform(.cardsTemplatesInstall, payload: ["agentId": .string("default")])
+        }
+        // Any other 503 to a change may have run: still unknown.
+        code = "busy"
+        await #expect(throws: WorkspaceClientError.outcomeUnknown) {
+            try await client.perform(.cardsTemplatesInstall, payload: ["agentId": .string("default")])
+        }
+    }
+
     @Test func successRequiresEchoedRequestAndContextWhileErrorsDoNotRequireETag() async throws {
         let owner = try owner()
         let http = HTTP()

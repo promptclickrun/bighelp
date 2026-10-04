@@ -348,7 +348,8 @@ enum UsageExportRenderer {
             ? CGSize(width: 612, height: 792) : CGSize(width: 595, height: 842)
     }
 
-    static func pdf(_ snapshot: UsageExportSnapshot, appearance: BighelpAppearanceContext) -> Data? {
+    /// Pauses between blocks so the screen keeps moving (and Exporting… spins) on a long page.
+    static func pdf(_ snapshot: UsageExportSnapshot, appearance: BighelpAppearanceContext) async -> Data? {
         let page = pageSize
         let margin: CGFloat = 28
         // Laid out at the screen's width, then scaled onto the page.
@@ -361,6 +362,7 @@ enum UsageExportRenderer {
         var pages: [[(renderer: ImageRenderer<AnyView>, y: CGFloat, height: CGFloat)]] = [[]]
         var y: CGFloat = 0
         for block in UsageExportBlocks(snapshot: snapshot, forPages: true).blocks {
+            await pause()
             let renderer = ImageRenderer(content: AnyView(prepared(block, width: pageWidth, appearance: appearance)))
             renderer.proposedSize = ProposedViewSize(width: pageWidth, height: nil)
             var height: CGFloat = 0
@@ -388,6 +390,7 @@ enum UsageExportRenderer {
             context.setFillColor(UIColor(Color(hex: theme.canvasHex)).cgColor)
             context.fill(box)
             for block in blocks {
+                await pause()
                 let fit = block.height > usable ? scale * usable / block.height : scale
                 block.renderer.render { size, draw in
                     context.saveGState()
@@ -412,5 +415,10 @@ enum UsageExportRenderer {
         }
         context.closePDF()
         return data as Data
+    }
+
+    /// A moment off the main thread's work, long enough for a frame and a tap to get through.
+    private static func pause() async {
+        try? await Task.sleep(for: .milliseconds(2))
     }
 }

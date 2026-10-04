@@ -62,9 +62,9 @@ struct UsageExportTests {
         try? data.write(to: URL(fileURLWithPath: folder).appendingPathComponent(name))
     }
 
-    @Test func keepsEachFormatForReview() throws {
+    @Test func keepsEachFormatForReview() async throws {
         for format in UsageExportFormat.allCases {
-            let data = try UsageExporter.data(format, Self.snapshot(), appearance: .init(appearance: .system))
+            let data = try await UsageExporter.data(format, Self.snapshot(), appearance: .init(appearance: .system))
             Self.keep(data, "usage.\(format.fileExtension)")
             #expect(!data.isEmpty)
         }
@@ -200,8 +200,8 @@ struct UsageExportTests {
         #expect(image.size.height > 4_000, "Every section, top to bottom: \(image.size.height)")
     }
 
-    @Test func pdfHasPagesOfThePage() throws {
-        let data = try #require(UsageExportRenderer.pdf(Self.snapshot(), appearance: .init(appearance: .dark)))
+    @Test func pdfHasPagesOfThePage() async throws {
+        let data = try #require(await UsageExportRenderer.pdf(Self.snapshot(), appearance: .init(appearance: .dark)))
         #expect(data.starts(with: Array("%PDF".utf8)))
         #expect(data.count > 20_000, "Drawn content: \(data.count) bytes")
         let document = try #require(CGPDFDocument(CGDataProvider(data: data as CFData)!))
@@ -210,15 +210,31 @@ struct UsageExportTests {
         #expect(page.getBoxRect(.mediaBox).size == UsageExportRenderer.pageSize)
     }
 
-    @Test func writesNamedFilesToTheTemporaryFolderAndClearsThem() throws {
+    @Test func writesNamedFilesToTheTemporaryFolderAndClearsThem() async throws {
         let snapshot = Self.snapshot()
-        let csv = try UsageExporter.write(.csv, snapshot, appearance: .init(appearance: .light))
+        let csv = try await UsageExporter.write(.csv, snapshot, appearance: .init(appearance: .light))
         #expect(csv.lastPathComponent == "bighelp-usage-2026-10-03.csv")
         #expect(csv.path.hasPrefix(FileManager.default.temporaryDirectory.path))
-        let html = try UsageExporter.write(.html, snapshot, appearance: .init(appearance: .light))
+        let html = try await UsageExporter.write(.html, snapshot, appearance: .init(appearance: .light))
         #expect(!FileManager.default.fileExists(atPath: csv.path), "Earlier exports go")
         #expect(FileManager.default.fileExists(atPath: html.path))
         UsageExporter.removeAll()
         #expect(!FileManager.default.fileExists(atPath: html.path))
+    }
+
+    /// Drawing a big page takes seconds, so the page says it's exporting from the tap until the
+    /// file is ready, and a second tap meanwhile doesn't start another.
+    @MainActor
+    @Test func exportingShowsUntilTheFileIsReady() async throws {
+        let job = UsageExportJob()
+        let started = Task { await job.run(.pdf, Self.snapshot(), appearance: .init(appearance: .light)) }
+        await Task.yield()
+        #expect(job.exporting == .pdf, "Shown at once")
+        #expect(await job.run(.csv, Self.snapshot(), appearance: .init(appearance: .light)) == nil, "One at a time")
+        let url = try #require(await started.value)
+        #expect(job.exporting == nil)
+        #expect(url.pathExtension == "pdf")
+        #expect(FileManager.default.fileExists(atPath: url.path))
+        UsageExporter.removeAll()
     }
 }

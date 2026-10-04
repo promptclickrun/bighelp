@@ -161,7 +161,7 @@ final class ProviderUsageUITests: BighelpUITestCase {
     /// Share, top right: PDF, PNG, HTML and CSV, each to the system share sheet.
     @MainActor
     func testShareOffersFourFormats() throws {
-        let app = launch(["-bighelp.hosts.all-hosts", "YES"])
+        let app = launch(["-bighelp.hosts.all-hosts", "YES", "-test-slow-usage-export"])
         openMenu(app)
         app.buttons["menu.usage"].tap()
         _ = expectPage(app)
@@ -175,11 +175,15 @@ final class ProviderUsageUITests: BighelpUITestCase {
         }
         save("usage-9-share-\(appearance)", app)
         app.buttons["PDF"].tap()
+        // Drawing the file takes a moment; the page says so instead of freezing.
+        XCTAssertTrue(app.descendants(matching: .any)["usage.exporting"].waitForExistence(timeout: 3),
+                      "Exporting shows while the file is made")
+        save("usage-10-exporting-\(appearance)", app)
         // The system share sheet, with the file ready to send.
         let sheet = app.otherElements["ActivityListView"]
         let named = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Usage, ")).firstMatch
         XCTAssertTrue(sheet.waitForExistence(timeout: 15) || named.waitForExistence(timeout: 5), "The share sheet opens")
-        save("usage-10-share-sheet-\(appearance)", app)
+        save("usage-11-share-sheet-\(appearance)", app)
     }
 
     @MainActor

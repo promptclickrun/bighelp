@@ -13,6 +13,8 @@ struct UsageView: View {
 
     @State private var selectedDay: String?
     @State private var isChoosingProviders = false
+    @State private var exportJob = UsageExportJob()
+    @State private var shareAnchor = UsageShareSheetAnchor()
     /// Which computers' plans Limits shows (`UsageLimitsComputers.Choice`).
     @AppStorage(UsageLimitsComputers.choiceKey) private var limitsChoice = "current"
     @AppStorage(ProviderUsagePreferences.hiddenKey) private var hiddenProviders = ""
@@ -46,6 +48,18 @@ struct UsageView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) { shareMenu }
             ToolbarItem(placement: .topBarTrailing) { refreshButton }
+        }
+        .overlay {
+            if let format = exportJob.exporting {
+                UsageExportingCard(format: format)
+                    .transition(.opacity.combined(with: .scale(scale: 0.94)))
+            }
+        }
+        .animation(.snappy, value: exportJob.exporting)
+        .alert("Couldn't export", isPresented: $exportJob.failed) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Try again in a moment.")
         }
         // Exports are only for the share sheet.
         .onDisappear { UsageExporter.removeAll() }
@@ -106,9 +120,11 @@ struct UsageView: View {
             if let snapshot {
                 Section("Share as") {
                     ForEach(UsageExportFormat.allCases) { format in
-                        ShareLink(item: UsageExportItem(format: format, snapshot: snapshot, appearance: appearance),
-                                  preview: SharePreview("Usage, \(snapshot.dateRangeText)")) {
-                            Label(format.title, systemImage: format.symbol)
+                        Button(format.title, systemImage: format.symbol) {
+                            Task {
+                                guard let url = await exportJob.run(format, snapshot, appearance: appearance) else { return }
+                                shareAnchor.share(url, title: "Usage, \(snapshot.dateRangeText)")
+                            }
                         }
                         .accessibilityIdentifier("usage.share.\(format.rawValue)")
                     }
@@ -118,7 +134,8 @@ struct UsageView: View {
             Image(systemName: "square.and.arrow.up")
                 .bighelpToolbarIcon()
         }
-        .disabled(snapshot == nil)
+        .background(UsageShareSheetHost(anchor: shareAnchor))
+        .disabled(snapshot == nil || exportJob.exporting != nil)
         .bighelpIconLabel("Share")
         .accessibilityIdentifier("usage.share")
     }
@@ -342,4 +359,29 @@ struct UsageMessageCard: View {
     }
 
     @BighelpThemeReader private var theme
+}
+
+/// Shown over the page while an export is drawn.
+private struct UsageExportingCard: View {
+    let format: UsageExportFormat
+    @BighelpThemeReader private var theme
+
+    var body: some View {
+        VStack(spacing: BighelpTokens.space12) {
+            ProgressView()
+                .controlSize(.large)
+            Text("Exporting…")
+                .font(.bighelp(.headline))
+                .foregroundStyle(theme.primaryText)
+            Text(format.title)
+                .font(.bighelp(.footnote))
+                .foregroundStyle(theme.secondaryText)
+        }
+        .padding(.horizontal, BighelpTokens.space32)
+        .padding(.vertical, BighelpTokens.space24)
+        .background(.regularMaterial, in: .rect(cornerRadius: BighelpTokens.radius20))
+        .shadow(color: .black.opacity(0.12), radius: 16, y: 6)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("usage.exporting")
+    }
 }

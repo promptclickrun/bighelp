@@ -1,5 +1,6 @@
-import CoreTransferable
+import LinkPresentation
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 
 /// The Usage page as it is when Share is tapped: its range, Cost or Tokens,
@@ -163,12 +164,12 @@ enum UsageExporter {
 
     @MainActor
     static func data(_ format: UsageExportFormat, _ snapshot: UsageExportSnapshot,
-                     appearance: BighelpAppearanceContext) throws -> Data {
+                     appearance: BighelpAppearanceContext) async throws -> Data {
         let data: Data? = switch format {
         case .csv: Data(UsageExportCSV.make(snapshot).utf8)
         case .html: Data(UsageExportHTML.make(snapshot, palette: .init(appearance: appearance)).utf8)
         case .png: UsageExportRenderer.png(snapshot, appearance: appearance)
-        case .pdf: UsageExportRenderer.pdf(snapshot, appearance: appearance)
+        case .pdf: await UsageExportRenderer.pdf(snapshot, appearance: appearance)
         }
         guard let data, !data.isEmpty else { throw CocoaError(.fileWriteUnknown) }
         return data
@@ -176,8 +177,8 @@ enum UsageExporter {
 
     @MainActor
     static func write(_ format: UsageExportFormat, _ snapshot: UsageExportSnapshot,
-                      appearance: BighelpAppearanceContext) throws -> URL {
-        let data = try data(format, snapshot, appearance: appearance)
+                      appearance: BighelpAppearanceContext) async throws -> URL {
+        let data = try await data(format, snapshot, appearance: appearance)
         removeAll()
         let directory = folder.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -192,28 +193,92 @@ enum UsageExporter {
     }
 }
 
-/// One format of the page for ShareLink, written only once something asks for it.
-struct UsageExportItem: Transferable {
-    let format: UsageExportFormat
-    let snapshot: UsageExportSnapshot
-    let appearance: BighelpAppearanceContext
+/// Writes the format picked, saying so while it works: drawing the page as a PDF or picture can
+/// take seconds, and with the share sheet asking for it the screen froze with nothing to show.
+@MainActor
+@Observable
+final class UsageExportJob {
+    private(set) var exporting: UsageExportFormat?
+    var failed = false
 
-    static var transferRepresentation: some TransferRepresentation {
-        FileRepresentation(exportedContentType: .pdf) { try await $0.file() }
-            .exportingCondition { $0.format == .pdf }
-        FileRepresentation(exportedContentType: .png) { try await $0.file() }
-            .exportingCondition { $0.format == .png }
-        FileRepresentation(exportedContentType: .html) { try await $0.file() }
-            .exportingCondition { $0.format == .html }
-        FileRepresentation(exportedContentType: .commaSeparatedText) { try await $0.file() }
-            .exportingCondition { $0.format == .csv }
-    }
+    #if DEBUG
+    /// "-test-slow-usage-export": long enough for UI tests to see Exporting….
+    private static let holdMilliseconds = CommandLine.arguments.contains("-test-slow-usage-export") ? 2_500 : 350
+    #else
+    private static let holdMilliseconds = 350
+    #endif
 
-    private func file() async throws -> SentTransferredFile {
+    func run(_ format: UsageExportFormat, _ snapshot: UsageExportSnapshot,
+             appearance: BighelpAppearanceContext) async -> URL? {
+        guard exporting == nil else { return nil }
+        exporting = format
+        defer { exporting = nil }
+        // Let the menu close and the loader appear before drawing holds up the screen.
+        try? await Task.sleep(for: .milliseconds(Self.holdMilliseconds))
         var snapshot = snapshot
         snapshot.generatedAt = .now
-        let format = format, appearance = appearance
-        let url = try await MainActor.run { try UsageExporter.write(format, snapshot, appearance: appearance) }
-        return SentTransferredFile(url)
+        do {
+            return try await UsageExporter.write(format, snapshot, appearance: appearance)
+        } catch {
+            failed = true
+            return nil
+        }
+    }
+}
+
+/// Opens the share sheet for a finished export, pointing at Share on iPad, Mac and Vision Pro.
+@MainActor
+final class UsageShareSheetAnchor {
+    fileprivate weak var host: UIViewController?
+
+    func share(_ url: URL, title: String) {
+        guard let host, host.view.window != nil else { return }
+        let sheet = UIActivityViewController(activityItems: [UsageShareItem(url: url, title: title)],
+                                             applicationActivities: nil)
+        sheet.popoverPresentationController?.sourceView = host.view
+        sheet.popoverPresentationController?.sourceRect = host.view.bounds
+        host.present(sheet, animated: true)
+    }
+}
+
+/// Sits behind Share so the sheet has a place to come from.
+struct UsageShareSheetHost: UIViewControllerRepresentable {
+    let anchor: UsageShareSheetAnchor
+
+    func makeUIViewController(context: Context) -> UIViewController {
+        let host = UIViewController()
+        host.view.backgroundColor = .clear
+        // Taps belong to Share above it.
+        host.view.isUserInteractionEnabled = false
+        anchor.host = host
+        return host
+    }
+
+    func updateUIViewController(_ host: UIViewController, context: Context) {
+        anchor.host = host
+    }
+}
+
+/// The file, titled "Usage, <range>" at the top of the share sheet.
+private final class UsageShareItem: NSObject, UIActivityItemSource {
+    let url: URL
+    let title: String
+
+    init(url: URL, title: String) {
+        self.url = url
+        self.title = title
+    }
+
+    func activityViewControllerPlaceholderItem(_ controller: UIActivityViewController) -> Any { url }
+
+    func activityViewController(_ controller: UIActivityViewController,
+                                itemForActivityType activityType: UIActivity.ActivityType?) -> Any? { url }
+
+    func activityViewControllerLinkMetadata(_ controller: UIActivityViewController) -> LPLinkMetadata? {
+        let metadata = LPLinkMetadata()
+        metadata.title = title
+        metadata.originalURL = url
+        metadata.url = url
+        return metadata
     }
 }

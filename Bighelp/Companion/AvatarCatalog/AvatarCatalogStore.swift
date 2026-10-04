@@ -73,6 +73,8 @@ final class AvatarCatalogStore {
     /// Moves on at each start or expiry so views re-filter.
     private(set) var now: Date
     private(set) var isRefreshing = false
+    /// Moves on when the active characters' kit changes, so previews redraw.
+    private(set) var kitRevision = 0
 
     @ObservationIgnored private let transport: any AvatarCatalogFetching
     @ObservationIgnored private let directory: URL?
@@ -92,6 +94,9 @@ final class AvatarCatalogStore {
         // The copy that shipped with the app until a download lands; demo mode and tests keep it.
         catalog = (isEnabled ? Self.readCatalog(in: directory) : nil) ?? AvatarCatalog.bundled
         AvatarKitLibrary.shared.directory = directory?.appending(path: "packs", directoryHint: .isDirectory)
+        if isEnabled, let data = Self.read("kit.json", in: directory) {
+            AvatarKitLibrary.shared.activeKit = AvatarKitPackValidator.decode(data)
+        }
     }
 
     /// Demo fixtures and tests never touch the network.
@@ -151,12 +156,14 @@ final class AvatarCatalogStore {
         switch result {
         case .notModified(let age)?:
             maxAge = age
+            if AvatarKitLibrary.shared.activeKit == nil { await refreshKit() }
         case .fetched(let data, let newETag, let age)?:
             maxAge = age
             if let fresh = AvatarCatalog(discovery: data) {
                 catalog = fresh
                 Self.write(fresh, etag: newETag, in: directory)
             }
+            await refreshKit()
         case nil:
             // Try again within a minute, not five.
             dueAt = clock().addingTimeInterval(60)
@@ -165,6 +172,28 @@ final class AvatarCatalogStore {
         var due = clock().addingTimeInterval(min(maxAge ?? AvatarCatalogPolicy.maximumAge, AvatarCatalogPolicy.maximumAge))
         if let next = catalog.nextChange(after: clock()), next < due { due = next }
         dueAt = due
+    }
+
+    /// The active characters' kit, with its own ETag; a failure keeps the last good one.
+    private func refreshKit() async {
+        let library = AvatarKitLibrary.shared
+        let etag = library.activeKit == nil ? nil : Self.read("kit.etag", in: directory).map { String(decoding: $0, as: UTF8.self) }
+        guard case .fetched(let data, let newETag, _)? = try? await transport.fetch(AvatarCatalogPolicy.kitURL, etag: etag),
+              let kit = AvatarKitPackValidator.decode(data) else { return }
+        library.activeKit = kit
+        kitRevision += 1
+        guard let directory else { return }
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try? data.write(to: directory.appending(path: "kit.json"), options: .atomic)
+        if let newETag, newETag.utf8.count <= 256 {
+            try? Data(newETag.utf8).write(to: directory.appending(path: "kit.etag"), options: .atomic)
+        }
+    }
+
+    private static func read(_ name: String, in directory: URL?) -> Data? {
+        guard let url = directory?.appending(path: name), let data = try? Data(contentsOf: url),
+              !data.isEmpty, data.count <= AvatarCatalogPolicy.maximumBytes else { return nil }
+        return data
     }
 
     // MARK: Packs
@@ -249,9 +278,19 @@ final class AvatarKitLibrary: @unchecked Sendable {
         return AvatarKitPackValidator.decode(data)
     }()
 
-    /// The pack for a picked character: its own downloaded pack, else the shipped copy of it.
+    private var _activeKit: AvatarKit?
+
+    /// The catalog's active characters, downloaded in one file.
+    var activeKit: AvatarKit? {
+        get { lock.withLock { _activeKit } }
+        set { lock.withLock { _activeKit = newValue } }
+    }
+
+    /// The pack for a character: its own downloaded pack (what a pick keeps), else the catalog's
+    /// active kit, else the copy shipped with the app.
     func kit(for reference: AvatarCatalogReference) -> AvatarKit? {
         if let kit = kit(sha256: reference.kitSHA256), kit.character(reference.id) != nil { return kit }
+        if let kit = activeKit, kit.character(reference.id) != nil { return kit }
         if let kit = Self.bundledKit, kit.character(reference.id) != nil { return kit }
         return nil
     }

@@ -647,6 +647,7 @@ struct AvatarCreatorView: View {
     @ViewBuilder
     private var catalogPanel: some View {
         let store = AvatarCatalogStore.shared
+        let _ = store.kitRevision
         let sets = store.catalog.sets(in: model.catalogGroup, at: store.now)
         if sets.isEmpty {
             Text(model.catalogGroup == .other

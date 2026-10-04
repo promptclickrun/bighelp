@@ -142,6 +142,36 @@ struct AvatarCatalogStoreTests {
         #expect(appearance.displayName == "Biggie")
     }
 
+    @Test func previewsComeFromTheActiveKitInOneRequest() async throws {
+        let transport = FakeTransport()
+        let folder = directory()
+        defer {
+            try? FileManager.default.removeItem(at: folder)
+            AvatarKitLibrary.shared.activeKit = nil
+        }
+        // A character the app didn't ship with, in the active kit.
+        var object = try #require(try JSONSerialization.jsonObject(with: Self.pack()) as? [String: Any])
+        var characters = try #require(object["characters"] as? [[String: Any]])
+        characters[0]["id"] = "pocket-curios-drizzle"
+        object["characters"] = characters
+        let kitData = try JSONSerialization.data(withJSONObject: object)
+        let sha = String(repeating: "e", count: 64)
+        let extra = """
+        ,{"id":"pocket-curios-drizzle","name":"Drizzle","setId":"bighelp","category":"bighelp",
+          "kit":{"url":"https://avatars.bighelp.app/assets/drizzle.json","sha256":"\(sha)","bytes":10}}
+        """
+        await transport.reply(AvatarCatalogPolicy.discoveryURL, .success(.fetched(Self.discovery(sha: sha, extra: extra), etag: nil, maxAge: nil)))
+        await transport.reply(AvatarCatalogPolicy.kitURL, .success(.fetched(kitData, etag: "\"k1\"", maxAge: nil)))
+        let store = AvatarCatalogStore(transport: transport, directory: folder)
+        await store.refreshIfNeeded()
+        let entry = try #require(store.catalog.avatars.first { $0.id == "pocket-curios-drizzle" })
+        var appearance = CompanionAppearance(usesCharacterColors: true)
+        appearance.catalogAvatar = AvatarCatalogReference(entry)
+        #expect(appearance.kitArt?.art.id == "pocket-curios-drizzle", "Drawn from the active kit, no per-character request")
+        #expect(await transport.requests.filter { $0.path.hasPrefix("/assets/") }.isEmpty)
+        #expect(store.kitRevision == 1)
+    }
+
     @Test func unknownCatalogIDsNeverBecomeALobster() throws {
         var appearance = CompanionAppearance(character: .dog)
         appearance.catalogAvatar = AvatarCatalogReference(

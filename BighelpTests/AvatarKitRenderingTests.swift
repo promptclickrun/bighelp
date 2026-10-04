@@ -33,7 +33,30 @@ struct AvatarKitRenderingTests {
             let pixels = try #require(renderer.cgImage.flatMap(Self.rgba))
             let drawn = stride(from: 3, to: pixels.count, by: 4).filter { pixels[$0] > 32 }.count
             #expect(drawn > 600, "\(art.id) drew \(drawn) pixels")
+            #expect(Self.distinctColors(pixels) >= 3, "\(art.id) draws in its own colors, not one silhouette")
         }
+    }
+
+    /// The color check that, failing on one iPhone, drew every avatar in the fallback red.
+    @Test func colorCodesReadTheSameEverywhere() {
+        #expect(CompanionAppearance.validatedColorHex("#f28b32") == "#F28B32")
+        #expect(CompanionAppearance.validatedColorHex(" F28B32\n") == "#F28B32")
+        for bad in ["#F28B3", "#F28B32FF", "#GG8B32", "", "#", "＃F28B32", "#F28B 2"] {
+            #expect(CompanionAppearance.validatedColorHex(bad) == nil, "\(bad)")
+        }
+        let color = CompanionColor.components("#F28B32")
+        #expect(color.red == 242.0 / 255 && color.green == 139.0 / 255 && color.blue == 50.0 / 255)
+        #expect(CompanionColor.components("nonsense") == CompanionColor.components(CompanionAppearance.fallbackColorHex))
+        #expect(CompanionAppearance.validatedColorway("sunset-2") == "sunset-2")
+        #expect(CompanionAppearance.validatedColorway("Sunset") == nil)
+    }
+
+    static func distinctColors(_ pixels: [UInt8]) -> Int {
+        var distinct = Set<UInt32>()
+        for index in stride(from: 0, to: pixels.count, by: 4) where pixels[index + 3] > 200 {
+            distinct.insert(UInt32(pixels[index] >> 4) << 8 | UInt32(pixels[index + 1] >> 4) << 4 | UInt32(pixels[index + 2] >> 4))
+        }
+        return distinct.count
     }
 
     static func rgba(_ image: CGImage) -> [UInt8]? {

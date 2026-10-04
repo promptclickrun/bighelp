@@ -409,20 +409,22 @@ struct CompanionAppearance: Codable, Equatable, Sendable {
     }
 
     static func validatedColorway(_ value: String) -> String? {
-        let allowed = CharacterSet.lowercaseLetters.union(.decimalDigits).union(CharacterSet(charactersIn: "-"))
-        guard !value.isEmpty, value.utf8.count <= 32, value.unicodeScalars.allSatisfy(allowed.contains) else { return nil }
+        let bytes = Array(value.utf8)
+        guard !bytes.isEmpty, bytes.count <= 32,
+              bytes.allSatisfy({ ASCIIText.isLowercaseLetter($0) || ASCIIText.isDigit($0) || $0 == UInt8(ascii: "-") })
+        else { return nil }
         return value
     }
 
+    /// Byte by byte, without Foundation's character sets: on one tester's iPhone that check turned
+    /// down every valid color, so every avatar drew in `fallbackColorHex`.
     static func validatedColorHex(_ value: String) -> String? {
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        let digits = trimmed.hasPrefix("#") ? String(trimmed.dropFirst()) : trimmed
-        let hexadecimal = CharacterSet(charactersIn: "0123456789ABCDEFabcdef")
-        guard digits.count == 6,
-              digits.unicodeScalars.allSatisfy(hexadecimal.contains) else {
-            return nil
-        }
-        return "#" + digits.uppercased()
+        var digits = ArraySlice(value.utf8)
+        while let first = digits.first, ASCIIText.isSpace(first) { digits = digits.dropFirst() }
+        while let last = digits.last, ASCIIText.isSpace(last) { digits = digits.dropLast() }
+        if digits.first == UInt8(ascii: "#") { digits = digits.dropFirst() }
+        guard digits.count == 6, digits.allSatisfy(ASCIIText.isHexDigit) else { return nil }
+        return "#" + String(decoding: digits.map(ASCIIText.uppercased), as: UTF8.self)
     }
 }
 
@@ -650,8 +652,8 @@ final class CompanionStore {
 /// sRGB helpers for avatar colors (six-digit hex).
 enum CompanionColor {
     static func components(_ hex: String) -> (red: Double, green: Double, blue: Double) {
-        let digits = (CompanionAppearance.validatedColorHex(hex) ?? CompanionAppearance.fallbackColorHex).dropFirst()
-        let value = UInt32(digits, radix: 16) ?? 0
+        let digits = (CompanionAppearance.validatedColorHex(hex) ?? CompanionAppearance.fallbackColorHex).utf8.dropFirst()
+        let value = digits.reduce(UInt32(0)) { $0 << 4 | UInt32(ASCIIText.hexValue($1)) }
         return (Double((value >> 16) & 0xFF) / 255, Double((value >> 8) & 0xFF) / 255, Double(value & 0xFF) / 255)
     }
 
@@ -679,5 +681,24 @@ enum CompanionColor {
             green: color.green + (target - color.green) * weight,
             blue: color.blue + (target - color.blue) * weight
         )
+    }
+}
+
+/// ASCII checks on raw bytes, for values that must read the same on every device.
+enum ASCIIText {
+    static func isDigit(_ byte: UInt8) -> Bool { (0x30...0x39).contains(byte) }
+    static func isLowercaseLetter(_ byte: UInt8) -> Bool { (0x61...0x7A).contains(byte) }
+    static func isHexDigit(_ byte: UInt8) -> Bool { isDigit(byte) || (0x41...0x46).contains(byte) || (0x61...0x66).contains(byte) }
+    static func isSpace(_ byte: UInt8) -> Bool { byte == 0x20 || (0x09...0x0D).contains(byte) }
+    static func uppercased(_ byte: UInt8) -> UInt8 { isLowercaseLetter(byte) ? byte - 0x20 : byte }
+
+    /// 0–15 for a hex digit; 0 otherwise.
+    static func hexValue(_ byte: UInt8) -> UInt8 {
+        switch byte {
+        case 0x30...0x39: byte - 0x30
+        case 0x41...0x46: byte - 0x41 + 10
+        case 0x61...0x66: byte - 0x61 + 10
+        default: 0
+        }
     }
 }

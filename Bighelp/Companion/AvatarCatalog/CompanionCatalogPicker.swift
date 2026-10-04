@@ -14,6 +14,7 @@ struct CompanionCatalogPicker: View {
     private let store = AvatarCatalogStore.shared
 
     var body: some View {
+        let _ = store.kitRevision
         ScrollView {
             VStack(alignment: .leading, spacing: BighelpTokens.space20) {
                 if let defaultTitle {

@@ -6,6 +6,8 @@ import Foundation
 enum AvatarCatalogPolicy {
     static let host = "avatars.bighelp.app"
     static let discoveryURL = URL(string: "https://avatars.bighelp.app/v1/avatars.json")!
+    /// Every active character in one file: the picker's previews in one request, not one each.
+    static let kitURL = URL(string: "https://avatars.bighelp.app/v1/avatar-kit.json")!
     static let maximumBytes = 2_097_152
     /// The service says five minutes; never trust a longer one.
     static let maximumAge: TimeInterval = 300
@@ -142,8 +144,8 @@ struct AvatarCatalog: Codable, Equatable, Sendable {
 
     private static func identifier(_ value: Any?) -> String? {
         guard let value = value as? String, !value.isEmpty, value.utf8.count <= 64,
-              value.unicodeScalars.allSatisfy({ CharacterSet.lowercaseLetters.union(.decimalDigits)
-                  .union(CharacterSet(charactersIn: "-_")).contains($0) }) else { return nil }
+              value.utf8.allSatisfy({ ASCIIText.isLowercaseLetter($0) || ASCIIText.isDigit($0)
+                  || $0 == UInt8(ascii: "-") || $0 == UInt8(ascii: "_") }) else { return nil }
         return value
     }
 
@@ -155,7 +157,7 @@ struct AvatarCatalog: Codable, Equatable, Sendable {
     }
 
     static func isSHA256(_ value: String) -> Bool {
-        value.count == 64 && value.unicodeScalars.allSatisfy { CharacterSet(charactersIn: "0123456789abcdefABCDEF").contains($0) }
+        value.utf8.count == 64 && value.utf8.allSatisfy(ASCIIText.isHexDigit)
     }
 
     /// Timestamps carry their offset; date-only or offset-free ones aren't accepted.
@@ -229,7 +231,7 @@ enum AvatarKitPackValidator {
     static func decode(_ data: Data) -> AvatarKit? {
         guard data.count <= AvatarCatalogPolicy.maximumBytes, nesting(of: data) <= maximumNesting,
               let kit = try? JSONDecoder().decode(AvatarKit.self, from: data),
-              !kit.characters.isEmpty, kit.characters.count <= 64 else { return nil }
+              !kit.characters.isEmpty, kit.characters.count <= 512 else { return nil }
         var count = 0
         for character in kit.characters {
             guard character.look.isFinite, abs(character.look) <= 100, isValid(character.tree, count: &count) else { return nil }

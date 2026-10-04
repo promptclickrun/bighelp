@@ -155,6 +155,33 @@ struct BighelpActivityRowTests {
         #expect(BighelpActivitySummary.doneLabel(elapsed: 3_725) == "Worked for 1h 2m")
     }
 
+    /// Models head each thought with `**Checking the tests**`; the Thinking text
+    /// draws that emphasis instead of showing the asterisks, and leaves code-ish
+    /// text (`2 * 3`, `snake_case`, `__init__`) as written.
+    @Test func thinkingDrawsMarkdownEmphasis() {
+        func runs(_ text: String) -> [(String, InlinePresentationIntent?)] {
+            let note = BighelpActivitySummary.note(text)
+            return note.runs.map { (String(note[$0.range].characters), $0.inlinePresentationIntent) }
+        }
+        func plain(_ text: String) -> String { String(BighelpActivitySummary.note(text).characters) }
+
+        let heading = runs("**Checking state contract updates**\n\nI should read the tests.")
+        #expect(heading.map(\.0) == ["Checking state contract updates", "\n\nI should read the tests."])
+        #expect(heading.map(\.1) == [.stronglyEmphasized, nil])
+        #expect(runs("__Planning__ next").map(\.1) == [.stronglyEmphasized, nil])
+        #expect(runs("a *quick* look").map(\.0) == ["a ", "quick", " look"])
+        #expect(runs("a *quick* look").map(\.1) == [nil, .emphasized, nil])
+        #expect(runs("**Read *all* of it**").map(\.1) == [.stronglyEmphasized, [.stronglyEmphasized, .emphasized],
+                                                          .stronglyEmphasized])
+
+        for literal in ["2 * 3 * 4", "2*3*4", "call __init__ first", "edit __init__.py", "snake_case_name",
+                        "f(*args, **kwargs)", "**unclosed bold", "** spaced **", "*a\nb*", "***", "a**b**c",
+                        "`**raw**` stays"] {
+            #expect(plain(literal) == literal, "\(literal)")
+        }
+        #expect(plain("**Two**\n\n**Thoughts**") == "Two\n\nThoughts")
+    }
+
     @Test func stepCountsReadNaturally() {
         #expect(BighelpActivitySummary.stepCountLabel(0) == nil)
         #expect(BighelpActivitySummary.stepCountLabel(1) == "· 1 step")

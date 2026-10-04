@@ -2681,9 +2681,52 @@ struct NativeMidSessionTests {
         turn.cancel()
     }
 
+    /// The chat's model sheet read "Reasoning: unknown" while the agent worked:
+    /// its own read waits for an idle chat, and the one made when the chat opened
+    /// can fail before the chat is attached. Hermes reports the level in every
+    /// `session.info`, including the one that starts the turn.
+    @Test func reasoningLevelShowsDuringATurnFromSessionInfo() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let client = try makeClient(DirectTestRPC(), root: root)
+        defer { client.suspend() }
+        let messaging = UnattachedSessionControlMessaging()
+        let controls = SessionRuntimeControlModel(sessionID: client.conversationID, agentID: "default",
+                                                  messaging: messaging, allowsAgentDefaults: false)
+        await controls.loadReasoningPickerIfNeeded()
+        let model = ChatModel(conversationID: client.conversationID, client: client, initialItems: [],
+                              runtimeControls: controls)
+        client.model = model
+
+        client.receive(.init(type: "session.info", sessionID: "runtime", payload: [
+            "running": .boolean(true), "model": .string("hermes-test"), "provider": .string("nous"),
+            "reasoning_effort": .string("high")
+        ], sequence: 1))
+        controls.setTurnActive(true)
+        await controls.loadSummaryIfNeeded()
+
+        #expect(controls.isTurnActive)
+        #expect(messaging.openedCount == 1, "Nothing is read from the host while the agent is replying")
+        #expect(ChatModelSummaryPresentation(controls: controls).reasoning == "Reasoning: High")
+    }
+
     private func makeClient(_ rpc: DirectTestRPC, root: URL) throws -> DirectHermesConversationClient {
         try DirectHermesConversationClient(rpc: rpc, hostIdentity: "host", profile: "default", runtimeID: "runtime",
             storedID: "saved", title: "Chat", epoch: "epoch", drafts: DirectHermesDraftStore(root: root))
+    }
+}
+
+/// Answers like the host does before the chat's live session is attached.
+@MainActor private final class UnattachedSessionControlMessaging: BighelpLinkSessionControlMessaging {
+    private(set) var openedCount = 0
+
+    func openPicker(_ request: BighelpLinkPickerOpenRequest) async throws -> BighelpLinkPicker {
+        openedCount += 1
+        throw WorkspaceClientError.unavailable(.unsupportedOperation)
+    }
+
+    func selectPicker(_ selection: BighelpLinkPickerSelection) async throws -> BighelpLinkPickerResult {
+        throw WorkspaceClientError.unavailable(.unsupportedOperation)
     }
 }
 

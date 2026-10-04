@@ -1234,6 +1234,36 @@ struct ChatModelTests {
         #expect(summary.providerID == "nous")
     }
 
+    /// Hermes' session info carries the chat's reasoning. Live info is the newest
+    /// word; replayed info only fills in an unknown level and never undoes a
+    /// read or a choice made since.
+    @Test func sessionInfoReasoningKeepsTheNewestLevel() async throws {
+        let messaging = RuntimeControlMessagingFixture(
+            modelPicker: try decodeModelPicker(),
+            reasoningPicker: try decodeReasoningPicker(current: "high")
+        )
+        let controls = SessionRuntimeControlModel(
+            sessionID: "session_runtime_fixture_0001",
+            agentID: "juno",
+            messaging: messaging,
+            allowsAgentDefaults: false,
+            now: { 1_788_000_000 }
+        )
+        controls.reconcileSessionReasoning("", observedAt: .distantPast)
+        #expect(ChatModelSummaryPresentation(controls: controls).reasoning == "Reasoning: Auto")
+        controls.reconcileSessionReasoning("louder", observedAt: Date())
+        #expect(controls.currentReasoningValue == "reset", "Unknown levels are ignored")
+
+        await controls.loadReasoningPicker()
+        #expect(controls.currentReasoningValue == "high")
+        controls.reconcileSessionReasoning("low", observedAt: .distantPast)
+        #expect(controls.currentReasoningValue == "high", "Replayed info never undoes a newer read")
+
+        controls.setTurnActive(true)
+        controls.reconcileSessionReasoning("medium", observedAt: Date())
+        #expect(ChatModelSummaryPresentation(controls: controls).reasoning == "Reasoning: Medium")
+    }
+
     /// A new chat already knows its agent's defaults, so nothing is read.
     @Test func modelSummaryUsesAgentDefaultsForANewChat() async throws {
         let messaging = RuntimeControlMessagingFixture(

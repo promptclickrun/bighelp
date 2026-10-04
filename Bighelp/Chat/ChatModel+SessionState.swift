@@ -77,6 +77,13 @@ extension ChatModel {
         }
     }
 
+    /// The reasoning level from this chat's own Hermes session info. Replayed
+    /// info only fills in a level nothing newer has reported.
+    func reconcileNativeReasoning(_ value: String, isLive: Bool, from owner: DirectHermesConversationClient) {
+        guard (client as? DirectHermesConversationClient) === owner else { return }
+        runtimeControls?.reconcileSessionReasoning(value, observedAt: isLive ? Date() : .distantPast)
+    }
+
     func applyRenamedSessionTitle(_ title: String) {
         sessionTitle = title
     }

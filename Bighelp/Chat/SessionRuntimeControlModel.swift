@@ -176,6 +176,19 @@ final class SessionRuntimeControlModel {
         }
     }
 
+    /// Hermes reports the chat's reasoning in each `session.info`, including the
+    /// one that starts a turn, so the level is known while the agent works even
+    /// when the picker read (which waits for an idle chat) hasn't happened. An
+    /// empty value is Hermes' automatic choice. Replayed info is older than any
+    /// read or choice made here, so it only fills in an unknown level.
+    func reconcileSessionReasoning(_ value: String, observedAt: Date) {
+        let value = value.isEmpty ? "reset" : value
+        guard !isApplyingSelection, observedAt >= reasoningObservedAt,
+              Self.reasoningValues.contains(value) else { return }
+        reasoningObservedAt = observedAt
+        currentReasoningValue = value
+    }
+
     /// Agent defaults describe new chats only, not restored session authority.
     func seedAgentDefaults(_ selection: AgentRuntimeSelection) {
         guard allowsAgentDefaults, modelPicker == nil else { return }
@@ -210,7 +223,8 @@ final class SessionRuntimeControlModel {
 
     /// For showing the chat's model and reasoning (context pop-up, Info, the
     /// avatar's profile). The model is already known from the session; this
-    /// reads the reasoning once. Never mid-turn: the read touches the session.
+    /// reads the reasoning once. Never mid-turn: the read touches the session
+    /// (Hermes' session info keeps the level current then).
     func loadSummaryIfNeeded() async {
         guard !isTurnActive, currentReasoningValue == nil, reasoningPicker == nil else { return }
         await loadReasoningPickerIfNeeded()
@@ -320,7 +334,7 @@ final class SessionRuntimeControlModel {
             guard readStartedAt >= reasoningObservedAt,
                   currentChoices.count == 1,
                   let current = currentChoices.first?.value,
-                  ["reset", "none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"].contains(current)
+                  Self.reasoningValues.contains(current)
             else { return }
             reasoningObservedAt = readStartedAt
             currentReasoningValue = current
@@ -662,6 +676,10 @@ final class SessionRuntimeControlModel {
         errorMessage = nil
         invalidateNativeModelPicker()
     }
+
+    private static let reasoningValues: Set<String> = [
+        "reset", "none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"
+    ]
 
     private static func requestID() -> String {
         "picker_request_" + UUID().uuidString.replacingOccurrences(of: "-", with: "")

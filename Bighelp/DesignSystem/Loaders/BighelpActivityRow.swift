@@ -67,6 +67,80 @@ enum BighelpActivitySummary {
         return seconds < 60 ? "Thought for \(seconds)s" : "Thought for \(seconds / 60)m \(seconds % 60)s"
     }
 
+    /// The agent's thinking with its markdown emphasis drawn instead of spelled
+    /// out: models head each thought with `**Checking the tests**`. Only bold
+    /// (`**x**`, `__x__`) and italic (`*x*`) within one line count, drawn in
+    /// the row's own font. Everything else stays as written, so `2 * 3`,
+    /// `snake_case`, `__init__` and code in backticks keep their characters.
+    static func note(_ text: String) -> AttributedString {
+        let characters = Array(text)
+        var result = AttributedString()
+        var plain = ""
+        var index = 0
+        while index < characters.count {
+            if characters[index] == "`",
+               let close = characters[(index + 1)...].firstIndex(where: { $0 == "`" || $0.isNewline }),
+               characters[close] == "`" {
+                plain.append(contentsOf: characters[index...close])
+                index = close + 1
+                continue
+            }
+            if let run = emphasisRun(in: characters, at: index) {
+                result += AttributedString(plain)
+                plain = ""
+                var inner = note(String(characters[run.content]))
+                for (range, intent) in inner.runs.map({ ($0.range, $0.inlinePresentationIntent) }) {
+                    inner[range].inlinePresentationIntent = (intent ?? []).union(run.intent)
+                }
+                result += inner
+                index = run.end
+                continue
+            }
+            plain.append(characters[index])
+            index += 1
+        }
+        result += AttributedString(plain)
+        return result
+    }
+
+    /// A `**x**`, `__x__` or `*x*` starting at `index`, with CommonMark's
+    /// rules for where a run may open and close, kept to one line.
+    private static func emphasisRun(
+        in characters: [Character], at index: Int
+    ) -> (content: Range<Int>, end: Int, intent: InlinePresentationIntent)? {
+        let marker = characters[index]
+        guard marker == "*" || marker == "_" else { return nil }
+        var length = 1
+        while index + length < characters.count, characters[index + length] == marker { length += 1 }
+        // A single `_` is too often part of a name to read as italic.
+        guard length == 2 || (length == 1 && marker == "*") else { return nil }
+        let start = index + length
+        guard start < characters.count, !characters[start].isWhitespace,
+              index == 0 || (characters[index - 1] != marker && !isWordCharacter(characters[index - 1]))
+        else { return nil }
+        var close = start + 1
+        while close + length <= characters.count, !characters[close].isNewline {
+            let closes = characters[close..<(close + length)].allSatisfy { $0 == marker }
+                && characters[close - 1] != marker && !characters[close - 1].isWhitespace
+                && (close + length == characters.count
+                    || (characters[close + length] != marker && !isWordCharacter(characters[close + length])))
+            if closes {
+                let content = start..<close
+                // Python's `__init__` and friends are names, not bold.
+                if marker == "_", characters[content].allSatisfy({ $0.isLowercase || $0.isNumber || $0 == "_" }) {
+                    return nil
+                }
+                return (content, close + length, length == 2 ? .stronglyEmphasized : .emphasized)
+            }
+            close += 1
+        }
+        return nil
+    }
+
+    private static func isWordCharacter(_ character: Character) -> Bool {
+        character.isLetter || character.isNumber || character == "_"
+    }
+
     /// "· 3 steps", or nil with none.
     static func stepCountLabel(_ count: Int) -> String? {
         guard count > 0 else { return nil }
@@ -279,7 +353,7 @@ struct BighelpActivityRow: View {
     private var details: some View {
         VStack(alignment: .leading, spacing: 2) {
             if let note, !note.isEmpty {
-                Text(note)
+                Text(BighelpActivitySummary.note(note))
                     .font(.bighelp(.footnote))
                     .foregroundStyle(theme.secondaryText)
                     .lineSpacing(3)

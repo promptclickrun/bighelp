@@ -14,6 +14,11 @@ final class BighelpBuzzKitPresentation: BuzzKitDelegate {
         if BighelpVisibleChats.isShowingFromAnyThread(chat: Self.thread(payload.data), agent: Self.agent(payload.data)) {
             return []
         }
+        // bighelp was open and showed this alert straight from the host: the push
+        // takes that copy's place in Notification Center, without a second banner.
+        if let eventID = Self.eventID(payload.data), BighelpRecentAlerts.shared.contains(eventID) {
+            return [.list]
+        }
         // bighelp already raised this question or approval itself (BighelpPromptAlerts).
         if let eventType = Self.eventType(payload.data),
            ["approval.required", "clarification.required"].contains(eventType),
@@ -29,6 +34,12 @@ final class BighelpBuzzKitPresentation: BuzzKitDelegate {
         if case .object(let agent)? = loopdy["agent"], case .string(let id)? = agent["id"], !id.isEmpty { return id }
         if case .string(let profile)? = loopdy["profile"], !profile.isEmpty { return profile }
         return nil
+    }
+
+    static func eventID(_ data: [String: JSONValue]) -> String? {
+        guard case .object(let loopdy)? = data["loopdy"],
+              case .string(let eventID)? = loopdy["eventId"], !eventID.isEmpty else { return nil }
+        return eventID
     }
 
     static func eventType(_ data: [String: JSONValue]) -> String? {

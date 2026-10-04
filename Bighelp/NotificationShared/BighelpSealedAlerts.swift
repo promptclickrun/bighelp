@@ -159,6 +159,9 @@ struct BighelpSealedNotification: Sendable {
     let envelope: BighelpSealedAlert.Envelope
     let eventType: String
     let avatarURL: URL?
+    /// The encrypted picture itself, when it came along (instant alerts, for a
+    /// picture the phone didn't have yet). Pushes carry only `avatarURL`.
+    var inlineAvatar: Data?
 
     init?(userInfo: [AnyHashable: Any]) {
         guard let payload = userInfo["loopdy"] as? [String: Any], let sealed = payload["sealed"],
@@ -204,6 +207,10 @@ struct BighelpSealedNotification: Sendable {
         let image: Data
         if let cached = cache.image(sha256: avatar.sha256) {
             image = cached
+        } else if let inlineAvatar,
+                  let opened = try? BighelpSealedAlert.openAvatar(inlineAvatar, avatar: avatar, grantID: envelope.grantID) {
+            cache.store(opened, sha256: avatar.sha256)
+            image = opened
         } else {
             guard let avatarURL else { return nil }
             var request = URLRequest(url: avatarURL)
@@ -252,6 +259,16 @@ struct BighelpNotificationAvatarCache: Sendable {
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try? image.write(to: file, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
         prune(directory)
+    }
+
+    /// The pictures kept here, by SHA-256. A host sending an alert straight to the
+    /// app leaves these out.
+    func hashes() -> [String] {
+        guard let directory,
+              let files = try? FileManager.default.contentsOfDirectory(atPath: directory.path) else { return [] }
+        return Array(files.filter { name in
+            name.utf8.count == 64 && name.utf8.allSatisfy { (48...57).contains($0) || (97...102).contains($0) }
+        }.prefix(Self.limit))
     }
 
     private func file(_ sha256: String) -> URL? {

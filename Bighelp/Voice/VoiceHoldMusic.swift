@@ -8,13 +8,15 @@ protocol VoiceHoldMusicPlaying: AnyObject {
     func stop()
 }
 
-/// The hold loop, looping quietly under the conversation's audio session. It picks up where it
+/// The hold loop, looping under the conversation's audio session. It picks up where it
 /// paused, so each wait doesn't restart the tune.
 @MainActor
 final class AVAudioPlayerHoldMusic: VoiceHoldMusicPlaying {
     static let resourceName = "VoiceHoldLoop"
-    /// Under a reply's level: it's a waiting sound, not something to listen to.
-    static let volume: Float = 0.35
+    /// Full volume, like a reply: the file itself sits about 3 LU under Hermes' default voice
+    /// (-23.5 LUFS against -20.3), so it's easy to hear and still a little quieter. At 0.35 it
+    /// was 15 LU under, too quiet to notice.
+    static let volume: Float = 1.0
 
     private let sessionCoordinator: VoiceAudioSessionCoordinator
     private var player: AVAudioPlayer?

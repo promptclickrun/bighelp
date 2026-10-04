@@ -474,6 +474,68 @@ import UserNotifications
         #expect(fixture.ledger.record(host: fixture.host, profile: "default")?.peerChatsAlert == true)
     }
 
+    /// Quiet Hours go to the computer when notifications turn on, again only when they change,
+    /// and again when the device is in another time zone.
+    @Test func quietHoursReachTheComputerOnEnrollmentAndWhenTheyChange() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        fixture.hostAPI.quietHoursSupported = true
+        var night = BighelpQuietHours(enabled: true, startMinute: 22 * 60, endMinute: 7 * 60)
+        night.save(fixture.defaults)
+        _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+        let grant = try #require(fixture.account.grant?.grantId)
+        let zone = BighelpQuietHours.timeZoneID()
+        #expect(fixture.hostAPI.quietHoursPuts == [night.body(grantID: grant, timeZone: zone)], "Sent on enrollment")
+        #expect(fixture.ledger.record(host: fixture.host, profile: "default")?.quietHoursSent
+            == .init(quietHours: night, timeZone: zone))
+
+        #expect(await fixture.service.applyQuietHours() == BighelpQuietHoursSyncResult())
+        #expect(fixture.hostAPI.quietHoursPuts.count == 1, "Unchanged: not sent again")
+
+        night.startMinute = 23 * 60
+        night.save(fixture.defaults)
+        #expect(await fixture.service.applyQuietHours().note == nil)
+        #expect(fixture.hostAPI.quietHoursPuts.last == night.body(grantID: grant, timeZone: zone), "Sent on change")
+
+        night.enabled = false
+        night.save(fixture.defaults)
+        _ = await fixture.service.applyQuietHours()
+        #expect(fixture.hostAPI.quietHoursPuts.last?["enabled"] == .boolean(false), "Turning it off reaches the computer")
+
+        var record = try #require(fixture.ledger.record(host: fixture.host, profile: "default"))
+        record.quietHoursSent = .init(quietHours: night, timeZone: zone == "Asia/Tokyo" ? "Europe/Berlin" : "Asia/Tokyo")
+        try fixture.ledger.save(record)
+        _ = await fixture.service.applyQuietHours()
+        #expect(fixture.hostAPI.quietHoursPuts.count == 4, "Another time zone: sent again")
+        #expect(fixture.hostAPI.quietHoursPuts.last?["timeZone"] == .string(zone))
+    }
+
+    @Test func aComputerWithAnOlderPluginIsNamedForAPluginUpdate() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        BighelpQuietHours(enabled: true, startMinute: 22 * 60, endMinute: 7 * 60).save(fixture.defaults)
+        _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+        let result = await fixture.service.applyQuietHours()
+        #expect(result.needsPluginUpdate == [fixture.host.name])
+        #expect(result.note == "Quiet Hours needs a plugin update on \(fixture.host.name).")
+        #expect(fixture.hostAPI.quietHoursPuts.isEmpty)
+        #expect(fixture.ledger.record(host: fixture.host, profile: "default")?.enabled == true,
+                "Notifications stay on without Quiet Hours")
+    }
+
+    @Test func aComputerThatCanNotBeReachedIsNotCalledOutdated() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        fixture.hostAPI.quietHoursSupported = true
+        _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+        BighelpQuietHours(enabled: true, startMinute: 21 * 60, endMinute: 6 * 60).save(fixture.defaults)
+        fixture.hostAPI.offline = true
+        #expect(await fixture.service.applyQuietHours() == BighelpQuietHoursSyncResult())
+        fixture.hostAPI.offline = false
+        _ = await fixture.service.applyQuietHours()
+        #expect(fixture.hostAPI.quietHoursPuts.last?["startMinute"] == .integer(21 * 60), "Sent once it's back")
+    }
+
     @Test func anOlderPluginIsNeverAskedAboutPeerChats() async throws {
         let fixture = try Fixture()
         defer { fixture.cleanup() }
@@ -660,6 +722,8 @@ import UserNotifications
         var sealedAlerts = false
         var peerChatPreference = false
         var peerChatPuts: [Bool] = []
+        var quietHoursSupported = false
+        var quietHoursPuts: [[String: BighelpJSONValue]] = []
         var recipientKeys: [String] = []
         init(_ account: Account, _ trust: BighelpNotificationHostTrustStore) { self.account=account;self.trust=trust }
         var offline = false
@@ -699,6 +763,19 @@ import UserNotifications
             }
             if suffix == "/enroll" { sawPinnedClaim = hasPersistedGrant() }
             return .object(["version":.integer(1),"grant":try Account.value(#require(account.grant))])
+        }
+        /// Like the plugin: only a context that lists the feature has the route.
+        func nativeRequest(_ path: String, feature: String, body: [String: BighelpJSONValue],
+                           isCurrent: @escaping @MainActor () -> Bool) async throws -> BighelpJSONValue {
+            guard isCurrent() else { throw DirectHermesError.secureStorageChanged }
+            if offline { throw DirectHermesError.notConnected }
+            guard quietHoursSupported, feature == BighelpQuietHours.feature, path == BighelpQuietHours.route else {
+                throw DirectHostNotificationError.featureUnavailable
+            }
+            quietHoursPuts.append(body)
+            var window = body
+            let grant = window.removeValue(forKey: "grantId") ?? .null
+            return .object(["version": .integer(1), "grantId": grant, "quietHours": .object(window), "quietNow": .boolean(false)])
         }
     }
     @MainActor private final class Provider: BighelpManagedNotificationProvider {

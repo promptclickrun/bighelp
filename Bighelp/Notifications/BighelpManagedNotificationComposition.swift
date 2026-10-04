@@ -178,6 +178,10 @@ final class BighelpManagedNotificationComposition: HostNotificationSetupServing 
         await integration?.service.applyPeerChatPreference()
     }
 
+    func applyQuietHours() async -> BighelpQuietHoursSyncResult {
+        await integration?.service.applyQuietHours() ?? BighelpQuietHoursSyncResult()
+    }
+
     @discardableResult
     private func retryAutomatically(for reason: AutomaticRetryReason) -> Bool {
         guard !isFixture else { return false }

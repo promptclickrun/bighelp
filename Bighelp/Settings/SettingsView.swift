@@ -430,6 +430,7 @@ struct SettingsView: View {
                 refreshRuntime: notificationContext?.refresh ?? refreshNotificationRuntime,
                 sendTest: notificationContext?.test,
                 turnOff: notificationTurnOff,
+                quietHoursSync: notificationQuietHoursSync,
                 isCurrent: notificationContext?.isCurrent ?? notificationIsCurrent
             )
         case .permissions:
@@ -441,6 +442,14 @@ struct SettingsView: View {
         case .connectivityAndNotifications:
             systemPage
         }
+    }
+
+    private var notificationQuietHoursSync: BighelpQuietHoursSync? {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains("-use-demo-fixtures") ? .demo : nil
+        #else
+        nil
+        #endif
     }
 
     private var notificationTurnOff: BighelpNotificationTurnOff? {

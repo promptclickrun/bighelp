@@ -36,6 +36,7 @@ struct BighelpNotificationSettingsView: View {
     let refreshRuntime: (@MainActor () async throws -> BighelpNotificationRuntimeSnapshot)?
     let sendTest: (@MainActor () async throws -> BighelpNotificationTestReceipt)?
     let turnOff: BighelpNotificationTurnOff?
+    let quietHoursSync: BighelpQuietHoursSync
     let isCurrent: @MainActor () -> Bool
 
     @State private var preferences: [BighelpBuzzKitPreference] = []
@@ -54,6 +55,8 @@ struct BighelpNotificationSettingsView: View {
     @State private var operationToken = UUID()
     @State private var isConfirmingTurnOff = false
     @AppStorage(BighelpPeerChatAlerts.key) private var peerChatAlerts = false
+    @State private var quietHours = BighelpQuietHours.load()
+    @State private var quietHoursNote: String?
     @State private var turnOffStep: BighelpNotificationTurnOffStep?
     @State private var turnOffMessage: String?
     @State private var turnOffFailed = false
@@ -71,6 +74,7 @@ struct BighelpNotificationSettingsView: View {
         refreshRuntime: (@MainActor () async throws -> BighelpNotificationRuntimeSnapshot)? = nil,
         sendTest: (@MainActor () async throws -> BighelpNotificationTestReceipt)? = nil,
         turnOff: BighelpNotificationTurnOff? = nil,
+        quietHoursSync: BighelpQuietHoursSync? = nil,
         isCurrent: @escaping @MainActor () -> Bool = { true }
     ) {
         self.permissionCenter = permissionCenter
@@ -81,6 +85,7 @@ struct BighelpNotificationSettingsView: View {
         self.refreshRuntime = refreshRuntime
         self.sendTest = sendTest
         self.turnOff = turnOff
+        self.quietHoursSync = quietHoursSync ?? .live(hostRegistry)
         self.isCurrent = isCurrent
         _runtime = State(initialValue: runtimeSource())
         if let hostRegistry, let host = hostRegistry.selectedHost {
@@ -123,6 +128,7 @@ struct BighelpNotificationSettingsView: View {
                 }
             }
             topicsSection
+            quietHoursSection
             turnOffSection
             Section("Advanced") {
                 DisclosureGroup("Provider details") {
@@ -151,6 +157,7 @@ struct BighelpNotificationSettingsView: View {
             configureNotificationSetup()
             await reloadAll()
         }
+        .task(id: quietHours) { await applyQuietHours() }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else {
                 notificationSetup?.cancel()
@@ -451,6 +458,83 @@ struct BighelpNotificationSettingsView: View {
             Text("Notify Me About")
         }
         .listRowBackground(theme.surface)
+    }
+
+    private var quietHoursSection: some View {
+        Section {
+            Toggle(isOn: $quietHours.enabled) {
+                VStack(alignment: .leading, spacing: BighelpTokens.space4) {
+                    Text("Quiet Hours")
+                        .bighelpFont(.body)
+                        .foregroundStyle(theme.primaryText)
+                    Text("No notifications at night or any time you pick.")
+                        .bighelpFont(.metadata)
+                        .foregroundStyle(theme.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.vertical, BighelpTokens.space4)
+            }
+            .accessibilityValue(quietHours.enabled ? "On" : "Off")
+            .accessibilityIdentifier("settings.notifications.quiet-hours")
+
+            if quietHours.enabled {
+                DatePicker(selection: quietHoursTime(\.startMinute), displayedComponents: .hourAndMinute) {
+                    Text("From").bighelpFont(.body).foregroundStyle(theme.primaryText)
+                }
+                .accessibilityIdentifier("settings.notifications.quiet-hours.start")
+                DatePicker(selection: quietHoursTime(\.endMinute), displayedComponents: .hourAndMinute) {
+                    Text("To").bighelpFont(.body).foregroundStyle(theme.primaryText)
+                }
+                .accessibilityIdentifier("settings.notifications.quiet-hours.end")
+                if let note = quietHoursNote {
+                    Text(note)
+                        .bighelpFont(.metadata)
+                        .foregroundStyle(theme.warning)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("settings.notifications.quiet-hours.note")
+                }
+            }
+        } footer: {
+            Text(quietHoursFooter)
+        }
+        .listRowBackground(theme.surface)
+    }
+
+    private var quietHoursFooter: String {
+        guard quietHours.enabled else {
+            return "Your computers send this device no notifications in these hours. Replies still wait in the chat."
+        }
+        guard !quietHours.isEmpty else { return "Pick a different start and end time." }
+        let next = quietHours.crossesMidnight ? " the next day" : ""
+        return "From \(Self.clock(quietHours.startMinute)) to \(Self.clock(quietHours.endMinute))\(next), your computers send this device no notifications. Replies still wait in the chat."
+    }
+
+    private static func clock(_ minute: Int) -> String {
+        Self.date(minute).formatted(date: .omitted, time: .shortened)
+    }
+
+    private static func date(_ minute: Int) -> Date {
+        Calendar.current.date(bySettingHour: minute / 60, minute: minute % 60, second: 0, of: Date()) ?? Date()
+    }
+
+    private func quietHoursTime(_ field: WritableKeyPath<BighelpQuietHours, Int>) -> Binding<Date> {
+        Binding(
+            get: { Self.date(quietHours[keyPath: field]) },
+            set: { date in
+                let parts = Calendar.current.dateComponents([.hour, .minute], from: date)
+                quietHours[keyPath: field] = (parts.hour ?? 0) * 60 + (parts.minute ?? 0)
+            }
+        )
+    }
+
+    /// Saves on the device, waits for the picker to settle, then tells the computers.
+    private func applyQuietHours() async {
+        quietHours.save()
+        try? await Task.sleep(for: .milliseconds(600))
+        guard !Task.isCancelled else { return }
+        let result = await quietHoursSync.apply()
+        guard !Task.isCancelled else { return }
+        quietHoursNote = result.note
     }
 
     private func topicLabel(

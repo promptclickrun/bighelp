@@ -336,6 +336,11 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
                                               isCurrent: { (try? check()) != nil })
             try check()
         }
+        // Quiet Hours never hold up notifications: an older plugin or a miss now is
+        // retried when a chat opens or the setting changes.
+        _ = try? await syncQuietHours(host: host, profile: profile, grant: grant, client: client,
+                                      isCurrent: { (try? check()) != nil })
+        try check()
         // Enrollment from Settings can occur after the selected chat was already
         // opened. Subscribe that exact authenticated session now; later chats use
         // the normal onChatOpened hook.
@@ -388,6 +393,10 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
                                     isCurrent: { (try? self.requireCurrent(host, credentials: credentials)) != nil })
             try requireCurrent(host, credentials: credentials)
         }
+        // Also catches a device that moved to another time zone since it last sent them.
+        _ = try? await syncQuietHours(host: host, profile: profile, grant: grant, client: client,
+                                      isCurrent: { (try? self.requireCurrent(host, credentials: credentials)) != nil })
+        try requireCurrent(host, credentials: credentials)
         let value = try await client.request("/enrollments/\(grant.grantId)/sessions", method: "PUT", body: [
             "version": .integer(1), "profile": .string(profile), "sessionId": .string(session), "enabled": .boolean(true)
         ], isCurrent: { (try? self.requireCurrent(host, credentials: credentials)) != nil })
@@ -437,6 +446,61 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
                                      isCurrent: isCurrent)
         }
     }
+
+    /// Quiet Hours: the window this device keeps and its own time zone, so the computer
+    /// skips alerts by the device's clock. Sent only when the computer's confirmed copy differs.
+    /// Returns false when the computer's plugin doesn't have Quiet Hours yet.
+    @discardableResult
+    private func syncQuietHours(host: BighelpConfiguredHost, profile: String, grant: BighelpManagedGrant,
+                                client: any DirectHostNotificationServing,
+                                isCurrent: @escaping @MainActor () -> Bool) async throws -> Bool {
+        let wanted = BighelpQuietHours.Sent(quietHours: BighelpQuietHours.load(defaults),
+                                            timeZone: BighelpQuietHours.timeZoneID())
+        let sent = ledger.record(host: host, profile: profile)?.quietHoursSent
+        // A host without a window already sends everything: off and never sent needs no request.
+        guard sent != wanted, sent != nil || wanted.quietHours.enabled else { return true }
+        let value: BighelpJSONValue
+        do {
+            value = try await client.nativeRequest(
+                BighelpQuietHours.route, feature: BighelpQuietHours.feature,
+                body: wanted.quietHours.body(grantID: grant.grantId, timeZone: wanted.timeZone), isCurrent: isCurrent)
+        } catch DirectHostNotificationError.featureUnavailable {
+            return false
+        }
+        let confirmed = value.object?["quietHours"]?.object
+        guard isCurrent(), value.object?["grantId"]?.string == grant.grantId,
+              confirmed?["enabled"]?.boolean == wanted.quietHours.enabled,
+              confirmed?["startMinute"]?.integer == wanted.quietHours.startMinute,
+              confirmed?["endMinute"]?.integer == wanted.quietHours.endMinute,
+              confirmed?["timeZone"]?.string == wanted.timeZone,
+              var current = ledger.record(host: host, profile: profile), current.grant == grant else {
+            throw DirectHermesError.invalidResponse
+        }
+        current.quietHoursSent = wanted
+        try ledger.save(current)
+        return true
+    }
+
+    /// Settings › Notifications › Quiet Hours changed: tell every computer with notifications on.
+    /// A computer that can't be reached now gets it the next time a chat opens there.
+    func applyQuietHours() async -> BighelpQuietHoursSyncResult {
+        var outdated: [String] = []
+        for record in ledger.enrollments where record.enabled && !record.revokePending {
+            guard let grant = record.grant, grant.state == "active", grant.expiresAt > timestamp,
+                  let host = registry.hosts.first(where: {
+                      $0.hostConnectionID == record.hostConnectionID && $0.notificationScope == record.accountScope
+                  }),
+                  let credentials = try? self.credentials(for: host),
+                  let client = try? hostClient(host) else { continue }
+            let isCurrent: @MainActor () -> Bool = { (try? self.requireCurrent(host, credentials: credentials)) != nil }
+            if (try? await syncQuietHours(host: host, profile: record.profile, grant: grant, client: client,
+                                          isCurrent: isCurrent)) == false, !outdated.contains(host.name) {
+                outdated.append(host.name)
+            }
+        }
+        return BighelpQuietHoursSyncResult(needsPluginUpdate: outdated)
+    }
+
 
     /// Gives the host this phone's sealed-alert key, directly and never through the
     /// notification service, and pins the host key that signs the sealed alerts.

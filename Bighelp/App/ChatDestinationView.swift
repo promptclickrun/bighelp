@@ -69,6 +69,8 @@ struct ChatDestinationView: View {
     let onOpenAgentSessions: (String) -> Void
     let onOpenApproval: (ApprovalRequest) -> Void
     let onForkMessage: ((String) -> Void)?
+    /// The root menu's hosts, so a chat's ☰ has the all-hosts switch too.
+    let menuHosts: BighelpMenuHosts?
 
     private var currentAppearanceScope: SessionAppearanceScope? {
         let authority = model.nativeConversationClient?.nativeWorkspaceAuthority ?? appearanceAuthority
@@ -144,7 +146,8 @@ struct ChatDestinationView: View {
         onOpenAgentSessions: @escaping (String) -> Void,
         onOpenApproval: @escaping (ApprovalRequest) -> Void,
         onForkMessage: ((String) -> Void)?,
-        appearanceAuthority: WorkspaceAuthority? = nil
+        appearanceAuthority: WorkspaceAuthority? = nil,
+        menuHosts: BighelpMenuHosts? = nil
     ) {
         self.model = model
         self.appState = appState
@@ -178,6 +181,7 @@ struct ChatDestinationView: View {
         self.onOpenAgentSessions = onOpenAgentSessions
         self.onOpenApproval = onOpenApproval
         self.onForkMessage = onForkMessage
+        self.menuHosts = menuHosts
     }
 
     var body: some View {
@@ -909,7 +913,8 @@ struct ChatDestinationView: View {
                     dismissWorkspace()
                     onSelectAgent(agent)
                 },
-                onOpenMore: { openTab(.profile) }
+                onOpenMore: { openTab(.profile) },
+                menuHosts: menuHosts
             )
         }
         .accessibilityElement(children: .contain)

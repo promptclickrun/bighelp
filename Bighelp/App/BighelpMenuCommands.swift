@@ -68,7 +68,7 @@ extension AppTab {
         case .feed: "Feed"
         case .ideas: "Ideas"
         case .goals: "Goals"
-        case .apps: "Apps"
+        case .apps: "Files"
         default: rawValue.capitalized
         }
     }

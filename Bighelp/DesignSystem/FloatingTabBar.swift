@@ -49,56 +49,33 @@ struct FloatingTabBar: View {
         path.isEmpty
     }
 
-    /// Settings › Appearance › Bottom menu › Fold: one button in chats and while reading down a page.
-    static let startsCollapsedKey = "bighelp.tabbar.starts-collapsed"
-
     @Binding var selection: AppTab
     let onNewChat: (() -> Void)?
     /// Points the bar drops into the home indicator's area.
     let homeIndicatorSink: CGFloat
     /// Feed, Ideas or Goals with something the person hasn't seen: a small dot.
     let unread: Set<AppTab>
-    /// In a chat the bar is one button, so the message box has the room.
+    /// In a chat, Chat is the current tab whichever page the chat was opened from.
     var isInChat = false
-    /// Feed, Ideas, Goals and Apps fold it while you scroll down and bring it back as you scroll up.
-    var scrollFold: BottomBarFold?
 
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var tabChanges = 0
-    /// Observed so the bar follows the setting; read through `bool(forKey:)` because a launch
-    /// argument's "NO" is a string that AppStorage would ignore.
-    @AppStorage(FloatingTabBar.startsCollapsedKey) private var storedStartsCollapsed = true
-    private var startsCollapsed: Bool {
-        _ = storedStartsCollapsed
-        let defaults = UserDefaults.standard
-        return defaults.object(forKey: Self.startsCollapsedKey) == nil || defaults.bool(forKey: Self.startsCollapsedKey)
-    }
-    @State private var isExpanded = false
-    /// The tab under the finger while pressing and sliding from the folded button.
-    @State private var scrubIndex: Int?
-    @State private var barWidth: CGFloat = 0
-    @Namespace private var barSpace
     /// The glyphs keep a 3-pt margin on their 24-pt grid, so 26 draws them about 20pt.
     @ScaledMetric(relativeTo: .caption2) private var iconSize: CGFloat = 26
-    @ScaledMetric(relativeTo: .caption2) private var captionHeight: CGFloat = 28
 
     init(selection: Binding<AppTab>, onNewChat: (() -> Void)? = nil, homeIndicatorSink: CGFloat = 0,
-         unread: Set<AppTab> = [], isInChat: Bool = false, scrollFold: BottomBarFold? = nil) {
+         unread: Set<AppTab> = [], isInChat: Bool = false) {
         self._selection = selection
         self.onNewChat = onNewChat
         self.homeIndicatorSink = homeIndicatorSink
         self.unread = unread
         self.isInChat = isInChat
-        self.scrollFold = scrollFold
     }
 
-    /// Folded: in a chat until opened, or on a page while reading down it.
-    private var isFolded: Bool {
-        guard startsCollapsed else { return false }
-        return isInChat ? !isExpanded : scrollFold?.isFolded == true
-    }
+    /// The highlighted tab: a chat pushed from Ideas is still a chat.
+    private var current: AppTab { isInChat ? .sessions : selection }
 
     /// Like the system tab bar, the bar sits low, just above the home
     /// indicator, instead of a full safe-area inset above it. Clamped so a
@@ -117,35 +94,16 @@ struct FloatingTabBar: View {
                         Label(Self.newChatVisibleLabel, systemImage: "square.and.pencil")
                     }
             }
-            if isFolded {
-                ZStack {
-                    // Stays in place under a slide, so its gesture keeps going.
-                    collapsedButton.opacity(scrubIndex == nil ? 1 : 0)
-                    if let scrubIndex {
-                        scrubBar(highlighting: scrubIndex)
-                            .allowsHitTesting(false)
-                            .transition(.scale(scale: 0.6).combined(with: .opacity))
-                    }
+            // Five tabs in one row, each named under its icon.
+            navigationRow(constrainsWidth: true) {
+                ForEach(AppTab.allCases) { tab in
+                    destination(tab)
                 }
-                .frame(maxWidth: .infinity)
-            } else {
-                // Five icons in one row, like a dock; names stay in VoiceOver and
-                // the large content viewer.
-                navigationRow(constrainsWidth: true) {
-                    ForEach(AppTab.allCases) { tab in
-                        destination(tab, showsCaption: false)
-                    }
-                }
-                .padding(6)
-                .bighelpNavigationGlass(in: Capsule())
-                .matchedGeometryEffect(id: "bar", in: barSpace)
-                .transition(.opacity)
             }
+            .padding(6)
+            .bighelpNavigationGlass(in: Capsule())
         }
         .sensoryFeedback(.selection, trigger: tabChanges)
-        .sensoryFeedback(.selection, trigger: scrubIndex)
-        .coordinateSpace(.named(Self.barCoordinateSpace))
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { barWidth = $0 }
         .frame(maxWidth: BighelpTokens.scaled(620))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Primary navigation")
@@ -158,77 +116,6 @@ struct FloatingTabBar: View {
 
     private var isVerticallyCompact: Bool { verticalSizeClass == .compact }
 
-    static let barCoordinateSpace = "floating-tab-bar"
-
-    /// The full bar while sliding from the folded button, the tab under the finger lit.
-    private func scrubBar(highlighting index: Int) -> some View {
-        navigationRow(constrainsWidth: true) {
-            ForEach(Array(AppTab.allCases.enumerated()), id: \.element) { offset, tab in
-                itemLabel(tab, selected: offset == index, showsCaption: false)
-            }
-        }
-        .padding(6)
-        .bighelpNavigationGlass(in: Capsule())
-    }
-
-    /// Which tab a finger at `x` (in the bar's space) is over: five equal slots inside its padding.
-    static func tabIndex(at x: CGFloat, barWidth: CGFloat, count: Int = AppTab.allCases.count) -> Int {
-        guard barWidth > 12, count > 0 else { return 0 }
-        let slot = (barWidth - 12) / CGFloat(count)
-        return min(max(Int((x - 6) / slot), 0), count - 1)
-    }
-
-    private func open() {
-        withAnimation(reduceMotion ? nil : .snappy(duration: BighelpTokens.transitionDuration)) {
-            if isInChat { isExpanded = true } else { scrollFold?.isFolded = false }
-        }
-    }
-
-    /// Press and slide toward a tab, let go to open it: one motion instead of open, then pick.
-    private var slideToPick: some Gesture {
-        DragGesture(minimumDistance: 10, coordinateSpace: .named(Self.barCoordinateSpace))
-            .onChanged { value in
-                let index = Self.tabIndex(at: value.location.x, barWidth: barWidth)
-                if scrubIndex == nil {
-                    withAnimation(reduceMotion ? nil : .snappy(duration: 0.18)) { scrubIndex = index }
-                } else if scrubIndex != index {
-                    scrubIndex = index
-                }
-            }
-            .onEnded { value in
-                let index = Self.tabIndex(at: value.location.x, barWidth: barWidth)
-                withAnimation(reduceMotion ? nil : .snappy(duration: 0.18)) { scrubIndex = nil }
-                let tab = AppTab.allCases[index]
-                BighelpKeyboard.dismiss()
-                if selection != tab { tabChanges += 1 }
-                withAnimation(reduceMotion ? nil : .snappy(duration: BighelpTokens.transitionDuration)) {
-                    selection = tab
-                }
-            }
-    }
-
-    /// One round button in the middle: tap for the full bar, or press and slide to a tab. Ideas'
-    /// sparkle, not ☰, so it isn't mistaken for the menu at the top.
-    private var collapsedButton: some View {
-        Button {
-            open()
-        } label: {
-            AppTabIcon(tab: .ideas, selected: false)
-                .frame(width: BighelpTokens.scaled(26), height: BighelpTokens.scaled(26))
-                .foregroundStyle(theme.action)
-                .frame(width: BighelpTokens.scaled(56), height: BighelpTokens.scaled(56))
-                .contentShape(Circle())
-        }
-        .buttonStyle(.bighelpTilePress)
-        .bighelpNavigationGlass(in: Circle(), isInteractive: true)
-        .matchedGeometryEffect(id: "bar", in: barSpace)
-        .transition(.opacity)
-        .simultaneousGesture(slideToPick)
-        .accessibilityLabel("Show Feed, Ideas, Goals and more")
-        .accessibilityHint("Or press and slide to a tab")
-        .accessibilityIdentifier("primary-navigation.expand")
-    }
-
     private func navigationRow<Content: View>(
         constrainsWidth: Bool = false, @ViewBuilder content: () -> Content
     ) -> some View {
@@ -237,16 +124,18 @@ struct FloatingTabBar: View {
     }
 
 
-    private func destination(_ tab: AppTab, showsCaption: Bool = true) -> some View {
-        let isSelected = selection == tab
+    private func destination(_ tab: AppTab) -> some View {
+        let isSelected = current == tab
         return Button {
+            // Chat in a chat is where you already are.
+            if isInChat, isSelected { return }
             BighelpKeyboard.dismiss()
             if selection != tab { tabChanges += 1 }
             withAnimation(reduceMotion ? nil : .snappy(duration: BighelpTokens.transitionDuration)) {
                 selection = tab
             }
         } label: {
-            itemLabel(tab, selected: isSelected, showsCaption: showsCaption)
+            itemLabel(tab, selected: isSelected)
                 .overlay(alignment: .topTrailing) {
                     if unread.contains(tab), !isSelected {
                         Circle()
@@ -275,26 +164,23 @@ struct FloatingTabBar: View {
     }
 
     // Destinations share the existing neutral surface and equal touch targets.
-    private func itemLabel(_ tab: AppTab, selected: Bool, showsCaption: Bool) -> some View {
+    private func itemLabel(_ tab: AppTab, selected: Bool) -> some View {
         let identifier = tab.accessibilityIdentifier
-        return VStack(spacing: 4) {
+        return VStack(spacing: 2) {
             AppTabIcon(tab: tab, selected: selected)
                 .frame(width: BighelpTokens.scaled(min(iconSize, 32)), height: BighelpTokens.scaled(min(iconSize, 32)))
                 .accessibilityIdentifier(identifier + ".icon")
-            if showsCaption {
-                Text(tab.title)
-                    .font(.bighelp(.caption2).weight(.semibold))
-                    .lineLimit(1)
-                    .fixedSize(horizontal: true, vertical: true)
-                    .frame(height: captionHeight)
-                    .accessibilityIdentifier(identifier + ".label")
-            }
+            Text(tab.title)
+                .font(.bighelp(.caption2).weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .accessibilityIdentifier(identifier + ".label")
         }
         // The theme's ink, not `.secondary`: on glass that turns symbols vibrant
         // but leaves the drawn glyphs a faint grey.
         .foregroundStyle(selected ? (increasedContrast ? Color.primary : theme.action) : theme.secondaryText)
         .padding(.horizontal, 4)
-        .padding(.vertical, isVerticallyCompact ? 4 : 10)
+        .padding(.vertical, isVerticallyCompact ? 3 : 6)
         .frame(minWidth: BighelpTokens.hitTarget, maxWidth: .infinity, minHeight: BighelpTokens.hitTarget)
         .background {
             if selected {
@@ -454,12 +340,15 @@ struct VisionTabOrnament: View {
     @Binding var selection: AppTab
     var unread: Set<AppTab> = []
     var onNewChat: (() -> Void)?
+    /// In a chat, Chat is the current tab.
+    var isInChat = false
 
     var body: some View {
         VStack(spacing: BighelpTokens.space8) {
             ForEach(AppTab.allCases) { tab in
-                let isSelected = selection == tab
+                let isSelected = (isInChat ? .sessions : selection) == tab
                 Button {
+                    if isInChat, isSelected { return }
                     selection = tab
                 } label: {
                     AppTabIcon(tab: tab, selected: isSelected)
@@ -555,7 +444,7 @@ private extension AppTab {
         case .feed: "Feed"
         case .ideas: "Ideas"
         case .goals: "Goals"
-        case .apps: "Apps"
+        case .apps: "Files"
         }
     }
 
@@ -598,52 +487,6 @@ private extension AppTab {
         case .ideas: "tab.ideas"
         case .goals: "tab.goals"
         case .apps: "tab.apps"
-        }
-    }
-}
-
-/// Feed, Ideas, Goals and Apps fold the bottom menu while you read down the page, like Safari's
-/// toolbar, and bring it back when you scroll up, reach the top, or switch pages.
-@MainActor
-@Observable
-final class BottomBarFold {
-    var isFolded = false
-
-    /// `offset` is how far the page is scrolled; small moves are ignored.
-    func scrolled(from old: CGFloat, to new: CGFloat) {
-        if new < 40 { if isFolded { isFolded = false }; return }
-        let delta = new - old
-        if delta > 8, !isFolded { isFolded = true }
-        else if delta < -8, isFolded { isFolded = false }
-    }
-}
-
-private struct BottomBarFoldKey: EnvironmentKey {
-    static let defaultValue: BottomBarFold? = nil
-}
-
-extension EnvironmentValues {
-    var bottomBarFold: BottomBarFold? {
-        get { self[BottomBarFoldKey.self] }
-        set { self[BottomBarFoldKey.self] = newValue }
-    }
-}
-
-extension View {
-    /// Folds the bottom menu while this scroll view is scrolled down (iOS 18 and later).
-    func foldsBottomBarOnScroll() -> some View { modifier(BottomBarFoldOnScroll()) }
-}
-
-private struct BottomBarFoldOnScroll: ViewModifier {
-    @Environment(\.bottomBarFold) private var fold
-
-    func body(content: Content) -> some View {
-        if #available(iOS 18, visionOS 2, *), let fold {
-            content.onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y + $0.contentInsets.top } action: {
-                fold.scrolled(from: $0, to: $1)
-            }
-        } else {
-            content
         }
     }
 }

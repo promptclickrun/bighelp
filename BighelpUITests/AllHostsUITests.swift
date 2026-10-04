@@ -71,7 +71,7 @@ final class AllHostsUITests: BighelpUITestCase {
         XCTAssertTrue(agentsRow.waitForExistence(timeout: 5))
         XCTAssertEqual(agentsRow.label, "Agents")
         XCTAssertLessThan(app.buttons["menu.new-chat"].frame.minY, agentsRow.frame.minY, "New chat comes first")
-        for hidden in ["menu.agents", "menu.projects", "menu.kanban", "menu.scheduled-tasks", "menu.new-group"] {
+        for hidden in ["menu.agents", "menu.projects", "menu.kanban", "menu.new-group"] {
             XCTAssertFalse(app.buttons[hidden].exists, "\(hidden) isn't in the all-hosts menu")
         }
         save("menu-all-hosts", app)

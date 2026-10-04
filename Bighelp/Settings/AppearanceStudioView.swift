@@ -55,19 +55,6 @@ struct AppearanceStudioView<Extras: View>: View {
                     .accessibilityIdentifier("appearance.mode")
                 }
                 section("Text and buttons", caption: nil) { AppearanceSizeControls() }
-                section("Bottom menu", caption: nil) {
-                    Toggle(isOn: $bottomMenuStartsCollapsed) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Fold it").foregroundStyle(currentTheme.primaryText)
-                            Text("One button in chats and while you scroll down a page. Tap it, or press and slide to a tab.")
-                                .font(.bighelp(.caption))
-                                .foregroundStyle(currentTheme.secondaryText)
-                        }
-                    }
-                    .padding(BighelpTokens.space12)
-                    .background(currentTheme.surface, in: .rect(cornerRadius: 18))
-                    .accessibilityIdentifier("appearance.bottom-menu-collapsed")
-                }
                 VStack(spacing: BighelpTokens.space12) { extras }
             }
             .padding(.horizontal, BighelpTokens.space20)
@@ -170,7 +157,6 @@ struct AppearanceStudioView<Extras: View>: View {
             colorScheme: scheme, contrast: contrast)
     }
 
-    @AppStorage(FloatingTabBar.startsCollapsedKey) private var bottomMenuStartsCollapsed = true
     @BighelpThemeReader private var currentTheme
 }
 

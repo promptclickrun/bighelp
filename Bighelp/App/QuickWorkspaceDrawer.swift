@@ -248,6 +248,8 @@ struct QuickWorkspaceDrawer: View {
     let onSelectAgent: (AgentProfile) -> Void
     let onOpenMore: () -> Void
     var isEmbedded = false
+    /// ☰'s host row from the root, with its all-hosts switch; else just the hosts.
+    var menuHosts: BighelpMenuHosts? = nil
 
     /// Settings has one fixed header affordance in every drawer variant.
     var onOpenSettings: () -> Void { onOpenMore }
@@ -282,7 +284,7 @@ struct QuickWorkspaceDrawer: View {
     /// The same menu as ☰, with the sidebar's project groups and pinned agents as its recent list.
     private var menu: some View {
         BighelpMenu(
-            hosts: BighelpMenuHosts.current(registry: hostRegistry, demoHosts: demoHosts),
+            hosts: menuHosts ?? BighelpMenuHosts.current(registry: hostRegistry, demoHosts: demoHosts),
             destinations: BighelpMenuDestinations(
                 onNewChat: onNewChat,
                 onAllChats: onOpenSessions,

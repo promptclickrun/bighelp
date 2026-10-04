@@ -39,7 +39,6 @@ struct RootShellView: View {
     @Environment(\.managedNotificationService) private var managedNotifications
     @State var actionErrorMessage: String?
     /// Feed, Ideas, Goals and Apps fold the bottom menu while scrolled down.
-    @State var bottomBarFold = BottomBarFold()
     /// All hosts: the chat you left for Feed, Ideas or Goals, which the Chat tab goes back to.
     @State var fleetLastChatID: String?
     @State var isHostStatusPresented = false
@@ -550,8 +549,6 @@ struct RootShellView: View {
 
     private var shell: some View {
         rootTabs
-        .environment(\.bottomBarFold, bottomBarFold)
-        .onChange(of: appState.selectedTab) { _, _ in bottomBarFold.isFolded = false }
         .toolbar(.hidden, for: .tabBar)
         .toolbar(showsAgentBoard ? .hidden : .automatic, for: .navigationBar)
         .navigationTitle(showsAgentBoard ? "" : rootNavigationTitle)
@@ -594,7 +591,7 @@ struct RootShellView: View {
                                    startNewChat(explicitAgentID: nil)
                                } : nil,
                                homeIndicatorSink: FloatingTabBar.homeIndicatorSink(forBottomInset: rootBottomSafeArea),
-                               unread: boardUnreadTabs, scrollFold: bottomBarFold)
+                               unread: boardUnreadTabs)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
@@ -829,6 +826,8 @@ struct RootShellView: View {
         Binding(
             get: { appState.selectedTab },
             set: { tab in
+                // Chat from a chat is where you already are, not a trip to the list.
+                if tab == .sessions, case .chat? = appState.path.last { return }
                 // From a chat, its agent's Feed, Ideas and Goals; and the switch is a swap like
                 // Feed to Ideas, not the chat sliding away.
                 if fleetModeOn, case .chat(let id)? = appState.path.last { fleetLastChatID = id }

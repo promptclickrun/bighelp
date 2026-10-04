@@ -62,7 +62,6 @@ struct BoardScroll<Content: View>: View {
             .scrollContentBackground(.hidden)
             .environment(\.defaultMinListRowHeight, 0)
             .contentMargins(.bottom, 120, for: .scrollContent)
-            .foldsBottomBarOnScroll()
         }
         .scrollIndicators(.hidden)
         .overlay(alignment: .top) { AgentBoardHeaderButtons(context: context) }

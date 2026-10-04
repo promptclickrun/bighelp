@@ -175,7 +175,8 @@ extension RootShellView {
                 onForkMessage: { itemID in
                     forkSession(sourceID: conversationID, throughItemID: itemID)
                 },
-                appearanceAuthority: currentWorkspaceOwner?.authority
+                appearanceAuthority: currentWorkspaceOwner?.authority,
+                menuHosts: fleetMenuHosts
             )
             .environment(\.chatCardInteractions, cardInteractions(for: model))
             .environment(\.agentHomeChrome, homeChrome(for: route))

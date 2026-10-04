@@ -43,7 +43,13 @@ extension RootShellView {
         destinations.onAllChats = { afterClosingHomeSheets { openFleetChats() } }
         destinations.onAgents = { afterClosingHomeSheets { fleetGate(.agents) } }
         destinations.onSettings = { afterClosingHomeSheets { fleetGate(.settings) } }
-        // Projects, Kanban and Scheduled tasks belong to one host; the all-hosts menu leaves them out.
+        // Every host's tasks in one list.
+        destinations.onScheduledTasks = { afterClosingHomeSheets {
+            _ = featureStore.prepareScheduledTasks(filteredTo: nil)
+            appState.chatOpenedFromList = false
+            appState.openScheduledTasks()
+        } }
+        // Projects and Kanban belong to one host; the all-hosts menu leaves them out.
         destinations.onProjects = nil
         destinations.onKanban = nil
         // Usage covers every host while all show; no host to pick.

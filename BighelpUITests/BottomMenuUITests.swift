@@ -1,67 +1,42 @@
 import XCTest
 
-/// The bottom menu on the demo data: it starts as one button that opens into Chat, Feed, Ideas,
-/// Goals and Apps; a chat's Feed is its own agent's; Agents has New chat and no bottom menu; and
-/// in the all-hosts view a chat has the menu too. BIGHELP_BOTTOM_MENU_EVIDENCE (TEST_RUNNER_…)
+/// The bottom menu on the demo data: always open, each tab named; in a chat Chat is the lit tab and
+/// tapping it stays put; a chat's Feed is its own agent's; Agents has New chat and no bottom menu;
+/// and in the all-hosts view a chat has the menu too. BIGHELP_BOTTOM_MENU_EVIDENCE (TEST_RUNNER_…)
 /// saves the screenshots.
 final class BottomMenuUITests: BighelpUITestCase {
     @MainActor
-    func testCollapsedMenuOpensAndChatsReachTheirAgentsBoard() throws {
+    func testMenuNamesItsTabsAndChatsReachTheirAgentsBoard() throws {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.home.opens-chat", "YES",
-                               "-bighelp.tabbar.starts-collapsed", "YES", "-bighelp.hosts.all-hosts", "NO"]
+                               "-bighelp.hosts.all-hosts", "NO"]
         app.launch()
         let composer = app.textViews["chat.composer.text"]
         XCTAssertTrue(composer.waitForExistence(timeout: 15), "Opens on the agent's chat")
-        let expand = app.buttons["primary-navigation.expand"]
-        XCTAssertTrue(expand.waitForExistence(timeout: 5), "One button, not the whole bar")
-        XCTAssertFalse(app.buttons["tab.feed"].exists)
-        save("collapsed-chat", app)
-
-        expand.tap()
-        let feed = app.buttons["tab.feed"]
-        XCTAssertTrue(feed.waitForExistence(timeout: 3), "It opens into the bar")
-        XCTAssertTrue(app.buttons["tab.ideas"].exists && app.buttons["tab.goals"].exists)
-        save("expanded-chat", app)
-        feed.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["board.feed"].waitForExistence(timeout: 5), "Feed, from the chat")
-        // On Feed, Ideas and Goals the bar stays open: one tap to the next page.
-        let ideas = app.buttons["tab.ideas"]
-        XCTAssertTrue(ideas.waitForExistence(timeout: 3), "The bar stays open on Feed")
-        save("feed-open", app)
-        ideas.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["board.ideas"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["tab.goals"].exists, "Still open on Ideas")
-
-        // Reading down a page folds it; scrolling back up brings it back.
-        let page = app.collectionViews.firstMatch
-        page.swipeUp()
-        if expand.waitForExistence(timeout: 3) {
-            save("ideas-scrolled-folded", app)
-            page.swipeDown()
-            page.swipeDown()
-            XCTAssertTrue(app.buttons["tab.goals"].waitForExistence(timeout: 3), "Back when scrolling up")
+        let chat = app.buttons["tab.sessions"]
+        XCTAssertTrue(chat.waitForExistence(timeout: 5), "The whole bar, not one button")
+        for name in ["Chat", "Feed", "Ideas", "Goals", "Files"] {
+            XCTAssertTrue(app.staticTexts[name].exists, "\(name) is named under its icon")
         }
+        save("chat", app)
 
-        // In a chat: press the folded button and slide to Goals, one motion.
-        app.buttons["tab.sessions"].tap()
-        XCTAssertTrue(composer.waitForExistence(timeout: 5))
-        XCTAssertTrue(expand.waitForExistence(timeout: 3), "Folded again in the chat")
-        let width = app.frame.width
-        let slot = (width - 24 - 12) / 5
-        let goalsX = (12 + 6 + slot * 3.5) / width
-        let start = expand.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        let end = app.coordinate(withNormalizedOffset: CGVector(dx: goalsX, dy: 0))
-            .withOffset(CGVector(dx: 0, dy: expand.frame.midY))
-        start.press(forDuration: 0.15, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.3)
-        XCTAssertTrue(app.descendants(matching: .any)["board.goals"].waitForExistence(timeout: 5), "Press and slide to Goals")
-        save("slid-to-goals", app)
+        app.buttons["tab.ideas"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["board.ideas"].waitForExistence(timeout: 5), "Ideas, from the chat")
+        save("ideas", app)
+        chat.tap()
+        XCTAssertTrue(composer.waitForExistence(timeout: 5), "Back in the chat")
+        XCTAssertTrue(chat.isSelected, "Chat is lit in a chat")
+        XCTAssertFalse(app.buttons["tab.ideas"].isSelected, "Ideas isn't")
+        chat.tap()
+        XCTAssertTrue(composer.waitForExistence(timeout: 3), "Chat again stays in the chat")
+        XCTAssertFalse(app.buttons["agents.new-chat"].exists, "Not thrown to Agents")
+        save("chat-selected", app)
 
         // Agents: pick an agent first; New chat sits bottom right.
         openRootTab("tab.agents", in: app)
         let newChat = app.buttons["agents.new-chat"]
         XCTAssertTrue(newChat.waitForExistence(timeout: 5), "Agents has the big New chat")
-        XCTAssertFalse(expand.exists, "No bottom menu on Agents")
+        XCTAssertFalse(app.buttons["tab.sessions"].exists, "No bottom menu on Agents")
         XCTAssertFalse(app.buttons["tab.feed"].exists)
         save("agents", app)
         newChat.tap()
@@ -74,8 +49,7 @@ final class BottomMenuUITests: BighelpUITestCase {
     @MainActor
     func testAllHostsChatsHaveTheMenu() throws {
         let app = makeApp()
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-bighelp.hosts.all-hosts", "YES",
-                               "-bighelp.tabbar.starts-collapsed", "NO"]
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-bighelp.hosts.all-hosts", "YES"]
         app.launch()
         let mina = app.buttons["fleet.agent.Mina Shah"]
         XCTAssertTrue(mina.waitForExistence(timeout: 15))

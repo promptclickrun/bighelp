@@ -585,7 +585,7 @@ struct ChatView: View {
                           ? .visible : .hidden,
                       attachmentAnchor: .scene(.leading), contentAlignment: .trailing) {
                 if let selection = homeChrome.tabSelection {
-                    VisionTabOrnament(selection: selection, unread: homeChrome.unreadTabs)
+                    VisionTabOrnament(selection: selection, unread: homeChrome.unreadTabs, isInChat: true)
                 }
             }
             #endif

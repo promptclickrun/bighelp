@@ -383,7 +383,7 @@ struct ProjectDetailView: View {
     private var chats: some View {
         let rows = context.store.chats[projectID]
         VStack(alignment: .leading, spacing: BighelpTokens.space8) {
-            Text("Chats")
+            Text("Sessions")
                 .font(.bighelp(.title3).weight(.bold))
                 .foregroundStyle(theme.primaryText)
                 .accessibilityAddTraits(.isHeader)
@@ -400,7 +400,7 @@ struct ProjectDetailView: View {
             } else if context.store.loadingChats.contains(projectID) && rows == nil {
                 ProgressView().frame(maxWidth: .infinity, minHeight: 80)
             } else {
-                Text("No chats yet. Start one above and it'll show up here.")
+                Text("No sessions yet. Start one above and it'll show up here.")
                     .font(.bighelp(.subheadline))
                     .foregroundStyle(theme.secondaryText)
                     .accessibilityIdentifier("project.chats.empty")

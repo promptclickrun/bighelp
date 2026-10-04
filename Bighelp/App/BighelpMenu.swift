@@ -233,12 +233,12 @@ struct BighelpMenu<Recent: View>: View {
             }
         } header: {
             HStack {
-                Text("Recent chats")
+                Text("Recent sessions")
                 Spacer()
                 Button("See all") { choose(destinations.onAllChats) }
                     .font(.bighelp(.subheadline).weight(.semibold))
                     .textCase(nil)
-                    .accessibilityLabel("See all chats")
+                    .accessibilityLabel("See all sessions")
                     .accessibilityIdentifier("menu.chats")
             }
         }

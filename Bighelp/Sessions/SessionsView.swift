@@ -118,13 +118,13 @@ struct SessionsView: View {
             }
         }
         .background(theme.canvas.ignoresSafeArea())
-        .navigationTitle("Chats")
+        .navigationTitle("Sessions")
         .navigationBarTitleDisplayMode(.large)
         .searchable(
             text: $model.query,
             // Search sits under the large title (revealed on pull) so it never stacks with the tab bar.
             placement: .navigationBarDrawer,
-            prompt: "Search chats"
+            prompt: "Search sessions"
         )
         .toolbar {
             #if targetEnvironment(macCatalyst)
@@ -1087,7 +1087,7 @@ struct SessionsView: View {
     }
 
     private func filterAccessibilityValue(_ model: SessionsModel) -> String {
-        guard hasActiveFilters(model) else { return "All chats" }
+        guard hasActiveFilters(model) else { return "All sessions" }
         return [
             model.typeFilter.title,
             agentFilterTitle(model.agentFilter, model: model),

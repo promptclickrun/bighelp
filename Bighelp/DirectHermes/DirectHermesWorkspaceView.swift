@@ -89,7 +89,7 @@ struct DirectHermesWorkspaceView: View {
             }
         }
         .bighelpFormSurface()
-        .navigationTitle(showsProfiles ? "Agents" : "Chats")
+        .navigationTitle(showsProfiles ? "Agents" : "Sessions")
         .navigationBarTitleDisplayMode(.large)
         .sheet(isPresented: $showsSupport) { DirectHermesSupportView().bighelpSheetSize(.standard) }
         .onChange(of: store.selectedProfile) { _, _ in Task { await store.loadSessions() } }

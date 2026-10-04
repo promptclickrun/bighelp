@@ -6,6 +6,7 @@ enum BighelpLandingScreen: String, CaseIterable, Identifiable, Sendable {
     case agents
     case allAgents = "all-agents"
     case lastChat = "last-chat"
+    case sessions
     case feed, ideas, goals, kanban, projects
 
     var id: Self { self }
@@ -15,6 +16,7 @@ enum BighelpLandingScreen: String, CaseIterable, Identifiable, Sendable {
         case .agents: "Agents"
         case .allAgents: "Agents (multi)"
         case .lastChat: "Last chat"
+        case .sessions: "Sessions"
         case .feed: "Feed"
         case .ideas: "Ideas"
         case .goals: "Goals"
@@ -28,6 +30,7 @@ enum BighelpLandingScreen: String, CaseIterable, Identifiable, Sendable {
         case .agents: "This computer's agents."
         case .allAgents: "Every agent on every computer."
         case .lastChat: "Your latest chat with the agent."
+        case .sessions: "All sessions, to pick a recent one."
         case .feed: "The agent's Feed."
         case .ideas: "The agent's Ideas."
         case .goals: "The agent's Goals."
@@ -37,7 +40,7 @@ enum BighelpLandingScreen: String, CaseIterable, Identifiable, Sendable {
     }
 
     /// Every choice but every computer's agents starts with one agent.
-    var offersStartAgent: Bool { self != .allAgents }
+    var offersStartAgent: Bool { self != .allAgents && self != .sessions }
 }
 
 /// What a cold launch was asked to open on.
@@ -80,6 +83,7 @@ enum BighelpLanding {
         case .agents: return .agents
         case .allAgents: return .allAgents
         case .lastChat: return .homeChat
+        case .sessions: return .chatList
         case .feed: return .board(.feed)
         case .ideas: return .board(.ideas)
         case .goals: return .board(.goals)

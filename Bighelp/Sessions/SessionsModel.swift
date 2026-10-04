@@ -137,7 +137,7 @@ struct SessionDaySection: Identifiable, Equatable {
             switch self {
             case .active: "Active Chats"
             case .pinned: "Pinned"
-            case .sessions: "Chats"
+            case .sessions: "Sessions"
             case .today: "Today"
             case .yesterday: "Yesterday"
             case .earlier: "Earlier"

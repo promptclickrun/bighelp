@@ -26,6 +26,7 @@ final class LandingScreenUITests: BighelpUITestCase {
             ("kanban", "kanban.screen", nil),
             ("agents", "agents.screen", nil),
             ("last-chat", "agent.hero.avatar", nil),
+            ("sessions", "sessions.screen", nil),
             ("all-agents", "fleet.home", nil),
         ]
         for screen in screens {
@@ -37,6 +38,9 @@ final class LandingScreenUITests: BighelpUITestCase {
             }
             if screen.landing == "last-chat" {
                 XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 5), "A chat is open")
+            }
+            if screen.landing == "sessions" {
+                XCTAssertTrue(app.navigationBars["Sessions"].exists, "All sessions, to pick a recent one")
             }
             if screen.landing == "agents" {
                 XCTAssertFalse(element("fleet.home", in: app).exists, "One computer's agents, not every computer's")

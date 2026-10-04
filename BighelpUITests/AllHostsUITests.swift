@@ -81,7 +81,7 @@ final class AllHostsUITests: BighelpUITestCase {
         // Off again: one host, its own chat list.
         XCTAssertEqual(app.buttons["fleet.toggle"].label, "Show one host")
         app.buttons["fleet.toggle"].tap()
-        XCTAssertTrue(app.navigationBars["Chats"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Sessions"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.descendants(matching: .any)["fleet.home"].exists)
     }
 

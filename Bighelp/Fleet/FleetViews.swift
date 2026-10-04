@@ -542,11 +542,11 @@ struct FleetChatsView: View {
         }
         .overlay {
             if fleet.chats(on: hostFilter).isEmpty {
-                ContentUnavailableView("No chats yet", systemImage: "bubble.left.and.bubble.right")
+                ContentUnavailableView("No sessions yet", systemImage: "bubble.left.and.bubble.right")
             }
         }
         .task { fleet.refresh() }
-        .navigationTitle("All chats")
+        .navigationTitle("All sessions")
         .accessibilityIdentifier("fleet.chats")
     }
 

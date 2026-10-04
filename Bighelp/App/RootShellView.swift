@@ -717,7 +717,7 @@ struct RootShellView: View {
 
     private var rootNavigationTitle: String {
         switch appState.selectedTab {
-        case .sessions: fleetModeOn ? "All agents" : "Chats"
+        case .sessions: fleetModeOn ? "All agents" : "Sessions"
         case .agents: "Agents"
         case .scheduledTasks: "Scheduled Tasks"
         case .home, .inbox: "Activity"

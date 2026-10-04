@@ -29,7 +29,7 @@ extension RootShellView {
             if let fleet {
                 FleetChatsView(fleet: fleet, onOpen: { openFleetChat($0) })
             } else {
-                ContentUnavailableView("All chats", systemImage: "bubble.left.and.bubble.right")
+                ContentUnavailableView("All sessions", systemImage: "bubble.left.and.bubble.right")
             }
         case (.project(let id), _):
             if let context = projectsContext {

@@ -42,7 +42,7 @@ struct DirectHermesChatView: View {
                     accessibilityIdentifier: "direct-hermes.controls",
                     action: { showsControls = true }
                 ),
-                workspaceButtonLabel: "Chats")
+                workspaceButtonLabel: "Sessions")
                 .environment(\.chatSurfaceCapabilities, .standaloneDirect)
         }
         .chatAttention(client: chat.client, agentName: agentName, isPresented: $showsAttention,

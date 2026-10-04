@@ -20,6 +20,7 @@ struct BighelpLandingTests {
         #expect(open(.agents) == .agents)
         #expect(open(.allAgents) == .allAgents)
         #expect(open(.lastChat) == .homeChat)
+        #expect(open(.sessions) == .chatList, "All sessions, to pick a recent one")
         #expect(open(.feed) == .board(.feed))
         #expect(open(.ideas) == .board(.ideas))
         #expect(open(.goals) == .board(.goals))
@@ -80,7 +81,8 @@ struct BighelpLandingTests {
     @Test func allAgentsStartsWithNoOneAgent() {
         #expect(BighelpLanding.startAgent(stored: "travel", agentIDs: ["travel"], choice: .chosen(.allAgents)) == nil)
         #expect(!BighelpLandingScreen.allAgents.offersStartAgent)
-        #expect(BighelpLandingScreen.allCases.filter(\.offersStartAgent).count == BighelpLandingScreen.allCases.count - 1)
+        #expect(!BighelpLandingScreen.sessions.offersStartAgent, "Every agent's sessions")
+        #expect(BighelpLandingScreen.allCases.filter(\.offersStartAgent).count == BighelpLandingScreen.allCases.count - 2)
     }
 
     // MARK: Saved choices
@@ -162,6 +164,6 @@ struct BighelpLandingTests {
 
     @Test func choicesUseThePlainLabels() {
         #expect(BighelpLandingScreen.allCases.map(\.title)
-                == ["Agents", "Agents (multi)", "Last chat", "Feed", "Ideas", "Goals", "Kanban", "Projects"])
+                == ["Agents", "Agents (multi)", "Last chat", "Sessions", "Feed", "Ideas", "Goals", "Kanban", "Projects"])
     }
 }

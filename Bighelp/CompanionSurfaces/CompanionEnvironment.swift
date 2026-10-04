@@ -21,6 +21,14 @@ extension EnvironmentValues {
 }
 
 enum CompanionSurfaceScope {
+    /// Agents' characters and pets on this device are kept per computer, since two
+    /// computers can each have an agent with the same ID. Empty with no computer
+    /// chosen: then nothing is saved or shown.
+    static func computer(_ hostConnectionID: String?) -> String {
+        guard let hostConnectionID, !hostConnectionID.isEmpty else { return "" }
+        return "computer:" + hostConnectionID
+    }
+
     static func accountHost(
         deviceID: String,
         authorizationEpoch: Int,

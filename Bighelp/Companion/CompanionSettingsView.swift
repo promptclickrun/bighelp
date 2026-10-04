@@ -83,10 +83,18 @@ struct CompanionSettingsView: View {
             }
 
             Section("App default") {
-                characterPicker(
-                    title: "Character",
-                    selection: defaultCharacterBinding
-                )
+                NavigationLink {
+                    CompanionCatalogPicker(title: "Character", appearance: store.defaultAppearance, isDefault: false) { entry in
+                        guard let entry else { return }
+                        var appearance = store.defaultAppearance
+                        appearance.catalogAvatar = AvatarCatalogReference(entry)
+                        appearance.topper = nil
+                        store.defaultAppearance = appearance
+                    }
+                } label: {
+                    LabeledContent("Character", value: store.defaultAppearance.displayName)
+                }
+                .accessibilityIdentifier("companion.default.character")
 
                 Toggle("Match app theme", isOn: defaultMatchesThemeBinding)
                     .tint(theme.action)
@@ -139,17 +147,23 @@ struct CompanionSettingsView: View {
         let override = store.override(for: key)
 
         Section {
-            Picker("Companion", selection: agentCharacterBinding(key: key)) {
-                Text("Use app default")
-                    .tag(nil as CompanionCharacter?)
-                ForEach(CompanionCharacter.allCases) { character in
-                    Text(character.displayName)
-                        .tag(Optional(character))
+            NavigationLink {
+                CompanionCatalogPicker(title: agent.name, appearance: store.appearance(for: key),
+                                       defaultTitle: "Use app default", isDefault: override == nil) { entry in
+                    guard let entry else {
+                        store.setOverride(nil, for: key)
+                        return
+                    }
+                    var appearance = store.override(for: key) ?? store.defaultAppearance
+                    appearance.catalogAvatar = AvatarCatalogReference(entry)
+                    appearance.topper = nil
+                    store.setOverride(appearance, for: key)
                 }
+            } label: {
+                LabeledContent("Companion", value: override?.displayName ?? "Use app default")
             }
-            .pickerStyle(.menu)
             .accessibilityLabel("Companion for \(agent.name)")
-            .accessibilityValue(override?.character.displayName ?? "Use app default")
+            .accessibilityValue(override?.displayName ?? "Use app default")
             .accessibilityIdentifier("companion.agent.\(agent.id).character")
 
             if override != nil {
@@ -181,19 +195,6 @@ struct CompanionSettingsView: View {
         }
     }
 
-    private func characterPicker(
-        title: String,
-        selection: Binding<CompanionCharacter>
-    ) -> some View {
-        Picker(title, selection: selection) {
-            ForEach(CompanionCharacter.allCases) { character in
-                Text(character.displayName).tag(character)
-            }
-        }
-        .pickerStyle(.menu)
-        .accessibilityIdentifier("companion.default.character")
-    }
-
     private func preview(appearance: CompanionAppearance, label: String) -> some View {
         let side = 104 * CGFloat(store.sizeScale)
         return HStack {
@@ -216,17 +217,6 @@ struct CompanionSettingsView: View {
         "\(Int((store.sizeScale * 100).rounded()))%"
     }
 
-    private var defaultCharacterBinding: Binding<CompanionCharacter> {
-        Binding(
-            get: { store.defaultAppearance.character },
-            set: { character in
-                var appearance = store.defaultAppearance
-                appearance.character = character
-                store.defaultAppearance = appearance
-            }
-        )
-    }
-
     private var defaultMatchesThemeBinding: Binding<Bool> {
         Binding(
             get: { store.defaultAppearance.matchesTheme },
@@ -245,21 +235,6 @@ struct CompanionSettingsView: View {
                 var appearance = store.defaultAppearance
                 appearance.colorHex = colorHex
                 store.defaultAppearance = appearance
-            }
-        )
-    }
-
-    private func agentCharacterBinding(key: String) -> Binding<CompanionCharacter?> {
-        Binding(
-            get: { store.override(for: key)?.character },
-            set: { character in
-                guard let character else {
-                    store.setOverride(nil, for: key)
-                    return
-                }
-                var appearance = store.override(for: key) ?? store.defaultAppearance
-                appearance.character = character
-                store.setOverride(appearance, for: key)
             }
         )
     }

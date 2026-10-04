@@ -291,6 +291,9 @@ struct CompanionAppearance: Codable, Equatable, Sendable {
     /// True keeps the character's (or colorway's) main color instead of
     /// tinting it with `colorHex` or the app theme.
     var usesCharacterColors: Bool
+    /// A character from the avatar catalog; it draws instead of `character`, which stays for
+    /// builds that don't know the catalog.
+    var catalogAvatar: AvatarCatalogReference?
 
     var colorHex: String {
         get { storedColorHex }
@@ -317,7 +320,8 @@ struct CompanionAppearance: Codable, Equatable, Sendable {
         bitEyes: CompanionBitEyes? = nil,
         bitMouth: CompanionBitMouth? = nil,
         bitAccessory: CompanionBitAccessory? = nil,
-        showsCheeks: Bool = true
+        showsCheeks: Bool = true,
+        catalogAvatar: AvatarCatalogReference? = nil
     ) {
         self.character = character
         storedColorHex = Self.validatedColorHex(colorHex) ?? Self.fallbackColorHex
@@ -333,6 +337,7 @@ struct CompanionAppearance: Codable, Equatable, Sendable {
         self.bitMouth = bitMouth
         self.bitAccessory = bitAccessory
         self.showsCheeks = showsCheeks
+        self.catalogAvatar = catalogAvatar
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -350,6 +355,7 @@ struct CompanionAppearance: Codable, Equatable, Sendable {
         case bitMouth
         case bitAccessory
         case showsCheeks
+        case catalogAvatar
     }
 
     init(from decoder: Decoder) throws {
@@ -380,6 +386,7 @@ struct CompanionAppearance: Codable, Equatable, Sendable {
         bitMouth = try? container.decodeIfPresent(CompanionBitMouth.self, forKey: .bitMouth)
         bitAccessory = try? container.decodeIfPresent(CompanionBitAccessory.self, forKey: .bitAccessory)
         showsCheeks = (try? container.decodeIfPresent(Bool.self, forKey: .showsCheeks)).flatMap { $0 } ?? true
+        catalogAvatar = (try? container.decodeIfPresent(AvatarCatalogReference.self, forKey: .catalogAvatar)).flatMap { $0 }
     }
 
     func encode(to encoder: Encoder) throws {
@@ -398,6 +405,7 @@ struct CompanionAppearance: Codable, Equatable, Sendable {
         try container.encodeIfPresent(bitMouth, forKey: .bitMouth)
         try container.encodeIfPresent(bitAccessory, forKey: .bitAccessory)
         if !showsCheeks { try container.encode(showsCheeks, forKey: .showsCheeks) }
+        try container.encodeIfPresent(catalogAvatar, forKey: .catalogAvatar)
     }
 
     static func validatedColorway(_ value: String) -> String? {
@@ -422,7 +430,8 @@ struct CompanionAppearance: Codable, Equatable, Sendable {
 @Observable
 final class CompanionStore {
     static let currentSchemaVersion = 1
-    static let maximumPersistedBytes = 65_536
+    // Catalog characters add their pack reference to each look.
+    static let maximumPersistedBytes = 262_144
     static let maximumOverrides = 256
     static let maximumKeyUTF8Count = 512
     nonisolated static let minimumSizeScale = 0.6
@@ -455,6 +464,13 @@ final class CompanionStore {
         didSet { persistIfReady() }
     }
 
+    /// A new phone's pet: bighelp's first character, in its own colors.
+    static var firstPet: CompanionAppearance {
+        var appearance = CompanionAppearance(usesCharacterColors: true)
+        appearance.catalogAvatar = AvatarCatalog.bundled.avatars(in: .bighelp, at: .now).first.map(AvatarCatalogReference.init)
+        return appearance
+    }
+
     private static let storageKey = "loopdy.companion.preferences"
     private let defaults: UserDefaults
     private var isReadyToPersist = false
@@ -463,7 +479,7 @@ final class CompanionStore {
         self.defaults = defaults
         let persisted = Self.readPersistedState(from: defaults, key: Self.storageKey)
         isEnabled = persisted?.isEnabled ?? false
-        defaultAppearance = Self.sanitized(persisted?.defaultAppearance ?? CompanionAppearance(usesCharacterColors: true))
+        defaultAppearance = Self.sanitized(persisted?.defaultAppearance ?? Self.firstPet)
         storedSizeScale = Self.sanitizedSizeScale(persisted?.sizeScale ?? Self.defaultSizeScale)
         isAdventurous = persisted?.isAdventurous ?? false
         agentOverrides = persisted?.agentOverrides ?? [:]
@@ -621,7 +637,8 @@ final class CompanionStore {
             bitEyes: appearance.bitEyes,
             bitMouth: appearance.bitMouth,
             bitAccessory: appearance.bitAccessory,
-            showsCheeks: appearance.showsCheeks
+            showsCheeks: appearance.showsCheeks,
+            catalogAvatar: appearance.catalogAvatar
         )
     }
 

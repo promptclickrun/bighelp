@@ -128,7 +128,7 @@ struct HermesFacesTests {
         #expect(shape.style == .shapes && shape.shape == "triangle" && shape.shapeColor == "hsl(60 68% 58%)")
 
         let pets = AvatarCreatorModel(appearance: CompanionAppearance(character: .lobster))
-        #expect(pets.style == .characters)
+        #expect(pets.style == .catalog)
         pets.style = .pets
         #expect(pets.result(faceName: "nova") == nil, "Nothing to use until a pet is picked")
         pets.style = .photo

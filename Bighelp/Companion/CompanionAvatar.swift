@@ -55,19 +55,24 @@ struct CompanionAvatar: View {
     /// An engine mood for what the agent is doing right now (coding, browsing,
     /// making images…). It replaces the idle move while set.
     var activityMood: String? = nil
-    /// The kit's backdrop disc; off for pets floating over the app.
-    var showsBackground = true
+    /// The kit's backdrop disc. Off: avatars are transparent like Hermes's faces and shapes.
+    var showsBackground = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
     @State private var isVisible = false
     @State private var isInViewport = true
+    /// Redraws once a missing catalog pack lands.
+    @State private var packArrived = 0
 
     var body: some View {
         Group {
-            if let colors = appearance.avatarKitColors(themeHex: themeHex) {
+            let _ = packArrived
+            if let (kit, art) = appearance.kitArt, let colors = appearance.avatarKitColors(themeHex: themeHex) {
                 AvatarKitView(
-                    character: appearance.character,
+                    kit: kit,
+                    art: art,
+                    headwear: appearance.catalogAvatar == nil ? appearance.character : nil,
                     colors: colors,
                     look: BuddyLook(topper: appearance.topper ?? .none, pattern: appearance.pattern ?? .none),
                     face: appearance.avatarKitFace,
@@ -78,12 +83,17 @@ struct CompanionAvatar: View {
                 )
             }
         }
-        .id(appearance.character)
+        .id(appearance.catalogAvatar?.id ?? appearance.character.rawValue)
+        // A catalog character picked on this phone keeps its pack; fetch it if it's gone.
+        .task(id: appearance.catalogAvatar) {
+            guard let reference = appearance.catalogAvatar, appearance.kitArt == nil else { return }
+            if await AvatarCatalogStore.shared.pack(for: reference) != nil { packArrived += 1 }
+        }
         .modifier(CompanionViewportObserver(isInViewport: $isInViewport))
         .onAppear { isVisible = true }
         .onDisappear { isVisible = false }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(appearance.character.displayName) companion")
+        .accessibilityLabel("\(appearance.displayName) companion")
         .accessibilityValue(accessibilityDescription)
     }
 

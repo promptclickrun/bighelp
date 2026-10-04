@@ -18,16 +18,16 @@ enum AvatarCreatorResult {
 @MainActor
 @Observable
 final class AvatarCreatorModel {
-    /// The kind of avatar: the app's own characters, or Hermes Desktop's choices.
+    /// What the stage draws: a catalog character, Hermes Desktop's face or shape, a pet or a photo.
     enum Style: String, CaseIterable, Identifiable {
-        case characters, face, shapes, pets, photo
+        case catalog, face, shapes, pets, photo
 
         var id: String { rawValue }
 
         var title: String {
             switch self {
-            case .characters: "Characters"
-            case .face: "Face"
+            case .catalog: "Characters"
+            case .face: "Faces"
             case .shapes: "Shapes"
             case .pets: "Pets"
             case .photo: "Photo"
@@ -35,7 +35,47 @@ final class AvatarCreatorModel {
         }
     }
 
-    var style: Style = .characters
+    /// The picker's top row: bighelp's own art, Hermes's faces and shapes, petdex, approved
+    /// community art, or a photo.
+    enum Category: String, CaseIterable, Identifiable {
+        case bighelp, hermes, petdex, other, photo
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .bighelp: "bighelp"
+            case .hermes: "hermes"
+            case .petdex: "petdex"
+            case .other: "other"
+            case .photo: "Photo"
+            }
+        }
+    }
+
+    var style: Style = .catalog
+    /// Which catalog group the characters come from while `style` is `.catalog`.
+    var catalogGroup: AvatarCatalog.Group = .bighelp
+
+    var category: Category {
+        switch style {
+        case .catalog: catalogGroup == .other ? .other : .bighelp
+        case .face, .shapes: .hermes
+        case .pets: .petdex
+        case .photo: .photo
+        }
+    }
+
+    func select(_ category: Category) {
+        switch category {
+        case .bighelp: style = .catalog; catalogGroup = .bighelp
+        case .other: style = .catalog; catalogGroup = .other
+        case .hermes: if style != .face, style != .shapes { style = .face }
+        case .petdex: style = .pets
+        case .photo: style = .photo
+        }
+        if !tabs.contains(tab) { tab = .character }
+    }
     /// The blob face: follows the name unless locked, optionally pinned to a silhouette.
     var blobShape = HermesBlobShape()
     var shape = "circle"
@@ -86,8 +126,12 @@ final class AvatarCreatorModel {
     private(set) var isCelebrating = false
     private var celebration: Task<Void, Never>?
 
-    init(appearance: CompanionAppearance, look: AgentAvatarLook? = nil) {
+    init(appearance: CompanionAppearance, look: AgentAvatarLook? = nil, catalog: AvatarCatalog = .bundled) {
         self.appearance = appearance
+        if let picked = appearance.catalogAvatar,
+           let entry = catalog.avatars.first(where: { $0.id == picked.id }) {
+            catalogGroup = AvatarCatalog.Group.of(category: entry.category) == .other ? .other : .bighelp
+        }
         switch look?.style {
         case .face:
             style = .face
@@ -129,7 +173,7 @@ final class AvatarCreatorModel {
     /// The finished choice for this style, or nil when there's nothing to use yet.
     func result(faceName: String) -> AvatarCreatorResult? {
         switch style {
-        case .characters:
+        case .catalog:
             .companion(appearance)
         case .face:
             .look(AgentAvatarLook(style: .face, shape: blobShape.string, color: faceColor,
@@ -146,14 +190,20 @@ final class AvatarCreatorModel {
     /// New agents start from a random pleasant look instead of the same one.
     static func surprise() -> CompanionAppearance {
         let model = AvatarCreatorModel(appearance: CompanionAppearance(usesCharacterColors: true))
-        model.shuffle()
+        model.shuffle(from: AvatarCatalog.bundled.avatars(in: .bighelp, at: .now))
         return model.appearance
     }
 
-    var tabs: [Tab] { Tab.allCases }
+    /// Catalog characters have no head anchor for headwear and no Bit face parts.
+    var tabs: [Tab] { appearance.catalogAvatar == nil ? Tab.allCases : [.character, .color, .moves] }
 
-    func select(_ character: CompanionCharacter) {
-        appearance.character = character
+    func select(_ entry: AvatarCatalogEntry) {
+        appearance.catalogAvatar = AvatarCatalogReference(entry)
+        appearance.topper = nil
+        appearance.colorway = nil
+        appearance.bitEyes = nil
+        appearance.bitMouth = nil
+        appearance.bitAccessory = nil
         if !tabs.contains(tab) { tab = .character }
     }
 
@@ -174,13 +224,15 @@ final class AvatarCreatorModel {
         appearance.usesCharacterColors = true
     }
 
-    /// Kit colorways, Original first.
-    static var colorways: [AvatarKit.Theme] { AvatarKit.bundled?.themes ?? [] }
+    /// The drawn character's kit colorways, Original first.
+    var colorways: [AvatarKit.Theme] { appearance.kitArt?.kit.themes ?? AvatarKit.bundled?.themes ?? [] }
 
-    func shuffle() {
+    /// A random character from `choices` (another one when there's a choice) in a random look.
+    func shuffle(from choices: [AvatarCatalogEntry]) {
+        let others = choices.filter { $0.id != appearance.catalogAvatar?.id }
+        guard let entry = (others.isEmpty ? choices : others).randomElement() else { return }
+        select(entry)
         var next = appearance
-        let characters = CompanionCharacter.allCases.filter { $0 != appearance.character }
-        next.character = characters.randomElement() ?? .lobster
         next.matchesTheme = false
         if Int.random(in: 0..<3) == 0 {
             next.usesCharacterColors = false
@@ -188,18 +240,18 @@ final class AvatarCreatorModel {
                 ?? CompanionAppearance.fallbackColorHex
         } else {
             next.usesCharacterColors = true
-            let way = Self.colorways.randomElement()?.id ?? "original"
+            let way = colorways.randomElement()?.id ?? "original"
             next.colorway = way == "original" ? nil : way
         }
-        next.topper = !next.character.isBit && Int.random(in: 0..<3) == 0
-            ? CompanionTopper.allCases.randomElement() : CompanionTopper.none
-        next.bitEyes = Int.random(in: 0..<3) == 0 ? CompanionBitEyes.allCases.randomElement() : nil
-        next.bitMouth = Int.random(in: 0..<3) == 0 ? CompanionBitMouth.allCases.randomElement() : nil
-        next.bitAccessory = Int.random(in: 0..<3) == 0 ? CompanionBitAccessory.allCases.randomElement() : nil
-        next.pattern = Int.random(in: 0..<3) == 0 ? CompanionPattern.allCases.randomElement() : CompanionPattern.none
+        next.pattern = Int.random(in: 0..<4) == 0 ? CompanionPattern.allCases.randomElement() : CompanionPattern.none
         next.vibe = CompanionVibe.allCases.randomElement()
         appearance = next
-        if !tabs.contains(tab) { tab = .character }
+    }
+
+    /// Another shape, sometimes in a color of its own.
+    func randomizeShape() {
+        shape = HermesShapeFace.pickerShapes.filter { $0 != shape }.randomElement() ?? shape
+        shapeColor = Int.random(in: 0..<3) == 0 ? nil : HermesShapeFace.swatches.randomElement()
     }
 
     func celebrate() {
@@ -212,12 +264,9 @@ final class AvatarCreatorModel {
         }
     }
 
-    /// The current look on another character, for tile previews.
-    func appearance(for character: CompanionCharacter) -> CompanionAppearance {
-        var preview = appearance
-        preview.character = character
-        preview.vibe = nil
-        return preview
+    /// A catalog character as it comes, for tile previews: its own colors, nothing carried over.
+    func appearance(for entry: AvatarCatalogEntry) -> CompanionAppearance {
+        CompanionAppearance(usesCharacterColors: true, catalogAvatar: AvatarCatalogReference(entry))
     }
 }
 
@@ -297,6 +346,8 @@ struct AvatarCreatorView: View {
             }
         }
         .accessibilityIdentifier("avatar.creator")
+        // New characters and seasonal changes show while the picker is open.
+        .task { await AvatarCatalogStore.shared.keepCurrent() }
         .onChange(of: photoItem) { _, item in
             guard let item else { return }
             onUse(.photo(item))
@@ -319,7 +370,8 @@ struct AvatarCreatorView: View {
                 VStack(spacing: 0) {
                     styleBar
                         .padding(.top, BighelpTokens.space12)
-                    if model.style == .characters {
+                    sectionBar
+                    if model.style == .catalog, hasCatalogPick {
                         tabBar
                             .padding(.top, BighelpTokens.space8)
                     }
@@ -338,7 +390,8 @@ struct AvatarCreatorView: View {
             }
             styleBar
                 .padding(.top, BighelpTokens.space12)
-            if model.style == .characters {
+            sectionBar
+            if model.style == .catalog, hasCatalogPick {
                 tabBar
                     .padding(.top, BighelpTokens.space8)
             }
@@ -357,7 +410,7 @@ struct AvatarCreatorView: View {
         .scrollIndicators(.hidden)
         .dismissesKeyboardOnScroll(true)
         // Each tab opens at its top, not where the last one was scrolled.
-        .id("\(model.style.rawValue).\(model.tab.rawValue)")
+        .id("\(model.style.rawValue).\(model.catalogGroup.rawValue).\(model.tab.rawValue)")
     }
 
     // MARK: Stage
@@ -374,7 +427,7 @@ struct AvatarCreatorView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
                 }
                 .overlay(RoundedRectangle(cornerRadius: 32, style: .continuous).strokeBorder(theme.border, lineWidth: 1))
-            if model.style == .characters {
+            if model.style == .catalog {
                 characterStage
             } else {
                 hermesStage
@@ -391,11 +444,9 @@ struct AvatarCreatorView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .allowsHitTesting(false)
                 .accessibilityIdentifier("avatar.creator.name")
-            if model.style == .characters || model.style == .face {
+            if model.style != .photo {
             Button {
-                withAnimation(.snappy) {
-                    if model.style == .face { model.randomizeFace() } else { model.shuffle() }
-                }
+                withAnimation(.snappy) { randomize() }
             } label: {
                 Image(systemName: "dice")
                     .font(.system(size: 17, weight: .semibold))
@@ -407,8 +458,8 @@ struct AvatarCreatorView: View {
             }
             .buttonStyle(.plain)
             .padding(BighelpTokens.space8)
-            .accessibilityLabel(model.style == .face ? "Randomize" : "Shuffle")
-            .accessibilityHint(model.style == .face ? "Tries a random face." : "Tries a random character and look.")
+            .accessibilityLabel("Randomize")
+            .accessibilityHint("Tries a random \(model.style == .pets ? "pet" : model.style == .shapes ? "shape" : model.style == .face ? "face" : "character and look").")
             .accessibilityIdentifier("avatar.creator.shuffle")
             }
         }
@@ -442,7 +493,7 @@ struct AvatarCreatorView: View {
 
     private var stageTitle: String {
         switch model.style {
-        case .characters: model.appearance.character.displayName
+        case .catalog: hasCatalogPick ? model.appearance.displayName : "Characters"
         case .face: model.blobShape.kind?.displayName ?? "Face"
         case .shapes: HermesShapeFace.displayName(model.shape)
         case .pets: model.selectedPet?.displayName ?? "Pets"
@@ -471,7 +522,7 @@ struct AvatarCreatorView: View {
                     model.celebrate()
                 }
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("\(model.appearance.character.displayName) in 3D")
+                .accessibilityLabel("\(model.appearance.displayName) in 3D")
                 .accessibilityHint("Pinch for a hop; drag to turn it around.")
                 .accessibilityAddTraits(.isButton)
                 .accessibilityAction(.default) { model.celebrate() }
@@ -576,9 +627,9 @@ struct AvatarCreatorView: View {
     @ViewBuilder
     private var panel: some View {
         switch model.style {
-        case .characters:
+        case .catalog:
             switch model.tab {
-            case .character: characterPanel
+            case .character: catalogPanel
             case .color: colorPanel
             case .extras: extrasPanel
             case .moves: movesPanel
@@ -592,28 +643,70 @@ struct AvatarCreatorView: View {
 
     // MARK: Character
 
-    private var characterPanel: some View {
-        VStack(alignment: .leading, spacing: BighelpTokens.space16) {
-            characterSection("Characters", CompanionCharacter.characters)
-            characterSection("Bits", CompanionCharacter.bits)
-        }
-    }
-
-    private func characterSection(_ title: String, _ characters: [CompanionCharacter]) -> some View {
-        section(title) {
-            grid(minimum: 76) {
-                ForEach(characters) { character in
-                    tile(
-                        title: character.displayName,
-                        isSelected: model.appearance.character == character,
-                        identifier: "avatar.creator.character.\(character.rawValue)"
-                    ) {
-                        withAnimation(.snappy) { model.select(character) }
-                    } preview: {
-                        CompanionAvatar(appearance: model.appearance(for: character), reaction: .idle, isAnimating: false)
+    /// The group's sets, each its own section; changes on time at a start or expiry.
+    @ViewBuilder
+    private var catalogPanel: some View {
+        let store = AvatarCatalogStore.shared
+        let sets = store.catalog.sets(in: model.catalogGroup, at: store.now)
+        if sets.isEmpty {
+            Text(model.catalogGroup == .other
+                 ? "Avatars people make will show here once they’re approved."
+                 : "No characters here right now.")
+                .font(.bighelp(.body))
+                .foregroundStyle(theme.secondaryText)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity, minHeight: 140)
+                .accessibilityIdentifier("avatar.creator.catalog.empty")
+        } else {
+            VStack(alignment: .leading, spacing: BighelpTokens.space16) {
+                ForEach(sets) { set in
+                    section(set.name) {
+                        grid(minimum: 76) {
+                            ForEach(store.catalog.avatars(in: set, at: store.now)) { entry in
+                                tile(
+                                    title: entry.name,
+                                    isSelected: model.appearance.catalogAvatar?.id == entry.id,
+                                    identifier: "avatar.creator.catalog.\(entry.id)"
+                                ) {
+                                    withAnimation(.snappy) { pick(entry) }
+                                } preview: {
+                                    CompanionAvatar(appearance: model.appearance(for: entry), reaction: .idle, isAnimating: false)
+                                }
+                            }
+                        }
                     }
                 }
             }
+        }
+    }
+
+    private var hasCatalogPick: Bool { model.appearance.catalogAvatar != nil }
+
+    /// Picks a character and keeps its pack on the phone, so the saved look outlives the catalog.
+    private func pick(_ entry: AvatarCatalogEntry) {
+        model.select(entry)
+        Task { _ = await AvatarCatalogStore.shared.pack(for: entry) }
+    }
+
+    /// The dice: something new from what's on screen.
+    private func randomize() {
+        switch model.style {
+        case .catalog:
+            let store = AvatarCatalogStore.shared
+            let choices = store.catalog.avatars(in: model.catalogGroup, at: store.now)
+            model.shuffle(from: choices)
+            if let picked = model.appearance.catalogAvatar, let entry = choices.first(where: { $0.id == picked.id }) {
+                Task { _ = await AvatarCatalogStore.shared.pack(for: entry) }
+            }
+        case .face:
+            model.randomizeFace()
+        case .shapes:
+            model.randomizeShape()
+        case .pets:
+            let choices = pets.matches.filter { $0 != model.selectedPet }
+            if let pet = choices.randomElement() { Task { await model.select(pet, gallery: pets) } }
+        case .photo:
+            break
         }
     }
 
@@ -623,7 +716,7 @@ struct AvatarCreatorView: View {
         VStack(alignment: .leading, spacing: BighelpTokens.space16) {
             section("Colorway") {
                 grid(minimum: 76) {
-                    ForEach(AvatarCreatorModel.colorways) { way in
+                    ForEach(model.colorways) { way in
                         tile(
                             title: way.name,
                             isSelected: model.appearance.usesCharacterColors && (model.appearance.colorway ?? "original") == way.id,
@@ -825,16 +918,16 @@ struct AvatarCreatorView: View {
 
     // MARK: Hermes styles
 
-    /// Characters, Hermes faces and shapes, petdex pets, or a photo.
+    /// bighelp, hermes, petdex, other, or a photo.
     private var styleBar: some View {
         ScrollView(.horizontal) {
             HStack(spacing: BighelpTokens.space8) {
-                ForEach(AvatarCreatorModel.Style.allCases) { style in
-                    let isSelected = model.style == style
+                ForEach(AvatarCreatorModel.Category.allCases) { category in
+                    let isSelected = model.category == category
                     Button {
-                        withAnimation(.snappy) { model.style = style }
+                        withAnimation(.snappy) { model.select(category) }
                     } label: {
-                        Text(style.title)
+                        Text(category.title)
                             .font(.bighelp(.callout).weight(.semibold))
                             .foregroundStyle(isSelected ? theme.actionForeground : theme.primaryText)
                             .padding(.horizontal, BighelpTokens.space16)
@@ -845,12 +938,41 @@ struct AvatarCreatorView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
-                    .accessibilityIdentifier("avatar.creator.style.\(style.rawValue)")
+                    .accessibilityIdentifier("avatar.creator.category.\(category.rawValue)")
                 }
             }
             .padding(.horizontal, BighelpTokens.space20)
         }
         .scrollIndicators(.hidden)
+    }
+
+    /// hermes: Faces or Shapes.
+    @ViewBuilder
+    private var sectionBar: some View {
+        if model.category == .hermes {
+            HStack(spacing: BighelpTokens.space8) {
+                ForEach([AvatarCreatorModel.Style.face, .shapes]) { style in
+                    let isSelected = model.style == style
+                    Button {
+                        withAnimation(.snappy) { model.style = style }
+                    } label: {
+                        Text(style.title)
+                            .font(.bighelp(.footnote).weight(.semibold))
+                            .foregroundStyle(isSelected ? theme.primaryText : theme.secondaryText)
+                            .padding(.horizontal, BighelpTokens.space12)
+                            .frame(minHeight: 30)
+                            .background(Capsule().strokeBorder(isSelected ? theme.primaryText : theme.border, lineWidth: 1.5))
+                            .frame(minHeight: BighelpTokens.hitTarget)
+                            .contentShape(.capsule)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+                    .accessibilityIdentifier("avatar.creator.style.\(style.rawValue)")
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, BighelpTokens.space20)
+        }
     }
 
     @ViewBuilder
@@ -869,7 +991,7 @@ struct AvatarCreatorView: View {
             } else {
                 stagePlaceholder("pawprint", "Pick a pet below")
             }
-        case .photo, .characters:
+        case .photo, .catalog:
             stagePlaceholder("photo.on.rectangle", "Choose a photo below")
         }
     }

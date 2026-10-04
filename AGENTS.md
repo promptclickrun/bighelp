@@ -423,6 +423,12 @@ New code uses Bighelp names. Don't "finish" the rename on this list.
 
 - The avatar kit's source is `Design/AvatarKit`. `tools/export_native.py` writes `Bighelp/Resources/AvatarKit.json`,
   which the app draws natively.
+- The avatar picker's characters come from the avatar catalog (`avatars.bighelp.app`, `services/avatars`;
+  `Bighelp/Companion/AvatarCatalog/`): bighelp, hermes (the app's own Faces and Shapes), petdex and other.
+  A pick saves the character's immutable pack hash (`AvatarCatalogReference`) and keeps the pack in
+  Application Support, so it keeps drawing after its set expires. Expiry only hides choices. The app ships a
+  copy of the catalog (`AvatarCatalog.json`, `AvatarCatalogKit.json`) for demo mode and first launch;
+  refresh it before a release.
 - Only first-party or permissively licensed art can ship in this Apache-2.0 repo.
 - The maintainer approves new character art before it ships.
 - An agent's face (`AgentLiveAvatar`) draws, in order: its saved character (`CompanionStore` override), its

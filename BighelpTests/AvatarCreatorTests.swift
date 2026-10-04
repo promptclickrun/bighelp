@@ -65,30 +65,45 @@ struct AvatarCreatorTests {
         #expect(CompanionAvatar.readableEyeColor(authored: "#F5F6F4", body: "#1E7A4E") == "#F5F6F4")
     }
 
-    @Test func everyCharacterOffersEveryTab() {
+    @Test func catalogCharactersOfferCharacterColorAndMoves() throws {
+        let entries = AvatarCatalog.bundled.avatars(in: .bighelp, at: .now)
+        #expect(entries.count >= 10, "The shipped catalog has bighelp's characters")
         let model = AvatarCreatorModel(appearance: CompanionAppearance(character: .lobster))
+        #expect(model.tabs == [.character, .color, .extras, .moves], "An older bundled look keeps its tabs")
         model.tab = .extras
-        for character in CompanionCharacter.allCases {
-            model.select(character)
-            #expect(model.tabs == [.character, .color, .extras, .moves])
-            #expect(model.tab == .extras)
-        }
-        #expect(CompanionCharacter.characters.count == 10 && CompanionCharacter.bits.count == 10)
+        model.select(try #require(entries.first))
+        #expect(model.tabs == [.character, .color, .moves])
+        #expect(model.tab == .character)
+        #expect(model.appearance.catalogAvatar?.id == entries.first?.id)
+        #expect(model.appearance.kitArt != nil, "It draws from the shipped pack with nothing downloaded")
     }
 
-    @Test func colorChoicesAndShuffle() {
+    @Test func categoriesAndRandomizeInEach() {
+        let entries = AvatarCatalog.bundled.avatars(in: .bighelp, at: .now)
         let model = AvatarCreatorModel(appearance: CompanionAppearance(character: .lobster, matchesTheme: true))
         model.selectColor("#3F6FD8")
         #expect(!model.appearance.matchesTheme && model.appearance.colorHex == "#3F6FD8")
         model.selectThemeColor()
         #expect(model.appearance.matchesTheme)
         for _ in 0..<20 {
-            let before = model.appearance.character
-            model.shuffle()
-            #expect(model.appearance.character != before)
+            let before = model.appearance.catalogAvatar?.id
+            model.shuffle(from: entries)
+            #expect(model.appearance.catalogAvatar?.id != before)
             #expect(!model.appearance.matchesTheme)
             #expect(model.tabs.contains(model.tab))
         }
+        model.select(.hermes)
+        #expect(model.style == .face && model.category == .hermes)
+        model.style = .shapes
+        let shape = model.shape
+        model.randomizeShape()
+        #expect(model.shape != shape && HermesShapeFace.pickerShapes.contains(model.shape))
+        model.select(.other)
+        #expect(model.style == .catalog && model.catalogGroup == .other && model.category == .other)
+        model.select(.petdex)
+        #expect(model.style == .pets)
+        model.select(.bighelp)
+        #expect(model.style == .catalog && model.category == .bighelp)
     }
 
     @Test func newAgentsCloneTheDefaultAgentUnlessCloningIsUnavailable() async throws {

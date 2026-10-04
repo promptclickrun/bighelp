@@ -117,7 +117,12 @@ struct AvatarKit: Decodable, Sendable {
             text = try c.decodeIfPresent(String.self, forKey: .text)
             switch kind {
             case "path":
-                path = AvatarKitPath.parse(try c.decode(String.self, forKey: .d))
+                let data = try c.decode(String.self, forKey: .d)
+                // Catalog packs come from the network; no outline needs more.
+                guard data.utf8.count <= AvatarKitPackValidator.maximumPathLength else {
+                    throw DecodingError.dataCorruptedError(forKey: .d, in: c, debugDescription: "Path too long.")
+                }
+                path = AvatarKitPath.parse(data)
                 textOrigin = nil
             case "circle", "ellipse":
                 let cx = try c.decode(Double.self, forKey: .cx), cy = try c.decode(Double.self, forKey: .cy)

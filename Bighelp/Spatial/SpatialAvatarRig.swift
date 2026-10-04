@@ -7,8 +7,9 @@ import UIKit
 enum SpatialAvatarLook: Equatable {
     /// One of the avatar kit's characters, built in 3D from the same art,
     /// wearing the creator's headwear and pattern.
+    /// `packSHA256` names a catalog pack; nil is the bundled kit.
     case kit(characterID: String, colors: AvatarKitColors, face: AvatarKitFace,
-             topper: CompanionTopper = .none, pattern: CompanionPattern = .none)
+             topper: CompanionTopper = .none, pattern: CompanionPattern = .none, packSHA256: String? = nil)
     /// The default agent: a glossy body with two eyes, in the agent's color.
     case persona(colorHex: String, isOrb: Bool)
     /// A picture can't be 3D; it floats as a clean disc with no backdrop.
@@ -18,12 +19,13 @@ enum SpatialAvatarLook: Equatable {
 extension SpatialAvatarLook {
     /// The 3D look for an Agent Studio appearance.
     init?(appearance: CompanionAppearance, themeHex: String) {
-        guard let colors = appearance.avatarKitColors(themeHex: themeHex) else { return nil }
-        let id = appearance.character.rawValue
-        self = .kit(characterID: id, colors: colors,
-                    face: appearance.avatarKitFace ?? AvatarKitFace(AvatarKit.bundled?.character(id)?.face),
-                    topper: appearance.character.isBit ? .none : appearance.topper ?? .none,
-                    pattern: appearance.pattern ?? .none)
+        guard let (_, art) = appearance.kitArt, let colors = appearance.avatarKitColors(themeHex: themeHex) else { return nil }
+        let isCatalog = appearance.catalogAvatar != nil
+        self = .kit(characterID: art.id, colors: colors,
+                    face: appearance.avatarKitFace ?? AvatarKitFace(art.face),
+                    topper: isCatalog || appearance.character.isBit ? .none : appearance.topper ?? .none,
+                    pattern: appearance.pattern ?? .none,
+                    packSHA256: appearance.catalogAvatar?.kitSHA256)
     }
 }
 
@@ -79,8 +81,11 @@ final class SpatialAvatarRig {
         solids = []
         personaEyes = []
         switch look {
-        case .kit(let id, let colors, let face, let topper, let pattern):
-            guard let kit = AvatarKit.bundled, let character = kit.character(id) else {
+        case .kit(let id, let colors, let face, let topper, let pattern, let packSHA256):
+            let source = packSHA256.map { sha in
+                AvatarKitLibrary.shared.kit(sha256: sha) ?? AvatarKitLibrary.bundledKit.flatMap { $0.character(id) == nil ? nil : $0 }
+            } ?? AvatarKit.bundled
+            guard let kit = source, let character = kit.character(id) else {
                 buildPersona(colorHex: colors.primary, isOrb: false)
                 return
             }
@@ -88,7 +93,7 @@ final class SpatialAvatarRig {
             self.character = character
             self.face = face
             buildKit(character, colors: colors, face: face, pattern: pattern)
-            if let companion = CompanionCharacter(rawValue: id) { buildTopper(topper, on: companion, colors: colors) }
+            if packSHA256 == nil, let companion = CompanionCharacter(rawValue: id) { buildTopper(topper, on: companion, colors: colors) }
         case .persona(let hex, let isOrb):
             buildPersona(colorHex: hex, isOrb: isOrb)
         case .photo(let url):

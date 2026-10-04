@@ -1,6 +1,7 @@
 import XCTest
 
-/// Agents › New agent › avatar: the Characters grid, and Face's colors like Shapes'. BIGHELP_AVATAR_EVIDENCE (TEST_RUNNER_…) saves the screenshots.
+/// Agents › New agent › avatar: bighelp's catalog characters, hermes's Faces and Shapes (with colors),
+/// petdex and other, and Randomize in each. BIGHELP_AVATAR_EVIDENCE (TEST_RUNNER_…) saves the screenshots.
 final class AvatarCreatorUITests: BighelpUITestCase {
     @MainActor
     func testFacesHaveColorsLikeShapes() throws {
@@ -15,8 +16,25 @@ final class AvatarCreatorUITests: BighelpUITestCase {
         XCTAssertTrue(preview.waitForExistence(timeout: 10))
         preview.tap()
         let any = app.descendants(matching: .any)
-        XCTAssertTrue(any["avatar.creator.style.face"].firstMatch.waitForExistence(timeout: 10))
-        save("characters", app)
+        XCTAssertTrue(any["avatar.creator.category.bighelp"].firstMatch.waitForExistence(timeout: 10))
+        let biggie = any["avatar.creator.catalog.bighelp-biggie"].firstMatch
+        XCTAssertTrue(biggie.waitForExistence(timeout: 5), "bighelp's characters, from the shipped catalog")
+        biggie.tap()
+        XCTAssertEqual(any["avatar.creator.name"].firstMatch.label, "Biggie")
+        save("bighelp", app)
+        any["avatar.creator.shuffle"].firstMatch.tap()
+        XCTAssertNotEqual(any["avatar.creator.name"].firstMatch.label, "Biggie", "Randomize picks another character")
+        save("bighelp-randomized", app)
+        any["avatar.creator.category.other"].firstMatch.tap()
+        XCTAssertTrue(any["avatar.creator.catalog.empty"].firstMatch.waitForExistence(timeout: 3))
+        save("other", app)
+        any["avatar.creator.category.hermes"].firstMatch.tap()
+        XCTAssertTrue(any["avatar.creator.style.shapes"].firstMatch.waitForExistence(timeout: 3), "hermes has Faces and Shapes")
+        any["avatar.creator.style.shapes"].firstMatch.tap()
+        let shapeName = any["avatar.creator.name"].firstMatch.label
+        any["avatar.creator.shuffle"].firstMatch.tap()
+        XCTAssertNotEqual(any["avatar.creator.name"].firstMatch.label, shapeName, "Randomize picks another shape")
+        save("hermes-shapes", app)
         any["avatar.creator.style.face"].firstMatch.tap()
         let swatch = any["avatar.creator.face-color.3"].firstMatch
         for _ in 0..<5 where !(swatch.exists && swatch.isHittable) { app.swipeUp() }

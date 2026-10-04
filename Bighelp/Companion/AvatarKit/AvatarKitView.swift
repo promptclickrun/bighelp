@@ -3,7 +3,10 @@ import SwiftUI
 /// One kit character, animated with the display while `isAnimating`;
 /// otherwise a still frame (also used for saved pictures).
 struct AvatarKitView: View {
-    let character: CompanionCharacter
+    let kit: AvatarKit
+    let art: AvatarKit.Character
+    /// Bundled characters wear headwear; catalog ones don't have a head anchor.
+    var headwear: CompanionCharacter?
     let colors: AvatarKitColors
     var look = BuddyLook()
     /// A Bit's face; nil draws its own.
@@ -26,7 +29,7 @@ struct AvatarKitView: View {
     private func canvas(time: Double?) -> some View {
         Canvas { context, size in
             AvatarKitScene.draw(
-                character, colors: colors, look: look, face: face, mood: mood, time: time,
+                art, kit: kit, headwear: headwear, colors: colors, look: look, face: face, mood: mood, time: time,
                 showsBackground: showsBackground, showsQuestion: showsQuestion,
                 in: context, size: size
             )
@@ -78,7 +81,9 @@ enum AvatarKitScene {
     }
 
     static func draw(
-        _ character: CompanionCharacter,
+        _ art: AvatarKit.Character,
+        kit: AvatarKit,
+        headwear: CompanionCharacter?,
         colors: AvatarKitColors,
         look: BuddyLook,
         face: AvatarKitFace? = nil,
@@ -89,7 +94,6 @@ enum AvatarKitScene {
         in context: GraphicsContext,
         size: CGSize
     ) {
-        guard let kit = AvatarKit.bundled, let art = kit.character(character.rawValue) else { return }
         let (state, extra) = states(for: mood)
         let seconds = time ?? stillTime
         var pose = BuddyPose.make(mood: extra, time: seconds, breathes: false)
@@ -116,7 +120,7 @@ enum AvatarKitScene {
         AvatarKitRenderer.draw(
             art, kit: kit, colors: colors, frame: frame, in: context, size: size,
             decorateBody: { body in
-                guard look.topper != .none, let anchor = headwearAnchor(character) else { return }
+                guard look.topper != .none, let headwear, let anchor = headwearAnchor(headwear) else { return }
                 BuddyPainter(ctx: body, u: 2, palette: palette, look: look, pose: pose)
                     .topper(anchor.x, anchor.y, width: anchor.width)
             },
@@ -139,9 +143,24 @@ enum AvatarKitScene {
 }
 
 extension CompanionAppearance {
+    /// The kit and character this look draws: the picked catalog pack, else the bundled kit.
+    /// nil while a catalog pack isn't on the phone yet.
+    var kitArt: (kit: AvatarKit, art: AvatarKit.Character)? {
+        if let catalogAvatar {
+            guard let kit = AvatarKitLibrary.shared.kit(for: catalogAvatar),
+                  let art = kit.character(catalogAvatar.id) else { return nil }
+            return (kit, art)
+        }
+        guard let kit = AvatarKit.bundled, let art = kit.character(character.rawValue) else { return nil }
+        return (kit, art)
+    }
+
+    /// The name people see: the catalog character's, else the bundled one's.
+    var displayName: String { catalogAvatar?.name ?? character.displayName }
+
     /// The face a Bit draws with; nil for characters and untouched Bits.
     var avatarKitFace: AvatarKitFace? {
-        guard character.isBit, bitEyes != nil || bitMouth != nil || bitAccessory != nil || !showsCheeks,
+        guard catalogAvatar == nil, character.isBit, bitEyes != nil || bitMouth != nil || bitAccessory != nil || !showsCheeks,
               let art = AvatarKit.bundled?.character(character.rawValue) else { return nil }
         var face = AvatarKitFace(art.face)
         if let bitEyes { face.eyes = bitEyes.rawValue }
@@ -153,7 +172,7 @@ extension CompanionAppearance {
 
     /// The kit colors this look draws with.
     func avatarKitColors(themeHex: String) -> AvatarKitColors? {
-        guard let kit = AvatarKit.bundled, let art = kit.character(character.rawValue) else { return nil }
+        guard let (kit, art) = kitArt else { return nil }
         var colors = AvatarKitColors(character: art)
         if let colorway, let theme = kit.theme(colorway) { colors.apply(theme) }
         if !usesCharacterColors {

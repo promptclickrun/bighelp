@@ -340,7 +340,7 @@ struct ChatComposer: View {
             .background { composerInputFocusSurface }
             .clipShape(ComposerFieldMetrics.shape)
             .contentShape(ComposerFieldMetrics.shape)
-            .background(ComposerFieldMetrics.shape.fill(theme.surface))
+            .composerGlass(ComposerFieldMetrics.shape, fill: theme.surface)
             .overlay {
                 ComposerFieldMetrics.shape
                     .strokeBorder(
@@ -371,7 +371,7 @@ struct ChatComposer: View {
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(theme.secondaryText)
                     .frame(width: ComposerFieldMetrics.controlDiameter, height: ComposerFieldMetrics.controlDiameter)
-                    .background(theme.incomingMessageBackground, in: .circle)
+                    .composerGlass(Circle(), fill: theme.incomingMessageBackground)
                     // Match the primary action's outer hit area as well as its
                     // painted circle, so both ends share the same center line.
                     .frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
@@ -702,4 +702,32 @@ enum ComposerFieldMetrics {
     static let leadingInset: CGFloat = 16
     static let trailingInset: CGFloat = 12
     static var shape: RoundedRectangle { RoundedRectangle(cornerRadius: cornerRadius, style: .continuous) }
+}
+
+/// The message box, + and the voice button: Liquid Glass tinted with their usual fill, so the chat
+/// behind shows through faintly but text stays easy to read. Reduce Transparency, systems before
+/// iOS 26 and visionOS (no glassEffect) keep the solid fill.
+private struct ComposerGlass<S: InsettableShape>: ViewModifier {
+    let shape: S
+    let fill: Color
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    func body(content: Content) -> some View {
+        #if compiler(>=6.2) && !os(visionOS)
+        if #available(iOS 26, *), !reduceTransparency, contrast != .increased {
+            content.glassEffect(.regular.tint(fill.opacity(0.72)), in: shape)
+        } else {
+            content.background(shape.fill(fill))
+        }
+        #else
+        content.background(shape.fill(fill))
+        #endif
+    }
+}
+
+extension View {
+    func composerGlass<S: InsettableShape>(_ shape: S, fill: Color) -> some View {
+        modifier(ComposerGlass(shape: shape, fill: fill))
+    }
 }

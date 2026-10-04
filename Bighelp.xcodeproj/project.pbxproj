@@ -1073,6 +1073,7 @@
 		D61515622140213AD7E0FB1E /* soul-counterpoint.md in Resources */ = {isa = PBXBuildFile; fileRef = 60C035E1E9D9E86ADE7FF305 /* soul-counterpoint.md */; };
 		D658DABD316296699BA57736 /* soul-quill.md in Resources */ = {isa = PBXBuildFile; fileRef = EBA3D8873FF00E975871E446 /* soul-quill.md */; };
 		D66D2449778F4D1AAEA2CC50 /* BighelpLogo.swift in Sources */ = {isa = PBXBuildFile; fileRef = D29D3004AA6E39970301E5B4 /* BighelpLogo.swift */; };
+		D6953205AD992A7915070EF8 /* ComposerGlassUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 530632539B8C069371C9BC57 /* ComposerGlassUITests.swift */; };
 		D6A802CC2404B335CF4136F8 /* DirectHermesNativeAttachmentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06604943C1C5D780822F64D6 /* DirectHermesNativeAttachmentTests.swift */; };
 		D6CA11453C9E2BA2A65F09AC /* StockGitReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2F653D00F8A7467F524639E /* StockGitReviewView.swift */; };
 		D70A0CBF9875274DF55F8F06 /* ChatMentionTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B6E8F02A6376ED091905B6E /* ChatMentionTextView.swift */; };
@@ -1806,6 +1807,7 @@
 		52EBB91094C47E61D846446D /* ScheduledTaskFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduledTaskFixtures.swift; sourceTree = "<group>"; };
 		52EFFEF9D100E00D374E903F /* DirectHermesWikiClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectHermesWikiClient.swift; sourceTree = "<group>"; };
 		52F5FEDC372FADF6E0C549AD /* BotModeCatalogFixtureClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BotModeCatalogFixtureClient.swift; sourceTree = "<group>"; };
+		530632539B8C069371C9BC57 /* ComposerGlassUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerGlassUITests.swift; sourceTree = "<group>"; };
 		530F3F8D7D4A8EC5C8E2B699 /* RecentModelHistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentModelHistoryStore.swift; sourceTree = "<group>"; };
 		534DAB25F93A633C02471F10 /* NativeWorkspaceLifecycleCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeWorkspaceLifecycleCoordinator.swift; sourceTree = "<group>"; };
 		5352DF80CF9AB261CA0A0415 /* DirectHermesConversationClient+Subagents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DirectHermesConversationClient+Subagents.swift"; sourceTree = "<group>"; };
@@ -3879,6 +3881,7 @@
 				B21A4DAF16C06699A239D845 /* ChatReplyUITests.swift */,
 				32A8093F2FE15DF1627DCB77 /* ChatStreamingAnchorUITests.swift */,
 				9DFD40C7EF8353F3B2682B44 /* ChatToolFoldersUITests.swift */,
+				530632539B8C069371C9BC57 /* ComposerGlassUITests.swift */,
 				D12AC6E66E242B6AA18EECAF /* ComposerInteractionUITests.swift */,
 				3CDABE72B40973455A986015 /* CredentialVaultUITests.swift */,
 				29295CBE65C606B310909E2D /* DefaultModelReasoningUITests.swift */,
@@ -6305,6 +6308,7 @@
 				CC4800D30AB3BD74AB0F555C /* ChatReplyUITests.swift in Sources */,
 				313E0D3151A48CE98320724D /* ChatStreamingAnchorUITests.swift in Sources */,
 				83290EF0564275CC106CA573 /* ChatToolFoldersUITests.swift in Sources */,
+				D6953205AD992A7915070EF8 /* ComposerGlassUITests.swift in Sources */,
 				C1FB39C6F4D951394EC6A67A /* ComposerInteractionUITests.swift in Sources */,
 				FDF931038113A673577D553B /* CredentialVaultUITests.swift in Sources */,
 				2D0E909384E7C02A1E4ED57D /* DefaultModelReasoningUITests.swift in Sources */,

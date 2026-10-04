@@ -237,21 +237,25 @@ struct AdaptiveComposerActionButton: View {
         }
     }
 
-    /// Solid circles: accent for Send, danger for Stop, and the quiet incoming
-    /// neutral for the voice shortcut shown while the draft is empty.
+    /// Solid circles for Send (accent) and Stop (danger); the voice shortcut shown while the draft
+    /// is empty is glass in the quiet incoming color.
+    @ViewBuilder
     private var actionBackground: some View {
-        let fill = switch effectiveAction {
-        case .voice: theme.incomingMessageBackground
-        case .send: theme.action
-        case .stop: theme.danger
-        }
-        return Circle()
-            .fill(fill)
-            .overlay {
-                if colorSchemeContrast == .increased, effectiveAction == .voice {
-                    Circle().strokeBorder(theme.primaryText, lineWidth: 1.5)
+        switch effectiveAction {
+        case .voice:
+            // Glass like the message box beside it; Send and Stop stay solid so they read as actions.
+            Color.clear
+                .composerGlass(Circle(), fill: theme.incomingMessageBackground)
+                .overlay {
+                    if colorSchemeContrast == .increased {
+                        Circle().strokeBorder(theme.primaryText, lineWidth: 1.5)
+                    }
                 }
-            }
+        case .send:
+            Circle().fill(theme.action)
+        case .stop:
+            Circle().fill(theme.danger)
+        }
     }
 
     private var midSessionHoldGesture: some Gesture {

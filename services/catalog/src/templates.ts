@@ -1,5 +1,7 @@
 // Template shapes and the validation every submission and reviewer edit passes through.
 
+import { type TemplateVariable, parseVariables } from "./variables.js";
+
 export const BOARDS = ["feed", "ideas", "goals"] as const;
 export const BLUEPRINT_CATEGORIES = ["productivity", "marketing", "content", "personal", "research"] as const;
 export const GOAL_CATEGORIES = [
@@ -34,6 +36,8 @@ export interface AgentPayload {
   category: AgentCategory;
   /** SF Symbol for its card. Reviewers set it; submissions can't. */
   symbol?: string;
+  /** What the app asks for before it fills `{{key}}`s in instructions, role and description. */
+  variables?: TemplateVariable[];
 }
 
 export type TemplatePayload =
@@ -97,6 +101,15 @@ function parseAgent(body: Fields, allowSymbol: boolean): AgentPayload {
   };
   const description = optionalLine(body.description, "description", LIMITS.description);
   if (description) payload.description = description;
+  for (const field of ["name", "vibe"] as const) {
+    if (payload[field].includes("{{") || payload[field].includes("}}")) {
+      throw new ValidationError(field, "Variables go in the instructions, role or description, not here.");
+    }
+  }
+  const variables = parseVariables(body.variables, {
+    role: payload.role, description: payload.description, instructions: payload.instructions,
+  });
+  if (variables) payload.variables = variables;
   if (allowSymbol) {
     const symbol = optionalLine(body.symbol, "symbol", LIMITS.symbol);
     if (symbol) {

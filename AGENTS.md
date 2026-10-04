@@ -437,6 +437,16 @@ New code uses Bighelp names. Don't "finish" the rename on this list.
 - A petdex pet saves its first frame as the agent's picture (what Hermes Desktop and other devices show). Its
   sheet is fetched from petdex and cut into one strip per move; hatched-on-host pets have no sheet and stay still.
 
+### Agent templates
+
+- Agent templates come from the Template Catalog (`catalog.bighelp.app`, `services/catalog`;
+  `TemplateCatalogStore`), with the bundled ones as the fallback.
+- A template can declare fill-in fields (`variables`) for its `{{key}}` placeholders. The rules for the app,
+  the catalog and the plugin are in
+  [services/catalog/docs/TEMPLATE_VARIABLES.md](services/catalog/docs/TEMPLATE_VARIABLES.md).
+- The app's side is `TemplateVariables` (parse, check and fill in one pass) and `AgentTemplateFillView`, the
+  short form that opens when someone starts an agent from a template that has fields.
+
 ### Secrets and access
 
 - Credentials live in the Keychain, never in `UserDefaults` or logs.

@@ -33,9 +33,11 @@ text, goalCategory?: health|relationships|finance|career|interests|productivity|
 bighelp|community, credit?, updatedAt }`. `[brackets]` in `text` are the app's fill-in blanks.
 
 Agent: `{ id, name, role, vibe, description?, instructions, category:
-work|personal|learning|creative|research|support|fun, symbol?, source, credit?, updatedAt }`.
+work|personal|learning|creative|research|support|fun, symbol?, variables?, source, credit?, updatedAt }`.
 `instructions` uses `{{agent_name}}` like the bundled SOUL templates. `symbol` is an SF Symbol name set
-by a reviewer; it can be missing.
+by a reviewer; it can be missing. `variables` lists the fields the app asks for before it fills the
+template's other `{{key}}`s; submit, review and the seed all check them against the text. The rules are in
+[docs/TEMPLATE_VARIABLES.md](docs/TEMPLATE_VARIABLES.md).
 
 The seed (`scripts/build-seed.mjs` → `seed/0001_bundled.sql`) loads exactly what the app bundles today,
 with the same ids (`feed-productivity-1`…, `anchor`…), so the app can match remote and bundled items.

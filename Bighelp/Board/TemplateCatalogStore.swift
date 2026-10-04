@@ -102,12 +102,15 @@ final class TemplateCatalogStore {
         let arguments = ProcessInfo.processInfo.arguments
         let environment = ProcessInfo.processInfo.environment
         let isOffline = arguments.contains("-use-demo-fixtures") || environment["XCTestConfigurationFilePath"] != nil
-        return TemplateCatalogStore(
+        let store = TemplateCatalogStore(
             transport: TemplateCatalogURLSessionTransport(),
             cacheDirectory: FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?
                 .appending(path: "TemplateCatalog", directoryHint: .isDirectory),
             isEnabled: !isOffline
         )
+        // Demo mode adds a catalog-style template with fill-in fields.
+        if arguments.contains("-use-demo-fixtures") { store.agentTemplates.append(.demoFieldLead) }
+        return store
     }
 
     /// One refresh at a time; callers during it wait for that one.
@@ -222,7 +225,8 @@ extension AgentSoulTemplate {
                 id: id, title: name, profile: role, voice: text("vibe", max: 160) ?? "",
                 strength: text("description", max: 400) ?? "", systemImage: symbol ?? "person.crop.square",
                 inlineSoul: instructions, credit: credit, isCommunity: (row["source"] as? String) == "community",
-                updatedAt: TemplateCatalogDate.parse(row["updatedAt"] as? String)
+                updatedAt: TemplateCatalogDate.parse(row["updatedAt"] as? String),
+                variables: TemplateVariables.parse(row["variables"])
             )
         }
     }

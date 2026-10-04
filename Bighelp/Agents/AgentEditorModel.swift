@@ -179,8 +179,14 @@ final class AgentEditorModel: Identifiable {
     private(set) var startChoice: StartChoice = .scratch
     /// "builtin:<id>" or "saved:<uuid>", for the template applied now.
     private(set) var appliedTemplateID: String?
-    /// The applied template's instructions with `{{agent_name}}` still in them.
+    /// The applied template's instructions with its placeholders still in them.
     private var templateInstructions: String?
+    /// What the template's form gave each key (all but the agent's name, which follows the Name field).
+    private var templateValues: [String: String] = [:]
+    /// A template that asks for its fields before it fills the editor; the editor shows its form.
+    private(set) var templateForm: AgentTemplateFormRequest?
+    /// The person's saved name, for templates that say `{{user_name}}`.
+    @ObservationIgnored var savedUserName: @MainActor () -> String = { UserIdentityStore.savedName() }
     /// What the applied template put in each field, so another choice replaces
     /// only those values and never what the person typed.
     private var applied = AppliedValues()
@@ -198,15 +204,45 @@ final class AgentEditorModel: Identifiable {
     func showStartChoice(_ choice: StartChoice) {
         guard !isEditing else { return }
         startChoice = choice
-        if choice == .scratch { apply(AppliedValues(), template: nil, id: nil) }
+        if choice == .scratch {
+            templateValues = [:]
+            apply(AppliedValues(), template: nil, id: nil)
+        }
     }
 
     func startFrom(_ template: AgentSoulTemplate) {
         guard !isEditing, let soul = template.soul else { return }
         startChoice = .builtIn
+        let userName = UserIdentity.savedName(savedUserName())
+        if let form = template.form(agentName: draft.name, savedUserName: userName) {
+            templateForm = AgentTemplateFormRequest(template: template, form: form)
+            return
+        }
         // A personality doesn't name the agent: the person's own name goes into it.
-        apply(AppliedValues(role: template.profile, summary: template.about), template: soul,
-              id: "builtin:\(template.id)")
+        apply(template, soul: soul, values: userName.isEmpty ? [:] : [TemplateVariables.userName: userName])
+    }
+
+    /// The form's Continue: the template fills the editor with the name and fields it was given.
+    func finishTemplateForm(_ form: TemplateForm) {
+        guard let request = templateForm, form.canContinue, let soul = request.template.soul else { return }
+        templateForm = nil
+        var values = form.filledValues()
+        let name = values.removeValue(forKey: TemplateVariables.agentName) ?? ""
+        apply(request.template, soul: soul, values: values)
+        // The name is the person's own, so Scratch or another template never clears it.
+        draft.name = name
+        nameDidChange()
+        fieldErrors[.name] = nil
+    }
+
+    func cancelTemplateForm() {
+        templateForm = nil
+    }
+
+    private func apply(_ template: AgentSoulTemplate, soul: String, values: [String: String]) {
+        templateValues = values
+        let role = TemplateVariables.fill(template.profile, values: filledValues)
+        apply(AppliedValues(role: role, summary: template.about), template: soul, id: "builtin:\(template.id)")
     }
 
     func startFrom(_ template: SavedAgentTemplate) {
@@ -218,16 +254,26 @@ final class AgentEditorModel: Identifiable {
         var name = template.title
         var number = 2
         while taken.contains(name.lowercased()) { name = "\(template.title) \(number)"; number += 1 }
+        templateValues = [:]
         apply(AppliedValues(name: name, role: template.role, summary: template.summary, avatar: template.avatar),
               template: AgentNamePlaceholder.generalize(template.instructions, name: template.sourceAgentName),
               id: "saved:\(template.id.uuidString)")
+    }
+
+    /// The template's values plus the name typed now. An empty name keeps its placeholder, so it
+    /// still shows where the name will go.
+    private var filledValues: [String: String] {
+        var values = templateValues
+        let name = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !name.isEmpty { values[TemplateVariables.agentName] = name }
+        return values
     }
 
     /// Keeps the applied template's instructions in step with the name as it's typed,
     /// until the person edits the instructions themselves.
     func nameDidChange() {
         guard let templateInstructions, draft.instructions == applied.instructions else { return }
-        let filled = AgentNamePlaceholder.fill(templateInstructions, name: draft.name)
+        let filled = TemplateVariables.fill(templateInstructions, values: filledValues)
         draft.instructions = filled
         applied.instructions = filled
     }
@@ -238,7 +284,7 @@ final class AgentEditorModel: Identifiable {
             current.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || current == previous ? next : current
         }
         draft.name = merged(draft.name, previous: applied.name, next: next.name)
-        next.instructions = template.map { AgentNamePlaceholder.fill($0, name: draft.name) } ?? ""
+        next.instructions = template.map { TemplateVariables.fill($0, values: filledValues) } ?? ""
         draft.role = merged(draft.role, previous: applied.role, next: next.role)
         draft.summary = merged(draft.summary, previous: applied.summary, next: next.summary)
         draft.instructions = merged(draft.instructions, previous: applied.instructions, next: next.instructions)
@@ -509,6 +555,13 @@ final class AgentEditorModel: Identifiable {
             "We couldn’t prepare that image. Choose another photo and try again."
         }
     }
+}
+
+/// A template waiting for its form: which template, and the form as it starts.
+struct AgentTemplateFormRequest: Identifiable, Equatable {
+    let id = UUID()
+    let template: AgentSoulTemplate
+    let form: TemplateForm
 }
 
 private extension AgentAvatar {

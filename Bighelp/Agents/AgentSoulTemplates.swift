@@ -20,6 +20,8 @@ struct AgentSoulTemplate: Identifiable, Equatable, Sendable {
     var isCommunity = false
     /// When the catalog last changed it; nil for bundled ones.
     var updatedAt: Date? = nil
+    /// Fill-in fields for its other `{{key}}`s (services/catalog/docs/TEMPLATE_VARIABLES.md).
+    var variables: [TemplateVariable] = []
 
     /// The personality text with `{{agent_name}}` still in it.
     var soul: String? {
@@ -30,6 +32,16 @@ struct AgentSoulTemplate: Identifiable, Equatable, Sendable {
     }
 
     var about: String { voice + "." }
+
+    /// Its role and strength for a card: each field shows as "[Its label]".
+    var cardRole: String { TemplateVariables.preview(profile, variables: variables) }
+    var cardStrength: String { TemplateVariables.preview(strength, variables: variables) }
+
+    /// The form to fill before it's used, or nil when the name is all it needs.
+    func form(agentName: String, savedUserName: String) -> TemplateForm? {
+        TemplateForm(texts: [soul ?? "", profile, strength], declared: variables, agentName: agentName,
+                     savedUserName: savedUserName)
+    }
 
     /// The catalog's templates when there are some, otherwise the bundled ones.
     @MainActor static var all: [AgentSoulTemplate] { TemplateCatalogStore.shared.agentTemplates }

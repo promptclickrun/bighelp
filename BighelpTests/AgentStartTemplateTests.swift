@@ -148,4 +148,83 @@ struct AgentStartTemplateTests {
         #expect(model.draft.instructions == "Help with budgets.")
         #expect(model.draft.role == "Finance")
     }
+
+    // MARK: Templates with fill-in fields
+
+    @Test func aTemplateWithFieldsAsksBeforeItFillsTheEditor() async throws {
+        let model = try await model()
+        model.savedUserName = { "" }
+        model.draft.role = ""
+        model.startFrom(.demoFieldLead)
+        let request = try #require(model.templateForm, "Its form opens first")
+        #expect(model.startChoice == .builtIn)
+        #expect(model.appliedTemplateID == nil, "Nothing is filled until Continue")
+        #expect(model.draft.instructions.isEmpty && model.draft.role.isEmpty)
+        #expect(request.form.fields.map(\.key) == ["agent_name", "agent_role", "operating_context", "tone"])
+
+        var form = request.form
+        form.values["agent_role"] = "Release coordinator"
+        model.finishTemplateForm(form)
+        #expect(model.templateForm != nil, "Continue waits for the name")
+
+        form.values["agent_name"] = " Kai "
+        model.finishTemplateForm(form)
+        #expect(model.templateForm == nil)
+        #expect(model.appliedTemplateID == "builtin:field-lead")
+        #expect(model.draft.name == "Kai")
+        #expect(model.draft.role == "Release coordinator")
+        #expect(model.draft.summary == "Confident, practical, quick.")
+        let instructions = model.draft.instructions
+        #expect(instructions.hasPrefix("# Kai\n\nYou are Kai, a Hermes Agent profile"))
+        #expect(instructions.contains("Role: Release coordinator"))
+        #expect(instructions.contains("Operating context: General work for the user."))
+        #expect(instructions.contains("Tone: Direct."))
+        #expect(!instructions.contains("{{") && !instructions.contains("}}"))
+
+        // The name still follows the Name field afterwards, and the fields keep their values.
+        type("Rio", into: model)
+        #expect(model.draft.instructions.hasPrefix("# Rio\n\nYou are Rio,"))
+        #expect(model.draft.instructions.contains("Role: Release coordinator"))
+        // Scratch clears what the template filled in, but not the name the person gave.
+        model.showStartChoice(.scratch)
+        #expect(model.draft.instructions.isEmpty && model.draft.role.isEmpty)
+        #expect(model.draft.name == "Rio")
+    }
+
+    @Test func cancellingTheFormLeavesTheEditorAsItWas() async throws {
+        let model = try await model()
+        model.savedUserName = { "" }
+        model.startFrom(try #require(AgentSoulTemplate.template("anchor")))
+        type("Kai", into: model)
+        let before = model.draft
+        model.startFrom(.demoFieldLead)
+        let form = try #require(model.templateForm?.form)
+        #expect(form.values["agent_name"] == "Kai", "The name typed so far is filled in")
+        model.cancelTemplateForm()
+        #expect(model.templateForm == nil)
+        #expect(model.draft == before)
+        #expect(model.appliedTemplateID == "builtin:anchor")
+    }
+
+    @Test func theSavedNameFillsUserNameOrTheFormAsksForIt() async throws {
+        let asking = AgentSoulTemplate(id: "host", title: "Host", profile: "Household host", voice: "Warm",
+                                   strength: "", systemImage: "house",
+                                   inlineSoul: "# {{agent_name}}\n\nYou are {{agent_name}}. You help {{user_name}}.")
+        let model = try await model()
+        model.savedUserName = { "Sam" }
+        model.startFrom(asking)
+        #expect(model.templateForm == nil, "Nothing to ask but the name: no form, as before")
+        #expect(model.draft.instructions == "# {{agent_name}}\n\nYou are {{agent_name}}. You help Sam.")
+        type("Kai", into: model)
+        #expect(model.draft.instructions == "# Kai\n\nYou are Kai. You help Sam.")
+
+        let unnamed = try await self.model()
+        unnamed.savedUserName = { "" }
+        unnamed.startFrom(asking)
+        var form = try #require(unnamed.templateForm?.form)
+        #expect(form.fields.map(\.key) == ["agent_name", "user_name"])
+        form.values = ["agent_name": "Kai", "user_name": "Sam Rivera"]
+        unnamed.finishTemplateForm(form)
+        #expect(unnamed.draft.instructions == "# Kai\n\nYou are Kai. You help Sam Rivera.")
+    }
 }

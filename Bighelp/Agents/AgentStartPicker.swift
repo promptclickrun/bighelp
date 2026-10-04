@@ -29,6 +29,9 @@ struct AgentStartPicker: View {
     @State private var renaming: SavedAgentTemplate?
     @State private var renameText = ""
     @State private var isBrowsingTemplates = false
+    /// Picked in Browse all; applied once that sheet has closed, since a template's form opens as
+    /// a sheet of its own.
+    @State private var browsedTemplate: AgentSoulTemplate?
 
     var body: some View {
         VStack(alignment: .leading, spacing: BighelpTokens.space12) {
@@ -47,7 +50,7 @@ struct AgentStartPicker: View {
             case .builtIn:
                 carousel {
                     ForEach(AgentSoulTemplate.all) { template in
-                        card(title: template.title, subtitle: template.profile, detail: template.strength,
+                        card(title: template.title, subtitle: template.cardRole, detail: template.cardStrength,
                              credit: template.isCommunity ? template.credit : nil,
                              systemImage: template.systemImage, selected: "builtin:\(template.id)",
                              identifier: "agent.editor.template.\(template.id)") {
@@ -105,8 +108,12 @@ struct AgentStartPicker: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .sheet(isPresented: $isBrowsingTemplates) {
-            AgentTemplateBrowser { pick($0) }
+        .sheet(isPresented: $isBrowsingTemplates, onDismiss: {
+            guard let browsedTemplate else { return }
+            self.browsedTemplate = nil
+            pick(browsedTemplate)
+        }) {
+            AgentTemplateBrowser { browsedTemplate = $0 }
                 .bighelpSheetSize(.large)
         }
         .alert("Rename template", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {

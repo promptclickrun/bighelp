@@ -62,6 +62,80 @@ final class TemplateCatalogUITests: BighelpUITestCase {
         XCTAssertFalse(any["agent.templates.browser"].firstMatch.waitForExistence(timeout: 2), "Picking one closes it")
     }
 
+    /// A catalog template with fill-in fields (the demo Field Lead) opens a short form from Browse all:
+    /// name first, then its fields. Continue fills the editor's instructions with no `{{` left.
+    @MainActor
+    func testTemplateFormFillsTheInstructions() throws {
+        for appearance in ["light", "dark"] {
+            let app = makeApp()
+            app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.demo.appearance", appearance]
+            app.launch()
+            openRootTab("tab.agents", in: app)
+            let create = app.buttons["agents.create"].firstMatch
+            XCTAssertTrue(create.waitForExistence(timeout: 10))
+            create.tap()
+            let start = app.segmentedControls["agent.editor.start"].firstMatch
+            XCTAssertTrue(start.waitForExistence(timeout: 10))
+            start.buttons["Templates"].tap()
+            app.buttons["agent.editor.templates.browse"].firstMatch.tap()
+            let search = app.searchFields.firstMatch
+            XCTAssertTrue(search.waitForExistence(timeout: 5))
+            search.tap()
+            search.typeText("Field")
+            let card = app.buttons["agent.templates.field-lead"]
+            XCTAssertTrue(card.waitForExistence(timeout: 3), "The demo template with fields")
+            card.tap()
+
+            let any = app.descendants(matching: .any)
+            XCTAssertTrue(any["agent.template-form"].firstMatch.waitForExistence(timeout: 5), "Its form opens")
+            let name = app.textFields["agent.template-form.field.agent_name"]
+            let role = app.textFields["agent.template-form.field.agent_role"]
+            XCTAssertTrue(name.waitForExistence(timeout: 3))
+            XCTAssertTrue(role.exists, "Role follows the name")
+            XCTAssertEqual(role.placeholderValue, "Release coordinator", "The example is a hint, not a value")
+            let continueButton = app.buttons["agent.template-form.continue"]
+            XCTAssertFalse(continueButton.isEnabled, "Required fields are empty")
+            save("template-form-empty-\(appearance)", app)
+
+            name.tap()
+            name.typeText("Kai")
+            XCTAssertFalse(continueButton.isEnabled, "Role is required too")
+            role.tap()
+            role.typeText("Release coordinator")
+            let tone = any["agent.template-form.field.tone"].firstMatch
+            tone.tap()
+            let warm = app.buttons["Warm"].firstMatch
+            XCTAssertTrue(warm.waitForExistence(timeout: 3), "Tone offers its choices")
+            warm.tap()
+            if appearance == "dark" {
+                let context = any["agent.template-form.field.operating_context"].firstMatch
+                context.tap()
+                context.typeText("A two-person studio")
+            }
+            save("template-form-filled-\(appearance)", app)
+            app.swipeDown(velocity: .fast)
+            for _ in 0..<3 where !continueButton.isHittable { app.swipeUp() }
+            XCTAssertTrue(continueButton.isEnabled)
+            continueButton.tap()
+            XCTAssertTrue(any["agent.template-form"].firstMatch.waitForNonExistence(timeout: 5))
+
+            XCTAssertEqual(app.textFields["agent.editor.name"].value as? String, "Kai")
+            XCTAssertEqual(app.textFields["agent.editor.role"].value as? String, "Release coordinator")
+            let instructions = (app.textViews["agent.editor.instructions"].value as? String) ?? ""
+            XCTAssertTrue(instructions.hasPrefix("# Kai"), instructions)
+            XCTAssertTrue(instructions.contains("Role: Release coordinator"))
+            XCTAssertTrue(instructions.contains("Tone: Warm."))
+            XCTAssertTrue(instructions.contains(appearance == "dark" ? "Operating context: A two-person studio"
+                                                : "Operating context: General work for the user."))
+            XCTAssertFalse(instructions.contains("{{"), "No placeholder is left")
+            XCTAssertFalse(instructions.contains("}}"))
+            save("template-form-editor-\(appearance)", app)
+            app.swipeUp()
+            save("template-form-instructions-\(appearance)", app)
+            app.terminate()
+        }
+    }
+
     private func save(_ name: String, _ app: XCUIApplication) {
         let shot = XCTAttachment(screenshot: app.screenshot())
         shot.name = name

@@ -266,6 +266,7 @@ struct AgentEditorView: View {
             // The Mac: wide enough for the character beside the choices.
             .bighelpSheetSize(.large)
         }
+        .agentTemplateForm(model)
         // Modal ownership must outlive the lazy sections while a picker is presented.
         .sheet(item: $modelPickerScope) { scope in
             if let defaults = runtimeDefaultsModel {

@@ -89,6 +89,11 @@ final class UserIdentityStore {
         identity.avatarFileName = try AvatarImageProcessor().store(avatar, in: avatarDirectory)
     }
 
+    /// The name saved on this device, read without a store (for screens that don't hold one).
+    static func savedName(in defaults: UserDefaults = .standard) -> String {
+        load(from: defaults).name
+    }
+
     private static func load(from defaults: UserDefaults) -> UserIdentity {
         guard
             let data = defaults.data(forKey: Keys.identity),

@@ -78,12 +78,12 @@ struct AgentTemplateBrowser: View {
                     .font(.bighelp(.headline))
                     .foregroundStyle(theme.primaryText)
                     .lineLimit(1)
-                Text(verbatim: template.profile)
+                Text(verbatim: template.cardRole)
                     .font(.bighelp(.subheadline).weight(.medium))
                     .foregroundStyle(theme.secondaryText)
                     .lineLimit(2)
                 if !template.strength.isEmpty {
-                    Text(verbatim: template.strength)
+                    Text(verbatim: template.cardStrength)
                         .font(.bighelp(.caption))
                         .foregroundStyle(theme.secondaryText)
                         .lineLimit(3)
@@ -112,7 +112,7 @@ struct AgentTemplateBrowser: View {
             .contentShape(.rect(cornerRadius: BighelpTokens.radius20))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(template.title), \(template.profile)")
+        .accessibilityLabel("\(template.title), \(template.cardRole)")
         .accessibilityIdentifier("agent.templates.\(template.id)")
     }
 

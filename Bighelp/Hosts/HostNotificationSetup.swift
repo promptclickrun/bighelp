@@ -21,10 +21,13 @@ protocol HostNotificationSetupServing {
     func removeLocalEnrollment(host: BighelpConfiguredHost) throws
     /// Tells every computer with notifications on whether this phone wants Peer chats alerts.
     func applyPeerChatPreference() async
+    /// Gives this device's Quiet Hours to every computer with notifications on.
+    func applyQuietHours() async -> BighelpQuietHoursSyncResult
 }
 
 extension HostNotificationSetupServing {
     func applyPeerChatPreference() async {}
+    func applyQuietHours() async -> BighelpQuietHoursSyncResult { BighelpQuietHoursSyncResult() }
 }
 
 /// Whether agents talking to each other (`hermes peer`, Bot Chat) alert this phone. Off unless

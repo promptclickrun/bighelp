@@ -345,6 +345,7 @@
 		3FE064E054E9CD126B1BEAAD /* MemoryGraphView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A2C5B05A71C60F1D56EA416 /* MemoryGraphView.swift */; };
 		3FE13F8490BB2650DD3624DA /* SpatialAvatarUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68B6EC34B145204BDE98228C /* SpatialAvatarUITests.swift */; };
 		400697422195AAFA2E6A188B /* BighelpBuzzKitPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F4D534025C972FF9C5DB5BF /* BighelpBuzzKitPresentation.swift */; };
+		40512E44EC2B6337386DE9B4 /* BighelpQuietHours.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51D769A3504F32207EA002CF /* BighelpQuietHours.swift */; };
 		40607B210431BEEE90022E01 /* AvatarKitView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4EF40390B49367173F071A4 /* AvatarKitView.swift */; };
 		40BA8C7AF650DBFF97704487 /* BighelpCardTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68A31C169E92D2A4F7554C8E /* BighelpCardTemplate.swift */; };
 		40E3CA8B926228E363347A3B /* ProjectChangesStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D5E604EC2EF8CB526E026C5 /* ProjectChangesStoreTests.swift */; };
@@ -356,6 +357,7 @@
 		422D06B571DBDD21DCE31AC8 /* DirectHermesPairingClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = E705F4D224CB3B48D1C0A8CA /* DirectHermesPairingClient.swift */; };
 		424685DD6558A079DBF15041 /* AgentCompanionAvatarTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE52D2EAC2696C43D3604E89 /* AgentCompanionAvatarTests.swift */; };
 		4269CB56CD599F47FCBD70B5 /* NativeMessageSelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEAAC293921CC8A177EB54B7 /* NativeMessageSelectionTests.swift */; };
+		427083B31B0A0436223FC5D9 /* QuietHoursTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 669DAF82317674E55C46F825 /* QuietHoursTests.swift */; };
 		42C6DB2374D7427D000AB094 /* TemplateCatalogStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44223CB9667024350A9D441 /* TemplateCatalogStore.swift */; };
 		4313B7CBC502A7BD1C69BE08 /* PeopleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5ABB843955626E16B7224421 /* PeopleTests.swift */; };
 		439C7B1833A69D5C7785AC14 /* HermesLogsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D88AAE29CD127FD229FF04B /* HermesLogsTests.swift */; };
@@ -639,6 +641,7 @@
 		798AB46934955192680B3C22 /* LiveVoiceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DE2AFF1D5FD9181A8FD5C0C /* LiveVoiceView.swift */; };
 		79B603212451FE324DA59380 /* BighelpTabGlyphTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F92745044C01ED431726BEDF /* BighelpTabGlyphTests.swift */; };
 		79D02B84205D99E9D6CF38E2 /* BighelpCarPlayScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = 054D3F1E61308B59672A882A /* BighelpCarPlayScene.swift */; };
+		79D6909B9E1B244C15549428 /* QuietHoursUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCB46164ED10DBD654E8A0FA /* QuietHoursUITests.swift */; };
 		79DDD17A622B812479F8582C /* SessionSubagentPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AC7DF2F678C14DF3F82F320 /* SessionSubagentPresentation.swift */; };
 		7A09D8A9BC85A10B3643B0D8 /* AgentDirectoryStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61CF8425B2257FC6AF3EF723 /* AgentDirectoryStoreTests.swift */; };
 		7A757D30B04EAC5B05E8DCBE /* SessionsModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84E6FD40B1E479B7018012F1 /* SessionsModelTests.swift */; };
@@ -1828,6 +1831,7 @@
 		515B729EC6C73BB17D8A272A /* ChatCardMessageProjection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatCardMessageProjection.swift; sourceTree = "<group>"; };
 		517D85803C55B72202A77B6C /* soul-bridge.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "soul-bridge.md"; sourceTree = "<group>"; };
 		51AA6E7CE4BAF0F1D72A876D /* DirectHermesConversationClient+Attachments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DirectHermesConversationClient+Attachments.swift"; sourceTree = "<group>"; };
+		51D769A3504F32207EA002CF /* BighelpQuietHours.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpQuietHours.swift; sourceTree = "<group>"; };
 		51EBF6C938422836EEFF31AF /* ModelReasoningDefaultsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelReasoningDefaultsTests.swift; sourceTree = "<group>"; };
 		523FAEE099C696A0EB986626 /* ApprovalModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApprovalModelTests.swift; sourceTree = "<group>"; };
 		524DA6B2B0F79C6B9987E562 /* ChatActionMenuSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatActionMenuSheet.swift; sourceTree = "<group>"; };
@@ -1939,6 +1943,7 @@
 		6661090B045F120655A86FA1 /* Bighelp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Bighelp.entitlements; sourceTree = "<group>"; };
 		666D3AEDBC83C445A41D285F /* ProjectsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectsViews.swift; sourceTree = "<group>"; };
 		667C668F80E683C0F5DCA2F9 /* CardBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardBackground.swift; sourceTree = "<group>"; };
+		669DAF82317674E55C46F825 /* QuietHoursTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuietHoursTests.swift; sourceTree = "<group>"; };
 		66AF282858CB05C3A0DE1D5A /* ManagedWorkSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagedWorkSnapshotTests.swift; sourceTree = "<group>"; };
 		66E4E333550166DD2DCFE881 /* ChatActivityPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatActivityPresentation.swift; sourceTree = "<group>"; };
 		67523907B748CF380DF5E276 /* ScheduleRequestBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleRequestBuilder.swift; sourceTree = "<group>"; };
@@ -2677,6 +2682,7 @@
 		FC3F5DFA60CB944EBA4AC304 /* ChatTimelinePresentationPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatTimelinePresentationPolicy.swift; sourceTree = "<group>"; };
 		FC5FF84A7BFB9842FEF2E239 /* SlashCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlashCommands.swift; sourceTree = "<group>"; };
 		FC7A06A6391FB704F789A1C5 /* DirectHermesProjectGitClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectHermesProjectGitClientTests.swift; sourceTree = "<group>"; };
+		FCB46164ED10DBD654E8A0FA /* QuietHoursUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuietHoursUITests.swift; sourceTree = "<group>"; };
 		FCD72AB088AD85CF46830B9D /* BighelpCardCatalogClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpCardCatalogClientTests.swift; sourceTree = "<group>"; };
 		FD8984FDAE443FADB5D80A91 /* DirectHermesModelAdministrationClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectHermesModelAdministrationClient.swift; sourceTree = "<group>"; };
 		FDEF6209757EC5C416BD6C15 /* soul-forge.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "soul-forge.md"; sourceTree = "<group>"; };
@@ -2829,6 +2835,7 @@
 				35FA8B7D9876C8CC995FE87A /* BighelpManagedWorkSnapshot.swift */,
 				44A6C6E3CF44927895F2574B /* BighelpNotificationIdentity.swift */,
 				105657A2E54E5B41552C2167 /* BighelpPromptAlerts.swift */,
+				51D769A3504F32207EA002CF /* BighelpQuietHours.swift */,
 				76DECB1180E7EB7CD9EDDDF1 /* BighelpVisibleChats.swift */,
 			);
 			path = Notifications;
@@ -3785,6 +3792,7 @@
 				616D19E9F795349C87ACE003 /* ProviderKeysOverviewTests.swift */,
 				2AD5C5D32BA1CD651DCF7F2D /* ProviderLogoStoreTests.swift */,
 				25406CC474CAEC5B3FD368D0 /* ProviderUsageTests.swift */,
+				669DAF82317674E55C46F825 /* QuietHoursTests.swift */,
 				D14822CD27B2AE28D7A9438A /* ReasoningPaletteTests.swift */,
 				7A1FEE0AC68F7AA09AED38ED /* ReconnectContinuityTests.swift */,
 				5FC16504871822C0D070D37B /* RecordedActivityTests.swift */,
@@ -3965,6 +3973,7 @@
 				76A9E790A09E41281C7CF8C7 /* ProjectsAndBoardHostUITests.swift */,
 				F69C0374B3943429B3465FDF /* ProviderUsageHostUITests.swift */,
 				58625F7B2E999825B55E3351 /* ProviderUsageUITests.swift */,
+				FCB46164ED10DBD654E8A0FA /* QuietHoursUITests.swift */,
 				9B421A02FAA46B05C25DC0D6 /* ReferenceHubUITests.swift */,
 				EFAB21B494DC7BB11FC84213 /* ReleaseScreensWalkthroughUITests.swift */,
 				DFE73F4A4859A0E806EB1E12 /* SessionsSearchUITests.swift */,
@@ -5293,6 +5302,7 @@
 				79886F92EDC77B3FF813148B /* BighelpPluginUpdateClient.swift in Sources */,
 				45AAB6D6B0491D4FDAB56CA8 /* BighelpPointer.swift in Sources */,
 				C35979A40E41DA94829A8503 /* BighelpPromptAlerts.swift in Sources */,
+				40512E44EC2B6337386DE9B4 /* BighelpQuietHours.swift in Sources */,
 				5A394E6D02D5BA8702A671C1 /* BighelpRailCard.swift in Sources */,
 				053E66E5A37D5E8F24168EBC /* BighelpRealtimeAudioPeer.swift in Sources */,
 				4A3BF1DF98D0973CD3EDB595 /* BighelpReasoningPickerSheet.swift in Sources */,
@@ -6320,6 +6330,7 @@
 				8B3B670E9977C1FD1E5C50CE /* ProviderKeysOverviewTests.swift in Sources */,
 				563F1A73B2B3159E89F27834 /* ProviderLogoStoreTests.swift in Sources */,
 				EC5DB32ACA11BD0473D17AC8 /* ProviderUsageTests.swift in Sources */,
+				427083B31B0A0436223FC5D9 /* QuietHoursTests.swift in Sources */,
 				0095D436CD156D66BD463281 /* ReasoningPaletteTests.swift in Sources */,
 				735E230B323E3282A682AE32 /* ReconnectContinuityTests.swift in Sources */,
 				38232E5ED2072E8F357B65FE /* RecordedActivityTests.swift in Sources */,
@@ -6430,6 +6441,7 @@
 				6AF03C308DFFF1432E48DAD0 /* ProjectsAndBoardHostUITests.swift in Sources */,
 				1041DB26B353971614540418 /* ProviderUsageHostUITests.swift in Sources */,
 				F457459FC8D55A6830E08429 /* ProviderUsageUITests.swift in Sources */,
+				79D6909B9E1B244C15549428 /* QuietHoursUITests.swift in Sources */,
 				592929733948DB5DD30E29B1 /* ReferenceHubUITests.swift in Sources */,
 				9622B5EF6600D45BD3B139CC /* ReleaseScreensWalkthroughUITests.swift in Sources */,
 				218D20CB8D6D32772B63AB5D /* SessionsSearchUITests.swift in Sources */,

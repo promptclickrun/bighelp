@@ -20,13 +20,15 @@ struct BighelpManagedEnrollmentRecord: Codable, Equatable {
     var sealedRecipientKeyID: String? = nil
     /// The Peer chats choice the host last confirmed for this grant.
     var peerChatsAlert: Bool? = nil
+    /// The Quiet Hours the host last confirmed for this grant, with the time zone sent.
+    var quietHoursSent: BighelpQuietHours.Sent? = nil
 }
 
 extension BighelpManagedEnrollmentRecord {
     private enum CodingKeys: String, CodingKey {
         case accountScope, accountID, hostConnectionID, profile, creationBody, enrollmentID
         case grant, richLiveActivitySupported, enabled, revokePending, subscriptions, retiredRelayState
-        case sealedRecipientKeyID, peerChatsAlert
+        case sealedRecipientKeyID, peerChatsAlert, quietHoursSent
     }
 
     init(from decoder: Decoder) throws {
@@ -44,6 +46,7 @@ extension BighelpManagedEnrollmentRecord {
         retiredRelayState = try values.decodeIfPresent(Data.self, forKey: .retiredRelayState)
         sealedRecipientKeyID = try values.decodeIfPresent(String.self, forKey: .sealedRecipientKeyID)
         peerChatsAlert = try values.decodeIfPresent(Bool.self, forKey: .peerChatsAlert)
+        quietHoursSent = try? values.decodeIfPresent(BighelpQuietHours.Sent.self, forKey: .quietHoursSent)
         if let raw = try values.decodeIfPresent(BighelpJSONValue.self, forKey: .grant),
            let object = raw.object, Self.isLegacyRelayGrant(object) {
             // The former provider used the same owners-v1 file but a different

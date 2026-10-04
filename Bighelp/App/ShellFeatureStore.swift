@@ -1569,7 +1569,9 @@ final class ShellFeatureStore {
                     )
                     self?.chatModels[conversationID]?
                         .finishExternallyOwnedTurnWithoutReply()
-                }
+                },
+                holdMusic: ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil
+                    ? AVAudioPlayerHoldMusic() : nil
             ),
             conversationMode: conversationMode,
             liveModel: liveModel

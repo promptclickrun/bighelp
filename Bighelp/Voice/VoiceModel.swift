@@ -28,6 +28,19 @@ final class VoiceModel {
     private(set) var isAgentRunActive: Bool
     /// A finished turn is being turned into text on the computer.
     private(set) var isTranscribing = false
+    /// The person is mid-sentence (words are coming in), so nothing plays over them.
+    private(set) var isUserSpeaking = false
+    /// The reply is being made into audio and hasn't started playing.
+    private var isAwaitingReplyAudio = false
+
+    /// Dead space: the person has finished and the agent's reply isn't playing yet, while it's
+    /// transcribed, while the agent works, and while its reply is made into audio. Talking again
+    /// or the reply starting ends it.
+    var wantsHoldMusic: Bool {
+        guard isActive, !isEndPending, !isAgentAudioMuted, !isUserSpeaking, !isWalkieTalkieCapturing else { return false }
+        return isTranscribing || isAwaitingWalkieTalkieTranscript || status == .working
+            || (status == .speaking && isAwaitingReplyAudio)
+    }
 
     private let client: any VoiceSessionClient
     private let inputLevelSource: any VoiceInputLevelSource
@@ -37,6 +50,8 @@ final class VoiceModel {
     private let onSteeredTurn: (String) -> Void
     private let onCompletedTurn: (String, VoiceAgentReply) -> Void
     private let onFailedTurn: () -> Void
+    @ObservationIgnored private let holdMusic: (any VoiceHoldMusicPlaying)?
+    @ObservationIgnored private var isHoldMusicPlaying = false
     private var monitoringGeneration: UInt64 = 0
     private var turnGeneration: UInt64 = 0
     private var playbackGeneration: UInt64 = 0
@@ -77,7 +92,8 @@ final class VoiceModel {
         onStartedTurn: @escaping (String) -> Void = { _ in },
         onSteeredTurn: @escaping (String) -> Void = { _ in },
         onCompletedTurn: @escaping (String, VoiceAgentReply) -> Void = { _, _ in },
-        onFailedTurn: @escaping () -> Void = {}
+        onFailedTurn: @escaping () -> Void = {},
+        holdMusic: (any VoiceHoldMusicPlaying)? = nil
     ) {
         self.conversationID = conversationID
         self.agentName = agentName
@@ -94,6 +110,19 @@ final class VoiceModel {
         self.onSteeredTurn = onSteeredTurn
         self.onCompletedTurn = onCompletedTurn
         self.onFailedTurn = onFailedTurn
+        self.holdMusic = holdMusic
+        followHoldMusic()
+    }
+
+    /// Starts and stops the hold music as `wantsHoldMusic` changes, from every path that changes it.
+    private func followHoldMusic() {
+        guard let holdMusic else { return }
+        let wanted = withObservationTracking { wantsHoldMusic } onChange: { [weak self] in
+            Task { @MainActor [weak self] in self?.followHoldMusic() }
+        }
+        guard wanted != isHoldMusicPlaying else { return }
+        isHoldMusicPlaying = wanted
+        if wanted { holdMusic.start() } else { holdMusic.stop() }
     }
 
     func toggleAgentAudio() {
@@ -214,6 +243,7 @@ final class VoiceModel {
         bargeInDetector.reset()
         isCollectingBargeIn = false
         isTranscribing = false
+        isUserSpeaking = false
         inputLevel = 0
         partialUserTranscript = nil
         meterState = .idle
@@ -393,12 +423,14 @@ final class VoiceModel {
             return
         }
         guard meterState == .monitoring, shouldMonitor else { return }
+        if update.isFinal, text.isEmpty { isUserSpeaking = false }
         if update.isFinal, text.isEmpty, mode == .pressToTalk, !isCollectingBargeIn {
             // Nothing was heard after all: listen again.
             restartListening()
             return
         }
         guard !text.isEmpty, !text.contains("\0") else { return }
+        isUserSpeaking = !update.isFinal
         if mode == .walkieTalkie {
             guard isWalkieTalkieCapturing,
                   status == .listening || isAgentRunActive
@@ -557,6 +589,7 @@ final class VoiceModel {
                 status = .listening
                 return
             }
+            isAwaitingReplyAudio = true
             status = .speaking
             currentSpokenReply = normalizedReply
             bargeInDetector.begin(spokenText: normalizedReply)
@@ -636,6 +669,7 @@ final class VoiceModel {
         guard generation == turnGeneration,
               playbackGeneration == self.playbackGeneration,
               isActive, !isAgentAudioMuted, status == .speaking else { return }
+        isAwaitingReplyAudio = false
         switch event {
         case .started:
             isPlaybackActive = true
@@ -649,6 +683,7 @@ final class VoiceModel {
     }
 
     private func resetPlaybackPresentation() {
+        isAwaitingReplyAudio = false
         playbackGeneration &+= 1
         isPlaybackActive = false
         outputLevel = 0

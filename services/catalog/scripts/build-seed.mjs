@@ -4,7 +4,7 @@
 //
 //   node scripts/build-seed.mjs && wrangler d1 execute bighelp-catalog --remote --file seed/0001_bundled.sql
 
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -56,7 +56,11 @@ for (const page of blueprints.pages) {
 
 for (const [id, name, role, vibe, description, symbol, category] of agents) {
   const instructions = readFileSync(join(app, `Resources/SoulTemplates/soul-${id}.md`), "utf8").trim();
-  insert(id, "agent", { name, role, vibe, description, instructions, category, symbol });
+  const payload = { name, role, vibe, description, instructions, category, symbol };
+  // A template with fill-in fields (docs/TEMPLATE_VARIABLES.md) keeps them beside its text.
+  const variablesFile = join(app, `Resources/SoulTemplates/soul-${id}.variables.json`);
+  if (existsSync(variablesFile)) payload.variables = JSON.parse(readFileSync(variablesFile, "utf8"));
+  insert(id, "agent", payload);
 }
 
 mkdirSync(join(here, "../seed"), { recursive: true });

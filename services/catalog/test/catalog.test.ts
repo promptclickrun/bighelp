@@ -368,3 +368,80 @@ describe("public feed", () => {
     expect(response.headers.get("Access-Control-Allow-Credentials")).toBeNull();
   });
 });
+
+describe("template variables", () => {
+  const fieldLead = {
+    ...agent,
+    name: "Field Lead",
+    role: "{{agent_role}}",
+    instructions: "You are {{agent_name}}, a {{agent_role}}. Operating context: {{operating_context}}. "
+      + "Speak in a {{tone}} way with {{user_name}}.",
+    variables: [
+      { key: "agent_role", label: "Role", type: "text", example: "Release coordinator", maxLength: 80 },
+      { key: "operating_context", label: "Where it works", type: "long_text", required: false,
+        whenEmpty: "General work for the user." },
+      { key: "tone", label: "Tone", type: "choice", options: ["Warm", "Direct", "Playful"], default: "Direct" },
+    ],
+  };
+
+  it("serves a submission's variables once it's approved", async () => {
+    const response = await submit(fieldLead);
+    expect(response.status).toBe(201);
+    const { id } = await response.json<{ id: string }>();
+    await call(`/review/templates/${id}/approve`, { method: "POST", jwt: await reviewer() });
+    const catalog = await (await call("/v1/catalog.json")).json<{ agents: Record<string, unknown>[] }>();
+    expect(catalog.agents).toEqual([expect.objectContaining({
+      id, role: "{{agent_role}}",
+      variables: [
+        { key: "agent_role", label: "Role", type: "text", required: true, example: "Release coordinator", maxLength: 80 },
+        { key: "operating_context", label: "Where it works", type: "long_text", required: false,
+          whenEmpty: "General work for the user." },
+        { key: "tone", label: "Tone", type: "choice", required: true, options: ["Warm", "Direct", "Playful"],
+          default: "Direct" },
+      ],
+    })]);
+    const file = await (await call("/v1/agent-templates.json")).json<{ templates: Record<string, unknown>[] }>();
+    expect(file.templates[0]).toHaveProperty("variables");
+  });
+
+  it("refuses bad variables from people and agents with the field to fix", async () => {
+    const undeclared = await submit({ ...fieldLead, variables: fieldLead.variables.slice(1) });
+    expect(undeclared.status).toBe(400);
+    expect(await undeclared.json()).toMatchObject({ field: "role" });
+    const reserved = await agentSubmit(await register("gh-42"), {
+      ...fieldLead, variables: [...fieldLead.variables, { key: "user_name", label: "You", type: "text" }],
+    });
+    expect(reserved.status).toBe(400);
+    expect(await reserved.json()).toMatchObject({ field: "variables[3].key" });
+    const accepted = await agentSubmit(await register("gh-42"), fieldLead);
+    expect(accepted.status).toBe(201);
+  });
+
+  it("checks reviewer edits and reviewer-written templates the same way", async () => {
+    const { id } = await (await submit(fieldLead)).json<{ id: string }>();
+    const unused = await call(`/review/templates/${id}`, {
+      method: "PATCH", jwt: await reviewer(), body: {
+        role: "Field lead",
+        instructions: "You are {{agent_name}}. Operating context: {{operating_context}}. Speak in a {{tone}} way, always.",
+      },
+    });
+    expect(unused.status).toBe(400);
+    expect(await unused.json()).toMatchObject({ field: "variables[0].key" });
+    const edited = await call(`/review/templates/${id}`, {
+      method: "PATCH", jwt: await reviewer(),
+      body: { variables: fieldLead.variables.map((variable) => ({ ...variable, help: `About ${variable.label}.` })) },
+    });
+    expect(edited.status).toBe(200);
+    expect(await edited.json()).toMatchObject({ variables: [{ help: "About Role." }, {}, {}] });
+
+    const tooLong = await call("/review/templates", {
+      method: "POST", jwt: await reviewer(),
+      body: { ...fieldLead, variables: [{ ...fieldLead.variables[0], maxLength: 500 }, ...fieldLead.variables.slice(1)] },
+    });
+    expect(tooLong.status).toBe(400);
+    expect(await tooLong.json()).toMatchObject({ field: "variables[0].maxLength" });
+    const published = await call("/review/templates", { method: "POST", body: fieldLead, jwt: await reviewer() });
+    expect(published.status).toBe(201);
+    expect(await published.json()).toMatchObject({ status: "approved", variables: [{ key: "agent_role" }, {}, {}] });
+  });
+});

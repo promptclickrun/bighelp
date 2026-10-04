@@ -383,6 +383,11 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
             guard let refreshed = ledger.record(host: host, profile: profile) else { return }
             record = refreshed
         }
+        if loaded.supportsPeerChatPreference {
+            try await syncPeerChats(host: host, profile: profile, grant: grant, client: client,
+                                    isCurrent: { (try? self.requireCurrent(host, credentials: credentials)) != nil })
+            try requireCurrent(host, credentials: credentials)
+        }
         let value = try await client.request("/enrollments/\(grant.grantId)/sessions", method: "PUT", body: [
             "version": .integer(1), "profile": .string(profile), "sessionId": .string(session), "enabled": .boolean(true)
         ], isCurrent: { (try? self.requireCurrent(host, credentials: credentials)) != nil })
@@ -394,6 +399,43 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
               let current = ledger.record(host: host, profile: profile), current.enabled,
               current.grant == grant, !current.revokePending else { throw DirectHermesError.invalidResponse }
         record = current; record.subscriptions.insert(session); try ledger.save(record)
+    }
+
+    /// Peer chats (agents talking to each other) alert this phone only when it turned them on.
+    /// Sent only when the host's confirmed choice differs from this phone's.
+    private func syncPeerChats(host: BighelpConfiguredHost, profile: String, grant: BighelpManagedGrant,
+                               client: any DirectHostNotificationServing,
+                               isCurrent: @escaping @MainActor () -> Bool) async throws {
+        let wanted = BighelpPeerChatAlerts.isOn
+        guard ledger.record(host: host, profile: profile)?.peerChatsAlert != wanted else { return }
+        let value = try await client.request("/enrollments/\(grant.grantId)/preferences", method: "PUT", body: [
+            "version": .integer(1), "peerChats": .boolean(wanted)
+        ], isCurrent: isCurrent)
+        guard isCurrent(), value.object?["peerChats"]?.boolean == wanted,
+              var current = ledger.record(host: host, profile: profile), current.grant == grant else {
+            throw DirectHermesError.invalidResponse
+        }
+        current.peerChatsAlert = wanted
+        try ledger.save(current)
+    }
+
+    /// Settings › Notifications › Peer chats changed: tell every computer with notifications on.
+    /// A computer that can't be reached now gets it the next time a chat opens there.
+    func applyPeerChatPreference() async {
+        for record in ledger.enrollments where record.enabled && !record.revokePending {
+            guard let grant = record.grant, grant.state == "active", grant.expiresAt > timestamp,
+                  let host = registry.hosts.first(where: {
+                      $0.hostConnectionID == record.hostConnectionID && $0.notificationScope == record.accountScope
+                  }),
+                  let credentials = try? self.credentials(for: host),
+                  let client = try? hostClient(host) else { continue }
+            let isCurrent: @MainActor () -> Bool = { (try? self.requireCurrent(host, credentials: credentials)) != nil }
+            guard let raw = try? await client.request("/capabilities", method: "GET", body: nil, isCurrent: isCurrent),
+                  let loaded = try? ManagedNotificationValidation.decode(BighelpManagedCapabilities.self, from: raw),
+                  loaded.supportsPeerChatPreference else { continue }
+            try? await syncPeerChats(host: host, profile: record.profile, grant: grant, client: client,
+                                     isCurrent: isCurrent)
+        }
     }
 
     /// Gives the host this phone's sealed-alert key, directly and never through the

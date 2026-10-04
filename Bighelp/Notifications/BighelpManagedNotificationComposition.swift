@@ -174,6 +174,10 @@ final class BighelpManagedNotificationComposition: HostNotificationSetupServing 
         guard isCurrent(owner) else { throw DirectHermesError.secureStorageChanged }
     }
 
+    func applyPeerChatPreference() async {
+        await integration?.service.applyPeerChatPreference()
+    }
+
     @discardableResult
     private func retryAutomatically(for reason: AutomaticRetryReason) -> Bool {
         guard !isFixture else { return false }

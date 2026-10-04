@@ -445,6 +445,49 @@ import UserNotifications
         #expect(fixture.ledger.record(host: fixture.host, profile: "default")?.subscriptions.contains("stored") == true)
     }
 
+    /// Peer chats (agents talking to each other) alert only when this phone turned them on: the
+    /// choice reaches the host when a chat opens, once, and again only when it changes.
+    @Test func peerChatChoiceReachesTheHostOnceAndWhenItChanges() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        let defaults = UserDefaults.standard
+        let previous = defaults.object(forKey: BighelpPeerChatAlerts.key)
+        defer { defaults.set(previous, forKey: BighelpPeerChatAlerts.key) }
+        defaults.set(false, forKey: BighelpPeerChatAlerts.key)
+        fixture.hostAPI.peerChatPreference = true
+        _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+        let client = try DirectHermesConversationClient(rpc: IdleRPC(), hostIdentity: fixture.host.principalIdentity,
+            profile: "default", runtimeID: "runtime", storedID: "stored", title: "Fixture", epoch: "epoch",
+            drafts: DirectHermesDraftStore(root: fixture.root.appending(path: "drafts")))
+        let model = ChatModel(conversationID: client.conversationID, client: client, initialItems: [])
+        client.model = model
+        let chat = DirectHermesChat(id: client.conversationID, client: client, model: model)
+
+        try await fixture.service.onChatOpened(host: fixture.host, chat: chat)
+        try await fixture.service.onChatOpened(host: fixture.host, chat: chat)
+        #expect(fixture.hostAPI.peerChatPuts == [false], "Sent once")
+        #expect(fixture.ledger.record(host: fixture.host, profile: "default")?.peerChatsAlert == false)
+
+        defaults.set(true, forKey: BighelpPeerChatAlerts.key)
+        await fixture.service.applyPeerChatPreference()
+        #expect(fixture.hostAPI.peerChatPuts == [false, true], "Turning it on reaches the host at once")
+        #expect(fixture.ledger.record(host: fixture.host, profile: "default")?.peerChatsAlert == true)
+    }
+
+    @Test func anOlderPluginIsNeverAskedAboutPeerChats() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+        let client = try DirectHermesConversationClient(rpc: IdleRPC(), hostIdentity: fixture.host.principalIdentity,
+            profile: "default", runtimeID: "runtime", storedID: "stored", title: "Fixture", epoch: "epoch",
+            drafts: DirectHermesDraftStore(root: fixture.root.appending(path: "drafts")))
+        let model = ChatModel(conversationID: client.conversationID, client: client, initialItems: [])
+        client.model = model
+        try await fixture.service.onChatOpened(host: fixture.host, chat: DirectHermesChat(id: client.conversationID, client: client, model: model))
+        await fixture.service.applyPeerChatPreference()
+        #expect(fixture.hostAPI.peerChatPuts.isEmpty)
+    }
+
     @Test func sealedAlertHostGetsThisPhonesKeyDirectlyAndOnce() async throws {
         let fixture = try Fixture()
         defer { fixture.cleanup() }
@@ -615,6 +658,8 @@ import UserNotifications
         var producerLoaded = true
         var supportedEvents = ManagedNotificationValidation.eventTypes.sorted()
         var sealedAlerts = false
+        var peerChatPreference = false
+        var peerChatPuts: [Bool] = []
         var recipientKeys: [String] = []
         init(_ account: Account, _ trust: BighelpNotificationHostTrustStore) { self.account=account;self.trust=trust }
         var offline = false
@@ -634,7 +679,12 @@ import UserNotifications
                 "supportedEventTypes":.array(supportedEvents.map(BighelpJSONValue.string)),
                 "richLiveActivitySupported":.boolean(true),
                 "sealedAlerts":sealedAlerts ? .object(["version":.integer(2)]) : .null,
+                "preferences":peerChatPreference ? .object(["peerChats":.boolean(true)]) : .null,
                 "producerCapabilities":.object(["sessionCompletion":.boolean(producerLoaded),"sessionFailure":.boolean(producerLoaded),"richLiveActivity":.boolean(producerLoaded),"nativeApproval":.boolean(supportedEvents.contains("approval.required")),"nativeClarification":.boolean(false)])]) }
+            if suffix.hasSuffix("/preferences"), method == "PUT", let wanted = body?["peerChats"]?.boolean {
+                peerChatPuts.append(wanted)
+                return .object(["version":.integer(1),"peerChats":.boolean(wanted)])
+            }
             if suffix.hasSuffix("/recipient-key"), method == "PUT", let key = body?["publicKey"]?.string {
                 recipientKeys.append(key)
                 let raw = try #require(BighelpNotificationBase64URL.decodeCanonical(key))

@@ -89,6 +89,10 @@ struct BighelpManagedCapabilities: Decodable, Sendable {
     let sealedAlerts: SealedAlerts?
     struct SealedAlerts: Decodable, Sendable { let version: Int }
     var supportsSealedAlerts: Bool { sealedAlerts?.version == 2 }
+    /// Alert choices this phone can set on the host (plugin 3.4.9+).
+    let preferences: Preferences?
+    struct Preferences: Decodable, Sendable { let peerChats: Bool? }
+    var supportsPeerChatPreference: Bool { preferences?.peerChats == true }
     var supportsCompletionEnrollment: Bool {
         guard let supportedEventTypes else { return false }
         return Set(supportedEventTypes).isSuperset(of: ManagedNotificationValidation.eventTypes)

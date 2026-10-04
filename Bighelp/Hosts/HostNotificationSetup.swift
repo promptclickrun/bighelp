@@ -19,6 +19,19 @@ protocol HostNotificationSetupServing {
                 isCurrent: @escaping @MainActor () -> Bool) async throws -> HostNotificationSetupResult
     /// Removes only this device's recipient trust/grant metadata, not host data.
     func removeLocalEnrollment(host: BighelpConfiguredHost) throws
+    /// Tells every computer with notifications on whether this phone wants Peer chats alerts.
+    func applyPeerChatPreference() async
+}
+
+extension HostNotificationSetupServing {
+    func applyPeerChatPreference() async {}
+}
+
+/// Whether agents talking to each other (`hermes peer`, Bot Chat) alert this phone. Off unless
+/// the person turns it on in Settings › Notifications.
+enum BighelpPeerChatAlerts {
+    static let key = "bighelp.notifications.peer-chats"
+    static var isOn: Bool { UserDefaults.standard.bool(forKey: key) }
 }
 
 enum HostNotificationSetupResult: Sendable {

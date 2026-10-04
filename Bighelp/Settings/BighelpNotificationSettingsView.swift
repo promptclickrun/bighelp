@@ -53,6 +53,7 @@ struct BighelpNotificationSettingsView: View {
     @State private var preferencesAreStale = false
     @State private var operationToken = UUID()
     @State private var isConfirmingTurnOff = false
+    @AppStorage(BighelpPeerChatAlerts.key) private var peerChatAlerts = false
     @State private var turnOffStep: BighelpNotificationTurnOffStep?
     @State private var turnOffMessage: String?
     @State private var turnOffFailed = false
@@ -399,6 +400,24 @@ struct BighelpNotificationSettingsView: View {
                     .accessibilityIdentifier("settings.notifications.topic.\(topic.rawValue)")
                 }
             }
+
+            Toggle(isOn: $peerChatAlerts) {
+                VStack(alignment: .leading, spacing: BighelpTokens.space4) {
+                    Text("Peer chats")
+                        .bighelpFont(.body)
+                        .foregroundStyle(theme.primaryText)
+                    Text("When your agents message each other with hermes peer. Questions and approvals still notify you.")
+                        .bighelpFont(.metadata)
+                        .foregroundStyle(theme.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.vertical, BighelpTokens.space4)
+            }
+            .onChange(of: peerChatAlerts) { _, _ in
+                Task { await hostRegistry?.notificationSetup?.applyPeerChatPreference() }
+            }
+            .accessibilityValue(peerChatAlerts ? "On" : "Off")
+            .accessibilityIdentifier("settings.notifications.peer-chats")
 
             if isLoading {
                 ProgressView("Loading notification topics…")

@@ -365,6 +365,7 @@ extension RootShellView {
         let feedback: Bool
         let goalCategories: Bool
         let files: Bool
+        let answers: Bool
         let fixtures: Bool
         /// The selected computer will reconnect by itself (it has a saved sign-in).
         let reconnects: Bool
@@ -380,8 +381,11 @@ extension RootShellView {
             currentWorkspaceCapabilities.supports(.agentBoardGoalCategories, owner: $0, profileID: nil)
         } ?? false
         let files = owner.map { currentWorkspaceCapabilities.supports(.agentBoardFiles, owner: $0, profileID: nil) } ?? false
+        let answers = owner.map {
+            currentWorkspaceCapabilities.supports(.agentBoardAnswers, owner: $0, profileID: nil)
+        } ?? false
         return AgentBoardClientKey(owner: owner, board: board, feedback: feedback, goalCategories: goalCategories,
-                                   files: files, fixtures: usesWorkspaceFixtures && workspaceConnections?.isDirectSelected != true,
+                                   files: files, answers: answers, fixtures: usesWorkspaceFixtures && workspaceConnections?.isDirectSelected != true,
                                    reconnects: nativeWorkspaceStore?.hasSavedConnection == true)
     }
 
@@ -439,7 +443,8 @@ extension RootShellView {
                 workspace: workspace, owner: owner, currentOwner: { [weak workspace] in workspace?.owner },
                 cache: .shared) : nil
             let client = DirectHermesAgentBoardClient(workspace: workspace, owner: owner, supportsFeedback: key.feedback,
-                                                      supportsGoalCategories: key.goalCategories, files: files)
+                                                      supportsGoalCategories: key.goalCategories,
+                                                      supportsAnswers: key.answers, files: files)
             // Feed, Ideas and Goals widgets set to another agent read its board the same way.
             BighelpWidgetBoardLoader.shared.configure(client: client, scope: owner.cacheScopeID)
             await agentBoard.connect(client: client, scope: owner.cacheScopeID)

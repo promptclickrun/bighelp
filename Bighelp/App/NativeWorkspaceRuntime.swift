@@ -446,6 +446,7 @@ final class NativeWorkspaceRuntime {
     static let pluginCapabilities: Set<WorkspaceCapability> = [
         .liveVoice, .wikiRead, .wikiEdit, .wikiDisconnect, .cardTemplates, .cards, .forms, .cloudNotifications,
         .phoneTools, .projectChangesRead, .agentBoard, .agentBoardFeedback, .agentBoardGoalCategories, .agentBoardFiles,
+        .agentBoardAnswers,
     ]
 
     func refresh() async {
@@ -691,6 +692,7 @@ final class NativeWorkspaceRuntime {
                     supported.insert(.agentBoardGoalCategories)
                 }
                 if context.features.contains("native-agent-board-files-v1") { supported.insert(.agentBoardFiles) }
+                if context.features.contains("native-agent-board-answers-v1") { supported.insert(.agentBoardAnswers) }
             }
             pluginFeaturesKnown = true
             try publishCapabilities()

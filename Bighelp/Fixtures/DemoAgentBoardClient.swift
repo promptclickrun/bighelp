@@ -9,6 +9,9 @@ final class DemoAgentBoardClient: AgentBoardClient {
     private let now: Date
     let supportsFeedback = true
     let supportsGoalCategories = true
+    let supportsAnswers = true
+    /// Ideas the person said Let's do it to, per agent.
+    private(set) var accepted: [String: Set<String>] = [:]
 
     init(now: Date = .now) {
         self.now = now
@@ -56,6 +59,14 @@ final class DemoAgentBoardClient: AgentBoardClient {
         items.insert(goal, at: 0)
         itemsByAgent[agentID] = items
         return goal
+    }
+
+    func accept(agentID: String, itemID: String) async throws {
+        let items = try await self.items(agentID: agentID)
+        guard items.contains(where: { $0.id == itemID && $0.kind == .idea }) else {
+            throw WorkspaceClientError.invalidRequest
+        }
+        accepted[agentID, default: []].insert(itemID)
     }
 
     func picture(agentID: String, itemID: String, index: Int) async throws -> Data {

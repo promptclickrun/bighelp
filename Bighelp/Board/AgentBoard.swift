@@ -180,7 +180,11 @@ struct AgentBoardItem: Identifiable, Equatable, Sendable {
     enum Rating: String, Sendable { case up, down, none }
 
     /// Nil for goals without one, or with a name this build doesn't know: they show under Other.
-    var goalCategory: GoalCategory? { GoalCategory(stored: category) }
+    /// A goal's category. One saved without one (older plugins, or an agent that left it out)
+    /// goes where its words point, so a "Health goal" shows under Health, not Other.
+    var goalCategory: GoalCategory? {
+        GoalCategory(stored: category) ?? (category.isEmpty ? GoalCategory.inferred(from: title, body, note) : nil)
+    }
 
     var liked: Bool { rating == .up }
     var isDone: Bool { status == "done" }
@@ -244,9 +248,57 @@ enum GoalCategory: String, CaseIterable, Identifiable, Sendable {
 
     var id: String { rawValue }
 
-    /// Lenient: hosts differ, so an empty or unknown name is no category.
+    /// Lenient: hosts differ, so an empty name is no category, and one off the list ("Fitness")
+    /// is the category it means.
     init?(stored: String) {
-        self.init(rawValue: stored.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
+        let name = stored.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard let category = GoalCategory(rawValue: name) ?? (name.isEmpty ? nil : Self.inferred(from: name))
+        else { return nil }
+        self = category
+    }
+
+    /// Words people and agents use for each category; the plugin files new goals with the same
+    /// list (`_CATEGORY_WORDS`). Whole words; the most matches wins, and a tie is no category.
+    static func inferred(from texts: String...) -> GoalCategory? {
+        let text = texts.joined(separator: " ").lowercased()
+        let words = Set(text.split { !($0.isLetter || $0.isNumber || $0 == "-") }.map(String.init))
+        let scores = allCases.map { category in
+            (category, category.words.filter { $0.contains(" ") ? text.contains($0) : words.contains($0) }.count)
+        }
+        guard let best = scores.map(\.1).max(), best > 0 else { return nil }
+        let leaders = scores.filter { $0.1 == best }
+        return leaders.count == 1 ? leaders[0].0 : nil
+    }
+
+    private var words: [String] {
+        switch self {
+        case .health:
+            ["health", "healthy", "fitness", "fit", "exercise", "workout", "workouts", "running", "run",
+             "marathon", "5k", "10k", "weight", "diet", "nutrition", "sleep", "wellness", "wellbeing",
+             "meditation", "meditate", "mental", "steps", "gym", "yoga", "medical", "doctor", "sober",
+             "drinking", "smoking", "calories", "protein", "walk", "walking", "swim", "cycling"]
+        case .relationships:
+            ["relationship", "relationships", "family", "friend", "friends", "friendship", "partner", "dating",
+             "date", "marriage", "wife", "husband", "kids", "children", "parents", "mom", "dad", "social",
+             "community"]
+        case .finance:
+            ["finance", "finances", "financial", "money", "budget", "budgeting", "save", "saving", "savings",
+             "debt", "invest", "investing", "investment", "retirement", "spending", "income", "mortgage", "loan",
+             "credit", "taxes", "emergency fund"]
+        case .career:
+            ["career", "job", "work", "promotion", "raise", "interview", "resume", "business", "salary",
+             "startup", "client", "clients", "certification", "networking", "portfolio"]
+        case .interests:
+            ["interest", "interests", "hobby", "hobbies", "learn", "learning", "read", "reading", "books",
+             "music", "guitar", "piano", "art", "draw", "drawing", "paint", "painting", "language", "spanish",
+             "french", "japanese", "travel", "trip", "cooking", "cook", "garden", "gardening", "photography",
+             "writing", "novel", "game", "games", "craft"]
+        case .productivity:
+            ["productivity", "productive", "habit", "habits", "routine", "routines", "focus", "organize",
+             "organized", "organizing", "declutter", "inbox", "time", "schedule", "procrastination", "planning",
+             "todo", "to-do", "chores"]
+        case .other: []
+        }
     }
 
     /// In the Create a goal list.

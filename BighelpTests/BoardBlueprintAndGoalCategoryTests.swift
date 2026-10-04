@@ -145,10 +145,28 @@ struct BoardBlueprintAndGoalCategoryTests {
         }
         #expect(try goal(.string("health")).goalCategory == .health)
         #expect(try goal(.string(" Finance ")).goalCategory == .finance)
-        #expect(try goal(nil).goalCategory == nil, "Older plugins send no category")
-        #expect(try goal(.string("")).goalCategory == nil)
+        #expect(try goal(nil).goalCategory == .health, "Older plugins send none; its words say")
+        #expect(try goal(.string("")).goalCategory == .health)
+        #expect(try goal(.string("Fitness")).goalCategory == .health, "A name off the list means one on it")
         #expect(try goal(.string("pets")).goalCategory == nil, "Unknown names are uncategorized")
-        #expect(try goal(.integer(3)).goalCategory == nil)
+        #expect(try goal(.string("other")).goalCategory == .other, "Filed under other stays there")
+    }
+
+    /// An agent that leaves the category out still has its goal shown where it belongs.
+    @Test func goalsWithoutACategoryGoWhereTheirWordsPoint() {
+        #expect(GoalCategory.inferred(from: "Health goal: sleep by 11") == .health)
+        #expect(GoalCategory.inferred(from: "Pay off the credit card") == .finance)
+        #expect(GoalCategory.inferred(from: "Get the promotion at work") == .career)
+        #expect(GoalCategory.inferred(from: "Call mom every Sunday") == .relationships)
+        #expect(GoalCategory.inferred(from: "Learn 20 songs on guitar") == .interests)
+        #expect(GoalCategory.inferred(from: "Inbox under 20 every Friday") == .productivity)
+        #expect(GoalCategory.inferred(from: "Something nice") == nil)
+        #expect(GoalCategory.inferred(from: "Workout budget") == nil, "A tie is no category")
+        let groups = GoalCategory.grouped([
+            AgentBoardItem(id: "a", kind: .goal, title: "Health goal", body: "Walk 8,000 steps a day"),
+            AgentBoardItem(id: "b", kind: .goal, title: "Something nice"),
+        ])
+        #expect(groups.map(\.category) == [.health, .other])
     }
 
     @Test func goalsGroupByCategoryInTheListsOrderWithUncategorizedUnderOther() {
@@ -164,9 +182,10 @@ struct BoardBlueprintAndGoalCategoryTests {
         #expect(groups.map(\.category) == [.health, .finance, .other])
         #expect(groups.map { $0.items.map(\.id) } == [["c", "e"], ["a"], ["b", "d", "f"]])
         #expect(GoalCategory.grouped([]).isEmpty)
-        // An older plugin: everything is under Other, nothing is lost.
-        let legacy = GoalCategory.grouped([AgentBoardItem(id: "x", kind: .goal, title: "Sleep")])
-        #expect(legacy.map(\.category) == [.other] && legacy[0].items.count == 1)
+        // An older plugin: goals go where their words point, the rest under Other; nothing is lost.
+        let legacy = GoalCategory.grouped([AgentBoardItem(id: "x", kind: .goal, title: "Sleep"),
+                                           AgentBoardItem(id: "y", kind: .goal, title: "Old goal")])
+        #expect(legacy.map(\.category) == [.health, .other] && legacy.allSatisfy { $0.items.count == 1 })
     }
 
     @Test func everyCategoryStartsAChatThatNamesIt() {

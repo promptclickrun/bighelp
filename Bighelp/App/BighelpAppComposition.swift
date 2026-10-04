@@ -71,13 +71,19 @@ struct BighelpAppComposition {
         }
         if usesFixtures, arguments.contains("-test-companion-disabled") { companion.isEnabled = false }
         // "-test-agent-companion finance:octopus": one demo agent wears a creator look.
+        // A catalog ID ("finance:bighelp-biggie") is a character as the creator saves it now.
         if usesFixtures, let index = arguments.firstIndex(of: "-test-agent-companion"),
            arguments.indices.contains(index + 1) {
             let parts = arguments[index + 1].split(separator: ":").map(String.init)
+            let key = parts.count == 2
+                ? CompanionStore.agentKey(agentScope: "fixture-account:fixture-host", agentID: parts[0]) : ""
             if parts.count == 2, let character = CompanionCharacter(id: parts[1]) {
                 companion.setOverride(
-                    CompanionAppearance(character: character, colorHex: "#E0457B", matchesTheme: false),
-                    for: CompanionStore.agentKey(agentScope: "fixture-account:fixture-host", agentID: parts[0]))
+                    CompanionAppearance(character: character, colorHex: "#E0457B", matchesTheme: false), for: key)
+            } else if parts.count == 2, let entry = AvatarCatalog.bundled.avatars.first(where: { $0.id == parts[1] }) {
+                companion.setOverride(
+                    CompanionAppearance(colorHex: "#3F6FD8", matchesTheme: false, vibe: .bouncy,
+                                        catalogAvatar: AvatarCatalogReference(entry)), for: key)
             }
         }
         // "-test-agent-pet finance:pip": one demo agent wears a petdex pet that plays its moves.

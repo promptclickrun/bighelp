@@ -652,7 +652,7 @@ struct BighelpApp: App {
         #if DEBUG
         if usesDemoFixtures { return "fixture-account:fixture-host" }
         #endif
-        return ""
+        return CompanionSurfaceScope.computer(hostRegistry.activeHostConnectionID)
     }
 
 }

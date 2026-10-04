@@ -21,7 +21,10 @@ struct AgentEditorView: View {
     @State private var isModelConfirmationPresented = false
     @State private var pendingCompletedProfile: AgentProfile?
     @State private var isAvatarCreatorPresented = false
-    /// A new agent's first look in the creator, picked once per editor.
+    /// Where the creator opens, worked out each time it's opened.
+    @State private var creatorStart: AvatarCreatorStart?
+    /// A new agent's first look in the creator, picked once per editor. Also the
+    /// character page for an agent that wears something else.
     @State private var surpriseLook = AvatarCreatorModel.surprise()
     @FocusState private var focusedField: AgentEditorModel.Field?
     @Environment(\.dismiss) private var dismiss
@@ -247,7 +250,7 @@ struct AgentEditorView: View {
         }
         .sheet(isPresented: $isAvatarCreatorPresented) {
             AvatarCreatorView(
-                appearance: creatorStartLook, look: creatorStartHermesLook, agentName: heroTitle,
+                start: creatorStart ?? currentCreatorStart, characters: surpriseLook, agentName: heroTitle,
                 faceName: model.faceName,
                 petSource: PetdexSource(store: model.store, cacheScope: "\(ObjectIdentifier(model.store))")
             ) { result in
@@ -466,7 +469,7 @@ struct AgentEditorView: View {
         VStack(spacing: BighelpTokens.space8) {
             heroAvatar(model: model)
                 .contentShape(.circle)
-                .onTapGesture { isAvatarCreatorPresented = true }
+                .onTapGesture { openAvatarCreator() }
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(model.selectedCompanionCharacter.map {
                     "\($0.displayName) agent avatar preview"
@@ -512,7 +515,7 @@ struct AgentEditorView: View {
             }
             HStack(spacing: BighelpTokens.space8) {
                 Button {
-                    isAvatarCreatorPresented = true
+                    openAvatarCreator()
                 } label: {
                     Label(hasAvatar ? "Edit avatar" : "Design avatar", systemImage: "wand.and.stars")
                         .font(.bighelp(.subheadline).weight(.semibold))
@@ -586,22 +589,25 @@ struct AgentEditorView: View {
         }
     }
 
-    /// Where the creator opens: this session's look, the agent's saved chat
-    /// companion, or a fresh surprise for a new agent.
-    private var creatorStartLook: CompanionAppearance {
-        if let look = model.selectedCompanionAppearance { return look }
-        if let agentID = model.editingAgentID, let store = companionStore, !companionAgentScope.isEmpty,
-           let saved = store.override(for: CompanionStore.agentKey(agentScope: companionAgentScope, agentID: agentID)) {
-            return saved
-        }
-        return surpriseLook
+    private func openAvatarCreator() {
+        creatorStart = currentCreatorStart
+        isAvatarCreatorPresented = true
     }
 
-    /// The Hermes face or shape the creator opens on, if that's the current look.
-    private var creatorStartHermesLook: AgentAvatarLook? {
-        if let look = model.pendingLook { return look }
-        guard !model.draft.removesAvatar, model.pendingAvatar == nil else { return nil }
-        return model.editedProfile?.look
+    /// The avatar the agent has now, or a surprise for a new agent.
+    private var currentCreatorStart: AvatarCreatorStart {
+        let key = savedLookKey
+        return model.avatarCreatorStart(
+            savedCharacter: key.flatMap { companionStore?.override(for: $0) },
+            savedPetSlug: key.flatMap { PetAvatarStore.shared.slug(for: $0) },
+            surprise: surpriseLook
+        )
+    }
+
+    /// Where this device keeps the agent's character and pet.
+    private var savedLookKey: String? {
+        guard let agentID = model.editingAgentID, !companionAgentScope.isEmpty else { return nil }
+        return CompanionStore.agentKey(agentScope: companionAgentScope, agentID: agentID)
     }
 
     private func prepareLookAvatar(_ look: AgentAvatarLook) {

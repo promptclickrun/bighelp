@@ -208,6 +208,140 @@ struct AvatarCreatorTests {
     }
 }
 
+/// Editing an agent: the avatar creator opens on the avatar the agent has now,
+/// never a random one, and there's nothing to use until something changes.
+@MainActor
+struct AvatarCreatorCurrentAvatarTests {
+    private let png = UIGraphicsImageRenderer(size: CGSize(width: 24, height: 24)).pngData { context in
+        UIColor.systemTeal.setFill()
+        context.fill(CGRect(x: 0, y: 0, width: 24, height: 24))
+    }
+    private let fox = CompanionAppearance(colorHex: "#3F6FD8", matchesTheme: false, vibe: .bouncy,
+                                          catalogAvatar: AvatarCatalogReference(AvatarCatalog.bundled.avatars[0]))
+    private let surprise = AvatarCreatorModel.surprise()
+
+    @Test func editorOpensTheCreatorOnTheAvatarTheAgentHas() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try png.write(to: directory.appending(path: "finance.png"))
+        var shaped = AgentProfile.financeFixture
+        shaped.look = AgentAvatarLook(style: .shape, shape: "hexagon", color: "#56AEE0")
+        let photo = AgentProfile(id: "photo", name: "Photo", role: "", summary: "", instructions: "",
+                                 avatarFileName: "finance.png", isDefault: false)
+        let bare = AgentProfile(id: "bare", name: "Bare", role: "", summary: "", instructions: "",
+                                avatarFileName: nil, isDefault: false)
+        let store = AgentDirectoryStore(client: AgentDirectoryFixtureClient(profiles: [shaped, photo, bare]),
+                                        defaults: isolatedDefaults())
+        try await store.load()
+        func editing(_ profile: AgentProfile) -> AgentEditorModel {
+            AgentEditorModel.editing(profile, store: store, processor: AvatarImageProcessor(), avatarDirectory: directory)
+        }
+        func start(_ model: AgentEditorModel, character: CompanionAppearance? = nil, pet: String? = nil) -> AvatarCreatorStart {
+            model.avatarCreatorStart(savedCharacter: character, savedPetSlug: pet, surprise: surprise)
+        }
+
+        // What chats draw first: its character, then its pet; then its Hermes look, then its picture.
+        #expect(start(editing(shaped), character: fox) == .character(fox))
+        #expect(start(editing(shaped), pet: "pip") == .pet(slug: "pip", picture: png))
+        #expect(start(editing(shaped)) == .look(shaped.look!))
+        #expect(start(editing(photo)) == .photo(png))
+        #expect(start(editing(bare)) == .photo(nil), "No avatar: no surprise either")
+
+        // This visit's pick, before it's saved.
+        let picked = editing(shaped)
+        try await picked.importPetAvatar(data: png, pet: PetdexFixtures.pets[0])
+        #expect(start(picked, character: fox) == .pet(slug: PetdexFixtures.pets[0].slug, picture: picked.pendingAvatar!.data))
+        try await picked.importLookAvatar(data: png, look: AgentAvatarLook(style: .face, shape: "blobatar::cloud"))
+        #expect(start(picked, character: fox) == .look(AgentAvatarLook(style: .face, shape: "blobatar::cloud")))
+        picked.removeAvatar()
+        #expect(start(picked, character: fox) == .photo(nil))
+
+        // Only a new agent with nothing picked opens on a surprise.
+        let new = AgentEditorModel.creating(store: store, processor: AvatarImageProcessor())
+        #expect(start(new) == .surprise(surprise))
+        try await new.importCompanionAvatar(data: png, appearance: fox)
+        #expect(start(new) == .character(fox))
+    }
+
+    @Test func aCharacterOpensOnItselfAndUseWaitsForAChange() {
+        let model = AvatarCreatorModel(start: .character(fox), characters: surprise)
+        #expect(model.style == .catalog && model.appearance == fox)
+        #expect(!model.hasChanges && !model.canUse(faceName: "finance"))
+        model.tab = .moves
+        model.select(.hermes)
+        model.select(.bighelp)
+        #expect(!model.canUse(faceName: "finance"), "Looking around changes nothing")
+        model.appearance.vibe = .dancer
+        #expect(model.canUse(faceName: "finance"))
+        model.appearance.vibe = .bouncy
+        #expect(!model.canUse(faceName: "finance"), "Back to how it was")
+    }
+
+    @Test func aHermesLookOpensOnItself() {
+        let model = AvatarCreatorModel(start: .look(AgentAvatarLook(style: .shape, shape: "hexagon", color: "#56AEE0")),
+                                       characters: surprise)
+        #expect(model.style == .shapes && model.shape == "hexagon" && model.shapeColor == "#56AEE0")
+        #expect(!model.canUse(faceName: "finance"))
+        model.select(.bighelp)
+        #expect(model.canUse(faceName: "finance"), "Another kind of avatar is a change")
+        model.select(.hermes)
+        model.style = .shapes
+        #expect(!model.canUse(faceName: "finance"))
+        model.shapeColor = nil
+        #expect(model.canUse(faceName: "finance"))
+
+        let face = AvatarCreatorModel(start: .look(AgentAvatarLook(style: .face, shape: "blobatar::cloud")),
+                                      characters: surprise)
+        #expect(face.style == .face && face.blobShape == HermesBlobShape(kind: .cloud))
+        #expect(!face.canUse(faceName: "finance"))
+        face.faceColor = "#56AEE0"
+        #expect(face.canUse(faceName: "finance"))
+    }
+
+    @Test func aPetOpensInPetdexWithThatPetPicked() async {
+        let pip = PetdexFixtures.pets[0], other = PetdexFixtures.pets[1]
+        let model = AvatarCreatorModel(start: .pet(slug: pip.slug, picture: png), characters: surprise)
+        #expect(model.category == .petdex && model.selectedPetFrame == png)
+        #expect(model.isPicked(pip) && !model.isPicked(other))
+        #expect(!model.canUse(faceName: "finance"))
+        let gallery = PetdexGalleryModel(source: PetdexSource(
+            hostGallery: { PetdexFixtures.pets }, hostThumbnail: { PetdexFixtures.thumbnail(slug: $0.slug) ?? Data() },
+            publicCatalog: nil, cacheScope: UUID().uuidString))
+        await gallery.loadIfNeeded()
+        await model.adoptCurrentPet(from: gallery)
+        #expect(model.selectedPet == pip && model.selectedPetFrame == png, "Its name shows; its picture stays")
+        #expect(!model.canUse(faceName: "finance"))
+        await model.select(other, gallery: gallery)
+        #expect(model.isPicked(other) && model.canUse(faceName: "finance"))
+    }
+
+    @Test func aPhotoOrNoAvatarOpensOnThePhotoPage() {
+        let photo = AvatarCreatorModel(start: .photo(png), characters: surprise)
+        #expect(photo.category == .photo && photo.currentPicture == png && !photo.hasNoAvatar)
+        #expect(!photo.canUse(faceName: "finance"))
+        let none = AvatarCreatorModel(start: .photo(nil), characters: surprise)
+        #expect(none.category == .photo && none.hasNoAvatar)
+        #expect(!none.canUse(faceName: "finance"))
+        none.select(.bighelp)
+        #expect(none.appearance == surprise && none.canUse(faceName: "finance"))
+    }
+
+    @Test func aNewAgentsSurpriseIsReadyToUse() {
+        let model = AvatarCreatorModel(start: .surprise(surprise), characters: surprise)
+        #expect(model.style == .catalog && model.appearance == surprise)
+        #expect(model.canUse(faceName: "nova"))
+    }
+
+    /// Looks and pets are kept per computer; with none chosen nothing is kept,
+    /// which once left every agent's saved look unread (and the creator random).
+    @Test func looksAreKeptPerComputer() {
+        #expect(CompanionSurfaceScope.computer(nil).isEmpty)
+        #expect(!CompanionSurfaceScope.computer("A").isEmpty)
+        #expect(CompanionSurfaceScope.computer("A") != CompanionSurfaceScope.computer("B"))
+    }
+}
+
 /// Face and Shape colors: saturation down to gray keeps the hue and brightness.
 struct AvatarColorAdjustTests {
     @Test func saturationRunsFromGrayToVivid() {

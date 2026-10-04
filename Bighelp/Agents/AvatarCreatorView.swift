@@ -12,6 +12,21 @@ enum AvatarCreatorResult {
     case photo(PhotosPickerItem)
 }
 
+/// Where the creator opens. Editing an agent opens on the avatar it has now, so
+/// nothing changes until the person picks something. Only a new agent with
+/// nothing picked yet opens on a surprise.
+enum AvatarCreatorStart: Equatable {
+    /// A new agent: a random character, ready to use.
+    case surprise(CompanionAppearance)
+    case character(CompanionAppearance)
+    /// A Hermes face or shape.
+    case look(AgentAvatarLook)
+    /// A petdex pet and the picture it has now (its first frame).
+    case pet(slug: String, picture: Data?)
+    /// A photo, or no avatar at all when there's no picture.
+    case photo(Data?)
+}
+
 /// Agent Studio avatar creator: pick a character or a Bit, then make it yours
 /// with a colorway or color, headwear (or a Bit's face), a pattern and how it moves.
 /// Hermes Desktop's faces and shapes, a petdex pet or a photo work too.
@@ -88,6 +103,15 @@ final class AvatarCreatorModel {
     private(set) var selectedPetAvatar: Data?
     private(set) var isLoadingPet = false
     private(set) var petError: String?
+    /// The agent's picture as it is now (a photo or its pet's first frame).
+    private(set) var currentPicture: Data?
+    /// The agent has no avatar yet: the stage shows its default face.
+    private(set) var hasNoAvatar = false
+    /// The pet the agent wears now; it's picked once the gallery has it.
+    private(set) var currentPetSlug: String?
+    /// The choice the creator opened on for an agent that has an avatar.
+    /// While nothing differs from it there's nothing to use.
+    private var opening: Choice?
     enum Tab: String, CaseIterable, Identifiable {
         case character, color, extras, moves
 
@@ -144,6 +168,69 @@ final class AvatarCreatorModel {
         default:
             break
         }
+    }
+
+    /// Opens on `start`. `characters` is the look the character page shows when
+    /// the agent wears something else.
+    convenience init(start: AvatarCreatorStart, characters: CompanionAppearance, catalog: AvatarCatalog = .bundled) {
+        switch start {
+        case .surprise(let appearance), .character(let appearance):
+            self.init(appearance: appearance, catalog: catalog)
+        case .look(let look):
+            self.init(appearance: characters, look: look, catalog: catalog)
+        case .pet(let slug, let picture):
+            self.init(appearance: characters, catalog: catalog)
+            style = .pets
+            currentPetSlug = slug
+            currentPicture = picture
+            selectedPetFrame = picture
+        case .photo(let picture):
+            self.init(appearance: characters, catalog: catalog)
+            style = .photo
+            currentPicture = picture
+            hasNoAvatar = picture == nil
+        }
+        if case .surprise = start { return }
+        opening = choice
+    }
+
+    /// What the stage shows as the finished avatar, to tell a change from just looking around.
+    private enum Choice: Equatable {
+        case character(CompanionAppearance)
+        case face(HermesBlobShape, color: String?)
+        case shape(String, color: String?)
+        case pet(String?)
+        case photo
+    }
+
+    private var choice: Choice {
+        switch style {
+        case .catalog: .character(appearance)
+        case .face: .face(blobShape, color: faceColor)
+        case .shapes: .shape(shape, color: shapeColor)
+        case .pets: .pet(selectedPet?.slug ?? currentPetSlug)
+        case .photo: .photo
+        }
+    }
+
+    /// False while the creator still shows the avatar the agent has now.
+    var hasChanges: Bool { opening.map { $0 != choice } ?? true }
+
+    /// Use avatar: something new, and ready.
+    func canUse(faceName: String) -> Bool { hasChanges && result(faceName: faceName) != nil }
+
+    /// The pet tile that is picked: a new pick, or the pet the agent wears now.
+    func isPicked(_ pet: PetdexPet) -> Bool { (selectedPet?.slug ?? currentPetSlug) == pet.slug }
+
+    /// The agent's own pet, once the gallery has it: picked, so its name and tile show.
+    func adoptCurrentPet(from gallery: PetdexGalleryModel) async {
+        guard selectedPet == nil, let slug = currentPetSlug,
+              let pet = gallery.pets.first(where: { $0.slug == slug }) else { return }
+        selectedPet = pet
+        guard selectedPetFrame == nil else { return }
+        let frame = await gallery.thumbnail(pet)
+        guard selectedPet == pet else { return }
+        selectedPetFrame = frame
     }
 
     func randomizeFace() {
@@ -291,14 +378,14 @@ struct AvatarCreatorView: View {
     #endif
 
     init(
-        appearance: CompanionAppearance,
-        look: AgentAvatarLook? = nil,
+        start: AvatarCreatorStart,
+        characters: CompanionAppearance,
         agentName: String,
         faceName: String,
         petSource: PetdexSource,
         onUse: @escaping (AvatarCreatorResult) -> Void
     ) {
-        _model = State(initialValue: AvatarCreatorModel(appearance: appearance, look: look))
+        _model = State(initialValue: AvatarCreatorModel(start: start, characters: characters))
         _pets = State(initialValue: PetdexGalleryModel(source: petSource))
         self.agentName = agentName
         self.faceName = faceName
@@ -330,11 +417,12 @@ struct AvatarCreatorView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Use avatar") {
-                        guard let result = model.result(faceName: faceName) else { return }
+                        guard model.canUse(faceName: faceName), let result = model.result(faceName: faceName) else { return }
                         onUse(result)
                         dismiss()
                     }
-                    .disabled(model.result(faceName: faceName) == nil)
+                    // Off until something changes, so a quick tap can't replace the agent's avatar.
+                    .disabled(!model.canUse(faceName: faceName))
                     .fontWeight(.semibold)
                     .bighelpProminentButtonStyle()
                     .buttonBorderShape(.capsule)
@@ -497,7 +585,7 @@ struct AvatarCreatorView: View {
         case .face: model.blobShape.kind?.displayName ?? "Face"
         case .shapes: HermesShapeFace.displayName(model.shape)
         case .pets: model.selectedPet?.displayName ?? "Pets"
-        case .photo: "Photo"
+        case .photo: model.hasNoAvatar ? "No avatar yet" : "Photo"
         }
     }
 
@@ -993,7 +1081,13 @@ struct AvatarCreatorView: View {
                 stagePlaceholder("pawprint", "Pick a pet below")
             }
         case .photo, .catalog:
-            stagePlaceholder("photo.on.rectangle", "Choose a photo below")
+            if let picture = model.currentPicture, let image = UIImage(data: picture) {
+                Image(uiImage: image).resizable().scaledToFill().clipShape(.circle)
+            } else if model.hasNoAvatar {
+                AvatarView(stableID: faceName, displayName: agentName, size: Self.hermesPreviewSize)
+            } else {
+                stagePlaceholder("photo.on.rectangle", "Choose a photo below")
+            }
         }
     }
 
@@ -1176,7 +1270,10 @@ struct AvatarCreatorView: View {
             }
             petsContent
         }
-        .task { await pets.loadIfNeeded() }
+        .task {
+            await pets.loadIfNeeded()
+            await model.adoptCurrentPet(from: pets)
+        }
         .animation(.snappy, value: isSearchingPets)
     }
 
@@ -1209,7 +1306,7 @@ struct AvatarCreatorView: View {
                     ForEach(pets.visible) { pet in
                         tile(
                             title: pet.displayName,
-                            isSelected: model.selectedPet == pet,
+                            isSelected: model.isPicked(pet),
                             identifier: "avatar.creator.pet.\(pet.slug)"
                         ) {
                             isSearchingPets = false

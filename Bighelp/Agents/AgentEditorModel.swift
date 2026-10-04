@@ -280,6 +280,30 @@ final class AgentEditorModel: Identifiable {
         selectedPet = pet
     }
 
+    /// Where the avatar creator opens: the avatar this agent has now. That's this
+    /// visit's pick, else its saved character or pet (what chats draw first), its
+    /// Hermes face or shape, or its picture. Only a new agent with nothing picked
+    /// opens on `surprise`.
+    func avatarCreatorStart(
+        savedCharacter: CompanionAppearance?,
+        savedPetSlug: String?,
+        surprise: CompanionAppearance
+    ) -> AvatarCreatorStart {
+        if let pending = pendingAvatar {
+            if let look = selectedCompanionAppearance { return .character(look) }
+            if let pet = selectedPet { return .pet(slug: pet.slug, picture: pending.data) }
+            if let look = pendingLook, look.style != .photo { return .look(look) }
+            return .photo(pending.data)
+        }
+        guard isEditing else { return .surprise(surprise) }
+        if draft.removesAvatar { return .photo(nil) }
+        if let savedCharacter { return .character(savedCharacter) }
+        let picture = avatarURL.flatMap { try? Data(contentsOf: $0) }
+        if let savedPetSlug { return .pet(slug: savedPetSlug, picture: picture) }
+        if let look = editedProfile?.look, look.style != .photo { return .look(look) }
+        return .photo(picture)
+    }
+
     /// The profile name a face follows: the agent's, or the one a new agent will get.
     var faceName: String {
         editingID ?? AgentProfileID.generated(from: draft.name, occupied: Set(store.profiles.map(\.id)))

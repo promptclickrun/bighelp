@@ -1,0 +1,15 @@
+// Local test harness only. Never deploy this configuration.
+{
+  "name": "bighelp-catalog-test",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-22",
+  "workers_dev": false,
+  "vars": {
+    "ACCESS_TEAM_DOMAIN": "team.example.cloudflareaccess.com",
+    "ACCESS_AUD_ACCOUNT": "aud-account",
+    "ACCESS_AUD_REVIEW": "aud-review",
+    "SITE_ORIGINS": "https://bighelp.example",
+    "SITE_RETURN_URL": "https://bighelp.example/templates"
+  },
+  "d1_databases": [{ "binding": "DB", "database_name": "bighelp-catalog-test", "migrations_dir": "./migrations" }]
+}

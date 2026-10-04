@@ -1,0 +1,28 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "bighelp-catalog",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-22",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "catalog.bighelp.app", "custom_domain": true }],
+  "observability": { "enabled": true },
+  "send_metrics": false,
+  "limits": { "cpu_ms": 200 },
+  // Access audiences are public identifiers (they appear in every Access token), not secrets.
+  "vars": {
+    "ACCESS_TEAM_DOMAIN": "coltcoan.cloudflareaccess.com",
+    "ACCESS_AUD_ACCOUNT": "8ce00f2f0c19e78de732d95eb681e219b4612a469be69c9f209806a538d0588d",
+    "ACCESS_AUD_REVIEW": "a8895de40dcec1396476256c5723d02299010140a9981e986244ac506e039a6c",
+    "SITE_ORIGINS": "https://bighelp.app,https://www.bighelp.app",
+    "SITE_RETURN_URL": "https://bighelp.app/templates"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "bighelp-catalog",
+      "database_id": "da7d9678-bc63-472b-be94-ce9bdd01ec07",
+      "migrations_dir": "./migrations"
+    }
+  ]
+}

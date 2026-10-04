@@ -131,6 +131,40 @@ struct DirectHermesNativeContextTests {
         #expect(http.calls.count == 1)
     }
 
+    /// Let's do it reaches only plugins that list `native-agent-board-answers-v1`; older ones
+    /// never see the request, and the app falls back to the chat message alone.
+    @Test func ideaAcceptanceUsesItsOwnFeatureAndFixedRoute() async throws {
+        let owner = try owner()
+        let http = HTTP()
+        var features = ["native-context-v1", "serving-profile-v1", "native-agent-board-v1",
+                        "native-agent-board-feedback-v1"]
+        http.handler = { request, guardValue in
+            if let guardValue {
+                return try self.response(request, body: ["agentId": .string("default"), "item": .object([
+                    "id": .string("idea-7f3a91"), "kind": .string("idea"), "title": .string("Plan a trip"),
+                    "answer": .string("yes"),
+                ])], headers: ["ETag": guardValue.etag, "X-Loopdy-Request-ID": guardValue.requestIDHeader])
+            }
+            return try self.response(request, body: self.context(features: features))
+        }
+        let client = DirectHermesNativePluginClient(http: http, owner: owner, currentOwner: { owner })
+        let payload: [String: BighelpJSONValue] = ["agentId": .string("default"), "itemId": .string("idea-7f3a91")]
+        await #expect(throws: WorkspaceClientError.unavailable(.unsupportedOperation)) {
+            try await client.perform(.boardAccept, payload: payload)
+        }
+        #expect(http.calls.count == 1, "An older plugin is never asked")
+
+        features.append("native-agent-board-answers-v1")
+        _ = try await client.loadContext(force: true)
+        _ = try await client.perform(.boardAccept, payload: payload)
+        let call = try #require(http.calls.last)
+        #expect(call.request.path == "/api/plugins/loopdy/native/board/accept")
+        #expect(call.request.method == .post)
+        #expect(call.request.body == payload)
+        #expect(call.guardValue?.etag == etag)
+        #expect(call.guardValue?.requestIDHeader == call.guardValue?.requestIDHeader.lowercased())
+    }
+
     @Test func templateReadUsesOnlyFixedPathAndExactContextHeaders() async throws {
         let owner = try owner()
         let http = HTTP()

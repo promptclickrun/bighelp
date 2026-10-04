@@ -155,6 +155,8 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     case boardIdentity = "board.identity"
     case boardRead = "board.read"
     case boardPromote = "board.promote"
+    /// Let's do it on an idea, by its ID (plugin `native-agent-board-answers-v1`).
+    case boardAccept = "board.accept"
     case usageList = "usage.list"
     /// Hours of the day, messages and models per day for the Usage page (plugin, `native-usage-activity-v1`).
     case usageActivity = "usage.activity"

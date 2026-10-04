@@ -115,6 +115,95 @@ struct AgentBoardTests {
         #expect(store.goals.map(\.title) == ["Sleep by 11"])
     }
 
+    /// Let's do it tells the host which idea by its ID, and the chat gets only the readable text.
+    @Test func letsDoItNamesTheIdeaByIDAndKeepsTheIDOutOfTheChat() async throws {
+        let client = FakeBoardClient(items: [
+            AgentBoardItem(id: "idea-7f3a91", kind: .idea, title: "Plan a trip"),
+            AgentBoardItem(id: "idea-0c2e44", kind: .idea, title: "Plan a trip"),
+        ])
+        client.supportsAnswers = true
+        let store = AgentBoardStore()
+        store.configure(client: client)
+        await store.load(agentID: "default")
+        let idea = try #require(store.ideas.first { $0.id == "idea-0c2e44" })
+        #expect(await store.accept(idea) == .recorded)
+        #expect(client.accepted.map(\.itemID) == ["idea-0c2e44"], "Exactly the tapped idea, not its same-title twin")
+        #expect(client.accepted.map(\.agentID) == ["default"])
+        #expect(store.ideas.count == 2, "The idea stays on the board")
+        let text = idea.letsDoItMessage
+        #expect(text == "Yes, go ahead with this idea: “Plan a trip”.")
+        #expect(!text.contains(idea.id) && !text.contains("idea-"))
+    }
+
+    @Test func letsDoItOnAnOlderPluginJustOpensTheChat() async {
+        let client = FakeBoardClient(items: [AgentBoardItem(id: "i", kind: .idea, title: "Plan a trip")])
+        let store = AgentBoardStore()
+        store.configure(client: client)
+        await store.load(agentID: "default")
+        #expect(await store.accept(store.ideas[0]) == .notSupported)
+        #expect(client.accepted.isEmpty)
+
+        // A plugin that stops listing the feature after the board loaded: still no error.
+        client.supportsAnswers = true
+        client.acceptError = WorkspaceClientError.unavailable(.unsupportedOperation)
+        #expect(await store.accept(store.ideas[0]) == .notSupported)
+
+        store.configure(client: nil)
+        #expect(await store.accept(AgentBoardItem(id: "i", kind: .idea, title: "Plan a trip")) == .notSupported)
+    }
+
+    @Test func aFailedLetsDoItCanBeTriedAgain() async {
+        let client = FakeBoardClient(items: [AgentBoardItem(id: "i", kind: .idea, title: "Plan a trip")])
+        client.supportsAnswers = true
+        client.acceptError = WorkspaceClientError.outcomeUnknown
+        let store = AgentBoardStore()
+        store.configure(client: client)
+        await store.load(agentID: "default")
+        #expect(await store.accept(store.ideas[0]) == .failed)
+        client.acceptError = nil
+        #expect(await store.accept(store.ideas[0]) == .recorded)
+        #expect(client.accepted.map(\.itemID) == ["i"])
+    }
+
+    @Test func letsDoItIsNotRecordedAcrossAHostOrAgentChange() async {
+        let client = FakeBoardClient(items: [AgentBoardItem(id: "i", kind: .idea, title: "Plan a trip")])
+        client.supportsAnswers = true
+        let store = AgentBoardStore()
+        store.configure(client: client)
+        await store.load(agentID: "default")
+        let idea = store.ideas[0]
+        // The connection changes while the request is out: the answer belongs to the old one.
+        client.onAccept = { store.configure(client: FakeBoardClient(items: [])) }
+        #expect(await store.accept(idea) == .failed)
+
+        // An idea from another agent's board never goes to this one.
+        let other = FakeBoardClient(items: [AgentBoardItem(id: "j", kind: .idea, title: "Other")])
+        other.supportsAnswers = true
+        store.configure(client: other)
+        await store.load(agentID: "work")
+        #expect(await store.accept(idea) == .failed)
+        #expect(other.accepted.isEmpty)
+        // Only ideas.
+        #expect(await store.accept(AgentBoardItem(id: "j", kind: .feed, title: "Other")) == .failed)
+    }
+
+    @Test func theAcceptRouteSendsOnlyTheAgentAndIdeaIDs() async throws {
+        let performer = try BoardPerformer()
+        let old = DirectHermesAgentBoardClient(workspace: performer, owner: performer.owner!, supportsFeedback: true)
+        #expect(!old.supportsAnswers)
+        await #expect(throws: WorkspaceClientError.unavailable(.unsupportedOperation)) {
+            try await old.accept(agentID: "default", itemID: "i")
+        }
+        #expect(performer.calls.isEmpty)
+        let current = DirectHermesAgentBoardClient(workspace: performer, owner: performer.owner!, supportsFeedback: true,
+                                                   supportsAnswers: true)
+        try await current.accept(agentID: "default", itemID: "idea-7f3a91")
+        #expect(performer.calls.map(\.operation) == [.boardAccept])
+        #expect(performer.calls.last?.payload == ["agentId": .string("default"), "itemId": .string("idea-7f3a91")])
+        #expect(DirectHermesNativePluginClient.supports(.boardAccept))
+        #expect(DemoAgentBoardClient().supportsAnswers)
+    }
+
     @Test func olderPluginsKeepTheHeartAndHideNewFeedback() async throws {
         let performer = try BoardPerformer()
         let old = DirectHermesAgentBoardClient(workspace: performer, owner: performer.owner!, supportsFeedback: false)
@@ -274,6 +363,10 @@ private final class FakeBoardClient: AgentBoardClient {
     var failsUpdates = false
     var failsIdentity = false
     let supportsFeedback = true
+    var supportsAnswers = false
+    var acceptError: (any Error)?
+    var onAccept: (() -> Void)?
+    private(set) var accepted: [(agentID: String, itemID: String)] = []
     private(set) var updates: [(id: String, change: AgentBoardChange)] = []
     private(set) var markedRead: [String] = []
 
@@ -301,6 +394,12 @@ private final class FakeBoardClient: AgentBoardClient {
                                   status: "active")
         items.append(goal)
         return goal
+    }
+
+    func accept(agentID: String, itemID: String) async throws {
+        onAccept?()
+        if let acceptError { throw acceptError }
+        accepted.append((agentID, itemID))
     }
 
     func picture(agentID: String, itemID: String, index: Int) async throws -> Data { Data() }

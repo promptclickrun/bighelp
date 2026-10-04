@@ -483,6 +483,13 @@ struct AgentIdentityDocuments: Equatable, Sendable {
     var user: Document
 }
 
+extension AgentBoardItem {
+    /// What Let's do it puts in the chat: the idea's title only. The host learns which idea from
+    /// `AgentBoardStore.accept`, so its ID never shows in the message box, the sent message or
+    /// the chat's history. Older plugins match this exact text to record the yes.
+    var letsDoItMessage: String { "Yes, go ahead with this idea: “\(title)”." }
+}
+
 // MARK: - Clients
 
 /// What the person did to one item. Nil fields stay as they are.
@@ -504,6 +511,9 @@ protocol AgentBoardClient: AnyObject {
     func update(agentID: String, itemID: String, change: AgentBoardChange) async throws -> AgentBoardItem
     func markRead(agentID: String, itemIDs: [String]) async throws
     func promote(agentID: String, itemID: String) async throws -> AgentBoardItem
+    /// Let's do it records exactly this idea (`native-agent-board-answers-v1`).
+    var supportsAnswers: Bool { get }
+    func accept(agentID: String, itemID: String) async throws
     func picture(agentID: String, itemID: String, index: Int) async throws -> Data
     func activity(agentID: String) async throws -> [AgentActivityEntry]
     func approvals(agentID: String) async throws -> [AgentApprovalEntry]
@@ -517,6 +527,11 @@ protocol AgentBoardClient: AnyObject {
 extension AgentBoardClient {
     var supportsGoalCategories: Bool { false }
     var supportsFiles: Bool { false }
+    var supportsAnswers: Bool { false }
+
+    func accept(agentID: String, itemID: String) async throws {
+        throw WorkspaceClientError.unavailable(.unsupportedOperation)
+    }
 
     func file(agentID: String, itemID: String, file: AgentBoardItem.File) async throws -> ChatAttachment {
         throw WorkspaceClientError.unavailable(.unsupportedOperation)
@@ -530,16 +545,19 @@ final class DirectHermesAgentBoardClient: AgentBoardClient {
     private let owner: WorkspaceOwner
     let supportsFeedback: Bool
     let supportsGoalCategories: Bool
+    let supportsAnswers: Bool
     /// Chat's attachment client: the same chunked download, checks and cache. Only
     /// given when the plugin serves posts' files.
     private let files: DirectHermesGeneratedMediaClient?
 
     init(workspace: any WorkspaceOperationPerforming, owner: WorkspaceOwner, supportsFeedback: Bool,
-         supportsGoalCategories: Bool = false, files: DirectHermesGeneratedMediaClient? = nil) {
+         supportsGoalCategories: Bool = false, supportsAnswers: Bool = false,
+         files: DirectHermesGeneratedMediaClient? = nil) {
         self.workspace = workspace
         self.owner = owner
         self.supportsFeedback = supportsFeedback
         self.supportsGoalCategories = supportsGoalCategories
+        self.supportsAnswers = supportsAnswers
         self.files = files
     }
 
@@ -596,6 +614,11 @@ final class DirectHermesAgentBoardClient: AgentBoardClient {
         let result = try await perform(.boardPromote, ["agentId": .string(agentID), "itemId": .string(itemID)])
         guard let item = result["item"] else { throw WorkspaceClientError.invalidResponse }
         return try AgentBoardItem(json: item)
+    }
+
+    func accept(agentID: String, itemID: String) async throws {
+        guard supportsAnswers else { throw WorkspaceClientError.unavailable(.unsupportedOperation) }
+        _ = try await perform(.boardAccept, ["agentId": .string(agentID), "itemId": .string(itemID)])
     }
 
     func picture(agentID: String, itemID: String, index: Int) async throws -> Data {
@@ -859,6 +882,35 @@ final class AgentBoardStore {
             guard generation == self.generation, let current = items.firstIndex(where: { $0.id == idea.id }) else { return false }
             items[current].dismissed = false
             return false
+        }
+    }
+
+    /// What Let's do it managed on this connection.
+    enum AcceptOutcome: Equatable {
+        /// The host recorded the yes for exactly this idea.
+        case recorded
+        /// An older plugin: the chat message alone carries the yes, as before.
+        case notSupported
+        /// The host didn't confirm it; the person can try again.
+        case failed
+    }
+
+    /// Let's do it: tells the host which idea by its ID, before the chat opens. The ID goes
+    /// only here, never into the chat (`letsDoItMessage`). The idea stays on the board.
+    func accept(_ idea: AgentBoardItem) async -> AcceptOutcome {
+        guard let client, client.supportsAnswers else { return .notSupported }
+        guard idea.kind == .idea, let agentID, items.contains(where: { $0.id == idea.id && $0.kind == .idea }) else {
+            return .failed
+        }
+        let generation = generation
+        do {
+            try await client.accept(agentID: agentID, itemID: idea.id)
+            // A yes recorded by a connection that's gone may belong to another computer.
+            return generation == self.generation ? .recorded : .failed
+        } catch WorkspaceClientError.unavailable(.unsupportedOperation) {
+            return .notSupported
+        } catch {
+            return .failed
         }
     }
 

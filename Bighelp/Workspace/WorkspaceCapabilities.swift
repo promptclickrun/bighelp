@@ -27,6 +27,8 @@ enum WorkspaceCapability: String, CaseIterable, Sendable {
     case agentBoardGoalCategories
     /// Feed posts carry files (plugin `native-agent-board-files-v1`).
     case agentBoardFiles
+    /// Let's do it records the idea by its ID (plugin `native-agent-board-answers-v1`).
+    case agentBoardAnswers
 }
 
 enum WorkspaceUnavailableReason: String, Equatable, Sendable {

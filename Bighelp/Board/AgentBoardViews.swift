@@ -795,6 +795,8 @@ private struct IdeaDetailSheet: View {
     let idea: AgentBoardItem
     let context: AgentBoardContext
     @Environment(\.dismiss) private var dismiss
+    @State private var isAccepting = false
+    @State private var acceptFailed = false
 
     var body: some View {
         ScrollView {
@@ -808,18 +810,31 @@ private struct IdeaDetailSheet: View {
                     .tint(theme.action)
                 VStack(spacing: BighelpTokens.space8) {
                     Button {
-                        dismiss()
-                        context.onAsk("Yes, go ahead with this idea: “\(idea.title)”.")
+                        Task { await letsDoIt() }
                     } label: {
-                        Text("Let's do it")
-                            .font(.bighelp(.body).weight(.semibold))
-                            .frame(maxWidth: .infinity, minHeight: BighelpTokens.hitTarget)
+                        Group {
+                            if isAccepting {
+                                ProgressView().tint(theme.actionForeground)
+                            } else {
+                                Text(acceptFailed ? "Try again" : "Let's do it")
+                            }
+                        }
+                        .font(.bighelp(.body).weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: BighelpTokens.hitTarget)
                     }
                     .bighelpProminentButtonStyle()
                     .buttonBorderShape(.capsule)
                     .tint(theme.action)
                     .foregroundStyle(theme.actionForeground)
+                    .disabled(isAccepting)
                     .accessibilityIdentifier("board.idea.accept")
+                    if acceptFailed {
+                        Text("Couldn't tell \(context.agentName) yet. Check the connection and try again.")
+                            .font(.bighelp(.footnote))
+                            .foregroundStyle(theme.secondaryText)
+                            .multilineTextAlignment(.center)
+                            .accessibilityIdentifier("board.idea.accept.failed")
+                    }
                     if context.store.supportsFeedback {
                         Button {
                             dismiss()
@@ -867,6 +882,17 @@ private struct IdeaDetailSheet: View {
             .accessibilityIdentifier("board.idea.close")
         }
         #endif
+    }
+
+    /// The yes is recorded when the person taps, by the idea's ID; the chat that opens
+    /// gets only the readable text. Older plugins skip straight to the chat, as before.
+    private func letsDoIt() async {
+        isAccepting = true
+        let outcome = await context.store.accept(idea)
+        isAccepting = false
+        guard outcome != .failed else { acceptFailed = true; return }
+        dismiss()
+        context.onAsk(idea.letsDoItMessage)
     }
 
     @BighelpThemeReader private var theme

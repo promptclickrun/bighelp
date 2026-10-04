@@ -119,6 +119,33 @@ final class BoardSwipeBlueprintsUITests: BighelpUITestCase {
         }
     }
 
+    /// Let's do it records the idea by its ID (the demo board stands in for the host) and opens
+    /// a chat with only the readable text: the ID never reaches the message box.
+    @MainActor
+    func testLetsDoItOpensAChatWithTheIdeaTitleOnly() throws {
+        for appearance in ["light", "dark"] {
+            let app = launch(appearance: appearance)
+            openRootTab("tab.ideas", in: app)
+            let idea = app.buttons["board.idea.idea-1"]
+            XCTAssertTrue(idea.waitForExistence(timeout: 10))
+            idea.tap()
+            let accept = app.buttons["board.idea.accept"]
+            XCTAssertTrue(accept.waitForExistence(timeout: 5))
+            save("board-idea-sheet-\(appearance)", app)
+            accept.tap()
+            let editor = app.textViews["chat.composer.text"]
+            XCTAssertTrue(editor.waitForExistence(timeout: 10))
+            let placed = NSPredicate(format: "value == %@",
+                                     "Yes, go ahead with this idea: “I can plan Sam's birthday dinner end to end”.")
+            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: placed, object: editor)],
+                                          timeout: 8), .completed, "The readable text is ready to send")
+            XCTAssertFalse((editor.value as? String ?? "").contains("idea-1"), "The idea's ID stays out of the chat")
+            XCTAssertFalse(app.descendants(matching: .any)["board.idea.accept.failed"].exists)
+            save("board-idea-lets-do-it-\(appearance)", app)
+            app.terminate()
+        }
+    }
+
     private let sentWords = [
         "feed-marketing-1": "post what Acme shipped",
         "goals-productivity-1": "Add a goal to my Goals under Productivity",

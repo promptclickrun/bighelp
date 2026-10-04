@@ -65,7 +65,8 @@ sit under More at the bottom.
 Keep it that short: a new destination goes where people already look, not on the first screen. A tap on the
 header's compose button starts a new chat with this agent right away; touch and hold picks agents: one is a 1:1
 chat, two or more a group. On the chat list, New chat floats centered above the bottom bar, which keeps the
-same width as on every other screen. Feed, Ideas, Goals and Apps keep the Chat tab's header: ☰, the avatar, New
+same width as on every other screen. The chat list (and the all-hosts view's All sessions) searches from the system
+glass search bar along the bottom, like All agents; it matches titles and previews, and a scroll puts the keyboard away. Feed, Ideas, Goals and Apps keep the Chat tab's header: ☰, the avatar, New
 chat and ⋯ (the agent's profile, then Files, Memory, Skills & tools and Scheduled tasks). The root's edge-swipe zones
 start below that row, so its corner buttons always get the tap. The avatar reacts to what the agent is doing (thinking, writing code, browsing, making
 images…), driven by the running tool (`AgentActivityKind`, shared with the island as `BighelpActivityPose`). On

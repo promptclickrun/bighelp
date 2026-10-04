@@ -248,6 +248,25 @@ struct FleetStoreTests {
         #expect(reader.reads == [studio], "The selected host is live; it is never read")
     }
 
+    /// All sessions' search bar matches a chat's title and its preview text, in any case, on every host.
+    @Test func chatSearchMatchesTitleAndPreview() {
+        let fleet = FleetStore(reader: reader(), directory: directory(), saveDelay: .zero)
+        var trip = chat(home, "travel", "Trip to Lisbon", minutesAgo: 1)
+        trip.preview = "Booked the train"
+        var budget = chat(studio, "default", "Budget", minutesAgo: 2)
+        budget.preview = "The lisbon hotel costs more"
+        fleet.recordLive(FleetSnapshot(agents: [agent(home, "travel", "Mina")], chats: [trip], refreshedAt: Date()),
+                         hostID: home)
+        fleet.recordLive(FleetSnapshot(agents: [agent(studio, "default", "Rio")], chats: [budget],
+                                       refreshedAt: Date()), hostID: studio)
+
+        #expect(fleet.chats(matching: "lisbon").map(\.title) == ["Trip to Lisbon", "Budget"])
+        #expect(fleet.chats(matching: "TRAIN").map(\.title) == ["Trip to Lisbon"])
+        #expect(fleet.chats(on: studio, matching: "lisbon").map(\.title) == ["Budget"])
+        #expect(fleet.chats(matching: "  ").count == 2, "An empty search shows every chat")
+        #expect(fleet.chats(matching: "paris").isEmpty)
+    }
+
     /// Pinned agents from every host stay in the order the person dragged them
     /// into, after a relaunch too; a newly pinned agent joins at the end.
     @Test func pinnedAgentsKeepTheArrangedOrderAcrossHosts() async {

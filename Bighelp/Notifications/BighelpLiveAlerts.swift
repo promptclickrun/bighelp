@@ -103,10 +103,12 @@ struct BighelpLiveAlertPresenter {
         guard var sealed = BighelpSealedNotification(userInfo: alert.userInfo),
               let opened = try? open(sealed) else { return .failed }
         sealed.inlineAvatar = alert.inlineAvatar
+        // Shown already: the host hears back, so no second banner and no push.
+        guard !recent.contains(alert.eventID) else { return .kept }
         guard kindIsOn(alert.eventType) else { return .kept }
         // The chat you're looking at shows it already, like Messages. The phone
         // decides this; the host never learns which chat is on screen.
-        if false, appIsActive(), isShowing(alert.sessionReference, alert.agentID) {
+        if appIsActive(), isShowing(alert.sessionReference, alert.agentID) {
             recent.insert(alert.eventID)
             return .kept
         }

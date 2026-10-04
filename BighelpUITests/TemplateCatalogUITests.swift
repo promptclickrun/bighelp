@@ -122,7 +122,11 @@ final class TemplateCatalogUITests: BighelpUITestCase {
 
             XCTAssertEqual(app.textFields["agent.editor.name"].value as? String, "Kai")
             XCTAssertEqual(app.textFields["agent.editor.role"].value as? String, "Release coordinator")
-            let instructions = (app.textViews["agent.editor.instructions"].value as? String) ?? ""
+            save("template-form-editor-\(appearance)", app)
+            // The editor builds its rows as they scroll into view.
+            let instructionsView = app.textViews["agent.editor.instructions"]
+            for _ in 0..<5 where !instructionsView.exists { app.swipeUp() }
+            let instructions = (instructionsView.value as? String) ?? ""
             XCTAssertTrue(instructions.hasPrefix("# Kai"), instructions)
             XCTAssertTrue(instructions.contains("Role: Release coordinator"))
             XCTAssertTrue(instructions.contains("Tone: Warm."))
@@ -130,8 +134,6 @@ final class TemplateCatalogUITests: BighelpUITestCase {
                                                 : "Operating context: General work for the user."))
             XCTAssertFalse(instructions.contains("{{"), "No placeholder is left")
             XCTAssertFalse(instructions.contains("}}"))
-            save("template-form-editor-\(appearance)", app)
-            app.swipeUp()
             save("template-form-instructions-\(appearance)", app)
             app.terminate()
         }

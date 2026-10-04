@@ -1,121 +1,174 @@
-# Public avatar catalog
+# Public, color-editable avatar catalog
 
-Cloudflare Worker `bighelp-avatars`, custom domain `avatars.bighelp.app`.
-Public reads; publishing is restricted to maintainers with Cloudflare deployment access.
-There is **no public upload or mutation API**, user account, or Access seat requirement.
-The service does not modify Hermes or the Swift app.
+Cloudflare Worker **bighelp-avatars**, custom domain **avatars.bighelp.app**.
+Public reads. Only maintainers with Cloudflare deployment credentials can publish. There is no
+public upload/mutation API, sign-in requirement or per-user Access seat. No Hermes core changes.
 
-## App integration contract
+**Use AvatarKit JSON as the app's rendering source. PNGs are previews, not editable avatars.**
 
-`GET https://avatars.bighelp.app/v1/avatars.json`
+## Live endpoints
 
-JSON fields:
+- `GET https://avatars.bighelp.app/v1/avatars.json`: discovery, categories, collections, dates, asset URLs.
+- `GET https://avatars.bighelp.app/v1/avatar-kit.json`: active characters in the app's existing AvatarKit schema.
+- Each discovery entry's `kit.url`: immutable, single-character AvatarKit pack for caching and saved selections.
+- Each entry's `svg.url`: original source art. `png.url`: transparent 512×512 default-color preview.
+- `GET https://avatars.bighelp.app/NOTICES.txt`: attribution.
 
-- `schemaVersion`: `1`. Reject an unsupported major schema without replacing a good cache.
-- `revision`: opaque content revision; use the HTTP `ETag` for conditional requests.
-- `categories`: `{id, name}` entries for `bighelp` / bighelp (official first-party, `isFirstParty: true`), `faces` / Faces, `shapes` / Shapes, `seasonal` / Seasonal.
-- `sets`: currently active collections, each `{id, name, category, startsAt, expiresAt}`.
-- `avatars`: currently active choices, each `{id, name, setId, category, startsAt, expiresAt, svg, png, nativeLook?, role?}`.
-- `nextChangeAt`: UTC timestamp of the next configured start or expiry, or null.
-- `svg` and `png`: `{url, sha256, bytes, contentType}`. PNG also has `width: 512, height: 512`.
-- `nativeLook`: existing app metadata for builtin Faces and Shapes, `{style: "face"|"shape", shape, color?}`.
+All endpoints are anonymous HTTPS reads. GET/HEAD and CORS OPTIONS work; writes return 405 and unknown
+paths return 404. Do not give the app Cloudflare credentials or cookies.
 
-All timestamps have explicit offsets. A set is selectable when `startsAt == null || now >= startsAt`
-and `expiresAt == null || now < expiresAt`. Expiry is **exclusive**.
+## Categories and collections
 
-The Halloween collection is category `seasonal`, set `halloween`.
-Initial cutoff is `2026-11-03T00:00:00-06:00` (midnight starting November 3, America/Chicago),
-which is `2026-11-03T06:00:00Z`. bighelp, Faces and Shapes do not expire. The bighelp collection contains the ten maintainer-supplied official mascots; optional `role` preserves each mascot's tagline.
+| Category ID | Label | Set ID | Count | Expiry |
+|---|---|---|---:|---|
+| bighelp | bighelp | bighelp | 10 | none |
+| faces | Faces | faces | 10 | none |
+| shapes | Shapes | shapes | 8 | none |
+| seasonal | Seasonal | halloween | 10 | 2026-11-03T00:00:00-06:00 |
 
-### Client behavior
+`bighelp` is official first-party art; its category carries `isFirstParty: true`.
+Its optional `role` strings preserve the supplied mascot taglines.
 
-1. Fetch anonymously over HTTPS. No cookie, Cloudflare token, service token or host credentials.
-   Only trust `avatars.bighelp.app` URLs from this catalog; disallow redirects to other hosts.
-2. Cache the last validated catalog and use `If-None-Match` unchanged, including any `W/` prefix.
-   The server supports strong/weak validators and lists. A 304 keeps the prior body.
-3. Follow `Cache-Control` (at most five minutes, shortened before a scheduled transition).
-   Refresh on foreground/picker opening when due, coalescing concurrent fetches. Schedule an
-   in-app refresh at `nextChangeAt` while the picker is visible. Do not create an AI cron job.
-4. Apply each entry's start/expiry locally too, even when offline or a refresh fails. An empty
-   seasonal section is normal. A successfully returned empty active catalog is valid, not a network error.
-5. Preserve bundled Faces and Shapes as offline fallbacks, deduplicating by their stable look IDs.
-   Do not seed expired seasonal choices from a bundled fallback. Demo mode must stay network-free.
-6. Use PNG for remote image display/saving. The original SVG is available for compatible renderers;
-   do not assume UIImage/AsyncImage can decode arbitrary remote SVG. These are static pictures,
-   not AvatarKit characters or animated native rigs. Expiry does not erase a selected picture.
-7. Faces and Shapes are **procedural choices**, not a finite set of personal faces. Their PNG/SVG
-   files are neutral preview exports. Applying `nativeLook` through the current face/shape path
-   preserves the app's name-derived colors, randomization and editable native behavior. Do not
-   replace those controls with fixed photos unless the user explicitly chooses that behavior.
-8. Halloween choices use the image/photo save path. Clear incompatible CompanionStore and pet
-   overrides through the existing AgentEditorModel save logic, so the previous character cannot
-   keep winning over the newly selected image. Cache the downloaded PNG before saving.
-9. A selection stores avatar ID, immutable asset URL, hash, and local PNG as appropriate. When
-   its set expires, remove it from the picker **without changing an already selected avatar**.
-   Old immutable asset URLs remain public. Expiry is discovery scheduling, not access revocation.
-10. Bound catalog downloads to 2 MB and each asset to its declared size and at most 2 MB; verify
-    SHA-256 before saving. Decode unknown fields leniently and skip malformed individual entries.
-    Never discard a good cache because a request failed or a response is oversized/malformed.
-11. Test conditional refresh, offline fallback, local expiry at the exact boundary, unknown entries,
-    duplicate builtin options, saving a seasonal PNG, and preserving it after expiry. Verify native
-    UI on iPhone, Mac Catalyst and visionOS locally, never Apple builds on GitHub Actions.
+Halloween's initial cutoff is midnight **starting November 3, 2026 in America/Chicago**,
+`2026-11-03T06:00:00Z`. Expiry removes choices from discovery, not from people's saved avatars.
 
-`HEAD` and CORS preflight are supported. Unsupported paths return 404. Writes return 405.
+## Discovery schema
 
-## Maintainer operations
+- `schemaVersion`: 1.
+- `revision`: opaque content revision. Use the HTTP ETag for conditional requests.
+- `avatarKitURL`: the active combined-kit endpoint above.
+- `categories`: `{id, name, isFirstParty?}`.
+- `sets`: active `{id, name, category, startsAt, expiresAt}` collections.
+- `avatars`: active `{id, name, role?, setId, category, startsAt, expiresAt, kit, svg, png, nativeLook?}`.
+- Each `kit`, `svg`, `png` descriptor: `{url, sha256, bytes, contentType}`. PNG also has `width` and `height`.
+- `nextChangeAt`: next configured start/expiry instant, or null.
+- `nativeLook`: existing procedural Faces/Shapes metadata `{style: "face"|"shape", shape}`.
 
-From `services/avatars`:
+All dates are null or timestamps with explicit offsets. A set is active when start <= now < expiry,
+with a null boundary unbounded. Unknown optional fields should not break decoding.
+
+## Native kit contract
+
+Both the combined kit and individual immutable packs have the same top-level format as the app's
+bundled `Bighelp/Resources/AvatarKit.json`:
+
+```json
+{
+  "version": 1,
+  "states": ["idle", "listening", "thinking", "waiting", "talking", "happy", "sleeping"],
+  "themes": [],
+  "keyframes": {},
+  "characters": []
+}
+```
+
+The arrays above illustrate field types; live responses contain the actual themes and characters.
+The combined response additionally has `nextChangeAt` and `revision`, ignored by the existing decoder.
+Character IDs exactly match discovery IDs. Each character has `name`, `role`, `family: "classic"`,
+`look: 0`, `colors` and a native geometry `tree`. Coordinates are normalized into the renderer's 200×200
+art space. These are converted static SVGs, not newly authored per-state animations. Their idle style
+is the fallback for other states. A rig/body wrapper supports the existing whole-character motion path.
+
+Colors are not baked into a raster. Editable fills/strokes use `@p`, `@s`, `@a`, `@ink` slots with the
+original colors in `character.colors`. Primary `@p` is present on every avatar. Some accents/highlights
+remain literal to preserve the supplied artwork. A primary-color change affects primary surfaces;
+secondary/accent surfaces keep their own colors unless the app changes those slots too, as with the
+existing kit's colorway behavior. Slot assignments are explicit in `sources/palettes.json`.
+
+Candy Corn's SVG clipping is flattened into ordinary paths at build time. The existing native renderer
+does not need new clip support. Native Shape triangle raster/kit viewports retain its overhanging apex.
+SVG source bytes are preserved. Unsupported markup fails the build rather than silently losing art.
+
+## Paseo/app implementation requirements
+
+1. Integrate the remote kit into the existing Avatar Studio, preserving the color picker and previews.
+   Resolve geometry by string ID from an observable remote/bundled library, not only `AvatarKit.bundled`.
+   **Do not decode new IDs through the closed CompanionCharacter enum:** it falls back to lobster for
+   unknown IDs. Add a persisted remote ID/asset reference while retaining legacy enum migration.
+2. Render using `AvatarKitRenderer` and the current `AvatarKitColors`/appearance color override logic.
+   The selected custom color must remain editable after saving and reopening. Do not store the PNG as
+   the sole source. Keep the immutable kit pack and appearance settings with the saved selection.
+3. Generate a customized PNG snapshot locally only where a picture is required (host avatar, widgets,
+   other clients). Clear incompatible companion/pet overrides through the existing save path, without
+   discarding the new remote character's saved geometry or color settings.
+4. Preserve existing procedural Faces/Shapes choices and their name-derived behavior. `nativeLook`
+   maps those legacy choices; downloaded Face art uses the neutral preview seed `agent`, not the
+   current person's name. Do not replace randomization/name-following controls with a frozen preview.
+5. Merge bundled fallback choices without duplicates. A failed fetch must not erase a good cached
+   catalog or selection. Demo fixtures must remain network-free. Do not add a second settings/menu.
+6. Use HTTPS with exact allowed host `avatars.bighelp.app`, including redirects. Bound catalog/combined
+   kit and per-asset downloads to 2 MB. Verify bytes/SHA-256 before caching immutable packs. Add app-side
+   bounds for node count, nesting, path length, finite geometry and allowed native primitives; the
+   bundled decoder alone was not designed as an arbitrary network-input validator.
+7. Return ETags unchanged in `If-None-Match`, including W/. Strong/weak/list validators work. Honor 304
+   and Cache-Control (at most five minutes, shortened before the next schedule transition). Coalesce
+   requests; refresh on foreground/picker opening when due and at `nextChangeAt` while visible.
+8. Apply start/expiry on device even offline. A valid empty seasonal list is expected. At expiry hide
+   entries from the picker, but retain already selected geometry, colors and snapshots. Immutable kit,
+   SVG and PNG URLs stay public. Expiry is discovery scheduling, not access revocation or forced reset.
+9. A JSON change may add characters using current renderer features without an app update. New drawing
+   primitives/behaviors still need an app update. Do not claim arbitrary SVG animations work natively.
+10. Test cache/304/error handling, custom-color changes and persistence, unknown remote IDs, deduping,
+    precise seasonal expiry, retaining an expired selection, switching between existing/pet/remote
+    avatars, and cold/offline rendering. Verify iPhone, Mac Catalyst and visionOS locally, never Apple
+    builds in GitHub Actions. Native Mac rendering probes here are not device UI acceptance tests.
+
+## Maintainer publishing
+
+From `services/avatars`, using the authorized Cloudflare account:
 
 ```sh
 npm ci
 npm test
 npm run build
+npx wrangler deploy --dry-run
 npx wrangler deploy
+node scripts/verify-live.mjs
 ```
 
-Authenticated deployment is the only write path. No credentials belong in the app or public repository.
-Read-only users cannot change the list even if they know every URL or send forged headers.
+Only deployment credentials can change the live collection. There is no public write route or admin
+credential embedded in the application.
 
-Change an expiry, then test/build/deploy:
+Set/remove an expiry, then test, build and deploy:
 
 ```sh
 node scripts/set-expiry.mjs halloween '2026-11-03T00:00:00-06:00'
-# Remove the cutoff:
 node scripts/set-expiry.mjs halloween none
 ```
 
-A date-only value is refused because it has no timezone. Use the correct offset for the date,
-not today's offset. The script changes local `sets.json`; it is not live until deployed.
-Set `startsAt` in the same file to schedule a future collection. Request-time filtering handles
-activation/expiry with no cron, job, database mutation or new deployment at the cutoff itself.
+The script edits local `sets.json`; it is not live until deployed. Date-only/offset-free timestamps are
+refused. Use the offset appropriate for that date, including daylight saving changes. `startsAt` in
+`sets.json` schedules future collections. Request-time filtering handles activation and expiry; no
+cron, AI job or deployment is needed at the cutoff itself.
 
-### Add a set
+To add artwork:
 
-1. Add a set to `sets.json`, with unique lowercase ID, name, category, `startsAt` and `expiresAt`.
-2. Place reviewed SVGs under `sources/<set-id>/` and an `index.json` array of
-   `{id, name, file}` entries. IDs and basenames must be safe lowercase identifiers.
-3. Review art rights. Publishing is maintainer-only; community submissions are not enabled.
-4. Run tests and build. The static SVG validator rejects scripts, event handlers, external images,
-   URL paint resources, XML entities, and unsupported markup. Convert more complex SVGs to supported
-   paths/shapes before adding them; do not loosen validation just to force an upload through.
-5. Inspect the PNG previews, commit source/config and **public/assets/** together, open the PR,
-   and deploy with the authorized Cloudflare account. Read back the public list and asset hashes.
+1. Add a collection to `sets.json` and reviewed SVGs under `sources/<set-id>/`.
+2. Add its `index.json` entries `{id, name, role?, file}`. Keep IDs stable and globally unique.
+3. Add explicit palette slots for each ID in `sources/palettes.json`; `p` is mandatory. Pick surfaces
+   deliberately, not by guessing that the most frequent SVG color is the body. Preserve art rights.
+4. Build validates SVGs and exports color-aware JSON and preview PNGs. Scripts/event handlers,
+   external resources and XML entities are refused. Only supported native geometry may publish.
+5. Check native renders and color edits, commit source/config plus **public/assets/**, and deploy.
 
-Builds emit the runtime `catalog.json` and content-addressed SVG + transparent 512-square PNG files.
-`catalog.json` is generated and ignored by git. `public/assets/` is deliberately versioned and
-append-only: retaining earlier content hashes keeps already selected avatars working after edits.
-Never delete old assets as part of seasonal expiry or normal rebuilds.
+`catalog.json` is generated/ignored. `public/assets/` is deliberately versioned and append-only. Never
+remove old hashes during normal updates or seasonal expiry: saved selections depend on them.
+Rollback through Cloudflare deployments when needed; preserve published assets on subsequent uploads.
+The service is independent of the template catalog.
 
-Builtin preview sources can be regenerated using `../../scripts/export-builtin.sh` on macOS with Swift.
-That exporter compiles the app's existing pure geometry code, not the app itself, and does not change
-its Swift source. See the per-source provenance/notice files. Public attribution is at `/NOTICES.txt`.
+## Reproduction and verification
 
-## Verification and rollback
+- `npm test`: scheduling, ETags, read-only routing, SVG safety, clipping conversion, palette tokens,
+  normalized geometry, PNG rendering and expiry editing.
+- `npm run build`: validates/converts every source and generates the deployment catalog.
+- From repo root, `bash scripts/export-builtin.sh`: isolated Mac Swift export of existing Faces/Shapes,
+  checked against the app's frozen face hashes and shape/eye vectors. Does not build/change the app.
+- `python3 scripts/verify-native.py <output-directory>` from this service: compiles the app's unchanged
+  AvatarKit decoder/renderer in an isolated Mac probe over the configured SSH alias. Decodes and renders
+  every character, overrides primary to magenta and verifies each rendered image changes. PNGs permit
+  visual comparisons. It uses a test-only hex Color adapter instead of unrelated app dependencies.
+- `node scripts/verify-live.mjs`: fetches both feeds plus every referenced JSON/SVG/PNG, checks IDs,
+  sizes, hashes, PNG dimensions and JSON primary slots, plus HTTP validators and read-only behavior.
 
-`npm test` covers seasonal boundary transitions, ETags, read-only methods, asset retention routing,
-SVG validation, rasterization and expiry editing. `npm run build` validates every published source.
-Use `npx wrangler deploy --dry-run` before uploading. After deploy, fetch the catalog and every
-listed SVG/PNG, compare declared bytes and SHA-256, and test weak ETag 304 plus write rejection.
-
-Cloudflare deployment rollback restores the previous Worker/config. Retain all previously published
-content-addressed assets in every subsequent upload. The service is isolated from the template catalog.
+The Swift app itself is unchanged in this infrastructure PR. Paseo still needs to wire the library,
+remote selection persistence and native controls into the shipping app.

@@ -33,7 +33,7 @@ export async function respond(request, env, source, now = Date.now()) {
     return new Response('Read only', { status: 405, headers: { ...cors, Allow: 'GET, HEAD, OPTIONS', 'Cache-Control': 'no-store' } });
   }
   const path = new URL(request.url).pathname;
-  if (/^\/assets\/[a-f0-9]{64}\.(svg|png)$/.test(path) || path === '/NOTICES.txt') {
+  if (/^\/assets\/[a-f0-9]{64}\.(svg|png|json)$/.test(path) || path === '/NOTICES.txt') {
     const result = await env.ASSETS.fetch(request);
     const headers = new Headers(result.headers);
     for (const [key, value] of Object.entries(cors)) headers.set(key, value);
@@ -42,13 +42,18 @@ export async function respond(request, env, source, now = Date.now()) {
       ? (path === '/NOTICES.txt' ? 'public, max-age=300' : 'public, max-age=31536000, immutable') : 'no-store');
     return new Response(request.method === 'HEAD' ? null : result.body, { status: result.status, headers });
   }
-  if (path !== '/v1/avatars.json') return new Response('Not found', { status: 404, headers: { ...cors, 'Cache-Control': 'no-store' } });
+  if (!['/v1/avatars.json', '/v1/avatar-kit.json'].includes(path)) return new Response('Not found', { status: 404, headers: { ...cors, 'Cache-Control': 'no-store' } });
   const sets = source.sets.filter(s => (!s.startsAt || Date.parse(s.startsAt) <= now) && (!s.expiresAt || now < Date.parse(s.expiresAt)));
   const ids = new Set(sets.map(s => s.id));
   const transitions = source.sets.flatMap(s => [s.startsAt, s.expiresAt]).filter(Boolean).map(Date.parse).filter(t => t > now);
   const next = transitions.length ? Math.min(...transitions) : null;
   const nextChangeAt = next === null ? null : new Date(next).toISOString();
-  const data = { ...source, sets, avatars: source.avatars.filter(a => ids.has(a.setId)), nextChangeAt };
+  const { kit, ...catalog } = source;
+  const avatars = source.avatars.filter(a => ids.has(a.setId));
+  const activeIDs = new Set(avatars.map(a => a.id));
+  const data = path === '/v1/avatar-kit.json'
+    ? { ...kit, characters: kit.characters.filter(c => activeIDs.has(c.id)), nextChangeAt }
+    : { ...catalog, sets, avatars, nextChangeAt };
   const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(data)));
   const revision = Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join('');
   const etag = `"${revision}"`;

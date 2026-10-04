@@ -13,6 +13,20 @@ const env = { ASSETS: { fetch: async () => new Response('asset') } };
 const request = (path = '/v1/avatars.json', options) => new Request(`https://avatars.bighelp.app${path}`, options);
 const before = Date.parse('2026-10-04T12:00:00Z');
 
+test('native JSON endpoint filters expired characters and immutable kit files remain available', async () => {
+  const augmented = { ...source, kit: { version: 1, states: ['idle'], themes: [], keyframes: {}, characters: source.avatars.map(a => ({id:a.id})) } };
+  const response = await respond(request('/v1/avatar-kit.json'), env, augmented, before);
+  assert.equal(response.status, 200);
+  const kit = await response.json();
+  assert.equal(kit.version, 1);
+  assert.deepEqual(kit.characters.map(c=>c.id), ['face-round','halloween-bat']);
+  const after = await respond(request('/v1/avatar-kit.json'), env, augmented, Date.parse('2026-11-03T06:00:00Z'));
+  assert.deepEqual((await after.json()).characters.map(c=>c.id), ['face-round','thanksgiving-turkey']);
+  const index = await (await respond(request(),env,augmented,before)).json();
+  assert.equal(index.kit, undefined);
+  assert.equal((await respond(request('/assets/'+ 'a'.repeat(64) + '.json'),env,augmented,before)).status, 200);
+});
+
 test('seasonal transition changes ETag exactly at expiry and bounds cache lifetime', async () => {
   const cutoff = Date.parse(source.sets[1].expiresAt);
   const old = await respond(request(), env, source, cutoff - 1000);

@@ -2,6 +2,7 @@ import { readFile, writeFile, mkdir, copyFile, access } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { convertCharacter } from './kit.mjs';
 import { validateSets, validateSVG, renderPNG, idPattern } from './assets.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -9,7 +10,9 @@ const base = 'https://avatars.bighelp.app';
 const { schemaVersion, sets } = JSON.parse(await readFile(path.join(root, 'sets.json'), 'utf8'));
 if (schemaVersion !== 1) throw new Error('Unsupported source schema');
 validateSets(sets);
-const avatars = [], ids = new Set();
+const avatars = [], ids = new Set(), characters = [];
+const palettes = JSON.parse(await readFile(path.join(root, 'sources/palettes.json'), 'utf8'));
+const kitSettings = JSON.parse(await readFile(path.join(root, 'sources/kit-settings.json'), 'utf8'));
 await mkdir(path.join(root, 'public/assets'), { recursive: true });
 async function asset(bytes, extension) {
   const sha256 = createHash('sha256').update(bytes).digest('hex');
@@ -22,7 +25,7 @@ async function asset(bytes, extension) {
     if (error.code !== 'ENOENT') throw error;
     await writeFile(file, bytes);
   }
-  return { url: `${base}/assets/${sha256}.${extension}`, sha256, bytes: Buffer.byteLength(bytes), contentType: extension === 'svg' ? 'image/svg+xml' : 'image/png' };
+  return { url: `${base}/assets/${sha256}.${extension}`, sha256, bytes: Buffer.byteLength(bytes), contentType: extension === 'svg' ? 'image/svg+xml' : extension === 'png' ? 'image/png' : 'application/json' };
 }
 for (const set of sets) {
   const folder = path.join(root, 'sources', set.id);
@@ -37,15 +40,20 @@ for (const set of sets) {
     const svg = await readFile(path.join(folder, entry.file), 'utf8');
     validateSVG(svg);
     const png = renderPNG(svg);
+    if (!palettes[entry.id]?.p) throw new Error(`Missing primary palette: ${entry.id}`);
+    const character = convertCharacter(svg, entry, palettes[entry.id]);
+    characters.push(character);
+    const kit = await asset(JSON.stringify({ ...kitSettings, characters: [character] }), 'json');
     avatars.push({ id: entry.id, name: entry.name, setId: set.id, category: set.category,
       startsAt: set.startsAt, expiresAt: set.expiresAt,
       ...(entry.role ? { role: entry.role } : {}),
       ...(entry.nativeLook ? { nativeLook: entry.nativeLook } : {}),
+      kit,
       svg: await asset(svg, 'svg'), png: { ...await asset(png, 'png'), width: 512, height: 512 },
     });
   }
 }
-const catalog = { schemaVersion: 1, categories: [{ id: 'bighelp', name: 'bighelp', isFirstParty: true }, { id: 'faces', name: 'Faces' }, { id: 'shapes', name: 'Shapes' }, { id: 'seasonal', name: 'Seasonal' }], sets, avatars };
+const catalog = { schemaVersion: 1, avatarKitURL: `${base}/v1/avatar-kit.json`, kit: { ...kitSettings, characters }, categories: [{ id: 'bighelp', name: 'bighelp', isFirstParty: true }, { id: 'faces', name: 'Faces' }, { id: 'shapes', name: 'Shapes' }, { id: 'seasonal', name: 'Seasonal' }], sets, avatars };
 await writeFile(path.join(root, 'catalog.json'), JSON.stringify(catalog, null, 2) + '\n');
 await copyFile(path.join(root, 'NOTICES.txt'), path.join(root, 'public/NOTICES.txt'));
 console.log(JSON.stringify({ avatars: avatars.length, sets: sets.map(s => ({ id: s.id, count: avatars.filter(a => a.setId === s.id).length, expiresAt: s.expiresAt })) }));

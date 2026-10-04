@@ -2,6 +2,8 @@ import { env } from "cloudflare:test";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import first from "../migrations/0001_templates.sql?raw";
 import second from "../migrations/0002_submitter_details.sql?raw";
+import third from "../migrations/0003_agent_installs.sql?raw";
+import type { GitHubLookup } from "../src/agents.js";
 import { type Env, type HumanCheck, handle } from "../src/index.js";
 
 const testEnv = env as unknown as Env;
@@ -11,9 +13,17 @@ let publicJwk: JsonWebKey & { kid: string };
 const keys = async () => [publicJwk];
 // Stands in for Turnstile: only "human" passes.
 const human: HumanCheck = async (token) => token === "human";
+// Stands in for GitHub's /user: "gh-<id>" tokens belong to a five-year-old account, "gh-new" to a week-old one.
+const githubLookups: string[] = [];
+const github: GitHubLookup = async (token) => {
+  githubLookups.push(token);
+  if (token === "gh-new") return { id: "900", login: "fresh", createdAt: new Date(Date.now() - 7 * 86_400_000) };
+  const match = /^gh-(\d+)$/.exec(token);
+  return match ? { id: match[1]!, login: `dev${match[1]}`, createdAt: new Date("2020-01-01T00:00:00Z") } : null;
+};
 
 beforeAll(async () => {
-  for (const statement of (first + ";" + second).replace(/^--.*$/gm, "").split(";").map((value: string) => value.trim()).filter(Boolean)) {
+  for (const statement of [first, second, third].join(";").replace(/^--.*$/gm, "").split(";").map((value: string) => value.trim()).filter(Boolean)) {
     await testEnv.DB.prepare(statement).run();
   }
   keyPair = await crypto.subtle.generateKey(
@@ -24,7 +34,10 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  await testEnv.DB.prepare("DELETE FROM templates").run();
+  for (const table of ["templates", "agent_installs", "banned_github_ids"]) {
+    await testEnv.DB.prepare(`DELETE FROM ${table}`).run();
+  }
+  githubLookups.length = 0;
 });
 
 function base64url(input: string | ArrayBuffer): string {
@@ -44,17 +57,18 @@ async function token(claims: Record<string, unknown>): Promise<string> {
 
 async function call(
   path: string,
-  init: { method?: string; body?: unknown; jwt?: string; origin?: string; ip?: string } = {},
+  init: { method?: string; body?: unknown; jwt?: string; origin?: string; ip?: string; bearer?: string } = {},
 ): Promise<Response> {
   const headers = new Headers({ "Content-Type": "application/json", "CF-Connecting-IP": init.ip ?? "203.0.113.7" });
   if (init.jwt) headers.set("Cf-Access-Jwt-Assertion", init.jwt);
   if (init.origin) headers.set("Origin", init.origin);
+  if (init.bearer) headers.set("Authorization", `Bearer ${init.bearer}`);
   const request = new Request(`https://catalog.example${path}`, {
     method: init.method ?? "GET",
     headers,
     body: init.body === undefined ? undefined : JSON.stringify(init.body),
   });
-  return handle(request, testEnv, { keys, human });
+  return handle(request, testEnv, { keys, human, github });
 }
 
 const sam = { submitterName: "Sam Rivera", username: "@samr", email: "Sam@Example.com", turnstileToken: "human" };
@@ -153,6 +167,93 @@ describe("submissions", () => {
       expect((await submit(blueprint, { email: `person${index}@example.com` })).status).toBe(201);
     }
     expect((await submit(blueprint, { email: "fresh@example.com" })).status).toBe(429);
+  });
+});
+
+/** Signs an install in with a fake GitHub token and returns its install token. */
+async function register(githubToken: string): Promise<string> {
+  const response = await call("/agent/register", { method: "POST", body: { githubToken } });
+  expect(response.status).toBe(201);
+  return (await response.json<{ token: string }>()).token;
+}
+
+const agentSubmit = (bearer: string | undefined, body: unknown = blueprint) =>
+  call("/submit/agent/templates", { method: "POST", body, bearer });
+
+describe("agent submissions", () => {
+  it("trades a GitHub sign-in for an install token and never keeps the GitHub token", async () => {
+    const response = await call("/agent/register", { method: "POST", body: { githubToken: "gh-42" } });
+    expect(response.status).toBe(201);
+    const body = await response.json<{ token: string; login: string; dailyLimit: number }>();
+    expect(body).toMatchObject({ login: "dev42", dailyLimit: 5 });
+    expect(body.token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    const stored = JSON.stringify((await testEnv.DB.prepare("SELECT * FROM agent_installs").all()).results);
+    expect(stored).not.toContain("gh-42");
+    expect(stored).not.toContain(body.token);
+  });
+
+  it("refuses unknown GitHub tokens and accounts younger than 30 days", async () => {
+    expect((await call("/agent/register", { method: "POST", body: { githubToken: "nope" } })).status).toBe(401);
+    const young = await call("/agent/register", { method: "POST", body: { githubToken: "gh-new" } });
+    expect(young.status).toBe(403);
+    expect((await young.json<{ error: string }>()).error).toContain("30 days");
+  });
+
+  it("queues a submission for review with the GitHub login as credit", async () => {
+    const response = await agentSubmit(await register("gh-42"), agent);
+    expect(response.status).toBe(201);
+    const { id, statusToken, remainingToday } = await response.json<{ id: string; statusToken: string; remainingToday: number }>();
+    expect(remainingToday).toBe(4);
+    expect((await status(statusToken)).submissions).toEqual([expect.objectContaining({ id, status: "pending" })]);
+    const row = await (await call(`/review/templates/${id}`, { jwt: await reviewer() })).json<Record<string, unknown>>();
+    expect(row).toMatchObject({ credit: "dev42", submitterUsername: "dev42", submitterGithubId: "42", submitterEmail: null });
+  });
+
+  it("needs a signed-in install", async () => {
+    expect((await agentSubmit(undefined)).status).toBe(401);
+    expect((await agentSubmit("x".repeat(43))).status).toBe(401);
+  });
+
+  it("counts 5 a day per GitHub account across all its installs", async () => {
+    const [first, second] = [await register("gh-42"), await register("gh-42")];
+    for (let index = 0; index < 5; index += 1) {
+      expect((await agentSubmit(index % 2 ? first : second)).status).toBe(201);
+    }
+    expect((await agentSubmit(first)).status).toBe(429);
+    expect((await agentSubmit(await register("gh-42"))).status).toBe(429);
+    expect((await agentSubmit(await register("gh-7"))).status).toBe(201);
+  });
+
+  it("stops a revoked install", async () => {
+    const token = await register("gh-42");
+    expect(await (await call("/agent/revoke", { method: "POST", bearer: token })).json()).toEqual({ revoked: true });
+    expect((await agentSubmit(token)).status).toBe(401);
+  });
+
+  it("lets reviewers ban an account: its installs stop and it can't sign in again until unbanned", async () => {
+    const token = await register("gh-42");
+    const banned = await call("/review/accounts/42/ban", { method: "POST", body: { note: "spam" }, jwt: await reviewer() });
+    expect(await banned.json()).toMatchObject({ banned: true, installsRemoved: 1 });
+    expect((await agentSubmit(token)).status).toBe(401);
+    expect((await call("/agent/register", { method: "POST", body: { githubToken: "gh-42" } })).status).toBe(403);
+    expect((await call("/review/accounts/42/unban", { method: "POST", jwt: await reviewer() })).status).toBe(200);
+    expect((await agentSubmit(await register("gh-42"))).status).toBe(201);
+  });
+
+  it("keeps ban and unban behind review sign-in", async () => {
+    expect((await call("/review/accounts/42/ban", { method: "POST" })).status).toBe(401);
+  });
+
+  it("closes every submit route once 200 community templates are waiting", async () => {
+    const statement = testEnv.DB.prepare(
+      `INSERT INTO templates (id, kind, status, source, payload, created_at, updated_at)
+       VALUES (?, 'blueprint', 'pending', 'community', '{}', '2020-01-01T00:00:00Z', '2020-01-01T00:00:00Z')`,
+    );
+    await testEnv.DB.batch(Array.from({ length: 200 }, (_, index) => statement.bind(`bp-full-${index}`)));
+    const full = await agentSubmit(await register("gh-42"));
+    expect(full.status).toBe(429);
+    expect((await full.json<{ error: string }>()).error).toContain("queue is full");
+    expect((await submit(blueprint)).status).toBe(429);
   });
 });
 

@@ -3,12 +3,17 @@
 //
 //   /v1/*        public, approved templates only (the app and the site read these)
 //   /submit/*    public, Turnstile-checked: submit with a name, username and email; check status by receipt
+//   /agent/*     the bighelp plugin trades a GitHub sign-in for an install token, or gives one back
+//   /submit/agent/templates   agents submit with that install token; limits count per GitHub account
 //   /review/*    behind Cloudflare Access (maintainer email or an agent's service token): review queue
 
 import { type AccessConfig, type KeySource, type Principal, fetchAccessKeys, verifyAccess } from "./access.js";
 import {
-  type TemplateRow, approved, byStatusTokens, find, insert, list, publicView, remove, review, reviewView,
-  submitterLoad, submitterView, toTemplate,
+  type GitHubLookup, addInstall, ban, githubUser, installFor, isBanned, removeInstall, unban,
+} from "./agents.js";
+import {
+  type TemplateRow, approved, byStatusTokens, find, githubLoad, insert, list, pendingCommunityCount, publicView,
+  remove, review, reviewView, submitterLoad, submitterView, toTemplate,
 } from "./store.js";
 import {
   BLUEPRINT_CATEGORIES, type BlueprintPayload, type TemplateKind, type TemplateStatus, ValidationError,
@@ -29,6 +34,7 @@ export type HumanCheck = (token: string, ip: string | null, secret: string) => P
 export interface Dependencies {
   keys?: KeySource;
   human?: HumanCheck;
+  github?: GitHubLookup;
   now?: () => Date;
 }
 
@@ -37,6 +43,12 @@ const MAX_PENDING_PER_SUBMITTER = 10;
 const MAX_SUBMISSIONS_PER_DAY = 10;
 const MAX_SUBMISSIONS_PER_NETWORK_PER_DAY = 20;
 const MAX_STATUS_TOKENS = 50;
+/** Agent submissions per GitHub account per day, across all of its installs and hosts. */
+const MAX_AGENT_SUBMISSIONS_PER_DAY = 5;
+/** GitHub accounts younger than this can't sign in: throwaway accounts are the one way around the limits. */
+const MIN_GITHUB_ACCOUNT_AGE_DAYS = 30;
+/** Backstop on review load: past this many community templates waiting, every submit route says try later. */
+const MAX_PENDING_COMMUNITY = 200;
 const GROUP_TITLES: Record<(typeof BLUEPRINT_CATEGORIES)[number], string> = {
   productivity: "Productivity",
   marketing: "Marketing",
@@ -69,8 +81,14 @@ export async function handle(request: Request, env: Env, deps: Dependencies = {}
     if (path.startsWith("/v1/")) {
       return withHeaders(await publicRoute(request, env, path), cors);
     }
+    if (path === "/submit/agent/templates") {
+      return withHeaders(await agentSubmitRoute(request, env, now()), cors, true);
+    }
     if (path.startsWith("/submit/")) {
       return withHeaders(await submitRoute(request, env, path, deps.human ?? siteverify, now()), cors, true);
+    }
+    if (path.startsWith("/agent/")) {
+      return withHeaders(await agentRoute(request, env, path, deps.github ?? githubUser, now()), cors, true);
     }
     if (path === "/review" || path.startsWith("/review/")) {
       const principal = await verifyAccess(request, accessConfig(env, env.ACCESS_AUD_REVIEW), keys);
@@ -195,6 +213,7 @@ async function submitRoute(
     if (!turnstile || turnstile.length > 2048 || !(await human(turnstile, ip, env.TURNSTILE_SECRET))) {
       throw new HttpError(403, "We couldn't confirm you're a person. Try the check again.");
     }
+    await requireQueueRoom(env.DB);
     const ipHash = await hmac(env.TURNSTILE_SECRET, `ip:${ip ?? "unknown"}`);
     const dayAgo = new Date(now.getTime() - 86_400_000).toISOString();
     const load = await submitterLoad(env.DB, submitter.email, ipHash, dayAgo);
@@ -237,12 +256,81 @@ async function siteverify(token: string, ip: string | null, secret: string): Pro
   return result.success === true;
 }
 
+// MARK: - Agents (through the bighelp plugin)
+
+async function agentRoute(
+  request: Request, env: Env, path: string, github: GitHubLookup, now: Date,
+): Promise<Response> {
+  if (request.method !== "POST") return error(405, "Use POST.");
+  if (path === "/agent/register") {
+    const body = await readJson(request);
+    const githubToken = isRecord(body) && typeof body.githubToken === "string" ? body.githubToken.trim() : "";
+    if (!githubToken || githubToken.length > 512) throw new ValidationError("githubToken", "Send the GitHub token.");
+    // The GitHub token is used for this one lookup and never stored.
+    const user = await github(githubToken);
+    if (!user) throw new HttpError(401, "GitHub didn't accept that sign-in. Sign in again.");
+    if (now.getTime() - user.createdAt.getTime() < MIN_GITHUB_ACCOUNT_AGE_DAYS * 86_400_000) {
+      throw new HttpError(403, `GitHub accounts need to be at least ${MIN_GITHUB_ACCOUNT_AGE_DAYS} days old to submit templates.`);
+    }
+    if (await isBanned(env.DB, user.id)) throw new HttpError(403, "This GitHub account can't submit templates.");
+    const token = randomToken();
+    await addInstall(env.DB, user, await sha256(token), now.toISOString());
+    return json({ token, login: user.login, dailyLimit: MAX_AGENT_SUBMISSIONS_PER_DAY }, 201);
+  }
+  if (path === "/agent/revoke") {
+    const token = bearer(request);
+    const revoked = token ? await removeInstall(env.DB, await sha256(token)) : false;
+    return json({ revoked });
+  }
+  return error(404, "Not found.");
+}
+
+async function agentSubmitRoute(request: Request, env: Env, now: Date): Promise<Response> {
+  if (request.method !== "POST") return error(405, "Use POST.");
+  const token = bearer(request);
+  const install = token ? await installFor(env.DB, await sha256(token), now.toISOString()) : null;
+  if (!install) throw new HttpError(401, "This install isn't signed in. Run the catalog sign-in again.");
+  const body = await readJson(request);
+  const template = parseTemplate(body);
+  await requireQueueRoom(env.DB);
+  const load = await githubLoad(env.DB, install.github_id, new Date(now.getTime() - 86_400_000).toISOString());
+  if (load.pending >= MAX_PENDING_PER_SUBMITTER) {
+    throw new HttpError(429, "You have 10 templates waiting for review. Try again once some are reviewed.");
+  }
+  if (load.recent >= MAX_AGENT_SUBMISSIONS_PER_DAY) {
+    throw new HttpError(429, `That's ${MAX_AGENT_SUBMISSIONS_PER_DAY} templates today. Try again tomorrow.`);
+  }
+  const statusToken = randomToken();
+  const id = newId(template.kind);
+  await insert(env.DB, {
+    id, template, status: "pending", source: "community", creditName: install.github_login,
+    submitter: { username: install.github_login, githubId: install.github_id, statusTokenHash: await sha256(statusToken) },
+    now: now.toISOString(),
+  });
+  return json({
+    id, status: "pending", statusToken, credit: install.github_login,
+    remainingToday: MAX_AGENT_SUBMISSIONS_PER_DAY - load.recent - 1,
+  }, 201);
+}
+
+async function requireQueueRoom(db: D1Database): Promise<void> {
+  if (await pendingCommunityCount(db) >= MAX_PENDING_COMMUNITY) {
+    throw new HttpError(429, "The review queue is full right now. Try again in a few days.");
+  }
+}
+
+function bearer(request: Request): string | null {
+  const match = /^Bearer ([A-Za-z0-9_-]{43})$/.exec(request.headers.get("Authorization") ?? "");
+  return match?.[1] ?? null;
+}
+
 // MARK: - Reviewers (Colt, Alfie and other agents)
 
 async function reviewRoute(
   request: Request, env: Env, path: string, url: URL, reviewer: string, now: Date,
 ): Promise<Response> {
   const segments = path.split("/").filter(Boolean); // ["review", "templates", id?, action?]
+  if (segments[1] === "accounts") return reviewAccountRoute(request, env, segments, reviewer, now);
   if (segments[1] !== "templates") return error(404, "Not found.");
   const [, , id, action] = segments;
 
@@ -318,6 +406,22 @@ async function reviewRoute(
   return json(reviewView((await find(env.DB, id))!));
 }
 
+/** `/review/accounts/<github id>/ban|unban`: stop or restore one GitHub account's agent submissions. */
+async function reviewAccountRoute(
+  request: Request, env: Env, segments: string[], reviewer: string, now: Date,
+): Promise<Response> {
+  const [, , githubId, action] = segments;
+  if (!githubId || !/^[0-9]{1,20}$/.test(githubId)) return error(404, "Use a numeric GitHub user ID.");
+  if (request.method !== "POST") return error(405, "Use POST.");
+  if (action === "ban") {
+    const body = await readJson(request, true);
+    const note = parseReviewNote(isRecord(body) ? body.note : undefined, false);
+    return json(await ban(env.DB, githubId, reviewer, note, now.toISOString()));
+  }
+  if (action === "unban") return json(await unban(env.DB, githubId));
+  return error(404, "Actions are ban and unban.");
+}
+
 function reviewerName(principal: Principal): string {
   return principal.email ?? `service-token:${principal.serviceTokenId ?? "unknown"}`;
 }
@@ -363,7 +467,7 @@ function oneOfOrUndefined<const T extends readonly string[]>(value: string | nul
 const PUBLIC_CORS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
   "Access-Control-Max-Age": "600",
 };
 

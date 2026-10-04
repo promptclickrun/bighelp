@@ -18,6 +18,8 @@ struct AgentSoulTemplate: Identifiable, Equatable, Sendable {
     /// Who shared a community template, shown as "by @credit".
     var credit: String? = nil
     var isCommunity = false
+    /// When the catalog last changed it; nil for bundled ones.
+    var updatedAt: Date? = nil
 
     /// The personality text with `{{agent_name}}` still in it.
     var soul: String? {

@@ -28,6 +28,7 @@ struct AgentStartPicker: View {
     @Bindable var library: AgentTemplateLibrary
     @State private var renaming: SavedAgentTemplate?
     @State private var renameText = ""
+    @State private var isBrowsingTemplates = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: BighelpTokens.space12) {
@@ -50,7 +51,7 @@ struct AgentStartPicker: View {
                              credit: template.isCommunity ? template.credit : nil,
                              systemImage: template.systemImage, selected: "builtin:\(template.id)",
                              identifier: "agent.editor.template.\(template.id)") {
-                            model.startFrom(template)
+                            pick(template)
                         }
                         .accessibilityHint("Fills in its role, vibe and personality. Your agent's name goes into it.")
                     }
@@ -58,11 +59,21 @@ struct AgentStartPicker: View {
                 note(model.appliedTemplateID?.hasPrefix("builtin:") == true
                      ? "Its personality is in Instructions below, with your agent's name filled in."
                      : "Each is a full personality. Pick one, then give your agent its name.")
-                Link(destination: TemplateCatalogPolicy.submitURL) {
-                    Label("Share yours", systemImage: "square.and.arrow.up")
-                        .font(.bighelp(.footnote).weight(.semibold))
+                HStack {
+                    Button {
+                        isBrowsingTemplates = true
+                    } label: {
+                        Label("Browse all \(AgentSoulTemplate.all.count)", systemImage: "square.grid.2x2")
+                            .font(.bighelp(.footnote).weight(.semibold))
+                    }
+                    .accessibilityIdentifier("agent.editor.templates.browse")
+                    Spacer()
+                    Link(destination: TemplateCatalogPolicy.submitURL) {
+                        Label("Share yours", systemImage: "square.and.arrow.up")
+                            .font(.bighelp(.footnote).weight(.semibold))
+                    }
+                    .accessibilityIdentifier("agent.editor.templates.share")
                 }
-                .accessibilityIdentifier("agent.editor.templates.share")
             case .saved:
                 if library.templates.isEmpty {
                     note("No saved templates yet. Save one from an agent's Edit screen or by holding it in Agents.")
@@ -94,6 +105,10 @@ struct AgentStartPicker: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .sheet(isPresented: $isBrowsingTemplates) {
+            AgentTemplateBrowser { pick($0) }
+                .bighelpSheetSize(.large)
+        }
         .alert("Rename template", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
             TextField("Name", text: $renameText)
             Button("Cancel", role: .cancel) { renaming = nil }
@@ -102,6 +117,11 @@ struct AgentStartPicker: View {
                 renaming = nil
             }
         }
+    }
+
+    private func pick(_ template: AgentSoulTemplate) {
+        TemplateUsage.shared.recordUse(AgentTemplateBrowsing.usageID(template))
+        model.startFrom(template)
     }
 
     private func carousel<Content: View>(@ViewBuilder _ content: @escaping () -> Content) -> some View {

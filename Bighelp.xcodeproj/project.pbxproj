@@ -444,6 +444,7 @@
 		559749A262264BF95DD6AEBB /* UsageExportCSV.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86558B0A0648697B13F8EF90 /* UsageExportCSV.swift */; };
 		55CF2FA1F062A3352A809DF5 /* ScriptedVoiceInputLevelSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CABEDA0CF0B5BF22DE145DE /* ScriptedVoiceInputLevelSource.swift */; };
 		5606DB188A589F5B4862AF9E /* BighelpManagedLiveActivityRegistrar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D7745D5E94F1FD8C5764702 /* BighelpManagedLiveActivityRegistrar.swift */; };
+		562B523D2568D03C42DCBC76 /* TemplateCatalogUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBD533A9FF9B1BB710AF3F81 /* TemplateCatalogUITests.swift */; };
 		563F1A73B2B3159E89F27834 /* ProviderLogoStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AD5C5D32BA1CD651DCF7F2D /* ProviderLogoStoreTests.swift */; };
 		5668A121916F51DA9276A145 /* UsageSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 044F71569210C6A2E1914814 /* UsageSections.swift */; };
 		56A0D72C05321B3D12F213C6 /* BighelpGlassGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0301ED2BC34B085E0DC13039 /* BighelpGlassGroup.swift */; };
@@ -1150,6 +1151,7 @@
 		E5AE72FCAF0D598E265BF605 /* ProfileLifecycleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4B3EF4DE0B3F0D3F8FF8DA5 /* ProfileLifecycleView.swift */; };
 		E5ED0E414BA70426E622F483 /* HostAccessEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFE0A4000866389A931340CB /* HostAccessEditorView.swift */; };
 		E631FB670F611061813B80C9 /* ModelNameCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06E0752CDEB93F69DFC3661C /* ModelNameCatalogTests.swift */; };
+		E67563B3E12A73308A799A38 /* AgentTemplateBrowser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B51E351013BB3D09F5BF96A /* AgentTemplateBrowser.swift */; };
 		E6B5DA183CBCD546DCAABD9B /* ChatLayoutPreferencesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F26A9153E01384FF3334E701 /* ChatLayoutPreferencesTests.swift */; };
 		E6BE2C3667CEEEBA7A13FB3A /* RichDraftRecoveryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9341CEE698D541FD92FE8E4B /* RichDraftRecoveryStore.swift */; };
 		E76DFCD3004B26CC4F2D656E /* SessionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D5EB7AE597E41A68DBA8FAD /* SessionsView.swift */; };
@@ -1932,6 +1934,7 @@
 		6A8EFA755488AC962B573043 /* DirectHermesConversationClient+Queued.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DirectHermesConversationClient+Queued.swift"; sourceTree = "<group>"; };
 		6AC7DF2F678C14DF3F82F320 /* SessionSubagentPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionSubagentPresentation.swift; sourceTree = "<group>"; };
 		6ADD22141655C8ECEAAAFF20 /* FixtureWorkspaceManagementClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixtureWorkspaceManagementClient.swift; sourceTree = "<group>"; };
+		6B51E351013BB3D09F5BF96A /* AgentTemplateBrowser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentTemplateBrowser.swift; sourceTree = "<group>"; };
 		6B7A896B2C3D652785254B28 /* SystemPageUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemPageUITests.swift; sourceTree = "<group>"; };
 		6BAB935FB2C454D6B7A963BB /* NewChatCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewChatCoordinator.swift; sourceTree = "<group>"; };
 		6BE74E54DB93F0E290670B40 /* BighelpSheetSize.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpSheetSize.swift; sourceTree = "<group>"; };
@@ -2342,6 +2345,7 @@
 		BB08330B2C6BB34444CAE4B9 /* ProfileLifecycleStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileLifecycleStore.swift; sourceTree = "<group>"; };
 		BB65AD325A6BC9301CF2010A /* UsageExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageExport.swift; sourceTree = "<group>"; };
 		BB90671104D35742A479E374 /* WorkspaceInventoryDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceInventoryDecoder.swift; sourceTree = "<group>"; };
+		BBD533A9FF9B1BB710AF3F81 /* TemplateCatalogUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateCatalogUITests.swift; sourceTree = "<group>"; };
 		BC406E40BA9D2F66AE2CEDA4 /* WorkspaceManagementDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceManagementDecoder.swift; sourceTree = "<group>"; };
 		BC59500AEED985EECAA4D71F /* ModelNameCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelNameCatalog.swift; sourceTree = "<group>"; };
 		BC6852D3CBD505DB72BC5F00 /* DirectHermesAdministrationCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectHermesAdministrationCodec.swift; sourceTree = "<group>"; };
@@ -3360,6 +3364,7 @@
 				9E07486D08776DE6DC09087A /* AgentsPresentation.swift */,
 				A196966B973298711CDD11ED /* AgentStartPicker.swift */,
 				3EE9EB659F86107004A3BEE6 /* AgentsView.swift */,
+				6B51E351013BB3D09F5BF96A /* AgentTemplateBrowser.swift */,
 				363125E35F32B409045A5DD4 /* AgentTemplateLibrary.swift */,
 				39E2D77A3FB09D926BCE99A5 /* AvatarCreatorView.swift */,
 				53997E89846DCEC17CBF0EF3 /* Petdex */,
@@ -3918,6 +3923,7 @@
 				BEA440374C1140D7507772AD /* SilentReplyUITests.swift */,
 				B786BE6FB911654CE87D487D /* SubagentCanvasUITests.swift */,
 				6B7A896B2C3D652785254B28 /* SystemPageUITests.swift */,
+				BBD533A9FF9B1BB710AF3F81 /* TemplateCatalogUITests.swift */,
 				2D1E11795B7E88BB7F60730C /* ToolDisclosureUITests.swift */,
 				997B937232851A556998C545 /* UsageNavigationUITests.swift */,
 				148206AE5A6AE634180F1E0B /* WeatherCardsUITests.swift */,
@@ -5103,6 +5109,7 @@
 				A4146827B760FF893C53D2FA /* AgentShortcutsView.swift in Sources */,
 				DFFEDACD945D5232FC4F56B9 /* AgentSoulTemplates.swift in Sources */,
 				B1E018B4E66E93621FD75071 /* AgentStartPicker.swift in Sources */,
+				E67563B3E12A73308A799A38 /* AgentTemplateBrowser.swift in Sources */,
 				8ACC3ADA08598009A4B2CBAE /* AgentTemplateLibrary.swift in Sources */,
 				F8D10C4C83902547DB0CA33C /* AgentsAcceptanceFixture.swift in Sources */,
 				25F2AE0AEF5D0DF35EDA7875 /* AgentsDirectoryComponents.swift in Sources */,
@@ -6349,6 +6356,7 @@
 				D286C368BB84B88A155CC0B8 /* SilentReplyUITests.swift in Sources */,
 				CD53051F93E86414FE833F0F /* SubagentCanvasUITests.swift in Sources */,
 				299D2D9354374582D51BED53 /* SystemPageUITests.swift in Sources */,
+				562B523D2568D03C42DCBC76 /* TemplateCatalogUITests.swift in Sources */,
 				6E06FD7A158360A66779DB29 /* ToolDisclosureUITests.swift in Sources */,
 				8D9B0E73D8D88ABC2AC19614 /* UsageNavigationUITests.swift in Sources */,
 				B05C0BE552D68EDA30874BB8 /* WeatherCardsUITests.swift in Sources */,

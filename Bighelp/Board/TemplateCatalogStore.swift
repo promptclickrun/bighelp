@@ -6,8 +6,8 @@ import UIKit
 /// templates without an app update. Public, read-only, approved items only.
 enum TemplateCatalogPolicy {
     static let host = "catalog.bighelp.app"
-    static let blueprintsURL = URL(string: "https://catalog.bighelp.app/v1/board-blueprints.json")!
-    static let agentTemplatesURL = URL(string: "https://catalog.bighelp.app/v1/agent-templates.json")!
+    /// Blueprints and agent templates in one file, each with its source (bighelp or community) and date.
+    static let catalogURL = URL(string: "https://catalog.bighelp.app/v1/catalog.json")!
     /// Where people send their own; there's no in-app form.
     static let submitURL = URL(string: "https://bighelp.app/templates#submit")!
     static let maximumBytes = 1_048_576
@@ -80,19 +80,9 @@ final class TemplateCatalogStore {
     @ObservationIgnored private let now: () -> Date
     @ObservationIgnored private var refreshing: Task<Void, Never>?
 
-    static let fetchedAtKey = "bighelp.template-catalog.fetched-at"
-
-    enum File: String, CaseIterable {
-        case blueprints = "board-blueprints"
-        case agentTemplates = "agent-templates"
-
-        var url: URL {
-            switch self {
-            case .blueprints: TemplateCatalogPolicy.blueprintsURL
-            case .agentTemplates: TemplateCatalogPolicy.agentTemplatesURL
-            }
-        }
-    }
+    /// A new key with the one-file catalog, so the first launch after updating fetches it at once.
+    static let fetchedAtKey = "bighelp.template-catalog.v2.fetched-at"
+    private static let cacheName = "catalog"
 
     init(transport: any TemplateCatalogFetching, cacheDirectory: URL?, defaults: UserDefaults = .standard,
          isEnabled: Bool = true, now: @escaping () -> Date = Date.init) {
@@ -101,18 +91,10 @@ final class TemplateCatalogStore {
         self.defaults = defaults
         self.isEnabled = isEnabled
         self.now = now
-        let bundled = (try? BoardBlueprintCatalog.bundled()) ?? .empty
-        blueprints = bundled
+        blueprints = (try? BoardBlueprintCatalog.bundled()) ?? .empty
         agentTemplates = AgentSoulTemplate.bundled
-        guard isEnabled else { return }
-        if let data = Self.read(.blueprints, in: cacheDirectory),
-           let cached = try? BoardBlueprintCatalog(data: data), cached.count > 0 {
-            blueprints = cached
-        }
-        if let data = Self.read(.agentTemplates, in: cacheDirectory) {
-            let cached = AgentSoulTemplate.remote(data)
-            if !cached.isEmpty { agentTemplates = cached }
-        }
+        guard isEnabled, let data = Self.read(in: cacheDirectory) else { return }
+        apply(data)
     }
 
     /// Demo fixtures and tests keep the bundled data and never touch the network.
@@ -146,58 +128,64 @@ final class TemplateCatalogStore {
     }
 
     private func refresh() async {
-        var answered = false
-        for file in File.allCases {
-            let cached = Self.read(file, in: cacheDirectory)
-            let etag = cached == nil ? nil : Self.readETag(file, in: cacheDirectory)
-            guard let result = try? await transport.fetch(file.url, etag: etag) else { continue }
-            answered = true
-            guard case .fetched(let data, let newETag) = result, accept(data, for: file) else { continue }
-            Self.write(file, data: data, etag: newETag, in: cacheDirectory)
-        }
-        if answered { defaults.set(now(), forKey: Self.fetchedAtKey) }
+        let cached = Self.read(in: cacheDirectory)
+        let etag = cached == nil ? nil : Self.readETag(in: cacheDirectory)
+        guard let result = try? await transport.fetch(TemplateCatalogPolicy.catalogURL, etag: etag) else { return }
+        defaults.set(now(), forKey: Self.fetchedAtKey)
+        guard case .fetched(let data, let newETag) = result, apply(data) else { return }
+        Self.write(data: data, etag: newETag, in: cacheDirectory)
     }
 
-    /// Publishes a download only when it holds at least one good item.
-    private func accept(_ data: Data, for file: File) -> Bool {
-        switch file {
-        case .blueprints:
-            guard let catalog = try? BoardBlueprintCatalog(data: data), catalog.count > 0 else { return false }
-            blueprints = catalog
-        case .agentTemplates:
-            let templates = AgentSoulTemplate.remote(data)
-            guard !templates.isEmpty else { return false }
-            agentTemplates = templates
+    /// Publishes each half of a download only when it holds at least one good item; returns whether
+    /// anything in it was good.
+    @discardableResult
+    private func apply(_ data: Data) -> Bool {
+        guard data.count <= TemplateCatalogPolicy.maximumBytes,
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return false }
+        var accepted = false
+        if let rows = object["blueprints"] as? [Any] {
+            let catalog = BoardBlueprintCatalog(catalogRows: rows)
+            if catalog.count > 0 { blueprints = catalog; accepted = true }
         }
-        return true
+        if let rows = object["agents"] as? [Any] {
+            let templates = AgentSoulTemplate.remote(rows: rows)
+            if !templates.isEmpty { agentTemplates = templates; accepted = true }
+        }
+        return accepted
     }
 
     // MARK: Cache
 
-    private static func read(_ file: File, in directory: URL?) -> Data? {
-        guard let url = directory?.appending(path: file.rawValue + ".json"),
+    private static func read(in directory: URL?) -> Data? {
+        guard let url = directory?.appending(path: cacheName + ".json"),
               let data = try? Data(contentsOf: url), !data.isEmpty,
               data.count <= TemplateCatalogPolicy.maximumBytes else { return nil }
         return data
     }
 
-    private static func readETag(_ file: File, in directory: URL?) -> String? {
-        guard let url = directory?.appending(path: file.rawValue + ".etag"),
+    private static func readETag(in directory: URL?) -> String? {
+        guard let url = directory?.appending(path: cacheName + ".etag"),
               let text = try? String(contentsOf: url, encoding: .utf8), !text.isEmpty, text.utf8.count <= 256 else {
             return nil
         }
         return text
     }
 
-    private static func write(_ file: File, data: Data, etag: String?, in directory: URL?) {
+    private static func write(data: Data, etag: String?, in directory: URL?) {
         guard let directory else { return }
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        try? data.write(to: directory.appending(path: file.rawValue + ".json"), options: .atomic)
-        let etagURL = directory.appending(path: file.rawValue + ".etag")
+        try? data.write(to: directory.appending(path: cacheName + ".json"), options: .atomic)
+        let etagURL = directory.appending(path: cacheName + ".etag")
         if let etag, etag.utf8.count <= 256 {
             try? Data(etag.utf8).write(to: etagURL, options: .atomic)
         } else {
             try? FileManager.default.removeItem(at: etagURL)
+        }
+        // The two separate files 2.3.0 (73) kept aren't read any more.
+        for old in ["board-blueprints", "agent-templates"] {
+            for suffix in [".json", ".etag"] {
+                try? FileManager.default.removeItem(at: directory.appending(path: old + suffix))
+            }
         }
     }
 }
@@ -209,6 +197,11 @@ extension AgentSoulTemplate {
         guard data.count <= TemplateCatalogPolicy.maximumBytes,
               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let rows = object["templates"] as? [Any] else { return [] }
+        return remote(rows: rows)
+    }
+
+    /// The catalog's agent rows (`templates` in agent-templates.json, `agents` in catalog.json).
+    static func remote(rows: [Any]) -> [AgentSoulTemplate] {
         var seen = Set<String>()
         return rows.prefix(500).compactMap { value -> AgentSoulTemplate? in
             guard let row = value as? [String: Any] else { return nil }
@@ -228,8 +221,48 @@ extension AgentSoulTemplate {
             return AgentSoulTemplate(
                 id: id, title: name, profile: role, voice: text("vibe", max: 160) ?? "",
                 strength: text("description", max: 400) ?? "", systemImage: symbol ?? "person.crop.square",
-                inlineSoul: instructions, credit: credit, isCommunity: (row["source"] as? String) == "community"
+                inlineSoul: instructions, credit: credit, isCommunity: (row["source"] as? String) == "community",
+                updatedAt: TemplateCatalogDate.parse(row["updatedAt"] as? String)
             )
         }
+    }
+}
+
+/// The catalog's `updatedAt` (ISO 8601, with or without milliseconds).
+enum TemplateCatalogDate {
+    static func parse(_ value: String?) -> Date? {
+        guard let value, value.count <= 40 else { return nil }
+        let precise = ISO8601DateFormatter()
+        precise.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return precise.date(from: value) ?? ISO8601DateFormatter().date(from: value)
+    }
+}
+
+/// How often this person used each blueprint and agent template, on this device: "Most used".
+@MainActor
+@Observable
+final class TemplateUsage {
+    static let shared = TemplateUsage()
+    static let key = "bighelp.template-usage"
+
+    private(set) var counts: [String: Int]
+    @ObservationIgnored private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        counts = (defaults.dictionary(forKey: Self.key) as? [String: Int]) ?? [:]
+    }
+
+    func count(_ id: String) -> Int { counts[id] ?? 0 }
+
+    func recordUse(_ id: String) {
+        guard !id.isEmpty, id.count <= 128 else { return }
+        counts[id, default: 0] += 1
+        // Bounded: the 500 most used.
+        if counts.count > 500 {
+            let kept = counts.sorted { $0.value > $1.value }.prefix(500)
+            counts = Dictionary(uniqueKeysWithValues: kept.map { ($0.key, $0.value) })
+        }
+        defaults.set(counts, forKey: Self.key)
     }
 }

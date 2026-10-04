@@ -180,7 +180,8 @@ struct RootShellView: View {
             fleet: fleet, gate: $fleetGateRequest, isNewChatPresented: $isFleetNewChatPresented,
             onGate: { destination, hostID in openFleet(.destination(destination), on: hostID) },
             onNewChat: startFleetChat,
-            onNewGroup: newGroupChatAction == nil ? nil : { startFleetGroupChat(with: $0) }))
+            onNewGroup: newGroupChatAction == nil ? nil : { startFleetGroupChat(with: $0) },
+            appPage: fleetAppPage))
         .modifier(FleetHooks(
             liveKey: liveFleetKey, readiness: fleetOpenReadiness, hostsKey: fleetHostsKey, scenePhase: scenePhase,
             keepsConnected: keepsFleetHostsConnected,
@@ -909,7 +910,12 @@ struct RootShellView: View {
         }
     }
 
-    func workspaceSettings(destination: WorkspaceDestination? = nil) -> some View {
+    /// Settings' Appearance or Chat page alone, for Fleet settings.
+    func fleetAppPage(_ section: SettingsMenuSection) -> AnyView {
+        AnyView(workspaceSettings().opening(section))
+    }
+
+    func workspaceSettings(destination: WorkspaceDestination? = nil) -> SettingsView {
         SettingsView(
             settings: settings, focusedDestination: destination, userIdentity: userIdentity,
             agents: agents.profiles, personalities: personalities,

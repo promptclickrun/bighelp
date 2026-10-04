@@ -1,10 +1,13 @@
 import SwiftUI
 
 /// Settings › Fleet settings, with every host shown: Update Hermes, update
-/// the bighelp plugin and restart the gateway everywhere at once, each host
-/// with its own live status and its own Restart when it needs one.
+/// the bighelp plugin and restart the gateway everywhere at once, or on one
+/// host from its own row, each with its own live status. This app's
+/// Appearance and Chat are here too.
 struct FleetSettingsView: View {
     let store: FleetMaintenanceStore
+    /// This app's own pages (Appearance, Chat), the same ones Settings opens.
+    var appPage: ((SettingsMenuSection) -> AnyView)?
     @State private var confirmation: Confirmation?
 
     private enum Confirmation: Identifiable {
@@ -12,6 +15,8 @@ struct FleetSettingsView: View {
         case restartGateways(count: Int)
         case finishHermes(FleetMaintenanceHost)
         case restartPlugin(FleetMaintenanceHost)
+        case updateHermesOn(FleetMaintenanceHost)
+        case restartGatewayOn(FleetMaintenanceHost)
 
         var id: String {
             switch self {
@@ -19,6 +24,8 @@ struct FleetSettingsView: View {
             case .restartGateways: "gateways"
             case .finishHermes(let host): "finish-\(host.id)"
             case .restartPlugin(let host): "plugin-\(host.id)"
+            case .updateHermesOn(let host): "hermes-\(host.id)"
+            case .restartGatewayOn(let host): "gateway-\(host.id)"
             }
         }
     }
@@ -28,6 +35,7 @@ struct FleetSettingsView: View {
             hermesSection
             pluginSection
             gatewaySection
+            if let appPage { appSection(appPage) }
         }
         .listStyle(.insetGrouped)
         .bighelpFormSurface()
@@ -46,7 +54,34 @@ struct FleetSettingsView: View {
         .accessibilityIdentifier("fleet.settings")
     }
 
+    @BighelpThemeReader private var theme
+
     // MARK: Sections
+
+    /// Appearance and Chat apply to bighelp on every host, so they're here too.
+    private func appSection(_ page: @escaping (SettingsMenuSection) -> AnyView) -> some View {
+        Section {
+            ForEach([SettingsMenuSection.appearance, .chat]) { section in
+                NavigationLink { page(section) } label: {
+                    HStack(spacing: BighelpTokens.space12) {
+                        BighelpIconTile(systemName: section == .appearance ? "paintpalette.fill" : "bubble.left.and.bubble.right.fill")
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(section.title)
+                                .font(.bighelp(.body).weight(.semibold))
+                                .foregroundStyle(theme.primaryText)
+                            Text(section.detail)
+                                .font(.bighelp(.footnote))
+                                .foregroundStyle(theme.secondaryText)
+                        }
+                    }
+                    .frame(minHeight: BighelpTokens.hitTarget)
+                }
+                .accessibilityIdentifier("fleet.settings.app.\(section.rawValue)")
+            }
+        } header: {
+            Text("This app")
+        }
+    }
 
     private var hermesSection: some View {
         Section {
@@ -59,9 +94,10 @@ struct FleetSettingsView: View {
             .disabled(count == 0)
             .accessibilityIdentifier("fleet.settings.hermes.update-all")
             ForEach(store.hosts) { host in
-                FleetMaintenanceRow(name: host.name, job: host.hermes, identifier: "fleet.settings.hermes.\(host.name)") {
-                    confirmation = .finishHermes(host)
-                }
+                FleetMaintenanceRow(name: host.name, job: host.hermes, identifier: "fleet.settings.hermes.\(host.name)",
+                                    onRestart: { confirmation = .finishHermes(host) },
+                                    action: host.hermes.kind == .pending
+                                        ? .init(title: "Update") { confirmation = .updateHermesOn(host) } : nil)
             }
         } header: {
             Text("Hermes")
@@ -79,9 +115,10 @@ struct FleetSettingsView: View {
             .disabled(count == 0)
             .accessibilityIdentifier("fleet.settings.plugin.update-all")
             ForEach(store.hosts) { host in
-                FleetMaintenanceRow(name: host.name, job: host.pluginJob, identifier: "fleet.settings.plugin.\(host.name)") {
-                    confirmation = .restartPlugin(host)
-                }
+                FleetMaintenanceRow(name: host.name, job: host.pluginJob, identifier: "fleet.settings.plugin.\(host.name)",
+                                    onRestart: { confirmation = .restartPlugin(host) },
+                                    action: host.pluginJob.kind == .pending
+                                        ? .init(title: "Update") { Task { await store.updatePlugin(on: host.id) } } : nil)
             }
         } header: {
             Text("bighelp plugin")
@@ -102,7 +139,9 @@ struct FleetSettingsView: View {
             .disabled(count == 0)
             .accessibilityIdentifier("fleet.settings.gateway.restart-all")
             ForEach(store.hosts) { host in
-                FleetMaintenanceRow(name: host.name, job: host.gateway, identifier: "fleet.settings.gateway.\(host.name)")
+                FleetMaintenanceRow(name: host.name, job: host.gateway, identifier: "fleet.settings.gateway.\(host.name)",
+                                    action: store.gatewayCandidates.contains { $0.id == host.id }
+                                        ? .init(title: "Restart") { confirmation = .restartGatewayOn(host) } : nil)
             }
         } header: {
             Text("Messaging gateway")
@@ -135,6 +174,8 @@ struct FleetSettingsView: View {
         case .restartGateways(let count): "Restart the gateway on \(hosts(count))?"
         case .finishHermes(let host): "Restart the gateway on \(host.name)?"
         case .restartPlugin(let host): "Restart Hermes on \(host.name)?"
+        case .updateHermesOn(let host): "Update Hermes on \(host.name)?"
+        case .restartGatewayOn(let host): "Restart the gateway on \(host.name)?"
         case nil: ""
         }
     }
@@ -145,6 +186,8 @@ struct FleetSettingsView: View {
         case .restartGateways: "Restart Gateways"
         case .finishHermes: "Restart Gateway"
         case .restartPlugin(let host): host.plugin?.canRestartHost == false ? "Restart Gateway" : "Restart Hermes"
+        case .updateHermesOn: "Update Hermes"
+        case .restartGatewayOn: "Restart Gateway"
         }
     }
 
@@ -152,6 +195,10 @@ struct FleetSettingsView: View {
         switch confirmation {
         case .updateHermes:
             "Each host installs the update and may restart, so bighelp can disconnect for a moment."
+        case .updateHermesOn:
+            "It installs the update and may restart, so bighelp can disconnect for a moment."
+        case .restartGatewayOn:
+            "Messaging pauses for a moment on that host. Replies in progress may stop."
         case .restartGateways:
             "Messaging pauses for a moment on each host. Replies in progress may stop."
         case .finishHermes:
@@ -170,6 +217,8 @@ struct FleetSettingsView: View {
             case .restartGateways: await store.restartGatewaysEverywhere()
             case .finishHermes(let host): await store.finishHermesUpdate(on: host.id)
             case .restartPlugin(let host): await store.restartPlugin(on: host.id)
+            case .updateHermesOn(let host): await store.updateHermes(on: host.id)
+            case .restartGatewayOn(let host): await store.restartGateway(on: host.id)
             }
         }
     }
@@ -181,6 +230,13 @@ struct FleetMaintenanceRow: View {
     let job: FleetHostJob
     let identifier: String
     var onRestart: (() -> Void)?
+    /// This host's own Update or Restart, beside its status.
+    var action: Action?
+
+    struct Action {
+        let title: String
+        let run: () -> Void
+    }
 
     var body: some View {
         HStack(spacing: BighelpTokens.space12) {
@@ -220,6 +276,16 @@ struct FleetMaintenanceRow: View {
                     .frame(minHeight: BighelpTokens.hitTarget)
                     .accessibilityLabel("Restart \(name)")
                     .accessibilityIdentifier("\(identifier).restart")
+            }
+        case _ where action != nil:
+            if let action {
+                Button(action.title, action: action.run)
+                    .font(.bighelp(.subheadline).weight(.semibold))
+                    .buttonStyle(.bordered)
+                    .tint(theme.action)
+                    .frame(minHeight: BighelpTokens.hitTarget)
+                    .accessibilityLabel("\(action.title) \(name)")
+                    .accessibilityIdentifier("\(identifier).action")
             }
         case .done:
             symbol("checkmark.circle.fill", color: .green)

@@ -33,6 +33,8 @@ struct SettingsView: View {
     var onOpenWorkspaceDestination: ((WorkspaceDestination) -> Void)?
     /// Opens another app route (Hermes tools hub, activity, direct links, ...).
     var onOpenRoute: ((AppRoute) -> Void)?
+    /// Shows just this page (Fleet settings links Appearance and Chat here, so there's one copy of each).
+    private var openSection: SettingsMenuSection?
     @Environment(\.bighelpNotificationContext) private var notificationContext
     @State private var pluginUpdates: PluginUpdateStore?
     /// Held in state so this screen redraws when the check finishes; the shared
@@ -115,9 +117,17 @@ struct SettingsView: View {
 
     var body: some View {
         Group {
-            if let focusedDestination { focusedPage(focusedDestination) }
+            if let openSection { destination(for: openSection) }
+            else if let focusedDestination { focusedPage(focusedDestination) }
             else { menuPage }
         }
+    }
+
+    /// This settings page alone.
+    func opening(_ section: SettingsMenuSection) -> Self {
+        var page = self
+        page.openSection = section
+        return page
     }
 
     private var menuPage: some View {

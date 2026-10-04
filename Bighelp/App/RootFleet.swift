@@ -346,6 +346,8 @@ struct FleetSheets: ViewModifier {
     let onNewChat: (FleetAgent) -> Void
     /// None when the selected host can't make group chats.
     let onNewGroup: (([FleetAgent]) -> Void)?
+    /// Settings' own Appearance and Chat pages, for Fleet settings.
+    var appPage: ((SettingsMenuSection) -> AnyView)?
     @State private var pickedHost: (destination: FleetDestination, hostID: UUID)?
     @State private var pickedAgent: FleetAgent?
     @State private var pickedGroup: [FleetAgent]?
@@ -358,7 +360,7 @@ struct FleetSheets: ViewModifier {
                 onGate(picked.destination, picked.hostID)
             }) { destination in
                 if let fleet {
-                    FleetHostPicker(fleet: fleet, destination: destination) { hostID in
+                    FleetHostPicker(fleet: fleet, destination: destination, appPage: appPage) { hostID in
                         pickedHost = (destination, hostID)
                         gate = nil
                     }

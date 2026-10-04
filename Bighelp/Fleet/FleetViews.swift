@@ -673,6 +673,7 @@ struct FleetTasksView: View {
 struct FleetHostPicker: View {
     let fleet: FleetStore
     let destination: FleetDestination
+    var appPage: ((SettingsMenuSection) -> AnyView)?
     let onPick: (UUID) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var detent: PresentationDetent = .medium
@@ -683,7 +684,7 @@ struct FleetHostPicker: View {
                 if destination == .settings, let maintenance = fleet.maintenance() {
                     Section {
                         NavigationLink {
-                            FleetSettingsView(store: maintenance)
+                            FleetSettingsView(store: maintenance, appPage: appPage)
                                 .onAppear { detent = .large }
                         } label: {
                             HStack(spacing: BighelpTokens.space12) {
@@ -692,7 +693,7 @@ struct FleetHostPicker: View {
                                     Text("Fleet settings")
                                         .font(.bighelp(.body).weight(.semibold))
                                         .foregroundStyle(theme.primaryText)
-                                    Text("Update and restart every host at once")
+                                    Text("Update and restart every host, together or one by one")
                                         .font(.bighelp(.footnote))
                                         .foregroundStyle(theme.secondaryText)
                                 }

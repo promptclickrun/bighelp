@@ -339,6 +339,12 @@ final class FleetMaintenanceStore {
         row.hermesJob.isSettled = true
     }
 
+    /// One host's own Update.
+    func updateHermes(on hostID: UUID) async {
+        guard let row = host(hostID), row.hermes.kind == .pending else { return }
+        await updateHermes(row)
+    }
+
     /// The Restart button beside a host whose Hermes update left the gateway on old code.
     func finishHermesUpdate(on hostID: UUID) async {
         guard let row = host(hostID), row.hermes.kind == .needsRestart else { return }
@@ -356,6 +362,14 @@ final class FleetMaintenanceStore {
         }
     }
 
+    /// One host's own plugin Update.
+    func updatePlugin(on hostID: UUID) async {
+        guard let row = host(hostID), row.pluginJob.kind == .pending, let plugin = row.plugin else { return }
+        row.pluginUpdatedHere = true
+        row.pluginRestartTried = false
+        _ = await plugin.update()
+    }
+
     /// The Restart button beside a host whose plugin update needs one.
     func restartPlugin(on hostID: UUID) async {
         guard let row = host(hostID), let plugin = row.plugin, plugin.state == .restartNeeded else { return }
@@ -368,6 +382,12 @@ final class FleetMaintenanceStore {
 
     func restartGatewaysEverywhere() async {
         await each(gatewayCandidates) { row in await self.restartGateway(row) }
+    }
+
+    /// One host's own gateway Restart.
+    func restartGateway(on hostID: UUID) async {
+        guard let row = host(hostID), gatewayCandidates.contains(where: { $0.id == hostID }) else { return }
+        await restartGateway(row)
     }
 
     private func restartGateway(_ row: FleetMaintenanceHost) async {

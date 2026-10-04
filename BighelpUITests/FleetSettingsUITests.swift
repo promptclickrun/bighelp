@@ -79,6 +79,58 @@ final class FleetSettingsUITests: BighelpUITestCase {
         save("hermes-done-\(appearance)", app)
     }
 
+    /// One host at a time, from its own row, and this app's Appearance and Chat from the same page.
+    @MainActor
+    func testOneHostAtATimeAndThisAppsPages() throws {
+        let app = makeApp()
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-use-multi-host-fixtures",
+                               "-bighelp.hosts.all-hosts", "NO"]
+        app.launch()
+        let menu = app.buttons["home.drawer.open"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 10))
+        menu.tap()
+        let allHosts = app.buttons["menu.all-hosts"]
+        XCTAssertTrue(allHosts.waitForExistence(timeout: 5))
+        allHosts.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["fleet.home"].waitForExistence(timeout: 5))
+        menu.tap()
+        let settings = app.buttons["menu.settings"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        settings.tap()
+        let fleetSettings = app.buttons["fleet.gate.fleet-settings"]
+        XCTAssertTrue(fleetSettings.waitForExistence(timeout: 5))
+        fleetSettings.tap()
+        XCTAssertTrue(app.navigationBars["Fleet settings"].waitForExistence(timeout: 5))
+
+        let homeHermes = status("fleet.settings.hermes.Home Hermes", in: app)
+        XCTAssertTrue(wait(for: homeHermes, toRead: "12 commits behind"), homeHermes.label)
+        let updateHome = app.buttons["fleet.settings.hermes.Home Hermes.action"]
+        XCTAssertTrue(updateHome.waitForExistence(timeout: 5), "Each host has its own Update")
+        XCTAssertTrue(app.buttons["fleet.settings.hermes.Studio Mac.action"].exists)
+        let list = app.collectionViews.firstMatch
+        let restartGateway = app.buttons["fleet.settings.gateway.Home Hermes.action"]
+        for _ in 0..<4 where !(restartGateway.exists && restartGateway.isHittable) { list.swipeUp() }
+        XCTAssertTrue(restartGateway.exists, "Each host's gateway has its own Restart")
+        save("one-by-one", app)
+        for _ in 0..<4 where !updateHome.isHittable { list.swipeDown() }
+
+        updateHome.tap()
+        let confirm = app.buttons["fleet.settings.confirm"].firstMatch
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5))
+        confirm.tap()
+        XCTAssertTrue(wait(for: homeHermes, toRead: "Updated · 0.21.5", timeout: 15), homeHermes.label)
+        XCTAssertTrue(app.buttons["fleet.settings.hermes.Studio Mac.action"].exists, "Only that host updated")
+
+        let appearanceLink = app.buttons["fleet.settings.app.appearance"]
+        for _ in 0..<6 where !(appearanceLink.exists && appearanceLink.isHittable) { list.swipeUp() }
+        XCTAssertTrue(appearanceLink.exists, "Appearance is here")
+        XCTAssertTrue(app.buttons["fleet.settings.app.chat"].exists, "Chat is here")
+        save("this-app", app)
+        appearanceLink.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["appearance.studio"].waitForExistence(timeout: 5))
+        save("appearance-from-fleet", app)
+    }
+
     @MainActor private func status(_ row: String, in app: XCUIApplication) -> XCUIElement {
         app.staticTexts["\(row).status"].firstMatch
     }

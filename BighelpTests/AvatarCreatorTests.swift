@@ -192,3 +192,14 @@ struct AvatarCreatorTests {
         #expect(companions.override(for: key) == nil)
     }
 }
+
+/// Face and Shape colors: saturation down to gray keeps the hue and brightness.
+struct AvatarColorAdjustTests {
+    @Test func saturationRunsFromGrayToVivid() {
+        #expect(abs(AvatarColorAdjust.saturation(of: "#FF0000") - 1) < 0.01)
+        #expect(AvatarColorAdjust.color("#FF0000", saturation: 0) == "#FFFFFF", "Gray at full brightness")
+        #expect(AvatarColorAdjust.color("#804040", saturation: 0) == "#808080", "Gray, same brightness")
+        #expect(AvatarColorAdjust.saturation(of: AvatarColorAdjust.color("#3366CC", saturation: 0.25)) > 0.2)
+        #expect(AvatarColorAdjust.saturation(of: "hsl(210, 80%, 50%)") > 0.5, "Hermes's hsl() colors read too")
+    }
+}

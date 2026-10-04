@@ -8,9 +8,10 @@ struct HermesBlobFaceView: View {
     private let bodyParts: [Path]
     private let eyes: [Path]
 
-    init(seed: String, kind: HermesBlobFace.Kind?) {
+    /// `color` (`hsl()` or hex) paints the face over the color its seed would give.
+    init(seed: String, kind: HermesBlobFace.Kind?, color: String? = nil) {
         let rendering = HermesBlobFace.render(seed: seed, kind: kind)
-        head = HermesFaceColor.color(rendering.head)
+        head = HermesFaceColor.color(color.flatMap { $0.isEmpty ? nil : $0 } ?? rendering.head)
         eye = HermesFaceColor.color(rendering.eye)
         bodyParts = rendering.body.map { part in
             switch part {
@@ -80,7 +81,7 @@ struct HermesLookView: View {
         switch look.style {
         case .face:
             let blob = HermesBlobShape(look.shape) ?? HermesBlobShape()
-            HermesBlobFaceView(seed: look.faceSeed ?? blob.seed(name: name), kind: blob.kind)
+            HermesBlobFaceView(seed: look.faceSeed ?? blob.seed(name: name), kind: blob.kind, color: look.color)
         case .shape:
             HermesShapeFaceView(shape: look.shape ?? HermesShapeFace.defaultShape(for: name),
                                 color: HermesShapeFace.color(look.color, name: name))

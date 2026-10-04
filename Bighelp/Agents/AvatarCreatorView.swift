@@ -41,6 +41,8 @@ final class AvatarCreatorModel {
     var shape = "circle"
     /// A picked shape color; nil matches the name.
     var shapeColor: String?
+    /// A picked face color; nil is the color the face's name gives it.
+    var faceColor: String?
     private(set) var selectedPet: PetdexPet?
     private(set) var selectedPetFrame: Data?
     private(set) var selectedPetAvatar: Data?
@@ -90,6 +92,7 @@ final class AvatarCreatorModel {
         case .face:
             style = .face
             blobShape = HermesBlobShape(look?.shape) ?? HermesBlobShape()
+            faceColor = look?.color
         case .shape:
             style = .shapes
             shape = look?.shape ?? shape
@@ -129,7 +132,7 @@ final class AvatarCreatorModel {
         case .characters:
             .companion(appearance)
         case .face:
-            .look(AgentAvatarLook(style: .face, shape: blobShape.string,
+            .look(AgentAvatarLook(style: .face, shape: blobShape.string, color: faceColor,
                                   faceSeed: blobShape.isLocked ? nil : faceName))
         case .shapes:
             .look(AgentAvatarLook(style: .shape, shape: shape, color: shapeColor))
@@ -854,7 +857,8 @@ struct AvatarCreatorView: View {
     private var hermesStage: some View {
         switch model.style {
         case .face:
-            HermesBlobFaceView(seed: model.blobShape.seed(name: faceName), kind: model.blobShape.kind)
+            HermesBlobFaceView(seed: model.blobShape.seed(name: faceName), kind: model.blobShape.kind,
+                               color: model.faceColor)
         case .shapes:
             HermesShapeFaceView(shape: model.shape, color: HermesShapeFace.color(model.shapeColor, name: faceName))
         case .pets:
@@ -893,7 +897,8 @@ struct AvatarCreatorView: View {
                         ) {
                             withAnimation(.snappy) { model.blobShape.kind = kind }
                         } preview: {
-                            HermesBlobFaceView(seed: model.blobShape.seed(name: faceName), kind: kind)
+                            HermesBlobFaceView(seed: model.blobShape.seed(name: faceName), kind: kind,
+                                               color: model.faceColor)
                         }
                     }
                 }
@@ -914,6 +919,91 @@ struct AvatarCreatorView: View {
                 .font(.bighelp(.footnote))
                 .foregroundStyle(theme.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
+            colorSection(selection: Binding(get: { model.faceColor }, set: { model.faceColor = $0 }),
+                         nameColor: HermesBlobFace.render(seed: model.blobShape.seed(name: faceName),
+                                                          kind: model.blobShape.kind).head,
+                         identifier: "avatar.creator.face-color")
+        }
+    }
+
+    /// "Match the name", Hermes Desktop's twelve swatches, any color from the wheel, and how
+    /// colorful it is (down to gray), for faces and shapes alike.
+    private func colorSection(selection: Binding<String?>, nameColor: String, identifier: String) -> some View {
+        section("Color") {
+            let matchesName = selection.wrappedValue == nil
+            Button {
+                selection.wrappedValue = nil
+            } label: {
+                Label {
+                    Text("Match the name")
+                } icon: {
+                    Circle()
+                        .fill(HermesFaceColor.color(nameColor))
+                        .frame(width: 18, height: 18)
+                }
+                .font(.bighelp(.callout).weight(.semibold))
+                .foregroundStyle(matchesName ? theme.actionForeground : theme.primaryText)
+                .padding(.horizontal, BighelpTokens.space16)
+                .frame(minHeight: 36)
+                .background(Capsule().fill(matchesName ? theme.action : theme.incomingMessageBackground))
+                .frame(minHeight: BighelpTokens.hitTarget)
+                .contentShape(.capsule)
+            }
+            .buttonStyle(.plain)
+            .accessibilityAddTraits(matchesName ? [.isButton, .isSelected] : .isButton)
+            .accessibilityIdentifier("\(identifier).name")
+            // Hermes Desktop's twelve swatches, two even rows.
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: BighelpTokens.space12), count: 6),
+                      spacing: BighelpTokens.space12) {
+                ForEach(Array(HermesShapeFace.swatches.enumerated()), id: \.element) { index, color in
+                    swatch(
+                        fill: AnyShapeStyle(HermesFaceColor.color(color)),
+                        isSelected: selection.wrappedValue == color,
+                        label: "Color \(index + 1)",
+                        identifier: "\(identifier).\(index)"
+                    ) { selection.wrappedValue = color } overlay: { EmptyView() }
+                }
+            }
+            let current = selection.wrappedValue ?? nameColor
+            HStack(spacing: BighelpTokens.space12) {
+                ColorPicker(selection: Binding(
+                    get: { HermesFaceColor.color(current) },
+                    set: { color in
+                        var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0
+                        guard UIColor(color).getRed(&red, green: &green, blue: &blue, alpha: nil) else { return }
+                        selection.wrappedValue = CompanionColor.hex(red: red, green: green, blue: blue)
+                    }), supportsOpacity: false) {
+                    Text("Custom color")
+                        .font(.bighelp(.callout).weight(.semibold))
+                        .foregroundStyle(theme.primaryText)
+                }
+                .frame(minHeight: BighelpTokens.hitTarget)
+                .accessibilityIdentifier("\(identifier).custom")
+            }
+            VStack(alignment: .leading, spacing: BighelpTokens.space4) {
+                HStack {
+                    Text("Saturation")
+                        .font(.bighelp(.callout).weight(.semibold))
+                        .foregroundStyle(theme.primaryText)
+                    Spacer()
+                    Text(AvatarColorAdjust.saturation(of: current) < 0.02 ? "Grayscale" : "\(Int((AvatarColorAdjust.saturation(of: current) * 100).rounded()))%")
+                        .font(.bighelp(.footnote).monospacedDigit())
+                        .foregroundStyle(theme.secondaryText)
+                }
+                HStack(spacing: BighelpTokens.space8) {
+                    Circle().fill(HermesFaceColor.color(AvatarColorAdjust.color(current, saturation: 0)))
+                        .frame(width: 14, height: 14).accessibilityHidden(true)
+                    Slider(value: Binding(
+                        get: { AvatarColorAdjust.saturation(of: current) },
+                        set: { selection.wrappedValue = AvatarColorAdjust.color(current, saturation: $0) }
+                    ), in: 0...1)
+                    .tint(HermesFaceColor.color(current))
+                    .accessibilityLabel("Saturation")
+                    .accessibilityIdentifier("\(identifier).saturation")
+                    Circle().fill(HermesFaceColor.color(AvatarColorAdjust.color(current, saturation: 1)))
+                        .frame(width: 14, height: 14).accessibilityHidden(true)
+                }
+            }
         }
     }
 
@@ -934,42 +1024,9 @@ struct AvatarCreatorView: View {
                     }
                 }
             }
-            section("Color") {
-                let matchesName = model.shapeColor == nil
-                Button {
-                    model.shapeColor = nil
-                } label: {
-                    Label {
-                        Text("Match the name")
-                    } icon: {
-                        Circle()
-                            .fill(HermesFaceColor.color(HermesShapeFace.color(nil, name: faceName)))
-                            .frame(width: 18, height: 18)
-                    }
-                    .font(.bighelp(.callout).weight(.semibold))
-                    .foregroundStyle(matchesName ? theme.actionForeground : theme.primaryText)
-                    .padding(.horizontal, BighelpTokens.space16)
-                    .frame(minHeight: 36)
-                    .background(Capsule().fill(matchesName ? theme.action : theme.incomingMessageBackground))
-                    .frame(minHeight: BighelpTokens.hitTarget)
-                    .contentShape(.capsule)
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(matchesName ? [.isButton, .isSelected] : .isButton)
-                .accessibilityIdentifier("avatar.creator.shape-color.name")
-                // Hermes Desktop's twelve swatches, two even rows.
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: BighelpTokens.space12), count: 6),
-                          spacing: BighelpTokens.space12) {
-                    ForEach(Array(HermesShapeFace.swatches.enumerated()), id: \.element) { index, color in
-                        swatch(
-                            fill: AnyShapeStyle(HermesFaceColor.color(color)),
-                            isSelected: model.shapeColor == color,
-                            label: "Color \(index + 1)",
-                            identifier: "avatar.creator.shape-color.\(index)"
-                        ) { model.shapeColor = color } overlay: { EmptyView() }
-                    }
-                }
-            }
+            colorSection(selection: Binding(get: { model.shapeColor }, set: { model.shapeColor = $0 }),
+                         nameColor: HermesShapeFace.color(nil, name: faceName),
+                         identifier: "avatar.creator.shape-color")
         }
     }
 
@@ -1245,4 +1302,28 @@ private struct PetdexThumbnailView: View {
     }
 
     @BighelpThemeReader private var theme
+}
+
+/// How colorful a face or shape color is: 0 is gray at the same brightness, 1 fully vivid.
+enum AvatarColorAdjust {
+    static func saturation(of css: String) -> Double {
+        hsb(css)?.saturation ?? 0
+    }
+
+    /// The color with that saturation, as hex; the hue and brightness stay.
+    static func color(_ css: String, saturation: Double) -> String {
+        guard let hsb = hsb(css) else { return css }
+        let color = UIColor(hue: hsb.hue, saturation: min(max(saturation, 0), 1), brightness: hsb.brightness, alpha: 1)
+        var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0
+        color.getRed(&red, green: &green, blue: &blue, alpha: nil)
+        return CompanionColor.hex(red: red, green: green, blue: blue)
+    }
+
+    private static func hsb(_ css: String) -> (hue: Double, saturation: Double, brightness: Double)? {
+        guard let rgb = HermesCSSColor.rgb(css) else { return nil }
+        var hue: CGFloat = 0, saturation: CGFloat = 0, brightness: CGFloat = 0
+        UIColor(red: rgb.red, green: rgb.green, blue: rgb.blue, alpha: 1)
+            .getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: nil)
+        return (hue, saturation, brightness)
+    }
 }

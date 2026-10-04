@@ -16,7 +16,7 @@ struct AgentAvatarLook: Codable, Equatable, Sendable {
     var style: Style
     /// Hermes's shape string: `blobatar[:seed[:kind]]` for faces, a shape name for shapes.
     var shape: String?
-    /// A picked shape color (`hsl()` or hex); nil matches the name.
+    /// A picked shape or face color (`hsl()` or hex); nil matches the name.
     var color: String?
     /// The name a face that follows the name was drawn from. If the agent's
     /// profile name turns out different, the face is locked to this one so
@@ -32,7 +32,7 @@ struct AgentAvatarLook: Codable, Equatable, Sendable {
         if namespace["imageKind"]?.string == "photo" {
             self.init(style: .photo)
         } else if let shape, HermesBlobShape(shape) != nil {
-            self.init(style: .face, shape: shape)
+            self.init(style: .face, shape: shape, color: color)
         } else if let shape, HermesShapeFace.pickerShapes.contains(shape) {
             self.init(style: .shape, shape: shape, color: color)
         } else {

@@ -525,6 +525,17 @@ struct RootShellView: View {
                 onAction: handleAgentWorkspaceAction,
                 groupFilterRequest: $agentGroupFilterRequest
             )
+            // The one main action, where a thumb rests, as on All agents.
+            .overlay(alignment: .bottomTrailing) {
+                if appState.path.isEmpty {
+                    RootComposeButton(identifier: "agents.new-chat", size: 72) {
+                        if currentWorkspaceOwner != nil { presentNewChatPicker(seed: nil) }
+                        else { startNewChat(explicitAgentID: nil) }
+                    }
+                        .padding(.trailing, BighelpTokens.space20)
+                        .padding(.bottom, BighelpTokens.space12)
+                }
+            }
     }
 
     /// Feed, Ideas, Goals and Apps draw their own header (the agent's avatar).
@@ -667,13 +678,15 @@ struct RootShellView: View {
     private var showsBottomNavigation: Bool {
         // The all-hosts view is just its list. Feed, Ideas and Goals keep the
         // bar if something opens them, so its Chat tab always leads back.
-        appState.path.isEmpty && !isKeyboardVisible && (!fleetModeOn || appState.selectedTab.isAgentBoard)
+        // Not on Agents: pick an agent first, so Feed, Ideas and Goals are clearly its own.
+        appState.path.isEmpty && !isKeyboardVisible && appState.selectedTab != .agents
+            && (!fleetModeOn || appState.selectedTab.isAgentBoard)
     }
 
     /// Vision Pro's tab strip on root screens. The agent's own chat draws its
     /// own: a screen covered by a pushed one doesn't show its ornaments.
     private var visionTabsVisible: Bool {
-        appState.path.isEmpty && (!fleetModeOn || appState.selectedTab.isAgentBoard)
+        appState.path.isEmpty && appState.selectedTab != .agents && (!fleetModeOn || appState.selectedTab.isAgentBoard)
     }
 
     @ViewBuilder
@@ -809,18 +822,32 @@ struct RootShellView: View {
         Binding(
             get: { appState.selectedTab },
             set: { tab in
-                if tab == .sessions, opensHomeChat {
-                    // Chat is the agent's own chat; ☰ and swipe-back reach the full list.
-                    openHomeChat()
-                } else if tab == .sessions {
-                    openSessions(filteredTo: nil)
-                } else if tab == .scheduledTasks {
-                    openScheduledTasks(filteredTo: nil)
-                } else {
-                    appState.select(tab)
+                // From a chat, its agent's Feed, Ideas and Goals; and the switch is a swap like
+                // Feed to Ideas, not the chat sliding away.
+                if tab.isAgentBoard, case .chat(let id)? = appState.path.last,
+                   let members = featureStore.preparedChatModel(id: id)?.memberIDs, members.count == 1,
+                   members[0] != homeAgent?.id {
+                    _ = agents.setPrimaryAgent(members[0])
                 }
+                var transaction = Transaction()
+                transaction.disablesAnimations = !appState.path.isEmpty
+                    || (tab == .sessions && appState.selectedTab.isAgentBoard)
+                withTransaction(transaction) { selectTab(tab) }
             }
         )
+    }
+
+    private func selectTab(_ tab: AppTab) {
+        if tab == .sessions, opensHomeChat {
+            // Chat is the agent's own chat; ☰ and swipe-back reach the full list.
+            openHomeChat()
+        } else if tab == .sessions {
+            openSessions(filteredTo: nil)
+        } else if tab == .scheduledTasks {
+            openScheduledTasks(filteredTo: nil)
+        } else {
+            appState.select(tab)
+        }
     }
 
     @ViewBuilder

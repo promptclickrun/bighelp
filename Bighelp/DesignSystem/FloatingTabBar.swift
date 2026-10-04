@@ -49,6 +49,9 @@ struct FloatingTabBar: View {
         path.isEmpty
     }
 
+    /// Settings › Appearance › Bottom menu: start as one button that opens the full bar.
+    static let startsCollapsedKey = "bighelp.tabbar.starts-collapsed"
+
     @Binding var selection: AppTab
     let onNewChat: (() -> Void)?
     /// Points the bar drops into the home indicator's area.
@@ -60,6 +63,17 @@ struct FloatingTabBar: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var tabChanges = 0
+    /// Observed so the bar follows the setting; read through `bool(forKey:)` because a launch
+    /// argument's "NO" is a string that AppStorage would ignore.
+    @AppStorage(FloatingTabBar.startsCollapsedKey) private var storedStartsCollapsed = true
+    private var startsCollapsed: Bool {
+        _ = storedStartsCollapsed
+        let defaults = UserDefaults.standard
+        return defaults.object(forKey: Self.startsCollapsedKey) == nil || defaults.bool(forKey: Self.startsCollapsedKey)
+    }
+    @State private var isExpanded = false
+    @State private var collapseTask: Task<Void, Never>?
+    @Namespace private var barSpace
     /// The glyphs keep a 3-pt margin on their 24-pt grid, so 26 draws them about 20pt.
     @ScaledMetric(relativeTo: .caption2) private var iconSize: CGFloat = 26
     @ScaledMetric(relativeTo: .caption2) private var captionHeight: CGFloat = 28
@@ -89,17 +103,24 @@ struct FloatingTabBar: View {
                         Label(Self.newChatVisibleLabel, systemImage: "square.and.pencil")
                     }
             }
-            // Five icons in one row, like a dock; names stay in VoiceOver and
-            // the large content viewer.
-            navigationRow(constrainsWidth: true) {
-                ForEach(AppTab.allCases) { tab in
-                    destination(tab, showsCaption: false)
+            if startsCollapsed && !isExpanded {
+                collapsedButton
+            } else {
+                // Five icons in one row, like a dock; names stay in VoiceOver and
+                // the large content viewer.
+                navigationRow(constrainsWidth: true) {
+                    ForEach(AppTab.allCases) { tab in
+                        destination(tab, showsCaption: false)
+                    }
                 }
+                .padding(6)
+                .bighelpNavigationGlass(in: Capsule())
+                .matchedGeometryEffect(id: "bar", in: barSpace)
+                .transition(.opacity)
             }
-            .padding(6)
-            .bighelpNavigationGlass(in: Capsule())
-            .sensoryFeedback(.selection, trigger: tabChanges)
         }
+        .sensoryFeedback(.selection, trigger: tabChanges)
+        .onDisappear { collapseTask?.cancel() }
         .frame(maxWidth: BighelpTokens.scaled(620))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Primary navigation")
@@ -111,6 +132,37 @@ struct FloatingTabBar: View {
     }
 
     private var isVerticallyCompact: Bool { verticalSizeClass == .compact }
+
+    /// One round button in the middle; a tap grows it into the full bar. Ideas' sparkle, not ☰,
+    /// so it isn't mistaken for the menu at the top.
+    private var collapsedButton: some View {
+        Button {
+            withAnimation(reduceMotion ? nil : .snappy(duration: BighelpTokens.transitionDuration)) { isExpanded = true }
+        } label: {
+            AppTabIcon(tab: .ideas, selected: false)
+                .frame(width: BighelpTokens.scaled(26), height: BighelpTokens.scaled(26))
+                .foregroundStyle(theme.action)
+                .frame(width: BighelpTokens.scaled(56), height: BighelpTokens.scaled(56))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.bighelpTilePress)
+        .bighelpNavigationGlass(in: Circle(), isInteractive: true)
+        .matchedGeometryEffect(id: "bar", in: barSpace)
+        .transition(.opacity)
+        .accessibilityLabel("Show Feed, Ideas, Goals and more")
+        .accessibilityIdentifier("primary-navigation.expand")
+    }
+
+    /// After a pick, a collapsed-by-default bar folds back once the new screen is up.
+    private func collapseSoon() {
+        guard startsCollapsed else { return }
+        collapseTask?.cancel()
+        collapseTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(600))
+            guard !Task.isCancelled else { return }
+            withAnimation(reduceMotion ? nil : .snappy(duration: BighelpTokens.transitionDuration)) { isExpanded = false }
+        }
+    }
 
     private func navigationRow<Content: View>(
         constrainsWidth: Bool = false, @ViewBuilder content: () -> Content
@@ -128,6 +180,7 @@ struct FloatingTabBar: View {
             withAnimation(reduceMotion ? nil : .snappy(duration: BighelpTokens.transitionDuration)) {
                 selection = tab
             }
+            collapseSoon()
         } label: {
             itemLabel(tab, selected: isSelected, showsCaption: showsCaption)
                 .overlay(alignment: .topTrailing) {

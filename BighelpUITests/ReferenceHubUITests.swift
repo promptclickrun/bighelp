@@ -15,6 +15,10 @@ final class BighelpTestApplication: XCUIApplication {
         if !launchArguments.contains("-loopdy.home.opens-chat") {
             launchArguments += ["-loopdy.home.opens-chat", "NO"]
         }
+        // Older flows tap the bar's tabs directly; the collapsed bar's own test opts in.
+        if !launchArguments.contains("-bighelp.tabbar.starts-collapsed") {
+            launchArguments += ["-bighelp.tabbar.starts-collapsed", "NO"]
+        }
         // For A/B runs: TEST_RUNNER_BIGHELP_UI_EXTRA_ARGS="-loopdy.chat.agentIsland NO".
         if let extra = ProcessInfo.processInfo.environment["BIGHELP_UI_EXTRA_ARGS"], !extra.isEmpty {
             launchArguments += extra.split(separator: " ").map(String.init)
@@ -117,6 +121,9 @@ class BighelpUITestCase: XCTestCase {
         repeat {
             let direct = app.buttons[identifier].firstMatch
             if direct.exists, direct.isHittable { direct.tap(); return }
+            // A collapsed bottom menu opens first.
+            let expand = app.buttons["primary-navigation.expand"].firstMatch
+            if expand.exists, expand.isHittable { expand.tap(); continue }
             if let id = sidebar[identifier], app.buttons["root.destination.\(id)"].firstMatch.isHittable {
                 app.buttons["root.destination.\(id)"].firstMatch.tap()
                 return

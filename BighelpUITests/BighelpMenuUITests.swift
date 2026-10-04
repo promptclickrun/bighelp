@@ -22,7 +22,9 @@ final class BighelpMenuUITests: BighelpUITestCase {
         let hostSwitcher = app.buttons["menu.hosts"].firstMatch
         XCTAssertTrue(hostSwitcher.waitForExistence(timeout: 3), "One row switches hosts.")
         XCTAssertTrue(app.buttons["menu.new-chat"].waitForExistence(timeout: 3))
-        XCTAssertLessThan(hostSwitcher.frame.minY, app.buttons["menu.new-chat"].frame.minY)
+        let newChat = app.buttons["menu.new-chat"]
+        XCTAssertGreaterThan(newChat.frame.minX, hostSwitcher.frame.maxX, "Its own button, right of the host")
+        XCTAssertLessThan(abs(newChat.frame.midY - hostSwitcher.frame.midY), 12, "On the host's row")
         save("02-menu", app)
         // Everything on the first screen is reachable without scrolling.
         for id in ["menu.new-chat", "menu.agents", "menu.projects", "menu.scheduled-tasks", "menu.settings", "menu.chats"] {

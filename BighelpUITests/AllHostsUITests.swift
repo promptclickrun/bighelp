@@ -104,7 +104,7 @@ final class AllHostsUITests: BighelpUITestCase {
         save("list-with-one-bot-switch", app)
         mina.tap()
         XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["tab.feed"].exists, "An all-hosts chat has no tab bar")
+        XCTAssertTrue(app.buttons["tab.feed"].exists, "An all-hosts chat has the bottom menu, for this agent")
 
         app.buttons["agent.hero.name"].tap()
         let other = app.buttons["agent.switcher.agent.finance"]
@@ -113,9 +113,8 @@ final class AllHostsUITests: BighelpUITestCase {
         XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["chat.back"].firstMatch.waitForExistence(timeout: 5),
                       "The switched-to chat has Back to All agents")
-        XCTAssertFalse(app.buttons["tab.feed"].waitForExistence(timeout: 2),
-                       "Switching agents must not bring back one host's Feed, Ideas and Goals bar")
-        XCTAssertFalse(app.buttons["tab.ideas"].exists)
+        XCTAssertTrue(app.buttons["tab.feed"].waitForExistence(timeout: 2),
+                      "The switched-to agent's chat has its Feed, Ideas and Goals too")
         save("switched-agent", app)
 
         app.buttons["chat.back"].firstMatch.tap()

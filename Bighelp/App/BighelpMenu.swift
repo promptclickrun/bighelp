@@ -67,7 +67,7 @@ struct BighelpMenuDestinations {
     var onSettings: () -> Void
 }
 
-/// bighelp's one menu (☰). The first screen is short on purpose: New chat,
+/// bighelp's one menu (☰). The first screen is short on purpose: New chat (top right),
 /// Agents, Projects, Kanban, Scheduled tasks, Usage and Settings, then recent chats
 /// with See all. With all hosts showing, Agents is All agents and the one-host
 /// places stay out, so each view keeps to its purpose. The host switcher is one
@@ -104,7 +104,6 @@ struct BighelpMenu<Recent: View>: View {
 
     private var mainSection: some View {
         Section {
-            newChatRow
             if let onAllAgents = destinations.onAllAgents {
                 row("Agents", symbol: "person.2", id: "menu.all-agents", action: onAllAgents)
             } else {
@@ -123,13 +122,15 @@ struct BighelpMenu<Recent: View>: View {
             }
             row("Settings", symbol: "gearshape", id: "menu.settings", action: destinations.onSettings)
         } header: {
-            if !hosts.hosts.isEmpty || hosts.add != nil {
-                HStack(spacing: BighelpTokens.space8) {
+            HStack(spacing: BighelpTokens.space8) {
+                if !hosts.hosts.isEmpty || hosts.add != nil {
                     hostSwitcher
                     if let allHosts = hosts.allHosts { allHostsToggle(allHosts) }
                 }
-                .padding(.bottom, BighelpTokens.space4)
+                Spacer(minLength: 0)
+                newChatButton
             }
+            .padding(.bottom, BighelpTokens.space4)
         }
         .listRowBackground(theme.surface)
     }
@@ -137,16 +138,21 @@ struct BighelpMenu<Recent: View>: View {
     /// Compact rows, so the whole first screen fits without scrolling.
     private static var rowInsets: EdgeInsets { EdgeInsets(top: 2, leading: 16, bottom: 2, trailing: 16) }
 
-    /// New chat. Group chats start from its own picker ("Group chat").
-    private var newChatRow: some View {
+    /// New chat, its own button at the top right. Group chats start from its own picker ("Group chat").
+    private var newChatButton: some View {
         Button { choose(destinations.onNewChat) } label: {
-            BighelpMenuRowLabel(title: destinations.newChatTitle, symbol: "square.and.pencil", trailing: .none)
+            Image(systemName: "square.and.pencil")
+                .font(.bighelp(.body).weight(.semibold))
+                .foregroundStyle(.white)
+                .frame(width: BighelpTokens.scaled(40), height: BighelpTokens.scaled(40))
+                .background(theme.action, in: Circle())
+                .contentShape(Circle())
         }
-        .bighelpPointerButtonStyle(.borderless, outline: .rounded(BighelpTokens.radius12),
-                                   padding: BighelpTokens.space4)
+        .buttonStyle(.plain)
+        .textCase(nil)
         .bighelpHelp(destinations.newChatTitle, shortcut: "⌘N")
+        .accessibilityLabel(destinations.newChatTitle)
         .accessibilityIdentifier("menu.new-chat")
-        .listRowInsets(Self.rowInsets)
     }
 
     /// The host you're on, as one row. Hosts and Add host are one tap away.

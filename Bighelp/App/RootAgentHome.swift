@@ -65,14 +65,14 @@ extension RootShellView {
     /// Agents (it becomes that chat). A chat picked from a list or opened about
     /// something (Feed's Discuss, a task, a deeper page) gets Back to it.
     func homeChrome(for route: AppRoute) -> AgentHomeChrome {
-        // The all-hosts view has no home chat: its chats get Back to All agents,
-        // never one host's tab bar (Feed, Ideas, Goals would strand you there).
+        // The all-hosts view has no home chat: its chats get Back to All agents.
         let isHome = !fleetModeOn && appState.selectedTab == .sessions && appState.path.count == 1
             && appState.path.first == route && !appState.chatOpenedFromList
         return AgentHomeChrome(
             isEnabled: true,
             isHome: isHome,
-            showsTabBar: !fleetModeOn,
+            // All hosts too: a chat's agent is on the selected host, so its tabs are that agent's.
+            showsTabBar: true,
             onMenu: { isHomeDrawerPresented.toggle() },
             onProfile: { profileAgentID = $0 },
             onSwitchAgent: { isAgentSwitcherPresented = true },

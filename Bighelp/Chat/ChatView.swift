@@ -571,7 +571,7 @@ struct ChatView: View {
                            !isDraftFocused, !BighelpPlatform.usesTabOrnament {
                             FloatingTabBar(selection: selection,
                                            homeIndicatorSink: FloatingTabBar.homeIndicatorSink(forBottomInset: bottomSafeArea),
-                                           unread: homeChrome.unreadTabs)
+                                           unread: homeChrome.unreadTabs, isInChat: true)
                                 .transition(.move(edge: .bottom).combined(with: .opacity))
                         }
                     }

@@ -25,8 +25,37 @@ final class BottomMenuUITests: BighelpUITestCase {
         save("expanded-chat", app)
         feed.tap()
         XCTAssertTrue(app.descendants(matching: .any)["board.feed"].waitForExistence(timeout: 5), "Feed, from the chat")
-        XCTAssertTrue(expand.waitForExistence(timeout: 3), "It folds back after a pick")
-        save("feed-collapsed", app)
+        // On Feed, Ideas and Goals the bar stays open: one tap to the next page.
+        let ideas = app.buttons["tab.ideas"]
+        XCTAssertTrue(ideas.waitForExistence(timeout: 3), "The bar stays open on Feed")
+        save("feed-open", app)
+        ideas.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["board.ideas"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["tab.goals"].exists, "Still open on Ideas")
+
+        // Reading down a page folds it; scrolling back up brings it back.
+        let page = app.collectionViews.firstMatch
+        page.swipeUp()
+        if expand.waitForExistence(timeout: 3) {
+            save("ideas-scrolled-folded", app)
+            page.swipeDown()
+            page.swipeDown()
+            XCTAssertTrue(app.buttons["tab.goals"].waitForExistence(timeout: 3), "Back when scrolling up")
+        }
+
+        // In a chat: press the folded button and slide to Goals, one motion.
+        app.buttons["tab.sessions"].tap()
+        XCTAssertTrue(composer.waitForExistence(timeout: 5))
+        XCTAssertTrue(expand.waitForExistence(timeout: 3), "Folded again in the chat")
+        let width = app.frame.width
+        let slot = (width - 24 - 12) / 5
+        let goalsX = (12 + 6 + slot * 3.5) / width
+        let start = expand.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        let end = app.coordinate(withNormalizedOffset: CGVector(dx: goalsX, dy: 0))
+            .withOffset(CGVector(dx: 0, dy: expand.frame.midY))
+        start.press(forDuration: 0.15, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.3)
+        XCTAssertTrue(app.descendants(matching: .any)["board.goals"].waitForExistence(timeout: 5), "Press and slide to Goals")
+        save("slid-to-goals", app)
 
         // Agents: pick an agent first; New chat sits bottom right.
         openRootTab("tab.agents", in: app)
@@ -59,6 +88,12 @@ final class BottomMenuUITests: BighelpUITestCase {
         feed.tap()
         XCTAssertTrue(app.descendants(matching: .any)["board.feed"].waitForExistence(timeout: 5))
         save("all-hosts-feed", app)
+        // Chat goes back to the chat you were in, not to All agents.
+        app.buttons["tab.sessions"].tap()
+        XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 5), "Back in the chat")
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Mina Shah"))
+            .firstMatch.exists, "Mina's chat")
+        XCTAssertFalse(app.descendants(matching: .any)["fleet.home"].exists)
     }
 
     private func save(_ name: String, _ app: XCUIApplication) {

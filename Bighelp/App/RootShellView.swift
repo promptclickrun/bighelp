@@ -38,6 +38,10 @@ struct RootShellView: View {
     @Environment(\.bighelpHostRegistry) var hostRegistry
     @Environment(\.managedNotificationService) private var managedNotifications
     @State var actionErrorMessage: String?
+    /// Feed, Ideas, Goals and Apps fold the bottom menu while scrolled down.
+    @State var bottomBarFold = BottomBarFold()
+    /// All hosts: the chat you left for Feed, Ideas or Goals, which the Chat tab goes back to.
+    @State var fleetLastChatID: String?
     @State var isHostStatusPresented = false
     @State private var actionErrorShowsHostStatus = false
     @State var hostRuntime: HostRuntimeStore?
@@ -546,6 +550,8 @@ struct RootShellView: View {
 
     private var shell: some View {
         rootTabs
+        .environment(\.bottomBarFold, bottomBarFold)
+        .onChange(of: appState.selectedTab) { _, _ in bottomBarFold.isFolded = false }
         .toolbar(.hidden, for: .tabBar)
         .toolbar(showsAgentBoard ? .hidden : .automatic, for: .navigationBar)
         .navigationTitle(showsAgentBoard ? "" : rootNavigationTitle)
@@ -588,7 +594,7 @@ struct RootShellView: View {
                                    startNewChat(explicitAgentID: nil)
                                } : nil,
                                homeIndicatorSink: FloatingTabBar.homeIndicatorSink(forBottomInset: rootBottomSafeArea),
-                               unread: boardUnreadTabs)
+                               unread: boardUnreadTabs, scrollFold: bottomBarFold)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
@@ -825,6 +831,7 @@ struct RootShellView: View {
             set: { tab in
                 // From a chat, its agent's Feed, Ideas and Goals; and the switch is a swap like
                 // Feed to Ideas, not the chat sliding away.
+                if fleetModeOn, case .chat(let id)? = appState.path.last { fleetLastChatID = id }
                 if tab.isAgentBoard, case .chat(let id)? = appState.path.last,
                    let members = featureStore.preparedChatModel(id: id)?.memberIDs, members.count == 1,
                    members[0] != homeAgent?.id {
@@ -839,6 +846,13 @@ struct RootShellView: View {
     }
 
     private func selectTab(_ tab: AppTab) {
+        // All hosts has no home chat: Chat goes back to the chat you were in, else to All agents.
+        if tab == .sessions, fleetModeOn, appState.path.isEmpty, let id = fleetLastChatID,
+           let record = sessionCatalog.session(id: id) {
+            appState.chatOpenedFromList = true
+            openSession(record.summary)
+            return
+        }
         if tab == .sessions, opensHomeChat {
             // Chat is the agent's own chat; ☰ and swipe-back reach the full list.
             openHomeChat()

@@ -58,8 +58,8 @@ struct AppearanceStudioView<Extras: View>: View {
                 section("Bottom menu", caption: nil) {
                     Toggle(isOn: $bottomMenuStartsCollapsed) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Start collapsed").foregroundStyle(currentTheme.primaryText)
-                            Text("One button at the bottom; tap it for Feed, Ideas, Goals and Apps.")
+                            Text("Fold it").foregroundStyle(currentTheme.primaryText)
+                            Text("One button in chats and while you scroll down a page. Tap it, or press and slide to a tab.")
                                 .font(.bighelp(.caption))
                                 .foregroundStyle(currentTheme.secondaryText)
                         }

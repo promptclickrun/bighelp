@@ -49,7 +49,7 @@ struct FloatingTabBar: View {
         path.isEmpty
     }
 
-    /// Settings › Appearance › Bottom menu: start as one button that opens the full bar.
+    /// Settings › Appearance › Bottom menu › Fold: one button in chats and while reading down a page.
     static let startsCollapsedKey = "bighelp.tabbar.starts-collapsed"
 
     @Binding var selection: AppTab
@@ -58,6 +58,10 @@ struct FloatingTabBar: View {
     let homeIndicatorSink: CGFloat
     /// Feed, Ideas or Goals with something the person hasn't seen: a small dot.
     let unread: Set<AppTab>
+    /// In a chat the bar is one button, so the message box has the room.
+    var isInChat = false
+    /// Feed, Ideas, Goals and Apps fold it while you scroll down and bring it back as you scroll up.
+    var scrollFold: BottomBarFold?
 
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -72,18 +76,28 @@ struct FloatingTabBar: View {
         return defaults.object(forKey: Self.startsCollapsedKey) == nil || defaults.bool(forKey: Self.startsCollapsedKey)
     }
     @State private var isExpanded = false
-    @State private var collapseTask: Task<Void, Never>?
+    /// The tab under the finger while pressing and sliding from the folded button.
+    @State private var scrubIndex: Int?
+    @State private var barWidth: CGFloat = 0
     @Namespace private var barSpace
     /// The glyphs keep a 3-pt margin on their 24-pt grid, so 26 draws them about 20pt.
     @ScaledMetric(relativeTo: .caption2) private var iconSize: CGFloat = 26
     @ScaledMetric(relativeTo: .caption2) private var captionHeight: CGFloat = 28
 
     init(selection: Binding<AppTab>, onNewChat: (() -> Void)? = nil, homeIndicatorSink: CGFloat = 0,
-         unread: Set<AppTab> = []) {
+         unread: Set<AppTab> = [], isInChat: Bool = false, scrollFold: BottomBarFold? = nil) {
         self._selection = selection
         self.onNewChat = onNewChat
         self.homeIndicatorSink = homeIndicatorSink
         self.unread = unread
+        self.isInChat = isInChat
+        self.scrollFold = scrollFold
+    }
+
+    /// Folded: in a chat until opened, or on a page while reading down it.
+    private var isFolded: Bool {
+        guard startsCollapsed else { return false }
+        return isInChat ? !isExpanded : scrollFold?.isFolded == true
     }
 
     /// Like the system tab bar, the bar sits low, just above the home
@@ -103,8 +117,17 @@ struct FloatingTabBar: View {
                         Label(Self.newChatVisibleLabel, systemImage: "square.and.pencil")
                     }
             }
-            if startsCollapsed && !isExpanded {
-                collapsedButton
+            if isFolded {
+                ZStack {
+                    // Stays in place under a slide, so its gesture keeps going.
+                    collapsedButton.opacity(scrubIndex == nil ? 1 : 0)
+                    if let scrubIndex {
+                        scrubBar(highlighting: scrubIndex)
+                            .allowsHitTesting(false)
+                            .transition(.scale(scale: 0.6).combined(with: .opacity))
+                    }
+                }
+                .frame(maxWidth: .infinity)
             } else {
                 // Five icons in one row, like a dock; names stay in VoiceOver and
                 // the large content viewer.
@@ -120,7 +143,9 @@ struct FloatingTabBar: View {
             }
         }
         .sensoryFeedback(.selection, trigger: tabChanges)
-        .onDisappear { collapseTask?.cancel() }
+        .sensoryFeedback(.selection, trigger: scrubIndex)
+        .coordinateSpace(.named(Self.barCoordinateSpace))
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { barWidth = $0 }
         .frame(maxWidth: BighelpTokens.scaled(620))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Primary navigation")
@@ -133,11 +158,60 @@ struct FloatingTabBar: View {
 
     private var isVerticallyCompact: Bool { verticalSizeClass == .compact }
 
-    /// One round button in the middle; a tap grows it into the full bar. Ideas' sparkle, not ☰,
-    /// so it isn't mistaken for the menu at the top.
+    static let barCoordinateSpace = "floating-tab-bar"
+
+    /// The full bar while sliding from the folded button, the tab under the finger lit.
+    private func scrubBar(highlighting index: Int) -> some View {
+        navigationRow(constrainsWidth: true) {
+            ForEach(Array(AppTab.allCases.enumerated()), id: \.element) { offset, tab in
+                itemLabel(tab, selected: offset == index, showsCaption: false)
+            }
+        }
+        .padding(6)
+        .bighelpNavigationGlass(in: Capsule())
+    }
+
+    /// Which tab a finger at `x` (in the bar's space) is over: five equal slots inside its padding.
+    static func tabIndex(at x: CGFloat, barWidth: CGFloat, count: Int = AppTab.allCases.count) -> Int {
+        guard barWidth > 12, count > 0 else { return 0 }
+        let slot = (barWidth - 12) / CGFloat(count)
+        return min(max(Int((x - 6) / slot), 0), count - 1)
+    }
+
+    private func open() {
+        withAnimation(reduceMotion ? nil : .snappy(duration: BighelpTokens.transitionDuration)) {
+            if isInChat { isExpanded = true } else { scrollFold?.isFolded = false }
+        }
+    }
+
+    /// Press and slide toward a tab, let go to open it: one motion instead of open, then pick.
+    private var slideToPick: some Gesture {
+        DragGesture(minimumDistance: 10, coordinateSpace: .named(Self.barCoordinateSpace))
+            .onChanged { value in
+                let index = Self.tabIndex(at: value.location.x, barWidth: barWidth)
+                if scrubIndex == nil {
+                    withAnimation(reduceMotion ? nil : .snappy(duration: 0.18)) { scrubIndex = index }
+                } else if scrubIndex != index {
+                    scrubIndex = index
+                }
+            }
+            .onEnded { value in
+                let index = Self.tabIndex(at: value.location.x, barWidth: barWidth)
+                withAnimation(reduceMotion ? nil : .snappy(duration: 0.18)) { scrubIndex = nil }
+                let tab = AppTab.allCases[index]
+                BighelpKeyboard.dismiss()
+                if selection != tab { tabChanges += 1 }
+                withAnimation(reduceMotion ? nil : .snappy(duration: BighelpTokens.transitionDuration)) {
+                    selection = tab
+                }
+            }
+    }
+
+    /// One round button in the middle: tap for the full bar, or press and slide to a tab. Ideas'
+    /// sparkle, not ☰, so it isn't mistaken for the menu at the top.
     private var collapsedButton: some View {
         Button {
-            withAnimation(reduceMotion ? nil : .snappy(duration: BighelpTokens.transitionDuration)) { isExpanded = true }
+            open()
         } label: {
             AppTabIcon(tab: .ideas, selected: false)
                 .frame(width: BighelpTokens.scaled(26), height: BighelpTokens.scaled(26))
@@ -149,19 +223,10 @@ struct FloatingTabBar: View {
         .bighelpNavigationGlass(in: Circle(), isInteractive: true)
         .matchedGeometryEffect(id: "bar", in: barSpace)
         .transition(.opacity)
+        .simultaneousGesture(slideToPick)
         .accessibilityLabel("Show Feed, Ideas, Goals and more")
+        .accessibilityHint("Or press and slide to a tab")
         .accessibilityIdentifier("primary-navigation.expand")
-    }
-
-    /// After a pick, a collapsed-by-default bar folds back once the new screen is up.
-    private func collapseSoon() {
-        guard startsCollapsed else { return }
-        collapseTask?.cancel()
-        collapseTask = Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(600))
-            guard !Task.isCancelled else { return }
-            withAnimation(reduceMotion ? nil : .snappy(duration: BighelpTokens.transitionDuration)) { isExpanded = false }
-        }
     }
 
     private func navigationRow<Content: View>(
@@ -180,7 +245,6 @@ struct FloatingTabBar: View {
             withAnimation(reduceMotion ? nil : .snappy(duration: BighelpTokens.transitionDuration)) {
                 selection = tab
             }
-            collapseSoon()
         } label: {
             itemLabel(tab, selected: isSelected, showsCaption: showsCaption)
                 .overlay(alignment: .topTrailing) {
@@ -534,6 +598,52 @@ private extension AppTab {
         case .ideas: "tab.ideas"
         case .goals: "tab.goals"
         case .apps: "tab.apps"
+        }
+    }
+}
+
+/// Feed, Ideas, Goals and Apps fold the bottom menu while you read down the page, like Safari's
+/// toolbar, and bring it back when you scroll up, reach the top, or switch pages.
+@MainActor
+@Observable
+final class BottomBarFold {
+    var isFolded = false
+
+    /// `offset` is how far the page is scrolled; small moves are ignored.
+    func scrolled(from old: CGFloat, to new: CGFloat) {
+        if new < 40 { if isFolded { isFolded = false }; return }
+        let delta = new - old
+        if delta > 8, !isFolded { isFolded = true }
+        else if delta < -8, isFolded { isFolded = false }
+    }
+}
+
+private struct BottomBarFoldKey: EnvironmentKey {
+    static let defaultValue: BottomBarFold? = nil
+}
+
+extension EnvironmentValues {
+    var bottomBarFold: BottomBarFold? {
+        get { self[BottomBarFoldKey.self] }
+        set { self[BottomBarFoldKey.self] = newValue }
+    }
+}
+
+extension View {
+    /// Folds the bottom menu while this scroll view is scrolled down (iOS 18 and later).
+    func foldsBottomBarOnScroll() -> some View { modifier(BottomBarFoldOnScroll()) }
+}
+
+private struct BottomBarFoldOnScroll: ViewModifier {
+    @Environment(\.bottomBarFold) private var fold
+
+    func body(content: Content) -> some View {
+        if #available(iOS 18, visionOS 2, *), let fold {
+            content.onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y + $0.contentInsets.top } action: {
+                fold.scrolled(from: $0, to: $1)
+            }
+        } else {
+            content
         }
     }
 }

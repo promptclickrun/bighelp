@@ -9,12 +9,10 @@
   "observability": { "enabled": true },
   "send_metrics": false,
   "limits": { "cpu_ms": 200 },
-  // Access audiences are public identifiers (they appear in every Access token), not secrets.
-  "vars": {
-    "ACCESS_TEAM_DOMAIN": "coltcoan.cloudflareaccess.com",
-    "ACCESS_AUD_REVIEW": "a8895de40dcec1396476256c5723d02299010140a9981e986244ac506e039a6c"
-  },
-  // Secret, set with `wrangler secret put TURNSTILE_SECRET`: the "bighelp Template Catalog submit" widget.
+  // Secrets, set with `wrangler secret put <NAME>` (see README › Develop and deploy):
+  // TURNSTILE_SECRET (the "bighelp Template Catalog submit" widget), ACCESS_TEAM_DOMAIN and
+  // ACCESS_AUD_REVIEW (the review Access app). The team domain names the account owner, so it stays
+  // out of this public repo.
   "d1_databases": [
     {
       "binding": "DB",

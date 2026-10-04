@@ -165,6 +165,14 @@ describe("review", () => {
     expect((await call("/review/templates", { jwt: forged })).status).toBe(401);
   });
 
+  it("stays closed when the Access secrets are missing, and the public feed still works", async () => {
+    const unset = { ...testEnv, ACCESS_TEAM_DOMAIN: "", ACCESS_AUD_REVIEW: "" } as Env;
+    const request = (path: string, jwt?: string) =>
+      new Request(`https://catalog.example${path}`, { headers: jwt ? { "Cf-Access-Jwt-Assertion": jwt } : {} });
+    expect((await handle(request("/review/templates", await reviewer()), unset, { keys, human })).status).toBe(503);
+    expect((await handle(request("/v1/catalog.json"), unset, { keys, human })).status).toBe(200);
+  });
+
   it("needs a reason to reject, and shows the reason to the submitter", async () => {
     const { id, statusToken } = await (await submit(blueprint)).json<{ id: string; statusToken: string }>();
     expect((await call(`/review/templates/${id}/reject`, { method: "POST", jwt: await reviewer() })).status).toBe(400);

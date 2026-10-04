@@ -331,6 +331,8 @@ class HttpError extends Error {
 }
 
 function accessConfig(env: Env, audience: string): AccessConfig {
+  // Without both secrets nobody can review: fail closed instead of checking against an empty issuer.
+  if (!env.ACCESS_TEAM_DOMAIN || !audience) throw new HttpError(503, "Review isn't set up.");
   return { teamDomain: env.ACCESS_TEAM_DOMAIN, audience };
 }
 

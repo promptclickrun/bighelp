@@ -107,5 +107,18 @@ npx wrangler d1 migrations apply bighelp-catalog --remote
 npx wrangler deploy
 ```
 
+The Worker reads three secrets. Set each one once with `npx wrangler secret put <NAME>`:
+
+- `TURNSTILE_SECRET`: the secret key of the "bighelp Template Catalog submit" Turnstile widget.
+- `ACCESS_TEAM_DOMAIN`: the Zero Trust team domain, for example `team.cloudflareaccess.com`.
+- `ACCESS_AUD_REVIEW`: the Application Audience (AUD) tag of the "review" Access app.
+
+The team domain contains the account owner's name, so it stays out of this public repo. If a secret is
+missing, the review routes answer 503 and the public routes keep working.
+
+A deploy from an older checkout set the two Access values as plain variables. Cloudflare refuses a secret
+with the same name as a variable. So, the first time, deploy this version first, then put the two secrets.
+Until you put them, review answers 503.
+
 `compatibility_date` must stay at or before the newest date the pinned workerd supports, or tests
 won't start. Deploys run from the Mac, where wrangler is logged in.

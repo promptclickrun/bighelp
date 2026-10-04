@@ -22,6 +22,7 @@ struct ChatAttachmentGallery: View {
                 .defaultScrollAnchor(alignsTrailing ? .trailing : .leading)
         }
         .frame(maxWidth: 560, alignment: alignsTrailing ? .trailing : .leading)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("chat.message-attachments")
         .sheet(item: $previewAttachment) { attachment in
             ChatAttachmentPreviewView(attachment: attachment)
@@ -29,9 +30,20 @@ struct ChatAttachmentGallery: View {
         }
     }
 
+    /// Two or more pictures go in one stack; anything else keeps its own tile beside it.
+    private var stackedImages: [ChatAttachment] {
+        let images = ChatImageStackContent.split(attachments).images
+        return ChatImageStackContent.showsStack(images) ? images : []
+    }
+
     private var attachmentRow: some View {
-        HStack(alignment: .bottom, spacing: BighelpTokens.space8) {
-            ForEach(attachments) { attachment in
+        let stacked = stackedImages
+        let stackedIDs = Set(stacked.map(\.id))
+        return HStack(alignment: .bottom, spacing: BighelpTokens.space8) {
+            if !stacked.isEmpty {
+                ChatImageStackView(images: stacked)
+            }
+            ForEach(attachments.filter { !stackedIDs.contains($0.id) }) { attachment in
                 if uiV3Enabled, attachment.mimeType.hasPrefix("audio/") {
                     BighelpV3MessageAudioView(attachment: attachment, theme: theme) {
                         previewAttachment = attachment
@@ -343,7 +355,7 @@ struct ChatAttachmentDocument: FileDocument {
     }
 }
 
-private enum ChatAttachmentTemporaryFile {
+enum ChatAttachmentTemporaryFile {
     static func write(_ attachment: ChatAttachment) throws -> URL {
         let directory = FileManager.default.temporaryDirectory
             .appending(path: "loopdy-preview-\(UUID().uuidString)", directoryHint: .isDirectory)

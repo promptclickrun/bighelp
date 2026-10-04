@@ -297,6 +297,65 @@ enum ConversationFixtures {
     /// done, a run of browser steps still going, a picture being made and a
     /// forecast card streaming in. With `waiting`, the live run is paused on a
     /// secure input request instead.
+    /// "-test-image-stack": the person sends two photos and the agent four, made up, so each
+    /// message shows a stack to open, swipe through and save.
+    static var imageStackPreview: SessionRecord {
+        let sessionID = "demo-finance"
+        let agent = TimelineSender.agent(id: "finance", snapshot: .init(name: "Atlas"))
+        // Each made-up photo is a little scene with its own label, so a screenshot shows which is which.
+        func picture(_ id: String, _ name: String, _ label: String, _ sky: UIColor, _ ground: UIColor) -> ChatAttachment? {
+            let size = CGSize(width: 640, height: 480)
+            let data = UIGraphicsImageRenderer(size: size).pngData { context in
+                let cg = context.cgContext
+                let colors = [sky.cgColor, UIColor.white.cgColor] as CFArray
+                if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0, 1]) {
+                    cg.drawLinearGradient(gradient, start: .zero, end: CGPoint(x: 0, y: 330), options: [])
+                }
+                UIColor(red: 1, green: 0.93, blue: 0.6, alpha: 1).setFill()
+                cg.fillEllipse(in: CGRect(x: 470, y: 50, width: 90, height: 90))
+                ground.setFill()
+                cg.fill(CGRect(x: 0, y: 330, width: size.width, height: 150))
+                UIColor(red: 0.45, green: 0.27, blue: 0.18, alpha: 1).setFill()
+                cg.fill(CGRect(x: 120, y: 220, width: 200, height: 130))
+                UIColor(red: 0.7, green: 0.15, blue: 0.12, alpha: 1).setFill()
+                cg.beginPath()
+                cg.move(to: CGPoint(x: 95, y: 225))
+                cg.addLine(to: CGPoint(x: 220, y: 140))
+                cg.addLine(to: CGPoint(x: 345, y: 225))
+                cg.closePath()
+                cg.fillPath()
+                let text = NSAttributedString(string: label, attributes: [
+                    .font: UIFont.systemFont(ofSize: 54, weight: .bold),
+                    .foregroundColor: UIColor.white,
+                    .strokeColor: UIColor.black.withAlphaComponent(0.6),
+                    .strokeWidth: -3,
+                ])
+                text.draw(at: CGPoint(x: 32, y: 380))
+            }
+            return try? ChatAttachment(id: id, fileName: name, mimeType: "image/png", data: data)
+        }
+        let sent = [
+            picture("image-stack-sent-1", "street.png", "Our street", .systemOrange, .systemBrown),
+            picture("image-stack-sent-2", "lantern.png", "Lanterns", .systemPurple, .darkGray),
+        ].compactMap { $0 }
+        let rooms = [
+            picture("image-stack-room-1", "hatanaka-room.png", "Room 1", .systemTeal, .systemGreen),
+            picture("image-stack-room-2", "gion-shinmonso.png", "Room 2", .systemBlue, .systemMint),
+            picture("image-stack-room-3", "ryokan-motonago.png", "Room 3", .systemYellow, .systemOrange),
+            picture("image-stack-room-4", "kinmata.png", "Room 4", .systemPink, .systemIndigo),
+        ].compactMap { $0 }
+        let items = [
+            TimelineItem(id: "stack-sent", role: .human, sender: .user(snapshot: .init(name: "You")),
+                         content: .message("These are from last time we went."), metadata: .init(sourceOrder: 10),
+                         attachments: sent),
+            TimelineItem(id: "stack-rooms", role: .assistant, sender: agent,
+                         content: .message("Here are the four rooms near Gion with your dates open."),
+                         metadata: .init(sourceOrder: 20), attachments: rooms),
+        ]
+        return SessionRecord(id: sessionID, kind: .direct, agentIDs: ["finance"], title: "Kyoto rooms",
+                             items: items)
+    }
+
     static func loaderChatPreview(waiting: Bool = false) -> SessionRecord {
         let sessionID = "demo-finance"
         let agent = TimelineSender.agent(id: "finance", snapshot: .init(name: "Avery Park"))

@@ -1451,7 +1451,9 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         record.catalogPreview = incoming.record.catalogPreview
         record.isPinned = incoming.record.isPinned
         record.isActive = hasOwnership(current) && current.record.isActive
-        record.updatedAt = max(current.record.updatedAt, incoming.record.updatedAt)
+        // The host's saved last activity, unless a reply is still coming in here.
+        record.updatedAt = record.isActive ? max(current.record.updatedAt, incoming.record.updatedAt)
+            : incoming.record.updatedAt
         record.hasAcceptedMessage = current.record.hasAcceptedMessage || incoming.record.hasAcceptedMessage
         adopted.record = record
         adopted.coordinate = try .init(
@@ -1725,7 +1727,11 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
                 matched.runtimeSessionKey = item.sessionKey
                 matched.ownership = owned.ownership
                 matched.record.isActive = item.status.hasActiveWork
-                matched.record.updatedAt = max(matched.record.updatedAt, item.lastActive)
+                // Hermes stamps a session "last active: now" whenever it's resumed, with no new
+                // message; only work in progress moves a saved chat up the list.
+                if item.status.hasActiveWork {
+                    matched.record.updatedAt = max(matched.record.updatedAt, item.lastActive)
+                }
                 if matched.catalog == nil && !owned.ownership.isReceipt {
                     matched.record.title = item.title.isEmpty ? "Untitled" : item.title
                     matched.record.catalogPreview = item.preview
@@ -1865,7 +1871,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         ) else { return incoming }
         merged.coordinate = coordinate
         merged.record.isActive = current.record.isActive
-        merged.record.updatedAt = max(merged.record.updatedAt, current.record.updatedAt)
+        if current.record.isActive { merged.record.updatedAt = max(merged.record.updatedAt, current.record.updatedAt) }
         if let runtime = current.record.sessionRuntime,
            runtime.observedAt > (merged.record.sessionRuntime?.observedAt ?? .distantPast) {
             merged.record.sessionRuntime = runtime

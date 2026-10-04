@@ -328,7 +328,9 @@ enum SessionCatalogReconciliation {
         // carry a legacy or default false value, so an existing local record
         // remains authoritative for its pin state across every refresh.
         merged.isPinned = local.isPinned
-        merged.updatedAt = max(local.updatedAt, incoming.updatedAt)
+        // The host's saved last activity wins once nothing is in progress here. Keeping the newer
+        // of the two kept times Hermes had stamped on merely reopened chats forever.
+        merged.updatedAt = local.isActive ? max(local.updatedAt, incoming.updatedAt) : incoming.updatedAt
         merged.hasAcceptedMessage = (hasSameTranscriptOwner && local.hasAcceptedMessage)
             || incoming.hasAcceptedMessage
             || merged.items.contains(where: { $0.role == .human })

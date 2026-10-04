@@ -505,6 +505,30 @@ struct DirectHermesSessionCatalogClientTests {
         }
     }
 
+    /// Hermes stamps an open session "last active: now" when it's resumed, without any new message.
+    /// Only real work moves a saved chat up the list; otherwise several chats opened at once all
+    /// showed the same recent time (Hermes Desktop shows the saved one).
+    @Test(arguments: ["idle", "working"])
+    func anOpenedChatKeepsItsSavedTimeUntilItWorks(status: String) async throws {
+        let workspace = try SessionWorkspaceStub()
+        workspace.activeSessions = nil
+        workspace.handler = { operation, _ in
+            if operation.rawValue == "session.active_list" {
+                return ["sessions": .array([Self.activeSession(stored: "saved-live", status: status)])]
+            }
+            switch operation {
+            case .profilesList: return Self.profiles()
+            case .sessionsList:
+                return ["sessions": .array([Self.session(id: "saved-live")]), "total": .integer(1),
+                        "offset": .integer(0), "limit": .integer(100)]
+            case .sessionEvents: return Self.ownershipReplay(profile: "alpha", stored: "saved-live")
+            default: throw WorkspaceClientError.invalidRequest
+            }
+        }
+        let record = try #require(try await Self.client(workspace).list().first)
+        #expect(record.updatedAt == Date(timeIntervalSince1970: status == "idle" ? 2 : 3))
+    }
+
     @Test func liveSessionBeforeItsFirstSavedMessageAppearsWithoutHydratingChat() async throws {
         let workspace = try SessionWorkspaceStub()
         workspace.activeSessions = [Self.activeSession(stored: "remote-new", status: "streaming", count: 0)]

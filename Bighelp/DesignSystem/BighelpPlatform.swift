@@ -5,13 +5,14 @@ import UIKit
 
 extension View {
     /// Vision Pro's keyboard floats apart from the window, so scrolling
-    /// never needs to put it away there.
+    /// never needs to put it away there. `immediately`: any scroll puts it
+    /// away, for search results under a bottom search bar.
     @ViewBuilder
-    func dismissesKeyboardOnScroll(_ dismisses: Bool) -> some View {
+    func dismissesKeyboardOnScroll(_ dismisses: Bool, immediately: Bool = false) -> some View {
         #if os(visionOS)
         self
         #else
-        scrollDismissesKeyboard(dismisses ? .interactively : .never)
+        scrollDismissesKeyboard(dismisses ? (immediately ? .immediately : .interactively) : .never)
         #endif
     }
 }

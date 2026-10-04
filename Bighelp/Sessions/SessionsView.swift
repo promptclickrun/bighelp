@@ -120,12 +120,8 @@ struct SessionsView: View {
         .background(theme.canvas.ignoresSafeArea())
         .navigationTitle("Sessions")
         .navigationBarTitleDisplayMode(.large)
-        .searchable(
-            text: $model.query,
-            // Search sits under the large title (revealed on pull) so it never stacks with the tab bar.
-            placement: .navigationBarDrawer,
-            prompt: "Search sessions"
-        )
+        // The glass search bar along the bottom, as on All agents.
+        .searchable(text: $model.query, prompt: "Search sessions")
         .toolbar {
             #if targetEnvironment(macCatalyst)
             // A Mac list can't be pulled down to refresh.
@@ -226,6 +222,7 @@ struct SessionsView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        .dismissesKeyboardOnScroll(true, immediately: true)
         .background(theme.canvas)
         .environment(\.defaultMinListRowHeight, BighelpTokens.hitTarget)
     }

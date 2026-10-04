@@ -295,6 +295,15 @@ final class FleetStore {
             .sorted { $0.updatedAt > $1.updatedAt }
     }
 
+    /// The chats whose title or preview has the search text. An empty search keeps them all.
+    func chats(on hostID: UUID? = nil, matching query: String) -> [FleetChat] {
+        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return chats(on: hostID) }
+        return chats(on: hostID).filter {
+            $0.title.localizedCaseInsensitiveContains(query) || $0.preview.localizedCaseInsensitiveContains(query)
+        }
+    }
+
     /// Every scheduled task, the next to run first.
     func tasks(on hostID: UUID? = nil) -> [FleetTask] {
         hosts.filter { hostID == nil || $0.id == hostID }

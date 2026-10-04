@@ -517,8 +517,10 @@ struct FleetChatsView: View {
     let fleet: FleetStore
     let onOpen: (FleetChat) -> Void
     @State private var hostFilter: UUID?
+    @State private var search = ""
 
     var body: some View {
+        let chats = fleet.chats(on: hostFilter, matching: search)
         List {
             if fleet.showsHostNames {
                 FleetHostFilter(fleet: fleet, selection: $hostFilter)
@@ -526,7 +528,7 @@ struct FleetChatsView: View {
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
             }
-            ForEach(fleet.chats(on: hostFilter)) { chat in
+            ForEach(chats) { chat in
                 Button { onOpen(chat) } label: { FleetChatRow(chat: chat, fleet: fleet) }
                     .buttonStyle(.plain)
                     .listRowBackground(Color.clear)
@@ -535,14 +537,21 @@ struct FleetChatsView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        .dismissesKeyboardOnScroll(true, immediately: true)
         .background(BighelpThemeCanvas(theme: theme).ignoresSafeArea())
+        // The glass search bar along the bottom, as on All agents.
+        .searchable(text: $search, prompt: "Search sessions")
         .refreshable {
             fleet.refresh(force: true)
             await fleet.waitForReads()
         }
         .overlay {
-            if fleet.chats(on: hostFilter).isEmpty {
-                ContentUnavailableView("No sessions yet", systemImage: "bubble.left.and.bubble.right")
+            if chats.isEmpty {
+                if search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    ContentUnavailableView("No sessions yet", systemImage: "bubble.left.and.bubble.right")
+                } else {
+                    ContentUnavailableView.search(text: search)
+                }
             }
         }
         .task { fleet.refresh() }

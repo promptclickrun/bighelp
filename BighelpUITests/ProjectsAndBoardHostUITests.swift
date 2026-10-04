@@ -128,7 +128,7 @@ final class ProjectsAndBoardHostUITests: BighelpUITestCase {
             .matching(NSPredicate(format: "label CONTAINS %@ OR value CONTAINS %@",
                                   "Direct streaming fixture complete.", "Direct streaming fixture complete.")).firstMatch
         XCTAssertTrue(reply.waitForExistence(timeout: 90), "The agent replies")
-        app.buttons["chat.back"].tap()
+        swipeBackFromLeadingEdge(in: app)
         let chatRow = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "project.chat.")).firstMatch
         let found = chatRow.waitForExistence(timeout: 20) || {
             app.swipeDown()

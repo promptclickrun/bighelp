@@ -76,8 +76,8 @@ planes…). The status bar hides while it shows, and the app moves down (root `a
 is covered. Tap for a compact pill, touch and hold to open the chat. Settings › Chat › Agent in the Dynamic Island
 turns it off. Outside the app the Live Activity shows the agent's picture and the same icon (the plugin sends only
 a fixed category). Every phone chat uses this big-avatar header and keeps the tab bar under its message box (All
-agents' chats excepted); only the Chat tab's first page has ☰, any other chat (from the list, Agents, Feed, a task)
-has Back. Chat Info lives in ⋯ › People & Chat, and the line under
+agents' chats excepted). Every chat has ☰ in the top left, like the other root screens; a chat opened from the
+list, Agents, Feed or a task goes back to it with the edge swipe. Chat Info lives in ⋯ › People & Chat, and the line under
 the name says "Updating…" while a chat reloads from Hermes. iPad works the same way, with no always-open sidebar:
 ☰ slides the menu in from the leading edge, and chats use the width of the screen. On Vision Pro bighelp always
 starts in its own window. The tabs sit in a strip beside the window (`VisionTabOrnament`), clear of the system's
@@ -203,7 +203,7 @@ the lane under it lights up.
 host, like Messages: pinned agents up top as big pictures with their name and role (no host name; touch and hold
 to drag them into a new order, kept on this device across hosts), host filter chips, then each agent with its host's
 name, its role and its latest chat, newest first. One big round New chat sits bottom right, above the search bar,
-where a thumb rests. A tap opens that agent's own chat with Back; if it's on another host, the app switches hosts
+where a thumb rests. A tap opens that agent's own chat (☰ top left, the edge swipe goes back); if it's on another host, the app switches hosts
 first while the list stays up. ☰'s recent chats, All chats and Scheduled tasks then list every host's, each with
 its host's name. Screens that belong to one host (Settings, Agents, Projects, Kanban, the credential
 vault, the folder, New group) ask which host first; Usage instead adds up every host, with a row for each; Settings' pop-up also leads with **Fleet settings**, one page

@@ -211,7 +211,7 @@ final class HostSignInMatrixUITests: BighelpUITestCase {
         XCTAssertFalse(text("MEDIA:", in: app).exists, "No raw MEDIA line in its place")
         save("media-1-after-turn", app)
 
-        app.buttons["chat.back"].firstMatch.tap()
+        swipeBackFromLeadingEdge(in: app)
         let row = app.descendants(matching: .any)
             .matching(NSPredicate(format: "identifier BEGINSWITH %@", "session.row.")).firstMatch
         if !row.waitForExistence(timeout: 5) { openRootTab("tab.sessions", in: app) }

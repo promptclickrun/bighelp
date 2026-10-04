@@ -4,8 +4,6 @@ import SwiftUI
 /// big live avatar, the ☰ drawer, New chat, and the bottom bar under the composer.
 struct AgentHomeChrome {
     var isEnabled = false
-    /// The Chat tab's first page: ☰. Otherwise Back.
-    var isHome = true
     /// The tab bar under the message box. Every chat on one computer has it,
     /// whether it's the Chat tab's own or opened from the list, Agents or Feed.
     var showsTabBar = false
@@ -32,8 +30,9 @@ extension EnvironmentValues {
     }
 }
 
-/// The Chat tab's header: ☰ on the left, the live avatar and name in the
-/// middle, New chat and chat options on the right.
+/// Every chat's header: ☰ on the left, the live avatar and name in the
+/// middle, New chat and chat options on the right. ☰ is in the same place as
+/// on the other root screens; the edge swipe goes back to where the chat opened from.
 struct AgentHomeChatHeader: View {
     let agentID: String
     let displayName: String
@@ -47,7 +46,6 @@ struct AgentHomeChatHeader: View {
     /// Full screen height, for the Auto avatar size.
     var screenHeight: CGFloat = 0
     let beforeAction: () -> Void
-    let onBack: () -> Void
     @AppStorage(ChatLayoutPreferences.avatarSizeKey) private var avatarSize: ChatAvatarSize = .automatic
     @AppStorage(ChatLayoutPreferences.showsAgentNameKey) private var showsAgentName = true
 
@@ -72,9 +70,9 @@ struct AgentHomeChatHeader: View {
             HStack(alignment: .top) {
                 Button {
                     beforeAction()
-                    if chrome.isHome { chrome.onMenu() } else { onBack() }
+                    chrome.onMenu()
                 } label: {
-                    Image(systemName: chrome.isHome ? "line.3.horizontal" : "chevron.left")
+                    Image(systemName: "line.3.horizontal")
                         .font(.bighelp(.title3).weight(.semibold))
                         .frame(width: HeaderButtonMetrics.glass, height: HeaderButtonMetrics.glass)
                         .bighelpNavigationGlass(in: Circle(), isInteractive: true)
@@ -82,8 +80,8 @@ struct AgentHomeChatHeader: View {
                         .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(chrome.isHome ? "Chats and menu" : "Back")
-                .accessibilityIdentifier(chrome.isHome ? "chat.menu" : "chat.back")
+                .accessibilityLabel("Chats and menu")
+                .accessibilityIdentifier("chat.menu")
                 Spacer()
                 HStack(spacing: 0) {
                     newChatButton

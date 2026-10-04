@@ -203,9 +203,12 @@ final class AppStoreScreenshotUITests: BighelpUITestCase {
 
     @MainActor
     private func goBack(_ app: XCUIApplication) {
-        let back = [app.buttons["chat.back"].firstMatch, app.navigationBars.buttons.firstMatch]
-            .first { $0.exists && $0.isHittable }
-        if let back { back.tap(); sleep(1) }
+        // Chats have ☰, not Back: leave them with an edge swipe.
+        if app.buttons["chat.menu"].firstMatch.exists {
+            swipeBackFromLeadingEdge(in: app); sleep(1); return
+        }
+        let back = app.navigationBars.buttons.firstMatch
+        if back.exists, back.isHittable { back.tap(); sleep(1) }
     }
 
     private func environment(_ name: String) -> String? {

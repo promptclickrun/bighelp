@@ -95,6 +95,15 @@ class BighelpUITestCase: XCTestCase {
         return item
     }
 
+    /// Leaves a pushed chat the way people do: a swipe from the leading edge.
+    /// Chats have ☰ in the top left, not Back.
+    @MainActor
+    func swipeBackFromLeadingEdge(in app: XCUIApplication) {
+        let window = app.windows.firstMatch
+        let start = window.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0.5)).withOffset(CGVector(dx: 2, dy: 0))
+        start.press(forDuration: 0.05, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5)))
+    }
+
     /// ⋯ › Context window (Nerd Mode, a chat with context). Returns the pop-up.
     @MainActor
     @discardableResult
@@ -135,13 +144,11 @@ class BighelpUITestCase: XCTestCase {
                     item.tap()
                     return
                 }
-                // Feed, Ideas, Goals and Apps have no ☰; Chat does. A chat
-                // opened from the list has Back instead.
-                let back = app.buttons["chat.back"].firstMatch
+                // Feed, Ideas, Goals and Apps have no ☰; Chat does.
                 let chat = app.buttons["tab.sessions"].firstMatch
                 // A pushed page (Activity, a task) has the system Back button.
                 let navigationBack = app.navigationBars.firstMatch.buttons.firstMatch
-                if back.exists, back.isHittable { back.tap() } else if chat.exists, chat.isHittable { chat.tap() }
+                if chat.exists, chat.isHittable { chat.tap() }
                 else if navigationBack.exists, navigationBack.isHittable, navigationBack.frame.minX < 60 {
                     navigationBack.tap()
                 }

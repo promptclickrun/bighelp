@@ -27,10 +27,9 @@ final class AppState {
     var suspendedChat: SuspendedChat?
     /// A blueprint's Send to agent: the next new chat sends `pendingComposerText` once it can.
     var pendingComposerSends = false
-    /// A chat picked from the full chat list keeps Back to that list. The Chat
-    /// tab's own chat (auto-opened, ☰ › New chat, the switcher, an agent tapped
-    /// on Agents) gets ☰ and the
-    /// tab bar. Both use the big-avatar header.
+    /// A chat picked from the full chat list isn't the Chat tab's own chat
+    /// (auto-opened, ☰ › New chat, the switcher, an agent tapped on Agents), so
+    /// tapping Chat leaves it. Both have ☰, the tab bar and the big-avatar header.
     var chatOpenedFromList = false
 
     /// The drawer reflects the destination on screen, while `selectedTab`

@@ -29,6 +29,13 @@ enum AppRoute: Hashable {
     case project(id: String)
     /// Kanban: the host's boards, worked by its agents.
     case kanban
+    /// Workflows: stages run by agents on the host, with your sign-off (☰ › Workflows).
+    case workflows
+    case workflow(id: String, startsRun: Bool)
+    case workflowRun(id: String)
+    case workflowSignoff(runID: String)
+    /// All runs; the Mac's three-column monitor, with one selected.
+    case workflowRuns(selected: String?)
     /// Plans, limits and what the agents used (☰ › Usage).
     case usage
     /// The all-hosts view's chat list: every host's chats.

@@ -186,7 +186,7 @@ final class DirectHermesNativePluginClient {
             return try await loadContext(force: true).projection
         }
         let route = try Self.route(operation)
-        let requestLimit = route.feature == "native-card-templates-v1" ? 196_608 : 1_048_576
+        let requestLimit = Self.smallRequestFeatures.contains(route.feature) ? 196_608 : 1_048_576
         try DirectHermesWire.validateValueSize(.object(payload), limit: requestLimit)
         guard try JSONEncoder().encode(BighelpJSONValue.object(payload)).count <= requestLimit else {
             throw WorkspaceClientError.capacityExceeded
@@ -248,6 +248,12 @@ final class DirectHermesNativePluginClient {
             throw responseError(response, mutation: true)
         }
     }
+
+    /// Features whose plugin routes refuse requests over 192 KB.
+    private static let smallRequestFeatures: Set<String> = ["native-card-templates-v1", workflowsFeature]
+
+    /// Workflows: stages run by agents on the host, with your sign-off.
+    static let workflowsFeature = "native-workflows-v1"
 
     static func supports(_ operation: WorkspaceOperation) -> Bool {
         operation == .nativeContext || (try? route(operation)) != nil
@@ -380,6 +386,18 @@ final class DirectHermesNativePluginClient {
                          maximumResponseBytes: 196_608)
         case .boardAccept:
             return Route(path: "board/accept", feature: "native-agent-board-answers-v1", isMutation: true,
+                         maximumResponseBytes: 196_608)
+        case .workflowsStatus, .workflowsList, .workflowsGet, .workflowsDraftSave, .workflowsValidate,
+             .workflowsPublish, .workflowsBind, .workflowsArchive, .workflowsRunsStart, .workflowsRunsList,
+             .workflowsRunsGet, .workflowsRunsEvents, .workflowsRunsControl, .workflowsRunsSignoff,
+             .workflowsArtifactsRead, .workflowsTemplatesList, .workflowsTemplatesUse:
+            // workflows.runs.start -> workflows/runs/start
+            let path = operation.rawValue.split(separator: ".").joined(separator: "/")
+            let mutations: Set<WorkspaceOperation> = [
+                .workflowsDraftSave, .workflowsPublish, .workflowsBind, .workflowsArchive, .workflowsRunsStart,
+                .workflowsRunsControl, .workflowsRunsSignoff, .workflowsTemplatesUse,
+            ]
+            return Route(path: path, feature: workflowsFeature, isMutation: mutations.contains(operation),
                          maximumResponseBytes: 196_608)
         default: throw WorkspaceClientError.unavailable(.unsupportedOperation)
         }

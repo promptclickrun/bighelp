@@ -1,0 +1,367 @@
+{
+  "errors": [
+    {
+      "status": 503,
+      "code": "workflows_unavailable",
+      "routes": [
+        "*"
+      ],
+      "example": {
+        "error": {
+          "code": "workflows_unavailable",
+          "message": "Workflows aren't available on this computer.",
+          "retryable": true,
+          "details": {}
+        }
+      }
+    },
+    {
+      "status": 503,
+      "code": "runner_unavailable",
+      "routes": [
+        "runs/start",
+        "runs/control"
+      ],
+      "example": {
+        "error": {
+          "code": "runner_unavailable",
+          "message": "This computer can't run workflow stages right now.",
+          "retryable": true,
+          "details": {}
+        }
+      }
+    },
+    {
+      "status": 503,
+      "code": "store_unavailable",
+      "routes": [
+        "*"
+      ],
+      "example": {
+        "error": {
+          "code": "store_unavailable",
+          "message": "The workflow store can't be opened.",
+          "retryable": true,
+          "details": {}
+        }
+      }
+    },
+    {
+      "status": 404,
+      "code": "workflow_not_found",
+      "routes": [
+        "get",
+        "draft/save",
+        "validate",
+        "publish",
+        "bind",
+        "archive",
+        "runs/start",
+        "runs/list"
+      ],
+      "example": {
+        "error": {
+          "code": "workflow_not_found",
+          "message": "That workflow no longer exists.",
+          "retryable": false,
+          "details": {}
+        }
+      }
+    },
+    {
+      "status": 404,
+      "code": "revision_not_found",
+      "routes": [
+        "get",
+        "runs/start"
+      ],
+      "example": {
+        "error": {
+          "code": "revision_not_found",
+          "message": "That version of the workflow doesn't exist.",
+          "retryable": false,
+          "details": {}
+        }
+      }
+    },
+    {
+      "status": 404,
+      "code": "run_not_found",
+      "routes": [
+        "runs/get",
+        "runs/events",
+        "runs/control",
+        "runs/signoff",
+        "artifacts/read"
+      ],
+      "example": {
+        "error": {
+          "code": "run_not_found",
+          "message": "That run no longer exists.",
+          "retryable": false,
+          "details": {}
+        }
+      }
+    },
+    {
+      "status": 404,
+      "code": "artifact_not_found",
+      "routes": [
+        "artifacts/read"
+      ],
+      "example": {
+        "error": {
+          "code": "artifact_not_found",
+          "message": "That file isn't part of this run.",
+          "retryable": false,
+          "details": {}
+        }
+      }
+    },
+    {
+      "status": 404,
+      "code": "template_not_found",
+      "routes": [
+        "templates/use"
+      ],
+      "example": {
+        "error": {
+          "code": "template_not_found",
+          "message": "That template doesn't exist.",
+          "retryable": false,
+          "details": {}
+        }
+      }
+    },
+    {
+      "status": 404,
+      "code": "role_not_found",
+      "routes": [
+        "bind"
+      ],
+      "example": {
+        "error": {
+          "code": "role_not_found",
+          "message": "That role isn't in this workflow.",
+          "retryable": false,
+          "details": {}
+        }
+      }
+    },
+    {
+      "status": 404,
+      "code": "profile_not_found",
+      "routes": [
+        "bind"
+      ],
+      "example": {
+        "error": {
+          "code": "profile_not_found",
+          "message": "The selected agent no longer exists.",
+          "retryable": false,
+          "details": {}
+        }
+      }
+    },
+    {
+      "status": 409,
+      "code": "draft_conflict",
+      "routes": [
+        "draft/save",
+        "publish"
+      ],
+      "example": {
+        "error": {
+          "code": "draft_conflict",
+          "message": "The draft changed. Load it again.",
+          "retryable": false,
+          "details": {}
+        }
+      }
+    },
+    {
+      "status": 409,
+      "code": "not_valid",
+      "routes": [
+        "publish",
+        "runs/start"
+      ],
+      "example": {
+        "error": {
+          "code": "not_valid",
+          "message": "Fix the problems in this workflow first.",
+          "retryable": false,
+          "details": {}
+        }
+      }
+    },
+    {
+      "status": 409,
+      "code": "workflow_archived",
+      "routes": [
+        "runs/start",
+        "draft/save",
+        "publish",
+        "bind"
+      ],
+      "example": {
+        "error": {
+          "code": "workflow_archived",
+          "message": "This workflow is archived.",
+          "retryable": false,
+          "details": {}
+        }
+      }
+    },
+    {
+      "status": 409,
+      "code": "run_conflict",
+      "routes": [
+        "runs/control"
+      ],
+      "example": {
+        "error": {
+          "code": "run_conflict",
+          "message": "The run changed. Load it again.",
+          "retryable": false,
+          "details": {}
+        }
+      }
+    },
+    {
+      "status": 409,
+      "code": "not_allowed",
+      "routes": [
+        "runs/control"
+      ],
+      "example": {
+        "error": {
+          "code": "not_allowed",
+          "message": "That isn't possible for this run now.",
+          "retryable": false,
+          "details": {}
+        }
+      }
+    },
+    {
+      "status": 409,
+      "code": "not_waiting",
+      "routes": [
+        "runs/signoff"
+      ],
+      "example": {
+        "error": {
+          "code": "not_waiting",
+          "message": "This stage isn't waiting for you.",
+          "retryable": false,
+          "details": {}
+        }
+      }
+    },
+    {
+      "status": 409,
+      "code": "approval_stale",
+      "routes": [
+        "runs/signoff"
+      ],
+      "example": {
+        "error": {
+          "code": "approval_stale",
+          "message": "The file changed since you opened it. Look at it again.",
+          "retryable": false,
+          "details": {}
+        }
+      }
+    },
+    {
+      "status": 409,
+      "code": "request_reused",
+      "routes": [
+        "*"
+      ],
+      "example": {
+        "error": {
+          "code": "request_reused",
+          "message": "That request ID was already used for another request.",
+          "retryable": false,
+          "details": {}
+        }
+      }
+    },
+    {
+      "status": 413,
+      "code": "definition_too_large",
+      "routes": [
+        "draft/save"
+      ],
+      "example": {
+        "error": {
+          "code": "definition_too_large",
+          "message": "The workflow is too large.",
+          "retryable": false,
+          "details": {}
+        }
+      }
+    },
+    {
+      "status": 422,
+      "code": "invalid_definition",
+      "routes": [
+        "draft/save"
+      ],
+      "example": {
+        "error": {
+          "code": "invalid_definition",
+          "message": "The workflow definition is invalid.",
+          "retryable": false,
+          "details": {}
+        }
+      }
+    },
+    {
+      "status": 422,
+      "code": "inputs_invalid",
+      "routes": [
+        "runs/start"
+      ],
+      "example": {
+        "error": {
+          "code": "inputs_invalid",
+          "message": "Fill in the run's inputs.",
+          "retryable": false,
+          "details": {}
+        }
+      }
+    },
+    {
+      "status": 422,
+      "code": "sample_unsupported",
+      "routes": [
+        "runs/start"
+      ],
+      "example": {
+        "error": {
+          "code": "sample_unsupported",
+          "message": "Runs with sample inputs aren't available yet.",
+          "retryable": false,
+          "details": {}
+        }
+      }
+    },
+    {
+      "status": 429,
+      "code": "queue_full",
+      "routes": [
+        "runs/start"
+      ],
+      "example": {
+        "error": {
+          "code": "queue_full",
+          "message": "Too many runs are waiting. Try again later.",
+          "retryable": false,
+          "details": {}
+        }
+      }
+    }
+  ]
+}

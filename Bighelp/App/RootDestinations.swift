@@ -23,6 +23,8 @@ extension RootShellView {
             }
         case (.kanban, _):
             kanbanDestination
+        case (.workflows, _), (.workflow, _), (.workflowRun, _), (.workflowSignoff, _), (.workflowRuns, _):
+            workflowsDestination(route)
         case (.usage, _):
             usageDestination
         case (.allHostsChats, _):
@@ -167,6 +169,7 @@ extension RootShellView {
                 },
                 onOpenProjects: canOpenProjects ? { openProjects() } : nil,
                 onOpenKanban: canOpenKanban ? { openKanban() } : nil,
+                onOpenWorkflows: canOpenWorkflows ? { openWorkflows() } : nil,
                 onSelectAgent: { openAgentChat($0.id) },
                 onOpenAgentSessions: { openSessions(filteredTo: $0) },
                 onOpenApproval: {

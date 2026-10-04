@@ -418,7 +418,7 @@ final class SessionsModel {
     }
 
     private func isVisible(_ record: SessionRecord) -> Bool {
-        showsCronSessions || !record.isCronSession
+        !record.isWorkflowSession && (showsCronSessions || !record.isCronSession)
     }
 
     private var agentNamesByID: [String: String] {

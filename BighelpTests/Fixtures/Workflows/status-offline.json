@@ -1,0 +1,21 @@
+{
+  "route": "workflows/status",
+  "request": {},
+  "response": {
+    "coordinator": {
+      "state": "offline",
+      "heartbeatAt": null,
+      "epoch": 0
+    },
+    "slots": {
+      "used": 0,
+      "total": 2
+    },
+    "survivesAppClose": true,
+    "runner": {
+      "available": false,
+      "reason": "service_manager_missing"
+    },
+    "hostName": "studio-mac"
+  }
+}

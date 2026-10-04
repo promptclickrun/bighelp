@@ -68,7 +68,7 @@ final class BighelpWidgetSnapshotPublisher {
         let names = Dictionary(profiles.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
         let defaultAgent = agents?.resolvedAgent(explicitID: nil) ?? profiles.first
         let records = (sessions?.presentedRecords ?? [])
-            .filter { $0.parentSessionID == nil && ($0.hasAcceptedMessage || $0.hasActiveWork) }
+            .filter { $0.parentSessionID == nil && !$0.isWorkflowSession && ($0.hasAcceptedMessage || $0.hasActiveWork) }
             .sorted { $0.updatedAt > $1.updatedAt }
             .prefix(12)
         let sessionRows = records.map { record -> BighelpWidgetSnapshot.Session in

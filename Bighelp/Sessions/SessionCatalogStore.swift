@@ -718,7 +718,7 @@ final class SessionCatalogStore {
 
     func recentSummaries(includeCronSessions: Bool) -> [SessionSummary] {
         presentedRecords
-            .filter { !$0.isSubagentSession && ($0.hasAcceptedMessage || $0.hasActiveWork) }
+            .filter { !$0.isSubagentSession && !$0.isWorkflowSession && ($0.hasAcceptedMessage || $0.hasActiveWork) }
             .filter { includeCronSessions || !$0.isCronSession }
             .sorted(by: SessionCatalogReconciliation.activitySort)
             .prefix(Self.summaryRetentionLimit)

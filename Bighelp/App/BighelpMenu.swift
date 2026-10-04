@@ -47,7 +47,7 @@ struct BighelpMenuHosts {
 /// Where the menu can go.
 struct BighelpMenuDestinations {
     /// The all-hosts view's list, its home while it's on. When set, ☰'s Agents opens it
-    /// and the one-host places (Projects, Kanban, Scheduled tasks) stay out of the menu.
+    /// and the one-host places (Projects, Kanban, Workflows) stay out of the menu.
     var onAllAgents: (() -> Void)? = nil
     var newChatTitle = "New chat"
     var onNewChat: () -> Void
@@ -58,6 +58,8 @@ struct BighelpMenuDestinations {
     var onScheduledTasks: () -> Void
     /// Kanban, when the host has Hermes' Kanban plugin.
     var onKanban: (() -> Void)? = nil
+    /// Workflows, when the host's bighelp plugin has them.
+    var onWorkflows: (() -> Void)? = nil
     /// Nerd Mode: the Hermes project folder chats run in.
     var folder: (name: String, open: () -> Void)?
     /// Usage: plans, limits and what the agents used. None while no computer is connected.
@@ -68,7 +70,7 @@ struct BighelpMenuDestinations {
 }
 
 /// bighelp's one menu (☰). The first screen is short on purpose: New chat (top right),
-/// Agents, Projects, Kanban, Scheduled tasks, Usage and Settings, then recent chats
+/// Agents, Projects, Kanban, Workflows, Scheduled tasks, Usage and Settings, then recent chats
 /// with See all. With all hosts showing, Agents is All agents and the one-host
 /// places stay out, so each view keeps to its purpose. The host switcher is one
 /// compact row on top; the rest (the credential vault, Nerd Mode's folder) waits below the chats.
@@ -115,6 +117,9 @@ struct BighelpMenu<Recent: View>: View {
                 }
                 if let onKanban = destinations.onKanban {
                     row("Kanban", symbol: "rectangle.split.3x1", id: "menu.kanban", action: onKanban)
+                }
+                if let onWorkflows = destinations.onWorkflows {
+                    row("Workflows", symbol: "flowchart", id: "menu.workflows", action: onWorkflows)
                 }
                 row("Scheduled tasks", symbol: "calendar.badge.clock", id: "menu.scheduled-tasks",
                     action: destinations.onScheduledTasks)

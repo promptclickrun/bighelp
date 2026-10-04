@@ -1,0 +1,32 @@
+{
+  "route": "workflows/runs/signoff",
+  "request": {
+    "runId": "run_10a1b2c3d4e5f606",
+    "stageKey": "signoff",
+    "decision": "approve",
+    "artifactSha256": "4f1c0d6b2e8a7f3c9d5e1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d9a2e",
+    "notes": ""
+  },
+  "response": {
+    "run": {
+      "id": "run_10a1b2c3d4e5f606",
+      "number": 9,
+      "workflowId": "wf_8c1d2e3f4a5b6c7d",
+      "workflowName": "Weekly newsletter",
+      "revision": 3,
+      "state": "succeeded",
+      "stageKey": "signoff",
+      "stageTitle": "Your sign-off",
+      "stageState": "accepted",
+      "stagesDone": 6,
+      "stageCount": 6,
+      "iteration": 2,
+      "startedAt": "2026-10-04T09:30:00Z",
+      "updatedAt": "2026-10-04T10:02:00Z",
+      "endedAt": "2026-10-04T10:02:00Z",
+      "paused": false,
+      "version": 22,
+      "sample": false
+    }
+  }
+}

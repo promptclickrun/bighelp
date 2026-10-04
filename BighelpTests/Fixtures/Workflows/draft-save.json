@@ -1,0 +1,176 @@
+{
+  "route": "workflows/draft/save",
+  "request": {
+    "workflowId": "wf_8c1d2e3f4a5b6c7d",
+    "baseDraftVersion": 5,
+    "definition": {
+      "schemaVersion": 1,
+      "name": "Weekly newsletter",
+      "description": "Research, draft and review the weekly newsletter.",
+      "roles": [
+        {
+          "key": "researcher",
+          "label": "Researcher"
+        },
+        {
+          "key": "writer",
+          "label": "Writer"
+        },
+        {
+          "key": "reviewer",
+          "label": "Reviewer"
+        }
+      ],
+      "inputs": [
+        {
+          "key": "topic",
+          "label": "Topic",
+          "type": "text",
+          "required": true,
+          "sample": "How small teams use checklists"
+        },
+        {
+          "key": "audience",
+          "label": "Who it is for",
+          "type": "text",
+          "required": false,
+          "sample": "New team leads"
+        },
+        {
+          "key": "length",
+          "label": "Length",
+          "type": "choice",
+          "required": true,
+          "choices": [
+            "Short",
+            "Medium",
+            "Long"
+          ],
+          "sample": "Medium"
+        }
+      ],
+      "limits": {
+        "stageMinutes": 20,
+        "maxRevisions": 2
+      },
+      "stages": [
+        {
+          "key": "research",
+          "kind": "agent",
+          "title": "Research the topic",
+          "role": "researcher",
+          "instructions": "Research the topic for the audience. Find the main facts, a few good examples and the sources you used. Write a short research brief in Markdown with a title, the key points and a list of sources.",
+          "tools": [
+            "web"
+          ],
+          "uses": [
+            "inputs.topic",
+            "inputs.audience"
+          ],
+          "outputs": [
+            {
+              "name": "brief",
+              "type": "markdown_file"
+            }
+          ]
+        },
+        {
+          "key": "draft",
+          "kind": "agent",
+          "title": "Write the draft",
+          "role": "writer",
+          "instructions": "Write the piece from the research brief. Start with a title line (# Title). Keep to the length asked for: Short is about 400 words, Medium about 800, Long about 1,500. Also give the word count.",
+          "tools": [],
+          "uses": [
+            "inputs.topic",
+            "inputs.audience",
+            "inputs.length",
+            "research.brief"
+          ],
+          "outputs": [
+            {
+              "name": "draft",
+              "type": "markdown_file"
+            },
+            {
+              "name": "word_count",
+              "type": "number"
+            }
+          ]
+        },
+        {
+          "key": "length_check",
+          "kind": "check",
+          "title": "Check length and title",
+          "rules": [
+            {
+              "type": "word_range",
+              "of": "draft.draft",
+              "min": 150,
+              "max": 3000
+            },
+            {
+              "type": "has_title",
+              "of": "draft.draft"
+            }
+          ]
+        },
+        {
+          "key": "review",
+          "kind": "agent",
+          "title": "Review the draft",
+          "role": "reviewer",
+          "instructions": "Review the draft against the research brief. Check facts, clarity and length. Decide pass if it is ready for the person to approve, or changes if the writer must fix something. Give short, specific notes; mark a note major when it must be fixed.",
+          "tools": [],
+          "uses": [
+            "inputs.topic",
+            "inputs.audience",
+            "research.brief",
+            "draft.draft"
+          ],
+          "outputs": [
+            {
+              "name": "decision",
+              "type": "decision",
+              "values": [
+                "pass",
+                "changes"
+              ]
+            },
+            {
+              "name": "notes",
+              "type": "notes"
+            }
+          ],
+          "minutes": 15
+        },
+        {
+          "key": "review_decision",
+          "kind": "decision",
+          "title": "Pass or send back",
+          "on": "review.decision",
+          "pass": "next",
+          "changes": {
+            "goTo": "draft",
+            "maxRevisions": 2
+          }
+        },
+        {
+          "key": "signoff",
+          "kind": "signoff",
+          "title": "Your sign-off",
+          "file": "draft.draft"
+        }
+      ]
+    }
+  },
+  "response": {
+    "workflowId": "wf_8c1d2e3f4a5b6c7d",
+    "draftVersion": 6,
+    "validation": {
+      "valid": true,
+      "host": true,
+      "issues": []
+    }
+  }
+}

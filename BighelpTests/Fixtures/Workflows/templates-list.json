@@ -1,0 +1,28 @@
+{
+  "route": "workflows/templates/list",
+  "request": {},
+  "response": {
+    "templates": [
+      {
+        "id": "research-draft-review",
+        "name": "Research, draft, review",
+        "description": "One agent researches the topic, one writes a draft and one reviews it. You approve the final file.",
+        "stageCount": 6,
+        "roles": [
+          {
+            "key": "researcher",
+            "label": "Researcher"
+          },
+          {
+            "key": "writer",
+            "label": "Writer"
+          },
+          {
+            "key": "reviewer",
+            "label": "Reviewer"
+          }
+        ]
+      }
+    ]
+  }
+}

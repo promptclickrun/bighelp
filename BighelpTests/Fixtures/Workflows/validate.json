@@ -1,0 +1,26 @@
+{
+  "route": "workflows/validate",
+  "request": {
+    "workflowId": "wf_8c1d2e3f4a5b6c7d"
+  },
+  "response": {
+    "validation": {
+      "valid": false,
+      "host": true,
+      "issues": [
+        {
+          "stageKey": "draft",
+          "code": "use_unknown",
+          "message": "Write the draft uses research.summary, which no earlier stage makes.",
+          "severity": "error"
+        },
+        {
+          "stageKey": "research",
+          "code": "tool_terminal",
+          "message": "Research the topic can run commands on this computer.",
+          "severity": "warning"
+        }
+      ]
+    }
+  }
+}

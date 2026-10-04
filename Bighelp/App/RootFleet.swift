@@ -49,9 +49,10 @@ extension RootShellView {
             appState.chatOpenedFromList = false
             appState.openScheduledTasks()
         } }
-        // Projects and Kanban belong to one host; the all-hosts menu leaves them out.
+        // Projects, Kanban and Workflows belong to one host; the all-hosts menu leaves them out.
         destinations.onProjects = nil
         destinations.onKanban = nil
+        destinations.onWorkflows = nil
         // Usage covers every host while all show; no host to pick.
         if destinations.onCredentialVault != nil {
             destinations.onCredentialVault = { afterClosingHomeSheets { fleetGate(.credentialVault) } }

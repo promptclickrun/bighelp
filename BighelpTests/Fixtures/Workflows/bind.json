@@ -1,0 +1,28 @@
+{
+  "route": "workflows/bind",
+  "request": {
+    "workflowId": "wf_8c1d2e3f4a5b6c7d",
+    "role": "reviewer",
+    "agentId": "editor"
+  },
+  "response": {
+    "workflowId": "wf_8c1d2e3f4a5b6c7d",
+    "bindings": [
+      {
+        "role": "researcher",
+        "agentId": "research",
+        "approvedAt": "2026-10-01T08:00:00Z"
+      },
+      {
+        "role": "writer",
+        "agentId": "writer",
+        "approvedAt": "2026-10-01T08:00:00Z"
+      },
+      {
+        "role": "reviewer",
+        "agentId": "editor",
+        "approvedAt": "2026-10-01T08:01:00Z"
+      }
+    ]
+  }
+}

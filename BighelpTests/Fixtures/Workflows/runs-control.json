@@ -1,0 +1,30 @@
+{
+  "route": "workflows/runs/control",
+  "request": {
+    "runId": "run_3f9a1c2e4b5d6f70",
+    "action": "cancel",
+    "expectedVersion": 7
+  },
+  "response": {
+    "run": {
+      "id": "run_3f9a1c2e4b5d6f70",
+      "number": 12,
+      "workflowId": "wf_8c1d2e3f4a5b6c7d",
+      "workflowName": "Weekly newsletter",
+      "revision": 3,
+      "state": "cancelled",
+      "stageKey": "draft",
+      "stageTitle": "Write the draft",
+      "stageState": "cancelled",
+      "stagesDone": 1,
+      "stageCount": 6,
+      "iteration": 1,
+      "startedAt": "2026-10-04T09:30:00Z",
+      "updatedAt": "2026-10-04T09:41:30Z",
+      "endedAt": "2026-10-04T09:41:30Z",
+      "paused": false,
+      "version": 8,
+      "sample": false
+    }
+  }
+}

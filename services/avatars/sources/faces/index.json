@@ -1,0 +1,92 @@
+[
+  {
+    "file" : "face-round.svg",
+    "id" : "face-round",
+    "name" : "Round",
+    "nativeLook" : {
+      "shape" : "blobatar::round",
+      "style" : "face"
+    }
+  },
+  {
+    "file" : "face-organic.svg",
+    "id" : "face-organic",
+    "name" : "Organic",
+    "nativeLook" : {
+      "shape" : "blobatar::organic",
+      "style" : "face"
+    }
+  },
+  {
+    "file" : "face-boxy.svg",
+    "id" : "face-boxy",
+    "name" : "Boxy",
+    "nativeLook" : {
+      "shape" : "blobatar::boxy",
+      "style" : "face"
+    }
+  },
+  {
+    "file" : "face-capsule.svg",
+    "id" : "face-capsule",
+    "name" : "Capsule",
+    "nativeLook" : {
+      "shape" : "blobatar::capsule",
+      "style" : "face"
+    }
+  },
+  {
+    "file" : "face-nub.svg",
+    "id" : "face-nub",
+    "name" : "Nub",
+    "nativeLook" : {
+      "shape" : "blobatar::nub",
+      "style" : "face"
+    }
+  },
+  {
+    "file" : "face-cloud.svg",
+    "id" : "face-cloud",
+    "name" : "Cloud",
+    "nativeLook" : {
+      "shape" : "blobatar::cloud",
+      "style" : "face"
+    }
+  },
+  {
+    "file" : "face-droplet.svg",
+    "id" : "face-droplet",
+    "name" : "Droplet",
+    "nativeLook" : {
+      "shape" : "blobatar::droplet",
+      "style" : "face"
+    }
+  },
+  {
+    "file" : "face-hexagon.svg",
+    "id" : "face-hexagon",
+    "name" : "Hexagon",
+    "nativeLook" : {
+      "shape" : "blobatar::hexagon",
+      "style" : "face"
+    }
+  },
+  {
+    "file" : "face-sun.svg",
+    "id" : "face-sun",
+    "name" : "Sun",
+    "nativeLook" : {
+      "shape" : "blobatar::sun",
+      "style" : "face"
+    }
+  },
+  {
+    "file" : "face-triangle.svg",
+    "id" : "face-triangle",
+    "name" : "Triangle",
+    "nativeLook" : {
+      "shape" : "blobatar::triangle",
+      "style" : "face"
+    }
+  }
+]

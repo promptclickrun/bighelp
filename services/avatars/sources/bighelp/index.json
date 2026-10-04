@@ -1,0 +1,62 @@
+[
+  {
+    "id": "bighelp-biggie",
+    "name": "Biggie",
+    "role": "Big help, little help",
+    "file": "bighelp-biggie.svg"
+  },
+  {
+    "id": "bighelp-bubs",
+    "name": "Bubs",
+    "role": "Here to chat",
+    "file": "bighelp-bubs.svg"
+  },
+  {
+    "id": "bighelp-scout",
+    "name": "Scout",
+    "role": "Looks things up",
+    "file": "bighelp-scout.svg"
+  },
+  {
+    "id": "bighelp-echo",
+    "name": "Echo",
+    "role": "Talks it out loud",
+    "file": "bighelp-echo.svg"
+  },
+  {
+    "id": "bighelp-tock",
+    "name": "Tock",
+    "role": "Runs on schedule",
+    "file": "bighelp-tock.svg"
+  },
+  {
+    "id": "bighelp-stack",
+    "name": "Stack",
+    "role": "Gets tasks done",
+    "file": "bighelp-stack.svg"
+  },
+  {
+    "id": "bighelp-patch",
+    "name": "Patch",
+    "role": "Writes the code",
+    "file": "bighelp-patch.svg"
+  },
+  {
+    "id": "bighelp-errand",
+    "name": "Errand",
+    "role": "Sends and delivers",
+    "file": "bighelp-errand.svg"
+  },
+  {
+    "id": "bighelp-snooze",
+    "name": "Snooze",
+    "role": "Rests when offline",
+    "file": "bighelp-snooze.svg"
+  },
+  {
+    "id": "bighelp-spark",
+    "name": "Spark",
+    "role": "Brings the ideas",
+    "file": "bighelp-spark.svg"
+  }
+]

@@ -50,26 +50,26 @@ final class AllHostsHostUITests: BighelpUITestCase {
         desk.tap()
         try say("Hello desk", in: app)
         save("fleet-2-other-host-chat", app)
-        app.buttons["chat.back"].firstMatch.tap()
+        swipeBackFromLeadingEdge(in: app)
 
         // Back on the list, Lab Hermes is now the one read in the background.
         XCTAssertTrue(agent(on: "Lab Hermes", in: app).waitForExistence(timeout: 45))
         XCTAssertTrue(agent(on: "Desk Hermes", in: app).exists)
         named("Lab agent", in: app).tap()
         try say("Hello lab", in: app)
-        app.buttons["chat.back"].firstMatch.tap()
+        swipeBackFromLeadingEdge(in: app)
 
         // Each switch is timed from the tap to that agent's own chat on screen.
         var timings: [String: Double] = [:]
         timings["1-to-desk"] = try timeToOpen(named("Desk agent", in: app), showing: "Hello desk", in: app)
-        app.buttons["chat.back"].firstMatch.tap()
+        swipeBackFromLeadingEdge(in: app)
         timings["2-to-lab"] = try timeToOpen(named("Lab agent", in: app), showing: "Hello lab", in: app)
-        app.buttons["chat.back"].firstMatch.tap()
+        swipeBackFromLeadingEdge(in: app)
         timings["3-to-desk-again"] = try timeToOpen(named("Desk agent", in: app), showing: "Hello desk", in: app)
-        app.buttons["chat.back"].firstMatch.tap()
+        swipeBackFromLeadingEdge(in: app)
         // The floor: the same host's agent again, with no switch at all.
         timings["4-same-host"] = try timeToOpen(named("Desk agent", in: app), showing: "Hello desk", in: app)
-        app.buttons["chat.back"].firstMatch.tap()
+        swipeBackFromLeadingEdge(in: app)
         report(timings)
         app.buttons["fleet.toggle"].tap()
         menu.tap()
@@ -172,7 +172,7 @@ final class AllHostsHostUITests: BighelpUITestCase {
         // Opening Desk Hermes' agent switches hosts; back on the list, Usage still opens.
         named("Desk agent", in: app).tap()
         XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 45), "Desk Hermes' chat opens")
-        app.buttons["chat.back"].firstMatch.tap()
+        swipeBackFromLeadingEdge(in: app)
         XCTAssertTrue(app.navigationBars["All agents"].waitForExistence(timeout: 10))
         openUsage("after switching hosts")
 
@@ -257,12 +257,12 @@ final class AllHostsHostUITests: BighelpUITestCase {
         if attention.exists { attention.buttons["Later"].tap() }
 
         // Over to the other host's agent and back, then ask again.
-        app.buttons["chat.back"].firstMatch.tap()
+        swipeBackFromLeadingEdge(in: app)
         let lab = named("Lab agent", in: app)
         XCTAssertTrue(lab.waitForExistence(timeout: 30))
         lab.tap()
         XCTAssertTrue(composer.waitForExistence(timeout: 45), "Lab Hermes' chat opens")
-        app.buttons["chat.back"].firstMatch.tap()
+        swipeBackFromLeadingEdge(in: app)
         XCTAssertTrue(desk.waitForExistence(timeout: 30))
         desk.tap()
         XCTAssertTrue(composer.waitForExistence(timeout: 45), "Back on Desk Hermes' chat")

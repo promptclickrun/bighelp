@@ -44,13 +44,15 @@ final class AllHostsUITests: BighelpUITestCase {
         XCTAssertFalse(pinned.element(boundBy: 0).label.contains("Home Hermes"), "Pinned agents skip the host name")
         save("list", app)
 
-        // A tap opens that agent's own chat, with Back to the list.
+        // A tap opens that agent's own chat. ☰ is top left, and an edge swipe goes back to the list.
         mina.tap()
         let composer = app.textViews["chat.composer.text"]
         XCTAssertTrue(composer.waitForExistence(timeout: 5))
         XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Mina Shah"))
             .firstMatch.exists, "It's Mina's chat")
-        app.buttons["chat.back"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["chat.menu"].firstMatch.exists, "The chat has ☰")
+        XCTAssertFalse(app.buttons["chat.back"].firstMatch.exists, "The chat has no Back button")
+        swipeBackFromLeadingEdge(in: app)
         XCTAssertTrue(mina.waitForExistence(timeout: 5))
 
         // Settings belongs to one host: pick which.
@@ -86,7 +88,7 @@ final class AllHostsUITests: BighelpUITestCase {
     }
 
     /// Switching agents from a chat's header keeps the all-hosts view: the new
-    /// agent's chat has Back to All agents and no one-host tab bar (Feed,
+    /// agent's chat has ☰, an edge swipe goes back to All agents, and no one-host tab bar (Feed,
     /// Ideas, Goals), so nothing strands you on one host's screens.
     @MainActor
     func testSwitchingAgentFromChatStaysInAllHosts() throws {
@@ -111,14 +113,14 @@ final class AllHostsUITests: BighelpUITestCase {
         XCTAssertTrue(other.waitForExistence(timeout: 5))
         other.tap()
         XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["chat.back"].firstMatch.waitForExistence(timeout: 5),
-                      "The switched-to chat has Back to All agents")
+        XCTAssertTrue(app.buttons["chat.menu"].firstMatch.waitForExistence(timeout: 5),
+                      "The switched-to chat has ☰")
         XCTAssertTrue(app.buttons["tab.feed"].waitForExistence(timeout: 2),
                       "The switched-to agent's chat has its Feed, Ideas and Goals too")
         save("switched-agent", app)
 
-        app.buttons["chat.back"].firstMatch.tap()
-        XCTAssertTrue(app.navigationBars["All agents"].waitForExistence(timeout: 5), "Back returns to All agents")
+        swipeBackFromLeadingEdge(in: app)
+        XCTAssertTrue(app.navigationBars["All agents"].waitForExistence(timeout: 5), "An edge swipe returns to All agents")
         XCTAssertTrue(mina.waitForExistence(timeout: 5))
         menu.tap()
         XCTAssertTrue(app.buttons["menu.all-hosts"].waitForExistence(timeout: 5))
@@ -308,7 +310,7 @@ final class AllHostsUITests: BighelpUITestCase {
         shot("new-chat-\(appearance)", app)
         avery.tap()
         XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 10), "Avery's new chat opens")
-        app.buttons["chat.back"].firstMatch.tap()
+        swipeBackFromLeadingEdge(in: app)
 
         // Several agents: Group chat, pick, Create chat.
         XCTAssertTrue(newChat.waitForExistence(timeout: 5))

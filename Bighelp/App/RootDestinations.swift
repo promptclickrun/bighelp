@@ -179,7 +179,7 @@ extension RootShellView {
                 menuHosts: fleetMenuHosts
             )
             .environment(\.chatCardInteractions, cardInteractions(for: model))
-            .environment(\.agentHomeChrome, homeChrome(for: route))
+            .environment(\.agentHomeChrome, homeChrome)
             .environment(connectionKeeper)
         case (.scheduledTasks, .scheduledTasks(let store)?):
             routeWithWorkspaceMenu {

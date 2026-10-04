@@ -649,8 +649,7 @@ struct ChatView: View {
             options: AnyView(chatOptionsMenu),
             chrome: homeChrome,
             screenHeight: screenHeight,
-            beforeAction: dismissKeyboard,
-            onBack: { dismiss() }
+            beforeAction: dismissKeyboard
         )
     }
 

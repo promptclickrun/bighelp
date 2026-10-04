@@ -81,8 +81,9 @@ final class AgentsUITests: BighelpUITestCase {
 
     /// On one computer every chat keeps the bottom bar, however Agents opened
     /// it: the pinned avatar, a new chat from the agent's row, or one of its
-    /// existing chats. Tapping an agent makes its chat the Chat tab's own, with
-    /// ☰ (which goes back to Agents); a chat picked from its list keeps Back.
+    /// existing chats. Every chat has ☰ (which goes back to Agents). Tapping an
+    /// agent makes its chat the Chat tab's own; a chat picked from its list
+    /// goes back to the list with an edge swipe.
     @MainActor
     func testChatsOpenedFromAgentsKeepTheTabBar() {
         XCUIDevice.shared.orientation = .portrait
@@ -95,14 +96,14 @@ final class AgentsUITests: BighelpUITestCase {
         let avatar = app.descendants(matching: .any)["agents.featured.finance"].firstMatch
         XCTAssertTrue(avatar.waitForExistence(timeout: 8))
         avatar.tap()
-        assertChatKeepsTabBar("The avatar's chat", leading: .menu, in: app)
+        assertChatKeepsTabBar("The avatar's chat", isTabHome: true, in: app)
 
         openAgents(in: app)
         let row = app.buttons["agent.travel"]
         for _ in 0..<6 where !(row.exists && row.isHittable) { directory.swipeUp() }
         XCTAssertTrue(row.isHittable)
         row.tap()
-        assertChatKeepsTabBar("A new chat", leading: .menu, in: app)
+        assertChatKeepsTabBar("A new chat", isTabHome: true, in: app)
 
         // ☰ is the way back to Agents.
         openAgents(in: app)
@@ -118,28 +119,26 @@ final class AgentsUITests: BighelpUITestCase {
         let session = app.buttons["session.row.demo-finance"]
         XCTAssertTrue(session.waitForExistence(timeout: 8))
         session.tap()
-        assertChatKeepsTabBar("An existing chat", leading: .back, in: app)
+        assertChatKeepsTabBar("An existing chat", isTabHome: false, in: app)
+
+        // An edge swipe still goes back to the agent's chat list.
+        swipeBackFromLeadingEdge(in: app)
+        XCTAssertTrue(session.waitForExistence(timeout: 5), "Swiping from the edge goes back to the list")
+        session.tap()
+        XCTAssertTrue(app.buttons["chat.menu"].waitForExistence(timeout: 5))
 
         // The bar works from there: Feed leaves the chat.
         app.buttons["tab.feed"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["board.feed"].firstMatch.waitForExistence(timeout: 8))
     }
 
-    private enum ChatLeadingButton { case menu, back }
-
     @MainActor
-    private func assertChatKeepsTabBar(_ chat: String, leading: ChatLeadingButton, in app: XCUIApplication,
+    private func assertChatKeepsTabBar(_ chat: String, isTabHome: Bool, in app: XCUIApplication,
                                        file: StaticString = #filePath, line: UInt = #line) {
         let composer = app.descendants(matching: .any)["chat.composer-shell"].firstMatch
         XCTAssertTrue(composer.waitForExistence(timeout: 10), "\(chat) didn't open", file: file, line: line)
-        switch leading {
-        case .menu:
-            XCTAssertTrue(app.buttons["chat.menu"].waitForExistence(timeout: 5), "\(chat) has ☰", file: file, line: line)
-            XCTAssertFalse(app.buttons["chat.back"].exists, "\(chat) has no Back", file: file, line: line)
-        case .back:
-            XCTAssertTrue(app.buttons["chat.back"].waitForExistence(timeout: 5), "\(chat) has Back", file: file, line: line)
-            XCTAssertFalse(app.buttons["chat.menu"].exists, "\(chat) has no ☰", file: file, line: line)
-        }
+        XCTAssertTrue(app.buttons["chat.menu"].waitForExistence(timeout: 5), "\(chat) has ☰", file: file, line: line)
+        XCTAssertFalse(app.buttons["chat.back"].exists, "\(chat) has no Back", file: file, line: line)
         // A new chat can focus the message box; the bar hides under the keyboard.
         if app.keyboards.firstMatch.exists {
             app.tables["chat.timeline"].swipeDown()
@@ -152,7 +151,7 @@ final class AgentsUITests: BighelpUITestCase {
             XCTAssertLessThanOrEqual(composer.frame.maxY, chatTab.frame.minY + 1,
                                      "\(chat): the message box sits above the tab bar", file: file, line: line)
         }
-        if leading == .menu {
+        if isTabHome {
             // That agent's chat is the Chat tab's own: Chat is the lit tab.
             XCTAssertTrue(chatTab.exists && chatTab.isSelected, "\(chat) lights the Chat tab", file: file, line: line)
         }

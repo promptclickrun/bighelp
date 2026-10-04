@@ -27,10 +27,10 @@ enum VoiceTranscriptionSource: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// Decides when someone has finished talking. People pause mid-thought, and
-/// longer messages have longer pauses, so the quiet it waits for grows with how
-/// long they've been talking, and a sentence left hanging ("…and", "…the")
-/// gets extra time. Nothing ends before there's speech to end.
+/// Decides when someone has finished talking: soon enough to feel quick, never
+/// mid-thought. A finished sentence ("…today?") goes after about a second; the
+/// quiet grows a little with how long they've been talking, and a sentence left
+/// hanging ("…and", "…the") gets extra time. Nothing ends before there's speech.
 @MainActor
 final class VoiceEndOfSpeechDetector {
     private let baseSilence: Duration
@@ -48,14 +48,14 @@ final class VoiceEndOfSpeechDetector {
     /// the microphone from ever sounding quiet; words that stopped still end the turn.
     private var lastText: String?
     private var sinceWordsChanged: Duration = .zero
-    private let wordsStoppedGrace: Duration = .seconds(2.5)
+    private let wordsStoppedGrace: Duration = .seconds(1.5)
     private var talkingTime: Duration = .zero
     private var voiceTime: Duration = .zero
     private var lastWord: String?
 
     init(
-        baseSilence: Duration = .seconds(1.8),
-        maximumSilence: Duration = .seconds(4.5),
+        baseSilence: Duration = .seconds(1.2),
+        maximumSilence: Duration = .seconds(3),
         activityThreshold: Float = 0.08,
         onEndOfSpeech: @escaping () -> Void
     ) {
@@ -74,11 +74,21 @@ final class VoiceEndOfSpeechDetector {
 
     /// How much quiet ends this turn.
     var requiredSilence: Duration {
-        // A thirty-second message waits about a second longer than a quick question.
-        let talked = min(talkingTime / .seconds(1), 45)
-        var silence = baseSilence + .milliseconds(Int(talked * 35))
-        if let lastWord, Self.continuationWords.contains(lastWord) { silence += .seconds(1.2) }
+        // A thirty-second message waits under a second longer than a quick question.
+        let talked = min(talkingTime / .seconds(1), 30)
+        var silence = baseSilence + .milliseconds(Int(talked * 25))
+        if let lastWord, Self.continuationWords.contains(lastWord) {
+            silence += .milliseconds(900)
+        } else if endsSentence {
+            silence -= .milliseconds(300)
+        }
         return min(silence, maximumSilence, silenceLimit ?? maximumSilence)
+    }
+
+    /// The live words end with a sentence's punctuation (the recognizer adds it).
+    private var endsSentence: Bool {
+        guard let last = lastText?.last else { return false }
+        return ".?!".contains(last)
     }
 
     func receiveTranscript(_ update: VoiceRecognitionUpdate) {

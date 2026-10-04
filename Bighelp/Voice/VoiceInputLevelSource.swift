@@ -430,9 +430,10 @@ final class AVAudioEngineVoiceInputLevelSource: VoiceInputLevelSource {
         }
         recognitionRequest.endAudio()
         recognitionTask.finish()
-        // If the recognizer never answers, the words so far still count.
+        // The recognizer's last word usually lands within a moment; don't keep someone
+        // waiting for it. If it hasn't answered, the words so far still count.
         Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(3))
+            try? await Task.sleep(for: .seconds(1))
             guard let self, self.activeGeneration == generation else { return }
             self.deliverFinal(self.transcript.text, generation: generation)
         }

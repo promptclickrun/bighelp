@@ -20,14 +20,26 @@ struct VoiceTurnCaptureTests {
         for _ in 0..<Int(seconds * 10) { detector.receiveLevel(0.01, duration: .milliseconds(100)) }
     }
 
+    /// A finished question goes about a second after the speaker stops.
     @Test func aShortQuestionEndsAfterAShortPause() {
         var ended = 0
         let detector = detector { ended += 1 }
         detector.receiveTranscript(.init(text: "What's on my calendar today?", isFinal: false))
         talk(detector, seconds: 2)
-        quiet(detector, seconds: 1.5)
+        quiet(detector, seconds: 0.7)
         #expect(ended == 0, "A breath isn't the end")
-        quiet(detector, seconds: 0.6)
+        quiet(detector, seconds: 0.4)
+        #expect(ended == 1)
+    }
+
+    @Test func anUnfinishedShortTurnWaitsALittleLonger() {
+        var ended = 0
+        let detector = detector { ended += 1 }
+        detector.receiveTranscript(.init(text: "Set a timer for ten minutes", isFinal: false))
+        talk(detector, seconds: 2)
+        quiet(detector, seconds: 1.1)
+        #expect(ended == 0)
+        quiet(detector, seconds: 0.2)
         #expect(ended == 1)
     }
 
@@ -39,13 +51,13 @@ struct VoiceTurnCaptureTests {
             detector.receiveTranscript(.init(text: "So here's what I'm thinking about the trip, part \(second)", isFinal: false))
             talk(detector, seconds: 1)
         }
-        #expect(detector.requiredSilence > .seconds(2.8))
-        quiet(detector, seconds: 2.5)
-        #expect(ended == 0, "Thirty seconds in, a two-and-a-half second pause is still mid-thought")
+        #expect(detector.requiredSilence > .seconds(1.9))
+        quiet(detector, seconds: 1.7)
+        #expect(ended == 0, "Thirty seconds in, a pause under two seconds is still mid-thought")
         talk(detector, seconds: 1)
-        quiet(detector, seconds: 2.5)
+        quiet(detector, seconds: 1.7)
         #expect(ended == 0)
-        quiet(detector, seconds: 0.5)
+        quiet(detector, seconds: 0.3)
         #expect(ended == 1)
     }
 
@@ -63,11 +75,11 @@ struct VoiceTurnCaptureTests {
     @Test func aSentenceLeftHangingWaitsLonger() {
         let detector = detector {}
         detector.receiveTranscript(.init(text: "I need milk and", isFinal: false))
-        #expect(seconds(detector.requiredSilence) == 3)
+        #expect(seconds(detector.requiredSilence) == 2.1)
         detector.receiveTranscript(.init(text: "I need milk and eggs.", isFinal: false))
-        #expect(seconds(detector.requiredSilence) == 1.8)
+        #expect(seconds(detector.requiredSilence) == 0.9, "A finished sentence goes sooner")
         detector.receiveTranscript(.init(text: "Book it for Friday and then", isFinal: false))
-        #expect(seconds(detector.requiredSilence) == 3)
+        #expect(seconds(detector.requiredSilence) == 2.1)
     }
 
     @Test func thePauseNeverGrowsPastItsLimit() {
@@ -76,7 +88,7 @@ struct VoiceTurnCaptureTests {
             detector.receiveTranscript(.init(text: "point \(second) and the", isFinal: false))
             talk(detector, seconds: 1)
         }
-        #expect(seconds(detector.requiredSilence) == 4.5)
+        #expect(seconds(detector.requiredSilence) == 2.85, "Never past three seconds")
     }
 
     @Test func withoutCaptionsSustainedVoiceCountsAsSpeech() {

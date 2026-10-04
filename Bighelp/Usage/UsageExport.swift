@@ -226,36 +226,23 @@ final class UsageExportJob {
     }
 }
 
-/// Opens the share sheet for a finished export, pointing at Share on iPad, Mac and Vision Pro.
+/// Opens the share sheet for a finished export from the screen on top, pointing at the top-right
+/// corner (where Share is) on iPad, Mac and Vision Pro. Nothing UIKit lives in the toolbar: a hosted
+/// view controller there emptied the bar (no title, no Share) and left a black screen after Back.
 @MainActor
-final class UsageShareSheetAnchor {
-    fileprivate weak var host: UIViewController?
-
-    func share(_ url: URL, title: String) {
-        guard let host, host.view.window != nil else { return }
+enum UsageShareSheet {
+    static func present(_ url: URL, title: String) {
+        guard let window = UIApplication.shared.connectedScenes
+            .compactMap({ ($0 as? UIWindowScene)?.keyWindow }).first,
+              var top = window.rootViewController else { return }
+        while let presented = top.presentedViewController { top = presented }
         let sheet = UIActivityViewController(activityItems: [UsageShareItem(url: url, title: title)],
                                              applicationActivities: nil)
-        sheet.popoverPresentationController?.sourceView = host.view
-        sheet.popoverPresentationController?.sourceRect = host.view.bounds
-        host.present(sheet, animated: true)
-    }
-}
-
-/// Sits behind Share so the sheet has a place to come from.
-struct UsageShareSheetHost: UIViewControllerRepresentable {
-    let anchor: UsageShareSheetAnchor
-
-    func makeUIViewController(context: Context) -> UIViewController {
-        let host = UIViewController()
-        host.view.backgroundColor = .clear
-        // Taps belong to Share above it.
-        host.view.isUserInteractionEnabled = false
-        anchor.host = host
-        return host
-    }
-
-    func updateUIViewController(_ host: UIViewController, context: Context) {
-        anchor.host = host
+        if let popover = sheet.popoverPresentationController {
+            popover.sourceView = window
+            popover.sourceRect = CGRect(x: window.bounds.maxX - 60, y: window.safeAreaInsets.top + 8, width: 1, height: 1)
+        }
+        top.present(sheet, animated: true)
     }
 }
 

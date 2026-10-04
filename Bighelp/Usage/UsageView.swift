@@ -14,7 +14,6 @@ struct UsageView: View {
     @State private var selectedDay: String?
     @State private var isChoosingProviders = false
     @State private var exportJob = UsageExportJob()
-    @State private var shareAnchor = UsageShareSheetAnchor()
     /// Which computers' plans Limits shows (`UsageLimitsComputers.Choice`).
     @AppStorage(UsageLimitsComputers.choiceKey) private var limitsChoice = "current"
     @AppStorage(ProviderUsagePreferences.hiddenKey) private var hiddenProviders = ""
@@ -45,6 +44,9 @@ struct UsageView: View {
         .background(BighelpThemeCanvas(theme: theme).ignoresSafeArea())
         .navigationTitle("Usage")
         .navigationBarTitleDisplayMode(.inline)
+        // Opened over a chat, which hides its bar for its own header: this page needs its own,
+        // with Back, Share and Refresh.
+        .toolbar(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) { shareMenu }
             ToolbarItem(placement: .topBarTrailing) { refreshButton }
@@ -123,7 +125,7 @@ struct UsageView: View {
                         Button(format.title, systemImage: format.symbol) {
                             Task {
                                 guard let url = await exportJob.run(format, snapshot, appearance: appearance) else { return }
-                                shareAnchor.share(url, title: "Usage, \(snapshot.dateRangeText)")
+                                UsageShareSheet.present(url, title: "Usage, \(snapshot.dateRangeText)")
                             }
                         }
                         .accessibilityIdentifier("usage.share.\(format.rawValue)")
@@ -134,7 +136,6 @@ struct UsageView: View {
             Image(systemName: "square.and.arrow.up")
                 .bighelpToolbarIcon()
         }
-        .background(UsageShareSheetHost(anchor: shareAnchor))
         .disabled(snapshot == nil || exportJob.exporting != nil)
         .bighelpIconLabel("Share")
         .accessibilityIdentifier("usage.share")

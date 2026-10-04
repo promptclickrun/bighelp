@@ -735,6 +735,7 @@
 		8D80559FBDE1C2D83A687FBE /* BighelpFoundationModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B7F846E6B472F0B4D981E2E /* BighelpFoundationModels.swift */; };
 		8D97B83C4FD588D4CCD14D65 /* AppFixtureClients.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98488C0FF2B75243A5C189E0 /* AppFixtureClients.swift */; };
 		8D991B82F85FEB62610C434C /* AIProviderBrand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33553B8841D6F75CDEB02447 /* AIProviderBrand.swift */; };
+		8D9B0E73D8D88ABC2AC19614 /* UsageNavigationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 997B937232851A556998C545 /* UsageNavigationUITests.swift */; };
 		8E2E6965629031C58D5CB3F1 /* PluginLifecycleManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 018AE94307FCF69BF62A9C22 /* PluginLifecycleManagementView.swift */; };
 		8E3F4C9B0DAE062488F3BF53 /* WatchBoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFD551373422D9AA073D2A85 /* WatchBoardView.swift */; };
 		8EA851E3E7883CEEC7D39940 /* PetdexTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53B43195521A318E92F67D5D /* PetdexTests.swift */; };
@@ -2179,6 +2180,7 @@
 		98A0392DC8985D4CD3EA1FBD /* GeneratedMediaAcceptanceFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneratedMediaAcceptanceFixture.swift; sourceTree = "<group>"; };
 		99134043B0FAE8EB4B53FC51 /* ChatModel+SubagentCanvas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ChatModel+SubagentCanvas.swift"; sourceTree = "<group>"; };
 		9965BF9A6F80AA4F0C3FEA00 /* AsyncOperationTestGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AsyncOperationTestGate.swift; sourceTree = "<group>"; };
+		997B937232851A556998C545 /* UsageNavigationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageNavigationUITests.swift; sourceTree = "<group>"; };
 		99A41F789761960F1B5EFD87 /* SpatialAvatarRig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpatialAvatarRig.swift; sourceTree = "<group>"; };
 		99B0B8D3F02D5C92ADE88D45 /* DirectHermesHostToolBackendsClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectHermesHostToolBackendsClient.swift; sourceTree = "<group>"; };
 		99BE727EEC8E98B908ECBF3D /* DirectHermesSessionCatalogClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectHermesSessionCatalogClientTests.swift; sourceTree = "<group>"; };
@@ -3914,6 +3916,7 @@
 				B786BE6FB911654CE87D487D /* SubagentCanvasUITests.swift */,
 				6B7A896B2C3D652785254B28 /* SystemPageUITests.swift */,
 				2D1E11795B7E88BB7F60730C /* ToolDisclosureUITests.swift */,
+				997B937232851A556998C545 /* UsageNavigationUITests.swift */,
 				148206AE5A6AE634180F1E0B /* WeatherCardsUITests.swift */,
 				69B714A6F7D3438FE4CF9ED0 /* WidgetLinkHostUITests.swift */,
 				8017569C6675F6EF32837C5E /* WorkspaceNavigationUITestSupport.swift */,
@@ -6343,6 +6346,7 @@
 				CD53051F93E86414FE833F0F /* SubagentCanvasUITests.swift in Sources */,
 				299D2D9354374582D51BED53 /* SystemPageUITests.swift in Sources */,
 				6E06FD7A158360A66779DB29 /* ToolDisclosureUITests.swift in Sources */,
+				8D9B0E73D8D88ABC2AC19614 /* UsageNavigationUITests.swift in Sources */,
 				B05C0BE552D68EDA30874BB8 /* WeatherCardsUITests.swift in Sources */,
 				4998F2F458DEA2AC652F6DD3 /* WidgetLinkHostUITests.swift in Sources */,
 				100982301E3E8EC010AE9AFC /* WorkspaceNavigationUITestSupport.swift in Sources */,

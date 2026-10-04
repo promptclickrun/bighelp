@@ -38,27 +38,6 @@ struct AgentTemplateFillView: View {
                     }
                     .listRowBackground(theme.surface)
                 }
-                Section {
-                    Button(action: finish) {
-                        Text("Continue")
-                            .font(.bighelp(.body).weight(.semibold))
-                            .foregroundStyle(theme.actionForeground)
-                            .frame(maxWidth: .infinity, minHeight: BighelpTokens.hitTarget)
-                            .contentShape(.rect)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(theme.action)
-                    .disabled(!form.canContinue)
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets())
-                    .accessibilityIdentifier("agent.template-form.continue")
-                } footer: {
-                    if !form.canContinue {
-                        Text("Fill in the required fields to continue.")
-                            .font(.bighelp(.footnote))
-                            .foregroundStyle(theme.secondaryText)
-                    }
-                }
             }
             .scrollContentBackground(.hidden)
             .background(theme.canvas.ignoresSafeArea())
@@ -72,6 +51,19 @@ struct AgentTemplateFillView: View {
                     Button("Cancel", action: onCancel)
                         .bighelpToolbarText()
                         .accessibilityIdentifier("agent.template-form.cancel")
+                }
+                // In the bar, so it stays in view above the keyboard and below a long form.
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Continue", action: finish)
+                        .fontWeight(.semibold)
+                        .bighelpProminentButtonStyle()
+                        .buttonBorderShape(.capsule)
+                        .tint(theme.action)
+                        .foregroundStyle(theme.actionForeground)
+                        .frame(minHeight: BighelpTokens.hitTarget)
+                        .disabled(!form.canContinue)
+                        .accessibilityHint(form.canContinue ? "" : "Fill in the required fields first.")
+                        .accessibilityIdentifier("agent.template-form.continue")
                 }
             }
             .onAppear {
@@ -89,7 +81,7 @@ struct AgentTemplateFillView: View {
                 .frame(width: 36)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: BighelpTokens.space4) {
-                Text(verbatim: template.cardRole)
+                Text(verbatim: headline)
                     .font(.bighelp(.headline))
                     .foregroundStyle(theme.primaryText)
                 Text("Fill in a few details. They go into its instructions, and you can change anything after.")
@@ -99,6 +91,11 @@ struct AgentTemplateFillView: View {
             }
         }
         .accessibilityElement(children: .combine)
+    }
+
+    /// What the template is for. Its role can be one of the fields, so it isn't used here.
+    private var headline: String {
+        template.cardStrength.isEmpty ? template.about : template.cardStrength
     }
 
     private func row(_ field: TemplateVariable) -> some View {

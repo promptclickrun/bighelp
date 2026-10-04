@@ -103,18 +103,19 @@ final class TemplateCatalogUITests: BighelpUITestCase {
             role.tap()
             role.typeText("Release coordinator")
             let tone = any["agent.template-form.field.tone"].firstMatch
+            let formList = app.collectionViews.firstMatch
+            for _ in 0..<3 where !tone.isHittable { formList.swipeUp() }
             tone.tap()
             let warm = app.buttons["Warm"].firstMatch
             XCTAssertTrue(warm.waitForExistence(timeout: 3), "Tone offers its choices")
             warm.tap()
             if appearance == "dark" {
                 let context = any["agent.template-form.field.operating_context"].firstMatch
+                for _ in 0..<3 where !context.isHittable { formList.swipeUp() }
                 context.tap()
                 context.typeText("A two-person studio")
             }
             save("template-form-filled-\(appearance)", app)
-            app.swipeDown(velocity: .fast)
-            for _ in 0..<3 where !continueButton.isHittable { app.swipeUp() }
             XCTAssertTrue(continueButton.isEnabled)
             continueButton.tap()
             XCTAssertTrue(any["agent.template-form"].firstMatch.waitForNonExistence(timeout: 5))

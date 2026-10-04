@@ -12,6 +12,10 @@ export interface TemplateRow {
   payload: string;
   credit_name: string | null;
   submitter_email: string | null;
+  submitter_name: string | null;
+  submitter_username: string | null;
+  status_token_hash: string | null;
+  submitter_ip_hash: string | null;
   created_at: string;
   updated_at: string;
   reviewed_at: string | null;
@@ -31,6 +35,8 @@ export function reviewView(row: TemplateRow) {
     title: titleOf(template),
     ...template.payload,
     credit: row.credit_name,
+    submitterName: row.submitter_name,
+    submitterUsername: row.submitter_username,
     submitterEmail: row.submitter_email,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -93,22 +99,27 @@ export async function find(db: D1Database, id: string): Promise<TemplateRow | nu
   return db.prepare("SELECT * FROM templates WHERE id = ?").bind(id).first<TemplateRow>();
 }
 
-export async function bySubmitter(db: D1Database, email: string): Promise<TemplateRow[]> {
+/** Submissions whose private status tokens hash to one of these. */
+export async function byStatusTokens(db: D1Database, hashes: string[]): Promise<TemplateRow[]> {
+  if (!hashes.length) return [];
   const { results } = await db.prepare(
-    "SELECT * FROM templates WHERE submitter_email = ? ORDER BY created_at DESC LIMIT 100",
-  ).bind(email).all<TemplateRow>();
+    `SELECT * FROM templates WHERE status_token_hash IN (${hashes.map(() => "?").join(", ")})
+     ORDER BY created_at DESC`,
+  ).bind(...hashes).all<TemplateRow>();
   return results;
 }
 
-/** Pending submissions from one person, and how many they sent in the last day. */
-export async function submitterLoad(db: D1Database, email: string, since: string) {
+/** Pending submissions from one email, and how many that email and that network sent since `since`. */
+export async function submitterLoad(db: D1Database, email: string, ipHash: string, since: string) {
   const row = await db.prepare(
     `SELECT
-       SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending,
-       SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) AS recent
-     FROM templates WHERE submitter_email = ?`,
-  ).bind(since, email).first<{ pending: number | null; recent: number | null }>();
-  return { pending: row?.pending ?? 0, recent: row?.recent ?? 0 };
+       SUM(CASE WHEN submitter_email = ? AND status = 'pending' THEN 1 ELSE 0 END) AS pending,
+       SUM(CASE WHEN submitter_email = ? AND created_at >= ? THEN 1 ELSE 0 END) AS byEmail,
+       SUM(CASE WHEN submitter_ip_hash = ? AND created_at >= ? THEN 1 ELSE 0 END) AS byNetwork
+     FROM templates WHERE submitter_email = ? OR submitter_ip_hash = ?`,
+  ).bind(email, email, since, ipHash, since, email, ipHash)
+    .first<{ pending: number | null; byEmail: number | null; byNetwork: number | null }>();
+  return { pending: row?.pending ?? 0, byEmail: row?.byEmail ?? 0, byNetwork: row?.byNetwork ?? 0 };
 }
 
 export async function insert(
@@ -119,20 +130,22 @@ export async function insert(
     status: TemplateStatus;
     source: TemplateSource;
     creditName: string | null;
-    submitterEmail: string | null;
+    submitter?: { name: string; username: string; email: string; statusTokenHash: string; ipHash: string };
     now: string;
     reviewedBy?: string;
   },
 ): Promise<void> {
   const reviewed = input.status === "pending" ? null : input.now;
   await db.prepare(
-    `INSERT INTO templates (id, kind, status, source, payload, credit_name, submitter_email,
-       created_at, updated_at, reviewed_at, reviewed_by, sort_key)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO templates (id, kind, status, source, payload, credit_name, submitter_email, submitter_name,
+       submitter_username, status_token_hash, submitter_ip_hash, created_at, updated_at, reviewed_at, reviewed_by,
+       sort_key)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
     input.id, input.template.kind, input.status, input.source, JSON.stringify(input.template.payload),
-    input.creditName, input.submitterEmail, input.now, input.now, reviewed, input.reviewedBy ?? null,
-    Date.parse(input.now) / 1000,
+    input.creditName, input.submitter?.email ?? null, input.submitter?.name ?? null,
+    input.submitter?.username ?? null, input.submitter?.statusTokenHash ?? null, input.submitter?.ipHash ?? null,
+    input.now, input.now, reviewed, input.reviewedBy ?? null, Date.parse(input.now) / 1000,
   ).run();
 }
 

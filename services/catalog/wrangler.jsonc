@@ -12,11 +12,9 @@
   // Access audiences are public identifiers (they appear in every Access token), not secrets.
   "vars": {
     "ACCESS_TEAM_DOMAIN": "coltcoan.cloudflareaccess.com",
-    "ACCESS_AUD_ACCOUNT": "8ce00f2f0c19e78de732d95eb681e219b4612a469be69c9f209806a538d0588d",
-    "ACCESS_AUD_REVIEW": "a8895de40dcec1396476256c5723d02299010140a9981e986244ac506e039a6c",
-    "SITE_ORIGINS": "https://bighelp.app,https://www.bighelp.app",
-    "SITE_RETURN_URL": "https://bighelp.app/templates"
+    "ACCESS_AUD_REVIEW": "a8895de40dcec1396476256c5723d02299010140a9981e986244ac506e039a6c"
   },
+  // Secret, set with `wrangler secret put TURNSTILE_SECRET`: the "bighelp Template Catalog submit" widget.
   "d1_databases": [
     {
       "binding": "DB",

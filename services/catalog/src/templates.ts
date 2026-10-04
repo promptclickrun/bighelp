@@ -48,6 +48,9 @@ export const LIMITS = {
   description: 240,
   instructions: 12_000,
   creditName: 40,
+  submitterName: 60,
+  username: 39,
+  email: 254,
   reviewNote: 1_000,
   symbol: 60,
 } as const;
@@ -102,6 +105,25 @@ function parseAgent(body: Fields, allowSymbol: boolean): AgentPayload {
     }
   }
   return payload;
+}
+
+export interface Submitter {
+  name: string;
+  /** Shown publicly as the template's credit. */
+  username: string;
+  email: string;
+}
+
+/** Who sent a submission. Not verified: it only ties their submissions together for reviewers. */
+export function parseSubmitter(body: Fields): Submitter {
+  const name = line(body.submitterName, "submitterName", LIMITS.submitterName, 1);
+  const username = line(body.username, "username", LIMITS.username, 2).replace(/^@/, "");
+  if (!/^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(username)) {
+    throw new ValidationError("username", "Use letters, numbers, dots, dashes or underscores.");
+  }
+  const email = line(body.email, "email", LIMITS.email, 3).toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new ValidationError("email", "That email doesn't look right.");
+  return { name, username, email };
 }
 
 export function parseCreditName(value: unknown): string | null {

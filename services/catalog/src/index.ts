@@ -2,33 +2,41 @@
 // bighelp.app, with community submissions held for review.
 //
 //   /v1/*        public, approved templates only (the app and the site read these)
-//   /account/*   behind Cloudflare Access (Google or GitHub): submit and see your own submissions
+//   /submit/*    public, Turnstile-checked: submit with a name, username and email; check status by receipt
 //   /review/*    behind Cloudflare Access (maintainer email or an agent's service token): review queue
 
 import { type AccessConfig, type KeySource, type Principal, fetchAccessKeys, verifyAccess } from "./access.js";
 import {
-  type TemplateRow, approved, bySubmitter, find, insert, list, publicView, remove, review, reviewView,
+  type TemplateRow, approved, byStatusTokens, find, insert, list, publicView, remove, review, reviewView,
   submitterLoad, submitterView, toTemplate,
 } from "./store.js";
 import {
   BLUEPRINT_CATEGORIES, type BlueprintPayload, type TemplateKind, type TemplateStatus, ValidationError,
-  isRecord, parseCreditName, parseReviewNote, parseTemplate,
+  isRecord, parseCreditName, parseReviewNote, parseSubmitter, parseTemplate,
 } from "./templates.js";
 
 export interface Env {
   DB: D1Database;
   ACCESS_TEAM_DOMAIN: string;
-  ACCESS_AUD_ACCOUNT: string;
   ACCESS_AUD_REVIEW: string;
-  /** Comma-separated origins allowed to call /account with cookies. */
-  SITE_ORIGINS: string;
-  /** Where /account/login sends people back to after signing in. */
-  SITE_RETURN_URL: string;
+  /** Turnstile widget secret (a Worker secret). Also keys the network hash used for rate limits. */
+  TURNSTILE_SECRET: string;
+}
+
+/** Checks a Turnstile token. Injectable so tests don't call Cloudflare. */
+export type HumanCheck = (token: string, ip: string | null, secret: string) => Promise<boolean>;
+
+export interface Dependencies {
+  keys?: KeySource;
+  human?: HumanCheck;
+  now?: () => Date;
 }
 
 const MAX_BODY_BYTES = 32 * 1024;
 const MAX_PENDING_PER_SUBMITTER = 10;
 const MAX_SUBMISSIONS_PER_DAY = 10;
+const MAX_SUBMISSIONS_PER_NETWORK_PER_DAY = 20;
+const MAX_STATUS_TOKENS = 50;
 const GROUP_TITLES: Record<(typeof BLUEPRINT_CATEGORIES)[number], string> = {
   productivity: "Productivity",
   marketing: "Marketing",
@@ -43,25 +51,26 @@ export default {
   },
 } satisfies ExportedHandler<Env>;
 
-/** The whole router. `keys` and `now` are injectable for tests. */
-export async function handle(
-  request: Request, env: Env, keys: KeySource = fetchAccessKeys, now: () => Date = () => new Date(),
-): Promise<Response> {
+/** The whole router. */
+export async function handle(request: Request, env: Env, deps: Dependencies = {}): Promise<Response> {
+  const keys = deps.keys ?? fetchAccessKeys;
+  const now = deps.now ?? (() => new Date());
   const url = new URL(request.url);
   const path = url.pathname.replace(/\/+$/, "") || "/";
-  const cors = corsHeaders(request, env);
+  // No cookies anywhere, so any page may call the public routes; Turnstile is the gate on submitting.
+  const cors = PUBLIC_CORS;
 
-  if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+  if (request.method === "OPTIONS") {
+    return path.startsWith("/review") ? new Response(null, { status: 204 }) : new Response(null, { status: 204, headers: cors });
+  }
 
   try {
     // Approved templates are public, so any page may read them (no cookies).
     if (path.startsWith("/v1/")) {
-      return withHeaders(await publicRoute(request, env, path), { "Access-Control-Allow-Origin": "*" });
+      return withHeaders(await publicRoute(request, env, path), cors);
     }
-    if (path === "/account" || path.startsWith("/account/")) {
-      const principal = await verifyAccess(request, accessConfig(env, env.ACCESS_AUD_ACCOUNT), keys);
-      if (!principal?.email) return withHeaders(error(401, "Sign in with Google or GitHub first."), cors);
-      return withHeaders(await accountRoute(request, env, path, url, principal.email, now()), cors, true);
+    if (path.startsWith("/submit/")) {
+      return withHeaders(await submitRoute(request, env, path, deps.human ?? siteverify, now()), cors, true);
     }
     if (path === "/review" || path.startsWith("/review/")) {
       const principal = await verifyAccess(request, accessConfig(env, env.ACCESS_AUD_REVIEW), keys);
@@ -148,49 +157,61 @@ function publicCacheHeaders(revision: string): HeadersInit {
   };
 }
 
-// MARK: - Signed-in submitters
+// MARK: - Submitters (no sign-in)
 
-async function accountRoute(
-  request: Request, env: Env, path: string, url: URL, email: string, now: Date,
+async function submitRoute(
+  request: Request, env: Env, path: string, human: HumanCheck, now: Date,
 ): Promise<Response> {
-  if (path === "/account/login" && request.method === "GET") {
-    // Access has already signed them in by the time this runs; send them back to the page.
-    return Response.redirect(safeReturn(url.searchParams.get("return"), env), 302);
-  }
-  if (path === "/account/me" && request.method === "GET") {
-    return json({ email, submissions: (await bySubmitter(env.DB, email)).map(submitterView) });
-  }
-  if (path === "/account/submissions" && request.method === "POST") {
+  if (path === "/submit/templates" && request.method === "POST") {
     const body = await readJson(request);
+    if (!isRecord(body)) throw new ValidationError("body", "Send a JSON object.");
     const template = parseTemplate(body);
-    const creditName = isRecord(body) ? parseCreditName(body.creditName) : null;
+    const submitter = parseSubmitter(body);
+    const ip = request.headers.get("CF-Connecting-IP");
+    const turnstile = typeof body.turnstileToken === "string" ? body.turnstileToken : "";
+    if (!turnstile || turnstile.length > 2048 || !(await human(turnstile, ip, env.TURNSTILE_SECRET))) {
+      throw new HttpError(403, "We couldn't confirm you're a person. Try the check again.");
+    }
+    const ipHash = await hmac(env.TURNSTILE_SECRET, `ip:${ip ?? "unknown"}`);
     const dayAgo = new Date(now.getTime() - 86_400_000).toISOString();
-    const load = await submitterLoad(env.DB, email, dayAgo);
+    const load = await submitterLoad(env.DB, submitter.email, ipHash, dayAgo);
     if (load.pending >= MAX_PENDING_PER_SUBMITTER) {
       throw new HttpError(429, "You have 10 templates waiting for review. Try again once some are reviewed.");
     }
-    if (load.recent >= MAX_SUBMISSIONS_PER_DAY) {
-      throw new HttpError(429, "That's 10 submissions today. Try again tomorrow.");
+    if (load.byEmail >= MAX_SUBMISSIONS_PER_DAY || load.byNetwork >= MAX_SUBMISSIONS_PER_NETWORK_PER_DAY) {
+      throw new HttpError(429, "That's a lot of templates for one day. Try again tomorrow.");
     }
+    // A receipt only this browser holds, so the page can show the review result without an account.
+    const statusToken = randomToken();
     const id = newId(template.kind);
     await insert(env.DB, {
-      id, template, status: "pending", source: "community", creditName, submitterEmail: email,
+      id, template, status: "pending", source: "community", creditName: submitter.username,
+      submitter: { ...submitter, statusTokenHash: await sha256(statusToken), ipHash },
       now: now.toISOString(),
     });
-    return json({ id, status: "pending" }, 201);
+    return json({ id, status: "pending", statusToken }, 201);
+  }
+  if (path === "/submit/status" && request.method === "POST") {
+    const body = await readJson(request);
+    const tokens = isRecord(body) && Array.isArray(body.tokens) ? body.tokens : [];
+    const valid = tokens.filter((token): token is string => typeof token === "string" && /^[A-Za-z0-9_-]{43}$/.test(token))
+      .slice(0, MAX_STATUS_TOKENS);
+    const rows = await byStatusTokens(env.DB, await Promise.all(valid.map(sha256)));
+    return json({ submissions: rows.map(submitterView) });
   }
   return error(404, "Not found.");
 }
 
-function safeReturn(value: string | null, env: Env): string {
-  const fallback = env.SITE_RETURN_URL;
-  if (!value) return fallback;
-  try {
-    const target = new URL(value);
-    return allowedOrigins(env).includes(target.origin) ? target.toString() : fallback;
-  } catch {
-    return fallback;
-  }
+/** Cloudflare Turnstile's server-side check. */
+async function siteverify(token: string, ip: string | null, secret: string): Promise<boolean> {
+  const form = new FormData();
+  form.append("secret", secret);
+  form.append("response", token);
+  if (ip) form.append("remoteip", ip);
+  const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body: form });
+  if (!response.ok) return false;
+  const result = await response.json<{ success?: boolean }>();
+  return result.success === true;
 }
 
 // MARK: - Reviewers (Colt, Alfie and other agents)
@@ -222,7 +243,7 @@ async function reviewRoute(
       const creditName = isRecord(body) ? parseCreditName(body.creditName) : null;
       const newID = newId(template.kind);
       await insert(env.DB, {
-        id: newID, template, status: "approved", source: "bighelp", creditName, submitterEmail: null,
+        id: newID, template, status: "approved", source: "bighelp", creditName,
         now: now.toISOString(), reviewedBy: reviewer,
       });
       return json(reviewView((await find(env.DB, newID))!), 201);
@@ -314,21 +335,30 @@ function oneOfOrUndefined<const T extends readonly string[]>(value: string | nul
   return value && (allowed as readonly string[]).includes(value) ? value as T[number] : undefined;
 }
 
-function allowedOrigins(env: Env): string[] {
-  return env.SITE_ORIGINS.split(",").map((origin) => origin.trim()).filter(Boolean);
+const PUBLIC_CORS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Max-Age": "600",
+};
+
+function hex(buffer: ArrayBuffer): string {
+  return [...new Uint8Array(buffer)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-function corsHeaders(request: Request, env: Env): Record<string, string> {
-  const origin = request.headers.get("Origin");
-  if (!origin || !allowedOrigins(env).includes(origin)) return { Vary: "Origin" };
-  return {
-    "Access-Control-Allow-Origin": origin,
-    "Access-Control-Allow-Credentials": "true",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Access-Control-Max-Age": "600",
-    Vary: "Origin",
-  };
+async function sha256(value: string): Promise<string> {
+  return hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)));
+}
+
+async function hmac(secret: string, value: string): Promise<string> {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" },
+    false, ["sign"]);
+  return hex(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value)));
+}
+
+function randomToken(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 function withHeaders(response: Response, headers: Record<string, string>, noStore = false): Response {

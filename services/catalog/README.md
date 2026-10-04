@@ -7,12 +7,14 @@ bighelp.app, and holds community submissions for review. New templates go live w
 |---|---|
 | Worker | `bighelp-catalog`, custom domain `catalog.bighelp.app` |
 | D1 | `bighelp-catalog` (one table, `templates`; `migrations/`) |
-| Access app "submit" | path `catalog.bighelp.app/account`, Google or GitHub, anyone may sign in |
+| Turnstile widget | "bighelp Template Catalog submit" (bighelp.app, www, bighelp.pages.dev); secret is the Worker secret `TURNSTILE_SECRET` |
 | Access app "review" | path `catalog.bighelp.app/review`, the maintainer's email, or the `bighelp-catalog-reviewer` service token |
 | Site page | `bighelp.app/templates` (bighelp-site `src/templates.html`) |
 
-The Worker verifies the Access JWT itself (signature, audience per path, issuer, expiry), so a
-misconfigured Access app can't open the signed-in routes. Audiences live in `wrangler.jsonc`.
+Submitting needs no account. Only reviewers go through Cloudflare Access, and its one app holds just the
+maintainer's login and a service token, so it never uses Zero Trust seats for the public. The Worker verifies
+that Access JWT itself (signature, audience, issuer, expiry), so a misconfigured Access app can't open
+`/review`.
 
 ## Routes
 
@@ -38,12 +40,19 @@ by a reviewer; it can be missing.
 The seed (`scripts/build-seed.mjs` → `seed/0001_bundled.sql`) loads exactly what the app bundles today,
 with the same ids (`feed-productivity-1`…, `anchor`…), so the app can match remote and bundled items.
 
-**Signed-in submitters (`/account`, Access cookie, credentials CORS for bighelp.app and www only):**
+**Submitters (no sign-in, CORS `*`, no cookies):**
 
-- `GET /account/login?return=<url on bighelp.app>`: Access signs them in, then this redirects back.
-- `GET /account/me`: `{ email, submissions: [{ id, kind, title, status, reviewNote (rejected only), createdAt }] }`
-- `POST /account/submissions`: a blueprint or agent body plus optional `creditName`; returns 201
-  `{ id, status: "pending" }`. 400 `{ error, field }` on bad input. 429 at 10 pending or 10 a day.
+- `POST /submit/templates`: a blueprint or agent body plus `submitterName`, `username`, `email` and
+  `turnstileToken` (from the Turnstile widget). Returns 201 `{ id, status: "pending", statusToken }`.
+  400 `{ error, field }` on bad input, 403 if Turnstile fails, 429 at 10 pending or 10 a day per email,
+  or 20 a day per network.
+- `POST /submit/status` `{ tokens: [statusToken, ...] }`: `{ submissions: [{ id, kind, title, status,
+  reviewNote (rejected only), createdAt }] }`. The site keeps each receipt in the browser's storage.
+  Only a hash of the receipt is stored.
+
+The username is the public credit. Name and email are visible only to reviewers. They aren't verified;
+they link one person's submissions together. The network limit uses an HMAC of the IP address, never the
+address itself.
 
 **Reviewers (`/review`, Access service token or the maintainer's login):**
 

@@ -71,7 +71,7 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 def summary(item: dict) -> str:
-    who = item.get("submitterEmail") or item.get("source")
+    who = (f"@{item['submitterUsername']} <{item['submitterEmail']}>" if item.get("submitterEmail") else item.get("source"))
     where = f"{item.get('board')}/{item.get('category')}" if item["kind"] == "blueprint" else item.get("category")
     return f"{item['id']:<22} {item['status']:<9} {item['kind']:<9} {where:<20} {who:<28} {item['title']}"
 

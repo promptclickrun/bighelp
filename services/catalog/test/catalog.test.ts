@@ -206,6 +206,47 @@ describe("public feed", () => {
     expect((await handle(request, testEnv, { keys, human })).status).toBe(304);
   });
 
+  it.each(["/v1/catalog.json", "/v1/board-blueprints.json", "/v1/agent-templates.json"])(
+    "accepts compression-weakened ETags for %s", async (path) => {
+      const first = await call(path);
+      const etag = first.headers.get("ETag")!;
+      for (const method of ["GET", "HEAD"]) {
+        const response = await handle(new Request(`https://catalog.example${path}`, {
+          method, headers: { "If-None-Match": `W/${etag}` },
+        }), testEnv, { keys, human });
+        expect(response.status).toBe(304);
+        expect(response.headers.get("ETag")).toBe(etag);
+        expect(await response.text()).toBe("");
+      }
+    },
+  );
+
+  it("matches ETag lists and wildcards without matching stale or malformed validators", async () => {
+    const etag = (await call("/v1/catalog.json")).headers.get("ETag")!;
+    const cases: [string, number][] = [
+      [`"stale", W/${etag}`, 304],
+      [` W/${etag} , "other" `, 304],
+      [`"opaque,comma", ${etag}`, 304],
+      ["*", 304],
+      [`"stale", W/"other"`, 200],
+      [etag.slice(1, -1), 200],
+      [`w/${etag}`, 200],
+      [`W/ ${etag}`, 200],
+      [`${etag} trailing`, 200],
+      [`${etag}, malformed`, 200],
+    ];
+    for (const [value, expected] of cases) {
+      const response = await handle(new Request("https://catalog.example/v1/catalog.json", {
+        headers: { "If-None-Match": value },
+      }), testEnv, { keys, human });
+      expect(response.status, value).toBe(expected);
+    }
+    const missing = await handle(new Request("https://catalog.example/v1/missing.json", {
+      headers: { "If-None-Match": "*" },
+    }), testEnv, { keys, human });
+    expect(missing.status).toBe(404);
+  });
+
   it("lets any page read the public feed", async () => {
     const response = await call("/v1/catalog.json", { origin: "https://anywhere.example" });
     expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");

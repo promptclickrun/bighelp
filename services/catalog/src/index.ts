@@ -93,9 +93,12 @@ export async function handle(request: Request, env: Env, deps: Dependencies = {}
 
 async function publicRoute(request: Request, env: Env, path: string): Promise<Response> {
   if (request.method !== "GET" && request.method !== "HEAD") return error(405, "Read only.");
+  if (!["/v1/catalog.json", "/v1/board-blueprints.json", "/v1/agent-templates.json"].includes(path)) {
+    return error(404, "Not found.");
+  }
   const rows = await approved(env.DB);
   const revision = await revisionOf(rows);
-  if (request.headers.get("If-None-Match") === `"${revision}"`) {
+  if (matchesIfNoneMatch(request.headers.get("If-None-Match"), `"${revision}"`)) {
     return new Response(null, { status: 304, headers: publicCacheHeaders(revision) });
   }
   let body: unknown;
@@ -148,6 +151,26 @@ async function revisionOf(rows: TemplateRow[]): Promise<string> {
   const basis = rows.map((row) => `${row.id}:${row.updated_at}`).join("\n");
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(basis));
   return [...new Uint8Array(digest)].slice(0, 8).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+/** GET/HEAD validators use weak comparison; commas inside quoted tags are not separators. */
+function matchesIfNoneMatch(header: string | null, etag: string): boolean {
+  if (!header) return false;
+  const value = header.trim();
+  if (value === "*") return true;
+  const tag = /(?:W\/)?("[\x21\x23-\x7e\x80-\xff]*")[ \t]*(?:,|$)/y;
+  let matched = false;
+  let offset = 0;
+  while (offset < value.length) {
+    // HTTP lists may contain empty elements and optional whitespace.
+    if (/[ \t,]/.test(value.charAt(offset))) { offset += 1; continue; }
+    tag.lastIndex = offset;
+    const token = tag.exec(value);
+    if (!token) return false;
+    matched ||= token[1] === etag;
+    offset = tag.lastIndex;
+  }
+  return matched;
 }
 
 function publicCacheHeaders(revision: string): HeadersInit {

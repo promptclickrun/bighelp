@@ -48,6 +48,16 @@ struct SessionRow: View {
                             .frame(width: 8, height: 8)
                             .accessibilityHidden(true)
                     }
+                    if let origin = SessionOrigin.label(session.origin) {
+                        Text(origin)
+                            .font(.system(size: timeSize * 0.85, weight: .semibold))
+                            .foregroundStyle(theme.secondaryText)
+                            .lineLimit(1)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 1)
+                            .background(theme.incomingMessageBackground, in: .capsule)
+                            .fixedSize()
+                    }
                     Text(previewLine)
                         .font(.system(size: previewSize))
                         .foregroundStyle(theme.secondaryText)
@@ -110,7 +120,8 @@ struct SessionRow: View {
             session.isPinned ? "Pinned" : nil,
         ].compactMap { $0 }.joined(separator: ", ")
         let stateLabel = state.isEmpty ? "" : "\(state). "
-        return "\(session.title). \(stateLabel)\(preview). \(agentNames.joined(separator: ", ")). \(kind). \(session.updatedAt.formatted(.relative(presentation: .named)))"
+        let origin = SessionOrigin.label(session.origin).map { " Started in \($0)." } ?? ""
+        return "\(session.title). \(stateLabel)\(preview). \(agentNames.joined(separator: ", ")). \(kind).\(origin) \(session.updatedAt.formatted(.relative(presentation: .named)))"
     }
 
     @BighelpThemeReader private var theme

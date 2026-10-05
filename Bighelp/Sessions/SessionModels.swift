@@ -76,6 +76,45 @@ final class LocalSessionForkClient: SessionForkClient {
     }
 }
 
+/// Where a chat started, from Hermes' session `source`: bighelp, Hermes Desktop, the
+/// terminal, a messaging app, a schedule, or a coding agent Hermes imported it from.
+enum SessionOrigin {
+    /// A short name for the tag on the chat's row, or nil when Hermes didn't say.
+    static func label(_ source: String?) -> String? {
+        guard let source else { return nil }
+        let raw = source.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !raw.isEmpty, raw.utf8.count <= 64 else { return nil }
+        switch raw {
+        case "bighelp", "loopdy": return "bighelp"
+        case "desktop", "hermes-desktop", "hermes_desktop": return "Hermes Desktop"
+        case "tui": return "TUI"
+        case "cli": return "CLI"
+        case "acp": return "Editor"
+        case "cron": return "Scheduled"
+        case "workflow": return "Workflow"
+        case "webhook": return "Webhook"
+        case "api_server", "api": return "API"
+        case "bot_room", HostedRoomSessionProjection.remoteSource: return "Group chat"
+        case "claude-code", "claude_code", "claude": return "Claude Code"
+        case "codex-cli", "codex_cli", "codex": return "Codex"
+        case "telegram": return "Telegram"
+        case "discord": return "Discord"
+        case "slack": return "Slack"
+        case "whatsapp": return "WhatsApp"
+        case "signal": return "Signal"
+        case "imessage", "bluebubbles": return "iMessage"
+        case "sms": return "SMS"
+        case "email": return "Email"
+        case "matrix": return "Matrix"
+        case "mattermost": return "Mattermost"
+        default:
+            let words = raw.split(whereSeparator: { $0 == "-" || $0 == "_" || $0 == " " })
+            guard !words.isEmpty else { return nil }
+            return words.map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " ")
+        }
+    }
+}
+
 struct SessionSummary: Identifiable, Equatable, Sendable {
     let id: String
     let kind: SessionKind
@@ -90,6 +129,8 @@ struct SessionSummary: Identifiable, Equatable, Sendable {
     let workspaceID: String?
     let workspaceName: String?
     let hostedRoomID: String?
+    /// Hermes' `source` for this chat (where it started); see `SessionOrigin`.
+    let origin: String?
 
     init(
         id: String,
@@ -104,7 +145,8 @@ struct SessionSummary: Identifiable, Equatable, Sendable {
         isCronSession: Bool = false,
         workspaceID: String? = nil,
         workspaceName: String? = nil,
-        hostedRoomID: String? = nil
+        hostedRoomID: String? = nil,
+        origin: String? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -119,6 +161,7 @@ struct SessionSummary: Identifiable, Equatable, Sendable {
         self.workspaceID = workspaceID
         self.workspaceName = workspaceName
         self.hostedRoomID = hostedRoomID
+        self.origin = origin
     }
 }
 
@@ -296,7 +339,8 @@ struct SessionRecord: Identifiable, Codable, Equatable, Sendable {
             workspaceID: workspaceID,
             workspaceName: workspaceName,
             hostedRoomID: remoteSource == HostedRoomSessionProjection.remoteSource
-                ? botModeRoomID : nil
+                ? botModeRoomID : nil,
+            origin: remoteSource
         )
     }
 

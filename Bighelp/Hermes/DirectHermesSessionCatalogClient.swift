@@ -308,10 +308,11 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
                     let stored = try DirectHermesSessionValidation.string(object["id"])
                     if !seen.insert(DirectHermesSessionIdentity.key(stored)).inserted {
                         // REST pages include pinned sessions as a back-fill on
-                        // every page. They are safe to skip after the first
-                        // occurrence; legacy internal pages retain strict
-                        // duplicate detection.
-                        guard response["has_more"]?.boolean != nil else {
+                        // every page (Hermes 0.21.x sends them with `pinned: true`
+                        // and no `has_more`). They are safe to skip after the first
+                        // occurrence; any other repeat still means history changed.
+                        guard response["has_more"]?.boolean != nil
+                                || (try? DirectHermesSessionValidation.flag(object["pinned"])) == true else {
                             throw DirectHermesSessionError.historyChanged
                         }
                         continue
@@ -347,7 +348,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
                         throw WorkspaceClientError.capacityExceeded
                     }
                 }
-                let hasMore = response["has_more"]?.boolean ?? (rows.count >= 100)
+                let hasMore = Self.pageHasMore(response, offset: offset, rows: rows.count)
                 if rows.isEmpty || !hasMore { break }
                 offset += response["limit"]?.integer ?? rows.count
                 guard offset <= DirectHermesSessionValidation.maximumSessions else { throw WorkspaceClientError.capacityExceeded }
@@ -1898,6 +1899,15 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         return response
     }
 
+    /// Whether `/api/sessions` has another page. Hermes 0.21.x sends no `has_more` and adds
+    /// pinned sessions past the limit, so the row count can't tell; `total` can.
+    static func pageHasMore(_ page: [String: BighelpJSONValue], offset: Int, rows: Int) -> Bool {
+        if let hasMore = page["has_more"]?.boolean { return hasMore }
+        let limit = page["limit"]?.integer ?? 100
+        if let total = page["total"]?.integer { return offset + limit < total }
+        return rows >= limit
+    }
+
     private func refreshedCatalogCoordinate(for binding: Binding) async throws -> DirectHermesCatalogCoordinate {
         let profile = try await requireProfile(binding.coordinate.profileID)
         var offset = 0
@@ -1920,7 +1930,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
                     || catalog.lineageIDs?.contains(where: { DirectHermesSessionValidation.same($0, binding.anchorID) }) == true
                 if matches { return catalog }
             }
-            let hasMore = page["has_more"]?.boolean ?? (rows.count >= 100)
+            let hasMore = Self.pageHasMore(page, offset: offset, rows: rows.count)
             if rows.isEmpty || !hasMore { break }
             offset += page["limit"]?.integer ?? rows.count
         }

@@ -21,9 +21,13 @@ struct ChatEdgeStop: Equatable {
 }
 
 enum ChatEdgeBlurMetrics {
-    /// How far the blur reaches past the header or message box, so it ends in a fade, not a line.
-    static let topOverhang: CGFloat = 24
-    static let bottomOverhang: CGFloat = 20
+    /// How far inside the header (or the message box) the blur starts to fade. The fade then
+    /// ends at about the header's bottom edge (the message box's top edge), so the messages
+    /// between them stay sharp. iOS's own soft edge fades on past its marker by about this much.
+    static let topInset: CGFloat = 30
+    static let bottomInset: CGFloat = 26
+
+    static func inset(for edge: VerticalEdge) -> CGFloat { edge == .top ? topInset : bottomInset }
 
     /// The blur's strength: full at the screen edge, gone where the messages are sharp again.
     static func blurStops(for edge: VerticalEdge) -> [ChatEdgeStop] {
@@ -88,20 +92,15 @@ struct ChatEdgeBlur: View {
                             .mask { gradient(ChatEdgeBlurMetrics.blurStops(for: edge), color: .black) }
                         gradient(ChatEdgeBlurMetrics.tintStops(for: edge), color: theme.canvas)
                     }
-                    .padding(edge == .top ? .bottom : .top, -overhang)
+                    .padding(edge == .top ? .bottom : .top, ChatEdgeBlurMetrics.inset(for: edge) / 2)
                 }
             case .solid:
                 gradient(ChatEdgeBlurMetrics.solidStops(for: edge), color: theme.canvas)
-                    .padding(edge == .top ? .bottom : .top, -overhang)
+                    .padding(edge == .top ? .bottom : .top, ChatEdgeBlurMetrics.inset(for: edge) / 2)
             }
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
-    }
-
-    /// The drawn backdrops reach a little past the header or message box, so they end in a fade.
-    private var overhang: CGFloat {
-        edge == .top ? ChatEdgeBlurMetrics.topOverhang : ChatEdgeBlurMetrics.bottomOverhang
     }
 
     private func gradient(_ stops: [ChatEdgeStop], color: Color) -> LinearGradient {
@@ -112,9 +111,10 @@ struct ChatEdgeBlur: View {
 }
 
 /// Marks the area the header (or the message box and tab bar) covers, so the chat's scroll
-/// view draws its soft edge effect under all of it. The effect takes its size from the UIKit
-/// text and controls in this view; the header is SwiftUI, so an invisible line of text along
-/// the inner side stands in for it. An empty or see-through plain view does not count.
+/// view draws its soft edge effect under it. The effect takes its size from the UIKit
+/// text and controls in this view; the header is SwiftUI, so an invisible line of text
+/// stands in for it, `ChatEdgeBlurMetrics.inset` inside the inner side so the effect's own
+/// fade ends where the header (or message box) does. An empty or see-through plain view does not count.
 @available(iOS 26, *)
 final class ChatScrollEdgeAnchor: UIView {
     var edge: VerticalEdge {
@@ -144,7 +144,8 @@ final class ChatScrollEdgeAnchor: UIView {
     override func layoutSubviews() {
         super.layoutSubviews()
         let height: CGFloat = 4
-        extentMarker.frame = CGRect(x: 0, y: edge == .top ? bounds.maxY - height : 0,
+        let inset = min(ChatEdgeBlurMetrics.inset(for: edge), max(0, bounds.height - height))
+        extentMarker.frame = CGRect(x: 0, y: edge == .top ? bounds.maxY - height - inset : inset,
                                     width: bounds.width, height: height)
         attach()
     }

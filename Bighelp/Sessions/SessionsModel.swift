@@ -100,6 +100,26 @@ enum SessionAgentFilter: Hashable {
     case agent(String)
 }
 
+/// Started in: chats from one place (by `SessionOrigin` label), or all.
+enum SessionOriginFilter: Hashable {
+    case all
+    case origin(String)
+
+    var title: String {
+        switch self {
+        case .all: "Everywhere"
+        case .origin(let label): label
+        }
+    }
+
+    fileprivate func includes(_ record: SessionRecord) -> Bool {
+        switch self {
+        case .all: true
+        case .origin(let label): SessionOrigin.label(record.remoteSource) == label
+        }
+    }
+}
+
 struct SessionProjectOption: Identifiable, Hashable {
     let projectID: String
     let name: String
@@ -178,6 +198,7 @@ final class SessionsModel {
 
     var query = ""
     var agentFilter: SessionAgentFilter = .all
+    var originFilter: SessionOriginFilter = .all
     var typeFilter: SessionTypeFilter = .all
     var projectFilter: SessionProjectFilter = .all
     var showsCronSessions = false
@@ -263,6 +284,16 @@ final class SessionsModel {
             let order = $0.name.localizedStandardCompare($1.name)
             return order == .orderedSame ? $0.projectID < $1.projectID : order == .orderedAscending
         }
+    }
+
+    /// The places chats on this list started, by name, for the Started in filter.
+    var availableOrigins: [String] {
+        var labels: Set<String> = []
+        for record in sourceRecords where
+            isVisible(record) && !record.isSubagentSession && (record.hasAcceptedMessage || record.hasActiveWork) {
+            if let label = SessionOrigin.label(record.remoteSource) { labels.insert(label) }
+        }
+        return labels.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
     }
 
     var effectiveProjectFilter: SessionProjectFilter {
@@ -432,6 +463,7 @@ final class SessionsModel {
     private func matches(_ record: SessionRecord) -> Bool {
         guard typeFilter.includes(record.kind) else { return false }
         guard effectiveProjectFilter.includes(record) else { return false }
+        guard originFilter.includes(record) else { return false }
         if case .agent(let agentID) = agentFilter, !record.agentIDs.contains(agentID) {
             return false
         }

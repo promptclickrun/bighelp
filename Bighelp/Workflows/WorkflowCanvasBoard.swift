@@ -261,7 +261,7 @@ struct WorkflowCanvasBoard: View {
         let size = WorkflowCanvasLayout.size(stage.kind)
         return WorkflowCanvasCard(title: stage.title, detail: detail(stage), kind: stage.kind,
                                   isSelected: selected == stage.key, hasIssue: hasIssue,
-                                  isDashed: stage.kind == .agent && model.agentID(for: stage.role) == nil,
+                                  isDashed: needsAgent(stage),
                                   rounds: stage.changesMaxRevisions ?? definition?.maxRevisions)
             .frame(width: size.width, height: size.height)
             .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: BighelpTokens.radius16, style: .continuous))
@@ -276,6 +276,11 @@ struct WorkflowCanvasBoard: View {
             .accessibilityIdentifier("workflows.canvas.node.\(stage.key)")
     }
 
+    /// An agent stage, or an agent of a parallel block, that no agent does yet.
+    private func needsAgent(_ stage: WorkflowStage) -> Bool {
+        ([stage] + stage.branches).contains { $0.kind == .agent && model.agentID(for: $0.role) == nil }
+    }
+
     /// "x,y": the node's saved place, so tests and VoiceOver can tell it moved.
     private func positionValue(_ key: String) -> String {
         guard let definition, let point = WorkflowCanvasLayout.positions(definition)[key] else { return "" }
@@ -286,8 +291,9 @@ struct WorkflowCanvasBoard: View {
         switch stage.kind {
         case .agent: context.agentName(model.agentID(for: stage.role)) ?? definition?.role(stage.role)?.label ?? "No agent yet"
         case .check: stage.rules.count == 1 ? "1 rule" : "\(stage.rules.count) rules"
-        case .decision: stage.on ?? ""
+        case .decision: stage.sources.count > 1 ? "\(stage.sources.count) verdicts" : stage.on ?? ""
         case .signoff: "You approve the file"
+        case .parallel: stage.subtitle { context.agentName(model.agentID(for: $0)) }
         case .unknown: ""
         }
     }
@@ -296,7 +302,7 @@ struct WorkflowCanvasBoard: View {
     private func nodeMenu(_ stage: WorkflowStage, graph: WorkflowFlowGraph) -> some View {
         Button("Edit", systemImage: "pencil") { edit(stage) }
         Menu("Add a stage after", systemImage: "plus") {
-            WorkflowAddStageButtons { add($0, stage.key) }
+            WorkflowAddStageButtons(parallel: model.canParallel) { add($0, stage.key) }
         }
         if editable, stage.kind != .decision, graph.exits[stage.key]?.primary != nil {
             Button("End the flow here", systemImage: "stop.circle") { model.connect(stage.key, .next, to: nil) }
@@ -623,10 +629,13 @@ struct WorkflowDotGrid: View {
 
 /// The four kinds of stage, for Add menus.
 struct WorkflowAddStageButtons: View {
+    /// The computer's plugin runs parallel blocks.
+    var parallel = false
     let add: (WorkflowStage.Kind) -> Void
 
     var body: some View {
-        ForEach([WorkflowStage.Kind.agent, .check, .decision, .signoff], id: \.self) { kind in
+        ForEach([WorkflowStage.Kind.agent] + (parallel ? [.parallel] : []) + [.check, .decision, .signoff],
+                id: \.self) { kind in
             Button(kind.title, systemImage: kind.symbol) { add(kind) }
                 .accessibilityIdentifier("workflows.add.\(kind.rawValue)")
         }

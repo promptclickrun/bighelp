@@ -48,7 +48,7 @@ struct WorkflowCanvasView: View {
             ToolbarItem(placement: .principal) { WorkflowTitle(model: model) }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
-                    WorkflowAddStageButtons { addStage($0, after: selected) }
+                    WorkflowAddStageButtons(parallel: model.canParallel) { addStage($0, after: selected) }
                     Divider()
                     Button("Inputs", systemImage: "arrow.right.to.line") { isInputsPresented = true }
                 } label: {

@@ -262,7 +262,9 @@ struct WorkflowCanvasBoard: View {
         return WorkflowCanvasCard(title: stage.title, detail: detail(stage), kind: stage.kind,
                                   isSelected: selected == stage.key, hasIssue: hasIssue,
                                   isDashed: needsAgent(stage),
-                                  rounds: stage.changesMaxRevisions ?? definition?.maxRevisions)
+                                  rounds: stage.changesMaxRevisions ?? definition?.maxRevisions,
+                                  passTitle: stage.passEnd.map { "Pass · ends \($0.outcome.title.lowercased())" },
+                                  changesTitle: stage.changesEnd.map { "Changes · ends \($0.outcome.title.lowercased())" })
             .frame(width: size.width, height: size.height)
             .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: BighelpTokens.radius16, style: .continuous))
             .contentShape(RoundedRectangle(cornerRadius: BighelpTokens.radius16, style: .continuous))
@@ -294,6 +296,7 @@ struct WorkflowCanvasBoard: View {
         case .decision: stage.sources.count > 1 ? "\(stage.sources.count) verdicts" : stage.on ?? ""
         case .signoff: "You approve the file"
         case .parallel: stage.subtitle { context.agentName(model.agentID(for: $0)) }
+        case .delivery: stage.subtitle { _ in nil }
         case .unknown: ""
         }
     }
@@ -302,7 +305,7 @@ struct WorkflowCanvasBoard: View {
     private func nodeMenu(_ stage: WorkflowStage, graph: WorkflowFlowGraph) -> some View {
         Button("Edit", systemImage: "pencil") { edit(stage) }
         Menu("Add a stage after", systemImage: "plus") {
-            WorkflowAddStageButtons(parallel: model.canParallel) { add($0, stage.key) }
+            WorkflowAddStageButtons(features: model.features) { add($0, stage.key) }
         }
         if editable, stage.kind != .decision, graph.exits[stage.key]?.primary != nil {
             Button("End the flow here", systemImage: "stop.circle") { model.connect(stage.key, .next, to: nil) }
@@ -540,6 +543,9 @@ struct WorkflowCanvasCard: View {
     let hasIssue: Bool
     let isDashed: Bool
     var rounds: Int?
+    /// A decision's way that ends the run says so instead of "Pass" or "Changes".
+    var passTitle: String?
+    var changesTitle: String?
     @BighelpThemeReader private var theme
 
     var body: some View {
@@ -573,8 +579,8 @@ struct WorkflowCanvasCard: View {
             .frame(height: kind == .decision ? WorkflowCanvasGeometry.decisionHeader : nil, alignment: .leading)
             .frame(maxHeight: kind == .decision ? nil : .infinity)
             if kind == .decision {
-                branch("Pass", tint: theme.secondaryText)
-                branch(rounds.map { "Changes · max \($0)" } ?? "Changes", tint: BighelpTokens.Palette.gold)
+                branch(passTitle ?? "Pass", tint: theme.secondaryText)
+                branch(changesTitle ?? rounds.map { "Changes · max \($0)" } ?? "Changes", tint: BighelpTokens.Palette.gold)
             }
         }
         .background(theme.surface, in: RoundedRectangle(cornerRadius: BighelpTokens.radius16, style: .continuous))
@@ -629,12 +635,13 @@ struct WorkflowDotGrid: View {
 
 /// The four kinds of stage, for Add menus.
 struct WorkflowAddStageButtons: View {
-    /// The computer's plugin runs parallel blocks.
-    var parallel = false
+    /// What the computer's plugin runs: parallel blocks, delivery.
+    var features: WorkflowFeatures = []
     let add: (WorkflowStage.Kind) -> Void
 
     var body: some View {
-        ForEach([WorkflowStage.Kind.agent] + (parallel ? [.parallel] : []) + [.check, .decision, .signoff],
+        ForEach([WorkflowStage.Kind.agent] + (features.contains(.parallel) ? [.parallel] : [])
+                + [.check, .decision, .signoff] + (features.contains(.delivery) ? [.delivery] : []),
                 id: \.self) { kind in
             Button(kind.title, systemImage: kind.symbol) { add(kind) }
                 .accessibilityIdentifier("workflows.add.\(kind.rawValue)")

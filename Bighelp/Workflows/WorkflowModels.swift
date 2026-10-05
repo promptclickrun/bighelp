@@ -524,7 +524,8 @@ struct WorkflowDefinition: Equatable, Sendable {
 struct WorkflowStage: Equatable, Sendable, Identifiable {
     enum Kind: Hashable, Sendable {
         /// `parallel`: a block of agent stages that run at the same time (`native-workflows-parallel-v1`).
-        case agent, check, decision, signoff, parallel
+        /// `delivery`: sends earlier outputs somewhere with `hermes send` (`native-workflows-delivery-v1`).
+        case agent, check, decision, signoff, parallel, delivery
         case unknown(String)
 
         init(_ raw: String) {
@@ -534,6 +535,7 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
             case "decision": self = .decision
             case "signoff": self = .signoff
             case "parallel": self = .parallel
+            case "delivery": self = .delivery
             default: self = .unknown(raw)
             }
         }
@@ -545,6 +547,7 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
             case .decision: "decision"
             case .signoff: "signoff"
             case .parallel: "parallel"
+            case .delivery: "delivery"
             case .unknown(let raw): raw
             }
         }
@@ -556,6 +559,7 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
             case .decision: "Decision"
             case .signoff: "Sign-off"
             case .parallel: "Parallel agents"
+            case .delivery: "Delivery"
             case .unknown: "Stage"
             }
         }
@@ -567,6 +571,7 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
             case .decision: "arrow.triangle.branch"
             case .signoff: "person.badge.shield.checkmark"
             case .parallel: "rectangle.split.3x1"
+            case .delivery: "paperplane"
             case .unknown: "square.dashed"
             }
         }
@@ -585,8 +590,57 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
             case "number": "Number"
             case "decision": "Decision"
             case "notes": "Notes"
+            case "file": "File"
+            case "image": "Image"
             default: type
             }
+        }
+    }
+
+    /// How a decision's way ends the run (`native-workflows-outcomes-v1`), and the note it leaves.
+    struct Ending: Equatable, Sendable {
+        enum Outcome: String, CaseIterable, Sendable {
+            case succeeded, cancelled, failed
+
+            var title: String {
+                switch self {
+                case .succeeded: "Succeeded"
+                case .cancelled: "Cancelled"
+                case .failed: "Failed"
+                }
+            }
+
+            var symbol: String {
+                switch self {
+                case .succeeded: "checkmark.circle"
+                case .cancelled: "xmark.circle"
+                case .failed: "exclamationmark.octagon"
+                }
+            }
+        }
+
+        static let messageLimit = 200
+
+        var outcome: Outcome
+        var message: String
+
+        init(outcome: Outcome, message: String = "") {
+            self.outcome = outcome
+            self.message = message
+        }
+
+        init?(json: BighelpJSONValue?) {
+            guard let object = json?.object, let raw = WorkflowDecode.string(object["end"], max: 16),
+                  let outcome = Outcome(rawValue: raw) else { return nil }
+            self.outcome = outcome
+            message = WorkflowDecode.string(object["message"], max: Self.messageLimit) ?? ""
+        }
+
+        var json: BighelpJSONValue {
+            var object: WorkflowJSON = ["end": .string(outcome.rawValue)]
+            let note = message.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !note.isEmpty { object["message"] = .string(String(note.prefix(Self.messageLimit))) }
+            return .object(object)
         }
     }
 
@@ -670,6 +724,13 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
     var require: String?
     /// Parallel block: its agent stages, which all run at the same time.
     var branches: [WorkflowStage] = []
+    /// Decision: a way that ends the run instead of going on (`pass`) or back (`changes`).
+    var passEnd: Ending?
+    var changesEnd: Ending?
+    /// Delivery: the earlier outputs it sends, where (`hermes send --to`) and the first line of the message.
+    var deliver: [String] = []
+    var to: String?
+    var message: String?
     private var extra: WorkflowJSON
     private var changesExtra: WorkflowJSON
 
@@ -697,11 +758,16 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
         }
         require = WorkflowDecode.string(json["require"], max: 8)
         branches = WorkflowDecode.objects(json["branches"], max: 5).compactMap(WorkflowStage.init(json:))
+        passEnd = Ending(json: json["pass"])
         pass = WorkflowDecode.string(json["pass"], max: 64)
+        changesEnd = Ending(json: json["changes"])
         let changes = json["changes"]?.object ?? [:]
         changesGoTo = WorkflowDecode.string(changes["goTo"], max: 64)
         changesMaxRevisions = WorkflowDecode.int(changes["maxRevisions"])
-        changesExtra = changes.filter { !["goTo", "maxRevisions"].contains($0.key) }
+        changesExtra = changes.filter { !["goTo", "maxRevisions", "end", "message"].contains($0.key) }
+        deliver = WorkflowDecode.strings(json["deliver"], max: 10)
+        to = WorkflowDecode.string(json["to"], max: 256)
+        message = WorkflowDecode.string(json["message"], max: Ending.messageLimit * 10)
         file = WorkflowDecode.string(json["file"], max: 128)
         switch json["next"] {
         case .null?: next = .end
@@ -709,7 +775,8 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
         default: next = .following
         }
         let known: Set<String> = ["key", "kind", "title", "next", "role", "instructions", "tools", "uses", "outputs",
-                                  "minutes", "rules", "on", "pass", "changes", "file", "require", "branches"]
+                                  "minutes", "rules", "on", "pass", "changes", "file", "require", "branches",
+                                  "deliver", "to", "message"]
         extra = json.filter { !known.contains($0.key) }
     }
 
@@ -732,6 +799,7 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
         case .decision: title = "Decision"
         case .signoff: title = "Your sign-off"
         case .parallel: title = "Parallel agents"
+        case .delivery: title = "Send it"
         case .unknown: title = "Stage"
         }
         role = nil
@@ -789,19 +857,42 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
                 value["on"] = .string(on)
             }
             if let require { value["require"] = .string(require) }
-            if let pass { value["pass"] = .string(pass) }
-            var changes = changesExtra
-            if let changesGoTo { changes["goTo"] = .string(changesGoTo) }
-            if let changesMaxRevisions { changes["maxRevisions"] = .integer(changesMaxRevisions) }
-            if !changes.isEmpty { value["changes"] = .object(changes) }
+            if let passEnd {
+                value["pass"] = passEnd.json
+            } else if let pass {
+                value["pass"] = .string(pass)
+            }
+            if let changesEnd {
+                value["changes"] = changesEnd.json
+            } else {
+                var changes = changesExtra
+                if let changesGoTo { changes["goTo"] = .string(changesGoTo) }
+                if let changesMaxRevisions { changes["maxRevisions"] = .integer(changesMaxRevisions) }
+                if !changes.isEmpty { value["changes"] = .object(changes) }
+            }
         case .signoff:
             if let file { value["file"] = .string(file) }
         case .parallel:
             value["branches"] = .array(branches.map { .object($0.json) })
+        case .delivery:
+            value["deliver"] = .array(deliver.map(BighelpJSONValue.string))
+            value["to"] = .string(to ?? "")
+            if let message, !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                value["message"] = .string(String(message.prefix(2_000)))
+            }
         case .unknown:
             break
         }
         return value
+    }
+
+    /// A decision's way on, in a few words: "pass", or how it ends the run.
+    var passWay: String { passEnd.map { "pass · ends \($0.outcome.title.lowercased())" } ?? "pass" }
+
+    /// A decision's way for changes, in a few words.
+    func changesWay(rounds: Int?) -> String {
+        if let changesEnd { return "changes · ends \(changesEnd.outcome.title.lowercased())" }
+        return rounds.map { "changes · max \($0)" } ?? "changes"
     }
 
     /// The decisions a decision stage reads: one, or several (a parallel block's agents).
@@ -814,8 +905,16 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
             let agent = agentName(role) ?? "no agent yet"
             return [role, agent].compactMap { $0 }.joined(separator: " → ")
         case .check: return rules.map(\.summary).joined(separator: " · ")
-        case .decision: return sources.count > 1 ? "\(sources.count) verdicts" : on ?? ""
+        case .decision:
+            let reads = sources.count > 1 ? "\(sources.count) verdicts" : on ?? ""
+            let ends = [passEnd.map { "pass ends \($0.outcome.title.lowercased())" },
+                        changesEnd.map { "else ends \($0.outcome.title.lowercased())" }].compactMap { $0 }
+            // How it ends first: the row is short, and that's what is new about it.
+            return (ends + [reads]).filter { !$0.isEmpty }.joined(separator: " · ")
         case .signoff: return "approval → you"
+        case .delivery:
+            let place = to.map { WorkflowDeliveryPlace.title($0) } ?? "nowhere yet"
+            return deliver.count == 1 ? "1 output → \(place)" : "\(deliver.count) outputs → \(place)"
         case .parallel:
             let names = branches.map { agentName($0.role) ?? "no agent yet" }
             return "\(branches.count) at once · " + names.joined(separator: ", ")
@@ -1056,6 +1155,9 @@ struct WorkflowRunStage: Equatable, Sendable, Identifiable {
     var decisions: [WorkflowStageDecision] = []
     /// The parallel block this agent runs in, with the others.
     var group: String?
+    /// A decision that ended the run: how, and the note it left (plugin 3.10.0).
+    var outcome: WorkflowStage.Ending.Outcome?
+    var outcomeNote: String?
 
     init?(json: WorkflowJSON) {
         guard let key = WorkflowDecode.string(json["key"], max: 64) else { return nil }
@@ -1073,6 +1175,9 @@ struct WorkflowRunStage: Equatable, Sendable, Identifiable {
         uses = WorkflowDecode.strings(json["uses"], max: 32)
         decisions = WorkflowDecode.objects(json["decisions"], max: 20).compactMap(WorkflowStageDecision.init(json:))
         group = WorkflowDecode.string(json["group"], max: 64)
+        let ending = json["outcome"]?.object
+        outcome = WorkflowDecode.string(ending?["end"], max: 16).flatMap(WorkflowStage.Ending.Outcome.init(rawValue:))
+        outcomeNote = WorkflowDecode.string(ending?["note"], max: 400)
     }
 
     init(key: String, kind: WorkflowStage.Kind, title: String, role: String?, agentID: String?, iteration: Int,
@@ -1176,6 +1281,40 @@ struct WorkflowOutput: Equatable, Sendable, Identifiable {
     }
 
     var isFile: Bool { type == "markdown_file" && sha256 != nil }
+    /// A file or picture an agent handed off (plugin 3.9.0): bytes to show or share, not text.
+    var isAttachment: Bool { (type == "file" || type == "image") && sha256 != nil }
+    var isImage: Bool { type == "image" }
+    /// The name the agent gave it, made safe by the plugin.
+    var fileName: String? { WorkflowDecode.string(value?.object?["fileName"], max: 200) }
+    var mimeType: String? { WorkflowDecode.string(value?.object?["mimeType"], max: 128) }
+}
+
+/// Where a delivery stage sends to, in words: "telegram" is "Telegram", "discord:#ops" is "Discord #ops".
+enum WorkflowDeliveryPlace {
+    static func title(_ target: String, known: [ScheduledTaskDeliveryTarget] = []) -> String {
+        if target.isEmpty { return "nowhere yet" }
+        if target == ScheduledTaskDeliveryTarget.local.id { return "kept here" }
+        if let match = known.first(where: { $0.id == target }) {
+            return ScheduledTaskDeliverySelection.displayName(id: match.id, name: match.name)
+        }
+        let parts = target.split(separator: ":", maxSplits: 1).map(String.init)
+        let platform = ScheduledTaskDeliverySelection.displayName(
+            id: parts[0], name: parts[0].replacingOccurrences(of: "_", with: " ").capitalized)
+        return parts.count == 2 ? "\(platform) \(parts[1])" : platform
+    }
+
+    /// What `hermes send --to` takes: a platform, then optionally `:` and a channel. No spaces or controls.
+    static func isValid(_ target: String) -> Bool {
+        let parts = target.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
+        guard let platform = parts.first, let first = platform.first, first.isLowercase, first.isASCII,
+              platform.count <= 32, platform.allSatisfy({ ($0.isASCII && ($0.isLowercase || $0.isNumber)) || $0 == "_" })
+        else { return false }
+        guard parts.count == 2 else { return true }
+        let channel = parts[1]
+        return !channel.isEmpty && channel.count <= 200
+            && !channel.unicodeScalars.contains { CharacterSet.controlCharacters.contains($0) }
+            && channel.first.map { !$0.isWhitespace } == true
+    }
 }
 
 /// What a sign-off stage is waiting on: one exact file, the same file one
@@ -1215,6 +1354,7 @@ struct WorkflowSignoff: Equatable, Sendable {
     var artifactName: String { Self.fileName(artifact) }
 
     static func fileName(_ output: WorkflowOutput) -> String {
+        if output.isAttachment, let name = output.fileName, !name.contains("/") { return name }
         if output.name.contains(".") { return output.name }
         return output.iteration > 1 ? "\(output.name)-v\(output.iteration).md" : "\(output.name).md"
     }
@@ -1567,6 +1707,7 @@ extension WorkflowStage {
         case .check: rules.map(\.of)
         case .decision: sources
         case .signoff: file.map { [$0] } ?? []
+        case .delivery: deliver
         case .parallel, .unknown: []
         }
         var seen = Set<String>()

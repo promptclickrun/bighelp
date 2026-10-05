@@ -226,6 +226,91 @@ final class WorkflowsEditingUITests: BighelpUITestCase {
         save("42-parallel-agent-editor", app)
     }
 
+    /// Morning numbers (demo): a Delivery node, a decision whose way ends the run as succeeded, and
+    /// output names that fix themselves as they're typed.
+    @MainActor
+    func testDeliveryNodeDecisionEndingsAndNames() throws {
+        let app = launch()
+        openWorkflows(app)
+        let morning = app.buttons["workflows.workflow.wf-morning"]
+        scrollTo(morning, in: app)
+        morning.tap()
+        let pad = app.userInterfaceIdiom == .pad
+        let send = element(pad ? "workflows.canvas.node.send" : "workflows.flow.stage.send", app)
+        XCTAssertTrue(send.waitForExistence(timeout: 8), "The flow has its Delivery node")
+        save("50-delivery-flow", app)
+        if pad { throw XCTSkip("The rest taps the iPhone's flow") }
+
+        send.tap()
+        XCTAssertTrue(element("workflows.stage.delivery.to", app).waitForExistence(timeout: 5), "It says where it sends")
+        XCTAssertTrue(element("workflows.stage.delivery.output.make.chart", app).waitForExistence(timeout: 5),
+                      "It lists what it can send, the picture too")
+        save("51-delivery-editor", app)
+        app.buttons["Cancel"].firstMatch.tap()
+
+        let decision = element("workflows.flow.stage.anything", app)
+        XCTAssertTrue(decision.waitForExistence(timeout: 5))
+        decision.tap()
+        XCTAssertTrue(element("workflows.stage.changes-way", app).waitForExistence(timeout: 5))
+        let note = element("workflows.stage.changes-note", app)
+        XCTAssertTrue(note.waitForExistence(timeout: 5), "Ending the run shows its note")
+        XCTAssertEqual(note.value as? String, "No new numbers since yesterday.")
+        save("52-decision-ends", app)
+        app.buttons["Cancel"].firstMatch.tap()
+
+        let make = element("workflows.flow.stage.make", app)
+        XCTAssertTrue(make.waitForExistence(timeout: 5))
+        make.tap()
+        app.buttons["Output"].firstMatch.tap()
+        let name = app.textFields["workflows.stage.output.0"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        name.tap()
+        name.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 12) + "Weekly Chart")
+        XCTAssertEqual(name.value as? String, "weekly_chart", "Capitals turn lowercase and spaces turn into _")
+        save("53-output-name", app)
+        app.buttons["Cancel"].firstMatch.tap()
+    }
+
+    /// A run of Morning numbers that the decision ended says so, and why.
+    @MainActor
+    func testARunSaysWhyItsDecisionEndedIt() throws {
+        let app = launch()
+        openRun("run-6", app)
+        XCTAssertTrue(element("workflows.run.ended", app).waitForExistence(timeout: 8),
+                      "The run says the decision ended it")
+        save("55-run-ended", app)
+    }
+
+    /// A run of Morning numbers shows the picture its agent made.
+    @MainActor
+    func testARunShowsThePictureItsAgentMade() throws {
+        let app = launch()
+        openRun("run-7", app)
+        let make = app.buttons["workflows.run.stage.make"]
+        XCTAssertTrue(make.waitForExistence(timeout: 8))
+        scrollTo(make, in: app)
+        make.tap()
+        let chart = element("workflows.run.stage.file.make.chart", app)
+        for _ in 0..<4 where !(chart.exists && chart.isHittable) {
+            element("workflows.run.stage-sheet", app).swipeUp()
+        }
+        chart.tap()
+        XCTAssertTrue(element("workflows.run.file.image", app).waitForExistence(timeout: 8), "The picture opens")
+        save("54-run-picture", app)
+    }
+
+    @MainActor
+    private func openRun(_ id: String, _ app: XCUIApplication) {
+        openWorkflows(app)
+        let all = app.buttons["workflows.all-runs"].firstMatch
+        scrollTo(all, in: app)
+        all.tap()
+        let row = app.buttons["workflows.run.\(id)"]
+        XCTAssertTrue(row.waitForExistence(timeout: 8))
+        scrollTo(row, in: app)
+        row.tap()
+    }
+
     // MARK: iPhone
 
     /// Compact width: every stage in one line, top to bottom, inside the screen,

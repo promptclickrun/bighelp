@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(UIKit)
+import UIKit
+#endif
 
 /// Demo mode: made-up workflows and runs in every state, held in memory so
 /// sign-off, Cancel, Try again and new runs behave like the real host. A run
@@ -56,6 +59,8 @@ final class DemoWorkflowsClient: WorkflowsClient {
         var lastStep: Date
         /// Ran on Hermes' fallback runner, which can't count tokens.
         var fallbackRunner = false
+        /// A decision that ended the run on purpose, how, and its note.
+        var ended: (stage: String, outcome: WorkflowStage.Ending.Outcome, note: String)?
     }
 
     private var workflows: [String: Workflow] = [:]
@@ -360,7 +365,13 @@ final class DemoWorkflowsClient: WorkflowsClient {
                                 stageCount: 4)]
     }
 
-    func supportsParallel() async -> Bool { true }
+    func features() async -> WorkflowFeatures { .all }
+
+    func deliveryTargets() async throws -> [ScheduledTaskDeliveryTarget] {
+        [.local, .init(id: "telegram", name: "Telegram", homeTargetSet: true),
+         .init(id: "discord", name: "Discord", homeTargetSet: true),
+         .init(id: "slack", name: "Slack", homeTargetSet: false)]
+    }
 
     func useTemplate(id: String) async throws -> String {
         await pause()
@@ -439,6 +450,16 @@ final class DemoWorkflowsClient: WorkflowsClient {
                                     message: "\(stage.title) can use the terminal.", isError: false))
             }
         }
+        for stage in workflow.definition.stages where stage.kind == .delivery {
+            if stage.deliver.isEmpty {
+                issues.append(.init(stageKey: stage.key, code: "delivery_empty",
+                                    message: "Choose what \(stage.title) sends.", isError: true))
+            }
+            if (stage.to ?? "").isEmpty {
+                issues.append(.init(stageKey: stage.key, code: "delivery_target",
+                                    message: "Choose where \(stage.title) sends it.", isError: true))
+            }
+        }
         // How the stages connect, as the host checks it.
         issues += workflow.definition.graph.issues(workflow.definition)
         // Like the host: a role a stage uses needs an agent. `valid` leaves
@@ -462,7 +483,10 @@ final class DemoWorkflowsClient: WorkflowsClient {
         let current = run.summary.stageKey
         let stages = definition.stages.enumerated().map { index, stage -> WorkflowRunStage in
             let state: WorkflowRunState
-            if run.summary.state == .succeeded || index < run.stageIndex {
+            let endIndex = run.ended.flatMap { ended in definition.stages.firstIndex { $0.key == ended.stage } }
+            if let endIndex, index > endIndex {
+                state = .planned
+            } else if run.summary.state == .succeeded || index < run.stageIndex {
                 state = .accepted
             } else if stage.key == current {
                 state = run.summary.state == .cancelled ? .cancelled : run.summary.stageState ?? run.summary.state
@@ -486,6 +510,10 @@ final class DemoWorkflowsClient: WorkflowsClient {
                                              ? Double(stage.minutes ?? definition.stageMinutes) : nil,
                                          attempts: attempts)
             value.uses = stage.reads
+            if let ended = run.ended, ended.stage == stage.key {
+                value.outcome = ended.outcome
+                value.outcomeNote = ended.note
+            }
             if stage.kind == .signoff {
                 value.decisions = run.history.filter { $0.stageKey == stage.key }.map {
                     WorkflowStageDecision(iteration: $0.iteration, decision: $0.outcome,
@@ -597,6 +625,15 @@ final class DemoWorkflowsClient: WorkflowsClient {
                                           sha256: sha, bytes: data.count, wordCount: words))
     }
 
+    private func attach(_ data: Data, as name: String, type: String, fileName: String, mimeType: String,
+                        stage: String, to run: inout Run) {
+        let sha = WorkflowArtifactReader.sha256(data)
+        files[sha] = data
+        run.outputs.append(WorkflowOutput(stageKey: stage, iteration: 1, name: name, type: type, sha256: sha,
+                                          bytes: data.count, wordCount: nil,
+                                          value: .object(["fileName": .string(fileName), "mimeType": .string(mimeType)])))
+    }
+
     // MARK: Seed
 
     private func seed() {
@@ -614,7 +651,10 @@ final class DemoWorkflowsClient: WorkflowsClient {
                               bindings: ["triager": "home"], lastRunAt: now.addingTimeInterval(-3_600))
         let captions = Workflow(id: "wf-captions", definition: Self.photoCaptions, revision: nil, draftVersion: 2,
                                 hasDraft: true, bindings: [:])
-        for workflow in [rdr, triage, captions] {
+        let morning = Workflow(id: "wf-morning", definition: Self.morningNumbers, revision: 3, draftVersion: 3,
+                               hasDraft: false, bindings: ["analyst": "finance"],
+                               lastRunAt: now.addingTimeInterval(-60 * 60 * 20))
+        for workflow in [rdr, triage, captions, morning] {
             workflows[workflow.id] = workflow
             order.append(workflow.id)
         }
@@ -695,12 +735,80 @@ final class DemoWorkflowsClient: WorkflowsClient {
         // 8: finished on Hermes' fallback runner, which can't count tokens.
         var fallback = run(8, triage, .succeeded, stage: 1, minutesAgo: 60 * 80)
         fallback.fallbackRunner = true
-        for value in [running, waiting, checking, planned, attention, succeeded, older, failed, cancelled, fallback] {
+        // 7: made a chart and sent it. 6: nothing new, so the decision ended the run as succeeded.
+        var sent = run(7, morning, .succeeded, stage: 2, minutesAgo: 60 * 92)
+        sent.inputs = [:]
+        sent.outputs.append(WorkflowOutput(stageKey: "make", iteration: 1, name: "summary", type: "text", sha256: nil,
+                                           bytes: 62, wordCount: 11,
+                                           value: .string("Sign-ups rose 12% on Tuesday. Everything else is steady.")))
+        attach(Self.chartPNG(), as: "chart", type: "image", fileName: "chart.png", mimeType: "image/png",
+               stage: "make", to: &sent)
+        attach(Data("day,signups\nMon,41\nTue,46\nWed,44\n".utf8), as: "data", type: "file", fileName: "numbers.csv",
+               mimeType: "text/csv", stage: "make", to: &sent)
+        sent.outputs.append(WorkflowOutput(stageKey: "make", iteration: 1, name: "decision", type: "decision",
+                                           sha256: nil, bytes: 4, wordCount: nil, value: .string("pass")))
+        log(&sent, "delivered", "send", "Send it to me: sent to telegram.", at: now.addingTimeInterval(-60 * 91))
+        var quiet = run(6, morning, .succeeded, stage: 1, minutesAgo: 60 * 116)
+        quiet.inputs = [:]
+        quiet.outputs.append(WorkflowOutput(stageKey: "make", iteration: 1, name: "decision", type: "decision",
+                                            sha256: nil, bytes: 7, wordCount: nil, value: .string("changes")))
+        quiet.ended = (stage: "anything", outcome: .succeeded, note: "No new numbers since yesterday.")
+        quiet.summary.stagesDone = 2
+        for value in [running, waiting, checking, planned, attention, succeeded, older, failed, cancelled, fallback,
+                      sent, quiet] {
             runs[value.summary.id] = value
         }
     }
 
     // MARK: Made-up content
+
+    /// Charts yesterday's made-up numbers and sends them. Nothing new: the decision ends the run as succeeded.
+    static var morningNumbers: WorkflowDefinition {
+        WorkflowDefinition(json: [
+            "schemaVersion": .integer(2), "name": .string("Morning numbers"),
+            "description": .string("Charts yesterday's numbers and sends them to Telegram. With nothing new, the run ends quietly."),
+            "roles": .array([.object(["key": .string("analyst"), "label": .string("Analyst")])]),
+            "inputs": .array([]),
+            "stages": .array([
+                .object(["key": .string("make"), "kind": .string("agent"), "title": .string("Chart the numbers"),
+                         "role": .string("analyst"),
+                         "instructions": .string("Chart yesterday's sign-ups. Say pass when there are new numbers."),
+                         "outputs": .array([
+                            .object(["name": .string("summary"), "type": .string("text")]),
+                            .object(["name": .string("chart"), "type": .string("image")]),
+                            .object(["name": .string("data"), "type": .string("file")]),
+                            .object(["name": .string("decision"), "type": .string("decision"),
+                                     "values": .array([.string("pass"), .string("changes")])]),
+                         ])]),
+                .object(["key": .string("anything"), "kind": .string("decision"), "title": .string("Anything new?"),
+                         "on": .string("make.decision"), "pass": .string("next"),
+                         "changes": .object(["end": .string("succeeded"),
+                                             "message": .string("No new numbers since yesterday.")])]),
+                .object(["key": .string("send"), "kind": .string("delivery"), "title": .string("Send it to me"),
+                         "deliver": .array([.string("make.summary"), .string("make.chart"), .string("make.data")]),
+                         "to": .string("telegram"), "message": .string("Morning numbers"), "next": .null]),
+            ]),
+        ])
+    }
+
+    /// A small made-up bar chart, so a picture output has something to show.
+    static func chartPNG() -> Data {
+        #if canImport(UIKit)
+        let size = CGSize(width: 600, height: 360)
+        return UIGraphicsImageRenderer(size: size).pngData { context in
+            UIColor(red: 0.98, green: 0.96, blue: 0.93, alpha: 1).setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+            for (index, value) in [0.35, 0.5, 0.42, 0.68, 0.6, 0.82, 0.74].enumerated() {
+                UIColor(red: 0.45, green: 0.32, blue: 0.86, alpha: 1).setFill()
+                let height = CGFloat(value) * 280
+                UIBezierPath(roundedRect: CGRect(x: 40 + CGFloat(index) * 78, y: 330 - height, width: 56, height: height),
+                             cornerRadius: 8).fill()
+            }
+        }
+        #else
+        return Data()
+        #endif
+    }
 
     /// Like the plugin's template: a parallel block of three agents, a decision on all three verdicts,
     /// one answer from them, and your sign-off.

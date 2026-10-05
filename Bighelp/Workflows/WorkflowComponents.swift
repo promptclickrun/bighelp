@@ -37,6 +37,7 @@ extension WorkflowStage.Kind {
         case .decision: BighelpTokens.Palette.gold
         case .signoff: theme.action
         case .parallel: BighelpTokens.Palette.violet
+        case .delivery: theme.action
         case .unknown: theme.secondaryText
         }
     }

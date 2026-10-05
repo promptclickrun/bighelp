@@ -29,15 +29,16 @@ final class WorkflowEditorModel {
     @ObservationIgnored private var saveTask: Task<Void, Never>?
     @ObservationIgnored private let saveDelay: Duration
 
-    /// The plugin runs parallel blocks (`native-workflows-parallel-v1`): the editor offers them.
-    let canParallel: Bool
+    /// What the plugin runs beyond the first Workflows; the editor offers only these.
+    let features: WorkflowFeatures
+    var canParallel: Bool { features.contains(.parallel) }
 
     init(workflowID: String, client: any WorkflowsClient, hasDraft: Bool = false, canEditFlow: Bool = false,
-         canParallel: Bool = false, saveDelay: Duration = .milliseconds(700)) {
+         features: WorkflowFeatures = [], saveDelay: Duration = .milliseconds(700)) {
         self.workflowID = workflowID
         self.client = client
         self.canEditFlow = canEditFlow
-        self.canParallel = canParallel
+        self.features = features
         self.saveDelay = saveDelay
         hasUnpublishedDraft = hasDraft
     }
@@ -98,6 +99,13 @@ final class WorkflowEditorModel {
 
     /// Puts a changed stage back: a stage of the flow, or an agent in its parallel block.
     func update(_ stage: WorkflowStage) {
+        guard definition != nil else { return }
+        if let old = definition?.stage(stage.key), old.outputs.count == stage.outputs.count {
+            // A renamed output: the stages that read it follow, so nothing breaks.
+            for (before, after) in zip(old.outputs, stage.outputs) where before.name != after.name {
+                definition?.renameReference("\(stage.key).\(before.name)", to: "\(stage.key).\(after.name)")
+            }
+        }
         guard let stages = definition?.stages else { return }
         if let index = stages.firstIndex(where: { $0.key == stage.key }) {
             definition?.stages[index] = stage
@@ -512,6 +520,13 @@ enum WorkflowStageDefaults {
                 stage.file = "\(file.stage.key).\(file.output.name)"
             } else {
                 stage.file = "\(earlier.last { $0.kind == .agent }?.key ?? "stage1").result"
+            }
+        case .delivery:
+            // What the stage just before it made, but its verdicts and notes; else its newest output.
+            if let latest = outputs.last {
+                stage.deliver = outputs.filter { $0.stage.key == latest.stage.key && !["decision", "notes"].contains($0.output.type) }
+                    .map { "\($0.stage.key).\($0.output.name)" }
+                if stage.deliver.isEmpty { stage.deliver = ["\(latest.stage.key).\(latest.output.name)"] }
             }
         case .parallel:
             // Each agent starts like a new agent stage: a role, and the workflow's inputs to read.

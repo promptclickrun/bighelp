@@ -467,7 +467,7 @@ struct WorkflowsStoreTests {
         let stopped = client.listCalls
         try await Task.sleep(for: .milliseconds(150))
         #expect(client.listCalls == stopped, "No calls once the home is off screen")
-        #expect(store.state == .loaded && store.workflows.count == 3)
+        #expect(store.state == .loaded && store.workflows.count == 4)
     }
 
     /// A run polls every 2 seconds while it works, stops when it waits for you,

@@ -41,6 +41,7 @@ struct WorkflowRunStagePage: View {
             Form {
                 if let detail, let stage {
                     Section { header(stage) }
+                    if let outcome = stage.outcome { ending(outcome, note: stage.outcomeNote) }
                     result(stage, in: detail)
                     reads(stage, in: detail)
                     made(stage, in: detail)
@@ -179,6 +180,15 @@ struct WorkflowRunStagePage: View {
                 row("Result", stage.state == .accepted ? "Passed"
                     : stage.state == .planned ? "Not checked yet" : stage.state.title)
             }
+        case .delivery:
+            Section("Delivery") {
+                row("Result", stage.state == .accepted ? "Sent"
+                    : stage.state == .planned ? "Not sent yet" : stage.state.title)
+                if let said = model.events.last(where: { $0.stageKey == stage.key && $0.kind == "delivered" }) {
+                    row("What happened", said.text)
+                }
+            }
+            .accessibilityIdentifier("workflows.run.stage.delivery")
         default:
             if let attempt = stage.attempts.last, attempt.state != .planned {
                 Section("Result") {
@@ -188,6 +198,20 @@ struct WorkflowRunStagePage: View {
                 }
             }
         }
+    }
+
+    /// A decision that ended the run, and why.
+    private func ending(_ outcome: WorkflowStage.Ending.Outcome, note: String?) -> some View {
+        Section("How the run ended") {
+            Label(outcome.title, systemImage: outcome.symbol)
+                .font(.bighelp(.body).weight(.semibold))
+                .foregroundStyle(outcome == .failed ? theme.danger : outcome == .succeeded ? theme.success
+                                 : theme.secondaryText)
+            if let note, !note.isEmpty {
+                Text(note).font(.bighelp(.body)).textSelection(.enabled)
+            }
+        }
+        .accessibilityIdentifier("workflows.run.stage.outcome")
     }
 
     // MARK: Inputs and outputs
@@ -228,16 +252,23 @@ struct WorkflowRunStagePage: View {
     @ViewBuilder
     private func outputRow(_ output: WorkflowOutput, label: String?) -> some View {
         let name = output.iteration > 1 ? "\(output.name) v\(output.iteration)" : output.name
-        if output.isFile {
+        if output.isFile || output.isAttachment {
             Button { opened = output } label: {
                 HStack(spacing: BighelpTokens.space12) {
-                    Image(systemName: "doc.text").foregroundStyle(theme.action)
+                    Image(systemName: output.isImage ? "photo" : output.isAttachment ? "doc" : "doc.text")
+                        .foregroundStyle(theme.action)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(label.map { "\($0): \(name)" } ?? name)
                             .font(.bighelp(.body))
                             .foregroundStyle(theme.primaryText)
                         if let words = output.wordCount {
                             Text("\(words.formatted()) words")
+                                .font(.bighelp(.caption))
+                                .foregroundStyle(theme.secondaryText)
+                        } else if output.isAttachment {
+                            Text([output.fileName, output.bytes.map {
+                                ByteCountFormatter.string(fromByteCount: Int64($0), countStyle: .file)
+                            }].compactMap { $0 }.joined(separator: " · "))
                                 .font(.bighelp(.caption))
                                 .foregroundStyle(theme.secondaryText)
                         }
@@ -322,6 +353,7 @@ struct WorkflowRunFileSheet: View {
     let context: WorkflowsContext
     let output: WorkflowOutput
     @State private var text: String?
+    @State private var data: Data?
     @State private var failed = false
     @Environment(\.dismiss) private var dismiss
     @BighelpThemeReader private var theme
@@ -332,6 +364,8 @@ struct WorkflowRunFileSheet: View {
                 Group {
                     if let text {
                         WorkflowDocumentView(text: text)
+                    } else if let data {
+                        WorkflowAttachmentView(output: output, data: data)
                     } else if failed {
                         ContentUnavailableView {
                             Label("Couldn't load the file", systemImage: "doc.questionmark")
@@ -353,15 +387,16 @@ struct WorkflowRunFileSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                 }
-                if let text {
+                if let shared = text.map({ Data($0.utf8) }) ?? data {
                     ToolbarItem(placement: .primaryAction) {
-                        Button { share(text) } label: { Image(systemName: "square.and.arrow.up") }
+                        Button { share(shared) } label: { Image(systemName: "square.and.arrow.up") }
                             .bighelpIconLabel("Share")
+                            .accessibilityIdentifier("workflows.run.file.share")
                     }
                 }
             }
         }
-        .task { if text == nil { await load() } }
+        .task { if text == nil && data == nil { await load() } }
         .accessibilityIdentifier("workflows.run.file")
     }
 
@@ -372,14 +407,55 @@ struct WorkflowRunFileSheet: View {
             failed = true
             return
         }
-        text = String(decoding: data, as: UTF8.self)
+        if output.isAttachment {
+            self.data = data
+        } else {
+            text = String(decoding: data, as: UTF8.self)
+        }
     }
 
-    private func share(_ text: String) {
+    private func share(_ data: Data) {
         let name = WorkflowSignoff.fileName(output)
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
-        try? Data(text.utf8).write(to: url, options: .atomic)
+        try? data.write(to: url, options: .atomic)
         UsageShareSheet.present(url, title: name)
+    }
+}
+
+/// A file or picture an agent handed off: the picture itself, or the file's name and size to share.
+struct WorkflowAttachmentView: View {
+    let output: WorkflowOutput
+    let data: Data
+    @BighelpThemeReader private var theme
+
+    var body: some View {
+        if output.isImage, let picture = UIImage(data: data) {
+            Image(uiImage: picture)
+                .resizable()
+                .scaledToFit()
+                .clipShape(RoundedRectangle(cornerRadius: BighelpTokens.radius16, style: .continuous))
+                .accessibilityLabel(output.fileName ?? output.name)
+                .accessibilityIdentifier("workflows.run.file.image")
+        } else {
+            VStack(spacing: BighelpTokens.space12) {
+                Image(systemName: "doc")
+                    .font(.system(size: 48))
+                    .foregroundStyle(theme.action)
+                Text(output.fileName ?? output.name)
+                    .font(.bighelp(.headline))
+                Text([output.mimeType, ByteCountFormatter.string(fromByteCount: Int64(data.count), countStyle: .file)]
+                    .compactMap { $0 }.joined(separator: " · "))
+                    .font(.bighelp(.caption))
+                    .foregroundStyle(theme.secondaryText)
+                Text("Share it to open it in another app or save it to Files.")
+                    .font(.bighelp(.footnote))
+                    .foregroundStyle(theme.secondaryText)
+                    .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity, minHeight: 220)
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("workflows.run.file.attachment")
+        }
     }
 }
 

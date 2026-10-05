@@ -49,6 +49,7 @@ struct WorkflowFlowView: View {
     @State private var isRunSheetPresented = false
     @State private var isInputsPresented = false
     @State private var isRolesPresented = false
+    @State private var isTriggerPresented = false
     @State private var templateSource: WorkflowSummary?
     @State private var didOfferRun = false
     @State private var rects: [String: CGRect] = [:]
@@ -65,6 +66,9 @@ struct WorkflowFlowView: View {
                 if model.definition == nil {
                     WorkflowLoadStateView(state: model.state) { Task { await model.load() } }
                 } else {
+                    if model.trigger != nil {
+                        WorkflowTriggerCard(trigger: model.trigger) { isTriggerPresented = true }
+                    }
                     BighelpDeferredSection { flow }
                     BighelpDeferredSection { issues }
                 }
@@ -86,12 +90,17 @@ struct WorkflowFlowView: View {
             ToolbarItem(placement: .principal) { WorkflowTitle(model: model) }
             ToolbarItem(placement: .topBarTrailing) {
                 WorkflowMoreMenu(model: model, context: context, templateSource: $templateSource,
-                                 editInputs: { isInputsPresented = true }, editRoles: { isRolesPresented = true })
+                                 editInputs: { isInputsPresented = true }, editRoles: { isRolesPresented = true },
+                                 editTrigger: { isTriggerPresented = true })
             }
         }
         .sheet(isPresented: $isRolesPresented) {
             WorkflowRolesEditor(model: model, context: context)
                 .bighelpSheetSize(.standard)
+        }
+        .sheet(isPresented: $isTriggerPresented) {
+            WorkflowTriggerSheet(model: model, context: context)
+                .bighelpSheetSize(.large)
         }
         .sheet(item: $editing) { stage in
             WorkflowStageEditor(model: model, context: context, stage: stage)
@@ -578,6 +587,7 @@ struct WorkflowMoreMenu: View {
     @Binding var templateSource: WorkflowSummary?
     var editInputs: (() -> Void)?
     var editRoles: (() -> Void)?
+    var editTrigger: (() -> Void)?
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -589,6 +599,10 @@ struct WorkflowMoreMenu: View {
             if let editRoles {
                 Button("Agent roles", systemImage: "person.2") { editRoles() }
                     .accessibilityIdentifier("workflows.more.roles")
+            }
+            if let editTrigger, model.trigger != nil {
+                Button("Trigger", systemImage: "clock.arrow.circlepath") { editTrigger() }
+                    .accessibilityIdentifier("workflows.more.trigger")
             }
             if context.canEdit {
                 Button("Save as template", systemImage: "square.on.square") {
@@ -749,7 +763,7 @@ struct WorkflowRunSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    ForEach(inputs) { input in field(input) }
+                    WorkflowInputFields(inputs: inputs, values: $values)
                 } footer: {
                     Text("The run happens on \(context.hostName). It keeps going when you close the app, and asks you before anything is final.")
                         .font(.bighelp(.footnote))
@@ -772,61 +786,15 @@ struct WorkflowRunSheet: View {
             }
         }
         .onAppear {
-            for input in inputs where values[input.key] == nil {
-                values[input.key] = input.sample ?? (input.kind == .choice ? input.choices.first : nil) ?? ""
-            }
+            if values.isEmpty { values = WorkflowInputFields.values(for: inputs) }
         }
     }
 
-    @ViewBuilder
-    private func field(_ input: WorkflowDefinition.Input) -> some View {
-        let binding = Binding(get: { values[input.key] ?? "" }, set: { values[input.key] = $0 })
-        switch input.kind {
-        case .choice:
-            Picker(input.label, selection: binding) {
-                ForEach(input.choices, id: \.self) { Text($0).tag($0) }
-            }
-        case .longText:
-            VStack(alignment: .leading) {
-                Text(input.label).font(.bighelp(.footnote)).foregroundStyle(theme.secondaryText)
-                TextEditor(text: binding).frame(minHeight: 120)
-            }
-        case .number:
-            LabeledContent(input.label) {
-                TextField(input.label, text: binding, prompt: Text("Number").bighelpFieldHint(theme))
-                    .keyboardType(.numberPad)
-                    .multilineTextAlignment(.trailing)
-            }
-        case .text:
-            LabeledContent(input.label) {
-                TextField(input.label, text: binding, prompt: Text(input.required ? "Required" : "Optional")
-                    .bighelpFieldHint(theme))
-                    .multilineTextAlignment(.trailing)
-                    .accessibilityIdentifier("workflows.run-sheet.\(input.key)")
-            }
-        }
-    }
-
-    private var isComplete: Bool {
-        inputs.allSatisfy { input in
-            let value = (values[input.key] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            if input.kind == .number, !value.isEmpty, Double(value) == nil { return false }
-            return !input.required || !value.isEmpty
-        }
-    }
+    private var isComplete: Bool { WorkflowInputFields.isComplete(inputs, values) }
 
     private func start() {
         isStarting = true
-        var json: WorkflowJSON = [:]
-        for input in inputs {
-            let value = (values[input.key] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !value.isEmpty else { continue }
-            if input.kind == .number, let number = Double(value) {
-                json[input.key] = number.rounded() == number ? .integer(Int(number)) : .number(number)
-            } else {
-                json[input.key] = .string(String(value.prefix(8_000)))
-            }
-        }
+        let json = WorkflowInputFields.json(inputs, values)
         Task {
             defer { isStarting = false }
             guard let run = await model.run(inputs: json) else { return }

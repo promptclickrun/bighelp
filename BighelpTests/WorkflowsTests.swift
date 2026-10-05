@@ -596,6 +596,62 @@ struct WorkflowsStoreTests {
         #expect(!editor.issues.contains { $0.code == "role_unbound" })
     }
 
+    /// A schedule saves through the trigger route: the draft is published first, and
+    /// a workflow that never ran can't be scheduled without that.
+    @Test func schedulingPublishesTheDraftThenSavesTheTrigger() async throws {
+        let demo = DemoWorkflowsClient(delays: false)
+        let editor = WorkflowEditorModel(workflowID: "wf-research", client: demo)
+        await editor.load()
+        #expect(editor.trigger == .manual)
+        editor.definition?.stages[0].title = "Research well"
+        let schedule = WorkflowTrigger.schedule("0 9 * * 1-5", inputs: ["topic": .string("Made-up topic")])
+        #expect(await editor.setTrigger(schedule))
+        #expect(editor.trigger == schedule)
+        #expect(!editor.isDirty && editor.detail?.latestRevision == 5, "What's on screen is what runs")
+        #expect(await editor.setTrigger(.schedule("tomorrow", inputs: [:])) == false)
+        #expect(editor.message?.contains("schedule") == true)
+        #expect(await editor.setTrigger(.manual))
+        #expect(try await demo.workflow(id: "wf-research", revision: .draft).trigger == .manual)
+    }
+
+    @Test func triggersDecodeAndStageDetailsCarryWhatTheyUsed() throws {
+        #expect(WorkflowTrigger(json: ["kind": .string("manual")]) == .manual)
+        let scheduled = WorkflowTrigger(json: ["kind": .string("schedule"), "schedule": .string("30 7 * * *"),
+                                               "inputs": .object(["topic": .string("x")]), "jobId": .string("j")])
+        #expect(scheduled == .schedule("30 7 * * *", inputs: ["topic": .string("x")]))
+        #expect(WorkflowTrigger(json: ["kind": .string("webhook")]) == nil, "Unknown kinds aren't guessed")
+        #expect(WorkflowTrigger(json: scheduled?.json) == scheduled)
+        let stage = try #require(WorkflowRunStage(json: [
+            "key": .string("signoff"), "kind": .string("signoff"), "uses": .array([.string("draft.draft")]),
+            "decisions": .array([.object(["iteration": .integer(2), "decision": .string("approve"),
+                                          "notes": .string(""), "decidedAt": .string("2026-01-02T03:04:05Z")])]),
+        ]))
+        #expect(stage.uses == ["draft.draft"] && stage.decisions.first?.decision == "approve")
+        #expect(WorkflowRunStageSheet.signoffWords(try #require(stage.decisions.first)) == "Approved by you (version 2)")
+    }
+
+    @Test func pickerSchedulesComeBackFromTheirCronExpressions() throws {
+        let zone = "UTC"
+        let time = DateComponents(hour: 9, minute: 30)
+        for input in [ScheduleInput.daily(time: time, timeZoneID: zone),
+                      .repeating(days: [.monday, .tuesday, .wednesday, .thursday, .friday], time: time, timeZoneID: zone),
+                      .repeating(days: [.sunday, .saturday], time: time, timeZoneID: zone),
+                      .monthly(day: 15, time: time, timeZoneID: zone)] {
+            let cron = try ScheduleRequestBuilder.hermesRequest(for: input)
+            let back = try #require(ScheduleRequestBuilder.input(forCron: cron, timeZoneID: zone))
+            #expect(try ScheduleRequestBuilder.hermesRequest(for: back) == cron)
+        }
+        #expect(ScheduleRequestBuilder.input(forCron: "*/5 * * * *", timeZoneID: zone) == nil)
+        #expect(ScheduleRequestBuilder.input(forCron: "0 9 * * 1-5", timeZoneID: zone)
+                == .repeating(days: [.monday, .tuesday, .wednesday, .thursday, .friday], time: time.with(minute: 0),
+                              timeZoneID: zone))
+    }
+
+    @Test func theTriggerRouteIsAPluginRoute() {
+        #expect(DirectHermesNativePluginClient.supports(.workflowsTriggerSet))
+        #expect(DirectHermesNativePluginClient.workflowsTriggerFeature == "native-workflows-trigger-v1")
+    }
+
     /// Workflows is remembered per computer: coming back keeps the row, another computer asks again.
     @Test func availabilityIsPerHost() async throws {
         let defaults = try #require(UserDefaults(suiteName: "workflows-availability-\(UUID().uuidString)"))
@@ -805,6 +861,7 @@ private final class ChunkClient: WorkflowsClient {
     func deleteTemplate(id: String) async throws {}
     func pin(workflowID: String, pinned: Bool) async throws -> Bool { pinned }
     func unarchive(workflowID: String) async throws {}
+    func setTrigger(workflowID: String, trigger: WorkflowTrigger) async throws -> WorkflowTrigger { trigger }
     func status() async throws -> WorkflowStatus { throw WorkspaceClientError.invalidResponse }
     func list(includeArchived: Bool) async throws -> WorkflowsList { throw WorkspaceClientError.invalidResponse }
     func workflow(id: String, revision: WorkflowRevisionRef) async throws -> WorkflowDetail { throw WorkspaceClientError.invalidResponse }
@@ -847,6 +904,7 @@ private final class CountingClient: WorkflowsClient {
     func deleteTemplate(id: String) async throws {}
     func pin(workflowID: String, pinned: Bool) async throws -> Bool { pinned }
     func unarchive(workflowID: String) async throws {}
+    func setTrigger(workflowID: String, trigger: WorkflowTrigger) async throws -> WorkflowTrigger { trigger }
     func status() async throws -> WorkflowStatus { try await demo.status() }
     func list(includeArchived: Bool) async throws -> WorkflowsList {
         listCalls += 1
@@ -910,6 +968,7 @@ private final class StaleSignoffClient: WorkflowsClient {
     func deleteTemplate(id: String) async throws {}
     func pin(workflowID: String, pinned: Bool) async throws -> Bool { pinned }
     func unarchive(workflowID: String) async throws {}
+    func setTrigger(workflowID: String, trigger: WorkflowTrigger) async throws -> WorkflowTrigger { trigger }
     func status() async throws -> WorkflowStatus { try await base.status() }
     func list(includeArchived: Bool) async throws -> WorkflowsList { try await base.list(includeArchived: includeArchived) }
     func workflow(id: String, revision: WorkflowRevisionRef) async throws -> WorkflowDetail {
@@ -985,4 +1044,8 @@ final class NativeHTTP: DirectHermesNativeHTTP {
                                                     headerFields: fields))
         return .init(http: response, body: try JSONEncoder().encode(BighelpJSONValue.object(body)))
     }
+}
+
+private extension DateComponents {
+    func with(minute: Int) -> DateComponents { DateComponents(hour: hour, minute: minute) }
 }

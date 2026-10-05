@@ -48,6 +48,8 @@ protocol WorkflowsClient: AnyObject {
     func deleteTemplate(id: String) async throws
     func pin(workflowID: String, pinned: Bool) async throws -> Bool
     func unarchive(workflowID: String) async throws
+    /// Manual or scheduled (`native-workflows-trigger-v1`). Returns the saved trigger.
+    func setTrigger(workflowID: String, trigger: WorkflowTrigger) async throws -> WorkflowTrigger
 }
 
 extension WorkflowsClient {
@@ -230,6 +232,12 @@ final class DirectHermesWorkflowsClient: WorkflowsClient {
 
     func unarchive(workflowID: String) async throws {
         _ = try await perform(.workflowsUnarchive, ["workflowId": .string(workflowID)])
+    }
+
+    func setTrigger(workflowID: String, trigger: WorkflowTrigger) async throws -> WorkflowTrigger {
+        let result = try await perform(.workflowsTriggerSet, ["workflowId": .string(workflowID), "trigger": .object(trigger.json)])
+        guard let saved = WorkflowTrigger(json: result["trigger"]?.object) else { throw WorkspaceClientError.invalidResponse }
+        return saved
     }
 
     // MARK: Plumbing

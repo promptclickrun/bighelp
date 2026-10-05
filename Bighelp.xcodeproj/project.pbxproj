@@ -268,6 +268,7 @@
 		31AFA31DC7F7993327ADCF1D /* DirectHermesProtocolParityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C02FFC8B5348F4DF43A16DCB /* DirectHermesProtocolParityTests.swift */; };
 		31E876700FADD2E0B8EDE2CD /* BighelpConfiguredHostsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0A1C71EA4895F05F28839F /* BighelpConfiguredHostsView.swift */; };
 		324367058318DB205A6E3424 /* WorkspaceCapabilityProxies.swift in Sources */ = {isa = PBXBuildFile; fileRef = 793CC597B994D7EF1CB7FC14 /* WorkspaceCapabilityProxies.swift */; };
+		32B24C1CCC94C9ABC1719931 /* WorkflowRunStageSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2134123E3894BA3AE1CCD71 /* WorkflowRunStageSheet.swift */; };
 		33447F02B1CE820CDFC11FCC /* ManagedWorkSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66AF282858CB05C3A0DE1D5A /* ManagedWorkSnapshotTests.swift */; };
 		334C431DA1A5A6AA749BF53A /* AgentsPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85DC1E5B5FD060F4323CBD59 /* AgentsPresentationTests.swift */; };
 		33945DDE70466A5576AA6722 /* ScheduledTaskModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC7ACDA5E34F8B893D51A9FE /* ScheduledTaskModels.swift */; };
@@ -716,6 +717,7 @@
 		82CBEB764B27D1CCC17E8F47 /* WorkspaceInventoryDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB90671104D35742A479E374 /* WorkspaceInventoryDecoder.swift */; };
 		82F461AF302E8D234787563A /* draft-save-v2.json in Resources */ = {isa = PBXBuildFile; fileRef = 1624858B5C804FDF5F7B1483 /* draft-save-v2.json */; };
 		83290EF0564275CC106CA573 /* ChatToolFoldersUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DFD40C7EF8353F3B2682B44 /* ChatToolFoldersUITests.swift */; };
+		832ED0A301E95E2C9649C759 /* WorkflowTriggerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F90DFFB9822D36299A5AB83 /* WorkflowTriggerSheet.swift */; };
 		8369F0E1E52908E735D09E5E /* CuratorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C255F7B0D992B474BEDB01EF /* CuratorView.swift */; };
 		83A60225FD79E9EEC947A379 /* BighelpNotificationIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44A6C6E3CF44927895F2574B /* BighelpNotificationIdentity.swift */; };
 		83AB7370EBBA889DB26F1C35 /* AgentTemplateLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F366E8128EB787B5C24A8E30 /* AgentTemplateLibraryTests.swift */; };
@@ -800,6 +802,7 @@
 		914B4421A42095334EF7017F /* BighelpRelayAlertCrypto.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C8427CB03B6BECFF4858341 /* BighelpRelayAlertCrypto.swift */; };
 		918347CFC209A52C0C782941 /* BighelpLiveActivity.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 736835BE6DF7AAF0BD52E6CA /* BighelpLiveActivity.appex */; platformFilters = (ios, xros, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		91A5F9640942E7A6681E0593 /* BighelpFoundationSessionRecordProjection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 361DCC9223DD4EAB9D6DCE27 /* BighelpFoundationSessionRecordProjection.swift */; };
+		91E8B0585743515DF6C47DED /* WorkflowsStagesAndTriggersUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED58013B1EF5580D7BE0CAEF /* WorkflowsStagesAndTriggersUITests.swift */; };
 		929ACA88C176BBDA4F31266F /* ProviderLogoURLSessionTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A77F06A4EB3AC264271D1B8 /* ProviderLogoURLSessionTransport.swift */; };
 		92B52193244FCF9153E11226 /* SessionRuntimeControlModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AD4D831AE3D6470D046BE65 /* SessionRuntimeControlModel.swift */; };
 		92D1BEC254D80BEF39834541 /* AgentHomeDrawer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A93F1D8C3BDEABBBE407101F /* AgentHomeDrawer.swift */; };
@@ -1343,6 +1346,7 @@
 		FAAA76C9160F98400D2C272B /* AvatarCreatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39E2D77A3FB09D926BCE99A5 /* AvatarCreatorView.swift */; };
 		FB1006D7E3368B0133A24FEF /* ApprovalModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1045F8AD2988A2DACF9DA83 /* ApprovalModel.swift */; };
 		FB1549A5148B7362638DDFAA /* BighelpMacUpdater.bundle in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = 36E49823646B5715F924EFF9 /* BighelpMacUpdater.bundle */; platformFilters = (maccatalyst, ); settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		FB5A5528B181EFACBC3CBECC /* ScheduleCadencePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77DE30B07B1CB21D93054AF7 /* ScheduleCadencePicker.swift */; };
 		FB90A8EFB9AEF8C517700101 /* WorkspaceManagementClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A648B71B7D1F154050281B2 /* WorkspaceManagementClient.swift */; };
 		FB9E3C59A382CC59D5D167CD /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C67E02B2BD7833C9DE7C3B7B /* NotificationService.swift */; };
 		FBB75ECBDCB2B3E4DC1A5019 /* HostBackupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12962B16DD7F5CFD17BD5DAA /* HostBackupView.swift */; };
@@ -2133,6 +2137,7 @@
 		775FC5D9A3E4A403ED64FF6C /* BighelpLinkAccountRetirement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpLinkAccountRetirement.swift; sourceTree = "<group>"; };
 		7773C53167EE878A8E8CF470 /* BotModeRoomStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BotModeRoomStoreTests.swift; sourceTree = "<group>"; };
 		77764B35BFE7ED560378376D /* BighelpCardDataClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpCardDataClient.swift; sourceTree = "<group>"; };
+		77DE30B07B1CB21D93054AF7 /* ScheduleCadencePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleCadencePicker.swift; sourceTree = "<group>"; };
 		78569AED58B1C7BD8A6C15F7 /* GitHubDeviceCode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubDeviceCode.swift; sourceTree = "<group>"; };
 		78705B25A7D9D785DC421550 /* AppearanceSizeControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceSizeControls.swift; sourceTree = "<group>"; };
 		78CE214940F6F86A06C9E2F4 /* WorkflowsAvailability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowsAvailability.swift; sourceTree = "<group>"; };
@@ -2174,6 +2179,7 @@
 		7F2C147A62B7578877E16AE2 /* DirectHermesKanbanTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectHermesKanbanTransport.swift; sourceTree = "<group>"; };
 		7F4E52943EFB57E078B4215E /* TeamCallServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamCallServices.swift; sourceTree = "<group>"; };
 		7F6059C9938AE497F3666A96 /* NativeSessionControlsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeSessionControlsView.swift; sourceTree = "<group>"; };
+		7F90DFFB9822D36299A5AB83 /* WorkflowTriggerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowTriggerSheet.swift; sourceTree = "<group>"; };
 		7FAA637668A8FF2E4BBD6B38 /* SessionsModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionsModel.swift; sourceTree = "<group>"; };
 		7FDF4E08DF2A7F5CBC393F11 /* AgentPinnedGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentPinnedGrid.swift; sourceTree = "<group>"; };
 		80088FB04D05EDBFE994777D /* VoiceConfigurationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceConfigurationView.swift; sourceTree = "<group>"; };
@@ -2455,6 +2461,7 @@
 		B164685C8448EC3814C1D248 /* DesignSystemTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystemTests.swift; sourceTree = "<group>"; };
 		B1858799695893DCA414812F /* WorkspaceConnectionKeeper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceConnectionKeeper.swift; sourceTree = "<group>"; };
 		B1AB31F3EA0C09A5B9F3FABD /* SessionSectionOrganizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionSectionOrganizationTests.swift; sourceTree = "<group>"; };
+		B2134123E3894BA3AE1CCD71 /* WorkflowRunStageSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowRunStageSheet.swift; sourceTree = "<group>"; };
 		B21A4DAF16C06699A239D845 /* ChatReplyUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatReplyUITests.swift; sourceTree = "<group>"; };
 		B2A6F6A9C1A94A35757FF24B /* AppStoreScreenshotFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStoreScreenshotFixture.swift; sourceTree = "<group>"; };
 		B2F653D00F8A7467F524639E /* StockGitReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StockGitReviewView.swift; sourceTree = "<group>"; };
@@ -2738,6 +2745,7 @@
 		EBCCCAC2ABC048282724A2A4 /* AgentDuplicateModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentDuplicateModel.swift; sourceTree = "<group>"; };
 		EBCE4D0A5B551F3B6980919E /* BighelpMacWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpMacWindow.swift; sourceTree = "<group>"; };
 		EC39FC7DE917522E6980D1BB /* PermissionCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionCenter.swift; sourceTree = "<group>"; };
+		ED58013B1EF5580D7BE0CAEF /* WorkflowsStagesAndTriggersUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowsStagesAndTriggersUITests.swift; sourceTree = "<group>"; };
 		ED592EAB0C77EF222B56EC54 /* KanbanLane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanbanLane.swift; sourceTree = "<group>"; };
 		EDD46FCF100ED36C05708CF4 /* HermesBotModeActivityClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesBotModeActivityClient.swift; sourceTree = "<group>"; };
 		EDEFB7BA37C703C0BAE31F85 /* BotModeRoomHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BotModeRoomHeader.swift; sourceTree = "<group>"; };
@@ -4172,6 +4180,7 @@
 				148206AE5A6AE634180F1E0B /* WeatherCardsUITests.swift */,
 				69B714A6F7D3438FE4CF9ED0 /* WidgetLinkHostUITests.swift */,
 				CEA7CE183DB9ED1863F32864 /* WorkflowsEditingUITests.swift */,
+				ED58013B1EF5580D7BE0CAEF /* WorkflowsStagesAndTriggersUITests.swift */,
 				BEB2EB68074BFE00C9154498 /* WorkflowsUITests.swift */,
 				8017569C6675F6EF32837C5E /* WorkspaceNavigationUITestSupport.swift */,
 			);
@@ -4241,6 +4250,7 @@
 			isa = PBXGroup;
 			children = (
 				0CF7C685B0AB5D146A3A9831 /* AgentSelectionView.swift */,
+				77DE30B07B1CB21D93054AF7 /* ScheduleCadencePicker.swift */,
 				AC8576300258E3A8F5BE068F /* ScheduledTaskBlueprintsView.swift */,
 				9EFE4B7F7CB11895654EA588 /* ScheduledTaskDetailView.swift */,
 				81C56021662277890DE4C559 /* ScheduledTaskEditorView.swift */,
@@ -4974,6 +4984,7 @@
 				31147A0236EB23CB0FD2A125 /* WorkflowModels.swift */,
 				5F429F2AD807B0999625A25C /* WorkflowRunModel.swift */,
 				D885EEDB742B2589822E2135 /* WorkflowRunMonitorView.swift */,
+				B2134123E3894BA3AE1CCD71 /* WorkflowRunStageSheet.swift */,
 				696582E23F3BDB6987E19C78 /* WorkflowRunView.swift */,
 				78CE214940F6F86A06C9E2F4 /* WorkflowsAvailability.swift */,
 				662F6DEE9C28B0A2688B53CE /* WorkflowsClient.swift */,
@@ -4981,6 +4992,7 @@
 				A48D538BC09DE38454C2C6F1 /* WorkflowSignoffView.swift */,
 				FDC7E648D4DD22AF01E07C4A /* WorkflowsStore.swift */,
 				90F9BB9002B4FAD0FE23982A /* WorkflowStageEditor.swift */,
+				7F90DFFB9822D36299A5AB83 /* WorkflowTriggerSheet.swift */,
 			);
 			path = Workflows;
 			sourceTree = "<group>";
@@ -6065,6 +6077,7 @@
 				9E42DD246B4400AECC558AED /* RootWorkflows.swift in Sources */,
 				DDF56263FE193874D1297886 /* RootWorkspaceActions.swift in Sources */,
 				B0F386A20C90BD39FCD7BE69 /* RootWorkspaceServices.swift in Sources */,
+				FB5A5528B181EFACBC3CBECC /* ScheduleCadencePicker.swift in Sources */,
 				8158488B976A7C682435DF64 /* ScheduleRequestBuilder.swift in Sources */,
 				FC960259E56C753A996A4DFC /* ScheduledTaskBlueprintsView.swift in Sources */,
 				976326018C8BA021020F38BF /* ScheduledTaskDetailView.swift in Sources */,
@@ -6211,9 +6224,11 @@
 				66E818C2CBEDE04E7D74D6D3 /* WorkflowModels.swift in Sources */,
 				98045BC274A9F07486257E23 /* WorkflowRunModel.swift in Sources */,
 				C8C8B15A43459F011DE41FEA /* WorkflowRunMonitorView.swift in Sources */,
+				32B24C1CCC94C9ABC1719931 /* WorkflowRunStageSheet.swift in Sources */,
 				51DA4E0343897F10E3048302 /* WorkflowRunView.swift in Sources */,
 				67CDDC69AE2084A28C976223 /* WorkflowSignoffView.swift in Sources */,
 				2E9934491E3104884B41FAAA /* WorkflowStageEditor.swift in Sources */,
+				832ED0A301E95E2C9649C759 /* WorkflowTriggerSheet.swift in Sources */,
 				CF0B948B022760B70AEA864C /* WorkflowsAvailability.swift in Sources */,
 				E93AE9C0CD311464DD107F29 /* WorkflowsClient.swift in Sources */,
 				CB43C36C26D6BEBDDBFBCC21 /* WorkflowsHomeView.swift in Sources */,
@@ -6736,6 +6751,7 @@
 				B05C0BE552D68EDA30874BB8 /* WeatherCardsUITests.swift in Sources */,
 				4998F2F458DEA2AC652F6DD3 /* WidgetLinkHostUITests.swift in Sources */,
 				AAEB8982D7E6FF8DFF842F7F /* WorkflowsEditingUITests.swift in Sources */,
+				91E8B0585743515DF6C47DED /* WorkflowsStagesAndTriggersUITests.swift in Sources */,
 				6BEB521EBB0F1E16CF88B875 /* WorkflowsUITests.swift in Sources */,
 				100982301E3E8EC010AE9AFC /* WorkspaceNavigationUITestSupport.swift in Sources */,
 			);

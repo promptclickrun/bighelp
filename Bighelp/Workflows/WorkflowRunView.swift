@@ -60,6 +60,7 @@ struct WorkflowRunContent: View {
     @State private var isConfirmingCancel = false
     @State private var exporting: (name: String, data: Data)?
     @State private var shareURL: URL?
+    @State private var openStage: WorkflowStageSelection?
     @BighelpThemeReader private var theme
 
     private var run: WorkflowRunSummary { detail.summary }
@@ -102,6 +103,10 @@ struct WorkflowRunContent: View {
                       document: ChatAttachmentDocument(data: exporting?.data ?? Data()),
                       contentType: UTType(filenameExtension: "md") ?? .plainText,
                       defaultFilename: exporting?.name) { _ in exporting = nil }
+        .sheet(item: $openStage) { selection in
+            WorkflowRunStageSheet(model: model, context: context, stageKey: selection.id)
+                .bighelpSheetSize(.large)
+        }
     }
 
     // MARK: Header
@@ -210,7 +215,7 @@ struct WorkflowRunContent: View {
             WorkflowGraph(nodes: detail.stages.map { stage in
                 WorkflowGraph.Node(id: stage.key, kind: stage.kind, title: stage.title,
                                    detail: stageTime(stage), state: stage.state)
-            }, loop: nil)
+            }, loop: nil, select: { openStage = WorkflowStageSelection(id: $0) })
             .padding(BighelpTokens.space16)
         }
         .workflowCard(theme, padding: 0)
@@ -223,6 +228,7 @@ struct WorkflowRunContent: View {
     private var stageRail: some View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(Array(detail.stages.enumerated()), id: \.element.key) { index, stage in
+                Button { openStage = WorkflowStageSelection(id: stage.key) } label: {
                 HStack(alignment: .top, spacing: BighelpTokens.space12) {
                     VStack(spacing: 0) {
                         Image(systemName: stage.state == .planned ? "circle" : stage.state.symbol)
@@ -249,8 +255,16 @@ struct WorkflowRunContent: View {
                         .font(.bighelp(.caption).monospacedDigit())
                         .foregroundStyle(stage.state.isWorking && stage.state != .accepted
                                          ? stage.state.color(theme) : theme.tertiaryText)
+                    Image(systemName: "chevron.right")
+                        .font(.bighelp(.caption))
+                        .foregroundStyle(theme.tertiaryText)
+                        .padding(.top, 4)
                 }
+                .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
                 .accessibilityElement(children: .combine)
+                .accessibilityHint("Shows what this stage used, made and decided")
                 .accessibilityIdentifier("workflows.run.stage.\(stage.key)")
             }
         }

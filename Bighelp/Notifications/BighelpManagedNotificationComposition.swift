@@ -174,8 +174,8 @@ final class BighelpManagedNotificationComposition: HostNotificationSetupServing 
         guard isCurrent(owner) else { throw DirectHermesError.secureStorageChanged }
     }
 
-    func applyPeerChatPreference() async {
-        await integration?.service.applyPeerChatPreference()
+    func applyAlertPreferences() async {
+        await integration?.service.applyAlertPreferences()
     }
 
     func applyQuietHours() async -> BighelpQuietHoursSyncResult {

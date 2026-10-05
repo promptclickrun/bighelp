@@ -469,9 +469,34 @@ import UserNotifications
         #expect(fixture.ledger.record(host: fixture.host, profile: "default")?.peerChatsAlert == false)
 
         defaults.set(true, forKey: BighelpPeerChatAlerts.key)
-        await fixture.service.applyPeerChatPreference()
+        await fixture.service.applyAlertPreferences()
         #expect(fixture.hostAPI.peerChatPuts == [false, true], "Turning it on reaches the host at once")
         #expect(fixture.ledger.record(host: fixture.host, profile: "default")?.peerChatsAlert == true)
+    }
+
+    /// Workflow alert switches go with Peer chats, only to computers whose plugin has them.
+    @Test func workflowAlertChoicesReachComputersThatHaveThem() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        let defaults = UserDefaults.standard
+        let keys = [BighelpPeerChatAlerts.key] + BighelpWorkflowAlerts.Kind.allCases.map(\.key)
+        let previous = keys.map { defaults.object(forKey: $0) }
+        defer { for (key, value) in zip(keys, previous) { defaults.set(value, forKey: key) } }
+        for key in keys { defaults.removeObject(forKey: key) }
+        fixture.hostAPI.peerChatPreference = true
+        _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+
+        // An older plugin: only Peer chats goes.
+        await fixture.service.applyAlertPreferences()
+        #expect(fixture.hostAPI.workflowPuts.isEmpty)
+
+        fixture.hostAPI.workflowPreference = true
+        defaults.set(false, forKey: BighelpWorkflowAlerts.Kind.succeeded.key)
+        await fixture.service.applyAlertPreferences()
+        #expect(fixture.hostAPI.workflowPuts == [["needsYou": true, "succeeded": false, "failed": true, "cancelled": true]])
+        #expect(fixture.ledger.record(host: fixture.host, profile: "default")?.workflowAlertsSent?["succeeded"] == false)
+        await fixture.service.applyAlertPreferences()
+        #expect(fixture.hostAPI.workflowPuts.count == 1, "Sent only when it changes")
     }
 
     /// Quiet Hours go to the computer when notifications turn on, again only when they change,
@@ -546,7 +571,7 @@ import UserNotifications
         let model = ChatModel(conversationID: client.conversationID, client: client, initialItems: [])
         client.model = model
         try await fixture.service.onChatOpened(host: fixture.host, chat: DirectHermesChat(id: client.conversationID, client: client, model: model))
-        await fixture.service.applyPeerChatPreference()
+        await fixture.service.applyAlertPreferences()
         #expect(fixture.hostAPI.peerChatPuts.isEmpty)
     }
 
@@ -721,6 +746,8 @@ import UserNotifications
         var supportedEvents = ManagedNotificationValidation.eventTypes.sorted()
         var sealedAlerts = false
         var peerChatPreference = false
+        var workflowPreference = false
+        var workflowPuts: [[String: Bool]] = []
         var peerChatPuts: [Bool] = []
         var quietHoursSupported = false
         var quietHoursPuts: [[String: BighelpJSONValue]] = []
@@ -743,11 +770,19 @@ import UserNotifications
                 "supportedEventTypes":.array(supportedEvents.map(BighelpJSONValue.string)),
                 "richLiveActivitySupported":.boolean(true),
                 "sealedAlerts":sealedAlerts ? .object(["version":.integer(2)]) : .null,
-                "preferences":peerChatPreference ? .object(["peerChats":.boolean(true)]) : .null,
+                "preferences":peerChatPreference ? .object(["peerChats":.boolean(true),
+                                                            "workflows":.boolean(workflowPreference)]) : .null,
                 "producerCapabilities":.object(["sessionCompletion":.boolean(producerLoaded),"sessionFailure":.boolean(producerLoaded),"richLiveActivity":.boolean(producerLoaded),"nativeApproval":.boolean(supportedEvents.contains("approval.required")),"nativeClarification":.boolean(false)])]) }
             if suffix.hasSuffix("/preferences"), method == "PUT", let wanted = body?["peerChats"]?.boolean {
                 peerChatPuts.append(wanted)
-                return .object(["version":.integer(1),"peerChats":.boolean(wanted)])
+                var answer: [String: BighelpJSONValue] = ["version":.integer(1),"peerChats":.boolean(wanted)]
+                // Like plugin 3.7.0: workflow switches are kept and sent back.
+                if let workflows = body?["workflows"]?.object {
+                    guard workflowPreference else { throw WorkspaceClientError.rejected(code: "invalid_request") }
+                    workflowPuts.append(workflows.compactMapValues(\.boolean))
+                    answer["workflows"] = .object(workflows)
+                }
+                return .object(answer)
             }
             if suffix.hasSuffix("/recipient-key"), method == "PUT", let key = body?["publicKey"]?.string {
                 recipientKeys.append(key)

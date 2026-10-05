@@ -193,4 +193,6 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     case workflowsTemplatesDelete = "workflows.templates.delete"
     case workflowsPin = "workflows.pin"
     case workflowsUnarchive = "workflows.unarchive"
+    // Manual or scheduled (`native-workflows-trigger-v1`).
+    case workflowsTriggerSet = "workflows.trigger.set"
 }

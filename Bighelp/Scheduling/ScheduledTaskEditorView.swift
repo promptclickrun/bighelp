@@ -2,29 +2,7 @@ import SwiftUI
 
 @MainActor
 struct ScheduledTaskEditorView: View {
-    /// Friendly presets layered over `ScheduledTaskEditorPickerState`.
-    private enum Frequency: String, CaseIterable, Identifiable {
-        case once = "Once"
-        case daily = "Daily"
-        case weekdays = "Weekdays"
-        case weekly = "Weekly"
-        case custom = "Custom"
-        var id: Self { self }
-        /// Five equal segments leave no room for "Weekdays" on iPhone.
-        var segmentTitle: String { self == .weekdays ? "Mon–Fri" : rawValue }
-    }
-
-    private enum CustomMode: String, CaseIterable, Identifiable {
-        case days = "On days I pick"
-        case monthly = "Once a month"
-        case words = "In my own words"
-        var id: Self { self }
-    }
-
-    private static let weekdaySet: Set<Weekday> = [.monday, .tuesday, .wednesday, .thursday, .friday]
-
     @State private var store: ScheduledTasksStore
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.dismiss) private var dismiss
     let agent: AgentProfile
     let task: ScheduledTask?
@@ -33,9 +11,7 @@ struct ScheduledTaskEditorView: View {
     @State private var name: String
     @State private var instructions: String
     @State private var selectedAgentID: String
-    @State private var frequency: Frequency
-    @State private var customMode: CustomMode
-    @State private var pickerState: ScheduledTaskEditorPickerState
+    @State private var cadence: ScheduleCadence
     @State private var descriptionText: String
     @State private var selectedDeliveryID: String
     @State private var manualDeliveryValue: String
@@ -70,9 +46,7 @@ struct ScheduledTaskEditorView: View {
         _name = State(initialValue: task?.name ?? "")
         _instructions = State(initialValue: task?.instructions ?? "")
         _selectedAgentID = State(initialValue: task?.agentID ?? agent.id)
-        _pickerState = State(initialValue: picker)
-        _customMode = State(initialValue: isDescribed ? .words : picker.kind == .monthly ? .monthly : .days)
-        _frequency = State(initialValue: isDescribed ? .custom : Self.frequency(for: picker))
+        _cadence = State(initialValue: ScheduleCadence(picker: picker, describing: isDescribed))
         _descriptionText = State(initialValue: description)
         let delivery = task?.deliveryTarget ?? "loopdy"
         _selectedDeliveryID = State(initialValue: delivery.contains(":")
@@ -278,35 +252,7 @@ struct ScheduledTaskEditorView: View {
 
     private var whenSection: some View {
         Section {
-            frequencyPicker
-            switch frequency {
-            case .once:
-                DatePicker("Date", selection: $pickerState.scheduledDate, displayedComponents: .date)
-                    .environment(\.timeZone, pickerState.timeZone)
-                timePicker
-            case .daily, .weekdays, .weekly:
-                weekdayChips
-                timePicker
-            case .custom:
-                Picker("Repeat", selection: customModeBinding) {
-                    ForEach(CustomMode.allCases) { mode in Text(mode.rawValue).tag(mode) }
-                }
-                .accessibilityIdentifier("scheduled-task.editor.custom-mode")
-                switch customMode {
-                case .days:
-                    weekdayChips
-                    timePicker
-                case .monthly:
-                    Picker("Day of month", selection: $pickerState.monthlyDay) {
-                        ForEach(1...31, id: \.self) { day in
-                            Text(day.formatted()).tag(day)
-                        }
-                    }
-                    timePicker
-                case .words:
-                    describeControls
-                }
-            }
+            ScheduleCadenceRows(cadence: $cadence) { describeControls }
             if let summary {
                 Label {
                     Text(summary)
@@ -327,68 +273,6 @@ struct ScheduledTaskEditorView: View {
                 .foregroundStyle(theme.secondaryText)
         }
         .listRowBackground(theme.surface)
-    }
-
-    @ViewBuilder
-    private var frequencyPicker: some View {
-        if dynamicTypeSize.isAccessibilitySize {
-            Picker("How often", selection: frequencyBinding) {
-                ForEach(Frequency.allCases) { option in Text(option.rawValue).tag(option) }
-            }
-            .pickerStyle(.menu)
-            .accessibilityIdentifier("scheduled-task.editor.frequency")
-        } else {
-            Picker("How often", selection: frequencyBinding) {
-                ForEach(Frequency.allCases) { option in
-                    Text(option.segmentTitle).tag(option).accessibilityLabel(option.rawValue)
-                }
-            }
-            .bighelpSegmentedPicker()
-            .listRowInsets(EdgeInsets(
-                top: BighelpTokens.space12,
-                leading: BighelpTokens.space12,
-                bottom: BighelpTokens.space12,
-                trailing: BighelpTokens.space12
-            ))
-            .accessibilityIdentifier("scheduled-task.editor.frequency")
-        }
-    }
-
-    private var timePicker: some View {
-        DatePicker("Time", selection: $pickerState.scheduledTime, displayedComponents: .hourAndMinute)
-            .environment(\.timeZone, pickerState.timeZone)
-    }
-
-    @ViewBuilder
-    private var weekdayChips: some View {
-        if dynamicTypeSize.isAccessibilitySize {
-            LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: 88), spacing: BighelpTokens.space8)],
-                spacing: BighelpTokens.space8
-            ) {
-                ForEach(orderedWeekdays) { day in weekdayChip(day, title: day.shortTitle) }
-            }
-        } else {
-            HStack(spacing: BighelpTokens.space4) {
-                ForEach(orderedWeekdays) { day in weekdayChip(day, title: String(day.title.prefix(1))) }
-            }
-        }
-    }
-
-    private func weekdayChip(_ day: Weekday, title: String) -> some View {
-        let isSelected = pickerState.selectedDays.contains(day)
-        return Button(title) { toggle(day) }
-            .buttonStyle(.plain)
-            .font(.bighelp(.subheadline).weight(.semibold))
-            .foregroundStyle(isSelected ? theme.actionForeground : theme.primaryText)
-            .frame(maxWidth: .infinity, minHeight: 38)
-            .background(isSelected ? theme.action : theme.incomingMessageBackground, in: .capsule)
-            .frame(minHeight: BighelpTokens.hitTarget)
-            .contentShape(.rect)
-            .accessibilityLabel(day.title)
-            .accessibilityValue(isSelected ? "Selected" : "Not selected")
-            .accessibilityAddTraits(isSelected ? .isSelected : [])
-            .accessibilityIdentifier("scheduled-task.editor.weekday.\(day.title.lowercased())")
     }
 
     private var describeControls: some View {
@@ -484,77 +368,7 @@ struct ScheduledTaskEditorView: View {
         .accessibilityElement(children: .combine)
     }
 
-    // MARK: - Frequency mapping
-
-    private var frequencyBinding: Binding<Frequency> {
-        Binding(get: { frequency }, set: { apply($0) })
-    }
-
-    private var customModeBinding: Binding<CustomMode> {
-        Binding(get: { customMode }, set: { mode in
-            customMode = mode
-            switch mode {
-            case .days: pickerState.kind = .repeating
-            case .monthly: pickerState.kind = .monthly
-            case .words: break
-            }
-        })
-    }
-
-    private func apply(_ newValue: Frequency) {
-        frequency = newValue
-        switch newValue {
-        case .once:
-            pickerState.kind = .once
-        case .daily:
-            pickerState.kind = .repeating
-            pickerState.selectedDays = Set(Weekday.allCases)
-        case .weekdays:
-            pickerState.kind = .repeating
-            pickerState.selectedDays = Self.weekdaySet
-        case .weekly:
-            pickerState.kind = .repeating
-            if pickerState.selectedDays.count != 1 {
-                let today = Calendar.current.component(.weekday, from: .now)
-                pickerState.selectedDays = [Weekday(rawValue: today) ?? .monday]
-            }
-        case .custom:
-            switch customMode {
-            case .days: pickerState.kind = .repeating
-            case .monthly: pickerState.kind = .monthly
-            case .words: break
-            }
-        }
-    }
-
-    private func toggle(_ day: Weekday) {
-        pickerState.toggle(day)
-        frequency = Self.frequency(for: pickerState)
-        if frequency == .custom { customMode = .days }
-    }
-
-    private static func frequency(for state: ScheduledTaskEditorPickerState) -> Frequency {
-        switch state.kind {
-        case .once: return .once
-        case .monthly: return .custom
-        case .repeating:
-            if state.selectedDays == Set(Weekday.allCases) { return .daily }
-            if state.selectedDays == weekdaySet { return .weekdays }
-            if state.selectedDays.count == 1 { return .weekly }
-            return .custom
-        }
-    }
-
-    private var orderedWeekdays: [Weekday] {
-        let first = Calendar.current.firstWeekday
-        return Weekday.allCases.sorted { lhs, rhs in
-            (lhs.rawValue - first + 7) % 7 < (rhs.rawValue - first + 7) % 7
-        }
-    }
-
-    private var isDescribing: Bool {
-        frequency == .custom && customMode == .words
-    }
+    private var isDescribing: Bool { cadence.isDescribing }
 
     // MARK: - Agents
 
@@ -574,7 +388,7 @@ struct ScheduledTaskEditorView: View {
     // MARK: - Schedule
 
     private var timeZoneID: String {
-        pickerState.timeZoneID
+        cadence.picker.timeZoneID
     }
 
     private var timeZoneDisclosure: String {
@@ -598,7 +412,7 @@ struct ScheduledTaskEditorView: View {
             guard !trimmed.isEmpty else { return nil }
             return .naturalLanguage(trimmed, timeZoneID: timeZoneID)
         }
-        return pickerState.schedule()
+        return cadence.picker.schedule()
     }
 
     /// Human summary without the device's own time zone tacked on.

@@ -20,13 +20,13 @@ protocol HostNotificationSetupServing {
     /// Removes only this device's recipient trust/grant metadata, not host data.
     func removeLocalEnrollment(host: BighelpConfiguredHost) throws
     /// Tells every computer with notifications on whether this phone wants Peer chats alerts.
-    func applyPeerChatPreference() async
+    func applyAlertPreferences() async
     /// Gives this device's Quiet Hours to every computer with notifications on.
     func applyQuietHours() async -> BighelpQuietHoursSyncResult
 }
 
 extension HostNotificationSetupServing {
-    func applyPeerChatPreference() async {}
+    func applyAlertPreferences() async {}
     func applyQuietHours() async -> BighelpQuietHoursSyncResult { BighelpQuietHoursSyncResult() }
 }
 
@@ -35,6 +35,38 @@ extension HostNotificationSetupServing {
 enum BighelpPeerChatAlerts {
     static let key = "bighelp.notifications.peer-chats"
     static var isOn: Bool { UserDefaults.standard.bool(forKey: key) }
+}
+
+/// Settings › Notifications › Workflows: which workflow alerts this device wants. All start on.
+enum BighelpWorkflowAlerts {
+    enum Kind: String, CaseIterable, Identifiable {
+        case needsYou, succeeded, failed, cancelled
+        var id: String { rawValue }
+        var key: String { "bighelp.notifications.workflows.\(rawValue)" }
+        var title: String {
+            switch self {
+            case .needsYou: "Needs you"
+            case .succeeded: "Succeeded"
+            case .failed: "Failed"
+            case .cancelled: "Cancelled"
+            }
+        }
+        var detail: String {
+            switch self {
+            case .needsYou: "A run waits for your sign-off, or needs a look."
+            case .succeeded: "A run finished."
+            case .failed: "A run stopped with a problem."
+            case .cancelled: "Someone cancelled a run."
+            }
+        }
+    }
+
+    static func isOn(_ kind: Kind) -> Bool { UserDefaults.standard.object(forKey: kind.key) as? Bool ?? true }
+
+    /// What the computer stores for this device (plugin 3.7.0).
+    static var current: [String: Bool] {
+        Dictionary(uniqueKeysWithValues: Kind.allCases.map { ($0.rawValue, isOn($0)) })
+    }
 }
 
 enum HostNotificationSetupResult: Sendable {

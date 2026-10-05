@@ -455,7 +455,6 @@ struct WorkflowDocumentView: View {
 
 // MARK: - What's wrong with the flow
 
-/// The flow's problems, plainly, in a card on the canvas.
 /// One problem. "Choose an agent for …" opens Agent roles.
 struct WorkflowIssueRow: View {
     let issue: WorkflowValidation.Issue
@@ -480,6 +479,7 @@ struct WorkflowIssueRow: View {
     }
 }
 
+/// The flow's problems, plainly, in a card on the canvas.
 struct WorkflowIssuesCard: View {
     let issues: [WorkflowValidation.Issue]
     var editRoles: (() -> Void)?

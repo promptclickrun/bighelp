@@ -389,8 +389,9 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
             record = refreshed
         }
         if loaded.supportsPeerChatPreference {
-            try await syncPeerChats(host: host, profile: profile, grant: grant, client: client,
-                                    isCurrent: { (try? self.requireCurrent(host, credentials: credentials)) != nil })
+            try await syncAlertPreferences(host: host, profile: profile, grant: grant, client: client,
+                                           workflows: loaded.supportsWorkflowAlertPreferences,
+                                           isCurrent: { (try? self.requireCurrent(host, credentials: credentials)) != nil })
             try requireCurrent(host, credentials: credentials)
         }
         // Also catches a device that moved to another time zone since it last sent them.
@@ -410,27 +411,35 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
         record = current; record.subscriptions.insert(session); try ledger.save(record)
     }
 
-    /// Peer chats (agents talking to each other) alert this phone only when it turned them on.
-    /// Sent only when the host's confirmed choice differs from this phone's.
-    private func syncPeerChats(host: BighelpConfiguredHost, profile: String, grant: BighelpManagedGrant,
-                               client: any DirectHostNotificationServing,
-                               isCurrent: @escaping @MainActor () -> Bool) async throws {
+    /// Peer chats (agents talking to each other) alert this phone only when it turned them on; each
+    /// kind of workflow alert unless it turned that off (hosts with `preferences.workflows`).
+    /// Sent only when the host's confirmed choices differ from this phone's.
+    private func syncAlertPreferences(host: BighelpConfiguredHost, profile: String, grant: BighelpManagedGrant,
+                                      client: any DirectHostNotificationServing, workflows: Bool,
+                                      isCurrent: @escaping @MainActor () -> Bool) async throws {
         let wanted = BighelpPeerChatAlerts.isOn
-        guard ledger.record(host: host, profile: profile)?.peerChatsAlert != wanted else { return }
-        let value = try await client.request("/enrollments/\(grant.grantId)/preferences", method: "PUT", body: [
-            "version": .integer(1), "peerChats": .boolean(wanted)
-        ], isCurrent: isCurrent)
+        let wantedWorkflows = workflows ? BighelpWorkflowAlerts.current : nil
+        let record = ledger.record(host: host, profile: profile)
+        guard record?.peerChatsAlert != wanted
+                || (wantedWorkflows != nil && record?.workflowAlertsSent != wantedWorkflows) else { return }
+        var body: [String: BighelpJSONValue] = ["version": .integer(1), "peerChats": .boolean(wanted)]
+        if let wantedWorkflows { body["workflows"] = .object(wantedWorkflows.mapValues(BighelpJSONValue.boolean)) }
+        let value = try await client.request("/enrollments/\(grant.grantId)/preferences", method: "PUT", body: body,
+                                             isCurrent: isCurrent)
+        let confirmed = value.object?["workflows"]?.object?.compactMapValues(\.boolean)
         guard isCurrent(), value.object?["peerChats"]?.boolean == wanted,
+              wantedWorkflows == nil || confirmed == wantedWorkflows,
               var current = ledger.record(host: host, profile: profile), current.grant == grant else {
             throw DirectHermesError.invalidResponse
         }
         current.peerChatsAlert = wanted
+        if let wantedWorkflows { current.workflowAlertsSent = wantedWorkflows }
         try ledger.save(current)
     }
 
-    /// Settings › Notifications › Peer chats changed: tell every computer with notifications on.
+    /// Settings › Notifications › Peer chats or Workflows changed: tell every computer with notifications on.
     /// A computer that can't be reached now gets it the next time a chat opens there.
-    func applyPeerChatPreference() async {
+    func applyAlertPreferences() async {
         for record in ledger.enrollments where record.enabled && !record.revokePending {
             guard let grant = record.grant, grant.state == "active", grant.expiresAt > timestamp,
                   let host = registry.hosts.first(where: {
@@ -442,8 +451,8 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
             guard let raw = try? await client.request("/capabilities", method: "GET", body: nil, isCurrent: isCurrent),
                   let loaded = try? ManagedNotificationValidation.decode(BighelpManagedCapabilities.self, from: raw),
                   loaded.supportsPeerChatPreference else { continue }
-            try? await syncPeerChats(host: host, profile: record.profile, grant: grant, client: client,
-                                     isCurrent: isCurrent)
+            try? await syncAlertPreferences(host: host, profile: record.profile, grant: grant, client: client,
+                                            workflows: loaded.supportsWorkflowAlertPreferences, isCurrent: isCurrent)
         }
     }
 

@@ -44,7 +44,7 @@ enum ScheduleRequestBuilder {
         if dayOfMonth == "*", month == "*", weekday == "*" {
             return "Every day at \(time)"
         }
-        if dayOfMonth == "*", month == "*", weekday == "1-5" {
+        if dayOfMonth == "*", month == "*", ["1-5", "1,2,3,4,5"].contains(weekday) {
             return "Every weekday at \(time)"
         }
         if dayOfMonth == "*", month == "*", let days = weekdayTitles(weekday) {
@@ -54,6 +54,37 @@ enum ScheduleRequestBuilder {
             return "Every month on the \(ordinal(day)) at \(time)"
         }
         return "Custom schedule"
+    }
+
+    /// The picker's choice for a cron expression it could have made (daily, weekdays, days of the week,
+    /// a day of the month), or nil for anything else.
+    static func input(forCron expression: String, timeZoneID: String) -> ScheduleInput? {
+        let fields = expression.split(whereSeparator: \.isWhitespace).map(String.init)
+        guard fields.count == 5, let minute = Int(fields[0]), let hour = Int(fields[1]),
+              (0...59).contains(minute), (0...23).contains(hour), fields[3] == "*" else { return nil }
+        let time = DateComponents(hour: hour, minute: minute)
+        switch (fields[2], fields[4]) {
+        case ("*", "*"):
+            return .daily(time: time, timeZoneID: timeZoneID)
+        case ("*", let weekdays):
+            var days = Set<Weekday>()
+            for part in weekdays.split(separator: ",") {
+                let bounds = part.split(separator: "-").compactMap { Int($0) }
+                guard (1...2).contains(bounds.count), bounds.allSatisfy({ (0...6).contains($0) }),
+                      bounds.first! <= bounds.last! else { return nil }
+                for number in bounds.first!...bounds.last! {
+                    guard let day = Weekday(rawValue: number + 1) else { return nil }
+                    days.insert(day)
+                }
+            }
+            guard !days.isEmpty else { return nil }
+            return .repeating(days: days, time: time, timeZoneID: timeZoneID)
+        case (let day, "*"):
+            guard let day = Int(day), (1...31).contains(day) else { return nil }
+            return .monthly(day: day, time: time, timeZoneID: timeZoneID)
+        default:
+            return nil
+        }
     }
 
     static func validatedHermesRequest(

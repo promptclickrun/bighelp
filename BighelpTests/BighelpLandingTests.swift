@@ -63,6 +63,33 @@ struct BighelpLandingTests {
         #expect(BighelpLanding.allHostsMode(for: .standard(opensChat: false)) == nil)
     }
 
+    @Test func sessionsAndLastChatKeepTheModeYouWereIn() {
+        // Both exist with one computer and with all of them.
+        #expect(BighelpLanding.allHostsMode(for: .chosen(.sessions)) == nil)
+        #expect(BighelpLanding.allHostsMode(for: .chosen(.lastChat)) == nil)
+    }
+
+    @Test func anAlertThatOpensTheAppKeepsTheModeOpenOnChanged() throws {
+        let suite = "bighelp.landing.alert.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(true, forKey: "bighelp.hosts.all-hosts")
+        defaults.set(BighelpLandingScreen.feed.rawValue, forKey: BighelpLanding.screenKey)
+        var now = Date(timeIntervalSince1970: 1_000)
+        let settings = SettingsStore(defaults: defaults, now: { now })
+        settings.applyLaunchLandingToAllHostsMode()
+        #expect(!settings.allHostsMode, "Open on Feed starts on one computer")
+        settings.restoreAllHostsModeForOutsideOpen()
+        #expect(settings.allHostsMode, "The tapped alert opens in the mode you were in")
+
+        // Later in the same launch, Open on stands.
+        settings.applyLaunchLandingToAllHostsMode()
+        settings.allHostsMode = false
+        now.addTimeInterval(120)
+        settings.restoreAllHostsModeForOutsideOpen()
+        #expect(!settings.allHostsMode)
+    }
+
     // MARK: Start with
 
     @Test func aStartAgentThatStillExistsIsUsed() {

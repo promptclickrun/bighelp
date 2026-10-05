@@ -1065,6 +1065,7 @@ struct ChatView: View {
             ? "Go to, file changes, model, context window, usage, this chat, the agent and advanced options"
             : "Model, usage, this chat and the agent")
         .accessibilityIdentifier("chat.options")
+        .bighelpChatPanelAnchor(.appearance)
     }
 
     /// The model shows under its item, so switching starts from knowing which is on.

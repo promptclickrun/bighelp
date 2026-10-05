@@ -153,12 +153,13 @@ struct BighelpMenu<Recent: View>: View {
         Button { choose(destinations.onNewChat) } label: {
             Image(systemName: "square.and.pencil")
                 .font(.bighelp(.body).weight(.semibold))
-                .foregroundStyle(.white)
+                // Dark Mac palettes use pale lavender and need dark icon ink.
+                .foregroundStyle(BighelpPlatform.isMac ? theme.actionForeground : .white)
                 .frame(width: BighelpTokens.scaled(40), height: BighelpTokens.scaled(40))
                 .background(theme.action, in: Circle())
                 .contentShape(Circle())
         }
-        .buttonStyle(.plain)
+        .bighelpPlainButtonStyle(.circle)
         .textCase(nil)
         .bighelpHelp(destinations.newChatTitle, shortcut: "⌘N")
         .accessibilityLabel(destinations.newChatTitle)

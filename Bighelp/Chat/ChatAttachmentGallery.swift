@@ -54,7 +54,7 @@ struct ChatAttachmentGallery: View {
                     } label: {
                         attachmentView(attachment)
                     }
-                    .buttonStyle(.plain)
+                    .bighelpPlainButtonStyle(.rounded(BighelpTokens.radius12))
                     .accessibilityLabel("Preview \(attachment.fileName)")
                     .accessibilityHint("Opens a preview with save options")
                     .modifier(PictureActionsIfImage(attachment: attachment))

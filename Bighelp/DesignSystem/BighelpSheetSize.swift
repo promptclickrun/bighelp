@@ -40,3 +40,101 @@ extension View {
         #endif
     }
 }
+
+/// Transient chat choices attach to their originating control on the Mac.
+/// Other platforms retain their existing sheet presentation.
+enum BighelpChatPanelAnchor: Hashable {
+    case attachments
+    case appearance
+}
+
+extension View {
+    func bighelpChatPanelAnchor(_ anchor: BighelpChatPanelAnchor) -> some View {
+        #if targetEnvironment(macCatalyst)
+        anchorPreference(key: BighelpChatPanelAnchors.self, value: .bounds) { [anchor: $0] }
+        #else
+        self
+        #endif
+    }
+
+    func bighelpChatPanel<Panel: View>(
+        isPresented: Binding<Bool>,
+        anchor: BighelpChatPanelAnchor,
+        onDismiss: (() -> Void)? = nil,
+        @ViewBuilder panel: @escaping () -> Panel
+    ) -> some View {
+        #if targetEnvironment(macCatalyst)
+        modifier(BighelpChatPanelPresenter(
+            isPresented: isPresented, anchor: anchor, onDismiss: onDismiss, panel: panel
+        ))
+        #else
+        sheet(isPresented: isPresented, onDismiss: onDismiss, content: panel)
+        #endif
+    }
+}
+
+#if targetEnvironment(macCatalyst)
+private struct BighelpChatPanelPresenter<Panel: View>: ViewModifier {
+    @Binding var isPresented: Bool
+    let anchor: BighelpChatPanelAnchor
+    let onDismiss: (() -> Void)?
+    @ViewBuilder let panel: () -> Panel
+    @State private var layout = BighelpChatPanelLayout()
+
+    func body(content: Content) -> some View {
+        // The presentation belongs to the stable chat view. Anchor preference
+        // readers only measure geometry; they do not own a modal controller.
+        content
+            .backgroundPreferenceValue(BighelpChatPanelAnchors.self) { anchors in
+                GeometryReader { geometry in
+                    Color.clear
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                        .preference(key: BighelpChatPanelLayouts.self, value: [
+                            anchor: BighelpChatPanelLayout(
+                                rect: anchors[anchor].map { geometry[$0] }
+                                    ?? CGRect(x: geometry.size.width / 2, y: geometry.size.height / 2,
+                                              width: 1, height: 1),
+                                availableSize: geometry.size
+                            )
+                        ])
+                }
+            }
+            .onPreferenceChange(BighelpChatPanelLayouts.self) { layouts in
+                if let resolved = layouts[anchor] { layout = resolved }
+            }
+            .popover(isPresented: $isPresented,
+                     attachmentAnchor: layout.rect.isEmpty ? .rect(.bounds) : .rect(.rect(layout.rect)),
+                     arrowEdge: anchor == .attachments ? .bottom : .top) {
+                panel()
+                    .frame(width: min(560, max(280, layout.availableSize.width - 32)),
+                           height: min(620, max(300, layout.availableSize.height - 100)))
+                    .presentationCompactAdaptation(.popover)
+                    .onDisappear { onDismiss?() }
+            }
+    }
+}
+
+private struct BighelpChatPanelLayout: Equatable {
+    var rect: CGRect = .zero
+    var availableSize: CGSize = CGSize(width: 680, height: 740)
+}
+
+private struct BighelpChatPanelLayouts: PreferenceKey {
+    static var defaultValue: [BighelpChatPanelAnchor: BighelpChatPanelLayout] { [:] }
+
+    static func reduce(value: inout [BighelpChatPanelAnchor: BighelpChatPanelLayout],
+                       nextValue: () -> [BighelpChatPanelAnchor: BighelpChatPanelLayout]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, new in new })
+    }
+}
+
+private struct BighelpChatPanelAnchors: PreferenceKey {
+    static var defaultValue: [BighelpChatPanelAnchor: Anchor<CGRect>] { [:] }
+
+    static func reduce(value: inout [BighelpChatPanelAnchor: Anchor<CGRect>],
+                       nextValue: () -> [BighelpChatPanelAnchor: Anchor<CGRect>]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, new in new })
+    }
+}
+#endif

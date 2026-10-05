@@ -5,6 +5,23 @@ import UniformTypeIdentifiers
 
 // Attachment work remains bound to the existing conversation and view state.
 extension ChatDestinationView {
+    func attachmentPickerPresentation(_ binding: Binding<Bool>, onMac: Bool) -> Binding<Bool> {
+        BighelpPlatform.isMac == onMac ? binding : .constant(false)
+    }
+
+    private func presentAttachmentPicker(_ binding: Binding<Bool>) {
+        #if targetEnvironment(macCatalyst)
+        attachmentFlow.isActionMenuPresented = false
+        Task { @MainActor in
+            // Finish the popover dismissal before asking UIKit for its panel.
+            try? await Task.sleep(for: .milliseconds(200))
+            binding.wrappedValue = true
+        }
+        #else
+        binding.wrappedValue = true
+        #endif
+    }
+
     func performChatAction(_ action: ChatActionMenuAction) {
         switch action {
             case .camera:
@@ -43,9 +60,9 @@ extension ChatDestinationView {
                     isDocumentScannerPresented = true
                 }
             case .photo:
-                isPhotoPickerPresented = true
+                presentAttachmentPicker($isPhotoPickerPresented)
             case .file:
-                isFilePickerPresented = true
+                presentAttachmentPicker($isFilePickerPresented)
             case .voice:
                 attachmentFlow.isActionMenuPresented = false
                 Task { @MainActor in

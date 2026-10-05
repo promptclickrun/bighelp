@@ -64,6 +64,7 @@ struct ChatActionMenuSheet: View {
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Done") { dismiss() }
                             .foregroundStyle(theme.action)
+                            .bighelpToolbarText()
                             .accessibilityIdentifier("chat.action-drawer.done")
                             #if targetEnvironment(macCatalyst)
                             .keyboardShortcut(.cancelAction)
@@ -213,6 +214,9 @@ struct ChatActionMenuSheet: View {
                             .frame(maxWidth: .infinity, minHeight: BighelpTokens.hitTarget, alignment: .leading)
                             .contentShape(.rect)
                     }
+                    #if targetEnvironment(macCatalyst)
+        .bighelpPointerButtonStyle(.borderless)
+        #endif
                     .accessibilityIdentifier("chat.composer.menu.native-session-controls")
                 }
                 .listRowBackground(theme.surface)
@@ -235,6 +239,9 @@ struct ChatActionMenuSheet: View {
                 tint: action == .voice ? AnyShapeStyle(theme.action) : AnyShapeStyle(.secondary)
             )
         }
+        #if targetEnvironment(macCatalyst)
+        .bighelpPointerButtonStyle(.borderless)
+        #endif
         .disabled(unavailableReason(action) != nil || !ChatActionMenuAvailability.isEnabled(
             action,
             hasRuntimeControls: runtimeControls != nil,
@@ -255,6 +262,9 @@ struct ChatActionMenuSheet: View {
                 symbol: "doc.richtext"
             )
         }
+        #if targetEnvironment(macCatalyst)
+        .bighelpPointerButtonStyle(.borderless)
+        #endif
         .disabled(pdfPagesAvailability.unavailableReason != nil)
         .accessibilityIdentifier("chat.action.pdf-pages")
         .accessibilityHint(pdfPagesAvailability.unavailableReason ?? "")
@@ -517,7 +527,7 @@ struct ChatActionMenuSheet: View {
                         .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
                         .contentShape(.rect)
                     }
-                    .buttonStyle(.plain)
+                    .bighelpPlainButtonStyle(.rounded(BighelpTokens.radius12))
                 }
             }
             if let agentSelectionErrorMessage {
@@ -569,7 +579,7 @@ struct ChatActionMenuSheet: View {
                                     symbol: entry.kind == .skill ? "sparkles" : "puzzlepiece.extension"
                                 )
                             }
-                            .buttonStyle(.plain)
+                            .bighelpPlainButtonStyle(.rounded(BighelpTokens.radius12))
                             .disabled(!entry.isEnabled || slashCommandCatalog()?.isLoading == true)
                             .accessibilityIdentifier("chat.skills-plugins.\(entry.kind == .skill ? "skill" : "plugin").\(entry.id)")
                         }

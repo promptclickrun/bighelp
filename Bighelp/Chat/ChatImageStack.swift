@@ -60,7 +60,7 @@ struct ChatImageStackView: View {
         } label: {
             stack
         }
-        .buttonStyle(.plain)
+        .bighelpPlainButtonStyle(.rounded(BighelpTokens.radius20))
         .accessibilityLabel(ChatImageStackContent.countLabel(images.count))
         .accessibilityHint("Opens the photos to swipe through, save or share")
         .accessibilityIdentifier("chat.image-stack")
@@ -279,7 +279,7 @@ struct ChatImageStackViewer: View {
                                 .opacity(offset == index ? 1 : 0.6)
                                 .frame(minWidth: BighelpTokens.hitTarget, minHeight: BighelpTokens.hitTarget)
                         }
-                        .buttonStyle(.plain)
+                        .bighelpPlainButtonStyle(.rounded(BighelpTokens.radius12))
                         .id(offset)
                         .accessibilityLabel("Photo \(ChatImageStackContent.position(offset, of: images.count))")
                         .accessibilityAddTraits(offset == index ? .isSelected : [])

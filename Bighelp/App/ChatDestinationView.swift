@@ -496,11 +496,10 @@ struct ChatDestinationView: View {
         .sheet(isPresented: $isSessionFilesPresented) {
             ChatSessionFilesView(model: model)
         }
-        .sheet(isPresented: $isChatAppearancePresented) {
+        .bighelpChatPanel(isPresented: $isChatAppearancePresented, anchor: .appearance) {
             if let sessionAppearance {
                 NavigationStack { SessionAppearanceView(store: sessionAppearance) }
                     .presentationDragIndicator(.visible)
-                    .bighelpSheetSize(.standard)
             }
         }
         .onChange(of: voicePresentation != nil) { _, isPresented in
@@ -535,7 +534,7 @@ struct ChatDestinationView: View {
                     .presentationDragIndicator(.visible)
             }
         }
-        .sheet(isPresented: $attachmentFlow.isActionMenuPresented, onDismiss: {
+        .bighelpChatPanel(isPresented: $attachmentFlow.isActionMenuPresented, anchor: .attachments, onDismiss: {
             if requestsNativeControlsAfterMenu {
                 requestsNativeControlsAfterMenu = false
                 isNativeSessionControlsPresented = model.nativeConversationClient != nil
@@ -568,13 +567,13 @@ struct ChatDestinationView: View {
                 }
             )
             .photosPicker(
-                isPresented: $isPhotoPickerPresented,
+                isPresented: attachmentPickerPresentation($isPhotoPickerPresented, onMac: false),
                 selection: $photoSelections,
                 maxSelectionCount: max(0, 10 - model.draftAttachments.count),
                 matching: .images
             )
             .fileImporter(
-                isPresented: $isFilePickerPresented,
+                isPresented: attachmentPickerPresentation($isFilePickerPresented, onMac: false),
                 allowedContentTypes: [.item],
                 allowsMultipleSelection: true,
                 onCompletion: importFiles
@@ -599,10 +598,23 @@ struct ChatDestinationView: View {
             .presentationDetents([.fraction(0.72), .large])
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(BighelpTokens.radius20)
-            // A sheet, not a popover, on the Mac too: its rows open pickers,
-            // file panels and pages of their own.
-            .bighelpSheetSize(.standard)
         }
+        // Native Mac panels need a stable presenter outside the transient
+        // popover; presenting from inside it leaves the first click pending.
+        #if targetEnvironment(macCatalyst)
+        .photosPicker(
+            isPresented: attachmentPickerPresentation($isPhotoPickerPresented, onMac: true),
+            selection: $photoSelections,
+            maxSelectionCount: max(0, 10 - model.draftAttachments.count),
+            matching: .images
+        )
+        .fileImporter(
+            isPresented: attachmentPickerPresentation($isFilePickerPresented, onMac: true),
+            allowedContentTypes: [.item],
+            allowsMultipleSelection: true,
+            onCompletion: importFiles
+        )
+        #endif
         .sheet(isPresented: $isHermesWorkspacePickerPresented) {
             HermesWorkspacePickerView(
                 store: hermesWorkspaces,

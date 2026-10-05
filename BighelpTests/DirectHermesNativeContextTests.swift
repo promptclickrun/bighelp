@@ -368,3 +368,22 @@ struct DirectHermesNativeContextTests {
         }
     }
 }
+
+extension DirectHermesNativeContextTests {
+    /// The plugin says why this computer can't run Workflows (`unavailable`).
+    /// The reason must reach Workflows, or the app wrongly says "Update the plugin".
+    @Test func unavailableReasonsReachWorkflows() throws {
+        var value = context()
+        value["unavailable"] = .object(["native-workflows-v1": .string("chat_runner_missing"),
+                                        "native-workflows-edit-v1": .string("chat_runner_missing")])
+        let request = DirectHermesHTTPRequest(path: "/api/plugins/loopdy/native/context", method: .get)
+        let decoded = try DirectHermesNativeContext(response: try response(request, body: value), owner: owner())
+        #expect(WorkflowsSupport(context: decoded.projection) == .unavailable(code: "chat_runner_missing"))
+
+        // Bad entries are left out; the rest of the context still loads.
+        value["unavailable"] = .object(["native-workflows-v1": .integer(3), " padded": .string("x")])
+        let lenient = try DirectHermesNativeContext(response: try response(request, body: value), owner: owner())
+        #expect(lenient.unavailable.isEmpty)
+        #expect(WorkflowsSupport(context: lenient.projection) == .missing)
+    }
+}

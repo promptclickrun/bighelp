@@ -37,6 +37,9 @@ struct DirectHermesNativeContext: Equatable, Sendable {
     let userID: String?
     let displayName: String?
     let features: Set<String>
+    /// Features this computer can't offer, with the plugin's fixed reason code
+    /// (`{"native-workflows-v1": "chat_runner_missing"}`), so screens can say why.
+    let unavailable: [String: String]
     let etag: String
 
     init(response: DirectHermesHTTP.Response, owner: WorkspaceOwner) throws {
@@ -105,7 +108,21 @@ struct DirectHermesNativeContext: Equatable, Sendable {
         userID = user
         displayName = display
         self.features = features
+        unavailable = Self.unavailable(value["unavailable"])
         self.etag = etag
+    }
+
+    /// Lenient: a bad entry is left out, never failing the whole context.
+    private static func unavailable(_ value: BighelpJSONValue?) -> [String: String] {
+        guard let object = value?.object, object.count <= 64 else { return [:] }
+        var result: [String: String] = [:]
+        for (feature, reason) in object {
+            guard let code = reason.string, !code.isEmpty, code.utf8.count <= 64,
+                  (try? WorkspaceAuthority.validateIdentifier(feature, maximumBytes: 128)) != nil,
+                  (try? WorkspaceAuthority.validateIdentifier(code, maximumBytes: 64)) != nil else { continue }
+            result[feature] = code
+        }
+        return result
     }
 
     var projection: [String: BighelpJSONValue] {
@@ -118,6 +135,7 @@ struct DirectHermesNativeContext: Equatable, Sendable {
             ]) } ?? .null,
             "features": .array(features.sorted().map(BighelpJSONValue.string)),
         ]
+        .merging(unavailable.isEmpty ? [:] : ["unavailable": .object(unavailable.mapValues(BighelpJSONValue.string))]) { $1 }
     }
 }
 

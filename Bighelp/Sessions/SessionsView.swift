@@ -276,12 +276,23 @@ struct SessionsView: View {
             }
             .accessibilityIdentifier("sessions.filter.project")
 
+            if !model.availableOrigins.isEmpty {
+                Picker("Started in", selection: $model.originFilter) {
+                    Text("Everywhere").tag(SessionOriginFilter.all)
+                    ForEach(model.availableOrigins, id: \.self) { label in
+                        Text(label).tag(SessionOriginFilter.origin(label))
+                    }
+                }
+                .accessibilityIdentifier("sessions.filter.origin")
+            }
+
             if hasActiveFilters(model) {
                 Divider()
                 Button("Clear Filters", systemImage: "arrow.counterclockwise") {
                     model.typeFilter = .all
                     model.agentFilter = .all
                     model.projectFilter = .all
+                    model.originFilter = .all
                 }
                 .accessibilityIdentifier("sessions.filters.clear")
             }
@@ -761,6 +772,23 @@ struct SessionsView: View {
             .accessibilityValue(projectFilterTitle(model.effectiveProjectFilter))
             .accessibilityIdentifier("sessions.filter.project")
 
+            if !model.availableOrigins.isEmpty {
+                Menu {
+                    Button("Everywhere") { model.originFilter = .all }
+                    ForEach(model.availableOrigins, id: \.self) { label in
+                        Button(label) { model.originFilter = .origin(label) }
+                    }
+                } label: {
+                    Label(model.originFilter.title, systemImage: "arrow.down.left.square")
+                        .bighelpFont(.label)
+                        .foregroundStyle(theme.primaryText)
+                        .frame(minHeight: BighelpTokens.hitTarget)
+                }
+                .accessibilityLabel("Started in filter")
+                .accessibilityValue(model.originFilter.title)
+                .accessibilityIdentifier("sessions.filter.origin")
+            }
+
             Picker("Type", selection: Bindable(model).typeFilter) {
                 ForEach(SessionTypeFilter.allCases, id: \.self) { filter in
                     Text(filter.title).tag(filter)
@@ -1081,6 +1109,7 @@ struct SessionsView: View {
 
     private func hasActiveFilters(_ model: SessionsModel) -> Bool {
         model.typeFilter != .all || model.agentFilter != .all || model.projectFilter != .all
+            || model.originFilter != .all
     }
 
     private func filterAccessibilityValue(_ model: SessionsModel) -> String {
@@ -1089,6 +1118,7 @@ struct SessionsView: View {
             model.typeFilter.title,
             agentFilterTitle(model.agentFilter, model: model),
             projectFilterTitle(model.projectFilter),
+            model.originFilter.title,
         ].joined(separator: ", ")
     }
 

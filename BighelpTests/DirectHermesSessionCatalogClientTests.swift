@@ -602,6 +602,26 @@ struct DirectHermesSessionCatalogClientTests {
         #expect(workspace.calls.filter { $0.operation == .sessionsList }.count == 2)
     }
 
+    /// Hermes 0.21.x `/api/sessions` (#215): no `has_more`, and pinned sessions back-filled onto
+    /// every page past the limit, so a pinned row repeats. More than 100 sessions must still list.
+    @Test func pinnedRowsRepeatOnEveryStockHermesPage() async throws {
+        let workspace = try SessionWorkspaceStub()
+        workspace.handler = { operation, payload in
+            if operation == .profilesList { return Self.profiles() }
+            let offset = try #require(payload["offset"]?.integer)
+            // s-120 is pinned: it comes back-filled on page one and in its place on page two.
+            let page = (offset..<min(offset + 100, 150)).map { Self.session(id: "s-\($0)", pinned: $0 == 120) }
+            // Hermes' list_sessions_rich(include_pinned=True): the pin is added when the page missed it.
+            let pinned = offset == 100 ? [] : [Self.session(id: "s-120", pinned: true)]
+            return ["sessions": .array(page + pinned), "total": .integer(150), "offset": .integer(offset),
+                    "limit": .integer(100)]
+        }
+        let records = try await Self.client(workspace).list()
+        #expect(records.count == 150)
+        #expect(Set(records.compactMap(\.remoteStoredID)).count == 150)
+        #expect(workspace.calls.filter { $0.operation == .sessionsList }.count == 2, "total says when to stop")
+    }
+
     @Test func catalogRehydratesProjectAssociationFromAuthoritativeSessionCWD() async throws {
         let workspace = try SessionWorkspaceStub()
         workspace.handler = { operation, payload in
@@ -1290,11 +1310,11 @@ struct DirectHermesSessionCatalogClientTests {
         ])])]
     }
 
-    static func session(id: String, profile: String = "alpha", cwd: String? = nil) -> BighelpJSONValue {
+    static func session(id: String, profile: String = "alpha", cwd: String? = nil, pinned: Bool = false) -> BighelpJSONValue {
         var value: [String: BighelpJSONValue] = ["id": .string(id), "profile": .string(profile), "source": .string("tui"),
                  "_lineage_root_id": .string(id), "_lineage_ids": .array([.string(id)]),
                  "title": .string("Session"), "started_at": .number(1), "last_active": .number(2),
-                 "message_count": .integer(2), "is_active": .boolean(true), "pinned": .boolean(false),
+                 "message_count": .integer(2), "is_active": .boolean(true), "pinned": .boolean(pinned),
                  "archived": .boolean(false), "preview": .string("A real preview")]
         if let cwd { value["cwd"] = .string(cwd) }
         return .object(value)

@@ -31,6 +31,29 @@ struct SessionsModelTests {
         ])
     }
 
+    /// Each chat says where it started, and the list can show chats from one place.
+    @Test func chatsTagAndFilterByWhereTheyStarted() {
+        #expect(SessionOrigin.label("desktop") == "Hermes Desktop")
+        #expect(SessionOrigin.label("claude-code") == "Claude Code")
+        #expect(SessionOrigin.label("codex-cli") == "Codex")
+        #expect(SessionOrigin.label("TELEGRAM") == "Telegram")
+        #expect(SessionOrigin.label("some_new_place") == "Some New Place", "Unknown sources still read as words")
+        #expect(SessionOrigin.label(nil) == nil && SessionOrigin.label("  ") == nil)
+
+        let date = Date(timeIntervalSince1970: 100)
+        let records = [("a", "desktop"), ("b", "telegram"), ("c", "hermes-desktop"), ("d", nil)].map { id, source in
+            SessionRecord(id: id, kind: .direct, agentIDs: ["juno"], title: id, remoteSource: source,
+                          createdAt: date, updatedAt: date, hasAcceptedMessage: true)
+        }
+        let model = SessionsModel(fixtures: records, calendar: Calendar(identifier: .gregorian))
+        #expect(model.availableOrigins == ["Hermes Desktop", "Telegram"])
+        #expect(model.filteredSections.flatMap(\.sessions).first { $0.id == "b" }?.origin == "telegram")
+        model.originFilter = .origin("Hermes Desktop")
+        #expect(Set(model.filteredSections.flatMap(\.sessions).map(\.id)) == ["a", "c"])
+        model.originFilter = .all
+        #expect(model.filteredSections.flatMap(\.sessions).count == 4)
+    }
+
     @Test func activitySortIsStableAndFilteringPreservesSectionPriority() {
         let date = Date(timeIntervalSince1970: 100)
         let records = ["z", "a", "m"].map { id in

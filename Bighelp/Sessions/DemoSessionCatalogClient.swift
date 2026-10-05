@@ -99,11 +99,14 @@ final class DemoSessionCatalogClient: SessionCatalogClient {
         }
         let kind: SessionKind = agentIDs.count > 1 ? .botMode : .direct
         let updatedAt = Date.now.addingTimeInterval(TimeInterval(-index * 3_600))
+        // Where each chat started, as Hermes reports it, for the tags and the Started in filter.
+        let sources = ["desktop", "telegram", "tui", "claude-code", "codex-cli", "bighelp"]
         return SessionRecord(
             id: "demo-session-\(index)",
             kind: kind,
             agentIDs: agentIDs,
             title: "\(kind == .botMode ? "Shared" : "Direct") session \(index)",
+            remoteSource: kind == .botMode ? nil : sources[index % sources.count],
             items: [
                 TimelineItem(
                     id: "demo-session-\(index)-message",

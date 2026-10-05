@@ -51,9 +51,11 @@ struct ChatEdgeBlurTests {
         #expect(anchor.interaction.scrollView === scrollView)
         #expect(anchor.interaction.edge == (edge == .top ? .top : .bottom))
         #expect((edge == .top ? scrollView.topEdgeEffect : scrollView.bottomEdgeEffect).style == .soft)
-        // The invisible text that sizes the effect runs along the inner side, where the messages start.
+        // The invisible text that sizes the effect sits inside the inner side, so the effect's own
+        // fade ends where the header (or message box) does, not over the messages.
         #expect(anchor.extentMarker.frame.width == 400)
-        #expect(edge == .top ? anchor.extentMarker.frame.maxY == 200 : anchor.extentMarker.frame.minY == 0)
+        let inset = ChatEdgeBlurMetrics.inset(for: edge)
+        #expect(edge == .top ? anchor.extentMarker.frame.maxY == 200 - inset : anchor.extentMarker.frame.minY == inset)
         #expect(anchor.extentMarker.textColor == .clear)
         #expect(!anchor.isUserInteractionEnabled)
         #expect(anchor.hitTest(CGPoint(x: 200, y: 100), with: nil) == nil)

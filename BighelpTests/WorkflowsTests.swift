@@ -627,7 +627,7 @@ struct WorkflowsStoreTests {
                                           "notes": .string(""), "decidedAt": .string("2026-01-02T03:04:05Z")])]),
         ]))
         #expect(stage.uses == ["draft.draft"] && stage.decisions.first?.decision == "approve")
-        #expect(WorkflowRunStageSheet.signoffWords(try #require(stage.decisions.first)) == "Approved by you (version 2)")
+        #expect(WorkflowRunStagePage.signoffWords(try #require(stage.decisions.first)) == "Approved by you (version 2)")
     }
 
     @Test func pickerSchedulesComeBackFromTheirCronExpressions() throws {

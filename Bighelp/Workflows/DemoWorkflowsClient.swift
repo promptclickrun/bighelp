@@ -354,8 +354,13 @@ final class DemoWorkflowsClient: WorkflowsClient {
         yourTemplates.reversed().map(\.template)
             + [WorkflowTemplate(id: "research-draft-review", name: "Research, draft, review",
                                 description: "One agent researches, another writes, a third reviews. You approve the result.",
-                                stageCount: 6)]
+                                stageCount: 6),
+               WorkflowTemplate(id: "three-takes", name: "Three takes, one answer",
+                                description: "Three agents answer at the same time from different angles. When all three agree, one writes the answer from them, and you sign it off.",
+                                stageCount: 4)]
     }
+
+    func supportsParallel() async -> Bool { true }
 
     func useTemplate(id: String) async throws -> String {
         await pause()
@@ -364,6 +369,8 @@ final class DemoWorkflowsClient: WorkflowsClient {
         var definition: WorkflowDefinition
         if let yours = yourTemplates.first(where: { $0.template.id == id }) {
             definition = yours.definition
+        } else if id == "three-takes" {
+            definition = Self.threeTakes
         } else {
             definition = Self.researchDraftReview
             definition.name = "Research, draft, review \(order.count)"
@@ -407,7 +414,7 @@ final class DemoWorkflowsClient: WorkflowsClient {
     }
 
     private func summary(_ workflow: Workflow) -> WorkflowSummary {
-        let used = Set(workflow.definition.stages.filter { $0.kind == .agent }.compactMap(\.role))
+        let used = Set(workflow.definition.allStages.filter { $0.kind == .agent }.compactMap(\.role))
         let unbound = workflow.definition.roles.map(\.key).filter { used.contains($0) && workflow.bindings[$0] == nil }
         return WorkflowSummary(id: workflow.id, name: workflow.definition.name, revision: workflow.revision,
                                hasDraft: workflow.hasDraft, stageCount: workflow.definition.stages.count,
@@ -418,7 +425,7 @@ final class DemoWorkflowsClient: WorkflowsClient {
 
     private func validation(_ workflow: Workflow) -> WorkflowValidation {
         var issues: [WorkflowValidation.Issue] = []
-        for stage in workflow.definition.stages where stage.kind == .agent {
+        for stage in workflow.definition.allStages where stage.kind == .agent {
             if stage.role == nil || workflow.definition.role(stage.role) == nil {
                 issues.append(.init(stageKey: stage.key, code: "role_missing",
                                     message: "\(stage.title) needs a role.", isError: true))
@@ -436,7 +443,7 @@ final class DemoWorkflowsClient: WorkflowsClient {
         issues += workflow.definition.graph.issues(workflow.definition)
         // Like the host: a role a stage uses needs an agent. `valid` leaves
         // this out; it is about the definition, not this computer.
-        let used = Set(workflow.definition.stages.filter { $0.kind == .agent }.compactMap(\.role))
+        let used = Set(workflow.definition.allStages.filter { $0.kind == .agent }.compactMap(\.role))
         let valid = !issues.contains(where: \.isError)
         for role in workflow.definition.roles where used.contains(role.key) && workflow.bindings[role.key] == nil {
             issues.append(.init(stageKey: nil, code: "role_unbound", message: "Choose an agent for \(role.label).",
@@ -507,7 +514,19 @@ final class DemoWorkflowsClient: WorkflowsClient {
         let tokens = run.fallbackRunner ? nil : counted.reduce(WorkflowTokens(input: 0, output: 0)) {
             WorkflowTokens(input: $0.input + $1.input, output: $0.output + $1.output)
         }
-        return WorkflowRunDetail(summary: run.summary, inputs: run.inputs, stages: stages, outputs: run.outputs,
+        // Like the host: each parallel block's agents follow it, in the block's state.
+        let shown = stages.flatMap { item -> [WorkflowRunStage] in
+            guard let block = definition.stage(item.key), block.kind == .parallel else { return [item] }
+            return [item] + block.branches.map { branch in
+                var agent = WorkflowRunStage(key: branch.key, kind: .agent, title: branch.title, role: branch.role,
+                                             agentID: workflow?.bindings[branch.role ?? ""], iteration: item.iteration,
+                                             state: item.state, minutes: Double(definition.stageMinutes), attempts: [])
+                agent.group = block.key
+                agent.uses = branch.reads
+                return agent
+            }
+        }
+        return WorkflowRunDetail(summary: run.summary, inputs: run.inputs, stages: shown, outputs: run.outputs,
                                  signoff: signoff, tokens: tokens, allowedActions: actions)
     }
 
@@ -682,6 +701,53 @@ final class DemoWorkflowsClient: WorkflowsClient {
     }
 
     // MARK: Made-up content
+
+    /// Like the plugin's template: a parallel block of three agents, a decision on all three verdicts,
+    /// one answer from them, and your sign-off.
+    static var threeTakes: WorkflowDefinition {
+        func take(_ key: String, _ role: String, _ title: String) -> BighelpJSONValue {
+            .object(["key": .string(key), "kind": .string("agent"), "title": .string(title), "role": .string(role),
+                     "instructions": .string("Answer the question from this angle: \(title.lowercased())."),
+                     "tools": .array([.string("web")]), "uses": .array([.string("inputs.question")]),
+                     "outputs": .array([
+                        .object(["name": .string("answer"), "type": .string("markdown_file")]),
+                        .object(["name": .string("decision"), "type": .string("decision"),
+                                 "values": .array([.string("pass"), .string("changes")])]),
+                        .object(["name": .string("notes"), "type": .string("notes")]),
+                     ])])
+        }
+        return WorkflowDefinition(json: [
+            "schemaVersion": .integer(2),
+            "name": .string("Three takes, one answer"),
+            "description": .string("Three agents answer at the same time from different angles."),
+            "roles": .array([
+                .object(["key": .string("researcher"), "label": .string("Researcher")]),
+                .object(["key": .string("skeptic"), "label": .string("Skeptic")]),
+                .object(["key": .string("practitioner"), "label": .string("Practitioner")]),
+                .object(["key": .string("writer"), "label": .string("Writer")]),
+            ]),
+            "inputs": .array([.object(["key": .string("question"), "label": .string("Question"),
+                                       "type": .string("long_text"), "required": .boolean(true)])]),
+            "stages": .array([
+                .object(["key": .string("takes"), "kind": .string("parallel"), "title": .string("Three takes at once"),
+                         "next": .string("agree"),
+                         "branches": .array([take("facts", "researcher", "The facts"),
+                                             take("risks", "skeptic", "The risks"),
+                                             take("practice", "practitioner", "In practice")])]),
+                .object(["key": .string("agree"), "kind": .string("decision"), "title": .string("All three agree"),
+                         "on": .array([.string("facts.decision"), .string("risks.decision"),
+                                       .string("practice.decision")]),
+                         "pass": .string("answer"), "changes": .object(["goTo": .string("takes")])]),
+                .object(["key": .string("answer"), "kind": .string("agent"), "title": .string("One answer"),
+                         "role": .string("writer"), "instructions": .string("Write one answer from the three takes."),
+                         "uses": .array([.string("facts.answer"), .string("risks.answer"), .string("practice.answer")]),
+                         "outputs": .array([.object(["name": .string("answer"), "type": .string("markdown_file")])]),
+                         "next": .string("signoff")]),
+                .object(["key": .string("signoff"), "kind": .string("signoff"), "title": .string("Your sign-off"),
+                         "file": .string("answer.answer"), "next": .null]),
+            ]),
+        ])
+    }
 
     static var researchDraftReview: WorkflowDefinition {
         WorkflowDefinition(json: [

@@ -50,9 +50,13 @@ protocol WorkflowsClient: AnyObject {
     func unarchive(workflowID: String) async throws
     /// Manual or scheduled (`native-workflows-trigger-v1`). Returns the saved trigger.
     func setTrigger(workflowID: String, trigger: WorkflowTrigger) async throws -> WorkflowTrigger
+    /// The plugin runs parallel blocks (`native-workflows-parallel-v1`).
+    func supportsParallel() async -> Bool
 }
 
 extension WorkflowsClient {
+    func supportsParallel() async -> Bool { false }
+
     /// The plugin's own check, read like the rest: true when Workflows run here.
     func isAvailable() async throws -> Bool {
         if case .available = try await support() { return true }
@@ -80,6 +84,16 @@ final class DirectHermesWorkflowsClient: WorkflowsClient {
         let (workspace, owner) = try await connection()
         return WorkflowsSupport(context: try await workspace.perform(.nativeContext, payload: [:], owner: owner))
     }
+
+    func supportsParallel() async -> Bool {
+        guard let connection = try? await connection(),
+              let context = try? await connection.0.perform(.nativeContext, payload: [:], owner: connection.1) else {
+            return false
+        }
+        return WorkflowDecode.strings(context["features"], max: 400).contains(Self.parallelFeature)
+    }
+
+    static let parallelFeature = "native-workflows-parallel-v1"
 
     func status() async throws -> WorkflowStatus {
         WorkflowStatus(json: try await perform(.workflowsStatus, [:]))

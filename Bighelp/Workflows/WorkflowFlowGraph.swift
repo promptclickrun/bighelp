@@ -167,10 +167,13 @@ struct WorkflowFlowGraph: Equatable, Sendable {
         // What a stage reads (its uses, a check's rules, a decision's result,
         // a sign-off's file) must be made on every way to it.
         for stage in definition.stages where reached.contains(stage.key) {
-            let reads = stage.uses + stage.rules.map(\.of) + [stage.on, stage.file].compactMap { $0 }
+            // A parallel block reads what its agents read; an agent's work stands for its block.
+            let reads = ([stage] + stage.branches).flatMap { item in
+                item.uses + item.rules.map(\.of) + item.sources + [item.file].compactMap { $0 }
+            }
             let sources = Set(reads.compactMap { read -> String? in
                 let head = read.split(separator: ".", maxSplits: 1).first.map(String.init)
-                return head == "inputs" ? nil : head
+                return head == "inputs" ? nil : head.map { definition.parent(of: $0)?.key ?? $0 }
             })
             for source in sources where source != stage.key {
                 if !known.contains(source)

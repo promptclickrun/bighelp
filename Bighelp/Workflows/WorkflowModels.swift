@@ -509,12 +509,22 @@ struct WorkflowDefinition: Equatable, Sendable {
     }
 
     func role(_ key: String?) -> Role? { roles.first { $0.key == key } }
-    func stage(_ key: String?) -> WorkflowStage? { stages.first { $0.key == key } }
+    /// A stage by key, the agents inside parallel blocks included.
+    func stage(_ key: String?) -> WorkflowStage? { allStages.first { $0.key == key } }
+
+    /// Every stage in list order, each parallel block followed by its agents.
+    var allStages: [WorkflowStage] { stages.flatMap { [$0] + $0.branches } }
+
+    /// The parallel block an agent belongs to, or nil for a stage in the flow itself.
+    func parent(of key: String?) -> WorkflowStage? {
+        stages.first { $0.branches.contains { $0.key == key } }
+    }
 }
 
 struct WorkflowStage: Equatable, Sendable, Identifiable {
     enum Kind: Hashable, Sendable {
-        case agent, check, decision, signoff
+        /// `parallel`: a block of agent stages that run at the same time (`native-workflows-parallel-v1`).
+        case agent, check, decision, signoff, parallel
         case unknown(String)
 
         init(_ raw: String) {
@@ -523,6 +533,7 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
             case "check": self = .check
             case "decision": self = .decision
             case "signoff": self = .signoff
+            case "parallel": self = .parallel
             default: self = .unknown(raw)
             }
         }
@@ -533,6 +544,7 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
             case .check: "check"
             case .decision: "decision"
             case .signoff: "signoff"
+            case .parallel: "parallel"
             case .unknown(let raw): raw
             }
         }
@@ -543,6 +555,7 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
             case .check: "Check"
             case .decision: "Decision"
             case .signoff: "Sign-off"
+            case .parallel: "Parallel agents"
             case .unknown: "Stage"
             }
         }
@@ -553,6 +566,7 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
             case .check: "checkmark.shield"
             case .decision: "arrow.triangle.branch"
             case .signoff: "person.badge.shield.checkmark"
+            case .parallel: "rectangle.split.3x1"
             case .unknown: "square.dashed"
             }
         }
@@ -650,6 +664,12 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
     var changesMaxRevisions: Int?
     /// Sign-off: the file you approve (`draft.draft`).
     var file: String?
+    /// Decision: several verdicts at once (a parallel block's agents); `on` is the first of them.
+    var onMany: [String] = []
+    /// Decision with several verdicts: "all" must pass (the host's default) or "any".
+    var require: String?
+    /// Parallel block: its agent stages, which all run at the same time.
+    var branches: [WorkflowStage] = []
     private var extra: WorkflowJSON
     private var changesExtra: WorkflowJSON
 
@@ -669,7 +689,14 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
         }
         minutes = WorkflowDecode.int(json["minutes"])
         rules = WorkflowDecode.objects(json["rules"], max: 20).map(Rule.init(json:))
-        on = WorkflowDecode.string(json["on"], max: 128)
+        if json["on"]?.array != nil {
+            onMany = WorkflowDecode.strings(json["on"], max: 5)
+            on = onMany.first
+        } else {
+            on = WorkflowDecode.string(json["on"], max: 128)
+        }
+        require = WorkflowDecode.string(json["require"], max: 8)
+        branches = WorkflowDecode.objects(json["branches"], max: 5).compactMap(WorkflowStage.init(json:))
         pass = WorkflowDecode.string(json["pass"], max: 64)
         let changes = json["changes"]?.object ?? [:]
         changesGoTo = WorkflowDecode.string(changes["goTo"], max: 64)
@@ -682,7 +709,7 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
         default: next = .following
         }
         let known: Set<String> = ["key", "kind", "title", "next", "role", "instructions", "tools", "uses", "outputs",
-                                  "minutes", "rules", "on", "pass", "changes", "file"]
+                                  "minutes", "rules", "on", "pass", "changes", "file", "require", "branches"]
         extra = json.filter { !known.contains($0.key) }
     }
 
@@ -704,6 +731,7 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
         case .check: title = "Check"
         case .decision: title = "Decision"
         case .signoff: title = "Your sign-off"
+        case .parallel: title = "Parallel agents"
         case .unknown: title = "Stage"
         }
         role = nil
@@ -715,6 +743,16 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
         rules = []
         extra = [:]
         changesExtra = [:]
+        if kind == .parallel {
+            // Three agents to start with: the block runs 2 to 5.
+            var taken = existing + [self]
+            for letter in ["A", "B", "C"] {
+                var branch = WorkflowStage(new: .agent, existing: taken)
+                branch.title = "Agent \(letter)"
+                taken.append(branch)
+                branches.append(branch)
+            }
+        }
     }
 
     var json: WorkflowJSON {
@@ -745,7 +783,12 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
             // The editor shows rules but doesn't change them: each goes back as it came.
             value["rules"] = .array(rules.map { .object($0.raw) })
         case .decision:
-            if let on { value["on"] = .string(on) }
+            if onMany.count > 1 {
+                value["on"] = .array(onMany.map(BighelpJSONValue.string))
+            } else if let on {
+                value["on"] = .string(on)
+            }
+            if let require { value["require"] = .string(require) }
             if let pass { value["pass"] = .string(pass) }
             var changes = changesExtra
             if let changesGoTo { changes["goTo"] = .string(changesGoTo) }
@@ -753,11 +796,16 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
             if !changes.isEmpty { value["changes"] = .object(changes) }
         case .signoff:
             if let file { value["file"] = .string(file) }
+        case .parallel:
+            value["branches"] = .array(branches.map { .object($0.json) })
         case .unknown:
             break
         }
         return value
     }
+
+    /// The decisions a decision stage reads: one, or several (a parallel block's agents).
+    var sources: [String] { onMany.count > 1 ? onMany : on.map { [$0] } ?? [] }
 
     /// One line under the stage's title: "writer → quill", "700-1,100 words · has title".
     func subtitle(agentName: (String?) -> String?) -> String {
@@ -766,8 +814,11 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
             let agent = agentName(role) ?? "no agent yet"
             return [role, agent].compactMap { $0 }.joined(separator: " → ")
         case .check: return rules.map(\.summary).joined(separator: " · ")
-        case .decision: return on ?? ""
+        case .decision: return sources.count > 1 ? "\(sources.count) verdicts" : on ?? ""
         case .signoff: return "approval → you"
+        case .parallel:
+            let names = branches.map { agentName($0.role) ?? "no agent yet" }
+            return "\(branches.count) at once · " + names.joined(separator: ", ")
         case .unknown: return ""
         }
     }
@@ -1003,6 +1054,8 @@ struct WorkflowRunStage: Equatable, Sendable, Identifiable {
     var uses: [String] = []
     /// A sign-off stage's decisions by the person, oldest first.
     var decisions: [WorkflowStageDecision] = []
+    /// The parallel block this agent runs in, with the others.
+    var group: String?
 
     init?(json: WorkflowJSON) {
         guard let key = WorkflowDecode.string(json["key"], max: 64) else { return nil }
@@ -1019,6 +1072,7 @@ struct WorkflowRunStage: Equatable, Sendable, Identifiable {
         attempts = WorkflowDecode.objects(json["attempts"], max: 50).compactMap(WorkflowAttempt.init(json:))
         uses = WorkflowDecode.strings(json["uses"], max: 32)
         decisions = WorkflowDecode.objects(json["decisions"], max: 20).compactMap(WorkflowStageDecision.init(json:))
+        group = WorkflowDecode.string(json["group"], max: 64)
     }
 
     init(key: String, kind: WorkflowStage.Kind, title: String, role: String?, agentID: String?, iteration: Int,
@@ -1511,9 +1565,9 @@ extension WorkflowStage {
         let all: [String] = switch kind {
         case .agent: uses
         case .check: rules.map(\.of)
-        case .decision: on.map { [$0] } ?? []
+        case .decision: sources
         case .signoff: file.map { [$0] } ?? []
-        default: []
+        case .parallel, .unknown: []
         }
         var seen = Set<String>()
         return all.filter { seen.insert($0).inserted }

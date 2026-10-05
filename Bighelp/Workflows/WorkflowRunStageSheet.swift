@@ -6,11 +6,30 @@ struct WorkflowStageSelection: Identifiable, Hashable {
 }
 
 /// One stage of a run, live or finished: how it ended, who decided, what it
-/// read and what it made. Tap a file to read it.
+/// read and what it made. Tap a file to read it; tap a parallel block's agent
+/// to open it.
 struct WorkflowRunStageSheet: View {
     let model: WorkflowRunModel
     let context: WorkflowsContext
     let stageKey: String
+
+    var body: some View {
+        NavigationStack {
+            WorkflowRunStagePage(model: model, context: context, stageKey: stageKey, isRoot: true)
+                .navigationDestination(for: WorkflowStageSelection.self) { selection in
+                    WorkflowRunStagePage(model: model, context: context, stageKey: selection.id, isRoot: false)
+                }
+        }
+        .accessibilityIdentifier("workflows.run.stage-sheet")
+    }
+}
+
+/// The page of one stage in `WorkflowRunStageSheet`.
+struct WorkflowRunStagePage: View {
+    let model: WorkflowRunModel
+    let context: WorkflowsContext
+    let stageKey: String
+    let isRoot: Bool
     @State private var opened: WorkflowOutput?
     @Environment(\.dismiss) private var dismiss
     @BighelpThemeReader private var theme
@@ -19,7 +38,6 @@ struct WorkflowRunStageSheet: View {
     private var stage: WorkflowRunStage? { detail?.stages.first { $0.key == stageKey } }
 
     var body: some View {
-        NavigationStack {
             Form {
                 if let detail, let stage {
                     Section { header(stage) }
@@ -37,17 +55,17 @@ struct WorkflowRunStageSheet: View {
             .navigationTitle(stage?.title ?? "Stage")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                        .bighelpDefaultAction()
+                if isRoot {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { dismiss() }
+                            .bighelpDefaultAction()
+                    }
                 }
             }
             .sheet(item: $opened) { output in
                 WorkflowRunFileSheet(model: model, context: context, output: output)
                     .bighelpSheetSize(.large)
             }
-        }
-        .accessibilityIdentifier("workflows.run.stage-sheet")
     }
 
     // MARK: Header
@@ -76,6 +94,16 @@ struct WorkflowRunStageSheet: View {
     @ViewBuilder
     private func result(_ stage: WorkflowRunStage, in detail: WorkflowRunDetail) -> some View {
         switch stage.kind {
+        case .decision where stage.uses.count > 1:
+            Section("Verdicts") {
+                ForEach(stage.uses, id: \.self) { reference in
+                    let decided = detail.output(reference)
+                    let producer = detail.stages.first { $0.key == decided?.stageKey }
+                    row(context.agentName(producer?.agentID) ?? producer?.title ?? reference,
+                        Self.decisionWords(decided?.value?.displayText))
+                }
+            }
+            .accessibilityIdentifier("workflows.run.stage.verdicts")
         case .decision:
             Section("Decision") {
                 if let reference = stage.uses.first, let decided = detail.output(reference) {
@@ -118,6 +146,33 @@ struct WorkflowRunStageSheet: View {
                         }
                     }
                 }
+            }
+        case .parallel:
+            Section {
+                ForEach(detail.stages.filter { $0.group == stage.key }) { agent in
+                    NavigationLink(value: WorkflowStageSelection(id: agent.key)) {
+                        HStack(spacing: BighelpTokens.space12) {
+                            WorkflowStageIcon(kind: .agent, size: 32)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(agent.title).font(.bighelp(.body))
+                                Text(context.agentName(agent.agentID) ?? "An agent")
+                                    .font(.bighelp(.caption))
+                                    .foregroundStyle(theme.secondaryText)
+                            }
+                            Spacer(minLength: 0)
+                            Label(agent.state.title, systemImage: agent.state == .planned ? "circle" : agent.state.symbol)
+                                .font(.bighelp(.caption).weight(.semibold))
+                                .foregroundStyle(agent.state == .planned ? theme.tertiaryText : agent.state.color(theme))
+                        }
+                        .frame(minHeight: BighelpTokens.hitTarget)
+                    }
+                    .accessibilityIdentifier("workflows.run.stage.agent.\(agent.key)")
+                }
+            } header: {
+                Text("Agents at the same time")
+            } footer: {
+                Text("The workflow goes on when every one is done.")
+                    .font(.bighelp(.footnote))
             }
         case .check:
             Section("Check") {

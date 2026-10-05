@@ -29,11 +29,15 @@ final class WorkflowEditorModel {
     @ObservationIgnored private var saveTask: Task<Void, Never>?
     @ObservationIgnored private let saveDelay: Duration
 
+    /// The plugin runs parallel blocks (`native-workflows-parallel-v1`): the editor offers them.
+    let canParallel: Bool
+
     init(workflowID: String, client: any WorkflowsClient, hasDraft: Bool = false, canEditFlow: Bool = false,
-         saveDelay: Duration = .milliseconds(700)) {
+         canParallel: Bool = false, saveDelay: Duration = .milliseconds(700)) {
         self.workflowID = workflowID
         self.client = client
         self.canEditFlow = canEditFlow
+        self.canParallel = canParallel
         self.saveDelay = saveDelay
         hasUnpublishedDraft = hasDraft
     }
@@ -43,7 +47,7 @@ final class WorkflowEditorModel {
 
     /// The roles agent stages use now.
     var usedRoleKeys: Set<String> {
-        Set((definition?.stages ?? []).filter { $0.kind == .agent }.compactMap(\.role))
+        Set((definition?.allStages ?? []).filter { $0.kind == .agent }.compactMap(\.role))
     }
 
     /// Roles a stage uses that no agent does yet. Roles no stage uses don't count.
@@ -92,9 +96,31 @@ final class WorkflowEditorModel {
 
     // MARK: Changing the draft
 
+    /// Puts a changed stage back: a stage of the flow, or an agent in its parallel block.
     func update(_ stage: WorkflowStage) {
-        guard let index = definition?.stages.firstIndex(where: { $0.key == stage.key }) else { return }
-        definition?.stages[index] = stage
+        guard let stages = definition?.stages else { return }
+        if let index = stages.firstIndex(where: { $0.key == stage.key }) {
+            definition?.stages[index] = stage
+        } else if let group = stages.firstIndex(where: { $0.branches.contains { $0.key == stage.key } }),
+                  let branch = stages[group].branches.firstIndex(where: { $0.key == stage.key }) {
+            definition?.stages[group].branches[branch] = stage
+        }
+    }
+
+    /// A new agent for a parallel block, filled in like a new agent stage. Not yet in the draft:
+    /// the block's editor adds it.
+    func newBranch(in block: WorkflowStage) -> WorkflowStage? {
+        guard var definition else { return nil }
+        var taken = definition.allStages
+        taken.append(contentsOf: block.branches.filter { branch in !taken.contains { $0.key == branch.key } })
+        var branch = WorkflowStage(new: .agent, existing: taken)
+        branch.title = "Agent \(block.branches.count + 1)"
+        let earlier = earlierStages(than: definition.parent(of: block.key)?.key ?? block.key, in: definition)
+            .filter { $0.key != block.key }
+        WorkflowStageDefaults.fill(&branch, earlier: earlier, definition: &definition)
+        branch.uses = definition.inputs.map { "inputs.\($0.key)" }
+        self.definition?.roles = definition.roles
+        return branch
     }
 
     /// A new agent stage (the stage editor opens on it; Done saves).
@@ -111,7 +137,7 @@ final class WorkflowEditorModel {
         let atStart = key == WorkflowCanvasLayout.inputsKey
         let anchor = atStart ? nil : key ?? (canEditFlow ? nil : definition.stages.last?.key)
         let earlier = atStart ? [] : earlierStages(than: anchor, in: definition)
-        var stage = WorkflowStage(new: kind, existing: definition.stages)
+        var stage = WorkflowStage(new: kind, existing: definition.allStages)
         WorkflowStageDefaults.fill(&stage, earlier: earlier, definition: &definition)
         if canEditFlow {
             let before = WorkflowCanvasLayout.positions(definition)
@@ -138,7 +164,7 @@ final class WorkflowEditorModel {
     }
 
     /// The stages that run before a new one placed after `anchor`.
-    private func earlierStages(than anchor: String?, in definition: WorkflowDefinition) -> [WorkflowStage] {
+    func earlierStages(than anchor: String?, in definition: WorkflowDefinition) -> [WorkflowStage] {
         guard let anchor, let index = definition.stages.firstIndex(where: { $0.key == anchor }) else {
             return definition.stages
         }
@@ -305,7 +331,7 @@ final class WorkflowEditorModel {
             return shared.key
         }
         if let own = stage.role, definition.role(own) != nil,
-           !definition.stages.contains(where: { $0.key != stage.key && $0.kind == .agent && $0.role == own }) {
+           !definition.allStages.contains(where: { $0.key != stage.key && $0.kind == .agent && $0.role == own }) {
             return own
         }
         return addRole(named: stage.title)
@@ -433,7 +459,10 @@ final class WorkflowEditorModel {
 /// sign-off shows the latest file.
 enum WorkflowStageDefaults {
     static func fill(_ stage: inout WorkflowStage, earlier: [WorkflowStage], definition: inout WorkflowDefinition) {
-        let outputs = earlier.flatMap { stage in stage.outputs.map { (stage: stage, output: $0) } }
+        // A parallel block's agents made outputs too.
+        let outputs = earlier.flatMap { [$0] + $0.branches }.flatMap { stage in
+            stage.outputs.map { (stage: stage, output: $0) }
+        }
         switch stage.kind {
         case .agent:
             if definition.roles.isEmpty {
@@ -445,7 +474,25 @@ enum WorkflowStageDefaults {
                 stage.rules = [.init(kind: "not_empty", of: "\(latest.stage.key).\(latest.output.name)")]
             }
         case .decision:
-            let agents = earlier.filter { $0.kind == .agent }
+            let agents = earlier.filter { $0.kind == .agent || $0.kind == .parallel }
+            if let block = earlier.last, block.kind == .parallel, !block.branches.isEmpty,
+               let index = definition.stages.firstIndex(where: { $0.key == block.key }) {
+                // Right after a parallel block: read every agent's verdict, and send changes back to the block.
+                for branch in definition.stages[index].branches.indices
+                where !definition.stages[index].branches[branch].outputs.contains(where: { $0.type == "decision" }) {
+                    definition.stages[index].branches[branch].outputs.append(
+                        .init(name: "decision", type: "decision", values: ["pass", "changes"]))
+                }
+                stage.onMany = definition.stages[index].branches.map { branch in
+                    "\(branch.key).\(branch.outputs.first { $0.type == "decision" }?.name ?? "decision")"
+                }
+                stage.on = stage.onMany.first
+                stage.title = "All agree"
+                stage.pass = "next"
+                stage.changesGoTo = block.key
+                stage.changesMaxRevisions = definition.maxRevisions
+                return
+            }
             if let decided = outputs.last(where: { $0.output.type == "decision" }) {
                 stage.on = "\(decided.stage.key).\(decided.output.name)"
             } else if let reviewer = agents.last, let index = definition.stages.firstIndex(where: { $0.key == reviewer.key }) {
@@ -465,6 +512,12 @@ enum WorkflowStageDefaults {
                 stage.file = "\(file.stage.key).\(file.output.name)"
             } else {
                 stage.file = "\(earlier.last { $0.kind == .agent }?.key ?? "stage1").result"
+            }
+        case .parallel:
+            // Each agent starts like a new agent stage: a role, and the workflow's inputs to read.
+            for index in stage.branches.indices {
+                fill(&stage.branches[index], earlier: earlier, definition: &definition)
+                stage.branches[index].uses = definition.inputs.map { "inputs.\($0.key)" }
             }
         case .unknown:
             break

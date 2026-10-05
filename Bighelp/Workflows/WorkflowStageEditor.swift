@@ -14,6 +14,8 @@ struct WorkflowStageEditor: View {
     @State private var tab: Tab = .setup
     @State private var isSaving = false
     @State private var isAssigning = false
+    /// A parallel block's agent being edited in its own sheet.
+    @State private var editingBranch: WorkflowStage?
     @Environment(\.dismiss) private var dismiss
     @BighelpThemeReader private var theme
 
@@ -24,17 +26,22 @@ struct WorkflowStageEditor: View {
     }
 
     private var isNew: Bool { model.detail?.definition.stage(stage.key) == nil }
+    /// An agent inside a parallel block: its block adds and removes it.
+    private var block: WorkflowStage? { model.definition?.parent(of: stage.key) }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
                     header
-                    Picker("Part", selection: $tab) {
-                        ForEach(Tab.allCases) { Text($0.rawValue).tag($0) }
+                    // A parallel block's agents each have their own output and limits.
+                    if stage.kind != .parallel {
+                        Picker("Part", selection: $tab) {
+                            ForEach(Tab.allCases) { Text($0.rawValue).tag($0) }
+                        }
+                        .bighelpSegmentedPicker()
+                        .accessibilityIdentifier("workflows.stage.tabs")
                     }
-                    .bighelpSegmentedPicker()
-                    .accessibilityIdentifier("workflows.stage.tabs")
                 }
                 switch tab {
                 case .setup: BighelpDeferredSection { setup }
@@ -42,12 +49,19 @@ struct WorkflowStageEditor: View {
                 case .limits: BighelpDeferredSection { limits }
                 }
                 Section {
-                    Button("Delete stage", role: .destructive) {
-                        model.deleteStage(stage.key)
-                        if isNew { dismiss() } else { save(deleting: true) }
+                    if let block {
+                        Button("Remove from \(block.title)", role: .destructive) { removeFromBlock(block) }
+                            .disabled(block.branches.count <= 2)
+                            .frame(minHeight: BighelpTokens.hitTarget)
+                            .accessibilityIdentifier("workflows.stage.delete")
+                    } else {
+                        Button("Delete stage", role: .destructive) {
+                            model.deleteStage(stage.key)
+                            if isNew { dismiss() } else { save(deleting: true) }
+                        }
+                        .frame(minHeight: BighelpTokens.hitTarget)
+                        .accessibilityIdentifier("workflows.stage.delete")
                     }
-                    .frame(minHeight: BighelpTokens.hitTarget)
-                    .accessibilityIdentifier("workflows.stage.delete")
                 }
             }
             .scrollContentBackground(.hidden)
@@ -57,7 +71,7 @@ struct WorkflowStageEditor: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
-                        if isNew { model.deleteStage(stage.key) }
+                        if isNew && block == nil { model.deleteStage(stage.key) }
                         dismiss()
                     }
                 }
@@ -70,6 +84,31 @@ struct WorkflowStageEditor: View {
             }
         }
         .accessibilityIdentifier("workflows.stage-editor")
+        .sheet(item: $editingBranch, onDismiss: {
+            // The agent's own editor saved it into the draft; show it as saved.
+            if let saved = model.definition?.stage(stage.key) { stage.branches = saved.branches }
+        }) { branch in
+            WorkflowStageEditor(model: model, context: context, stage: branch)
+                .bighelpSheetSize(.large)
+        }
+    }
+
+    private func removeFromBlock(_ block: WorkflowStage) {
+        guard var updated = model.definition?.stage(block.key), updated.branches.count > 2 else { return }
+        updated.branches.removeAll { $0.key == stage.key }
+        model.update(updated)
+        save(deleting: true)
+    }
+
+    /// Opens one of the block's agents; the block as it is on screen goes into the draft first.
+    private func edit(_ branch: WorkflowStage) {
+        model.update(stage)
+        editingBranch = branch
+    }
+
+    private func addBranch() {
+        guard stage.branches.count < 5, let branch = model.newBranch(in: stage) else { return }
+        stage.branches.append(branch)
     }
 
     /// Picking an agent makes or reuses the stage's role and chooses the agent for it.
@@ -179,6 +218,29 @@ struct WorkflowStageEditor: View {
                      : "The computer checks these itself. No agent runs.")
                     .font(.bighelp(.footnote))
             }
+        case .decision where stage.onMany.count > 1:
+            Section {
+                ForEach(stage.onMany, id: \.self) { source in
+                    Label(sourceTitle(source), systemImage: "checkmark.seal")
+                        .font(.bighelp(.body))
+                }
+                Picker("Passes when", selection: Binding(get: { stage.require ?? "all" },
+                                                        set: { stage.require = $0 == "all" ? nil : $0 })) {
+                    Text("All of them pass").tag("all")
+                    Text("Any of them passes").tag("any")
+                }
+                .accessibilityIdentifier("workflows.stage.require")
+                LabeledContent("Pass goes to", value: model.definition?.stage(stage.pass)?.title ?? stage.pass ?? "next stage")
+                Picker("Changes go back to", selection: Binding(get: { stage.changesGoTo ?? "" },
+                                                                 set: { stage.changesGoTo = $0.isEmpty ? nil : $0 })) {
+                    ForEach(earlierAgentStages) { Text($0.title).tag($0.key) }
+                }
+            } header: {
+                Text("Reads \(stage.onMany.count) verdicts")
+            } footer: {
+                Text("Each agent says pass or changes. Changes send the work back, with every agent's notes.")
+                    .font(.bighelp(.footnote))
+            }
         case .decision:
             Section("Decision") {
                 Picker("Reads", selection: Binding(get: { stage.on ?? "" }, set: { stage.on = $0.isEmpty ? nil : $0 })) {
@@ -206,6 +268,46 @@ struct WorkflowStageEditor: View {
                     .font(.bighelp(.footnote))
                     .foregroundStyle(theme.secondaryText)
             }
+        case .parallel:
+            Section {
+                ForEach(stage.branches) { branch in
+                    Button { edit(branch) } label: {
+                        HStack(spacing: BighelpTokens.space12) {
+                            WorkflowStageIcon(kind: .agent, size: 32)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(branch.title)
+                                    .font(.bighelp(.body))
+                                    .foregroundStyle(theme.primaryText)
+                                Text(context.agentName(model.agentID(for: branch.role)) ?? "Choose an agent")
+                                    .font(.bighelp(.caption))
+                                    .foregroundStyle(model.agentID(for: branch.role) == nil ? theme.action
+                                                     : theme.secondaryText)
+                            }
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right")
+                                .font(.bighelp(.caption))
+                                .foregroundStyle(theme.tertiaryText)
+                        }
+                        .frame(minHeight: BighelpTokens.hitTarget)
+                        .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("workflows.stage.branch.\(branch.key)")
+                }
+                .onDelete { offsets in
+                    guard stage.branches.count - offsets.count >= 2 else { return }
+                    stage.branches.remove(atOffsets: offsets)
+                }
+                Button("Add an agent", systemImage: "plus") { addBranch() }
+                    .disabled(stage.branches.count >= 5)
+                    .frame(minHeight: BighelpTokens.hitTarget)
+                    .accessibilityIdentifier("workflows.stage.add-branch")
+            } header: {
+                Text("Agents at the same time")
+            } footer: {
+                Text("All of them start at once, and the workflow goes on when every one is done. They can't read each other's work; the next stage can read all of it. 2 to 5 agents.")
+                    .font(.bighelp(.footnote))
+            }
         case .unknown:
             Section {
                 Text("This kind of stage needs a newer bighelp.")
@@ -215,11 +317,18 @@ struct WorkflowStageEditor: View {
     }
 
     /// Inputs and every earlier stage's outputs.
+    /// The stages before this one in the list, with the agents of parallel blocks. An agent in a
+    /// block counts from its block: it can't read the others in it.
+    private var earlierStages: [WorkflowStage] {
+        guard let definition = model.definition else { return [] }
+        let anchor = definition.parent(of: stage.key)?.key ?? stage.key
+        return definition.stages.prefix { $0.key != anchor }.flatMap { [$0] + $0.branches }
+    }
+
     private var availableUses: [String] {
         guard let definition = model.definition else { return [] }
         var uses = definition.inputs.map { "inputs.\($0.key)" }
-        for earlier in definition.stages {
-            if earlier.key == stage.key { break }
+        for earlier in earlierStages {
             uses += earlier.outputs.map { "\(earlier.key).\($0.name)" }
         }
         return uses + stage.uses.filter { !uses.contains($0) }
@@ -227,13 +336,16 @@ struct WorkflowStageEditor: View {
 
     /// Earlier stages' outputs of some types, as "stage.output".
     private func earlierOutputs(types: Set<String>) -> [String] {
-        guard let definition = model.definition else { return [] }
-        var result: [String] = []
-        for earlier in definition.stages {
-            if earlier.key == stage.key { break }
-            result += earlier.outputs.filter { types.contains($0.type) }.map { "\(earlier.key).\($0.name)" }
+        earlierStages.flatMap { earlier in
+            earlier.outputs.filter { types.contains($0.type) }.map { "\(earlier.key).\($0.name)" }
         }
-        return result
+    }
+
+    /// "Agent A: decision" for "agent_a.decision".
+    private func sourceTitle(_ reference: String) -> String {
+        let parts = reference.split(separator: ".", maxSplits: 1).map(String.init)
+        guard parts.count == 2, let source = model.definition?.stage(parts[0]) else { return reference }
+        return "\(source.title): \(parts[1])"
     }
 
     private var checkableOutputs: [String] { earlierOutputs(types: ["markdown_file", "text", "number"]) }
@@ -281,7 +393,8 @@ struct WorkflowStageEditor: View {
 
     private var earlierAgentStages: [WorkflowStage] {
         guard let definition = model.definition else { return [] }
-        return Array(definition.stages.prefix { $0.key != stage.key }.filter { $0.kind == .agent })
+        return Array(definition.stages.prefix { $0.key != stage.key }
+            .filter { $0.kind == .agent || $0.kind == .parallel })
     }
 
     private static func toolName(_ toolset: String) -> String {

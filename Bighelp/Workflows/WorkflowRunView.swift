@@ -212,7 +212,7 @@ struct WorkflowRunContent: View {
 
     private var graph: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            WorkflowGraph(nodes: detail.stages.map { stage in
+            WorkflowGraph(nodes: detail.stages.filter { $0.group == nil }.map { stage in
                 WorkflowGraph.Node(id: stage.key, kind: stage.kind, title: stage.title,
                                    detail: stageTime(stage), state: stage.state)
             }, loop: nil, select: { openStage = WorkflowStageSelection(id: $0) })
@@ -230,6 +230,8 @@ struct WorkflowRunContent: View {
             ForEach(Array(detail.stages.enumerated()), id: \.element.key) { index, stage in
                 Button { openStage = WorkflowStageSelection(id: stage.key) } label: {
                 HStack(alignment: .top, spacing: BighelpTokens.space12) {
+                    // A parallel block's agents sit under it, side by side in time.
+                    if stage.group != nil { Spacer().frame(width: BighelpTokens.space24) }
                     VStack(spacing: 0) {
                         Image(systemName: stage.state == .planned ? "circle" : stage.state.symbol)
                             .font(.bighelp(.body).weight(.semibold))

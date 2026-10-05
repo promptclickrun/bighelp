@@ -13,7 +13,8 @@ struct WorkflowScreen: View {
         self.startsRun = startsRun
         let hasDraft = context.store.workflows.first { $0.id == workflowID }?.hasDraft ?? false
         _model = State(initialValue: WorkflowEditorModel(workflowID: workflowID, client: context.client, hasDraft: hasDraft,
-                                                         canEditFlow: context.canEdit))
+                                                         canEditFlow: context.canEdit,
+                                                         canParallel: context.store.canParallel))
     }
 
     var body: some View {
@@ -161,7 +162,7 @@ struct WorkflowFlowView: View {
             if dropGap == order.count { insertionLine }
             Rectangle().fill(theme.border).frame(width: 1, height: 16)
             Menu {
-                WorkflowAddStageButtons { addStage($0, after: nil) }
+                WorkflowAddStageButtons(parallel: model.canParallel) { addStage($0, after: nil) }
             } label: {
                 Image(systemName: "plus")
                     .font(.bighelp(.body).weight(.semibold))
@@ -254,7 +255,7 @@ struct WorkflowFlowView: View {
                         .foregroundStyle(theme.secondaryText)
                 }
                 Menu {
-                    WorkflowAddStageButtons { addStage($0, after: previous) }
+                    WorkflowAddStageButtons(parallel: model.canParallel) { addStage($0, after: previous) }
                 } label: {
                     Image(systemName: "plus")
                         .font(.system(size: 11, weight: .bold))
@@ -288,7 +289,9 @@ struct WorkflowFlowView: View {
         return Button { editing = stage } label: {
             HStack(spacing: BighelpTokens.space12) {
                 WorkflowStageIcon(kind: stage.kind, size: isDecision ? 30 : 36,
-                                  isDashed: stage.kind == .agent && model.agentID(for: stage.role) == nil)
+                                  isDashed: ([stage] + stage.branches).contains {
+                                      $0.kind == .agent && model.agentID(for: $0.role) == nil
+                                  })
                 VStack(alignment: .leading, spacing: 2) {
                     Text(stage.title)
                         .font(.bighelp(isDecision ? .subheadline : .headline))
@@ -343,7 +346,7 @@ struct WorkflowFlowView: View {
     private func stageMenu(_ stage: WorkflowStage, graph: WorkflowFlowGraph?) -> some View {
         Button("Edit", systemImage: "pencil") { editing = stage }
         Menu("Add a stage after", systemImage: "plus") {
-            WorkflowAddStageButtons { addStage($0, after: stage.key) }
+            WorkflowAddStageButtons(parallel: model.canParallel) { addStage($0, after: stage.key) }
         }
         // Dragging toward an open menu picks from it, so moving is in the menu too.
         if editable, let index = stages.firstIndex(where: { $0.key == stage.key }) {
@@ -504,7 +507,7 @@ struct WorkflowFlowView: View {
     private var bottomBar: some View {
         HStack(spacing: BighelpTokens.space8) {
             Menu {
-                WorkflowAddStageButtons { addStage($0, after: nil) }
+                WorkflowAddStageButtons(parallel: model.canParallel) { addStage($0, after: nil) }
                 Divider()
                 Button("Inputs", systemImage: "arrow.right.to.line") { isInputsPresented = true }
             } label: {
@@ -743,7 +746,7 @@ struct WorkflowRolesEditor: View {
     }
 
     private func usedBy(_ role: WorkflowDefinition.Role) -> String {
-        let titles = (model.definition?.stages ?? []).filter { $0.kind == .agent && $0.role == role.key }.map(\.title)
+        let titles = (model.definition?.allStages ?? []).filter { $0.kind == .agent && $0.role == role.key }.map(\.title)
         return titles.isEmpty ? "No stage uses this role yet." : titles.joined(separator: ", ")
     }
 }

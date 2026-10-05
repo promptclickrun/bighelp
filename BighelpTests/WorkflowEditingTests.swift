@@ -499,7 +499,7 @@ struct WorkflowsHomeEditingTests {
 
         #expect(await store.saveTemplate(workflowID: "wf-research", name: "My review flow"))
         let mine = try #require(store.yourTemplates.first)
-        #expect(mine.name == "My review flow" && store.builtinTemplates.count == 1)
+        #expect(mine.name == "My review flow" && store.builtinTemplates.map(\.id) == ["research-draft-review", "three-takes"])
         let copy = try await store.use(mine)
         #expect(try await demo.workflow(id: copy, revision: .draft).definition.stages.count == 6)
         await store.deleteTemplate(mine)
@@ -698,5 +698,56 @@ struct WorkflowV2ContractDetailTests {
         #expect(store.message == "You have 100 templates. Delete one, then save this one.")
         #expect(await store.saveTemplate(workflowID: "wf", name: "   ") == false, "A blank name never goes to the host")
         #expect(performer.calls(.workflowsTemplatesSave) == 1)
+    }
+}
+
+/// Parallel blocks: several agent stages at once, and a decision that reads all their verdicts.
+@MainActor
+struct WorkflowParallelTests {
+    @Test func blocksAndSeveralVerdictsSurviveARoundTrip() throws {
+        let definition = DemoWorkflowsClient.threeTakes
+        let block = try #require(definition.stages.first)
+        #expect(block.kind == .parallel && block.branches.map(\.key) == ["facts", "risks", "practice"])
+        let decision = try #require(definition.stage("agree"))
+        #expect(decision.sources == ["facts.decision", "risks.decision", "practice.decision"])
+        #expect(definition.stage("risks")?.title == "The risks", "An agent of a block is found like any stage")
+        #expect(definition.parent(of: "risks")?.key == "takes")
+        // What goes back to the host is what came.
+        let again = WorkflowDefinition(json: definition.json)
+        #expect(again == definition)
+        #expect(again.stage("agree")?.json["on"]?.array?.count == 3)
+        #expect(!definition.graph.issues(definition).contains { $0.code == "uses_not_before" },
+                "A decision may read every agent of the block before it")
+    }
+
+    @Test func aNewBlockHasThreeAgentsAndADecisionAfterItReadsThemAll() async throws {
+        let demo = DemoWorkflowsClient(delays: false)
+        let editor = WorkflowEditorModel(workflowID: "wf-research", client: demo, canEditFlow: true, canParallel: true)
+        await editor.load()
+        let block = try #require(editor.addStage(.parallel, after: nil))
+        #expect(block.branches.count == 3)
+        let keys = try #require(editor.definition?.allStages.map(\.key))
+        #expect(Set(keys).count == keys.count, "Every agent has a key no other stage has")
+        let decision = try #require(editor.addStage(.decision, after: block.key))
+        #expect(decision.sources.count == 3 && decision.changesGoTo == block.key)
+        let saved = try #require(editor.definition?.stage(block.key))
+        #expect(saved.branches.allSatisfy { $0.outputs.contains { $0.type == "decision" } },
+                "Each agent learns to say pass or changes")
+
+        // An agent edited on its own goes back into its block.
+        var agent = saved.branches[1]
+        agent.title = "The skeptic"
+        editor.update(agent)
+        #expect(editor.definition?.stage(block.key)?.branches[1].title == "The skeptic")
+        #expect(editor.definition?.stages.contains { $0.key == agent.key } == false)
+    }
+
+    @Test func theThreeTakesTemplateIsOfferedAndRuns() async throws {
+        let demo = DemoWorkflowsClient(delays: false)
+        #expect(await demo.supportsParallel())
+        #expect(try await demo.templates().contains { $0.id == "three-takes" })
+        let id = try await demo.useTemplate(id: "three-takes")
+        let detail = try await demo.workflow(id: id, revision: .draft)
+        #expect(detail.definition.stages.first?.kind == .parallel)
     }
 }

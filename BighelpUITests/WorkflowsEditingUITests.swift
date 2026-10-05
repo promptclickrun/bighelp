@@ -196,6 +196,36 @@ final class WorkflowsEditingUITests: BighelpUITestCase {
         XCUIDevice.shared.orientation = .portrait
     }
 
+    /// "Three takes" puts three agents in one parallel block; the block's
+    /// editor lists them, and each opens its own editor.
+    @MainActor
+    func testAParallelBlockListsItsAgents() throws {
+        let app = launch()
+        openWorkflows(app)
+        let template = element("workflows.template.three-takes", app)
+        scrollTo(template, in: app)
+        XCTAssertTrue(template.exists, "The Three takes template is offered")
+        template.buttons["workflows.template.use"].tap()
+        let pad = app.userInterfaceIdiom == .pad
+        let block = element(pad ? "workflows.canvas.node.takes" : "workflows.flow.stage.takes", app)
+        XCTAssertTrue(block.waitForExistence(timeout: 8), "The copy opens with its parallel block")
+        save("40-parallel-flow", app)
+        block.tap()
+        if pad, !element("workflows.stage-editor", app).waitForExistence(timeout: 2) {
+            block.tap()
+        }
+        XCTAssertTrue(element("workflows.stage-editor", app).waitForExistence(timeout: 5))
+        for key in ["facts", "risks", "practice"] {
+            XCTAssertTrue(app.buttons["workflows.stage.branch.\(key)"].waitForExistence(timeout: 5),
+                          "The block lists \(key)")
+        }
+        save("41-parallel-block-editor", app)
+        app.buttons["workflows.stage.branch.risks"].tap()
+        XCTAssertTrue(app.staticTexts["The risks"].waitForExistence(timeout: 5) || app.textFields["The risks"].exists,
+                      "An agent of the block opens in its own editor")
+        save("42-parallel-agent-editor", app)
+    }
+
     // MARK: iPhone
 
     /// Compact width: every stage in one line, top to bottom, inside the screen,

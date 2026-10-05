@@ -136,6 +136,8 @@ enum ChatCanvasTranscriptProjection {
 final class ChatTimelineController {
     private(set) var isAtBottom = true
     @ObservationIgnored fileprivate weak var table: ChatTimelineTableView?
+    /// The chat's scroll view, for the blur under the header and message box.
+    var scrollView: UIScrollView? { table }
 
     func beginReview() { table?.followsTail = false }
 

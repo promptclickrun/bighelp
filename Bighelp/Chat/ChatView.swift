@@ -536,6 +536,12 @@ struct ChatView: View {
     // insets; overlay heights do not reserve a second SwiftUI scroll region.
     private var chatCanvas: some View {
         timeline
+            #if !os(visionOS)
+            // Messages run on under the status bar and home indicator, so the blur under the
+            // header reaches the top of the screen without a hard edge. UIKit adds those
+            // areas to the table's insets itself, so nothing moves.
+            .ignoresSafeArea(.container, edges: .vertical)
+            #endif
             #if os(visionOS)
             // The window is see-through, so a canvas-colored band can't hide
             // messages under the header; they fade out before reaching it instead.
@@ -575,6 +581,13 @@ struct ChatView: View {
                                 .transition(.move(edge: .bottom).combined(with: .opacity))
                         }
                     }
+                    #if !os(visionOS)
+                    // The same soft blur under the message box and the tab bar.
+                    .background {
+                        ChatEdgeBlur(edge: .bottom) { [timelineController] in timelineController.scrollView }
+                            .ignoresSafeArea(edges: .bottom)
+                    }
+                    #endif
                     .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { composerHeight = $0 }
                 }
             }
@@ -617,20 +630,11 @@ struct ChatView: View {
         .padding(.top, BighelpPlatform.usesTabOrnament ? 12 : max(0, 4 - (homeChrome.isEnabled ? HeaderButtonMetrics.slop : 0)))
         .padding(.bottom, 8)
         #if !os(visionOS)
-        .background(alignment: .top) {
-            // Messages scroll beneath the header. A short fade in the canvas
-            // color keeps the name chip readable without an opaque bar.
-            // The taller home header (big avatar) needs a solid band behind it.
-            LinearGradient(stops: [
-                .init(color: theme.canvas, location: 0),
-                .init(color: theme.canvas.opacity(homeChrome.isEnabled ? 1 : 0.92),
-                      location: homeChrome.isEnabled ? 0.72 : 0.55),
-                .init(color: theme.canvas.opacity(0), location: 1),
-            ], startPoint: .top, endPoint: .bottom)
-            .padding(.bottom, -24)
-            .ignoresSafeArea(edges: .top)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
+        .background {
+            // Messages scroll on beneath the header and blur near the top, so the
+            // glass buttons and the name show the chat instead of a band of color.
+            ChatEdgeBlur(edge: .top) { [timelineController] in timelineController.scrollView }
+                .ignoresSafeArea(edges: .top)
         }
         #endif
     }

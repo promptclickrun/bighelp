@@ -1,0 +1,32 @@
+{
+  "route": "workflows/templates/use",
+  "request": {
+    "templateId": "tpl-5d6e7f8091a2b3c4",
+    "name": "Monthly newsletter"
+  },
+  "response": {
+    "workflowId": "wf_3c4d5e6f708192a3",
+    "draftVersion": 1,
+    "validation": {
+      "valid": true,
+      "host": false,
+      "issues": [
+        {
+          "code": "role_unbound",
+          "message": "Choose an agent for Researcher.",
+          "severity": "error"
+        },
+        {
+          "code": "role_unbound",
+          "message": "Choose an agent for Writer.",
+          "severity": "error"
+        },
+        {
+          "code": "role_unbound",
+          "message": "Choose an agent for Reviewer.",
+          "severity": "error"
+        }
+      ]
+    }
+  }
+}

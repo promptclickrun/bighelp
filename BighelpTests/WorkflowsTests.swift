@@ -35,7 +35,7 @@ struct WorkflowModelTests {
         #expect(detail.summary.number == 14 && detail.stages.count == 2)
         #expect(detail.signoff?.artifactSHA256 == Samples.sha && detail.signoff?.reviewNotes.count == 2)
         #expect(detail.signoff?.history.first?.asksForChanges == true)
-        #expect(detail.tokens.total == 300 && detail.allowedActions == ["cancel"])
+        #expect(detail.tokens?.total == 300 && detail.allowedActions == ["cancel"])
         #expect(detail.previousVersion(of: try #require(detail.signoff))?.iteration == 1)
 
         let events = WorkflowEventPage(json: ["events": .array([.object(["seq": .integer(4), "at": .string("2026-10-04T10:52:04Z"),
@@ -161,7 +161,7 @@ struct WorkflowContractVectorTests {
         #expect(waiting.previousVersion(of: signoff)?.iteration == 1)
         #expect(signoff.reviewNotes.map(\.isMajor) == [true, false])
         #expect(waiting.reviewDecision(for: signoff) == "pass")
-        #expect(waiting.tokens.total == 60_940 && waiting.allowedActions == ["cancel", "pause"])
+        #expect(waiting.tokens?.total == 60_940 && waiting.allowedActions == ["cancel", "pause"])
         let history = waiting.signoffHistory(for: signoff)
         #expect(history.map(\.title) == ["Research the topic", "Write the draft v1", "Review the draft v1 asked for changes",
                                          "Write the draft v2", "Review the draft v2"])
@@ -423,8 +423,13 @@ struct WorkflowsClientTests {
         performer.answers[.nativeContext] = ["features": .array([.string("native-context-v1"), .string("native-workflows-v1")])]
         let client = DirectHermesWorkflowsClient(currentWorkspace: { performer })
         #expect(try await client.isAvailable())
+        #expect(try await client.support() == .available(canEdit: false), "An older plugin shows the flow as it is")
+        performer.answers[.nativeContext] = ["features": .array([.string("native-workflows-v1"),
+                                                                 .string("native-workflows-edit-v1")])]
+        #expect(try await client.support() == .available(canEdit: true))
         performer.answers[.nativeContext] = ["features": .array([.string("native-context-v1")])]
         #expect(try await client.isAvailable() == false)
+        #expect(try await client.support() == .missing)
     }
 
     /// Files come in pieces and must add up to exactly the file that was asked for.
@@ -559,8 +564,8 @@ struct WorkflowsStoreTests {
         let defaults = try #require(UserDefaults(suiteName: "workflows-availability-\(UUID().uuidString)"))
         let availability = WorkflowsAvailability(defaults: defaults, retryDelays: [])
         availability.use(host: "host-a")
-        await availability.check { true }
-        #expect(availability.isAvailable == true)
+        await availability.check { .available(canEdit: true) }
+        #expect(availability.isAvailable == true && availability.support?.canEdit == true)
         #expect(availability.use(host: "host-b"))
         #expect(availability.isAvailable == nil)
         await availability.check { throw WorkspaceClientError.transportUnavailable }
@@ -758,7 +763,11 @@ private final class ChunkClient: WorkflowsClient {
                                      data: data.subdata(in: offset..<end), done: end >= data.count)
     }
 
-    func isAvailable() async throws -> Bool { true }
+    func support() async throws -> WorkflowsSupport { .available(canEdit: true) }
+    func saveTemplate(workflowID: String, name: String, description: String?) async throws -> String { "" }
+    func deleteTemplate(id: String) async throws {}
+    func pin(workflowID: String, pinned: Bool) async throws -> Bool { pinned }
+    func unarchive(workflowID: String) async throws {}
     func status() async throws -> WorkflowStatus { throw WorkspaceClientError.invalidResponse }
     func list(includeArchived: Bool) async throws -> WorkflowsList { throw WorkspaceClientError.invalidResponse }
     func workflow(id: String, revision: WorkflowRevisionRef) async throws -> WorkflowDetail { throw WorkspaceClientError.invalidResponse }
@@ -796,7 +805,11 @@ private final class CountingClient: WorkflowsClient {
     var controlError: (any Error)?
     var controls: [(action: WorkflowRunAction, version: Int)] = []
 
-    func isAvailable() async throws -> Bool { true }
+    func support() async throws -> WorkflowsSupport { .available(canEdit: true) }
+    func saveTemplate(workflowID: String, name: String, description: String?) async throws -> String { "" }
+    func deleteTemplate(id: String) async throws {}
+    func pin(workflowID: String, pinned: Bool) async throws -> Bool { pinned }
+    func unarchive(workflowID: String) async throws {}
     func status() async throws -> WorkflowStatus { try await demo.status() }
     func list(includeArchived: Bool) async throws -> WorkflowsList {
         listCalls += 1
@@ -855,7 +868,11 @@ private final class StaleSignoffClient: WorkflowsClient {
                  notes: String) async throws -> WorkflowRunSummary {
         throw WorkspaceClientError.rejected(code: "approval_stale")
     }
-    func isAvailable() async throws -> Bool { true }
+    func support() async throws -> WorkflowsSupport { .available(canEdit: true) }
+    func saveTemplate(workflowID: String, name: String, description: String?) async throws -> String { "" }
+    func deleteTemplate(id: String) async throws {}
+    func pin(workflowID: String, pinned: Bool) async throws -> Bool { pinned }
+    func unarchive(workflowID: String) async throws {}
     func status() async throws -> WorkflowStatus { try await base.status() }
     func list(includeArchived: Bool) async throws -> WorkflowsList { try await base.list(includeArchived: includeArchived) }
     func workflow(id: String, revision: WorkflowRevisionRef) async throws -> WorkflowDetail {

@@ -130,7 +130,11 @@ struct WorkflowStatus: Equatable, Sendable {
     var survivesAppClose: Bool
     var runnerAvailable: Bool
     var runnerReason: String?
+    /// `stream` sends live lines and token counts; `text` (older Hermes) only the reply at the end.
+    var runnerMode: RunnerMode?
     var hostName: String?
+
+    enum RunnerMode: String, Sendable { case stream, text }
 
     init(json: WorkflowJSON) {
         let coordinator = json["coordinator"]?.object ?? [:]
@@ -144,11 +148,13 @@ struct WorkflowStatus: Equatable, Sendable {
         let runner = json["runner"]?.object ?? [:]
         runnerAvailable = WorkflowDecode.bool(runner["available"]) ?? true
         runnerReason = WorkflowDecode.string(runner["reason"], max: 500)
+        runnerMode = RunnerMode(rawValue: WorkflowDecode.string(runner["mode"], max: 16) ?? "")
         hostName = WorkflowDecode.string(json["hostName"], max: 200)
     }
 
     init(coordinator: Coordinator, heartbeatAt: Date?, epoch: Int?, slotsUsed: Int, slotsTotal: Int,
-         survivesAppClose: Bool = true, runnerAvailable: Bool = true, runnerReason: String? = nil, hostName: String?) {
+         survivesAppClose: Bool = true, runnerAvailable: Bool = true, runnerReason: String? = nil,
+         runnerMode: RunnerMode? = nil, hostName: String?) {
         self.coordinator = coordinator
         self.heartbeatAt = heartbeatAt
         self.epoch = epoch
@@ -157,6 +163,7 @@ struct WorkflowStatus: Equatable, Sendable {
         self.survivesAppClose = survivesAppClose
         self.runnerAvailable = runnerAvailable
         self.runnerReason = runnerReason
+        self.runnerMode = runnerMode
         self.hostName = hostName
     }
 }
@@ -175,6 +182,9 @@ struct WorkflowSummary: Identifiable, Equatable, Sendable {
     var lastRunAt: Date?
     /// Stage kinds in order, when the host sends them (for the little rail).
     var stageKinds: [WorkflowStage.Kind]
+    /// Pinned workflows come first (`native-workflows-edit-v1`).
+    var pinned = false
+    var archived = false
 
     init?(json: WorkflowJSON) {
         guard let id = WorkflowDecode.string(json["id"], max: 128), !id.isEmpty else { return nil }
@@ -187,10 +197,13 @@ struct WorkflowSummary: Identifiable, Equatable, Sendable {
         valid = WorkflowDecode.bool(json["valid"]) ?? false
         lastRunAt = WorkflowDecode.date(json["lastRunAt"])
         stageKinds = WorkflowDecode.strings(json["stageKinds"], max: 20).map(WorkflowStage.Kind.init)
+        pinned = WorkflowDecode.bool(json["pinned"]) ?? false
+        archived = WorkflowDecode.bool(json["archived"]) ?? false
     }
 
     init(id: String, name: String, revision: Int?, hasDraft: Bool, stageCount: Int, needsSetupRoles: [String],
-         valid: Bool, lastRunAt: Date?, stageKinds: [WorkflowStage.Kind] = []) {
+         valid: Bool, lastRunAt: Date?, stageKinds: [WorkflowStage.Kind] = [], pinned: Bool = false,
+         archived: Bool = false) {
         self.id = id
         self.name = name
         self.revision = revision
@@ -200,6 +213,8 @@ struct WorkflowSummary: Identifiable, Equatable, Sendable {
         self.valid = valid
         self.lastRunAt = lastRunAt
         self.stageKinds = stageKinds
+        self.pinned = pinned
+        self.archived = archived
     }
 }
 
@@ -209,15 +224,21 @@ struct WorkflowsList: Equatable, Sendable {
     var active: [WorkflowRunSummary]
 
     init(json: WorkflowJSON) {
-        workflows = WorkflowDecode.objects(json["workflows"], max: 200).compactMap(WorkflowSummary.init(json:))
+        workflows = WorkflowsList.pinnedFirst(
+            WorkflowDecode.objects(json["workflows"], max: 200).compactMap(WorkflowSummary.init(json:)))
         waiting = WorkflowDecode.objects(json["waiting"], max: 200).compactMap(WorkflowRunSummary.init(json:))
         active = WorkflowDecode.objects(json["active"], max: 200).compactMap(WorkflowRunSummary.init(json:))
     }
 
     init(workflows: [WorkflowSummary], waiting: [WorkflowRunSummary], active: [WorkflowRunSummary]) {
-        self.workflows = workflows
+        self.workflows = WorkflowsList.pinnedFirst(workflows)
         self.waiting = waiting
         self.active = active
+    }
+
+    /// Pinned first, each part in the host's order.
+    static func pinnedFirst(_ workflows: [WorkflowSummary]) -> [WorkflowSummary] {
+        workflows.filter(\.pinned) + workflows.filter { !$0.pinned }
     }
 }
 
@@ -292,6 +313,8 @@ struct WorkflowDetail: Equatable, Sendable {
     var definition: WorkflowDefinition
     var bindings: [WorkflowBinding]
     var validation: WorkflowValidation
+    /// Pinned workflows come first on the home screen (`native-workflows-edit-v1`).
+    var pinned = false
 
     init(json: WorkflowJSON) throws {
         guard let workflow = json["workflow"]?.object,
@@ -307,10 +330,11 @@ struct WorkflowDetail: Equatable, Sendable {
         draftVersion = WorkflowDecode.int(workflow["draftVersion"]) ?? 0
         bindings = WorkflowBinding.list(workflow["bindings"])
         validation = WorkflowValidation(json: json["validation"]?.object)
+        pinned = WorkflowDecode.bool(workflow["pinned"]) ?? false
     }
 
     init(id: String, name: String, revision: Int?, draftVersion: Int, definition: WorkflowDefinition,
-         bindings: [WorkflowBinding], validation: WorkflowValidation) {
+         bindings: [WorkflowBinding], validation: WorkflowValidation, pinned: Bool = false) {
         self.id = id
         self.name = name
         self.revision = revision
@@ -319,12 +343,68 @@ struct WorkflowDetail: Equatable, Sendable {
         self.definition = definition
         self.bindings = bindings
         self.validation = validation
+        self.pinned = pinned
     }
 
     func agentID(for role: String) -> String? { bindings.first { $0.role == role }?.agentID }
 }
 
-// MARK: - Definition (schemaVersion 1)
+// MARK: - Definition (schemaVersion 1 and 2)
+
+/// Where the canvas draws each node, in points (schemaVersion 2's `layout`).
+/// The host stores it as sent and runs ignore it.
+struct WorkflowLayout: Equatable, Sendable {
+    /// The host refuses anything farther out.
+    static let limit = 100_000.0
+
+    var inputs: CGPoint?
+    var stages: [String: CGPoint]
+    private var extra: WorkflowJSON
+
+    init(inputs: CGPoint? = nil, stages: [String: CGPoint] = [:]) {
+        self.inputs = inputs
+        self.stages = stages
+        extra = [:]
+    }
+
+    init?(json: BighelpJSONValue?) {
+        guard let object = json?.object else { return nil }
+        inputs = Self.point(object["inputs"])
+        var stages: [String: CGPoint] = [:]
+        for (key, value) in (object["stages"]?.object ?? [:]).prefix(100) {
+            guard key.utf8.count <= 64, let point = Self.point(value) else { continue }
+            stages[key] = point
+        }
+        self.stages = stages
+        extra = object.filter { !["inputs", "stages"].contains($0.key) }
+    }
+
+    var json: WorkflowJSON {
+        var value = extra
+        if let inputs { value["inputs"] = Self.json(inputs) }
+        value["stages"] = .object(stages.mapValues(Self.json))
+        return value
+    }
+
+    /// Keeps a point inside what the host accepts.
+    static func clamped(_ point: CGPoint) -> CGPoint {
+        CGPoint(x: min(max(point.x, -limit), limit), y: min(max(point.y, -limit), limit))
+    }
+
+    private static func point(_ value: BighelpJSONValue?) -> CGPoint? {
+        guard let object = value?.object, let x = object["x"]?.number, let y = object["y"]?.number,
+              x.isFinite, y.isFinite, abs(x) <= limit, abs(y) <= limit else { return nil }
+        return CGPoint(x: x, y: y)
+    }
+
+    private static func json(_ point: CGPoint) -> BighelpJSONValue {
+        func number(_ value: CGFloat) -> BighelpJSONValue {
+            let value = Double(value)
+            return value.rounded() == value ? .integer(Int(value)) : .number(value)
+        }
+        return .object(["x": number(point.x), "y": number(point.y)])
+    }
+}
 
 /// A workflow's definition. Fields the app doesn't know are kept and sent back
 /// unchanged, so saving a draft never drops what a newer plugin added.
@@ -357,8 +437,20 @@ struct WorkflowDefinition: Equatable, Sendable {
     var stageMinutes: Int
     var maxRevisions: Int
     var stages: [WorkflowStage]
+    /// schemaVersion 2: where the canvas draws each node. Nil: the canvas lays them out.
+    var layout: WorkflowLayout?
     private var extra: WorkflowJSON
     private var limitsExtra: WorkflowJSON
+
+    /// An empty draft for Create from scratch.
+    static func empty(name: String) -> WorkflowDefinition {
+        WorkflowDefinition(json: [
+            "schemaVersion": .integer(2), "name": .string(name), "description": .string(""),
+            "roles": .array([]), "inputs": .array([]),
+            "limits": .object(["stageMinutes": .integer(20), "maxRevisions": .integer(2)]),
+            "stages": .array([]),
+        ])
+    }
 
     init(json: WorkflowJSON) {
         schemaVersion = WorkflowDecode.int(json["schemaVersion"]) ?? 1
@@ -380,7 +472,8 @@ struct WorkflowDefinition: Equatable, Sendable {
         stageMinutes = WorkflowDecode.int(limits["stageMinutes"]) ?? 20
         maxRevisions = WorkflowDecode.int(limits["maxRevisions"]) ?? 2
         stages = WorkflowDecode.objects(json["stages"], max: 20).compactMap(WorkflowStage.init(json:))
-        let known: Set<String> = ["schemaVersion", "name", "description", "roles", "inputs", "limits", "stages"]
+        layout = WorkflowLayout(json: json["layout"])
+        let known: Set<String> = ["schemaVersion", "name", "description", "roles", "inputs", "limits", "stages", "layout"]
         extra = json.filter { !known.contains($0.key) }
         limitsExtra = limits.filter { !["stageMinutes", "maxRevisions"].contains($0.key) }
     }
@@ -403,6 +496,7 @@ struct WorkflowDefinition: Equatable, Sendable {
         limits["maxRevisions"] = .integer(maxRevisions)
         value["limits"] = .object(limits)
         value["stages"] = .array(stages.map { .object($0.json) })
+        if let layout { value["layout"] = .object(layout.json) }
         return value
     }
 
@@ -483,6 +577,14 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
         var max: Double?
         fileprivate var raw: WorkflowJSON
 
+        /// A rule made in the editor, in the host's own shape.
+        init(kind: String, of: String, min: Double? = nil, max: Double? = nil) {
+            var json: WorkflowJSON = ["type": .string(kind), "of": .string(of)]
+            if let min { json["min"] = min.rounded() == min ? .integer(Int(min)) : .number(min) }
+            if let max { json["max"] = max.rounded() == max ? .integer(Int(max)) : .number(max) }
+            self.init(json: json)
+        }
+
         /// `{"rule": "word_range", "of": …}` (or `type`/`kind`), or `{"word_range": {"of": …}}`.
         init(json: WorkflowJSON) {
             raw = json
@@ -512,10 +614,20 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
         }
     }
 
+    /// Where a stage that isn't a decision goes (schemaVersion 2's `next`).
+    enum Next: Equatable, Sendable {
+        /// Absent: the following stage in the list (schemaVersion 1).
+        case following
+        /// null: the flow ends after this stage.
+        case end
+        case stage(String)
+    }
+
     var id: String { key }
     var key: String
     var kind: Kind
     var title: String
+    var next: Next = .following
     var role: String?
     var instructions: String
     var tools: [String]
@@ -556,23 +668,41 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
         changesMaxRevisions = WorkflowDecode.int(changes["maxRevisions"])
         changesExtra = changes.filter { !["goTo", "maxRevisions"].contains($0.key) }
         file = WorkflowDecode.string(json["file"], max: 128)
-        let known: Set<String> = ["key", "kind", "title", "role", "instructions", "tools", "uses", "outputs",
+        switch json["next"] {
+        case .null?: next = .end
+        case .string(let target)? where target.utf8.count <= 64: next = .stage(target)
+        default: next = .following
+        }
+        let known: Set<String> = ["key", "kind", "title", "next", "role", "instructions", "tools", "uses", "outputs",
                                   "minutes", "rules", "on", "pass", "changes", "file"]
         extra = json.filter { !known.contains($0.key) }
     }
 
     /// A new agent stage for the editor.
     init(newAgentStageAfter existing: [WorkflowStage], role: String?) {
-        var number = existing.count + 1
-        while existing.contains(where: { $0.key == "stage\(number)" }) { number += 1 }
-        key = "stage\(number)"
-        kind = .agent
-        title = "New stage"
+        self.init(new: .agent, existing: existing)
         self.role = role
+    }
+
+    /// A new, blank stage of one kind with a key no other stage has.
+    init(new kind: Kind, existing: [WorkflowStage]) {
+        let base = kind == .signoff ? "signoff" : kind == .agent ? "stage" : kind.rawValue
+        var number = existing.count + 1
+        while existing.contains(where: { $0.key == "\(base)\(number)" }) { number += 1 }
+        key = "\(base)\(number)"
+        self.kind = kind
+        switch kind {
+        case .agent: title = "New stage"
+        case .check: title = "Check"
+        case .decision: title = "Decision"
+        case .signoff: title = "Your sign-off"
+        case .unknown: title = "Stage"
+        }
+        role = nil
         instructions = ""
         tools = []
         uses = []
-        outputs = [Output(name: "result", type: "text", values: [])]
+        outputs = kind == .agent ? [Output(name: "result", type: "text", values: [])] : []
         minutes = nil
         rules = []
         extra = [:]
@@ -584,6 +714,13 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
         value["key"] = .string(key)
         value["kind"] = .string(kind.rawValue)
         value["title"] = .string(title)
+        if kind != .decision {
+            switch next {
+            case .following: break
+            case .end: value["next"] = .null
+            case .stage(let target): value["next"] = .string(target)
+            }
+        }
         switch kind {
         case .agent:
             if let role { value["role"] = .string(role) }
@@ -790,6 +927,14 @@ struct WorkflowTokens: Equatable, Sendable {
         input = max(0, WorkflowDecode.int(object["in"]) ?? 0)
         output = max(0, WorkflowDecode.int(object["out"]) ?? 0)
     }
+
+    /// Nil when the host can't count them (the fallback runner sends null):
+    /// the app shows nothing then, never 0.
+    static func counted(_ json: BighelpJSONValue?) -> WorkflowTokens? {
+        guard let object = json?.object, WorkflowDecode.int(object["in"]) != nil
+                || WorkflowDecode.int(object["out"]) != nil else { return nil }
+        return WorkflowTokens(json: json)
+    }
 }
 
 struct WorkflowAttempt: Equatable, Sendable, Identifiable {
@@ -801,7 +946,7 @@ struct WorkflowAttempt: Equatable, Sendable, Identifiable {
     var launchedAt: Date?
     var endedAt: Date?
     var durationMs: Int?
-    var tokens: WorkflowTokens
+    var tokens: WorkflowTokens?
     var outcomeCode: String?
 
     init?(json: WorkflowJSON) {
@@ -815,12 +960,12 @@ struct WorkflowAttempt: Equatable, Sendable, Identifiable {
         launchedAt = WorkflowDecode.date(json["launchedAt"])
         endedAt = WorkflowDecode.date(json["endedAt"])
         durationMs = WorkflowDecode.int(json["durationMs"])
-        tokens = WorkflowTokens(json: json["tokens"])
+        tokens = WorkflowTokens.counted(json["tokens"])
         outcomeCode = WorkflowDecode.string(json["outcomeCode"], max: 128)
     }
 
     init(id: String, number: Int, state: WorkflowRunState, agentID: String?, launchedAt: Date?, endedAt: Date?,
-         durationMs: Int?, tokens: WorkflowTokens, outcomeCode: String? = nil) {
+         durationMs: Int?, tokens: WorkflowTokens?, outcomeCode: String? = nil) {
         self.id = id
         self.number = number
         self.state = state
@@ -1001,7 +1146,7 @@ struct WorkflowRunDetail: Equatable, Sendable {
     var stages: [WorkflowRunStage]
     var outputs: [WorkflowOutput]
     var signoff: WorkflowSignoff?
-    var tokens: WorkflowTokens
+    var tokens: WorkflowTokens?
     var allowedActions: Set<String>
 
     init(json: WorkflowJSON) throws {
@@ -1013,12 +1158,12 @@ struct WorkflowRunDetail: Equatable, Sendable {
         stages = WorkflowDecode.objects(run["stages"], max: 40).compactMap(WorkflowRunStage.init(json:))
         outputs = WorkflowDecode.objects(run["outputs"], max: 200).compactMap(WorkflowOutput.init(json:))
         signoff = run["signoff"]?.object.flatMap(WorkflowSignoff.init(json:))
-        tokens = WorkflowTokens(json: run["tokens"])
+        tokens = WorkflowTokens.counted(run["tokens"])
         allowedActions = Set(WorkflowDecode.strings(run["allowedActions"], max: 10))
     }
 
     init(summary: WorkflowRunSummary, inputs: WorkflowJSON, stages: [WorkflowRunStage], outputs: [WorkflowOutput],
-         signoff: WorkflowSignoff?, tokens: WorkflowTokens, allowedActions: Set<String>) {
+         signoff: WorkflowSignoff?, tokens: WorkflowTokens?, allowedActions: Set<String>) {
         self.summary = summary
         self.inputs = inputs
         self.stages = stages
@@ -1098,6 +1243,11 @@ struct WorkflowEvent: Equatable, Sendable, Identifiable {
         text = WorkflowDecode.string(json["text"], max: 300) ?? ""
     }
 
+    /// Why a stage stopped before its agent's turn began (`agent_error`), the newest for that stage.
+    static func agentError(in events: [WorkflowEvent], stageKey: String?) -> WorkflowEvent? {
+        events.last { $0.kind == "agent_error" && $0.stageKey == stageKey && !$0.text.isEmpty }
+    }
+
     init(seq: Int, at: Date?, kind: String, stageKey: String?, attempt: Int?, text: String) {
         self.seq = seq
         self.at = at
@@ -1158,10 +1308,18 @@ struct WorkflowArtifactChunk: Equatable, Sendable {
 }
 
 struct WorkflowTemplate: Equatable, Sendable, Identifiable {
+    enum Source: String, Sendable { case builtin, yours }
+
     var id: String
     var name: String
     var description: String
     var stageCount: Int
+    /// Built in, or saved from one of your workflows (which you can delete).
+    var source: Source
+    var updatedAt: Date?
+
+    /// The host's limit on a template's name.
+    static let nameLimit = 80
 
     init?(json: WorkflowJSON) {
         guard let id = WorkflowDecode.string(json["id"] ?? json["templateId"], max: 128) else { return nil }
@@ -1169,13 +1327,18 @@ struct WorkflowTemplate: Equatable, Sendable, Identifiable {
         name = WorkflowDecode.string(json["name"], max: 200) ?? id
         description = WorkflowDecode.string(json["description"], max: 1_000) ?? ""
         stageCount = WorkflowDecode.int(json["stageCount"]) ?? 0
+        source = Source(rawValue: WorkflowDecode.string(json["source"], max: 16) ?? "") ?? .builtin
+        updatedAt = WorkflowDecode.date(json["updatedAt"])
     }
 
-    init(id: String, name: String, description: String, stageCount: Int) {
+    init(id: String, name: String, description: String, stageCount: Int, source: Source = .builtin,
+         updatedAt: Date? = nil) {
         self.id = id
         self.name = name
         self.description = description
         self.stageCount = stageCount
+        self.source = source
+        self.updatedAt = updatedAt
     }
 }
 
@@ -1216,6 +1379,48 @@ enum WorkflowWords {
         default: code.hasPrefix("contract_")
             ? "The stage's result didn't match what the next stage needs."
             : code.replacingOccurrences(of: "_", with: " ").capitalized
+        }
+    }
+
+    static let templateSaved = "Saved. It's under Templates, in Yours."
+
+    /// A problem with how the stages connect, in plain words.
+    static func issue(_ code: String, stage: String? = nil) -> String {
+        let name = stage ?? "A stage"
+        return switch code {
+        case "no_stages": "Add a stage."
+        case "unreachable_stage": "Nothing leads to \(name). Connect a stage to it, or delete it."
+        case "cycle": "\(name) leads back to itself. Only a decision's changes can go back."
+        case "goto_not_earlier": "\(name) must send changes back to an earlier stage."
+        case "next_unknown": "\(name) leads to a stage that isn't there any more."
+        case "uses_not_before": "\(name) uses a result that isn't made on every way to it."
+        case "no_end": "The flow never ends. Let one stage end it."
+        case "tool_scope_unsupported": "This computer's Hermes can't limit \(name)'s tools. Update Hermes to run it."
+        default: problem(code)
+        }
+    }
+
+    /// Why a computer can't run workflows, and what to do (never the code itself).
+    static func unavailable(_ code: String) -> (reason: String, action: String) {
+        switch code {
+        case "not_posix":
+            ("Workflows need a Mac or Linux computer. This computer's system can't run them.",
+             "Use Workflows on a Mac or Linux computer with Hermes.")
+        case "profile_helpers_missing":
+            ("This computer's Hermes is missing a part that Workflows need.",
+             "Update Hermes on this computer, then open Workflows again.")
+        case "chat_runner_missing", "hermes_update_needed", "runner_unavailable":
+            ("This computer's Hermes can't run workflow stages yet.",
+             "Update Hermes on this computer, then open Workflows again.")
+        case "store_unavailable", "storage_unavailable":
+            ("This computer can't open its workflow files right now.",
+             "Make sure Hermes' folder on this computer has free space and can be written to, then try again.")
+        case "service_manager_missing":
+            ("This computer can't keep workflows running when bighelp is closed.",
+             "Workflows need a Mac, or Linux with systemd.")
+        default:
+            ("This computer can't run workflows right now.",
+             "Update Hermes and the bighelp plugin on this computer, then try again.")
         }
     }
 

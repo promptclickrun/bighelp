@@ -116,7 +116,7 @@ enum FleetOpen: Equatable, Sendable {
 /// Screens that belong to one host. With several hosts, the all-hosts view
 /// asks which one first.
 enum FleetDestination: String, Equatable, Sendable, Identifiable {
-    case settings, agents, projects, kanban, credentialVault, folder
+    case settings, agents, projects, kanban, workflows, credentialVault, folder
 
     var id: Self { self }
 
@@ -126,6 +126,7 @@ enum FleetDestination: String, Equatable, Sendable, Identifiable {
         case .agents: "Agents"
         case .projects: "Projects"
         case .kanban: "Kanban"
+        case .workflows: "Workflows"
         case .credentialVault: "Credential vault"
         case .folder: "Folder"
         }

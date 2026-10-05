@@ -10,6 +10,8 @@ enum WorkflowsLoadState: Equatable, Sendable {
     case needsPluginUpdate
     /// The plugin has Workflows, but this Hermes can't run them.
     case needsHermesUpdate
+    /// The plugin says this computer can't run workflows, with a fixed code.
+    case cantRunHere(String)
     case unavailable(String)
 
     @MainActor
@@ -17,6 +19,8 @@ enum WorkflowsLoadState: Equatable, Sendable {
         switch error {
         case WorkspaceClientError.unavailable(.unsupportedOperation), WorkspaceClientError.unavailable(.pluginRequired):
             return .needsPluginUpdate
+        case WorkspaceClientError.rejected(let code?) where WorkflowsSupport.unavailableCodes.contains(code):
+            return .cantRunHere(code)
         default:
             return .unavailable(hasContent ? "Couldn't refresh. Showing the last result." : WorkflowsStore.reason(error))
         }
@@ -37,15 +41,25 @@ final class WorkflowsStore {
     /// Waiting runs moved out of the way with Later, until the app closes.
     private(set) var later: Set<String> = []
     private(set) var isOnScreen = false
+    /// What the computer's plugin says about Workflows; nil until it's asked.
+    private(set) var support: WorkflowsSupport?
+    /// A change from a long-press menu that didn't work, in plain words.
+    var message: String?
 
     let client: any WorkflowsClient
     @ObservationIgnored private let pollInterval: Duration
     @ObservationIgnored private var pollTask: Task<Void, Never>?
 
-    init(client: any WorkflowsClient, pollInterval: Duration = .seconds(15)) {
+    init(client: any WorkflowsClient, support: WorkflowsSupport? = nil, pollInterval: Duration = .seconds(15)) {
         self.client = client
+        self.support = support
         self.pollInterval = pollInterval
     }
+
+    /// Connections, places, your templates and pins need `native-workflows-edit-v1`.
+    var canEdit: Bool { support?.canEdit == true }
+    var builtinTemplates: [WorkflowTemplate] { templates.filter { $0.source == .builtin } }
+    var yourTemplates: [WorkflowTemplate] { templates.filter { $0.source == .yours } }
 
     var waiting: [WorkflowRunSummary] { (list?.waiting ?? []).filter { !later.contains($0.id) } }
     /// Active runs, then runs set aside with Later.
@@ -70,6 +84,13 @@ final class WorkflowsStore {
 
     func load() async {
         if list == nil { state = .loading }
+        if support == nil || state == .needsPluginUpdate || isCantRunHere {
+            if let answer = try? await client.support() { support = answer }
+        }
+        if case .unavailable(let code)? = support {
+            state = .cantRunHere(code)
+            return
+        }
         do {
             let statusValue = try await client.status()
             let listValue = try await client.list(includeArchived: false)
@@ -85,8 +106,17 @@ final class WorkflowsStore {
             state = WorkflowsLoadState.from(error, hasContent: list != nil)
         }
         if templates.isEmpty, state == .loaded {
-            templates = (try? await client.templates()) ?? []
+            await loadTemplates()
         }
+    }
+
+    private var isCantRunHere: Bool {
+        if case .cantRunHere = state { return true }
+        return false
+    }
+
+    func loadTemplates() async {
+        if let value = try? await client.templates() { templates = value }
     }
 
     func setAside(_ run: WorkflowRunSummary) { later.insert(run.id) }
@@ -96,6 +126,70 @@ final class WorkflowsStore {
         let id = try await client.useTemplate(id: template.id)
         await load()
         return id
+    }
+
+    /// Create from scratch: an empty draft with this name; returns its id.
+    func create(name: String) async throws -> String {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let saved = try await client.saveDraft(workflowID: nil, baseDraftVersion: 0,
+                                               definition: .empty(name: String((name.isEmpty ? "New workflow" : name).prefix(200))))
+        await load()
+        return saved.workflowID
+    }
+
+    // MARK: Long-press actions
+
+    func setPinned(_ workflow: WorkflowSummary, _ pinned: Bool) async {
+        await act { _ = try await self.client.pin(workflowID: workflow.id, pinned: pinned) }
+    }
+
+    func archive(_ workflow: WorkflowSummary) async {
+        await act { try await self.client.archive(workflowID: workflow.id) }
+    }
+
+    func unarchive(_ workflowID: String) async {
+        await act { try await self.client.unarchive(workflowID: workflowID) }
+    }
+
+    /// Saves a workflow's latest version as one of your templates (without who does each role).
+    @discardableResult
+    func saveTemplate(workflowID: String, name: String) async -> Bool {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return false }
+        do {
+            _ = try await client.saveTemplate(workflowID: workflowID, name: String(name.prefix(WorkflowTemplate.nameLimit)),
+                                              description: nil)
+            await loadTemplates()
+            message = nil
+            return true
+        } catch WorkspaceClientError.rejected(let code) where code == "not_allowed" {
+            // The host keeps at most 100 of yours.
+            message = "You have 100 templates. Delete one, then save this one."
+        } catch {
+            message = Self.reason(error)
+        }
+        return false
+    }
+
+    func deleteTemplate(_ template: WorkflowTemplate) async {
+        guard template.source == .yours else { return }
+        await act { try await self.client.deleteTemplate(id: template.id) }
+        await loadTemplates()
+    }
+
+    /// Archived workflows, for the Archived list.
+    func archived() async throws -> [WorkflowSummary] {
+        try await client.list(includeArchived: true).workflows.filter(\.archived)
+    }
+
+    private func act(_ change: @escaping @MainActor () async throws -> Void) async {
+        do {
+            try await change()
+            message = nil
+        } catch {
+            message = Self.reason(error)
+        }
+        await load()
     }
 
     static func reason(_ error: any Error) -> String {

@@ -20,8 +20,9 @@ enum WorkflowSignoffDecision: String, Sendable {
 /// the computer; the app reads and asks.
 @MainActor
 protocol WorkflowsClient: AnyObject {
-    /// Whether the host's plugin has Workflows (`native-workflows-v1`).
-    func isAvailable() async throws -> Bool
+    /// Whether the host's plugin has Workflows (`native-workflows-v1`), can edit
+    /// them (`native-workflows-edit-v1`), or says why this computer can't run them.
+    func support() async throws -> WorkflowsSupport
     func status() async throws -> WorkflowStatus
     func list(includeArchived: Bool) async throws -> WorkflowsList
     func workflow(id: String, revision: WorkflowRevisionRef) async throws -> WorkflowDetail
@@ -42,6 +43,19 @@ protocol WorkflowsClient: AnyObject {
     func readArtifact(runID: String, sha256: String, offset: Int, length: Int) async throws -> WorkflowArtifactChunk
     func templates() async throws -> [WorkflowTemplate]
     func useTemplate(id: String) async throws -> String
+    // Editing (`native-workflows-edit-v1`).
+    func saveTemplate(workflowID: String, name: String, description: String?) async throws -> String
+    func deleteTemplate(id: String) async throws
+    func pin(workflowID: String, pinned: Bool) async throws -> Bool
+    func unarchive(workflowID: String) async throws
+}
+
+extension WorkflowsClient {
+    /// The plugin's own check, read like the rest: true when Workflows run here.
+    func isAvailable() async throws -> Bool {
+        if case .available = try await support() { return true }
+        return false
+    }
 }
 
 /// The bighelp plugin's Workflows routes, read through whichever connection is
@@ -60,11 +74,9 @@ final class DirectHermesWorkflowsClient: WorkflowsClient {
         self.reconnectAttempts = reconnectAttempts
     }
 
-    func isAvailable() async throws -> Bool {
+    func support() async throws -> WorkflowsSupport {
         let (workspace, owner) = try await connection()
-        let context = try await workspace.perform(.nativeContext, payload: [:], owner: owner)
-        let features = context["features"]?.array?.compactMap(\.string) ?? []
-        return features.contains(DirectHermesNativePluginClient.workflowsFeature)
+        return WorkflowsSupport(context: try await workspace.perform(.nativeContext, payload: [:], owner: owner))
     }
 
     func status() async throws -> WorkflowStatus {
@@ -184,7 +196,8 @@ final class DirectHermesWorkflowsClient: WorkflowsClient {
 
     func templates() async throws -> [WorkflowTemplate] {
         let result = try await perform(.workflowsTemplatesList, [:])
-        return WorkflowDecode.objects(result["templates"], max: 50).compactMap(WorkflowTemplate.init(json:))
+        // Built-in ones and at most 100 of yours.
+        return WorkflowDecode.objects(result["templates"], max: 150).compactMap(WorkflowTemplate.init(json:))
     }
 
     func useTemplate(id: String) async throws -> String {
@@ -193,6 +206,30 @@ final class DirectHermesWorkflowsClient: WorkflowsClient {
             throw WorkspaceClientError.invalidResponse
         }
         return workflowID
+    }
+
+    func saveTemplate(workflowID: String, name: String, description: String?) async throws -> String {
+        var payload: WorkflowJSON = ["workflowId": .string(workflowID),
+                                     "name": .string(String(name.prefix(WorkflowTemplate.nameLimit)))]
+        if let description { payload["description"] = .string(String(description.prefix(1_000))) }
+        let result = try await perform(.workflowsTemplatesSave, payload)
+        guard let id = WorkflowDecode.string(result["templateId"], max: 128) else {
+            throw WorkspaceClientError.invalidResponse
+        }
+        return id
+    }
+
+    func deleteTemplate(id: String) async throws {
+        _ = try await perform(.workflowsTemplatesDelete, ["templateId": .string(id)])
+    }
+
+    func pin(workflowID: String, pinned: Bool) async throws -> Bool {
+        let result = try await perform(.workflowsPin, ["workflowId": .string(workflowID), "pinned": .boolean(pinned)])
+        return WorkflowDecode.bool(result["pinned"]) ?? pinned
+    }
+
+    func unarchive(workflowID: String) async throws {
+        _ = try await perform(.workflowsUnarchive, ["workflowId": .string(workflowID)])
     }
 
     // MARK: Plumbing

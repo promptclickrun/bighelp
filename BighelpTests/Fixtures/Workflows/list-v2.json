@@ -1,0 +1,104 @@
+{
+  "route": "workflows/list",
+  "request": {
+    "includeArchived": false
+  },
+  "response": {
+    "workflows": [
+      {
+        "id": "wf_2b3c4d5e6f708192",
+        "name": "Newsletter with a loop",
+        "revision": null,
+        "draftVersion": 2,
+        "hasDraft": true,
+        "stageCount": 5,
+        "needsSetupRoles": [
+          "reviewer"
+        ],
+        "valid": true,
+        "archived": false,
+        "lastRunAt": null,
+        "pinned": true
+      },
+      {
+        "id": "wf_8c1d2e3f4a5b6c7d",
+        "name": "Weekly newsletter",
+        "revision": 3,
+        "draftVersion": 5,
+        "hasDraft": false,
+        "stageCount": 6,
+        "needsSetupRoles": [],
+        "valid": true,
+        "archived": false,
+        "lastRunAt": "2026-10-04T09:30:00Z",
+        "pinned": false
+      },
+      {
+        "id": "wf_1a2b3c4d5e6f7081",
+        "name": "Research, draft, review",
+        "revision": null,
+        "draftVersion": 1,
+        "hasDraft": true,
+        "stageCount": 6,
+        "needsSetupRoles": [
+          "researcher",
+          "writer",
+          "reviewer"
+        ],
+        "valid": true,
+        "archived": false,
+        "lastRunAt": null,
+        "pinned": false
+      }
+    ],
+    "waiting": [
+      {
+        "id": "run_10a1b2c3d4e5f606",
+        "number": 9,
+        "workflowId": "wf_8c1d2e3f4a5b6c7d",
+        "workflowName": "Weekly newsletter",
+        "revision": 3,
+        "state": "waiting_for_you",
+        "stageKey": "signoff",
+        "stageTitle": "Your sign-off",
+        "stageState": "waiting_for_you",
+        "stagesDone": 5,
+        "stageCount": 6,
+        "iteration": 2,
+        "startedAt": "2026-10-04T09:30:00Z",
+        "updatedAt": "2026-10-04T09:41:12Z",
+        "endedAt": null,
+        "paused": false,
+        "version": 21,
+        "sample": false,
+        "waiting": {
+          "kind": "signoff",
+          "stageKey": "signoff",
+          "since": "2026-10-04T09:58:40Z"
+        }
+      }
+    ],
+    "active": [
+      {
+        "id": "run_3f9a1c2e4b5d6f70",
+        "number": 12,
+        "workflowId": "wf_8c1d2e3f4a5b6c7d",
+        "workflowName": "Weekly newsletter",
+        "revision": 3,
+        "state": "running",
+        "stageKey": "draft",
+        "stageTitle": "Write the draft",
+        "stageState": "running",
+        "stagesDone": 1,
+        "stageCount": 6,
+        "iteration": 1,
+        "startedAt": "2026-10-04T09:30:00Z",
+        "updatedAt": "2026-10-04T09:41:12Z",
+        "endedAt": null,
+        "paused": false,
+        "version": 7,
+        "sample": false
+      }
+    ]
+  }
+}

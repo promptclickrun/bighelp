@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// The workflow canvas (iPad and Mac, regular width): every stage left to
-/// right at fixed places with the review loop above, and the selected stage's
-/// details in an inspector inside the page. Read-only in this version: Edit
-/// opens the same stage editor as iPhone.
+/// The workflow canvas (iPad, Mac and Vision Pro at regular width): a free,
+/// dotted canvas with every node where the person put it and curved wires
+/// between them (`WorkflowCanvasBoard`), and the selected stage's details in
+/// an inspector inside the page. Older plugins show the flow as it is.
 struct WorkflowCanvasView: View {
     @Bindable var model: WorkflowEditorModel
     let context: WorkflowsContext
@@ -12,6 +12,8 @@ struct WorkflowCanvasView: View {
     @State private var editing: WorkflowStage?
     @State private var inspectorTab: WorkflowStageEditor.Tab = .setup
     @State private var isRunSheetPresented = false
+    @State private var isInputsPresented = false
+    @State private var templateSource: WorkflowSummary?
     @State private var didOfferRun = false
     @BighelpThemeReader private var theme
 
@@ -20,9 +22,9 @@ struct WorkflowCanvasView: View {
 
     var body: some View {
         Group {
-            if let definition {
+            if definition != nil {
                 HStack(spacing: 0) {
-                    BighelpDeferredSection { canvas(definition) }
+                    BighelpDeferredSection { canvas }
                     if selectedStage != nil {
                         Divider().overlay(theme.separator)
                         BighelpDeferredSection { inspector }
@@ -43,6 +45,19 @@ struct WorkflowCanvasView: View {
         .toolbar {
             ToolbarItem(placement: .principal) { WorkflowTitle(model: model) }
             ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    WorkflowAddStageButtons { addStage($0, after: selected) }
+                    Divider()
+                    Button("Inputs", systemImage: "arrow.right.to.line") { isInputsPresented = true }
+                } label: {
+                    Image(systemName: "plus")
+                        .bighelpToolbarIcon()
+                }
+                .bighelpIconLabel("Add a stage")
+                .disabled(definition == nil)
+                .accessibilityIdentifier("workflows.canvas.add")
+            }
+            ToolbarItem(placement: .topBarTrailing) {
                 Button { isRunSheetPresented = true } label: {
                     Label("Run", systemImage: "play.fill")
                         .bighelpToolbarText()
@@ -50,7 +65,10 @@ struct WorkflowCanvasView: View {
                 .disabled(!model.canRun)
                 .accessibilityIdentifier("workflows.canvas.run")
             }
-            ToolbarItem(placement: .topBarTrailing) { WorkflowMoreMenu(model: model, context: context) }
+            ToolbarItem(placement: .topBarTrailing) {
+                WorkflowMoreMenu(model: model, context: context, templateSource: $templateSource,
+                                 editInputs: { isInputsPresented = true })
+            }
         }
         .sheet(item: $editing) { stage in
             WorkflowStageEditor(model: model, context: context, stage: stage)
@@ -60,6 +78,20 @@ struct WorkflowCanvasView: View {
             WorkflowRunSheet(model: model, context: context)
                 .bighelpSheetSize(.standard)
         }
+        .sheet(isPresented: $isInputsPresented) {
+            WorkflowInputsEditor(model: model)
+                .bighelpSheetSize(.large)
+        }
+        // Its own view: two alerts on one view and only one of them shows.
+        .background {
+            Color.clear
+                .modifier(WorkflowSaveTemplatePrompt(store: context.store, source: $templateSource,
+                                                     prepare: { await model.flushSave() }) { saved in
+                    model.message = saved ? WorkflowWords.templateSaved : context.store.message
+                    context.store.message = nil
+                })
+                .allowsHitTesting(false)
+        }
         .alert("Workflow", isPresented: Binding(get: { model.message != nil }, set: { if !$0 { model.message = nil } })) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -67,96 +99,48 @@ struct WorkflowCanvasView: View {
         }
         .onChange(of: model.definition != nil, initial: true) { _, loaded in
             guard loaded else { return }
-            if selected == nil { selected = model.definition?.stages.first { $0.kind == .agent }?.key }
             if startsRun, !didOfferRun {
                 didOfferRun = true
                 if model.canRun { isRunSheetPresented = true }
             }
         }
+        .onDisappear { Task { await model.flushSave() } }
         .animation(.snappy, value: selected)
     }
 
     // MARK: Canvas
 
-    private func canvas(_ definition: WorkflowDefinition) -> some View {
-        VStack(alignment: .leading, spacing: BighelpTokens.space20) {
-            if !model.unboundRoles.isEmpty {
-                VStack(alignment: .leading, spacing: BighelpTokens.space8) {
-                    Text(model.unboundRoles.count == 1 ? "1 role needs an agent" : "\(model.unboundRoles.count) roles need an agent")
-                        .font(.bighelp(.headline))
-                        .foregroundStyle(theme.warning)
-                    ForEach(definition.roles) { role in
-                        WorkflowRolePicker(model: model, context: context, role: role)
-                    }
-                }
-                .workflowCard(theme)
-                .frame(maxWidth: 420)
-            }
-            ScrollView(.horizontal, showsIndicators: false) {
-                WorkflowGraph(nodes: nodes(definition), loop: loop(definition), selected: selected) { key in
-                    selected = key == "inputs" ? nil : key
-                }
-                .padding(BighelpTokens.space24)
-            }
-            HStack(alignment: .top, spacing: BighelpTokens.space16) {
-                VStack(alignment: .leading, spacing: BighelpTokens.space4) {
-                    Text("Publishing stays manual.")
-                        .font(.bighelp(.subheadline).weight(.semibold))
-                    Text("After sign-off the approved file comes to you. No stage in this flow publishes anything.")
-                        .font(.bighelp(.footnote))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .foregroundStyle(theme.primaryText)
-                .padding(BighelpTokens.space12)
-                .frame(maxWidth: 320, alignment: .leading)
-                .background(BighelpTokens.Palette.gold.opacity(0.12),
-                            in: RoundedRectangle(cornerRadius: BighelpTokens.radius12, style: .continuous))
-                if let issues = model.validation?.issues, !issues.isEmpty {
-                    VStack(alignment: .leading, spacing: BighelpTokens.space4) {
-                        ForEach(issues) { issue in
-                            Label(issue.message, systemImage: issue.isError ? "xmark.octagon" : "exclamationmark.triangle")
-                                .font(.bighelp(.footnote))
-                                .foregroundStyle(issue.isError ? theme.danger : theme.warning)
+    private var canvas: some View {
+        WorkflowCanvasBoard(model: model, context: context, selected: $selected,
+                            edit: { editing = $0 }, add: { addStage($0, after: $1) },
+                            editInputs: { isInputsPresented = true })
+            .overlay(alignment: .topLeading) {
+                if !model.unboundRoles.isEmpty, let definition {
+                    VStack(alignment: .leading, spacing: BighelpTokens.space8) {
+                        Text(model.unboundRoles.count == 1 ? "1 role needs an agent"
+                             : "\(model.unboundRoles.count) roles need an agent")
+                            .font(.bighelp(.headline))
+                            .foregroundStyle(theme.warning)
+                        ForEach(definition.roles) { role in
+                            WorkflowRolePicker(model: model, context: context, role: role)
                         }
                     }
+                    .workflowCard(theme)
+                    .frame(maxWidth: 360)
+                    .padding(BighelpTokens.space16)
                 }
             }
-            .padding(.horizontal, BighelpTokens.space24)
-            Spacer(minLength: 0)
-            Text("One stage at a time · \(definition.stageMinutes) min per stage · Nothing runs until you tap Run")
-                .font(.bighelp(.footnote))
-                .foregroundStyle(theme.secondaryText)
-                .padding(.horizontal, BighelpTokens.space16)
-                .padding(.vertical, BighelpTokens.space8)
-                .background(theme.surface, in: Capsule())
-                .overlay(Capsule().strokeBorder(theme.border))
-                .frame(maxWidth: .infinity)
-                .padding(.bottom, BighelpTokens.space16)
-        }
-        .padding(.top, BighelpTokens.space16)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-
-    private func nodes(_ definition: WorkflowDefinition) -> [WorkflowGraph.Node] {
-        [WorkflowGraph.Node(id: "inputs", kind: nil, title: "Inputs",
-                            detail: definition.inputs.count == 1 ? "1 field" : "\(definition.inputs.count) fields")]
-            + definition.stages.map { stage in
-                let detail: String
-                switch stage.kind {
-                case .agent: detail = context.agentName(model.agentID(for: stage.role)) ?? stage.role ?? ""
-                case .check: detail = stage.rules.count == 1 ? "1 rule" : "\(stage.rules.count) rules"
-                case .decision: detail = stage.on ?? ""
-                case .signoff: detail = "you"
-                case .unknown: detail = ""
-                }
-                return WorkflowGraph.Node(id: stage.key, kind: stage.kind, title: stage.title, detail: detail)
+            .overlay(alignment: .bottomTrailing) {
+                WorkflowIssuesCard(issues: model.issues)
+                    .frame(maxWidth: 360)
+                    .padding(BighelpTokens.space16)
             }
     }
 
-    private func loop(_ definition: WorkflowDefinition) -> (from: String, to: String, label: String)? {
-        guard let decision = definition.stages.first(where: { $0.kind == .decision && $0.changesGoTo != nil }),
-              let goTo = decision.changesGoTo else { return nil }
-        return (decision.key, goTo, "revise · max \(decision.changesMaxRevisions ?? definition.maxRevisions)")
+    private func addStage(_ kind: WorkflowStage.Kind, after key: String?) {
+        guard let stage = model.addStage(kind, after: key) else { return }
+        selected = stage.key
+        editing = stage
     }
 
     // MARK: Inspector

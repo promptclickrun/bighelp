@@ -250,10 +250,13 @@ final class DirectHermesNativePluginClient {
     }
 
     /// Features whose plugin routes refuse requests over 192 KB.
-    private static let smallRequestFeatures: Set<String> = ["native-card-templates-v1", workflowsFeature]
+    private static let smallRequestFeatures: Set<String> = ["native-card-templates-v1", workflowsFeature,
+                                                            workflowsEditFeature]
 
     /// Workflows: stages run by agents on the host, with your sign-off.
     static let workflowsFeature = "native-workflows-v1"
+    /// Workflows editing: connections and places on the canvas, your templates, pins and unarchive.
+    static let workflowsEditFeature = "native-workflows-edit-v1"
 
     static func supports(_ operation: WorkspaceOperation) -> Bool {
         operation == .nativeContext || (try? route(operation)) != nil
@@ -399,6 +402,9 @@ final class DirectHermesNativePluginClient {
             ]
             return Route(path: path, feature: workflowsFeature, isMutation: mutations.contains(operation),
                          maximumResponseBytes: 196_608)
+        case .workflowsTemplatesSave, .workflowsTemplatesDelete, .workflowsPin, .workflowsUnarchive:
+            let path = operation.rawValue.split(separator: ".").joined(separator: "/")
+            return Route(path: path, feature: workflowsEditFeature, isMutation: true, maximumResponseBytes: 196_608)
         default: throw WorkspaceClientError.unavailable(.unsupportedOperation)
         }
     }

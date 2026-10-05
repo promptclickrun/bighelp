@@ -1,0 +1,52 @@
+{
+  "route": "workflows/templates/list",
+  "request": {},
+  "response": {
+    "templates": [
+      {
+        "id": "tpl-5d6e7f8091a2b3c4",
+        "name": "Newsletter with a loop",
+        "description": "Draft until the review passes.",
+        "source": "yours",
+        "stageCount": 5,
+        "roles": [
+          {
+            "key": "researcher",
+            "label": "Researcher"
+          },
+          {
+            "key": "writer",
+            "label": "Writer"
+          },
+          {
+            "key": "reviewer",
+            "label": "Reviewer"
+          }
+        ],
+        "updatedAt": "2026-10-04T09:20:00Z"
+      },
+      {
+        "id": "research-draft-review",
+        "name": "Research, draft, review",
+        "description": "One agent researches the topic, one writes a draft and one reviews it. You approve the final file.",
+        "stageCount": 6,
+        "roles": [
+          {
+            "key": "researcher",
+            "label": "Researcher"
+          },
+          {
+            "key": "writer",
+            "label": "Writer"
+          },
+          {
+            "key": "reviewer",
+            "label": "Reviewer"
+          }
+        ],
+        "source": "builtin",
+        "updatedAt": null
+      }
+    ]
+  }
+}

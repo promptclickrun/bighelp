@@ -143,8 +143,9 @@ struct WorkflowRunContent: View {
             parts.append("started \(started.formatted(date: .omitted, time: .shortened))")
             if run.state.isWorking { parts.append(WorkflowWords.duration(Date.now.timeIntervalSince(started))) }
         }
-        if context.isNerdMode, detail.tokens.total > 0 {
-            parts.append("\(detail.tokens.total.formatted(.number.notation(.compactName))) tokens")
+        // The fallback runner can't count them: nothing then, never 0.
+        if context.isNerdMode, let tokens = detail.tokens, tokens.total > 0 {
+            parts.append("\(tokens.total.formatted(.number.notation(.compactName))) tokens")
         }
         if run.stageCount > 0 { parts.append("\(run.stagesDone) of \(run.stageCount) stages done") }
         return parts.joined(separator: " · ")
@@ -182,6 +183,14 @@ struct WorkflowRunContent: View {
                     .font(.bighelp(.subheadline))
                     .foregroundStyle(theme.primaryText)
                     .fixedSize(horizontal: false, vertical: true)
+                // Why the stage stopped before its agent began, as the computer said it.
+                if let stopped = WorkflowEvent.agentError(in: model.events, stageKey: run.stageKey) {
+                    Text(stopped.text)
+                        .font(.bighelp(.subheadline))
+                        .foregroundStyle(theme.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("workflows.run.agent-error")
+                }
                 if run.state == .needsAttention {
                     Text("Nothing tries again by itself. Try again starts a new attempt; the old one stays on the record.")
                         .font(.bighelp(.footnote))
@@ -359,7 +368,9 @@ struct WorkflowRunContent: View {
                         Text("\(stage.key) #\(attempt.number)")
                             .font(.bighelp(.caption).monospaced())
                         Spacer()
-                        Text("\(attempt.state.rawValue) · \(attempt.tokens.input.formatted()) in · \(attempt.tokens.output.formatted()) out\(attempt.outcomeCode.map { " · \($0)" } ?? "")")
+                        Text(([attempt.state.rawValue]
+                              + (attempt.tokens.map { ["\($0.input.formatted()) in", "\($0.output.formatted()) out"] } ?? [])
+                              + [attempt.outcomeCode].compactMap { $0 }).joined(separator: " · "))
                             .font(.bighelp(.caption).monospaced())
                             .foregroundStyle(theme.secondaryText)
                     }

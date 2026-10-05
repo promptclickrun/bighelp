@@ -98,12 +98,20 @@ struct WorkflowRunMonitorView: View {
         .toolbar(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
+                // One line: a long computer name shortens in the middle instead of wrapping.
                 HStack(spacing: BighelpTokens.space4) {
                     Circle().fill(serviceColor).frame(width: 8, height: 8)
                     Text(context.store.status?.hostName ?? context.hostName)
-                        .font(.bighelp(.footnote).monospaced())
+                        .font(.bighelp(.footnote).weight(.medium))
+                        .foregroundStyle(theme.primaryText)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
                 }
+                .padding(.horizontal, BighelpTokens.space4)
+                .frame(maxWidth: isWide ? 260 : 132)
+                .fixedSize(horizontal: false, vertical: true)
                 .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("workflows.monitor.host")
             }
         }
         .onAppear {
@@ -316,6 +324,13 @@ struct WorkflowRunMonitorView: View {
                 }
                 LabeledContent("Workflow slots in use", value: "\(status.slotsUsed) of \(status.slotsTotal)")
                 LabeledContent("Runs keep going when you close the app", value: status.survivesAppClose ? "Yes" : "No")
+                if status.runnerMode == .text {
+                    // Older Hermes gives only the reply at the end: no live lines, no token counts.
+                    Text("Stages report only when they end. Update Hermes on this computer to follow them live.")
+                        .foregroundStyle(theme.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("workflows.monitor.text-runner")
+                }
             }
         }
         .font(.bighelp(.footnote))

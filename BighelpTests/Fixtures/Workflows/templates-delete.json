@@ -1,0 +1,9 @@
+{
+  "route": "workflows/templates/delete",
+  "request": {
+    "templateId": "tpl-5d6e7f8091a2b3c4"
+  },
+  "response": {
+    "deleted": true
+  }
+}

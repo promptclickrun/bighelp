@@ -208,6 +208,17 @@ struct WorkflowLoadStateView: View {
                 Text("Update Hermes to use Workflows. This version can't run workflow stages.")
             }
             .accessibilityIdentifier("workflows.update-hermes")
+        case .cantRunHere(let code):
+            let words = WorkflowWords.unavailable(code)
+            ContentUnavailableView {
+                Label("Workflows can't run on this computer", systemImage: "desktopcomputer.trianglebadge.exclamationmark")
+            } description: {
+                Text("\(words.reason)\n\n\(words.action)")
+                    .accessibilityIdentifier("workflows.cant-run.reason")
+            } actions: {
+                if let retry { Button("Check again", action: retry).accessibilityIdentifier("workflows.retry") }
+            }
+            .accessibilityIdentifier("workflows.cant-run")
         case .unavailable(let message):
             ContentUnavailableView {
                 Label("Workflows aren't available", systemImage: "exclamationmark.triangle")
@@ -438,6 +449,42 @@ struct WorkflowDocumentView: View {
             MarkdownMessageView(document: MarkdownDocument(text), primaryText: theme.primaryText)
                 .textSelection(.enabled)
                 .accessibilityIdentifier("workflows.document")
+        }
+    }
+}
+
+// MARK: - What's wrong with the flow
+
+/// The flow's problems, plainly, in a card on the canvas.
+struct WorkflowIssuesCard: View {
+    let issues: [WorkflowValidation.Issue]
+    @State private var isExpanded = false
+    @BighelpThemeReader private var theme
+
+    var body: some View {
+        if !issues.isEmpty {
+            let shown = isExpanded ? issues : Array(issues.prefix(3))
+            VStack(alignment: .leading, spacing: BighelpTokens.space8) {
+                Text(issues.contains(where: \.isError) ? "To fix before it can run" : "Worth a look")
+                    .font(.bighelp(.subheadline).weight(.semibold))
+                    .foregroundStyle(theme.primaryText)
+                ForEach(shown) { issue in
+                    Label(issue.message, systemImage: issue.isError ? "xmark.octagon" : "exclamationmark.triangle")
+                        .font(.bighelp(.footnote))
+                        .foregroundStyle(issue.isError ? theme.danger : theme.warning)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if issues.count > 3 {
+                    Button(isExpanded ? "Show less" : "Show all \(issues.count)") { isExpanded.toggle() }
+                        .font(.bighelp(.footnote).weight(.semibold))
+                        .foregroundStyle(theme.action)
+                        .bighelpPlainButtonStyle()
+                        .frame(minHeight: BighelpTokens.hitTarget - 12)
+                }
+            }
+            .workflowCard(theme, padding: BighelpTokens.space12)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("workflows.issues")
         }
     }
 }

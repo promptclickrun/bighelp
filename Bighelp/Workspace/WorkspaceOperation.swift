@@ -188,4 +188,9 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     case workflowsArtifactsRead = "workflows.artifacts.read"
     case workflowsTemplatesList = "workflows.templates.list"
     case workflowsTemplatesUse = "workflows.templates.use"
+    /// Workflows editing (plugin `native-workflows-edit-v1`): your templates, pins, unarchive.
+    case workflowsTemplatesSave = "workflows.templates.save"
+    case workflowsTemplatesDelete = "workflows.templates.delete"
+    case workflowsPin = "workflows.pin"
+    case workflowsUnarchive = "workflows.unarchive"
 }

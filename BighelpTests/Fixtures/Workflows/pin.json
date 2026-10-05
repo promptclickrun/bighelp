@@ -1,0 +1,11 @@
+{
+  "route": "workflows/pin",
+  "request": {
+    "workflowId": "wf_2b3c4d5e6f708192",
+    "pinned": true
+  },
+  "response": {
+    "workflowId": "wf_2b3c4d5e6f708192",
+    "pinned": true
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "route": "context",
+  "request": {},
+  "response": {
+    "schemaVersion": 1,
+    "pluginVersion": "3.5.0",
+    "runtimeId": "0f1e2d3c4b5a69788796a5b4c3d2e1f0",
+    "servingProfileId": "default",
+    "principal": null,
+    "features": [
+      "native-context-v1",
+      "serving-profile-v1",
+      "native-provider-usage-v1"
+    ],
+    "unavailable": {
+      "native-workflows-v1": "chat_runner_missing"
+    }
+  }
+}

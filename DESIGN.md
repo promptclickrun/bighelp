@@ -59,7 +59,8 @@ it is always open and names each tab under its icon. In a chat, Chat is the lit 
 Chat opens that agent's latest chat with its live avatar big at the top: tap the avatar for its profile (This chat's
 model and reasoning, then Activity, Approvals, Schedules, Identity), tap the name to switch agents or open a group
 chat, and ☰ for everything else. ☰'s first screen fits without
-scrolling: the host as one switcher row on top, then New chat (Group beside it), Agents, Projects, Kanban, Workflows,
+scrolling: the host as one switcher row on top, then New chat (Group beside it), Agents, Projects, Kanban, Workflows
+(where the computer's plugin has them or says why it can't run them; with All hosts on it asks which computer),
 Scheduled tasks, Usage and Settings, then Recent chats with See all. The Secure credential vault and Nerd Mode's folder
 sit under More at the bottom.
 Keep it that short: a new destination goes where people already look, not on the first screen. A tap on the
@@ -201,19 +202,44 @@ the board in its own glass window beside bighelp: look at a card, pinch and drag
 the lane under it lights up.
 
 **Workflows** (☰ › Workflows, after Kanban) are the bighelp plugin's: stages that agents run one at a time on the
-computer, with your sign-off at the end. The row shows only when the host's plugin has them
-(`native-workflows-v1`) and never while All hosts is on; an older plugin gets "Update the bighelp plugin to use
-Workflows". Home leads with the service line, then Waiting for you (Review or Later), Active runs (All runs), Your
-workflows (Run, or Set up while a role has no agent) and Templates. Build the flow is a vertical list of stages
-with the review loop drawn beside it; a stage opens its editor (Setup, Output, Limits) as a large sheet, and a stage
-with the terminal says so in warning colors. Nothing runs until you tap Run. At regular width the workflow opens as
-a read-only canvas with an inspector inside the page. A run shows each stage's time, Cancel and Try again; Sign-off
+computer, with your sign-off at the end. The row shows when the computer's plugin has them (`native-workflows-v1`)
+or lists them under `unavailable` with a reason; then the screen says in plain words why this computer can't run
+them and what to do, never the code. Plugins with neither keep the row hidden. With All hosts on the row asks which
+computer first, then opens that one's Workflows. An older plugin gets "Update the bighelp plugin to use Workflows".
+Home leads with the service line, then Waiting for you (Review or Later), Active runs (All runs), Your workflows
+(pinned first; Run, or Set up while a role has no agent) and Templates: Create from scratch on top, then Built-in
+and Yours. Touch and hold a workflow for Open, Run, Pin or Unpin, Save as template and Archive; Archived workflows
+at the end of the list opens the archived ones, each with Unarchive. Touch and hold one of your templates to delete
+it. Save as template (also in a workflow's ⋯) asks for a name and keeps the stages and inputs, not who does each
+role. Editing the flow, Create from scratch, your templates and pins need `native-workflows-edit-v1`; older plugins
+show the flow as it is.
+
+At compact width (iPhone, and any narrow window) a workflow is one vertical line of stages, so nothing is lost off
+screen; places saved on the canvas don't apply there. Ways out that don't go to the stage below are drawn beside
+the line, the review loop in gold. Touch and hold a stage for its menu (Edit, Add a stage after, Move up, Move down,
+End the flow here, Delete); drag it up or down to reorder (the stages around its old place join up). A drag toward
+the open menu picks from it, as everywhere in iOS, so Move up and Move down are there too. Drag a stage's port to another
+stage to rewire it. + between stages and at the end adds an agent stage, a check, a decision or a sign-off; Inputs
+(tap the Inputs card) adds and changes the fields a run asks for. A stage opens its editor (Setup, Output, Limits)
+as a large sheet, and a stage with the terminal says so in warning colors. Nothing runs until you tap Run.
+
+At regular width (iPad, Mac, Vision Pro) the workflow opens as a free canvas: a dotted grid you pan and pinch to
+zoom (zoom in, zoom out and Fit at the bottom left), rounded node cards at their saved places with a port on each
+edge, and curved wires between ports; a decision lists Pass and Changes as rows, each with its own port. Touch and
+hold a node to see its menu, then drag to move it anywhere (the menu goes away as the drag starts; on the Mac just
+drag it). Drag an output port, or a wire's end at a node, to another node to rewire. A new stage goes after the
+selected one (or at the end of the flow) on a clean grid, never on top of another, and is wired in; after that the
+person decides. Places save into `layout` and wiring into `next` and the decision's targets, a moment after the last
+change. What's wrong (a stage nothing reaches, a loop that isn't a decision's changes, no end) shows plainly in a
+card on the canvas and in red on the node, and the selected stage's details sit in an inspector inside the page.
+A run shows each stage's time, Cancel and Try again; Sign-off
 shows how the run got here, the reviewer's notes and the exact file (Read, or Changes from the last version), then
 Ask for changes or Approve, stacked on iPhone and side by side on iPad. Approving names the file by a short
 fingerprint (4f1c…9a2e) and never publishes anything: the file comes to you with Share and Save to Files. The Mac
-shows all runs as a three-column monitor (runs with filters, the run, and an inspector). Token counts, attempts,
-full fingerprints, the service's heartbeat and the events log are Nerd Mode only. Stage chats (source `workflow`)
-stay out of Sessions, recents and widgets.
+shows all runs as a three-column monitor (runs with filters, the run, and an inspector); the computer's name in
+the top bar stays on one line. Token counts, attempts, full fingerprints, the service's heartbeat and the events log
+are Nerd Mode only, and runs on Hermes' fallback runner (which can't count tokens) show none rather than 0. Stage
+chats (source `workflow`) stay out of Sessions, recents and widgets.
 
 **All hosts** (the stack button beside ☰'s host switcher) turns home into one list of every agent on every
 host, like Messages: pinned agents up top as big pictures with their name and role (no host name; touch and hold
@@ -221,7 +247,7 @@ to drag them into a new order, kept on this device across hosts), host filter ch
 name, its role and its latest chat, newest first. One big round New chat sits bottom right, above the search bar,
 where a thumb rests. A tap opens that agent's own chat (☰ top left, the edge swipe goes back); if it's on another host, the app switches hosts
 first while the list stays up. ☰'s recent chats, All chats and Scheduled tasks then list every host's, each with
-its host's name. Screens that belong to one host (Settings, Agents, Projects, Kanban, the credential
+its host's name. Screens that belong to one host (Settings, Agents, Projects, Kanban, Workflows, the credential
 vault, the folder, New group) ask which host first; Usage instead adds up every host, with a row for each; Settings' pop-up also leads with **Fleet settings**, one page
 for every host: Update Hermes (each host's commits behind), Update bighelp Plugin (each host's version → the new
 one) and Restart Hermes Gateway, all at once with each host's live status and its own Restart when it needs one.

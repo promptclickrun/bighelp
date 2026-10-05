@@ -6,7 +6,7 @@ extension RootShellView {
     /// The bighelp plugin's Workflows on the connected host; demo mode has samples.
     func makeWorkflowsClient() -> (any WorkflowsClient)? {
         if usesWorkspaceFixtures, workspaceConnections?.isDirectSelected != true {
-            return DemoWorkflowsClient.shared
+            return DemoWorkflowsClient.forHost(demoHosts.selectedHostID)
         }
         guard currentWorkspaceOwner != nil, let connections = workspaceConnections else { return nil }
         // Reads always go through the connection in use; a reconnect keeps the client.
@@ -23,9 +23,10 @@ extension RootShellView {
             workflowsStore = nil
         }
         guard key.owner != nil, let client = makeWorkflowsClient() else { return }
-        await workflowsAvailability.check { try await client.isAvailable() }
+        await workflowsAvailability.check { try await client.support() }
     }
 
+    /// ☰ shows Workflows where the plugin has them, or says why this computer can't run them.
     var canOpenWorkflows: Bool { workflowsAvailability.isAvailable == true }
 
     /// Opens ☰ › Workflows over the chat, so Back returns there.
@@ -49,7 +50,7 @@ extension RootShellView {
     private func prepareWorkflowsStore() -> WorkflowsStore? {
         if let workflowsStore { return workflowsStore }
         guard let client = makeWorkflowsClient() else { return nil }
-        let store = WorkflowsStore(client: client)
+        let store = WorkflowsStore(client: client, support: workflowsAvailability.support)
         workflowsStore = store
         return store
     }

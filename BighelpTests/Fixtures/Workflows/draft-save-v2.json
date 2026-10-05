@@ -1,0 +1,175 @@
+{
+  "route": "workflows/draft/save",
+  "request": {
+    "workflowId": "wf_2b3c4d5e6f708192",
+    "baseDraftVersion": 1,
+    "definition": {
+      "schemaVersion": 2,
+      "name": "Newsletter with a loop",
+      "description": "Draft until the review passes.",
+      "roles": [
+        {
+          "key": "researcher",
+          "label": "Researcher"
+        },
+        {
+          "key": "writer",
+          "label": "Writer"
+        },
+        {
+          "key": "reviewer",
+          "label": "Reviewer"
+        }
+      ],
+      "inputs": [
+        {
+          "key": "topic",
+          "label": "Topic",
+          "type": "text",
+          "required": true
+        }
+      ],
+      "limits": {
+        "stageMinutes": 20,
+        "maxRevisions": 2
+      },
+      "stages": [
+        {
+          "key": "research",
+          "kind": "agent",
+          "title": "Research the topic",
+          "role": "researcher",
+          "instructions": "Research the topic.",
+          "tools": [
+            "web"
+          ],
+          "uses": [
+            "inputs.topic"
+          ],
+          "outputs": [
+            {
+              "name": "brief",
+              "type": "markdown_file"
+            }
+          ],
+          "next": "draft"
+        },
+        {
+          "key": "signoff",
+          "kind": "signoff",
+          "title": "Your sign-off",
+          "file": "draft.draft",
+          "next": null
+        },
+        {
+          "key": "draft",
+          "kind": "agent",
+          "title": "Write the draft",
+          "role": "writer",
+          "instructions": "Write the draft.",
+          "uses": [
+            "research.brief"
+          ],
+          "outputs": [
+            {
+              "name": "draft",
+              "type": "markdown_file"
+            },
+            {
+              "name": "word_count",
+              "type": "number"
+            }
+          ]
+        },
+        {
+          "key": "review",
+          "kind": "agent",
+          "title": "Review the draft",
+          "role": "reviewer",
+          "instructions": "Review the draft.",
+          "uses": [
+            "draft.draft"
+          ],
+          "outputs": [
+            {
+              "name": "decision",
+              "type": "decision",
+              "values": [
+                "pass",
+                "changes"
+              ]
+            },
+            {
+              "name": "notes",
+              "type": "notes"
+            }
+          ]
+        },
+        {
+          "key": "review_decision",
+          "kind": "decision",
+          "title": "Pass or send back",
+          "on": "review.decision",
+          "pass": "signoff",
+          "changes": {
+            "goTo": "draft",
+            "maxRevisions": 1
+          }
+        }
+      ],
+      "layout": {
+        "inputs": {
+          "x": 0,
+          "y": 0
+        },
+        "stages": {
+          "research": {
+            "x": 0,
+            "y": 120
+          },
+          "draft": {
+            "x": 0,
+            "y": 240.5
+          },
+          "review": {
+            "x": 0,
+            "y": 360
+          },
+          "review_decision": {
+            "x": 0,
+            "y": 480
+          },
+          "signoff": {
+            "x": -220,
+            "y": 600
+          }
+        }
+      }
+    }
+  },
+  "response": {
+    "workflowId": "wf_2b3c4d5e6f708192",
+    "draftVersion": 2,
+    "validation": {
+      "valid": true,
+      "host": false,
+      "issues": [
+        {
+          "code": "role_unbound",
+          "message": "Choose an agent for Researcher.",
+          "severity": "error"
+        },
+        {
+          "code": "role_unbound",
+          "message": "Choose an agent for Writer.",
+          "severity": "error"
+        },
+        {
+          "code": "role_unbound",
+          "message": "Choose an agent for Reviewer.",
+          "severity": "error"
+        }
+      ]
+    }
+  }
+}

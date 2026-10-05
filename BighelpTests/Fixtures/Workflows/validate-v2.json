@@ -1,0 +1,55 @@
+{
+  "route": "workflows/validate",
+  "request": {
+    "workflowId": "wf_2b3c4d5e6f708192"
+  },
+  "response": {
+    "validation": {
+      "valid": false,
+      "host": true,
+      "issues": [
+        {
+          "code": "next_unknown",
+          "message": "Write a summary goes on to a stage this workflow doesn't have.",
+          "severity": "error",
+          "stageKey": "summary"
+        },
+        {
+          "code": "cycle",
+          "message": "Extra pass is part of a loop. Only a decision's changes can go back.",
+          "severity": "error",
+          "stageKey": "extra"
+        },
+        {
+          "code": "unreachable_stage",
+          "message": "Nothing leads to Write a summary.",
+          "severity": "error",
+          "stageKey": "summary"
+        },
+        {
+          "code": "unreachable_stage",
+          "message": "Nothing leads to Extra pass.",
+          "severity": "error",
+          "stageKey": "extra"
+        },
+        {
+          "code": "uses_not_before",
+          "message": "Research the topic uses review.notes, which doesn't always come first.",
+          "severity": "error",
+          "stageKey": "research"
+        },
+        {
+          "code": "goto_not_earlier",
+          "message": "Pass or send back must send changes back to a stage before it.",
+          "severity": "error",
+          "stageKey": "review_decision"
+        },
+        {
+          "code": "no_end",
+          "message": "The workflow never ends. Let a stage end the run.",
+          "severity": "error"
+        }
+      ]
+    }
+  }
+}

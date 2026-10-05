@@ -1,0 +1,11 @@
+{
+  "route": "workflows/templates/save",
+  "request": {
+    "workflowId": "wf_2b3c4d5e6f708192",
+    "name": "Newsletter with a loop",
+    "description": "Draft until the review passes."
+  },
+  "response": {
+    "templateId": "tpl-5d6e7f8091a2b3c4"
+  }
+}

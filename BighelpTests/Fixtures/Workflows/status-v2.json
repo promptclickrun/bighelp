@@ -1,0 +1,21 @@
+{
+  "route": "workflows/status",
+  "request": {},
+  "response": {
+    "coordinator": {
+      "state": "online",
+      "heartbeatAt": "2026-10-04T09:41:12Z",
+      "epoch": 4
+    },
+    "slots": {
+      "used": 1,
+      "total": 2
+    },
+    "survivesAppClose": true,
+    "runner": {
+      "available": true,
+      "mode": "text"
+    },
+    "hostName": "studio-mac"
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "route": "workflows/draft/save",
+  "request": {
+    "baseDraftVersion": 0,
+    "definition": {
+      "schemaVersion": 2,
+      "name": "New workflow",
+      "description": "",
+      "roles": [],
+      "inputs": [],
+      "limits": {
+        "stageMinutes": 20,
+        "maxRevisions": 2
+      },
+      "stages": []
+    }
+  },
+  "response": {
+    "workflowId": "wf_2b3c4d5e6f708192",
+    "draftVersion": 1,
+    "validation": {
+      "valid": false,
+      "host": true,
+      "issues": [
+        {
+          "code": "no_stages",
+          "message": "Add at least one stage.",
+          "severity": "error"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,158 @@
+{
+  "route": "workflows/runs/get",
+  "request": {
+    "runId": "run_3f9a1c2e4b5d6f70"
+  },
+  "response": {
+    "run": {
+      "id": "run_3f9a1c2e4b5d6f70",
+      "number": 12,
+      "workflowId": "wf_8c1d2e3f4a5b6c7d",
+      "workflowName": "Weekly newsletter",
+      "revision": 3,
+      "state": "running",
+      "stageKey": "draft",
+      "stageTitle": "Write the draft",
+      "stageState": "running",
+      "stagesDone": 1,
+      "stageCount": 6,
+      "iteration": 1,
+      "startedAt": "2026-10-04T09:30:00Z",
+      "updatedAt": "2026-10-04T09:41:12Z",
+      "endedAt": null,
+      "paused": false,
+      "version": 7,
+      "sample": false,
+      "inputs": {
+        "topic": "How small teams use checklists",
+        "audience": "",
+        "length": "Short"
+      },
+      "stages": [
+        {
+          "key": "research",
+          "kind": "agent",
+          "title": "Research the topic",
+          "role": "researcher",
+          "agentId": "research",
+          "iteration": 1,
+          "state": "accepted",
+          "minutes": 20,
+          "startedAt": "2026-10-04T09:30:01Z",
+          "endedAt": "2026-10-04T09:36:40Z",
+          "attempts": [
+            {
+              "id": "att_8b1c2d3e4f5a6b71",
+              "number": 1,
+              "iteration": 1,
+              "state": "accepted",
+              "agentId": "research",
+              "launchedAt": "2026-10-04T09:30:01Z",
+              "endedAt": "2026-10-04T09:36:40Z",
+              "durationMs": 399000,
+              "tokens": null,
+              "outcomeCode": "accepted"
+            }
+          ]
+        },
+        {
+          "key": "draft",
+          "kind": "agent",
+          "title": "Write the draft",
+          "role": "writer",
+          "agentId": "writer",
+          "iteration": 1,
+          "state": "running",
+          "minutes": 20,
+          "startedAt": "2026-10-04T09:36:42Z",
+          "endedAt": null,
+          "attempts": [
+            {
+              "id": "att_8b1c2d3e4f5a6b72",
+              "number": 1,
+              "iteration": 1,
+              "state": "running",
+              "agentId": "writer",
+              "launchedAt": "2026-10-04T09:36:42Z",
+              "endedAt": null,
+              "durationMs": null,
+              "tokens": null,
+              "outcomeCode": null
+            }
+          ]
+        },
+        {
+          "key": "length_check",
+          "kind": "check",
+          "title": "Check length and title",
+          "role": null,
+          "agentId": null,
+          "iteration": 1,
+          "state": "pending",
+          "minutes": null,
+          "startedAt": null,
+          "endedAt": null,
+          "attempts": []
+        },
+        {
+          "key": "review",
+          "kind": "agent",
+          "title": "Review the draft",
+          "role": "reviewer",
+          "agentId": "editor",
+          "iteration": 1,
+          "state": "pending",
+          "minutes": 15,
+          "startedAt": null,
+          "endedAt": null,
+          "attempts": []
+        },
+        {
+          "key": "review_decision",
+          "kind": "decision",
+          "title": "Pass or send back",
+          "role": null,
+          "agentId": null,
+          "iteration": 1,
+          "state": "pending",
+          "minutes": null,
+          "startedAt": null,
+          "endedAt": null,
+          "attempts": []
+        },
+        {
+          "key": "signoff",
+          "kind": "signoff",
+          "title": "Your sign-off",
+          "role": null,
+          "agentId": null,
+          "iteration": 1,
+          "state": "pending",
+          "minutes": null,
+          "startedAt": null,
+          "endedAt": null,
+          "attempts": []
+        }
+      ],
+      "outputs": [
+        {
+          "stageKey": "research",
+          "iteration": 1,
+          "name": "brief",
+          "type": "markdown_file",
+          "sha256": "0b5d9e3a7c1f4e2d8a6b0c9d7e5f3a1b2c4d6e8f0a1b3c5d7e9f1a2b4c6d8e0f",
+          "bytes": 3120,
+          "wordCount": 498
+        }
+      ],
+      "tokens": {
+        "in": 0,
+        "out": 0
+      },
+      "allowedActions": [
+        "cancel",
+        "pause"
+      ]
+    }
+  }
+}

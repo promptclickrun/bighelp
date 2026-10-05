@@ -1,0 +1,191 @@
+{
+  "route": "workflows/get",
+  "request": {
+    "workflowId": "wf_2b3c4d5e6f708192",
+    "revision": "draft"
+  },
+  "response": {
+    "workflow": {
+      "id": "wf_2b3c4d5e6f708192",
+      "name": "Newsletter with a loop",
+      "revision": null,
+      "latestRevision": null,
+      "draftVersion": 2,
+      "archived": false,
+      "pinned": true,
+      "definition": {
+        "schemaVersion": 2,
+        "name": "Newsletter with a loop",
+        "description": "Draft until the review passes.",
+        "roles": [
+          {
+            "key": "researcher",
+            "label": "Researcher"
+          },
+          {
+            "key": "writer",
+            "label": "Writer"
+          },
+          {
+            "key": "reviewer",
+            "label": "Reviewer"
+          }
+        ],
+        "inputs": [
+          {
+            "key": "topic",
+            "label": "Topic",
+            "type": "text",
+            "required": true
+          }
+        ],
+        "limits": {
+          "stageMinutes": 20,
+          "maxRevisions": 2
+        },
+        "stages": [
+          {
+            "key": "research",
+            "kind": "agent",
+            "title": "Research the topic",
+            "next": "draft",
+            "role": "researcher",
+            "instructions": "Research the topic.",
+            "tools": [
+              "web"
+            ],
+            "uses": [
+              "inputs.topic"
+            ],
+            "outputs": [
+              {
+                "name": "brief",
+                "type": "markdown_file"
+              }
+            ]
+          },
+          {
+            "key": "signoff",
+            "kind": "signoff",
+            "title": "Your sign-off",
+            "next": null,
+            "file": "draft.draft"
+          },
+          {
+            "key": "draft",
+            "kind": "agent",
+            "title": "Write the draft",
+            "role": "writer",
+            "instructions": "Write the draft.",
+            "tools": [],
+            "uses": [
+              "research.brief"
+            ],
+            "outputs": [
+              {
+                "name": "draft",
+                "type": "markdown_file"
+              },
+              {
+                "name": "word_count",
+                "type": "number"
+              }
+            ]
+          },
+          {
+            "key": "review",
+            "kind": "agent",
+            "title": "Review the draft",
+            "role": "reviewer",
+            "instructions": "Review the draft.",
+            "tools": [],
+            "uses": [
+              "draft.draft"
+            ],
+            "outputs": [
+              {
+                "name": "decision",
+                "type": "decision",
+                "values": [
+                  "pass",
+                  "changes"
+                ]
+              },
+              {
+                "name": "notes",
+                "type": "notes"
+              }
+            ]
+          },
+          {
+            "key": "review_decision",
+            "kind": "decision",
+            "title": "Pass or send back",
+            "on": "review.decision",
+            "pass": "signoff",
+            "changes": {
+              "goTo": "draft",
+              "maxRevisions": 1
+            }
+          }
+        ],
+        "layout": {
+          "inputs": {
+            "x": 0,
+            "y": 0
+          },
+          "stages": {
+            "research": {
+              "x": 0,
+              "y": 120
+            },
+            "draft": {
+              "x": 0,
+              "y": 240.5
+            },
+            "review": {
+              "x": 0,
+              "y": 360
+            },
+            "review_decision": {
+              "x": 0,
+              "y": 480
+            },
+            "signoff": {
+              "x": -220,
+              "y": 600
+            }
+          }
+        }
+      },
+      "bindings": [
+        {
+          "role": "researcher",
+          "agentId": "research",
+          "approvedAt": "2026-10-04T09:12:00Z"
+        },
+        {
+          "role": "writer",
+          "agentId": "writer",
+          "approvedAt": "2026-10-04T09:12:05Z"
+        },
+        {
+          "role": "reviewer",
+          "agentId": null,
+          "approvedAt": null
+        }
+      ]
+    },
+    "validation": {
+      "valid": true,
+      "host": false,
+      "issues": [
+        {
+          "code": "role_unbound",
+          "message": "Choose an agent for Reviewer.",
+          "severity": "error"
+        }
+      ]
+    }
+  }
+}

@@ -18,6 +18,8 @@ struct WorkflowsContext {
     let open: (AppRoute) -> Void
 
     var client: any WorkflowsClient { store.client }
+    /// Connections, places, your templates and pins (`native-workflows-edit-v1`).
+    var canEdit: Bool { store.canEdit }
 
     func agentName(_ id: String?) -> String? {
         guard let id else { return nil }
@@ -34,6 +36,10 @@ struct WorkflowsContext {
 struct WorkflowsHomeView: View {
     let context: WorkflowsContext
     @State private var isUsingTemplate = false
+    @State private var isNamingNew = false
+    @State private var newName = ""
+    @State private var templateSource: WorkflowSummary?
+    @State private var isArchivedPresented = false
     @Environment(\.horizontalSizeClass) private var sizeClass
     @BighelpThemeReader private var theme
 
@@ -42,8 +48,10 @@ struct WorkflowsHomeView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: BighelpTokens.space24) {
-                BighelpDeferredSection { statusLine }
-                if store.list == nil, store.state != .loaded {
+                if !isCantRunHere { BighelpDeferredSection { statusLine } }
+                if case .cantRunHere = store.state {
+                    WorkflowLoadStateView(state: store.state) { Task { await store.load() } }
+                } else if store.list == nil, store.state != .loaded {
                     WorkflowLoadStateView(state: store.state) { Task { await store.load() } }
                 } else {
                     if [.needsPluginUpdate, .needsHermesUpdate].contains(store.state) {
@@ -81,6 +89,32 @@ struct WorkflowsHomeView: View {
         .refreshable { await store.load() }
         .onAppear { store.setOnScreen(true) }
         .onDisappear { store.setOnScreen(false) }
+        // One alert per view: SwiftUI presents only one of several on the same view.
+        .background {
+            Color.clear
+                .alert("New workflow", isPresented: $isNamingNew) {
+                    TextField("Name", text: $newName)
+                    Button("Cancel", role: .cancel) {}
+                    Button("Create") { createFromScratch() }
+                } message: {
+                    Text("An empty workflow. Add its inputs and stages next.")
+                }
+                .allowsHitTesting(false)
+        }
+        .background {
+            Color.clear
+                .modifier(WorkflowSaveTemplatePrompt(store: store, source: $templateSource))
+                .allowsHitTesting(false)
+        }
+        .alert("Workflows", isPresented: Binding(get: { store.message != nil }, set: { if !$0 { store.message = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(store.message ?? "")
+        }
+        .sheet(isPresented: $isArchivedPresented) {
+            WorkflowsArchivedView(context: context)
+                .bighelpSheetSize(.standard)
+        }
     }
 
     // MARK: Status
@@ -128,19 +162,59 @@ struct WorkflowsHomeView: View {
         return text
     }
 
+    private var isCantRunHere: Bool {
+        if case .cantRunHere = store.state { return true }
+        return false
+    }
+
+    @ViewBuilder
     private var newMenu: some View {
-        Menu {
-            Section("Start from a template") {
-                ForEach(store.templates) { template in
-                    Button(template.name, systemImage: "square.on.square") { use(template) }
+        if !isCantRunHere {
+            Menu {
+                if context.canEdit {
+                    Button("Create from scratch", systemImage: "square.and.pencil") { askNewName() }
+                        .accessibilityIdentifier("workflows.new.scratch")
                 }
+                if !store.builtinTemplates.isEmpty {
+                    Section("Start from a template") {
+                        ForEach(store.builtinTemplates) { template in
+                            Button(template.name, systemImage: "square.on.square") { use(template) }
+                        }
+                    }
+                }
+                if !store.yourTemplates.isEmpty {
+                    Section("Your templates") {
+                        ForEach(store.yourTemplates) { template in
+                            Button(template.name, systemImage: "person.crop.square") { use(template) }
+                        }
+                    }
+                }
+            } label: {
+                Label("New", systemImage: "plus")
+                    .bighelpToolbarText()
             }
-        } label: {
-            Label("New", systemImage: "plus")
-                .bighelpToolbarText()
+            .disabled((store.templates.isEmpty && !context.canEdit) || isUsingTemplate)
+            .accessibilityIdentifier("workflows.new")
         }
-        .disabled(store.templates.isEmpty || isUsingTemplate)
-        .accessibilityIdentifier("workflows.new")
+    }
+
+    private func askNewName() {
+        newName = ""
+        isNamingNew = true
+    }
+
+    private func createFromScratch() {
+        let name = newName
+        isUsingTemplate = true
+        Task {
+            defer { isUsingTemplate = false }
+            do {
+                let id = try await store.create(name: name)
+                context.open(.workflow(id: id, startsRun: false))
+            } catch {
+                store.message = WorkflowsStore.reason(error)
+            }
+        }
     }
 
     private func use(_ template: WorkflowTemplate) {
@@ -253,7 +327,9 @@ struct WorkflowsHomeView: View {
                 VStack(alignment: .leading, spacing: BighelpTokens.space8) {
                     Text("No workflows yet")
                         .font(.bighelp(.headline))
-                    Text("A workflow passes work from one agent to the next and asks you before anything is final. Start from a template below.")
+                    Text(context.canEdit
+                         ? "A workflow passes work from one agent to the next and asks you before anything is final. Create one from scratch, or start from a template below."
+                         : "A workflow passes work from one agent to the next and asks you before anything is final. Start from a template below.")
                         .font(.bighelp(.subheadline))
                         .foregroundStyle(theme.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
@@ -262,6 +338,17 @@ struct WorkflowsHomeView: View {
             }
             ForEach(store.workflows) { workflow in
                 workflowCard(workflow)
+            }
+            if context.canEdit {
+                Button { isArchivedPresented = true } label: {
+                    Label("Archived workflows", systemImage: "archivebox")
+                        .font(.bighelp(.subheadline).weight(.semibold))
+                        .foregroundStyle(theme.action)
+                        .frame(minHeight: BighelpTokens.hitTarget)
+                        .contentShape(Rectangle())
+                }
+                .bighelpPlainButtonStyle()
+                .accessibilityIdentifier("workflows.archived")
             }
         }
     }
@@ -272,9 +359,18 @@ struct WorkflowsHomeView: View {
             Button { context.open(.workflow(id: workflow.id, startsRun: false)) } label: {
                 VStack(alignment: .leading, spacing: BighelpTokens.space8) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(workflow.name)
-                            .font(.bighelp(.headline))
-                            .foregroundStyle(theme.primaryText)
+                        HStack(spacing: BighelpTokens.space4) {
+                            if workflow.pinned {
+                                Image(systemName: "pin.fill")
+                                    .font(.bighelp(.caption).weight(.semibold))
+                                    .foregroundStyle(theme.action)
+                                    .accessibilityLabel("Pinned")
+                                    .accessibilityIdentifier("workflows.workflow.pinned")
+                            }
+                            Text(workflow.name)
+                                .font(.bighelp(.headline))
+                                .foregroundStyle(theme.primaryText)
+                        }
                         Text(workflowLine(workflow))
                             .font(.bighelp(.subheadline))
                             .foregroundStyle(needsSetup || workflow.revision == nil ? theme.warning : theme.secondaryText)
@@ -309,11 +405,24 @@ struct WorkflowsHomeView: View {
             }
         }
         .workflowCard(theme)
-        .contextMenu {
-            Button("Open", systemImage: "arrow.right.circle") { context.open(.workflow(id: workflow.id, startsRun: false)) }
-            if workflow.valid, !needsSetup {
-                Button("Run", systemImage: "play") { context.open(.workflow(id: workflow.id, startsRun: true)) }
+        .contextMenu { workflowMenu(workflow, needsSetup: needsSetup) }
+    }
+
+    /// The long-press menu: Open, Run, then Pin, Save as template and Archive.
+    @ViewBuilder
+    private func workflowMenu(_ workflow: WorkflowSummary, needsSetup: Bool) -> some View {
+        Button("Open", systemImage: "arrow.right.circle") { context.open(.workflow(id: workflow.id, startsRun: false)) }
+        if workflow.valid, !needsSetup {
+            Button("Run", systemImage: "play") { context.open(.workflow(id: workflow.id, startsRun: true)) }
+        }
+        if context.canEdit {
+            Button(workflow.pinned ? "Unpin" : "Pin", systemImage: workflow.pinned ? "pin.slash" : "pin") {
+                Task { await store.setPinned(workflow, !workflow.pinned) }
             }
+            Button("Save as template", systemImage: "square.on.square") { templateSource = workflow }
+        }
+        Button("Archive", systemImage: "archivebox", role: .destructive) {
+            Task { await store.archive(workflow) }
         }
     }
 
@@ -338,28 +447,193 @@ struct WorkflowsHomeView: View {
 
     private var templatesSection: some View {
         VStack(alignment: .leading, spacing: BighelpTokens.space12) {
-            if !store.templates.isEmpty {
+            if !store.templates.isEmpty || context.canEdit {
                 WorkflowSectionHeader(title: "Templates")
             }
-            ForEach(store.templates) { template in
-                HStack(spacing: BighelpTokens.space12) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(template.name)
-                            .font(.bighelp(.headline))
-                        Text(template.description)
-                            .font(.bighelp(.subheadline))
-                            .foregroundStyle(theme.secondaryText)
-                            .fixedSize(horizontal: false, vertical: true)
+            if context.canEdit {
+                Button { askNewName() } label: {
+                    HStack(spacing: BighelpTokens.space12) {
+                        Image(systemName: "square.and.pencil")
+                            .font(.bighelp(.body).weight(.semibold))
+                            .foregroundStyle(theme.action)
+                            .frame(width: 36, height: 36)
+                            .background(theme.action.opacity(0.12),
+                                        in: RoundedRectangle(cornerRadius: BighelpTokens.radius12, style: .continuous))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Create from scratch")
+                                .font(.bighelp(.headline))
+                                .foregroundStyle(theme.primaryText)
+                            Text("Start empty, then add inputs and stages.")
+                                .font(.bighelp(.subheadline))
+                                .foregroundStyle(theme.secondaryText)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right")
+                            .font(.bighelp(.footnote).weight(.semibold))
+                            .foregroundStyle(theme.tertiaryText)
                     }
-                    Spacer(minLength: 0)
-                    Button("Use") { use(template) }
-                        .buttonStyle(.bordered)
-                        .disabled(isUsingTemplate)
-                        .frame(minHeight: BighelpTokens.hitTarget)
-                        .accessibilityIdentifier("workflows.template.use")
+                    .contentShape(Rectangle())
                 }
+                .bighelpPlainButtonStyle()
+                .disabled(isUsingTemplate)
                 .workflowCard(theme)
+                .accessibilityIdentifier("workflows.template.scratch")
             }
+            if !store.builtinTemplates.isEmpty, !store.yourTemplates.isEmpty {
+                templateGroupTitle("Built-in")
+            }
+            ForEach(store.builtinTemplates) { template in templateCard(template) }
+            if !store.yourTemplates.isEmpty {
+                templateGroupTitle("Yours")
+                ForEach(store.yourTemplates) { template in templateCard(template) }
+            }
+        }
+    }
+
+    private func templateGroupTitle(_ title: String) -> some View {
+        Text(title)
+            .font(.bighelp(.subheadline).weight(.semibold))
+            .foregroundStyle(theme.secondaryText)
+            .padding(.horizontal, BighelpTokens.space4)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    private func templateCard(_ template: WorkflowTemplate) -> some View {
+        HStack(spacing: BighelpTokens.space12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(template.name)
+                    .font(.bighelp(.headline))
+                Text(template.description.isEmpty
+                     ? (template.stageCount == 1 ? "1 stage" : "\(template.stageCount) stages")
+                     : template.description)
+                    .font(.bighelp(.subheadline))
+                    .foregroundStyle(theme.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            Button("Use") { use(template) }
+                .buttonStyle(.bordered)
+                .disabled(isUsingTemplate)
+                .frame(minHeight: BighelpTokens.hitTarget)
+                .accessibilityIdentifier("workflows.template.use")
+        }
+        .workflowCard(theme)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("workflows.template.\(template.id)")
+        .contextMenu {
+            Button("Use", systemImage: "plus.square.on.square") { use(template) }
+            if template.source == .yours, context.canEdit {
+                Button("Delete template", systemImage: "trash", role: .destructive) {
+                    Task { await store.deleteTemplate(template) }
+                }
+            }
+        }
+    }
+}
+
+/// Save as template: asks for a name (the workflow's, to start with).
+struct WorkflowSaveTemplatePrompt: ViewModifier {
+    let store: WorkflowsStore
+    @Binding var source: WorkflowSummary?
+    /// Before saving: an editor saves its waiting changes first.
+    var prepare: (() async -> Void)?
+    /// After saving: true when it was saved.
+    var finished: ((Bool) -> Void)?
+    @State private var name = ""
+
+    func body(content: Content) -> some View {
+        content
+            // `presenting`: Save gets the workflow the alert opened for.
+            .alert("Save as template", isPresented: Binding(get: { source != nil }, set: { if !$0 { source = nil } }),
+                   presenting: source) { workflow in
+                TextField("Name", text: $name)
+                Button("Cancel", role: .cancel) { source = nil }
+                Button("Save") {
+                    let chosen = name
+                    source = nil
+                    Task {
+                        await prepare?()
+                        // Not inside `finished?(…)`: with no `finished` the call would be skipped.
+                        let saved = await store.saveTemplate(workflowID: workflow.id, name: chosen)
+                        finished?(saved)
+                    }
+                }
+            } message: { _ in
+                Text("A template keeps the stages and inputs, not which agent does each role.")
+            }
+            .onChange(of: source?.id, initial: true) { _, _ in
+                if let source { name = String(source.name.prefix(WorkflowTemplate.nameLimit)) }
+            }
+    }
+}
+
+/// Archived workflows: open one, or Unarchive it (also in its long-press menu).
+struct WorkflowsArchivedView: View {
+    let context: WorkflowsContext
+    @State private var workflows: [WorkflowSummary]?
+    @State private var failure: String?
+    @Environment(\.dismiss) private var dismiss
+    @BighelpThemeReader private var theme
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if let workflows, workflows.isEmpty {
+                    Text("No archived workflows.")
+                        .foregroundStyle(theme.secondaryText)
+                }
+                ForEach(workflows ?? []) { workflow in
+                    HStack(spacing: BighelpTokens.space12) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(workflow.name).font(.bighelp(.headline))
+                            Text(workflow.stageCount == 1 ? "1 stage" : "\(workflow.stageCount) stages")
+                                .font(.bighelp(.subheadline))
+                                .foregroundStyle(theme.secondaryText)
+                        }
+                        Spacer(minLength: 0)
+                        Button("Unarchive") { unarchive(workflow) }
+                            .buttonStyle(.bordered)
+                            .frame(minHeight: BighelpTokens.hitTarget)
+                            .accessibilityIdentifier("workflows.archived.unarchive")
+                    }
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("workflows.archived.\(workflow.id)")
+                    .contextMenu {
+                        Button("Unarchive", systemImage: "tray.and.arrow.up") { unarchive(workflow) }
+                    }
+                }
+                if let failure {
+                    Text(failure).foregroundStyle(theme.danger)
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(BighelpThemeCanvas(theme: theme).ignoresSafeArea())
+            .overlay { if workflows == nil, failure == nil { ProgressView() } }
+            .navigationTitle("Archived")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }.bighelpDefaultAction()
+                }
+            }
+            .task { await load() }
+        }
+        .accessibilityIdentifier("workflows.archived-list")
+    }
+
+    private func load() async {
+        do {
+            workflows = try await context.store.archived()
+            failure = nil
+        } catch {
+            failure = WorkflowsStore.reason(error)
+        }
+    }
+
+    private func unarchive(_ workflow: WorkflowSummary) {
+        Task {
+            await context.store.unarchive(workflow.id)
+            await load()
         }
     }
 }

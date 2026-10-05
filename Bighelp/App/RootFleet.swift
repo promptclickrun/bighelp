@@ -49,10 +49,11 @@ extension RootShellView {
             appState.chatOpenedFromList = false
             appState.openScheduledTasks()
         } }
-        // Projects, Kanban and Workflows belong to one host; the all-hosts menu leaves them out.
+        // Projects and Kanban belong to one host; the all-hosts menu leaves them out.
         destinations.onProjects = nil
         destinations.onKanban = nil
-        destinations.onWorkflows = nil
+        // Workflows ask which computer, then open that one's.
+        destinations.onWorkflows = { afterClosingHomeSheets { fleetGate(.workflows) } }
         // Usage covers every host while all show; no host to pick.
         if destinations.onCredentialVault != nil {
             destinations.onCredentialVault = { afterClosingHomeSheets { fleetGate(.credentialVault) } }
@@ -267,6 +268,7 @@ extension RootShellView {
                 if canOpenProjects { openProjects() } else { actionErrorMessage = "Projects aren't available on this host." }
             case .kanban:
                 if canOpenKanban { openKanban() } else { actionErrorMessage = "Kanban isn't set up on this host." }
+            case .workflows: openWorkflows()
             case .credentialVault: openCredentialVault()
             case .folder: presentHermesWorkspaces()
             }

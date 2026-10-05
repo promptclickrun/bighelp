@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import Observation
 
@@ -20,12 +21,20 @@ final class WorkflowEditorModel {
 
     let workflowID: String
     let client: any WorkflowsClient
+    /// The plugin has `native-workflows-edit-v1`: connections and places can change.
+    /// Older plugins show the flow as it is.
+    let canEditFlow: Bool
     /// One token per Run tap: a start that is tried again is the same start.
     @ObservationIgnored private var pendingRunToken: String?
+    @ObservationIgnored private var saveTask: Task<Void, Never>?
+    @ObservationIgnored private let saveDelay: Duration
 
-    init(workflowID: String, client: any WorkflowsClient, hasDraft: Bool = false) {
+    init(workflowID: String, client: any WorkflowsClient, hasDraft: Bool = false, canEditFlow: Bool = false,
+         saveDelay: Duration = .milliseconds(700)) {
         self.workflowID = workflowID
         self.client = client
+        self.canEditFlow = canEditFlow
+        self.saveDelay = saveDelay
         hasUnpublishedDraft = hasDraft
     }
 
@@ -80,17 +89,146 @@ final class WorkflowEditorModel {
         definition?.stages[index] = stage
     }
 
+    /// A new agent stage (the stage editor opens on it; Done saves).
     func addStage(after key: String?) -> WorkflowStage? {
-        guard var stages = definition?.stages else { return nil }
-        let stage = WorkflowStage(newAgentStageAfter: stages, role: definition?.roles.first?.key)
-        let index = key.flatMap { key in stages.firstIndex { $0.key == key } }.map { $0 + 1 } ?? stages.count
-        stages.insert(stage, at: index)
-        definition?.stages = stages
-        return stage
+        addStage(.agent, after: key)
+    }
+
+    /// A new stage of one kind after another one (nil: at the end of the flow),
+    /// filled in from the stages before it, wired in, and placed where nothing
+    /// else is. The stage editor opens on it; Done saves.
+    /// `inputs` as the key puts it first.
+    func addStage(_ kind: WorkflowStage.Kind, after key: String?) -> WorkflowStage? {
+        guard var definition else { return nil }
+        let atStart = key == WorkflowCanvasLayout.inputsKey
+        let anchor = atStart ? nil : key ?? (canEditFlow ? nil : definition.stages.last?.key)
+        let earlier = atStart ? [] : earlierStages(than: anchor, in: definition)
+        var stage = WorkflowStage(new: kind, existing: definition.stages)
+        WorkflowStageDefaults.fill(&stage, earlier: earlier, definition: &definition)
+        if canEditFlow {
+            let before = WorkflowCanvasLayout.positions(definition)
+            if atStart {
+                definition.insertFirst(stage)
+            } else {
+                definition.insert(stage, after: anchor)
+            }
+            let placedAfter = atStart ? WorkflowCanvasLayout.inputsKey
+                : anchor ?? definition.graph.exits.first { $0.value.primary == stage.key }?.key
+            let kinds = Dictionary(definition.stages.map { ($0.key, $0.kind) }, uniquingKeysWith: { first, _ in first })
+            var layout = definition.layout ?? WorkflowLayout()
+            Self.materialize(&layout, from: before, keys: definition.stages.map(\.key))
+            layout.stages[stage.key] = WorkflowCanvasLayout.place(after: placedAfter, kind: kind, in: before, kinds: kinds)
+            definition.layout = layout
+            definition.schemaVersion = max(definition.schemaVersion, 2)
+        } else {
+            let index = atStart ? 0 : anchor.flatMap { key in definition.stages.firstIndex { $0.key == key } }.map { $0 + 1 }
+                ?? definition.stages.count
+            definition.stages.insert(stage, at: index)
+        }
+        self.definition = definition
+        return self.definition?.stage(stage.key)
+    }
+
+    /// The stages that run before a new one placed after `anchor`.
+    private func earlierStages(than anchor: String?, in definition: WorkflowDefinition) -> [WorkflowStage] {
+        guard let anchor, let index = definition.stages.firstIndex(where: { $0.key == anchor }) else {
+            return definition.stages
+        }
+        return Array(definition.stages.prefix(through: index))
     }
 
     func deleteStage(_ key: String) {
-        definition?.stages.removeAll { $0.key == key }
+        if canEditFlow {
+            definition?.remove(key)
+            definition?.layout?.stages[key] = nil
+        } else {
+            definition?.stages.removeAll { $0.key == key }
+        }
+    }
+
+    // MARK: Changing the flow (native-workflows-edit-v1)
+
+    /// Points one way out of a stage at another (nil: the flow ends after it), then saves.
+    func connect(_ from: String, _ port: WorkflowPort, to target: String?) {
+        guard canEditFlow, definition != nil else { return }
+        if from == WorkflowCanvasLayout.inputsKey {
+            if let target { definition?.makeStart(target) }
+        } else {
+            definition?.connect(from, port, to: target)
+        }
+        scheduleSave()
+    }
+
+    /// Moves a stage to a gap in the list (0 is above the first stage), then saves.
+    func move(_ key: String, toGap gap: Int) {
+        guard canEditFlow, let stages = definition?.stages, let from = stages.firstIndex(where: { $0.key == key }) else { return }
+        let index = gap > from ? gap - 1 : gap
+        guard index != from else { return }
+        definition?.move(key, toIndex: index)
+        scheduleSave()
+    }
+
+    /// Puts a node somewhere on the canvas, on the grid, then saves.
+    func place(_ key: String, at point: CGPoint) {
+        guard canEditFlow, let definition else { return }
+        var layout = definition.layout ?? WorkflowLayout()
+        // The first move keeps every other node where it's drawn now.
+        Self.materialize(&layout, from: WorkflowCanvasLayout.positions(definition), keys: definition.stages.map(\.key))
+        let snapped = WorkflowLayout.clamped(WorkflowCanvasLayout.snap(point))
+        if key == WorkflowCanvasLayout.inputsKey {
+            layout.inputs = snapped
+        } else {
+            layout.stages[key] = snapped
+        }
+        guard layout != definition.layout else { return }
+        self.definition?.layout = layout
+        self.definition?.schemaVersion = max(definition.schemaVersion, 2)
+        scheduleSave()
+    }
+
+    private static func materialize(_ layout: inout WorkflowLayout, from positions: [String: CGPoint], keys: [String]) {
+        if layout.inputs == nil { layout.inputs = positions[WorkflowCanvasLayout.inputsKey] }
+        for key in keys where layout.stages[key] == nil {
+            if let point = positions[key] { layout.stages[key] = point }
+        }
+        layout.stages = layout.stages.filter { keys.contains($0.key) }
+    }
+
+    /// What's wrong, for the canvas: the flow's own problems as they are now,
+    /// then the host's other ones from the last save.
+    var issues: [WorkflowValidation.Issue] {
+        guard let definition else { return validation?.issues ?? [] }
+        let local = definition.graph.issues(definition)
+        let host = (validation?.issues ?? []).filter { !WorkflowFlowGraph.graphCodes.contains($0.code) }
+        return local + host
+    }
+
+    /// Saves a moment after the last change, so a drag or a few quick changes are one save.
+    func scheduleSave() {
+        saveTask?.cancel()
+        saveTask = Task { [weak self, saveDelay] in
+            try? await Task.sleep(for: saveDelay)
+            guard !Task.isCancelled, let self else { return }
+            await self.saveWhileDirty()
+        }
+    }
+
+    /// Saves now if a change is waiting (leaving the screen).
+    func flushSave() async {
+        guard saveTask != nil else { return }
+        saveTask?.cancel()
+        saveTask = nil
+        await saveWhileDirty()
+    }
+
+    private func saveWhileDirty() async {
+        // A save that's still on its way saves the newest changes after it.
+        while isSaving { try? await Task.sleep(for: .milliseconds(50)) }
+        var attempts = 0
+        while isDirty, attempts < 3 {
+            attempts += 1
+            guard await save() else { return }
+        }
     }
 
     /// Saves the draft; the host checks it and says what's wrong.
@@ -106,6 +244,7 @@ final class WorkflowEditorModel {
             validation = saved.validation
             hasUnpublishedDraft = true
             if var detail {
+                // What was sent is saved; a change made meanwhile still waits.
                 detail.definition = definition
                 detail.draftVersion = saved.draftVersion
                 detail.validation = saved.validation
@@ -167,5 +306,50 @@ final class WorkflowEditorModel {
             message = WorkflowsStore.reason(error)
         }
         return nil
+    }
+}
+
+/// Fills a new stage in from the stages before it, so it's ready to use:
+/// an agent stage gets a role, a check checks the latest result, a decision
+/// reads the latest review (which learns to decide pass or changes), and a
+/// sign-off shows the latest file.
+enum WorkflowStageDefaults {
+    static func fill(_ stage: inout WorkflowStage, earlier: [WorkflowStage], definition: inout WorkflowDefinition) {
+        let outputs = earlier.flatMap { stage in stage.outputs.map { (stage: stage, output: $0) } }
+        switch stage.kind {
+        case .agent:
+            if definition.roles.isEmpty {
+                definition.roles.append(.init(key: "agent", label: "Agent"))
+            }
+            stage.role = definition.roles.first?.key
+        case .check:
+            if let latest = outputs.last(where: { ["markdown_file", "text"].contains($0.output.type) }) {
+                stage.rules = [.init(kind: "not_empty", of: "\(latest.stage.key).\(latest.output.name)")]
+            }
+        case .decision:
+            let agents = earlier.filter { $0.kind == .agent }
+            if let decided = outputs.last(where: { $0.output.type == "decision" }) {
+                stage.on = "\(decided.stage.key).\(decided.output.name)"
+            } else if let reviewer = agents.last, let index = definition.stages.firstIndex(where: { $0.key == reviewer.key }) {
+                definition.stages[index].outputs.append(.init(name: "decision", type: "decision",
+                                                              values: ["pass", "changes"]))
+                stage.on = "\(reviewer.key).decision"
+            } else {
+                stage.on = "\(agents.last?.key ?? "review").decision"
+            }
+            stage.pass = "next"
+            // Changes go back to the agent stage before the one that decides.
+            // The host needs a stage named here; with none yet, its check says to choose one.
+            stage.changesGoTo = agents.dropLast().last?.key ?? agents.last?.key ?? earlier.first?.key ?? stage.key
+            stage.changesMaxRevisions = definition.maxRevisions
+        case .signoff:
+            if let file = outputs.last(where: { $0.output.type == "markdown_file" }) {
+                stage.file = "\(file.stage.key).\(file.output.name)"
+            } else {
+                stage.file = "\(earlier.last { $0.kind == .agent }?.key ?? "stage1").result"
+            }
+        case .unknown:
+            break
+        }
     }
 }

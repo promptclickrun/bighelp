@@ -1,6 +1,7 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
-/// Opens one workflow: the vertical flow on iPhone, the canvas at regular width.
+/// Opens one workflow: the vertical flow at compact width, the canvas at regular width.
 struct WorkflowScreen: View {
     let context: WorkflowsContext
     let startsRun: Bool
@@ -11,7 +12,8 @@ struct WorkflowScreen: View {
         self.context = context
         self.startsRun = startsRun
         let hasDraft = context.store.workflows.first { $0.id == workflowID }?.hasDraft ?? false
-        _model = State(initialValue: WorkflowEditorModel(workflowID: workflowID, client: context.client, hasDraft: hasDraft))
+        _model = State(initialValue: WorkflowEditorModel(workflowID: workflowID, client: context.client, hasDraft: hasDraft,
+                                                         canEditFlow: context.canEdit))
     }
 
     var body: some View {
@@ -26,16 +28,35 @@ struct WorkflowScreen: View {
     }
 }
 
-/// Build the flow (iPhone): inputs, then each stage top to bottom, with the
-/// review loop drawn beside them. Tap a stage to change it; Run starts one run.
+/// Where each card of the vertical flow is, in the flow's own space.
+private struct WorkflowFlowRects: PreferenceKey {
+    static let defaultValue: [String: CGRect] = [:]
+    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
+        value.merge(nextValue()) { $1 }
+    }
+}
+
+/// Build the flow at compact width (iPhone, and any narrow window): inputs,
+/// then every stage in one line top to bottom so nothing is lost off screen
+/// (saved places on the canvas don't apply here). Tap a stage to change it.
+/// With `native-workflows-edit-v1`: touch and hold a stage, then drag it up
+/// or down to reorder; drag a stage's port to another stage to rewire.
 struct WorkflowFlowView: View {
     @Bindable var model: WorkflowEditorModel
     let context: WorkflowsContext
     let startsRun: Bool
     @State private var editing: WorkflowStage?
     @State private var isRunSheetPresented = false
+    @State private var isInputsPresented = false
+    @State private var templateSource: WorkflowSummary?
     @State private var didOfferRun = false
+    @State private var rects: [String: CGRect] = [:]
+    @State private var draggingKey: String?
+    @State private var dropGap: Int?
+    @State private var wire: (from: String, port: WorkflowPort, point: CGPoint)?
     @BighelpThemeReader private var theme
+
+    private static let space = "workflows.flow.space"
 
     var body: some View {
         ScrollView {
@@ -63,7 +84,10 @@ struct WorkflowFlowView: View {
         .toolbar(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .principal) { WorkflowTitle(model: model) }
-            ToolbarItem(placement: .topBarTrailing) { WorkflowMoreMenu(model: model, context: context) }
+            ToolbarItem(placement: .topBarTrailing) {
+                WorkflowMoreMenu(model: model, context: context, templateSource: $templateSource,
+                                 editInputs: { isInputsPresented = true })
+            }
         }
         .sheet(item: $editing) { stage in
             WorkflowStageEditor(model: model, context: context, stage: stage)
@@ -72,6 +96,20 @@ struct WorkflowFlowView: View {
         .sheet(isPresented: $isRunSheetPresented) {
             WorkflowRunSheet(model: model, context: context)
                 .bighelpSheetSize(.standard)
+        }
+        .sheet(isPresented: $isInputsPresented) {
+            WorkflowInputsEditor(model: model)
+                .bighelpSheetSize(.large)
+        }
+        // Its own view: two alerts on one view and only one of them shows.
+        .background {
+            Color.clear
+                .modifier(WorkflowSaveTemplatePrompt(store: context.store, source: $templateSource,
+                                                     prepare: { await model.flushSave() }) { saved in
+                    model.message = saved ? WorkflowWords.templateSaved : context.store.message
+                    context.store.message = nil
+                })
+                .allowsHitTesting(false)
         }
         .alert("Workflow", isPresented: Binding(get: { model.message != nil }, set: { if !$0 { model.message = nil } })) {
             Button("OK", role: .cancel) {}
@@ -83,6 +121,7 @@ struct WorkflowFlowView: View {
             didOfferRun = true
             if model.canRun { isRunSheetPresented = true }
         }
+        .onDisappear { Task { await model.flushSave() } }
     }
 
     // MARK: Roles
@@ -103,16 +142,29 @@ struct WorkflowFlowView: View {
     // MARK: Flow
 
     private var stages: [WorkflowStage] { model.definition?.stages ?? [] }
+    private var graph: WorkflowFlowGraph? { model.definition?.graph }
+    private var editable: Bool { model.canEditFlow }
 
     private var flow: some View {
-        VStack(spacing: 0) {
+        let graph = graph
+        let order = model.definition.map(WorkflowCanvasLayout.compactOrder) ?? []
+        let byKey = Dictionary(stages.map { ($0.key, $0) }, uniquingKeysWith: { first, _ in first })
+        let lanes = sideLanes(graph, order: order)
+        return VStack(spacing: 0) {
             inputsNode
-            ForEach(Array(stages.enumerated()), id: \.element.key) { index, stage in
-                connector(after: index == 0 ? nil : stages[index - 1], before: stage)
-                stageNode(stage)
+            ForEach(Array(order.enumerated()), id: \.element) { index, key in
+                if let stage = byKey[key] {
+                    let previous = index == 0 ? WorkflowCanvasLayout.inputsKey : order[index - 1]
+                    connector(from: previous, to: stage, graph: graph)
+                    if dropGap == index { insertionLine }
+                    stageNode(stage, graph: graph)
+                }
             }
+            if dropGap == order.count { insertionLine }
             Rectangle().fill(theme.border).frame(width: 1, height: 16)
-            Button { addStage(after: stages.last?.key) } label: {
+            Menu {
+                WorkflowAddStageButtons { addStage($0, after: nil) }
+            } label: {
                 Image(systemName: "plus")
                     .font(.bighelp(.body).weight(.semibold))
                     .foregroundStyle(theme.secondaryText)
@@ -123,52 +175,89 @@ struct WorkflowFlowView: View {
                     }
                     .contentShape(Rectangle())
             }
-            .bighelpPlainButtonStyle()
             .bighelpIconLabel("Add a stage at the end")
             .accessibilityIdentifier("workflows.flow.add-end")
         }
-        .padding(.trailing, hasLoop ? 44 : 0)
-        .overlayPreferenceValue(WorkflowNodeFrames.self) { anchors in
-            GeometryReader { proxy in loopOverlay(anchors: anchors, proxy: proxy) }
-        }
+        .padding(.trailing, lanes.isEmpty ? 0 : CGFloat(min(lanes.count, 4)) * 12 + 28)
+        .overlay { sideWires(lanes) }
+        .overlay { liveWire }
+        .onPreferenceChange(WorkflowFlowRects.self) { rects = $0 }
+        .coordinateSpace(.named(Self.space))
+        .onDrop(of: [UTType.utf8PlainText], delegate: WorkflowNodeDrop(
+            isActive: { draggingKey != nil && editable },
+            update: { dropGap = gap(at: $0) },
+            drop: { location in
+                defer { draggingKey = nil; dropGap = nil }
+                guard let key = draggingKey, let gap = gap(at: location) else { return false }
+                withAnimation(.snappy) { model.move(key, toGap: gap) }
+                return true
+            },
+            exit: { dropGap = nil }))
         .frame(maxWidth: .infinity)
     }
 
-    private var inputsNode: some View {
-        HStack(spacing: BighelpTokens.space12) {
-            WorkflowInputsIcon()
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Inputs")
-                    .font(.bighelp(.headline))
-                Text((model.definition?.inputs ?? []).map(\.key).joined(separator: " · "))
-                    .font(.bighelp(.caption).monospaced())
-                    .foregroundStyle(theme.secondaryText)
-                    .lineLimit(1)
-            }
-            Spacer(minLength: 0)
+    /// Which gap between cards a drag is over: 0 is above the first stage.
+    private func gap(at location: CGPoint) -> Int? {
+        let order = model.definition.map(WorkflowCanvasLayout.compactOrder) ?? []
+        guard !order.isEmpty else { return nil }
+        for (index, key) in order.enumerated() {
+            if let rect = rects[key], location.y < rect.midY { return index }
         }
-        .workflowCard(theme, padding: BighelpTokens.space12)
-        .accessibilityElement(children: .combine)
+        return order.count
+    }
+
+    private var insertionLine: some View {
+        Capsule()
+            .fill(theme.action)
+            .frame(height: 3)
+            .padding(.vertical, BighelpTokens.space4)
+            .accessibilityHidden(true)
+    }
+
+    private var inputsNode: some View {
+        Button { isInputsPresented = true } label: {
+            HStack(spacing: BighelpTokens.space12) {
+                WorkflowInputsIcon()
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Inputs")
+                        .font(.bighelp(.headline))
+                        .foregroundStyle(theme.primaryText)
+                    Text((model.definition?.inputs ?? []).isEmpty ? "No fields yet"
+                         : (model.definition?.inputs ?? []).map(\.key).joined(separator: " · "))
+                        .font(.bighelp(.caption).monospaced())
+                        .foregroundStyle(theme.secondaryText)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.bighelp(.footnote).weight(.semibold))
+                    .foregroundStyle(theme.tertiaryText)
+            }
+            .workflowCard(theme, padding: BighelpTokens.space12)
+            .contentShape(Rectangle())
+        }
+        .bighelpPlainButtonStyle()
         .accessibilityIdentifier("workflows.flow.inputs")
+        .background(rectReader(WorkflowCanvasLayout.inputsKey))
+        .overlay(alignment: .bottom) { if editable { port(WorkflowCanvasLayout.inputsKey, .next) } }
     }
 
     @ViewBuilder
-    private func connector(after previous: WorkflowStage?, before stage: WorkflowStage) -> some View {
-        if previous?.kind == .decision {
-            // The decision's "pass" leads on.
+    private func connector(from previous: String, to stage: WorkflowStage, graph: WorkflowFlowGraph?) -> some View {
+        let leadsHere = previous == WorkflowCanvasLayout.inputsKey ? graph?.start == stage.key
+            : graph?.exits[previous]?.primary == stage.key
+        let fromDecision = graph?.kinds[previous] == .decision
+        VStack(spacing: 0) {
+            line(leadsHere, height: 8)
             HStack(spacing: BighelpTokens.space8) {
-                Rectangle().fill(theme.border).frame(width: 1, height: 28)
-                Text("pass")
-                    .font(.bighelp(.caption))
-                    .foregroundStyle(theme.secondaryText)
-            }
-            .offset(x: 14)
-        } else if stage.kind == .decision {
-            Rectangle().fill(theme.border).frame(width: 1, height: 28)
-        } else {
-            VStack(spacing: 0) {
-                Rectangle().fill(theme.border).frame(width: 1, height: 8)
-                Button { addStage(after: previous?.key) } label: {
+                if previous != WorkflowCanvasLayout.inputsKey, graph?.exits[previous]?.primary == nil {
+                    Text("Flow ends")
+                        .font(.bighelp(.caption).weight(.semibold))
+                        .foregroundStyle(theme.secondaryText)
+                }
+                Menu {
+                    WorkflowAddStageButtons { addStage($0, after: previous) }
+                } label: {
                     Image(systemName: "plus")
                         .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(theme.secondaryText)
@@ -178,14 +267,25 @@ struct WorkflowFlowView: View {
                         .frame(width: BighelpTokens.hitTarget, height: 28)
                         .contentShape(Rectangle())
                 }
-                .bighelpPlainButtonStyle()
                 .bighelpIconLabel("Add a stage before \(stage.title)")
-                Rectangle().fill(theme.border).frame(width: 1, height: 8)
+                if fromDecision, leadsHere {
+                    Text("pass")
+                        .font(.bighelp(.caption))
+                        .foregroundStyle(theme.secondaryText)
+                }
             }
+            line(leadsHere, height: 8)
         }
+        .frame(maxWidth: .infinity)
     }
 
-    private func stageNode(_ stage: WorkflowStage) -> some View {
+    private func line(_ solid: Bool, height: CGFloat) -> some View {
+        Rectangle()
+            .fill(solid ? theme.border : .clear)
+            .frame(width: 1, height: height)
+    }
+
+    private func stageNode(_ stage: WorkflowStage, graph: WorkflowFlowGraph?) -> some View {
         let isDecision = stage.kind == .decision
         return Button { editing = stage } label: {
             HStack(spacing: BighelpTokens.space12) {
@@ -201,80 +301,200 @@ struct WorkflowFlowView: View {
                         .lineLimit(1)
                 }
                 Spacer(minLength: 0)
-                if !isDecision {
+                if issueColor(stage) != nil {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.bighelp(.caption))
+                        .foregroundStyle(theme.danger)
+                        .accessibilityHidden(true)
+                } else if !isDecision {
                     Image(systemName: "chevron.right")
                         .font(.bighelp(.footnote).weight(.semibold))
                         .foregroundStyle(theme.tertiaryText)
                 }
             }
             .padding(isDecision ? BighelpTokens.space8 : BighelpTokens.space12)
-            .frame(maxWidth: isDecision ? 220 : .infinity, alignment: .leading)
+            // Room for the port on the bottom edge, clear of the text.
+            .padding(.bottom, isDecision ? BighelpTokens.space8 : 0)
+            .frame(maxWidth: isDecision ? 240 : .infinity, alignment: .leading)
             .background(isDecision ? BighelpTokens.Palette.gold.opacity(0.1) : theme.surface,
                         in: RoundedRectangle(cornerRadius: BighelpTokens.radius16, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: BighelpTokens.radius16, style: .continuous)
-                    .strokeBorder(isDecision ? BighelpTokens.Palette.gold.opacity(0.4) : issueColor(stage) ?? theme.border,
+                    .strokeBorder(issueColor(stage) ?? (isDecision ? BighelpTokens.Palette.gold.opacity(0.4) : theme.border),
                                   lineWidth: 1)
             }
+            .opacity(draggingKey == stage.key && dropGap != nil ? 0.4 : 1)
+            .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: BighelpTokens.radius16, style: .continuous))
             .contentShape(Rectangle())
         }
         .bighelpPlainButtonStyle()
-        .anchorPreference(key: WorkflowNodeFrames.self, value: .bounds) { [stage.key: $0] }
-        .contextMenu {
-            Button("Edit", systemImage: "pencil") { editing = stage }
-            Button("Add a stage after", systemImage: "plus") { addStage(after: stage.key) }
-            Button("Delete", systemImage: "trash", role: .destructive) {
-                model.deleteStage(stage.key)
-                Task { await model.save() }
+        .contextMenu { stageMenu(stage, graph: graph) }
+        .modifier(WorkflowNodeDragSource(key: stage.key, enabled: editable) { draggingKey = stage.key })
+        // Before the ports: an identifier on the card would hide theirs.
+        .accessibilityIdentifier("workflows.flow.stage.\(stage.key)")
+        .background(rectReader(stage.key))
+        .overlay(alignment: .bottom) {
+            if editable { port(stage.key, isDecision ? .pass : .next) }
+        }
+        .overlay(alignment: .trailing) {
+            if editable, isDecision { port(stage.key, .changes).offset(x: BighelpTokens.hitTarget / 2 - 6) }
+        }
+    }
+
+    @ViewBuilder
+    private func stageMenu(_ stage: WorkflowStage, graph: WorkflowFlowGraph?) -> some View {
+        Button("Edit", systemImage: "pencil") { editing = stage }
+        Menu("Add a stage after", systemImage: "plus") {
+            WorkflowAddStageButtons { addStage($0, after: stage.key) }
+        }
+        // Dragging toward an open menu picks from it, so moving is in the menu too.
+        if editable, let index = stages.firstIndex(where: { $0.key == stage.key }) {
+            if index > 0 {
+                Button("Move up", systemImage: "arrow.up") { model.move(stage.key, toGap: index - 1) }
+            }
+            if index < stages.count - 1 {
+                Button("Move down", systemImage: "arrow.down") { model.move(stage.key, toGap: index + 2) }
             }
         }
-        .accessibilityIdentifier("workflows.flow.stage.\(stage.key)")
+        if editable, stage.kind != .decision, graph?.exits[stage.key]?.primary != nil {
+            Button("End the flow here", systemImage: "stop.circle") { model.connect(stage.key, .next, to: nil) }
+        }
+        Button("Delete", systemImage: "trash", role: .destructive) {
+            model.deleteStage(stage.key)
+            Task { await model.save() }
+        }
+    }
+
+    private func rectReader(_ key: String) -> some View {
+        GeometryReader { proxy in
+            Color.clear.preference(key: WorkflowFlowRects.self, value: [key: proxy.frame(in: .named(Self.space))])
+        }
     }
 
     private func issueColor(_ stage: WorkflowStage) -> Color? {
-        guard let issues = model.validation?.issues.filter({ $0.stageKey == stage.key }), !issues.isEmpty else { return nil }
-        return issues.contains(where: \.isError) ? theme.danger : nil
+        model.issues.contains { $0.stageKey == stage.key && $0.isError } ? theme.danger : nil
     }
 
-    private var loopStage: WorkflowStage? { stages.first { $0.kind == .decision && $0.changesGoTo != nil } }
-    private var hasLoop: Bool { loopStage != nil }
+    // MARK: Ports and wires
+
+    /// A port: drag it to another stage to send this way out there.
+    private func port(_ key: String, _ port: WorkflowPort) -> some View {
+        let tint = port == .changes ? BighelpTokens.Palette.gold : theme.primaryText
+        return Circle()
+            .fill(tint)
+            .overlay(Circle().strokeBorder(theme.surface, lineWidth: 2))
+            .frame(width: 12, height: 12)
+            .frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
+            .contentShape(Circle())
+            .offset(y: port == .changes ? 0 : BighelpTokens.hitTarget / 2 - 6)
+            .highPriorityGesture(DragGesture(minimumDistance: 2, coordinateSpace: .named(Self.space))
+                .onChanged { value in wire = (key, port, value.location) }
+                .onEnded { value in finishWire(at: value.location) })
+            .accessibilityElement()
+            .accessibilityLabel(port == .changes ? "Changes go back" : "Way out")
+            .accessibilityValue(target(key, port) ?? "end")
+            .accessibilityIdentifier("workflows.flow.port.\(key).\(port.rawValue)")
+    }
+
+    private func target(_ key: String, _ port: WorkflowPort) -> String? {
+        key == WorkflowCanvasLayout.inputsKey ? graph?.start : graph?.target(key, port)
+    }
+
+    private func finishWire(at point: CGPoint) {
+        defer { wire = nil }
+        guard let wire else { return }
+        let target = stages.first { stage in
+            (stage.key != wire.from || wire.port == .changes) && (rects[stage.key]?.insetBy(dx: 0, dy: -6).contains(point) ?? false)
+        }
+        guard let target else { return }
+        withAnimation(.snappy) { model.connect(wire.from, wire.port, to: target.key) }
+    }
 
     @ViewBuilder
-    private func loopOverlay(anchors: [String: Anchor<CGRect>], proxy: GeometryProxy) -> some View {
-        if let decision = loopStage, let goTo = decision.changesGoTo,
-           let from = anchors[decision.key], let to = anchors[goTo] {
-            let start = proxy[from]
-            let end = proxy[to]
-            let x = proxy.size.width - 20
+    private var liveWire: some View {
+        if let wire, let rect = rects[wire.from] {
+            let start = wire.port == .changes ? CGPoint(x: rect.maxX, y: rect.midY) : CGPoint(x: rect.midX, y: rect.maxY)
             Path { path in
-                path.move(to: CGPoint(x: start.maxX, y: start.midY))
-                path.addLine(to: CGPoint(x: x, y: start.midY))
-                path.addLine(to: CGPoint(x: x, y: end.midY))
-                path.addLine(to: CGPoint(x: end.maxX + 4, y: end.midY))
+                path.move(to: start)
+                path.addCurve(to: wire.point, control1: CGPoint(x: start.x, y: start.y + 40),
+                              control2: CGPoint(x: wire.point.x, y: wire.point.y - 40))
             }
-            .stroke(BighelpTokens.Palette.gold, style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
-            Text("max \(decision.changesMaxRevisions ?? model.definition?.maxRevisions ?? 2)")
-                .font(.bighelp(.caption2).monospaced())
-                .foregroundStyle(BighelpTokens.Palette.gold)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(theme.canvas, in: Capsule())
-                .overlay(Capsule().strokeBorder(BighelpTokens.Palette.gold.opacity(0.5)))
-                .position(x: x, y: (start.midY + end.midY) / 2)
-            Text("changes")
-                .font(.bighelp(.caption))
-                .foregroundStyle(BighelpTokens.Palette.gold)
-                .position(x: (start.maxX + x) / 2, y: start.midY + 14)
+            .stroke(theme.action, style: StrokeStyle(lineWidth: 2, lineCap: .round, dash: [6, 4]))
+            .allowsHitTesting(false)
         }
+    }
+
+    /// Ways out that don't go to the card right below: drawn beside the cards,
+    /// each in its own lane. A decision's changes are gold and dashed.
+    private struct Lane: Identifiable {
+        var id: String { "\(from).\(port.rawValue)" }
+        var from: String
+        var to: String
+        var port: WorkflowPort
+        var label: String?
+    }
+
+    private func sideLanes(_ graph: WorkflowFlowGraph?, order: [String]) -> [Lane] {
+        guard let graph else { return [] }
+        var lanes: [Lane] = []
+        for (index, key) in order.enumerated() {
+            let below = order.indices.contains(index + 1) ? order[index + 1] : nil
+            if let to = graph.exits[key]?.primary, to != below, order.contains(to) {
+                lanes.append(Lane(from: key, to: to, port: graph.kinds[key] == .decision ? .pass : .next, label: nil))
+            }
+            if let to = graph.exits[key]?.changes, order.contains(to) {
+                let rounds = model.definition?.stage(key)?.changesMaxRevisions ?? model.definition?.maxRevisions ?? 2
+                lanes.append(Lane(from: key, to: to, port: .changes, label: "max \(rounds)"))
+            }
+        }
+        if let start = graph.start, order.first != start {
+            lanes.append(Lane(from: WorkflowCanvasLayout.inputsKey, to: start, port: .next, label: nil))
+        }
+        return lanes
+    }
+
+    private func sideWires(_ lanes: [Lane]) -> some View {
+        GeometryReader { proxy in
+            ForEach(Array(lanes.prefix(4).enumerated()), id: \.element.id) { index, lane in
+                if let from = rects[lane.from], let to = rects[lane.to] {
+                    let x = proxy.size.width - 14 - CGFloat(index) * 12
+                    let changes = lane.port == .changes
+                    let color = changes ? BighelpTokens.Palette.gold : theme.secondaryText
+                    Path { path in
+                        path.move(to: CGPoint(x: from.maxX, y: from.midY))
+                        path.addQuadCurve(to: CGPoint(x: x, y: from.midY + (to.midY > from.midY ? 12 : -12)),
+                                          control: CGPoint(x: x, y: from.midY))
+                        path.addLine(to: CGPoint(x: x, y: to.midY + (to.midY > from.midY ? -12 : 12)))
+                        path.addQuadCurve(to: CGPoint(x: to.maxX + 6, y: to.midY), control: CGPoint(x: x, y: to.midY))
+                    }
+                    .stroke(color, style: StrokeStyle(lineWidth: 1.5, lineCap: .round, dash: changes ? [5, 4] : []))
+                    if let label = lane.label {
+                        Text(label)
+                            .font(.bighelp(.caption2).monospaced())
+                            .foregroundStyle(color)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(theme.canvas, in: Capsule())
+                            .overlay(Capsule().strokeBorder(color.opacity(0.5)))
+                            .fixedSize()
+                            // Along the lane, so it stays inside the screen's edge.
+                            .rotationEffect(.degrees(-90))
+                            .position(x: x, y: (from.midY + to.midY) / 2)
+                    }
+                }
+            }
+        }
+        .allowsHitTesting(false)
     }
 
     // MARK: Issues and Run
 
     @ViewBuilder
     private var issues: some View {
-        if let validation = model.validation, !validation.issues.isEmpty {
+        let issues = model.issues
+        if !issues.isEmpty {
             VStack(alignment: .leading, spacing: BighelpTokens.space8) {
-                ForEach(validation.issues) { issue in
+                ForEach(issues) { issue in
                     Label(issue.message, systemImage: issue.isError ? "xmark.octagon" : "exclamationmark.triangle")
                         .font(.bighelp(.footnote))
                         .foregroundStyle(issue.isError ? theme.danger : theme.warning)
@@ -287,13 +507,17 @@ struct WorkflowFlowView: View {
 
     private var bottomBar: some View {
         HStack(spacing: BighelpTokens.space8) {
-            Button { addStage(after: stages.last?.key) } label: {
+            Menu {
+                WorkflowAddStageButtons { addStage($0, after: nil) }
+                Divider()
+                Button("Inputs", systemImage: "arrow.right.to.line") { isInputsPresented = true }
+            } label: {
                 Image(systemName: "plus")
                     .frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
                     .contentShape(Rectangle())
             }
-            .bighelpPlainButtonStyle()
             .bighelpIconLabel("Add a stage")
+            .accessibilityIdentifier("workflows.flow.add")
             Text("Nothing runs until you tap Run.")
                 .font(.bighelp(.footnote))
                 .foregroundStyle(theme.secondaryText)
@@ -317,8 +541,8 @@ struct WorkflowFlowView: View {
         .frame(maxWidth: 680)
     }
 
-    private func addStage(after key: String?) {
-        if let stage = model.addStage(after: key) { editing = stage }
+    private func addStage(_ kind: WorkflowStage.Kind, after key: String?) {
+        if let stage = model.addStage(kind, after: key) { editing = stage }
     }
 }
 
@@ -360,15 +584,28 @@ struct WorkflowTitle: View {
     }
 }
 
-/// ⋯ on a workflow: check again, archive.
+/// ⋯ on a workflow: runs, inputs, save as template, check again, archive.
 struct WorkflowMoreMenu: View {
     let model: WorkflowEditorModel
     let context: WorkflowsContext
+    @Binding var templateSource: WorkflowSummary?
+    var editInputs: (() -> Void)?
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         Menu {
             Button("Runs of this workflow", systemImage: "list.bullet") { context.open(.workflowRuns(selected: nil)) }
+            if let editInputs {
+                Button("Inputs", systemImage: "arrow.right.to.line") { editInputs() }
+            }
+            if context.canEdit {
+                Button("Save as template", systemImage: "square.on.square") {
+                    templateSource = WorkflowSummary(id: model.workflowID, name: model.name, revision: nil, hasDraft: true,
+                                                     stageCount: model.definition?.stages.count ?? 0,
+                                                     needsSetupRoles: [], valid: false, lastRunAt: nil)
+                }
+                .accessibilityIdentifier("workflows.more.save-template")
+            }
             if context.isNerdMode {
                 Button("Check again", systemImage: "checkmark.seal") { Task { await model.save() } }
             }

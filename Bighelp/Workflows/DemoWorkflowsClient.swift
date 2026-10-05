@@ -7,6 +7,23 @@ import Foundation
 @MainActor
 final class DemoWorkflowsClient: WorkflowsClient {
     static let shared = DemoWorkflowsClient()
+    /// The second demo computer ("Studio Hermes", `-use-multi-host-fixtures`)
+    /// has a plugin with Workflows, but its Hermes can't run them.
+    static let cantRun = DemoWorkflowsClient(support: .unavailable(code: "chat_runner_missing"))
+
+    /// The demo computer's client: `-demo-workflows-unavailable <code>` makes the
+    /// first one say why it can't run workflows, and `-demo-workflows-read-only`
+    /// gives it an older plugin without editing.
+    static func forHost(_ hostID: String?) -> DemoWorkflowsClient {
+        if hostID == "host-2" { return cantRun }
+        let arguments = ProcessInfo.processInfo.arguments
+        if let flag = arguments.firstIndex(of: "-demo-workflows-unavailable"), arguments.indices.contains(flag + 1) {
+            cantRun.supportValue = .unavailable(code: arguments[flag + 1])
+            return cantRun
+        }
+        if arguments.contains("-demo-workflows-read-only") { shared.supportValue = .available(canEdit: false) }
+        return shared
+    }
 
     private struct Workflow {
         var id: String
@@ -17,6 +34,12 @@ final class DemoWorkflowsClient: WorkflowsClient {
         var bindings: [String: String]
         var lastRunAt: Date?
         var archived = false
+        var pinned = false
+    }
+
+    private struct Template {
+        var template: WorkflowTemplate
+        var definition: WorkflowDefinition
     }
 
     private struct Run {
@@ -30,6 +53,8 @@ final class DemoWorkflowsClient: WorkflowsClient {
         var events: [WorkflowEvent]
         var scripted: Bool
         var lastStep: Date
+        /// Ran on Hermes' fallback runner, which can't count tokens.
+        var fallbackRunner = false
     }
 
     private var workflows: [String: Workflow] = [:]
@@ -38,27 +63,52 @@ final class DemoWorkflowsClient: WorkflowsClient {
     private var files: [String: Data] = [:]
     private var nextRunNumber = 18
     private var nextEvent = 1_000
+    private var nextWorkflow = 1
+    private var yourTemplates: [Template] = []
     private let delays: Bool
     private let now = Date.now
+    private var supportValue: WorkflowsSupport
 
-    init(delays: Bool = !ProcessInfo.processInfo.arguments.contains("-disable-demo-delays")) {
+    init(delays: Bool = !ProcessInfo.processInfo.arguments.contains("-disable-demo-delays"),
+         support: WorkflowsSupport = .available(canEdit: true)) {
         self.delays = delays
+        supportValue = support
         seed()
     }
 
     // MARK: WorkflowsClient
 
-    func isAvailable() async throws -> Bool { true }
+    func support() async throws -> WorkflowsSupport { supportValue }
+
+    /// Like the plugin, routes this computer can't serve aren't there.
+    private func requireRunnable() throws {
+        guard case .available = supportValue else { throw WorkspaceClientError.unavailable(.unsupportedOperation) }
+    }
+
+    private func requireEditing() throws {
+        guard supportValue.canEdit else { throw WorkspaceClientError.unavailable(.unsupportedOperation) }
+    }
 
     func status() async throws -> WorkflowStatus {
+        try requireRunnable()
         await pause()
         let busy = runs.values.filter { [.launched, .running].contains($0.summary.state) }.count
         return WorkflowStatus(coordinator: .online, heartbeatAt: Date.now.addingTimeInterval(-2), epoch: 7,
-                              slotsUsed: min(busy, 2), slotsTotal: 2, hostName: nil)
+                              slotsUsed: min(busy, 2), slotsTotal: 2, runnerMode: .stream, hostName: Self.hostName)
+    }
+
+    /// `-demo-workflows-host-name <name>`: the name the computer gives itself (a long one, for layout tests).
+    private static var hostName: String? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let flag = arguments.firstIndex(of: "-demo-workflows-host-name"), arguments.indices.contains(flag + 1) else {
+            return nil
+        }
+        return arguments[flag + 1]
     }
 
     func list(includeArchived: Bool) async throws -> WorkflowsList {
         await pause()
+        try requireRunnable()
         let summaries = order.compactMap { workflows[$0] }.filter { includeArchived || !$0.archived }.map(summary)
         let all = runs.values.map(\.summary).sorted { $0.number > $1.number }
         return WorkflowsList(workflows: summaries,
@@ -75,13 +125,24 @@ final class DemoWorkflowsClient: WorkflowsClient {
                                   WorkflowBinding(role: $0.key, agentID: workflow.bindings[$0.key],
                                                   approvedAt: workflow.bindings[$0.key] == nil ? nil : now)
                               },
-                              validation: validation(workflow))
+                              validation: validation(workflow), pinned: workflow.pinned)
     }
 
     func saveDraft(workflowID: String?, baseDraftVersion: Int,
                    definition: WorkflowDefinition) async throws -> (workflowID: String, draftVersion: Int, validation: WorkflowValidation) {
         await pause()
-        guard let id = workflowID, var workflow = workflows[id] else { throw WorkspaceClientError.rejected(code: "not_found") }
+        guard let id = workflowID else {
+            // Create from scratch.
+            try requireEditing()
+            nextWorkflow += 1
+            let newID = "wf-new-\(nextWorkflow)"
+            let workflow = Workflow(id: newID, definition: definition, revision: nil, draftVersion: 1, hasDraft: true,
+                                    bindings: [:])
+            workflows[newID] = workflow
+            order.append(newID)
+            return (newID, 1, validation(workflow))
+        }
+        guard var workflow = workflows[id] else { throw WorkspaceClientError.rejected(code: "not_found") }
         guard workflow.draftVersion == baseDraftVersion else { throw WorkspaceClientError.rejected(code: "draft_conflict") }
         workflow.definition = definition
         workflow.draftVersion += 1
@@ -116,6 +177,21 @@ final class DemoWorkflowsClient: WorkflowsClient {
 
     func archive(workflowID: String) async throws {
         workflows[workflowID]?.archived = true
+    }
+
+    func unarchive(workflowID: String) async throws {
+        try requireEditing()
+        await pause()
+        guard workflows[workflowID] != nil else { throw WorkspaceClientError.rejected(code: "workflow_not_found") }
+        workflows[workflowID]?.archived = false
+    }
+
+    func pin(workflowID: String, pinned: Bool) async throws -> Bool {
+        try requireEditing()
+        await pause()
+        guard workflows[workflowID] != nil else { throw WorkspaceClientError.rejected(code: "workflow_not_found") }
+        workflows[workflowID]?.pinned = pinned
+        return pinned
     }
 
     func startRun(workflowID: String, revision: Int, inputs: WorkflowJSON,
@@ -258,21 +334,55 @@ final class DemoWorkflowsClient: WorkflowsClient {
                                      data: data.subdata(in: offset..<end), done: end >= data.count)
     }
 
+    /// Like the host: yours first, newest first, then the built-in ones.
     func templates() async throws -> [WorkflowTemplate] {
-        [WorkflowTemplate(id: "research-draft-review", name: "Research, draft, review",
-                          description: "One agent researches, another writes, a third reviews. You approve the result.",
-                          stageCount: 6)]
+        yourTemplates.reversed().map(\.template)
+            + [WorkflowTemplate(id: "research-draft-review", name: "Research, draft, review",
+                                description: "One agent researches, another writes, a third reviews. You approve the result.",
+                                stageCount: 6)]
     }
 
     func useTemplate(id: String) async throws -> String {
         await pause()
-        let newID = "wf-\(order.count + 1)"
-        var definition = Self.researchDraftReview
-        definition.name = "Research, draft, review \(order.count)"
+        nextWorkflow += 1
+        let newID = "wf-\(order.count + 1)-\(nextWorkflow)"
+        var definition: WorkflowDefinition
+        if let yours = yourTemplates.first(where: { $0.template.id == id }) {
+            definition = yours.definition
+        } else {
+            definition = Self.researchDraftReview
+            definition.name = "Research, draft, review \(order.count)"
+        }
         workflows[newID] = Workflow(id: newID, definition: definition, revision: nil, draftVersion: 1, hasDraft: true,
                                     bindings: [:])
         order.append(newID)
         return newID
+    }
+
+    func saveTemplate(workflowID: String, name: String, description: String?) async throws -> String {
+        try requireEditing()
+        await pause()
+        guard let workflow = workflows[workflowID] else { throw WorkspaceClientError.rejected(code: "workflow_not_found") }
+        guard yourTemplates.count < 100 else { throw WorkspaceClientError.rejected(code: "not_allowed") }
+        nextWorkflow += 1
+        let id = "tpl-\(nextWorkflow)"
+        var definition = workflow.definition
+        definition.name = String(name.prefix(WorkflowTemplate.nameLimit))
+        yourTemplates.append(Template(
+            template: WorkflowTemplate(id: id, name: definition.name,
+                                       description: description ?? workflow.definition.description,
+                                       stageCount: definition.stages.count, source: .yours, updatedAt: .now),
+            definition: definition))
+        return id
+    }
+
+    func deleteTemplate(id: String) async throws {
+        try requireEditing()
+        await pause()
+        guard yourTemplates.contains(where: { $0.template.id == id }) else {
+            throw WorkspaceClientError.rejected(code: "not_allowed")
+        }
+        yourTemplates.removeAll { $0.template.id == id }
     }
 
     // MARK: Building answers
@@ -286,7 +396,8 @@ final class DemoWorkflowsClient: WorkflowsClient {
         return WorkflowSummary(id: workflow.id, name: workflow.definition.name, revision: workflow.revision,
                                hasDraft: workflow.hasDraft, stageCount: workflow.definition.stages.count,
                                needsSetupRoles: unbound, valid: validation(workflow).valid,
-                               lastRunAt: workflow.lastRunAt, stageKinds: workflow.definition.stages.map(\.kind))
+                               lastRunAt: workflow.lastRunAt, stageKinds: workflow.definition.stages.map(\.kind),
+                               pinned: workflow.pinned, archived: workflow.archived)
     }
 
     private func validation(_ workflow: Workflow) -> WorkflowValidation {
@@ -305,9 +416,8 @@ final class DemoWorkflowsClient: WorkflowsClient {
                                     message: "\(stage.title) can use the terminal.", isError: false))
             }
         }
-        if workflow.definition.stages.isEmpty {
-            issues.append(.init(stageKey: nil, code: "no_stages", message: "Add a stage.", isError: true))
-        }
+        // How the stages connect, as the host checks it.
+        issues += workflow.definition.graph.issues(workflow.definition)
         return WorkflowValidation(valid: !issues.contains(where: \.isError), issues: issues)
     }
 
@@ -334,7 +444,8 @@ final class DemoWorkflowsClient: WorkflowsClient {
                 WorkflowAttempt(id: "\(run.summary.id)-\(stage.key)-1", number: 1, state: state, agentID: agent,
                                 launchedAt: run.summary.startedAt, endedAt: state == .accepted ? run.summary.updatedAt : nil,
                                 durationMs: state == .accepted ? Int((doneMinutes[safe: index] ?? 1) * 60_000) : nil,
-                                tokens: WorkflowTokens(input: 4_200 + index * 900, output: 1_800 + index * 400),
+                                tokens: run.fallbackRunner ? nil
+                                    : WorkflowTokens(input: 4_200 + index * 900, output: 1_800 + index * 400),
                                 outcomeCode: state == .accepted ? "passed" : nil),
             ] : []
             var value = WorkflowRunStage(key: stage.key, kind: stage.kind, title: stage.title, role: stage.role,
@@ -361,8 +472,9 @@ final class DemoWorkflowsClient: WorkflowsClient {
         var actions: Set<String> = []
         if !run.summary.state.isFinished { actions.insert("cancel") }
         if [.needsAttention, .failed].contains(run.summary.state) { actions.insert("retry") }
-        let tokens = stages.flatMap(\.attempts).reduce(WorkflowTokens(input: 0, output: 0)) {
-            WorkflowTokens(input: $0.input + $1.tokens.input, output: $0.output + $1.tokens.output)
+        let counted = stages.flatMap(\.attempts).compactMap(\.tokens)
+        let tokens = run.fallbackRunner ? nil : counted.reduce(WorkflowTokens(input: 0, output: 0)) {
+            WorkflowTokens(input: $0.input + $1.input, output: $0.output + $1.output)
         }
         return WorkflowRunDetail(summary: run.summary, inputs: run.inputs, stages: stages, outputs: run.outputs,
                                  signoff: signoff, tokens: tokens, allowedActions: actions)
@@ -435,7 +547,14 @@ final class DemoWorkflowsClient: WorkflowsClient {
     // MARK: Seed
 
     private func seed() {
-        let rdr = Workflow(id: "wf-research", definition: Self.researchDraftReview, revision: 4, draftVersion: 9,
+        // Saved places on the canvas, far wider than an iPhone: compact widths line them up instead.
+        var laidOut = Self.researchDraftReview
+        laidOut.schemaVersion = 2
+        laidOut.layout = WorkflowLayout(inputs: CGPoint(x: 40, y: 100), stages: [
+            "research": CGPoint(x: 340, y: 100), "draft": CGPoint(x: 640, y: 100), "check": CGPoint(x: 940, y: 100),
+            "review": CGPoint(x: 1_240, y: 100), "decide": CGPoint(x: 1_540, y: 160), "signoff": CGPoint(x: 1_840, y: 100),
+        ])
+        let rdr = Workflow(id: "wf-research", definition: laidOut, revision: 4, draftVersion: 9,
                            hasDraft: false, bindings: ["researcher": "travel", "writer": "home", "reviewer": "finance"],
                            lastRunAt: now.addingTimeInterval(-38 * 60))
         let triage = Workflow(id: "wf-triage", definition: Self.triageDigest, revision: 2, draftVersion: 3, hasDraft: false,
@@ -517,7 +636,10 @@ final class DemoWorkflowsClient: WorkflowsClient {
         var cancelled = run(9, Workflow(id: "wf-captions", definition: Self.photoCaptions, revision: 1, draftVersion: 1,
                                         hasDraft: false, bindings: [:]), .cancelled, stage: 1, minutesAgo: 60 * 70)
         cancelled.summary.revision = 1
-        for value in [running, waiting, checking, planned, attention, succeeded, older, failed, cancelled] {
+        // 8: finished on Hermes' fallback runner, which can't count tokens.
+        var fallback = run(8, triage, .succeeded, stage: 1, minutesAgo: 60 * 80)
+        fallback.fallbackRunner = true
+        for value in [running, waiting, checking, planned, attention, succeeded, older, failed, cancelled, fallback] {
             runs[value.summary.id] = value
         }
     }

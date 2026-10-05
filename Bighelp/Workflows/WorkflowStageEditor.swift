@@ -13,8 +13,7 @@ struct WorkflowStageEditor: View {
     @State private var stage: WorkflowStage
     @State private var tab: Tab = .setup
     @State private var isSaving = false
-    @State private var isNamingRole = false
-    @State private var roleName = ""
+    @State private var isAssigning = false
     @Environment(\.dismiss) private var dismiss
     @BighelpThemeReader private var theme
 
@@ -71,21 +70,42 @@ struct WorkflowStageEditor: View {
             }
         }
         .accessibilityIdentifier("workflows.stage-editor")
-        .alert("New role", isPresented: $isNamingRole) {
-            TextField("Name", text: $roleName)
-            Button("Cancel", role: .cancel) {}
-            Button("Add") { addRole() }
-        } message: {
-            Text("A role is a job in this workflow, like Writer. You choose which agent does it.")
+    }
+
+    /// Picking an agent makes or reuses the stage's role and chooses the agent for it.
+    private func assign(_ agentID: String) {
+        isAssigning = true
+        let current = stage
+        Task {
+            let assigned = await model.assign(agentID: agentID, to: current)
+            stage.role = assigned.role
+            isAssigning = false
         }
     }
 
-    private func addRole() {
-        let label = String(roleName.trimmingCharacters(in: .whitespaces).prefix(200))
-        guard !label.isEmpty, model.definition != nil else { return }
-        let key = WorkflowInputKey.make(from: label, existing: model.definition?.roles.map(\.key) ?? [])
-        model.definition?.roles.append(.init(key: key, label: label))
-        stage.role = key
+    private var agentPicker: some View {
+        let agentID = model.agentID(for: stage.role)
+        return HStack {
+            Text("Agent")
+                .font(.bighelp(.body))
+            Spacer()
+            if isAssigning { ProgressView() }
+            Menu {
+                ForEach(context.agents) { agent in
+                    Button(agent.name) { assign(agent.id) }
+                }
+            } label: {
+                HStack(spacing: BighelpTokens.space4) {
+                    Text(context.agentName(agentID) ?? "Choose an agent")
+                    Image(systemName: "chevron.up.chevron.down").font(.bighelp(.caption2))
+                }
+                .font(.bighelp(.body).weight(.semibold))
+                .foregroundStyle(agentID == nil ? theme.action : theme.primaryText)
+                .frame(minHeight: BighelpTokens.hitTarget)
+            }
+            .disabled(isAssigning || context.agents.isEmpty)
+            .accessibilityIdentifier("workflows.stage.agent")
+        }
     }
 
     private var header: some View {
@@ -95,7 +115,7 @@ struct WorkflowStageEditor: View {
                 TextField("Title", text: $stage.title, prompt: Text("Title").bighelpFieldHint(theme))
                     .font(.bighelp(.headline))
                     .accessibilityIdentifier("workflows.stage.title")
-                Text([stage.kind.title, stage.role.map { "role \($0)" }].compactMap { $0 }.joined(separator: " · "))
+                Text(stage.kind.title)
                     .font(.bighelp(.caption))
                     .foregroundStyle(theme.secondaryText)
             }
@@ -108,20 +128,8 @@ struct WorkflowStageEditor: View {
     private var setup: some View {
         switch stage.kind {
         case .agent:
-            Section("Agent") {
-                if let definition = model.definition {
-                    Picker("Role", selection: Binding(get: { stage.role ?? "" }, set: { stage.role = $0.isEmpty ? nil : $0 })) {
-                        ForEach(definition.roles) { Text($0.label).tag($0.key) }
-                    }
-                    .accessibilityIdentifier("workflows.stage.role")
-                    Button("New role", systemImage: "person.badge.plus") {
-                        roleName = ""
-                        isNamingRole = true
-                    }
-                    if let role = definition.role(stage.role) {
-                        WorkflowRolePicker(model: model, context: context, role: role)
-                    }
-                }
+            Section {
+                agentPicker
                 if !stage.tools.isEmpty {
                     WorkflowChips(items: stage.tools.map(Self.toolName))
                 }

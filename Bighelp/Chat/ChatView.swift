@@ -559,6 +559,7 @@ struct ChatView: View {
                 .ignoresSafeArea()
             }
             #endif
+            .overlay(alignment: .bottom) { timelineStatusOverlay }
             .overlay(alignment: .top) {
                 floatingHeader
                     .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { headerHeight = $0 }

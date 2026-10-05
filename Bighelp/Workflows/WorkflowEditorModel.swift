@@ -41,15 +41,23 @@ final class WorkflowEditorModel {
     var isDirty: Bool { definition != nil && definition != detail?.definition }
     var name: String { definition?.name.isEmpty == false ? definition!.name : detail?.name ?? "Workflow" }
 
-    /// Roles no agent does yet.
-    var unboundRoles: [WorkflowDefinition.Role] {
-        (definition?.roles ?? []).filter { role in
-            bindings.first { $0.role == role.key }?.agentID == nil
-        }
+    /// The roles agent stages use now.
+    var usedRoleKeys: Set<String> {
+        Set((definition?.stages ?? []).filter { $0.kind == .agent }.compactMap(\.role))
     }
 
+    /// Roles a stage uses that no agent does yet. Roles no stage uses don't count.
+    var unboundRoles: [WorkflowDefinition.Role] {
+        let used = usedRoleKeys
+        return (definition?.roles ?? []).filter { used.contains($0.key) && agentID(for: $0.key) == nil }
+    }
+
+    /// Runs when nothing on screen is wrong. Which agent does each role is
+    /// known here (`bindings`), so the host's answer from before the last
+    /// choice can't keep Run off.
     var canRun: Bool {
-        (validation?.valid ?? false) && unboundRoles.isEmpty && !isSaving && definition?.stages.isEmpty == false
+        validation != nil && !isSaving && definition?.stages.isEmpty == false
+            && !issues.contains { $0.isError }
     }
 
     func load() async {
@@ -199,9 +207,19 @@ final class WorkflowEditorModel {
     var issues: [WorkflowValidation.Issue] {
         guard let definition else { return validation?.issues ?? [] }
         let local = definition.graph.issues(definition)
-        let host = (validation?.issues ?? []).filter { !WorkflowFlowGraph.graphCodes.contains($0.code) }
-        return local + host
+        let host = (validation?.issues ?? []).filter {
+            !WorkflowFlowGraph.graphCodes.contains($0.code) && !Self.roleCodes.contains($0.code)
+        }
+        let roles = unboundRoles.map {
+            WorkflowValidation.Issue(stageKey: nil, code: Self.roleUnbound, message: "Choose an agent for \($0.label).",
+                                     isError: true)
+        }
+        return local + roles + host
     }
+
+    static let roleUnbound = "role_unbound"
+    /// Role problems worked out here from the roles and agents as they are now.
+    private static let roleCodes: Set<String> = [roleUnbound, "role_unused"]
 
     /// Saves a moment after the last change, so a drag or a few quick changes are one save.
     func scheduleSave() {
@@ -263,14 +281,77 @@ final class WorkflowEditorModel {
 
     /// Chooses which agent does a role on this computer.
     func bind(role: String, agentID: String?) async {
+        // The computer only takes an agent for a role its saved draft has.
+        if isDirty { await flushSaveNow() }
         do {
             bindings = try await client.bind(workflowID: workflowID, role: role, agentID: agentID)
             message = nil
+            if let validation = try? await client.validate(workflowID: workflowID) { self.validation = validation }
         } catch WorkspaceClientError.rejected(let code) where code == "profile_not_found" {
             message = "That agent isn't on this computer any more."
         } catch {
             message = WorkflowsStore.reason(error)
         }
+    }
+
+    /// The role an agent stage should use so `agentID` does it: a role that
+    /// agent already does, else the stage's own role when no other stage
+    /// shares it, else a new role named after the stage. New roles are added
+    /// to the draft.
+    func role(for stage: WorkflowStage, agentID: String) -> String? {
+        guard let definition else { return nil }
+        let used = usedRoleKeys
+        if let shared = definition.roles.first(where: { used.contains($0.key) && self.agentID(for: $0.key) == agentID }) {
+            return shared.key
+        }
+        if let own = stage.role, definition.role(own) != nil,
+           !definition.stages.contains(where: { $0.key != stage.key && $0.kind == .agent && $0.role == own }) {
+            return own
+        }
+        return addRole(named: stage.title)
+    }
+
+    /// Adds a role to the draft and gives its key.
+    @discardableResult
+    func addRole(named name: String) -> String? {
+        let label = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(200))
+        guard definition != nil else { return nil }
+        let shown = label.isEmpty ? "Agent" : label
+        let key = WorkflowInputKey.make(from: shown, existing: definition?.roles.map(\.key) ?? [])
+        definition?.roles.append(.init(key: key, label: shown))
+        return key
+    }
+
+    /// Has `agentID` do one agent stage: picks or makes its role, saves the
+    /// draft so the computer knows the role, then chooses the agent for it.
+    func assign(agentID: String, to stage: WorkflowStage) async -> WorkflowStage {
+        var stage = stage
+        guard let role = role(for: stage, agentID: agentID) else { return stage }
+        stage.role = role
+        update(stage)
+        await bind(role: role, agentID: agentID)
+        return stage
+    }
+
+    /// Renames a role (the agent stays).
+    func renameRole(_ key: String, to name: String) {
+        let label = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(200))
+        guard !label.isEmpty, let index = definition?.roles.firstIndex(where: { $0.key == key }) else { return }
+        definition?.roles[index].label = label
+        scheduleSave()
+    }
+
+    /// Removes a role no stage uses.
+    func removeRole(_ key: String) {
+        guard !usedRoleKeys.contains(key) else { return }
+        definition?.roles.removeAll { $0.key == key }
+        scheduleSave()
+    }
+
+    private func flushSaveNow() async {
+        saveTask?.cancel()
+        saveTask = nil
+        await saveWhileDirty()
     }
 
     // MARK: Running

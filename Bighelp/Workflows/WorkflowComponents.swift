@@ -456,8 +456,33 @@ struct WorkflowDocumentView: View {
 // MARK: - What's wrong with the flow
 
 /// The flow's problems, plainly, in a card on the canvas.
+/// One problem. "Choose an agent for …" opens Agent roles.
+struct WorkflowIssueRow: View {
+    let issue: WorkflowValidation.Issue
+    var editRoles: (() -> Void)?
+    @BighelpThemeReader private var theme
+
+    var body: some View {
+        if issue.code == WorkflowEditorModel.roleUnbound, let editRoles {
+            Button(action: editRoles) { label }
+                .bighelpPlainButtonStyle()
+                .accessibilityIdentifier("workflows.issue.roles")
+        } else {
+            label
+        }
+    }
+
+    private var label: some View {
+        Label(issue.message, systemImage: issue.isError ? "xmark.octagon" : "exclamationmark.triangle")
+            .font(.bighelp(.footnote))
+            .foregroundStyle(issue.isError ? theme.danger : theme.warning)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
 struct WorkflowIssuesCard: View {
     let issues: [WorkflowValidation.Issue]
+    var editRoles: (() -> Void)?
     @State private var isExpanded = false
     @BighelpThemeReader private var theme
 
@@ -469,10 +494,7 @@ struct WorkflowIssuesCard: View {
                     .font(.bighelp(.subheadline).weight(.semibold))
                     .foregroundStyle(theme.primaryText)
                 ForEach(shown) { issue in
-                    Label(issue.message, systemImage: issue.isError ? "xmark.octagon" : "exclamationmark.triangle")
-                        .font(.bighelp(.footnote))
-                        .foregroundStyle(issue.isError ? theme.danger : theme.warning)
-                        .fixedSize(horizontal: false, vertical: true)
+                    WorkflowIssueRow(issue: issue, editRoles: editRoles)
                 }
                 if issues.count > 3 {
                     Button(isExpanded ? "Show less" : "Show all \(issues.count)") { isExpanded.toggle() }

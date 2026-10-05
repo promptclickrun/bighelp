@@ -48,6 +48,33 @@ final class ChatEdgeBlurUITests: BighelpUITestCase {
         }
     }
 
+    /// "Return to latest" sits above the message box, not under it. The
+    /// timeline runs under the home indicator, so the arrow must be laid out
+    /// in the safe area.
+    @MainActor
+    func testReturnToLatestStaysAboveTheMessageBox() throws {
+        let app = makeApp()
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-start-long-transcript",
+                               "-loopdy.chat.foldCompletedTurns", "NO", "-preview-ui-v3", "-test-companion-disabled"]
+        app.launch()
+        let composer = app.textViews["chat.composer.text"]
+        XCTAssertTrue(composer.waitForExistence(timeout: 20))
+        let latest = app.textViews.matching(NSPredicate(format: "value CONTAINS %@", "settled sentinel 1000"))
+        XCTAssertTrue(latest.firstMatch.waitForExistence(timeout: 20))
+        let middle = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3))
+        middle.press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.8)))
+        let arrow = app.buttons["chat.return-to-latest"]
+        XCTAssertTrue(arrow.waitForExistence(timeout: 10))
+        Thread.sleep(forTimeInterval: 1)
+        save("chat-return-to-latest", app)
+        // The message box's glass reaches a little above its text.
+        XCTAssertLessThanOrEqual(arrow.frame.maxY, composer.frame.minY - 8,
+                                 "The arrow overlaps the message box: \(arrow.frame) vs \(composer.frame)")
+        XCTAssertTrue(arrow.isHittable)
+        arrow.tap()
+        XCTAssertTrue(latest.firstMatch.waitForExistence(timeout: 10))
+    }
+
     /// Grey levels (0–255) of a part of the screen, given in points.
     private static func luminance(of image: UIImage, in rect: CGRect) throws -> [UInt8] {
         let cgImage = try XCTUnwrap(image.cgImage)

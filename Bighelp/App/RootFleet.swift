@@ -143,7 +143,8 @@ extension RootShellView {
     func fleetHome(_ fleet: FleetStore) -> FleetHomeView {
         FleetHomeView(fleet: fleet, onOpen: { openFleetAgent($0) }, onNewChat: { isFleetNewChatPresented = true },
                       onSetPinned: { setFleetPin($0, $1) }, onGroupAction: { performFleetGroupAction($0, $1) },
-                      onOpenRoutines: { openFleet(.routines(profileID: $0.profileID), on: $0.hostID) })
+                      onOpenRoutines: { openFleet(.routines(profileID: $0.profileID), on: $0.hostID) },
+                      onNewAgent: { fleetGate(.newAgent) })
     }
 
     /// Settings, Projects and other one-host screens: with several hosts, ask
@@ -264,6 +265,10 @@ extension RootShellView {
             switch destination {
             case .settings: appState.select(.profile)
             case .agents: appState.select(.agents)
+            case .newAgent:
+                // That computer's Agents screen opens its new-agent editor once it's connected.
+                agentCreateRequest = true
+                appState.select(.agents)
             case .projects:
                 if canOpenProjects { openProjects() } else { actionErrorMessage = "Projects aren't available on this host." }
             case .kanban:

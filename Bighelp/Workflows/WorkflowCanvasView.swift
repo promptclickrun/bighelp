@@ -14,6 +14,7 @@ struct WorkflowCanvasView: View {
     @State private var isRunSheetPresented = false
     @State private var isInputsPresented = false
     @State private var isRolesPresented = false
+    @State private var isTriggerPresented = false
     @State private var templateSource: WorkflowSummary?
     @State private var didOfferRun = false
     @BighelpThemeReader private var theme
@@ -68,12 +69,17 @@ struct WorkflowCanvasView: View {
             }
             ToolbarItem(placement: .topBarTrailing) {
                 WorkflowMoreMenu(model: model, context: context, templateSource: $templateSource,
-                                 editInputs: { isInputsPresented = true }, editRoles: { isRolesPresented = true })
+                                 editInputs: { isInputsPresented = true }, editRoles: { isRolesPresented = true },
+                                 editTrigger: { isTriggerPresented = true })
             }
         }
         .sheet(isPresented: $isRolesPresented) {
             WorkflowRolesEditor(model: model, context: context)
                 .bighelpSheetSize(.standard)
+        }
+        .sheet(isPresented: $isTriggerPresented) {
+            WorkflowTriggerSheet(model: model, context: context)
+                .bighelpSheetSize(.large)
         }
         .sheet(item: $editing) { stage in
             WorkflowStageEditor(model: model, context: context, stage: stage)
@@ -119,6 +125,13 @@ struct WorkflowCanvasView: View {
         WorkflowCanvasBoard(model: model, context: context, selected: $selected,
                             edit: { editing = $0 }, add: { addStage($0, after: $1) },
                             editInputs: { isInputsPresented = true })
+            .overlay(alignment: .topLeading) {
+                if model.trigger != nil {
+                    WorkflowTriggerCard(trigger: model.trigger) { isTriggerPresented = true }
+                        .frame(maxWidth: 320)
+                        .padding(BighelpTokens.space16)
+                }
+            }
             .overlay(alignment: .bottomTrailing) {
                 WorkflowIssuesCard(issues: model.issues, editRoles: { isRolesPresented = true })
                     .frame(maxWidth: 360)

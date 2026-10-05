@@ -128,6 +128,7 @@ struct BighelpNotificationSettingsView: View {
                 }
             }
             topicsSection
+            BighelpWorkflowAlertsSection(apply: { await hostRegistry?.notificationSetup?.applyAlertPreferences() })
             quietHoursSection
             turnOffSection
             Section("Advanced") {
@@ -421,7 +422,7 @@ struct BighelpNotificationSettingsView: View {
                 .padding(.vertical, BighelpTokens.space4)
             }
             .onChange(of: peerChatAlerts) { _, _ in
-                Task { await hostRegistry?.notificationSetup?.applyPeerChatPreference() }
+                Task { await hostRegistry?.notificationSetup?.applyAlertPreferences() }
             }
             .accessibilityValue(peerChatAlerts ? "On" : "Off")
             .accessibilityIdentifier("settings.notifications.peer-chats")
@@ -1070,5 +1071,49 @@ struct BighelpPluginCapabilitiesSection: View {
         let status: String
         let detail: String
         let isAvailable: Bool
+    }
+}
+
+/// Workflows: which run alerts this device gets. Stage replies never alert; these do.
+private struct BighelpWorkflowAlertsSection: View {
+    let apply: () async -> Void
+    @AppStorage(BighelpWorkflowAlerts.Kind.needsYou.key) private var needsYou = true
+    @AppStorage(BighelpWorkflowAlerts.Kind.succeeded.key) private var succeeded = true
+    @AppStorage(BighelpWorkflowAlerts.Kind.failed.key) private var failed = true
+    @AppStorage(BighelpWorkflowAlerts.Kind.cancelled.key) private var cancelled = true
+    @BighelpThemeReader private var theme
+
+    var body: some View {
+        Section {
+            toggle(.needsYou, $needsYou)
+            toggle(.succeeded, $succeeded)
+            toggle(.failed, $failed)
+            toggle(.cancelled, $cancelled)
+        } header: {
+            Text("Workflows")
+        } footer: {
+            Text("A workflow's stages never notify you. Needs you also follows Questions and approvals; the others follow Chat replies. Needs bighelp plugin 3.7.0 or later.")
+                .bighelpFont(.metadata)
+                .foregroundStyle(theme.secondaryText)
+        }
+        .listRowBackground(theme.surface)
+        .onChange(of: [needsYou, succeeded, failed, cancelled]) { _, _ in Task { await apply() } }
+    }
+
+    private func toggle(_ kind: BighelpWorkflowAlerts.Kind, _ isOn: Binding<Bool>) -> some View {
+        Toggle(isOn: isOn) {
+            VStack(alignment: .leading, spacing: BighelpTokens.space4) {
+                Text(kind.title)
+                    .bighelpFont(.body)
+                    .foregroundStyle(theme.primaryText)
+                Text(kind.detail)
+                    .bighelpFont(.metadata)
+                    .foregroundStyle(theme.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.vertical, BighelpTokens.space4)
+        }
+        .accessibilityValue(isOn.wrappedValue ? "On" : "Off")
+        .accessibilityIdentifier("settings.notifications.workflows.\(kind.rawValue)")
     }
 }

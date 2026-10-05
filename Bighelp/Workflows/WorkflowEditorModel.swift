@@ -356,6 +356,49 @@ final class WorkflowEditorModel {
 
     // MARK: Running
 
+    /// How runs start: by hand, or on a schedule. Nil while the plugin predates triggers.
+    var trigger: WorkflowTrigger? { detail?.trigger }
+
+    /// Saves the trigger. A schedule runs the newest published version, so what's on screen is
+    /// saved and published first. Returns true when the computer took it.
+    func setTrigger(_ trigger: WorkflowTrigger) async -> Bool {
+        guard !isSaving else { return false }
+        if trigger.isScheduled {
+            if isDirty, await !save() { return false }
+        }
+        isSaving = true
+        defer { isSaving = false }
+        do {
+            if trigger.isScheduled { _ = try await publishIfNeeded() }
+            let saved = try await client.setTrigger(workflowID: workflowID, trigger: trigger)
+            detail?.trigger = saved
+            message = nil
+            return true
+        } catch WorkspaceClientError.rejected(let code) where code == "schedule_invalid" {
+            message = "Your computer couldn't use that schedule. Choose another time."
+        } catch WorkspaceClientError.rejected(let code) where code == "not_valid" {
+            message = "Fix the problems in this workflow, then schedule it."
+        } catch WorkspaceClientError.rejected(let code) where code == "inputs_invalid" {
+            message = "Fill in what each run needs, then save again."
+        } catch WorkspaceClientError.unavailable(.unsupportedOperation) {
+            message = "Update the bighelp plugin on your computer to schedule workflows."
+        } catch {
+            message = WorkflowsStore.reason(error)
+        }
+        return false
+    }
+
+    /// Publishes the draft when it has changes the published version doesn't. Returns the newest revision.
+    private func publishIfNeeded() async throws -> Int? {
+        var revision = detail?.latestRevision
+        if hasUnpublishedDraft || revision == nil {
+            revision = try await client.publish(workflowID: workflowID, draftVersion: baseDraftVersion)
+            hasUnpublishedDraft = false
+            detail?.latestRevision = revision
+        }
+        return revision
+    }
+
     /// Saves and publishes what's on screen if needed, then starts one run.
     func run(inputs: WorkflowJSON) async -> WorkflowRunSummary? {
         guard !isSaving else { return nil }
@@ -363,13 +406,7 @@ final class WorkflowEditorModel {
         isSaving = true
         defer { isSaving = false }
         do {
-            var revision = detail?.latestRevision
-            if hasUnpublishedDraft || revision == nil {
-                revision = try await client.publish(workflowID: workflowID, draftVersion: baseDraftVersion)
-                hasUnpublishedDraft = false
-                detail?.latestRevision = revision
-            }
-            guard let revision else { return nil }
+            guard let revision = try await publishIfNeeded() else { return nil }
             let token = pendingRunToken ?? UUID().uuidString.lowercased()
             pendingRunToken = token
             let run = try await client.startRun(workflowID: workflowID, revision: revision, inputs: inputs,

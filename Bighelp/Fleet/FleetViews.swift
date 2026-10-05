@@ -141,6 +141,8 @@ struct FleetHomeView: View {
     var onGroupAction: ((FleetGroup, FleetGroupAction) -> Void)? = nil
     /// The agent's routines: add, pause, resume or delete them there.
     var onOpenRoutines: ((FleetAgent) -> Void)? = nil
+    /// New agent: asks which computer first.
+    var onNewAgent: (() -> Void)? = nil
     @State private var hostFilter: UUID?
     /// Hidden agents show, dimmed, so they can be shown again. For this visit only.
     @State private var showsHidden = false
@@ -277,9 +279,13 @@ struct FleetHomeView: View {
         }
     }
 
-    /// New section, and showing hidden agents. New group chat is in New chat.
+    /// New agent, new section, and showing hidden agents. New group chat is in New chat.
     private var organizeMenu: some View {
         Menu {
+            if let onNewAgent {
+                Button("New agent", systemImage: "person.badge.plus", action: onNewAgent)
+                    .accessibilityIdentifier("fleet.organize.new-agent")
+            }
             Button("New section", systemImage: "folder.badge.plus") { namePrompt = .newSection(filing: nil) }
                 .accessibilityIdentifier("fleet.organize.new-section")
             let hidden = fleet.hiddenAgentCount

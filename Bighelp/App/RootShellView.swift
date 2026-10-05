@@ -48,6 +48,7 @@ struct RootShellView: View {
     @State private var pendingIncomingURL: URL?
     /// Opens Agents filtered to one agent's group chats (from the Chats rail's menu).
     @State var agentGroupFilterRequest: String?
+    @State var agentCreateRequest = false
     /// Offered as "Try Again" in the error alert.
     @State private var actionErrorRetry: (@MainActor () -> Void)?
     @State var isHermesWorkspacePresented = false
@@ -530,7 +531,8 @@ struct RootShellView: View {
                     || (nativeRuntime != nil && currentWorkspaceOwner != nil)
 ,
                 onAction: handleAgentWorkspaceAction,
-                groupFilterRequest: $agentGroupFilterRequest
+                groupFilterRequest: $agentGroupFilterRequest,
+                createRequest: $agentCreateRequest
             )
             // The one main action, where a thumb rests, as on All agents.
             .overlay(alignment: .bottomTrailing) {
@@ -1339,6 +1341,8 @@ struct RootShellView: View {
         }
         guard acceptsIncomingLinks, BighelpExternalSessionOpenCenter.shared.consume(open) else { return }
         Task { @MainActor in
+            // Workflow alerts point at a run, not a chat.
+            if await openNotifiedWorkflowRun(profileID: profileID, reference: reference) { return }
             try? await sessionCatalog.load(requireAuthoritativeRefresh: true)
             guard let record = SessionRecord.matching(reference: reference, profileID: profileID,
                                                       in: sessionCatalog.records) else {

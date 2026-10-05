@@ -35,6 +35,7 @@ final class DemoWorkflowsClient: WorkflowsClient {
         var lastRunAt: Date?
         var archived = false
         var pinned = false
+        var trigger: WorkflowTrigger = .manual
     }
 
     private struct Template {
@@ -125,7 +126,7 @@ final class DemoWorkflowsClient: WorkflowsClient {
                                   WorkflowBinding(role: $0.key, agentID: workflow.bindings[$0.key],
                                                   approvedAt: workflow.bindings[$0.key] == nil ? nil : now)
                               },
-                              validation: validation(workflow), pinned: workflow.pinned)
+                              validation: validation(workflow), pinned: workflow.pinned, trigger: workflow.trigger)
     }
 
     func saveDraft(workflowID: String?, baseDraftVersion: Int,
@@ -186,6 +187,18 @@ final class DemoWorkflowsClient: WorkflowsClient {
         await pause()
         guard workflows[workflowID] != nil else { throw WorkspaceClientError.rejected(code: "workflow_not_found") }
         workflows[workflowID]?.archived = false
+    }
+
+    func setTrigger(workflowID: String, trigger: WorkflowTrigger) async throws -> WorkflowTrigger {
+        await pause()
+        guard let workflow = workflows[workflowID] else { throw WorkspaceClientError.rejected(code: "workflow_not_found") }
+        if case .schedule(let schedule, _) = trigger {
+            // Like the host: a repeating cron schedule, for a workflow that has run before.
+            guard schedule.split(separator: " ").count == 5 else { throw WorkspaceClientError.rejected(code: "schedule_invalid") }
+            guard workflow.revision != nil else { throw WorkspaceClientError.rejected(code: "not_published") }
+        }
+        workflows[workflowID]?.trigger = trigger
+        return trigger
     }
 
     func pin(workflowID: String, pinned: Bool) async throws -> Bool {
@@ -400,7 +413,7 @@ final class DemoWorkflowsClient: WorkflowsClient {
                                hasDraft: workflow.hasDraft, stageCount: workflow.definition.stages.count,
                                needsSetupRoles: unbound, valid: validation(workflow).valid,
                                lastRunAt: workflow.lastRunAt, stageKinds: workflow.definition.stages.map(\.kind),
-                               pinned: workflow.pinned, archived: workflow.archived)
+                               pinned: workflow.pinned, archived: workflow.archived, trigger: workflow.trigger)
     }
 
     private func validation(_ workflow: Workflow) -> WorkflowValidation {
@@ -465,6 +478,13 @@ final class DemoWorkflowsClient: WorkflowsClient {
                                          state: state, minutes: stage.kind == .agent
                                              ? Double(stage.minutes ?? definition.stageMinutes) : nil,
                                          attempts: attempts)
+            value.uses = stage.reads
+            if stage.kind == .signoff {
+                value.decisions = run.history.filter { $0.stageKey == stage.key }.map {
+                    WorkflowStageDecision(iteration: $0.iteration, decision: $0.outcome,
+                                          notes: $0.notes.map(\.text).joined(separator: "\n"), decidedAt: nil)
+                }
+            }
             if state != .planned, let started = run.summary.startedAt {
                 let before = doneMinutes.prefix(index).reduce(0, +) * 60
                 value.startedAt = started.addingTimeInterval(before)
@@ -517,6 +537,9 @@ final class DemoWorkflowsClient: WorkflowsClient {
         if stage.key == "draft" {
             let text = Self.draftText(version: run.iteration, topic: run.inputs["topic"]?.string)
             add(text, as: "draft", stage: "draft", iteration: run.iteration, to: &run)
+        } else if stage.key == "review" {
+            run.outputs.append(WorkflowOutput(stageKey: "review", iteration: run.iteration, name: "decision",
+                                              type: "decision", sha256: nil, bytes: 4, wordCount: nil, value: .string("pass")))
         }
         run.history.append(.init(index: run.history.count, stageKey: stage.key, title: stage.title,
                                  iteration: run.iteration, outcome: "passed", agentID: workflow.bindings[stage.role ?? ""],
@@ -610,6 +633,9 @@ final class DemoWorkflowsClient: WorkflowsClient {
         add(Self.brief, as: "brief", stage: "research", iteration: 1, to: &waiting)
         add(Self.draftText(version: 1, topic: nil), as: "draft", stage: "draft", iteration: 1, to: &waiting)
         add(Self.draftText(version: 2, topic: nil), as: "draft", stage: "draft", iteration: 2, to: &waiting)
+        // The review's verdict, which the decision stage read.
+        waiting.outputs.append(WorkflowOutput(stageKey: "review", iteration: 2, name: "decision", type: "decision",
+                                              sha256: nil, bytes: 4, wordCount: nil, value: .string("pass")))
         waiting.reviewNotes = [.init(severity: "minor", text: "Tighten the intro to two sentences."),
                                .init(severity: "minor", text: "Define \"host\" the first time it appears.")]
         waiting.history = [

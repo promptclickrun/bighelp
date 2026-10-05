@@ -16,6 +16,8 @@ struct AgentsView: View {
     var onAction: (@MainActor (AgentWorkspaceActionRequest) -> Void)? = nil
     /// Set from elsewhere (the Chats rail's "Group chats") to show one agent's groups.
     var groupFilterRequest: Binding<String?> = .constant(nil)
+    /// Set from all computers › New agent: opens the new-agent editor once this computer is connected.
+    var createRequest: Binding<Bool> = .constant(false)
 
     @State private var query = ""
     @State private var groupPreferences = AgentGroupPreferences()
@@ -147,6 +149,8 @@ struct AgentsView: View {
             activeOwner = workspaceOwner
             if let workspaceOwner { shownSignIn = workspaceOwner.signIn }
         }
+        .onChange(of: createRequest.wrappedValue, initial: true) { _, _ in startRequestedCreation() }
+        .onChange(of: workspaceOwner?.signIn) { _, _ in startRequestedCreation() }
         .onChange(of: groupFilterRequest.wrappedValue, initial: true) { _, profileID in
             guard let profileID else { return }
             groupFilterRequest.wrappedValue = nil
@@ -626,6 +630,16 @@ struct AgentsView: View {
     }
 
     /// The studio itself offers scratch, built-in and saved templates.
+    private func startRequestedCreation() {
+        guard createRequest.wrappedValue, workspaceOwner != nil else { return }
+        createRequest.wrappedValue = false
+        // The "which computer?" sheet is still closing; a sheet presented now would be dropped.
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(700))
+            startCreating()
+        }
+    }
+
     private func startCreating() {
         guard let owner = workspaceOwner, supports(.profilesCreate) else {
             agentActions.actionError = "Agent creation is not available on this connection."

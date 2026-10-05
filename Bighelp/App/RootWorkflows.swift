@@ -48,6 +48,22 @@ extension RootShellView {
         appState.path = [.workflows, BighelpPlatform.isMac ? .workflowRuns(selected: run) : .workflowRun(id: run)]
     }
 
+    /// A tapped workflow alert names its run only as a chat reference (`workflow.run.<id>`,
+    /// hashed with the agent); finds that run among the recent ones and opens it.
+    func openNotifiedWorkflowRun(profileID: String, reference: String) async -> Bool {
+        guard let client = makeWorkflowsClient(),
+              let page = try? await client.runs(workflowID: nil, filter: .all, before: nil, limit: 50),
+              let run = page.runs.first(where: {
+                  ManagedNotificationValidation.sessionReference(profile: profileID,
+                                                                 session: Self.workflowAlertPrefix + $0.id) == reference
+              }) else { return false }
+        openWorkflows(run: run.id)
+        return true
+    }
+
+    /// The plugin's chat coordinate for a run's alerts (managed_notifications.WORKFLOW_SESSION_PREFIX).
+    static let workflowAlertPrefix = "workflow.run."
+
     @discardableResult
     private func prepareWorkflowsStore() -> WorkflowsStore? {
         if let workflowsStore { return workflowsStore }

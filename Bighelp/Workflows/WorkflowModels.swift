@@ -185,6 +185,7 @@ struct WorkflowSummary: Identifiable, Equatable, Sendable {
     /// Pinned workflows come first (`native-workflows-edit-v1`).
     var pinned = false
     var archived = false
+    var trigger: WorkflowTrigger?
 
     init?(json: WorkflowJSON) {
         guard let id = WorkflowDecode.string(json["id"], max: 128), !id.isEmpty else { return nil }
@@ -199,11 +200,13 @@ struct WorkflowSummary: Identifiable, Equatable, Sendable {
         stageKinds = WorkflowDecode.strings(json["stageKinds"], max: 20).map(WorkflowStage.Kind.init)
         pinned = WorkflowDecode.bool(json["pinned"]) ?? false
         archived = WorkflowDecode.bool(json["archived"]) ?? false
+        trigger = WorkflowTrigger(json: json["trigger"]?.object)
     }
 
     init(id: String, name: String, revision: Int?, hasDraft: Bool, stageCount: Int, needsSetupRoles: [String],
          valid: Bool, lastRunAt: Date?, stageKinds: [WorkflowStage.Kind] = [], pinned: Bool = false,
-         archived: Bool = false) {
+         archived: Bool = false, trigger: WorkflowTrigger? = nil) {
+        self.trigger = trigger
         self.id = id
         self.name = name
         self.revision = revision
@@ -315,6 +318,8 @@ struct WorkflowDetail: Equatable, Sendable {
     var validation: WorkflowValidation
     /// Pinned workflows come first on the home screen (`native-workflows-edit-v1`).
     var pinned = false
+    /// Nil when the plugin predates triggers.
+    var trigger: WorkflowTrigger?
 
     init(json: WorkflowJSON) throws {
         guard let workflow = json["workflow"]?.object,
@@ -331,10 +336,13 @@ struct WorkflowDetail: Equatable, Sendable {
         bindings = WorkflowBinding.list(workflow["bindings"])
         validation = WorkflowValidation(json: json["validation"]?.object)
         pinned = WorkflowDecode.bool(workflow["pinned"]) ?? false
+        trigger = WorkflowTrigger(json: workflow["trigger"]?.object)
     }
 
     init(id: String, name: String, revision: Int?, draftVersion: Int, definition: WorkflowDefinition,
-         bindings: [WorkflowBinding], validation: WorkflowValidation, pinned: Bool = false) {
+         bindings: [WorkflowBinding], validation: WorkflowValidation, pinned: Bool = false,
+         trigger: WorkflowTrigger? = nil) {
+        self.trigger = trigger
         self.id = id
         self.name = name
         self.revision = revision
@@ -991,6 +999,10 @@ struct WorkflowRunStage: Equatable, Sendable, Identifiable {
     var startedAt: Date?
     var endedAt: Date?
     var attempts: [WorkflowAttempt]
+    /// What the stage read: run inputs (`inputs.topic`) and earlier outputs (`draft.draft`). Plugin 3.7.0.
+    var uses: [String] = []
+    /// A sign-off stage's decisions by the person, oldest first.
+    var decisions: [WorkflowStageDecision] = []
 
     init?(json: WorkflowJSON) {
         guard let key = WorkflowDecode.string(json["key"], max: 64) else { return nil }
@@ -1005,6 +1017,8 @@ struct WorkflowRunStage: Equatable, Sendable, Identifiable {
         startedAt = WorkflowDecode.date(json["startedAt"])
         endedAt = WorkflowDecode.date(json["endedAt"])
         attempts = WorkflowDecode.objects(json["attempts"], max: 50).compactMap(WorkflowAttempt.init(json:))
+        uses = WorkflowDecode.strings(json["uses"], max: 32)
+        decisions = WorkflowDecode.objects(json["decisions"], max: 20).compactMap(WorkflowStageDecision.init(json:))
     }
 
     init(key: String, kind: WorkflowStage.Kind, title: String, role: String?, agentID: String?, iteration: Int,
@@ -1019,6 +1033,57 @@ struct WorkflowRunStage: Equatable, Sendable, Identifiable {
         self.minutes = minutes
         self.attempts = attempts
     }
+}
+
+/// One sign-off by the person on a run's stage.
+struct WorkflowStageDecision: Equatable, Sendable {
+    var iteration: Int
+    var decision: String
+    var notes: String
+    var decidedAt: Date?
+
+    init?(json: WorkflowJSON) {
+        guard let decision = WorkflowDecode.string(json["decision"], max: 32) else { return nil }
+        self.decision = decision
+        iteration = WorkflowDecode.int(json["iteration"]) ?? 1
+        notes = WorkflowDecode.string(json["notes"], max: 2_000) ?? ""
+        decidedAt = WorkflowDecode.date(json["decidedAt"])
+    }
+
+    init(iteration: Int, decision: String, notes: String, decidedAt: Date?) {
+        self.iteration = iteration
+        self.decision = decision
+        self.notes = notes
+        self.decidedAt = decidedAt
+    }
+}
+
+/// How a workflow starts: by hand, or on a schedule the computer runs (`native-workflows-trigger-v1`).
+enum WorkflowTrigger: Equatable, Sendable {
+    case manual
+    /// A cron expression in the computer's time zone, and the inputs each run uses.
+    case schedule(String, inputs: WorkflowJSON)
+
+    init?(json: WorkflowJSON?) {
+        guard let json else { return nil }
+        switch WorkflowDecode.string(json["kind"], max: 16) {
+        case "manual": self = .manual
+        case "schedule":
+            guard let schedule = WorkflowDecode.string(json["schedule"], max: 200) else { return nil }
+            self = .schedule(schedule, inputs: json["inputs"]?.object ?? [:])
+        default: return nil
+        }
+    }
+
+    var json: WorkflowJSON {
+        switch self {
+        case .manual: ["kind": .string("manual")]
+        case .schedule(let schedule, let inputs):
+            ["kind": .string("schedule"), "schedule": .string(schedule), "inputs": .object(inputs)]
+        }
+    }
+
+    var isScheduled: Bool { if case .schedule = self { true } else { false } }
 }
 
 struct WorkflowOutput: Equatable, Sendable, Identifiable {
@@ -1437,5 +1502,20 @@ enum WorkflowWords {
         let seconds = now.timeIntervalSince(date)
         if seconds < 86_400 { return duration(seconds) }
         return date.formatted(.dateTime.weekday(.abbreviated))
+    }
+}
+
+extension WorkflowStage {
+    /// What the stage reads, as the plugin's run details list it (`uses`): run inputs and earlier outputs.
+    var reads: [String] {
+        let all: [String] = switch kind {
+        case .agent: uses
+        case .check: rules.map(\.of)
+        case .decision: on.map { [$0] } ?? []
+        case .signoff: file.map { [$0] } ?? []
+        default: []
+        }
+        var seen = Set<String>()
+        return all.filter { seen.insert($0).inserted }
     }
 }

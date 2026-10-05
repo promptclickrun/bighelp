@@ -239,9 +239,11 @@ final class SettingsStore {
 
     init(
         defaults: UserDefaults = .standard,
-        legacyThemeLogoDirectory: URL? = nil
+        legacyThemeLogoDirectory: URL? = nil,
+        now: @escaping () -> Date = Date.init
     ) {
         self.defaults = defaults
+        self.now = now
         Self.removeRetiredThemes(defaults: defaults,
                                  logoDirectory: legacyThemeLogoDirectory ?? Self.defaultLegacyThemeLogoDirectory)
         let recoveredReflectiveVisionActivation = ReflectiveVisionRecoveryMarker(
@@ -389,8 +391,24 @@ final class SettingsStore {
 
     /// A picked Open on decides, at launch, whether every computer's agents show.
     func applyLaunchLandingToAllHostsMode() {
-        if let on = BighelpLanding.allHostsMode(for: launchLanding), allHostsMode != on { allHostsMode = on }
+        guard let on = BighelpLanding.allHostsMode(for: launchLanding), allHostsMode != on else { return }
+        modeBeforeLaunchLanding = (allHostsMode, now())
+        allHostsMode = on
     }
+
+    /// A notification, widget or link that opened the app goes where it points, in the mode you
+    /// were in: Open on decides only for a launch you started yourself. Only right after launch.
+    func restoreAllHostsModeForOutsideOpen() {
+        guard let before = modeBeforeLaunchLanding else { return }
+        modeBeforeLaunchLanding = nil
+        guard now().timeIntervalSince(before.at) < Self.outsideOpenWindow, allHostsMode != before.on else { return }
+        allHostsMode = before.on
+    }
+
+    /// The switch as it was before Open on changed it at this launch.
+    @ObservationIgnored private var modeBeforeLaunchLanding: (on: Bool, at: Date)?
+    @ObservationIgnored private let now: () -> Date
+    private static let outsideOpenWindow: TimeInterval = 30
 
     /// Themes (Nous, Superpilot and your own, with their logos) were replaced by
     /// bubble colors and light and dark backgrounds. Picking a bubble color

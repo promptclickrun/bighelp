@@ -1158,8 +1158,9 @@ struct RootShellView: View {
 
     private func handleIncomingURL(_ url: URL) {
         guard let route = BighelpIncomingURLRoute.parse(url) else { return }
-        // A link opening the app wins over Settings › Chat › Open on.
+        // A link opening the app wins over Settings › Chat › Open on, and keeps the mode you were in.
         didAutoOpenHomeChat = true
+        settings.restoreAllHostsModeForOutsideOpen()
         // Opened while the app starts or comes back, a link found no workspace
         // ("host unavailable") or opened its chat under an alert. It waits for
         // a host that answers instead; the latest one wins.
@@ -1297,8 +1298,10 @@ struct RootShellView: View {
     /// Managed notifications and Live Activities verify a durable Hermes
     /// coordinate; resolve it through the visible catalog and open that row.
     func openExternalSession(_ open: BighelpExternalSessionOpen) {
-        // A notification opening the app wins over Settings › Chat › Open on.
+        // A notification opening the app wins over Settings › Chat › Open on, and keeps the mode
+        // you were in: All hosts stays All hosts, so ☰ matches it.
         didAutoOpenHomeChat = true
+        settings.restoreAllHostsModeForOutsideOpen()
         switch open.target {
         case .catalog(let sessionID):
             guard BighelpExternalSessionOpenCenter.shared.consume(open) else { return }

@@ -97,10 +97,10 @@ enum BighelpLanding {
         }
     }
 
-    /// A picked screen decides the all-hosts view at launch; nothing picked
-    /// leaves the switch as it was.
+    /// A picked screen decides the all-hosts view at launch; nothing picked, or a screen both views
+    /// have (Sessions, Last chat), leaves the switch as it was.
     static func allHostsMode(for choice: BighelpLandingChoice) -> Bool? {
-        guard case .chosen(let screen) = choice else { return nil }
+        guard case .chosen(let screen) = choice, screen != .sessions, screen != .lastChat else { return nil }
         return screen == .allAgents
     }
 

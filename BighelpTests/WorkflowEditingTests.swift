@@ -722,7 +722,7 @@ struct WorkflowParallelTests {
 
     @Test func aNewBlockHasThreeAgentsAndADecisionAfterItReadsThemAll() async throws {
         let demo = DemoWorkflowsClient(delays: false)
-        let editor = WorkflowEditorModel(workflowID: "wf-research", client: demo, canEditFlow: true, canParallel: true)
+        let editor = WorkflowEditorModel(workflowID: "wf-research", client: demo, canEditFlow: true, features: .all)
         await editor.load()
         let block = try #require(editor.addStage(.parallel, after: nil))
         #expect(block.branches.count == 3)
@@ -744,10 +744,119 @@ struct WorkflowParallelTests {
 
     @Test func theThreeTakesTemplateIsOfferedAndRuns() async throws {
         let demo = DemoWorkflowsClient(delays: false)
-        #expect(await demo.supportsParallel())
+        #expect(await demo.features() == .all)
         #expect(try await demo.templates().contains { $0.id == "three-takes" })
         let id = try await demo.useTemplate(id: "three-takes")
         let detail = try await demo.workflow(id: id, revision: .draft)
         #expect(detail.definition.stages.first?.kind == .parallel)
+    }
+}
+
+/// Names that fix themselves, delivery stages, file and picture outputs, and decisions that end the run.
+@MainActor
+struct WorkflowDeliveryAndOutcomeTests {
+    @Test func namesFixThemselvesAsTheyAreTyped() {
+        #expect(WorkflowInputKey.clean("Release Notes") == "release_notes")
+        #expect(WorkflowInputKey.clean("Café-Menu!") == "cafe_menu")
+        #expect(WorkflowInputKey.clean("two  spaces ") == "two_spaces_", "A name can end in _ while it's typed")
+        #expect(WorkflowInputKey.finished("two_spaces_", fallback: "result") == "two_spaces")
+        #expect(WorkflowInputKey.finished("2nd draft", fallback: "result") == "result_2nd_draft")
+        #expect(WorkflowInputKey.finished("!!", fallback: "result") == "result")
+        #expect(WorkflowInputKey.finished("Notes", fallback: "result", existing: ["notes"]) == "notes_2")
+        #expect(WorkflowInputKey.finished(String(repeating: "a", count: 50), fallback: "x").count <= 32)
+    }
+
+    @Test func aDeliveryStageSurvivesARoundTrip() throws {
+        let definition = Flow.definition([
+            Flow.agent("draft"),
+            ["key": .string("send"), "kind": .string("delivery"), "title": .string("Send it"),
+             "deliver": .array([.string("draft.result")]), "to": .string("discord:#news"),
+             "message": .string("This week's notes"), "next": .null],
+        ])
+        let send = try #require(definition.stage("send"))
+        #expect(send.kind == .delivery && send.deliver == ["draft.result"] && send.to == "discord:#news")
+        #expect(send.subtitle { _ in nil } == "1 output → Discord #news")
+        #expect(WorkflowDefinition(json: definition.json) == definition)
+        #expect(!Flow.codes(definition).contains("uses_not_before"))
+        let early = Flow.definition([definition.stages[1].json, Flow.agent("draft")].map { $0 })
+        #expect(Flow.codes(early).contains("uses_not_before"), "A delivery sends only what comes first")
+    }
+
+    @Test func deliveryPlacesAreWhatHermesSendTakes() {
+        #expect(WorkflowDeliveryPlace.isValid("telegram"))
+        #expect(WorkflowDeliveryPlace.isValid("telegram:-1001234567890:17585"))
+        #expect(!WorkflowDeliveryPlace.isValid("bot-chat:research"))
+        #expect(!WorkflowDeliveryPlace.isValid("Telegram"))
+        #expect(!WorkflowDeliveryPlace.isValid("slack:"))
+        #expect(!WorkflowDeliveryPlace.isValid("slack: C01"))
+        #expect(WorkflowDeliveryPlace.title("loopdy") == "\(EmberBrand.appName) app")
+        #expect(WorkflowDeliveryPlace.title("local") == "kept here")
+    }
+
+    @Test func aNewDeliverySendsWhatTheStageBeforeItMade() async throws {
+        let demo = DemoWorkflowsClient(delays: false)
+        let editor = WorkflowEditorModel(workflowID: "wf-research", client: demo, canEditFlow: true, features: .all)
+        await editor.load()
+        let draft = try #require(editor.definition?.stages.first { $0.kind == .agent && $0.outputs.count > 1 })
+        let send = try #require(editor.addStage(.delivery, after: draft.key))
+        let expected = draft.outputs.filter { !["decision", "notes"].contains($0.type) }.map { "\(draft.key).\($0.name)" }
+        #expect(send.deliver == expected && send.to == nil)
+        #expect(try await demo.deliveryTargets().contains { $0.id == "telegram" })
+    }
+
+    @Test func renamingAnOutputKeepsTheStagesThatReadIt() async throws {
+        let demo = DemoWorkflowsClient(delays: false)
+        let editor = WorkflowEditorModel(workflowID: "wf-research", client: demo, canEditFlow: true, features: .all)
+        await editor.load()
+        let definition = try #require(editor.definition)
+        let reader = try #require(definition.stages.first { stage in stage.uses.contains { !$0.hasPrefix("inputs.") } })
+        let reference = try #require(reader.uses.first { !$0.hasPrefix("inputs.") })
+        let parts = reference.split(separator: ".").map(String.init)
+        var producer = try #require(definition.stage(parts[0]))
+        let index = try #require(producer.outputs.firstIndex { $0.name == parts[1] })
+        producer.outputs[index].name = "renamed"
+        editor.update(producer)
+        #expect(editor.definition?.stage(reader.key)?.uses.contains("\(parts[0]).renamed") == true)
+        #expect(editor.definition?.stage(reader.key)?.uses.contains(reference) == false)
+    }
+
+    @Test func eitherWayOfADecisionCanEndTheRun() throws {
+        var decide = Flow.decision("decide", goTo: "draft")
+        decide["pass"] = .object(["end": .string("succeeded")])
+        decide["changes"] = .object(["end": .string("cancelled"), "message": .string("Nothing new to write.")])
+        let definition = Flow.definition([Flow.agent("draft"), Flow.agent("review"), decide])
+        let stage = try #require(definition.stage("decide"))
+        #expect(stage.passEnd == .init(outcome: .succeeded))
+        #expect(stage.changesEnd == .init(outcome: .cancelled, message: "Nothing new to write."))
+        #expect(stage.subtitle { _ in nil }.contains("else ends cancelled"))
+        #expect(WorkflowDefinition(json: definition.json) == definition)
+        #expect(stage.json["changes"] == .object(["end": .string("cancelled"), "message": .string("Nothing new to write.")]))
+        let graph = definition.graph
+        #expect(graph.exits["decide"]?.primary == nil && graph.exits["decide"]?.changesEnds == true)
+        #expect(Flow.codes(definition).isDisjoint(with: ["goto_not_earlier", "no_end"]))
+
+        // Wiring the pass way to a stage again takes its ending away.
+        var rewired = definition
+        rewired.stages.append(WorkflowStage(json: Flow.signoff())!)
+        rewired.connect("decide", .pass, to: "signoff")
+        #expect(rewired.stage("decide")?.passEnd == nil)
+        #expect(rewired.stage("decide")?.changesEnd != nil, "The other way keeps its ending")
+    }
+
+    @Test func filesAndPicturesAreAttachmentsWithTheirNames() throws {
+        let output = try #require(WorkflowOutput(json: [
+            "stageKey": .string("make"), "iteration": .integer(1), "name": .string("chart"), "type": .string("image"),
+            "sha256": .string(String(repeating: "a", count: 64)), "bytes": .integer(2_048),
+            "value": .object(["fileName": .string("chart.png"), "mimeType": .string("image/png")]),
+        ]))
+        #expect(output.isAttachment && output.isImage && !output.isFile)
+        #expect(WorkflowSignoff.fileName(output) == "chart.png")
+        let stage = try #require(WorkflowRunStage(json: [
+            "key": .string("anything"), "kind": .string("decision"), "title": .string("Anything new?"),
+            "state": .string("accepted"), "outcome": .object(["end": .string("succeeded"), "note": .string("No new PRs.")]),
+        ]))
+        #expect(stage.outcome == .succeeded && stage.outcomeNote == "No new PRs.")
+        #expect(WorkflowFeatures(features: ["native-workflows-delivery-v1", "native-workflows-outcomes-v1"])
+                == [.delivery, .outcomes])
     }
 }

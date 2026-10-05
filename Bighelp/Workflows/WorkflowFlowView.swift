@@ -14,7 +14,7 @@ struct WorkflowScreen: View {
         let hasDraft = context.store.workflows.first { $0.id == workflowID }?.hasDraft ?? false
         _model = State(initialValue: WorkflowEditorModel(workflowID: workflowID, client: context.client, hasDraft: hasDraft,
                                                          canEditFlow: context.canEdit,
-                                                         canParallel: context.store.canParallel))
+                                                         features: context.store.features))
     }
 
     var body: some View {
@@ -162,7 +162,7 @@ struct WorkflowFlowView: View {
             if dropGap == order.count { insertionLine }
             Rectangle().fill(theme.border).frame(width: 1, height: 16)
             Menu {
-                WorkflowAddStageButtons(parallel: model.canParallel) { addStage($0, after: nil) }
+                WorkflowAddStageButtons(features: model.features) { addStage($0, after: nil) }
             } label: {
                 Image(systemName: "plus")
                     .font(.bighelp(.body).weight(.semibold))
@@ -250,12 +250,13 @@ struct WorkflowFlowView: View {
             line(leadsHere, height: 8)
             HStack(spacing: BighelpTokens.space8) {
                 if previous != WorkflowCanvasLayout.inputsKey, graph?.exits[previous]?.primary == nil {
-                    Text("Flow ends")
+                    Text(model.definition?.stage(previous)?.passEnd.map { "Ends: \($0.outcome.title.lowercased())" }
+                         ?? "Flow ends")
                         .font(.bighelp(.caption).weight(.semibold))
                         .foregroundStyle(theme.secondaryText)
                 }
                 Menu {
-                    WorkflowAddStageButtons(parallel: model.canParallel) { addStage($0, after: previous) }
+                    WorkflowAddStageButtons(features: model.features) { addStage($0, after: previous) }
                 } label: {
                     Image(systemName: "plus")
                         .font(.system(size: 11, weight: .bold))
@@ -346,7 +347,7 @@ struct WorkflowFlowView: View {
     private func stageMenu(_ stage: WorkflowStage, graph: WorkflowFlowGraph?) -> some View {
         Button("Edit", systemImage: "pencil") { editing = stage }
         Menu("Add a stage after", systemImage: "plus") {
-            WorkflowAddStageButtons(parallel: model.canParallel) { addStage($0, after: stage.key) }
+            WorkflowAddStageButtons(features: model.features) { addStage($0, after: stage.key) }
         }
         // Dragging toward an open menu picks from it, so moving is in the menu too.
         if editable, let index = stages.firstIndex(where: { $0.key == stage.key }) {
@@ -507,7 +508,7 @@ struct WorkflowFlowView: View {
     private var bottomBar: some View {
         HStack(spacing: BighelpTokens.space8) {
             Menu {
-                WorkflowAddStageButtons(parallel: model.canParallel) { addStage($0, after: nil) }
+                WorkflowAddStageButtons(features: model.features) { addStage($0, after: nil) }
                 Divider()
                 Button("Inputs", systemImage: "arrow.right.to.line") { isInputsPresented = true }
             } label: {

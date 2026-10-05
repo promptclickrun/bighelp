@@ -48,7 +48,7 @@ struct WorkflowCanvasView: View {
             ToolbarItem(placement: .principal) { WorkflowTitle(model: model) }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
-                    WorkflowAddStageButtons(parallel: model.canParallel) { addStage($0, after: selected) }
+                    WorkflowAddStageButtons(features: model.features) { addStage($0, after: selected) }
                     Divider()
                     Button("Inputs", systemImage: "arrow.right.to.line") { isInputsPresented = true }
                 } label: {
@@ -219,9 +219,23 @@ struct WorkflowCanvasView: View {
                 WorkflowChips(items: stage.rules.map(\.summary))
             } else if stage.kind == .decision {
                 inspectorLabel("Reads")
-                Text(stage.on ?? "").font(.bighelp(.body).monospaced())
-                inspectorLabel("Changes go back to")
-                Text(definition?.stage(stage.changesGoTo)?.title ?? "")
+                Text(stage.sources.joined(separator: ", ")).font(.bighelp(.body).monospaced())
+                if let ending = stage.passEnd {
+                    inspectorLabel("When it passes")
+                    Text("Ends the run: \(ending.outcome.title.lowercased())")
+                }
+                if let ending = stage.changesEnd {
+                    inspectorLabel("When it doesn't pass")
+                    Text("Ends the run: \(ending.outcome.title.lowercased())")
+                } else {
+                    inspectorLabel("Changes go back to")
+                    Text(definition?.stage(stage.changesGoTo)?.title ?? "")
+                }
+            } else if stage.kind == .delivery {
+                inspectorLabel("Sends to")
+                Text(WorkflowDeliveryPlace.title(stage.to ?? "")).font(.bighelp(.body))
+                inspectorLabel("Sends")
+                WorkflowChips(items: stage.deliver, monospaced: true)
             } else {
                 Text("The run waits for you here, with no agent running.")
                     .font(.bighelp(.body))

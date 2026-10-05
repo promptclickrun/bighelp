@@ -205,6 +205,21 @@ struct WorkflowRunContent: View {
             }
             .workflowCard(theme)
             .accessibilityIdentifier("workflows.run.problem")
+        } else if let ended = detail.stages.first(where: { $0.outcome != nil }), run.state != .failed {
+            // A decision ended the run on purpose: say how and why.
+            VStack(alignment: .leading, spacing: BighelpTokens.space4) {
+                Label("Ended at \(ended.title)", systemImage: ended.outcome?.symbol ?? "flag.checkered")
+                    .font(.bighelp(.headline))
+                    .foregroundStyle(run.state.color(theme))
+                if let note = ended.outcomeNote, !note.isEmpty {
+                    Text(note)
+                        .font(.bighelp(.subheadline))
+                        .foregroundStyle(theme.primaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .workflowCard(theme)
+            .accessibilityIdentifier("workflows.run.ended")
         }
     }
 

@@ -34,8 +34,8 @@ struct WorkflowStageEditor: View {
             Form {
                 Section {
                     header
-                    // A parallel block's agents each have their own output and limits.
-                    if stage.kind != .parallel {
+                    // A parallel block's agents each have their own output and limits; a delivery has neither.
+                    if stage.kind != .parallel && stage.kind != .delivery {
                         Picker("Part", selection: $tab) {
                             ForEach(Tab.allCases) { Text($0.rawValue).tag($0) }
                         }
@@ -230,17 +230,13 @@ struct WorkflowStageEditor: View {
                     Text("Any of them passes").tag("any")
                 }
                 .accessibilityIdentifier("workflows.stage.require")
-                LabeledContent("Pass goes to", value: model.definition?.stage(stage.pass)?.title ?? stage.pass ?? "next stage")
-                Picker("Changes go back to", selection: Binding(get: { stage.changesGoTo ?? "" },
-                                                                 set: { stage.changesGoTo = $0.isEmpty ? nil : $0 })) {
-                    ForEach(earlierAgentStages) { Text($0.title).tag($0.key) }
-                }
             } header: {
                 Text("Reads \(stage.onMany.count) verdicts")
             } footer: {
-                Text("Each agent says pass or changes. Changes send the work back, with every agent's notes.")
+                Text("Each agent says pass or changes, with notes.")
                     .font(.bighelp(.footnote))
             }
+            ways
         case .decision:
             Section("Decision") {
                 Picker("Reads", selection: Binding(get: { stage.on ?? "" }, set: { stage.on = $0.isEmpty ? nil : $0 })) {
@@ -249,12 +245,10 @@ struct WorkflowStageEditor: View {
                         Text($0).tag($0)
                     }
                 }
-                LabeledContent("Pass goes to", value: model.definition?.stage(stage.pass)?.title ?? stage.pass ?? "next stage")
-                Picker("Changes go back to", selection: Binding(get: { stage.changesGoTo ?? "" },
-                                                                 set: { stage.changesGoTo = $0.isEmpty ? nil : $0 })) {
-                    ForEach(earlierAgentStages) { Text($0.title).tag($0.key) }
-                }
             }
+            ways
+        case .delivery:
+            WorkflowDeliverySection(stage: $stage, choices: deliveryChoices, client: model.client)
         case .signoff:
             Section("Sign-off") {
                 Picker("File you approve", selection: Binding(get: { stage.file ?? "" },
@@ -314,6 +308,32 @@ struct WorkflowStageEditor: View {
                     .foregroundStyle(theme.secondaryText)
             }
         }
+    }
+
+    private var ways: some View {
+        WorkflowDecisionWays(stage: $stage, canEnd: model.features.contains(.outcomes), passTarget: passTargetTitle,
+                             backTargets: earlierAgentStages)
+    }
+
+    /// Where a passing decision goes when it goes on: its `pass` stage, else the following one.
+    private var passTargetTitle: String {
+        guard let definition = model.definition else { return "the next stage" }
+        if let pass = stage.pass, pass != "next" { return definition.stage(pass)?.title ?? pass }
+        guard let index = definition.stages.firstIndex(where: { $0.key == stage.key }),
+              definition.stages.indices.contains(index + 1) else { return "the end" }
+        return definition.stages[index + 1].title
+    }
+
+    /// What a delivery can send: every earlier output, and what it sends now.
+    private var deliveryChoices: [WorkflowDeliverySection.Choice] {
+        var choices = earlierStages.flatMap { earlier in
+            earlier.outputs.map { WorkflowDeliverySection.Choice(reference: "\(earlier.key).\($0.name)",
+                                                                 title: "\(earlier.title): \($0.name)", type: $0.type) }
+        }
+        for reference in stage.deliver where !choices.contains(where: { $0.reference == reference }) {
+            choices.append(.init(reference: reference, title: reference, type: ""))
+        }
+        return choices
     }
 
     /// Inputs and every earlier stage's outputs.
@@ -422,11 +442,12 @@ struct WorkflowStageEditor: View {
                 // By place, not name: typing a name mustn't make a new row.
                 ForEach(stage.outputs.indices, id: \.self) { index in
                     HStack {
-                        TextField("Name", text: Binding(get: { stage.outputs[safe: index]?.name ?? "" }, set: { name in
-                            if stage.outputs.indices.contains(index) { stage.outputs[index].name = WorkflowInputKey.clean(name) }
+                        WorkflowKeyField(title: "Name", key: Binding(get: { stage.outputs[safe: index]?.name ?? "" }, set: { name in
+                            if stage.outputs.indices.contains(index) { stage.outputs[index].name = name }
                         }))
                         .font(.bighelp(.callout).monospaced())
                         .bighelpMacField()
+                        .accessibilityIdentifier("workflows.stage.output.\(index)")
                         Picker("Kind", selection: Binding(get: { stage.outputs[safe: index]?.type ?? "text" }, set: { type in
                             if stage.outputs.indices.contains(index) { stage.outputs[index].type = type }
                         })) {
@@ -435,7 +456,12 @@ struct WorkflowStageEditor: View {
                             Text("Number").tag("number")
                             Text("Decision").tag("decision")
                             Text("Notes").tag("notes")
+                            if model.features.contains(.delivery) || ["file", "image"].contains(stage.outputs[safe: index]?.type ?? "") {
+                                Text("File").tag("file")
+                                Text("Image").tag("image")
+                            }
                         }
+                        .accessibilityIdentifier("workflows.stage.output.\(index).type")
                         .labelsHidden()
                         .fixedSize()
                     }
@@ -492,7 +518,16 @@ struct WorkflowStageEditor: View {
     }
 
     private func save(deleting: Bool) {
-        if !deleting { model.update(stage) }
+        if !deleting {
+            // Names as the host takes them: a letter first, no _ at the ends, no two the same.
+            var names: [String] = []
+            for index in stage.outputs.indices {
+                let name = WorkflowInputKey.finished(stage.outputs[index].name, fallback: "result", existing: names)
+                stage.outputs[index].name = name
+                names.append(name)
+            }
+            model.update(stage)
+        }
         isSaving = true
         Task {
             defer { isSaving = false }

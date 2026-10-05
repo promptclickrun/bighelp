@@ -1269,6 +1269,7 @@
 		ECBDB3462D3EC5E6954A1393 /* BighelpToolActivityCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CAFE5045EE57412686BCCC3 /* BighelpToolActivityCatalog.swift */; };
 		ECC427FE28D994ADE69DF319 /* ChatActivityPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66E4E333550166DD2DCFE881 /* ChatActivityPresentation.swift */; };
 		ECCB7782A2A02B2D103F792E /* WorkspaceGrantedFilesClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45591296B1B8DF4C7F8DF5E0 /* WorkspaceGrantedFilesClient.swift */; };
+		ED1262C4EC3CDEEFCF8D2CBB /* WorkflowStageWays.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3038908E9DE27BD397123580 /* WorkflowStageWays.swift */; };
 		ED69174309D4579A06E663A3 /* NotificationPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2038A52DC5309296BB3CB20 /* NotificationPresentationTests.swift */; };
 		EDD0FF4309C7E540563DFFB9 /* VoiceModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5ECA70B7C1A6646021728982 /* VoiceModelTests.swift */; };
 		EDE0D703B5A96188D6357DAD /* NativeWorkspaceProductionUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 890274CE80C4CC5D8A048163 /* NativeWorkspaceProductionUITests.swift */; };
@@ -1756,6 +1757,7 @@
 		2F5839F4502130F191439023 /* MidSessionSendHoldStateMachine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MidSessionSendHoldStateMachine.swift; sourceTree = "<group>"; };
 		2F69DF4D8979ACD704171100 /* DirectHermesVoiceConfigurationClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectHermesVoiceConfigurationClient.swift; sourceTree = "<group>"; };
 		301F7F2D182A2BEC6F9B21B1 /* BighelpLoaderGallery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpLoaderGallery.swift; sourceTree = "<group>"; };
+		3038908E9DE27BD397123580 /* WorkflowStageWays.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowStageWays.swift; sourceTree = "<group>"; };
 		304B9396878FF0BB721994E2 /* BighelpLinkApplePush.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpLinkApplePush.swift; sourceTree = "<group>"; };
 		3071A950936A3DFC18A06CE2 /* ChatAttentionPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatAttentionPresenter.swift; sourceTree = "<group>"; };
 		308EE63FBC1D41AABEE4C5FC /* ActivityEventWireModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityEventWireModels.swift; sourceTree = "<group>"; };
@@ -4995,6 +4997,7 @@
 				A48D538BC09DE38454C2C6F1 /* WorkflowSignoffView.swift */,
 				FDC7E648D4DD22AF01E07C4A /* WorkflowsStore.swift */,
 				90F9BB9002B4FAD0FE23982A /* WorkflowStageEditor.swift */,
+				3038908E9DE27BD397123580 /* WorkflowStageWays.swift */,
 				7F90DFFB9822D36299A5AB83 /* WorkflowTriggerSheet.swift */,
 			);
 			path = Workflows;
@@ -6231,6 +6234,7 @@
 				51DA4E0343897F10E3048302 /* WorkflowRunView.swift in Sources */,
 				67CDDC69AE2084A28C976223 /* WorkflowSignoffView.swift in Sources */,
 				2E9934491E3104884B41FAAA /* WorkflowStageEditor.swift in Sources */,
+				ED1262C4EC3CDEEFCF8D2CBB /* WorkflowStageWays.swift in Sources */,
 				832ED0A301E95E2C9649C759 /* WorkflowTriggerSheet.swift in Sources */,
 				CF0B948B022760B70AEA864C /* WorkflowsAvailability.swift in Sources */,
 				E93AE9C0CD311464DD107F29 /* WorkflowsClient.swift in Sources */,

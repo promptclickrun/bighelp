@@ -44,7 +44,8 @@ final class WorkflowsStore {
     /// What the computer's plugin says about Workflows; nil until it's asked.
     private(set) var support: WorkflowsSupport?
     /// The plugin runs parallel blocks: the editor offers them.
-    private(set) var canParallel = false
+    private(set) var features: WorkflowFeatures = []
+    var canParallel: Bool { features.contains(.parallel) }
     /// A change from a long-press menu that didn't work, in plain words.
     var message: String?
 
@@ -88,7 +89,7 @@ final class WorkflowsStore {
         if list == nil { state = .loading }
         if support == nil || state == .needsPluginUpdate || isCantRunHere {
             if let answer = try? await client.support() { support = answer }
-            canParallel = await client.supportsParallel()
+            features = await client.features()
         }
         if case .unavailable(let code)? = support {
             state = .cantRunHere(code)

@@ -16,6 +16,31 @@ enum WorkflowSignoffDecision: String, Sendable {
     case approve, changes
 }
 
+/// What the computer's plugin can do beyond the first Workflows: the editor offers only these.
+struct WorkflowFeatures: OptionSet, Sendable {
+    let rawValue: Int
+    /// Parallel blocks (`native-workflows-parallel-v1`, plugin 3.8.0).
+    static let parallel = WorkflowFeatures(rawValue: 1 << 0)
+    /// Delivery stages, and file and picture outputs (`native-workflows-delivery-v1`, plugin 3.9.0).
+    static let delivery = WorkflowFeatures(rawValue: 1 << 1)
+    /// A decision's way can end the run (`native-workflows-outcomes-v1`, plugin 3.10.0).
+    static let outcomes = WorkflowFeatures(rawValue: 1 << 2)
+    static let all: WorkflowFeatures = [.parallel, .delivery, .outcomes]
+
+    static let names: [(String, WorkflowFeatures)] = [
+        ("native-workflows-parallel-v1", .parallel), ("native-workflows-delivery-v1", .delivery),
+        ("native-workflows-outcomes-v1", .outcomes),
+    ]
+
+    init(rawValue: Int) { self.rawValue = rawValue }
+
+    init(features: [String]) {
+        self = Self.names.reduce(into: []) { result, item in
+            if features.contains(item.0) { result.insert(item.1) }
+        }
+    }
+}
+
 /// The host's Workflows: definitions, runs and sign-offs. Everything lives on
 /// the computer; the app reads and asks.
 @MainActor
@@ -50,12 +75,15 @@ protocol WorkflowsClient: AnyObject {
     func unarchive(workflowID: String) async throws
     /// Manual or scheduled (`native-workflows-trigger-v1`). Returns the saved trigger.
     func setTrigger(workflowID: String, trigger: WorkflowTrigger) async throws -> WorkflowTrigger
-    /// The plugin runs parallel blocks (`native-workflows-parallel-v1`).
-    func supportsParallel() async -> Bool
+    /// What the plugin adds to Workflows: parallel blocks, delivery, decision outcomes.
+    func features() async -> WorkflowFeatures
+    /// Where a delivery stage can send: the computer's own list, as scheduled tasks use.
+    func deliveryTargets() async throws -> [ScheduledTaskDeliveryTarget]
 }
 
 extension WorkflowsClient {
-    func supportsParallel() async -> Bool { false }
+    func features() async -> WorkflowFeatures { [] }
+    func deliveryTargets() async throws -> [ScheduledTaskDeliveryTarget] { [] }
 
     /// The plugin's own check, read like the rest: true when Workflows run here.
     func isAvailable() async throws -> Bool {
@@ -85,15 +113,17 @@ final class DirectHermesWorkflowsClient: WorkflowsClient {
         return WorkflowsSupport(context: try await workspace.perform(.nativeContext, payload: [:], owner: owner))
     }
 
-    func supportsParallel() async -> Bool {
+    func features() async -> WorkflowFeatures {
         guard let connection = try? await connection(),
               let context = try? await connection.0.perform(.nativeContext, payload: [:], owner: connection.1) else {
-            return false
+            return []
         }
-        return WorkflowDecode.strings(context["features"], max: 400).contains(Self.parallelFeature)
+        return WorkflowFeatures(features: WorkflowDecode.strings(context["features"], max: 400))
     }
 
-    static let parallelFeature = "native-workflows-parallel-v1"
+    func deliveryTargets() async throws -> [ScheduledTaskDeliveryTarget] {
+        try DirectHermesScheduledTaskCodec.deliveryTargets(try await perform(.scheduledTaskDeliveryTargets, [:]))
+    }
 
     func status() async throws -> WorkflowStatus {
         WorkflowStatus(json: try await perform(.workflowsStatus, [:]))
@@ -286,8 +316,8 @@ final class DirectHermesWorkflowsClient: WorkflowsClient {
 /// Downloads one stored file in pieces and checks it is exactly the file asked for.
 enum WorkflowArtifactReader {
     static let chunkBytes = 98_304
-    /// Workflow files are at most 512 KB of text; anything far bigger isn't one.
-    static let maximumBytes = 4 * 1_024 * 1_024
+    /// Workflow files are at most 10 MB (a file or picture); anything far bigger isn't one.
+    static let maximumBytes = 12 * 1_024 * 1_024
 
     @MainActor
     static func read(client: any WorkflowsClient, runID: String, sha256: String) async throws -> Data {

@@ -30,6 +30,9 @@ struct WorkflowFlowGraph: Equatable, Sendable {
         var primary: String?
         /// A decision's `changes.goTo`.
         var changes: String?
+        /// A decision's way that ends the run with an outcome instead (its target is nil).
+        var passEnds = false
+        var changesEnds = false
     }
 
     let keys: [String]
@@ -44,8 +47,9 @@ struct WorkflowFlowGraph: Equatable, Sendable {
         for (index, stage) in stages.enumerated() {
             let following = stages.indices.contains(index + 1) ? stages[index + 1].key : nil
             if stage.kind == .decision {
-                let pass = stage.pass == nil || stage.pass == "next" ? following : stage.pass
-                exits[stage.key] = Exits(primary: pass, changes: stage.changesGoTo)
+                let pass = stage.passEnd != nil ? nil : stage.pass == nil || stage.pass == "next" ? following : stage.pass
+                exits[stage.key] = Exits(primary: pass, changes: stage.changesEnd != nil ? nil : stage.changesGoTo,
+                                         passEnds: stage.passEnd != nil, changesEnds: stage.changesEnd != nil)
             } else {
                 switch stage.next {
                 case .following: exits[stage.key] = Exits(primary: following)
@@ -154,23 +158,22 @@ struct WorkflowFlowGraph: Equatable, Sendable {
         // "Earlier" goes by the flow, not the list: the stage changes go back to must lead to the decision again.
         for key in keys where kinds[key] == .decision {
             guard let goTo = exits[key]?.changes else {
-                issues.append(issue("goto_not_earlier", key))
+                // Ending the run is a way too; only a way to nowhere isn't.
+                if exits[key]?.changesEnds != true { issues.append(issue("goto_not_earlier", key)) }
                 continue
             }
             if known.contains(goTo), goTo == key || !reachable(from: goTo, waysOnOnly: true).contains(key) {
                 issues.append(issue("goto_not_earlier", key))
             }
         }
-        if !reached.contains(where: { exits[$0]?.primary == nil }) {
+        if !reached.contains(where: { exits[$0]?.primary == nil || exits[$0]?.changesEnds == true }) {
             issues.append(issue("no_end", nil))
         }
         // What a stage reads (its uses, a check's rules, a decision's result,
         // a sign-off's file) must be made on every way to it.
         for stage in definition.stages where reached.contains(stage.key) {
             // A parallel block reads what its agents read; an agent's work stands for its block.
-            let reads = ([stage] + stage.branches).flatMap { item in
-                item.uses + item.rules.map(\.of) + item.sources + [item.file].compactMap { $0 }
-            }
+            let reads = ([stage] + stage.branches).flatMap(\.reads)
             let sources = Set(reads.compactMap { read -> String? in
                 let head = read.split(separator: ".", maxSplits: 1).first.map(String.init)
                 return head == "inputs" ? nil : head.map { definition.parent(of: $0)?.key ?? $0 }
@@ -194,6 +197,24 @@ struct WorkflowFlowGraph: Equatable, Sendable {
 // MARK: - Editing the connections
 
 extension WorkflowDefinition {
+    /// A renamed output or input: every stage that reads `old` reads `new` instead.
+    mutating func renameReference(_ old: String, to new: String) {
+        guard old != new else { return }
+        func renamed(_ stage: WorkflowStage) -> WorkflowStage {
+            var stage = stage
+            func swap(_ value: String) -> String { value == old ? new : value }
+            stage.uses = stage.uses.map(swap)
+            stage.deliver = stage.deliver.map(swap)
+            stage.onMany = stage.onMany.map(swap)
+            stage.on = stage.on.map(swap)
+            stage.file = stage.file.map(swap)
+            stage.rules = stage.rules.map { $0.of == old ? .init(kind: $0.kind, of: new, min: $0.min, max: $0.max) : $0 }
+            stage.branches = stage.branches.map(renamed)
+            return stage
+        }
+        stages = stages.map(renamed)
+    }
+
     var graph: WorkflowFlowGraph { WorkflowFlowGraph(self) }
 
     /// Points one way out of a stage at another stage (nil: the flow ends; only `next`).
@@ -202,8 +223,10 @@ extension WorkflowDefinition {
         guard graph.exits[from] != nil, target != from || port == .changes else { return }
         if port == .changes {
             graph.exits[from]?.changes = target
+            graph.exits[from]?.changesEnds = false
         } else {
             graph.exits[from]?.primary = target
+            if target != nil { graph.exits[from]?.passEnds = false }
         }
         apply(graph, start: graph.start)
     }
@@ -304,6 +327,8 @@ extension WorkflowDefinition {
             guard var stage = byKey[key], let exit = graph.exits[key] else { continue }
             let following = order.indices.contains(index + 1) ? order[index + 1] : nil
             if stage.kind == .decision {
+                if !exit.passEnds { stage.passEnd = nil }
+                if !exit.changesEnds { stage.changesEnd = nil }
                 stage.pass = exit.primary == nil || exit.primary == following ? "next" : exit.primary
                 stage.changesGoTo = exit.changes
             } else if exit.primary == following {

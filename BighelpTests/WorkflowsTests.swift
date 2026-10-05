@@ -559,6 +559,43 @@ struct WorkflowsStoreTests {
         #expect(editor.unboundRoles.isEmpty && editor.canRun)
     }
 
+    /// The host's check from before an agent was chosen says "Choose an agent
+    /// for …"; choosing one clears it at once, and roles no stage uses don't count.
+    @Test func choosingAnAgentClearsTheOldRoleProblem() async throws {
+        let editor = WorkflowEditorModel(workflowID: "wf-captions", client: DemoWorkflowsClient(delays: false))
+        await editor.load()
+        #expect(editor.issues.filter { $0.code == "role_unbound" }.count == 2)
+        await editor.bind(role: "captioner", agentID: "home")
+        await editor.bind(role: "checker", agentID: "finance")
+        #expect(!editor.issues.contains { $0.code == "role_unbound" })
+        #expect(editor.canRun)
+        editor.addRole(named: "Spare")
+        #expect(editor.unboundRoles.isEmpty && editor.canRun, "A role no stage uses doesn't stop a run")
+    }
+
+    /// Picking an agent on a new stage makes its role, saves it, and chooses the agent for it.
+    @Test func pickingAnAgentOnAStageMakesItsRole() async throws {
+        let editor = WorkflowEditorModel(workflowID: "wf-captions", client: DemoWorkflowsClient(delays: false),
+                                         canEditFlow: true)
+        await editor.load()
+        await editor.bind(role: "captioner", agentID: "home")
+        await editor.bind(role: "checker", agentID: "finance")
+        var stage = try #require(editor.addStage(.agent, after: nil))
+        stage.title = "Polish"
+        stage.instructions = "Polish the captions."
+        let shared = stage.role
+        stage = await editor.assign(agentID: "work", to: stage)
+        #expect(editor.message == nil)
+        #expect(stage.role != shared, "Another stage's role isn't taken over")
+        #expect(editor.definition?.role(stage.role)?.label == "Polish")
+        #expect(editor.agentID(for: stage.role) == "work")
+        // The same agent on another stage shares its role.
+        var next = try #require(editor.addStage(.agent, after: nil))
+        next = await editor.assign(agentID: "work", to: next)
+        #expect(next.role == stage.role)
+        #expect(!editor.issues.contains { $0.code == "role_unbound" })
+    }
+
     /// Workflows is remembered per computer: coming back keeps the row, another computer asks again.
     @Test func availabilityIsPerHost() async throws {
         let defaults = try #require(UserDefaults(suiteName: "workflows-availability-\(UUID().uuidString)"))

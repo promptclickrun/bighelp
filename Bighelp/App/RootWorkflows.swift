@@ -26,8 +26,10 @@ extension RootShellView {
         await workflowsAvailability.check { try await client.support() }
     }
 
-    /// ☰ shows Workflows where the plugin has them, or says why this computer can't run them.
-    var canOpenWorkflows: Bool { workflowsAvailability.isAvailable == true }
+    /// ☰ shows Workflows for any connected computer. Where the plugin lacks them
+    /// or says this computer can't run them, the Workflows page says why and
+    /// what to do, so a slow or failed check never hides the feature.
+    var canOpenWorkflows: Bool { workflowsAvailability.host != nil || workflowsAvailability.isAvailable == true }
 
     /// Opens ☰ › Workflows over the chat, so Back returns there.
     func openWorkflows() {

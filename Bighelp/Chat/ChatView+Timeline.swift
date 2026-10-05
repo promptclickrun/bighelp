@@ -56,45 +56,6 @@ extension ChatView {
                 .environment(\.chatMessageContinuesGroup, groupedIDs.contains(row.id))
                 .environment(\.chatMessageContinuesPrevious, continuedIDs.contains(row.id))
         }
-        .overlay(alignment: .bottom) {
-            VStack(spacing: BighelpTokens.space8) {
-                if !timelineController.isAtBottom {
-                    BighelpIconButton(systemImage: "arrow.down", accessibilityLabel: "Return to latest messages",
-                                     style: .neutralGlass,
-                                     action: { timelineController.scrollToLatest(animated: !reduceMotion) })
-                        .accessibilityIdentifier("chat.return-to-latest")
-                }
-                if let progress = model.nativeSessionResumeProgress.visibleIndicator {
-                    Label {
-                        Text(progress.message)
-                    } icon: {
-                        ProgressView()
-                            .controlSize(.small)
-                    }
-                    .bighelpFont(.metadata)
-                    .foregroundStyle(theme.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, BighelpTokens.space12)
-                    .padding(.vertical, BighelpTokens.space8)
-                    .background(theme.canvas.opacity(0.94), in: Capsule())
-                    .allowsHitTesting(false)
-                    .accessibilityIdentifier("chat.session-resume-progress")
-                }
-                if model.isHydratingHistory {
-                    Text(verbatim: "Getting the latest changes...")
-                        .bighelpFont(.metadata)
-                        .foregroundStyle(theme.secondaryText)
-                        .bighelpShimmer(isActive: true)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.horizontal, BighelpTokens.space12)
-                        .padding(.vertical, BighelpTokens.space8)
-                        .background(theme.canvas.opacity(0.94), in: Capsule())
-                        .allowsHitTesting(false)
-                        .accessibilityIdentifier("chat.hydration-status")
-                }
-            }
-            .padding(.bottom, composerHeight + BighelpTokens.space12)
-        }
         .simultaneousGesture(TapGesture().onEnded { dismissKeyboard() })
         .onChange(of: fittingRailScrollRequest.generation) { _, _ in
             switch fittingRailScrollRequest.direction {
@@ -102,6 +63,47 @@ extension ChatView {
             case .towardOldest: timelineController.scrollToOldest()
             }
         }
+    }
+    /// "Return to latest" and loading notes, just above the message box. Laid
+    /// out in the safe area (the timeline itself runs under the home indicator).
+    var timelineStatusOverlay: some View {
+        VStack(spacing: BighelpTokens.space8) {
+            if !timelineController.isAtBottom {
+                BighelpIconButton(systemImage: "arrow.down", accessibilityLabel: "Return to latest messages",
+                                 style: .neutralGlass,
+                                 action: { timelineController.scrollToLatest(animated: !reduceMotion) })
+                    .accessibilityIdentifier("chat.return-to-latest")
+            }
+            if let progress = model.nativeSessionResumeProgress.visibleIndicator {
+                Label {
+                    Text(progress.message)
+                } icon: {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+                .bighelpFont(.metadata)
+                .foregroundStyle(theme.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, BighelpTokens.space12)
+                .padding(.vertical, BighelpTokens.space8)
+                .background(theme.canvas.opacity(0.94), in: Capsule())
+                .allowsHitTesting(false)
+                .accessibilityIdentifier("chat.session-resume-progress")
+            }
+            if model.isHydratingHistory {
+                Text(verbatim: "Getting the latest changes...")
+                    .bighelpFont(.metadata)
+                    .foregroundStyle(theme.secondaryText)
+                    .bighelpShimmer(isActive: true)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, BighelpTokens.space12)
+                    .padding(.vertical, BighelpTokens.space8)
+                    .background(theme.canvas.opacity(0.94), in: Capsule())
+                    .allowsHitTesting(false)
+                    .accessibilityIdentifier("chat.hydration-status")
+            }
+        }
+        .padding(.bottom, composerHeight + BighelpTokens.space12)
     }
     @ViewBuilder
     private func canvasRowContent(_ row: ChatCanvasRow) -> some View {

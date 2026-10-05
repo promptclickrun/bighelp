@@ -170,6 +170,8 @@ final class DemoWorkflowsClient: WorkflowsClient {
     func bind(workflowID: String, role: String, agentID: String?) async throws -> [WorkflowBinding] {
         await pause()
         guard var workflow = workflows[workflowID] else { throw WorkspaceClientError.rejected(code: "not_found") }
+        // Like the host: only a role in the saved draft can have an agent.
+        guard workflow.definition.role(role) != nil else { throw WorkspaceClientError.rejected(code: "role_not_found") }
         workflow.bindings[role] = agentID
         workflows[workflowID] = workflow
         return workflow.definition.roles.map { WorkflowBinding(role: $0.key, agentID: workflow.bindings[$0.key]) }
@@ -392,7 +394,8 @@ final class DemoWorkflowsClient: WorkflowsClient {
     }
 
     private func summary(_ workflow: Workflow) -> WorkflowSummary {
-        let unbound = workflow.definition.roles.map(\.key).filter { workflow.bindings[$0] == nil }
+        let used = Set(workflow.definition.stages.filter { $0.kind == .agent }.compactMap(\.role))
+        let unbound = workflow.definition.roles.map(\.key).filter { used.contains($0) && workflow.bindings[$0] == nil }
         return WorkflowSummary(id: workflow.id, name: workflow.definition.name, revision: workflow.revision,
                                hasDraft: workflow.hasDraft, stageCount: workflow.definition.stages.count,
                                needsSetupRoles: unbound, valid: validation(workflow).valid,
@@ -418,7 +421,15 @@ final class DemoWorkflowsClient: WorkflowsClient {
         }
         // How the stages connect, as the host checks it.
         issues += workflow.definition.graph.issues(workflow.definition)
-        return WorkflowValidation(valid: !issues.contains(where: \.isError), issues: issues)
+        // Like the host: a role a stage uses needs an agent. `valid` leaves
+        // this out; it is about the definition, not this computer.
+        let used = Set(workflow.definition.stages.filter { $0.kind == .agent }.compactMap(\.role))
+        let valid = !issues.contains(where: \.isError)
+        for role in workflow.definition.roles where used.contains(role.key) && workflow.bindings[role.key] == nil {
+            issues.append(.init(stageKey: nil, code: "role_unbound", message: "Choose an agent for \(role.label).",
+                                isError: true))
+        }
+        return WorkflowValidation(valid: valid, issues: issues)
     }
 
     private func currentFile(_ run: Run) -> WorkflowOutput? {

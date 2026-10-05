@@ -108,6 +108,9 @@ struct BighelpMenu<Recent: View>: View {
         Section {
             if let onAllAgents = destinations.onAllAgents {
                 row("Agents", symbol: "person.2", id: "menu.all-agents", action: onAllAgents)
+                if let onWorkflows = destinations.onWorkflows {
+                    row("Workflows", symbol: "flowchart", id: "menu.workflows", action: onWorkflows)
+                }
                 row("Scheduled tasks", symbol: "calendar.badge.clock", id: "menu.scheduled-tasks",
                     action: destinations.onScheduledTasks)
             } else {

@@ -48,6 +48,7 @@ struct WorkflowFlowView: View {
     @State private var editing: WorkflowStage?
     @State private var isRunSheetPresented = false
     @State private var isInputsPresented = false
+    @State private var isRolesPresented = false
     @State private var templateSource: WorkflowSummary?
     @State private var didOfferRun = false
     @State private var rects: [String: CGRect] = [:]
@@ -64,7 +65,6 @@ struct WorkflowFlowView: View {
                 if model.definition == nil {
                     WorkflowLoadStateView(state: model.state) { Task { await model.load() } }
                 } else {
-                    if !model.unboundRoles.isEmpty { BighelpDeferredSection { rolesCard } }
                     BighelpDeferredSection { flow }
                     BighelpDeferredSection { issues }
                 }
@@ -86,8 +86,12 @@ struct WorkflowFlowView: View {
             ToolbarItem(placement: .principal) { WorkflowTitle(model: model) }
             ToolbarItem(placement: .topBarTrailing) {
                 WorkflowMoreMenu(model: model, context: context, templateSource: $templateSource,
-                                 editInputs: { isInputsPresented = true })
+                                 editInputs: { isInputsPresented = true }, editRoles: { isRolesPresented = true })
             }
+        }
+        .sheet(isPresented: $isRolesPresented) {
+            WorkflowRolesEditor(model: model, context: context)
+                .bighelpSheetSize(.standard)
         }
         .sheet(item: $editing) { stage in
             WorkflowStageEditor(model: model, context: context, stage: stage)
@@ -122,21 +126,6 @@ struct WorkflowFlowView: View {
             if model.canRun { isRunSheetPresented = true }
         }
         .onDisappear { Task { await model.flushSave() } }
-    }
-
-    // MARK: Roles
-
-    private var rolesCard: some View {
-        VStack(alignment: .leading, spacing: BighelpTokens.space12) {
-            Text(model.unboundRoles.count == 1 ? "1 role needs an agent" : "\(model.unboundRoles.count) roles need an agent")
-                .font(.bighelp(.headline))
-                .foregroundStyle(theme.warning)
-            ForEach(model.definition?.roles ?? []) { role in
-                WorkflowRolePicker(model: model, context: context, role: role)
-            }
-        }
-        .workflowCard(theme)
-        .accessibilityIdentifier("workflows.flow.roles")
     }
 
     // MARK: Flow
@@ -495,9 +484,7 @@ struct WorkflowFlowView: View {
         if !issues.isEmpty {
             VStack(alignment: .leading, spacing: BighelpTokens.space8) {
                 ForEach(issues) { issue in
-                    Label(issue.message, systemImage: issue.isError ? "xmark.octagon" : "exclamationmark.triangle")
-                        .font(.bighelp(.footnote))
-                        .foregroundStyle(issue.isError ? theme.danger : theme.warning)
+                    WorkflowIssueRow(issue: issue, editRoles: { isRolesPresented = true })
                 }
             }
             .workflowCard(theme, padding: BighelpTokens.space12)
@@ -590,6 +577,7 @@ struct WorkflowMoreMenu: View {
     let context: WorkflowsContext
     @Binding var templateSource: WorkflowSummary?
     var editInputs: (() -> Void)?
+    var editRoles: (() -> Void)?
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -597,6 +585,10 @@ struct WorkflowMoreMenu: View {
             Button("Runs of this workflow", systemImage: "list.bullet") { context.open(.workflowRuns(selected: nil)) }
             if let editInputs {
                 Button("Inputs", systemImage: "arrow.right.to.line") { editInputs() }
+            }
+            if let editRoles {
+                Button("Agent roles", systemImage: "person.2") { editRoles() }
+                    .accessibilityIdentifier("workflows.more.roles")
             }
             if context.canEdit {
                 Button("Save as template", systemImage: "square.on.square") {
@@ -655,6 +647,90 @@ struct WorkflowRolePicker: View {
             }
             .accessibilityIdentifier("workflows.role.\(role.key)")
         }
+    }
+}
+
+/// ⋯ › Agent roles: the jobs in this workflow and which agent does each one.
+/// A stage gets its role when you pick its agent; here you name roles, add
+/// them ahead of time, and change who does them.
+struct WorkflowRolesEditor: View {
+    let model: WorkflowEditorModel
+    let context: WorkflowsContext
+    @State private var isAdding = false
+    @State private var renaming: WorkflowDefinition.Role?
+    @State private var name = ""
+    @Environment(\.dismiss) private var dismiss
+    @BighelpThemeReader private var theme
+
+    private var roles: [WorkflowDefinition.Role] { model.definition?.roles ?? [] }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    ForEach(roles) { role in
+                        VStack(alignment: .leading, spacing: 2) {
+                            WorkflowRolePicker(model: model, context: context, role: role)
+                            Text(usedBy(role))
+                                .font(.bighelp(.caption))
+                                .foregroundStyle(theme.secondaryText)
+                        }
+                        .contextMenu { actions(role) }
+                        .swipeActions { actions(role) }
+                    }
+                    Button("New role", systemImage: "plus") {
+                        name = ""
+                        isAdding = true
+                    }
+                    .frame(minHeight: BighelpTokens.hitTarget)
+                    .accessibilityIdentifier("workflows.roles.add")
+                } footer: {
+                    Text("A role is a job in this workflow, like Writer. Picking an agent on a stage sets its role too.")
+                        .font(.bighelp(.footnote))
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(BighelpThemeCanvas(theme: theme).ignoresSafeArea())
+            .navigationTitle("Agent roles")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                        .bighelpDefaultAction()
+                }
+            }
+        }
+        .accessibilityIdentifier("workflows.roles")
+        .alert("New role", isPresented: $isAdding) {
+            TextField("Name", text: $name)
+            Button("Cancel", role: .cancel) {}
+            Button("Add") {
+                guard !name.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+                model.addRole(named: name)
+                model.scheduleSave()
+            }
+        }
+        .alert("Rename role", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
+            TextField("Name", text: $name)
+            Button("Cancel", role: .cancel) {}
+            Button("Rename") { if let renaming { model.renameRole(renaming.key, to: name) } }
+        }
+    }
+
+    @ViewBuilder
+    private func actions(_ role: WorkflowDefinition.Role) -> some View {
+        Button("Rename", systemImage: "pencil") {
+            name = role.label
+            renaming = role
+        }
+        if !model.usedRoleKeys.contains(role.key) {
+            Button("Remove", systemImage: "trash", role: .destructive) { model.removeRole(role.key) }
+        }
+    }
+
+    private func usedBy(_ role: WorkflowDefinition.Role) -> String {
+        let titles = (model.definition?.stages ?? []).filter { $0.kind == .agent && $0.role == role.key }.map(\.title)
+        return titles.isEmpty ? "No stage uses this role yet." : titles.joined(separator: ", ")
     }
 }
 

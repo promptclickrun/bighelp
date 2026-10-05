@@ -13,6 +13,7 @@ struct WorkflowCanvasView: View {
     @State private var inspectorTab: WorkflowStageEditor.Tab = .setup
     @State private var isRunSheetPresented = false
     @State private var isInputsPresented = false
+    @State private var isRolesPresented = false
     @State private var templateSource: WorkflowSummary?
     @State private var didOfferRun = false
     @BighelpThemeReader private var theme
@@ -67,8 +68,12 @@ struct WorkflowCanvasView: View {
             }
             ToolbarItem(placement: .topBarTrailing) {
                 WorkflowMoreMenu(model: model, context: context, templateSource: $templateSource,
-                                 editInputs: { isInputsPresented = true })
+                                 editInputs: { isInputsPresented = true }, editRoles: { isRolesPresented = true })
             }
+        }
+        .sheet(isPresented: $isRolesPresented) {
+            WorkflowRolesEditor(model: model, context: context)
+                .bighelpSheetSize(.standard)
         }
         .sheet(item: $editing) { stage in
             WorkflowStageEditor(model: model, context: context, stage: stage)
@@ -114,24 +119,8 @@ struct WorkflowCanvasView: View {
         WorkflowCanvasBoard(model: model, context: context, selected: $selected,
                             edit: { editing = $0 }, add: { addStage($0, after: $1) },
                             editInputs: { isInputsPresented = true })
-            .overlay(alignment: .topLeading) {
-                if !model.unboundRoles.isEmpty, let definition {
-                    VStack(alignment: .leading, spacing: BighelpTokens.space8) {
-                        Text(model.unboundRoles.count == 1 ? "1 role needs an agent"
-                             : "\(model.unboundRoles.count) roles need an agent")
-                            .font(.bighelp(.headline))
-                            .foregroundStyle(theme.warning)
-                        ForEach(definition.roles) { role in
-                            WorkflowRolePicker(model: model, context: context, role: role)
-                        }
-                    }
-                    .workflowCard(theme)
-                    .frame(maxWidth: 360)
-                    .padding(BighelpTokens.space16)
-                }
-            }
             .overlay(alignment: .bottomTrailing) {
-                WorkflowIssuesCard(issues: model.issues)
+                WorkflowIssuesCard(issues: model.issues, editRoles: { isRolesPresented = true })
                     .frame(maxWidth: 360)
                     .padding(BighelpTokens.space16)
             }
@@ -154,7 +143,7 @@ struct WorkflowCanvasView: View {
                         WorkflowStageIcon(kind: stage.kind, size: 40)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(stage.title).font(.bighelp(.headline))
-                            Text([stage.kind.title, stage.role.map { "role \($0)" }].compactMap { $0 }.joined(separator: " · "))
+                            Text(stage.kind.title)
                                 .font(.bighelp(.caption))
                                 .foregroundStyle(theme.secondaryText)
                         }

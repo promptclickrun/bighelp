@@ -7,24 +7,43 @@ enum WorkflowCanvasGeometry {
     static let decisionHeader: CGFloat = 52
     static let decisionRow: CGFloat = 40
 
-    static func outPort(_ port: WorkflowPort, origin: CGPoint, kind: WorkflowStage.Kind?) -> CGPoint {
+    static func outPort(_ port: WorkflowPort, origin: CGPoint, kind: WorkflowStage.Kind?,
+                        axis: Axis = .horizontal) -> CGPoint {
         let size = WorkflowCanvasLayout.size(kind)
+        // Top to bottom, the way on leaves from the bottom; a decision's changes still leave from its side.
+        if axis == .vertical, port != .changes {
+            return CGPoint(x: origin.x + size.width / 2, y: origin.y + size.height)
+        }
         guard kind == .decision else { return CGPoint(x: origin.x + size.width, y: origin.y + size.height / 2) }
         let row = port == .changes ? 1 : 0
         return CGPoint(x: origin.x + size.width,
                        y: origin.y + decisionHeader + decisionRow * CGFloat(row) + decisionRow / 2)
     }
 
-    static func inPort(origin: CGPoint, kind: WorkflowStage.Kind?) -> CGPoint {
+    static func inPort(origin: CGPoint, kind: WorkflowStage.Kind?, axis: Axis = .horizontal) -> CGPoint {
         let size = WorkflowCanvasLayout.size(kind)
+        if axis == .vertical { return CGPoint(x: origin.x + size.width / 2, y: origin.y) }
         return CGPoint(x: origin.x, y: origin.y + (kind == .decision ? decisionHeader / 2 : size.height / 2))
     }
 
     /// A smooth curve from a way out to a way in. One that goes back swings
     /// under both nodes, so a loop reads as a loop.
-    static func wire(from start: CGPoint, to end: CGPoint) -> Path {
+    static func wire(from start: CGPoint, to end: CGPoint, axis: Axis = .horizontal) -> Path {
         var path = Path()
         path.move(to: start)
+        if axis == .vertical {
+            if end.y >= start.y + 30 {
+                let pull = max(40, (end.y - start.y) / 2)
+                path.addCurve(to: end, control1: CGPoint(x: start.x, y: start.y + pull),
+                              control2: CGPoint(x: end.x, y: end.y - pull))
+            } else {
+                // Back up the column (a loop): out to the side, over, and down onto the stage.
+                let side = max(start.x, end.x + WorkflowCanvasLayout.nodeWidth / 2) + 80
+                path.addCurve(to: end, control1: CGPoint(x: side, y: start.y),
+                              control2: CGPoint(x: end.x, y: end.y - 140))
+            }
+            return path
+        }
         if end.x >= start.x + 40 {
             let pull = max(60, (end.x - start.x) / 2)
             path.addCurve(to: end, control1: CGPoint(x: start.x + pull, y: start.y),
@@ -38,7 +57,11 @@ enum WorkflowCanvasGeometry {
     }
 
     /// The middle of a wire, for its label.
-    static func middle(from start: CGPoint, to end: CGPoint) -> CGPoint {
+    static func middle(from start: CGPoint, to end: CGPoint, axis: Axis = .horizontal) -> CGPoint {
+        if axis == .vertical {
+            if end.y >= start.y + 30 { return CGPoint(x: (start.x + end.x) / 2, y: (start.y + end.y) / 2) }
+            return CGPoint(x: max(start.x, end.x + WorkflowCanvasLayout.nodeWidth / 2) + 40, y: (start.y + end.y) / 2)
+        }
         if end.x >= start.x + 40 { return CGPoint(x: (start.x + end.x) / 2, y: (start.y + end.y) / 2) }
         return CGPoint(x: (start.x + end.x) / 2, y: max(start.y, end.y) + 82)
     }
@@ -56,6 +79,8 @@ struct WorkflowCanvasBoard: View {
     let edit: (WorkflowStage) -> Void
     let add: (WorkflowStage.Kind, String?) -> Void
     let editInputs: () -> Void
+    /// Your places, or a straight line. Only `saved` lets nodes move, so a line never changes a place.
+    var arrangement: WorkflowArrangement = .saved
 
     @State private var scale: CGFloat = 1
     @State private var pan: CGSize = .zero
@@ -98,6 +123,8 @@ struct WorkflowCanvasBoard: View {
 
     private var definition: WorkflowDefinition? { model.definition }
     private var editable: Bool { model.canEditFlow }
+    private var canMoveNodes: Bool { editable && arrangement == .saved }
+    private var axis: Axis { arrangement.axis }
 
     var body: some View {
         GeometryReader { proxy in
@@ -120,7 +147,7 @@ struct WorkflowCanvasBoard: View {
             .contentShape(Rectangle())
             .simultaneousGesture(zoomGesture)
             .onDrop(of: [UTType.utf8PlainText], delegate: WorkflowNodeDrop(
-                isActive: { draggingKey != nil && editable },
+                isActive: { draggingKey != nil && canMoveNodes },
                 update: { dragUpdate($0) }, drop: { dragDrop($0) }, exit: { moving = nil }))
             .onAppear {
                 viewSize = proxy.size
@@ -129,6 +156,9 @@ struct WorkflowCanvasBoard: View {
             .onChange(of: proxy.size) { _, size in
                 viewSize = size
                 fitOnce()
+            }
+            .onChange(of: arrangement) {
+                withAnimation(.snappy) { fit() }
             }
         }
         .coordinateSpace(.named(Self.space))
@@ -140,7 +170,7 @@ struct WorkflowCanvasBoard: View {
     // MARK: Nodes and wires
 
     private func positions(_ definition: WorkflowDefinition) -> [String: CGPoint] {
-        var positions = WorkflowCanvasLayout.positions(definition)
+        var positions = WorkflowCanvasLayout.positions(definition, arrangement: arrangement)
         if let moving { positions[moving.key] = moving.origin }
         return positions
     }
@@ -165,7 +195,8 @@ struct WorkflowCanvasBoard: View {
             }
             if let wire, let origin = positions[wire.from] {
                 WorkflowCanvasGeometry.wire(
-                    from: WorkflowCanvasGeometry.outPort(wire.port, origin: origin, kind: kind(wire.from)), to: wire.point)
+                    from: WorkflowCanvasGeometry.outPort(wire.port, origin: origin, kind: kind(wire.from), axis: axis),
+                    to: wire.point, axis: axis)
                 .stroke(theme.action, style: StrokeStyle(lineWidth: 2, lineCap: .round, dash: [6, 4]))
                 .allowsHitTesting(false)
             }
@@ -179,11 +210,11 @@ struct WorkflowCanvasBoard: View {
         ForEach(edges, id: \.self) { edge in
             if let to = edge.to, let fromOrigin = positions[edge.from], let toOrigin = positions[to],
                !(wire?.from == edge.from && wire?.port == edge.port && wire?.detaches == true) {
-                let start = WorkflowCanvasGeometry.outPort(edge.port, origin: fromOrigin, kind: kind(edge.from))
-                let end = WorkflowCanvasGeometry.inPort(origin: toOrigin, kind: kind(to))
+                let start = WorkflowCanvasGeometry.outPort(edge.port, origin: fromOrigin, kind: kind(edge.from), axis: axis)
+                let end = WorkflowCanvasGeometry.inPort(origin: toOrigin, kind: kind(to), axis: axis)
                 let lit = selected != nil && (selected == edge.from || selected == to)
                 let color = edge.port == .changes ? BighelpTokens.Palette.gold : lit ? theme.action : theme.secondaryText
-                WorkflowCanvasGeometry.wire(from: start, to: end)
+                WorkflowCanvasGeometry.wire(from: start, to: end, axis: axis)
                     .stroke(color.opacity(lit || edge.port == .changes ? 1 : 0.7),
                             style: StrokeStyle(lineWidth: lit ? 2.5 : 1.75, lineCap: .round,
                                                dash: edge.port == .changes ? [6, 5] : []))
@@ -191,7 +222,7 @@ struct WorkflowCanvasBoard: View {
                 arrow(at: end, color: color)
                 if edge.port != .next {
                     wireLabel(edge, definition: definition)
-                        .position(WorkflowCanvasGeometry.middle(from: start, to: end))
+                        .position(WorkflowCanvasGeometry.middle(from: start, to: end, axis: axis))
                 }
             }
         }
@@ -199,7 +230,7 @@ struct WorkflowCanvasBoard: View {
         ForEach(graph.keys.filter { graph.exits[$0]?.primary == nil }, id: \.self) { key in
             if let origin = positions[key] {
                 let port = WorkflowCanvasGeometry.outPort(kind(key) == .decision ? .pass : .next, origin: origin,
-                                                          kind: kind(key))
+                                                          kind: kind(key), axis: axis)
                 Text("End")
                     .font(.bighelp(.caption2).weight(.semibold))
                     .foregroundStyle(theme.secondaryText)
@@ -208,7 +239,7 @@ struct WorkflowCanvasBoard: View {
                     .background(theme.surface, in: Capsule())
                     .overlay(Capsule().strokeBorder(theme.border))
                     .fixedSize()
-                    .position(x: port.x + 36, y: port.y)
+                    .position(x: axis == .vertical ? port.x : port.x + 36, y: axis == .vertical ? port.y + 22 : port.y)
                     .allowsHitTesting(false)
             }
         }
@@ -216,9 +247,16 @@ struct WorkflowCanvasBoard: View {
 
     private func arrow(at point: CGPoint, color: Color) -> some View {
         Path { path in
-            path.move(to: CGPoint(x: point.x - 1, y: point.y))
-            path.addLine(to: CGPoint(x: point.x - 9, y: point.y - 5))
-            path.addLine(to: CGPoint(x: point.x - 9, y: point.y + 5))
+            if axis == .vertical {
+                // Pointing down onto the stage's top.
+                path.move(to: CGPoint(x: point.x, y: point.y - 1))
+                path.addLine(to: CGPoint(x: point.x - 5, y: point.y - 9))
+                path.addLine(to: CGPoint(x: point.x + 5, y: point.y - 9))
+            } else {
+                path.move(to: CGPoint(x: point.x - 1, y: point.y))
+                path.addLine(to: CGPoint(x: point.x - 9, y: point.y - 5))
+                path.addLine(to: CGPoint(x: point.x - 9, y: point.y + 5))
+            }
             path.closeSubpath()
         }
         .fill(color)
@@ -247,7 +285,7 @@ struct WorkflowCanvasBoard: View {
             .frame(width: size.width, height: size.height)
             .contentShape(RoundedRectangle(cornerRadius: BighelpTokens.radius16, style: .continuous))
             .onTapGesture { editInputs() }
-            .modifier(WorkflowNodeDragSource(key: WorkflowCanvasLayout.inputsKey, enabled: editable) {
+            .modifier(WorkflowNodeDragSource(key: WorkflowCanvasLayout.inputsKey, enabled: canMoveNodes) {
                 draggingKey = WorkflowCanvasLayout.inputsKey
             })
             .accessibilityElement(children: .combine)
@@ -270,7 +308,7 @@ struct WorkflowCanvasBoard: View {
             .contentShape(RoundedRectangle(cornerRadius: BighelpTokens.radius16, style: .continuous))
             .onTapGesture { selected = stage.key }
             .contextMenu { nodeMenu(stage, graph: graph) }
-            .modifier(WorkflowNodeDragSource(key: stage.key, enabled: editable) { draggingKey = stage.key })
+            .modifier(WorkflowNodeDragSource(key: stage.key, enabled: canMoveNodes) { draggingKey = stage.key })
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isButton)
             .accessibilityLabel("\(stage.title), \(stage.kind.title)\(hasIssue ? ", needs fixing" : "")")
@@ -327,7 +365,7 @@ struct WorkflowCanvasBoard: View {
         var handles: [Handle] = []
         if let origin = positions[WorkflowCanvasLayout.inputsKey] {
             handles.append(Handle(key: WorkflowCanvasLayout.inputsKey, kind: .out(.next),
-                                  point: screen(WorkflowCanvasGeometry.outPort(.next, origin: origin, kind: nil)),
+                                  point: screen(WorkflowCanvasGeometry.outPort(.next, origin: origin, kind: nil, axis: axis)),
                                   target: graph.start))
         }
         for stage in definition.stages {
@@ -335,11 +373,12 @@ struct WorkflowCanvasBoard: View {
             let ports: [WorkflowPort] = stage.kind == .decision ? [.pass, .changes] : [.next]
             for port in ports {
                 handles.append(Handle(key: stage.key, kind: .out(port),
-                                      point: screen(WorkflowCanvasGeometry.outPort(port, origin: origin, kind: stage.kind)),
+                                      point: screen(WorkflowCanvasGeometry.outPort(port, origin: origin, kind: stage.kind,
+                                                                                    axis: axis)),
                                       target: graph.target(stage.key, port)))
             }
             handles.append(Handle(key: stage.key, kind: .into,
-                                  point: screen(WorkflowCanvasGeometry.inPort(origin: origin, kind: stage.kind)),
+                                  point: screen(WorkflowCanvasGeometry.inPort(origin: origin, kind: stage.kind, axis: axis)),
                                   target: nil))
         }
         return handles
@@ -499,8 +538,26 @@ struct WorkflowCanvasBoard: View {
     private func fit() {
         guard let definition, viewSize.width > 0, viewSize.height > 0 else { return }
         // Room on the sides for the End marker after the last node.
-        let bounds = WorkflowCanvasLayout.bounds(definition).insetBy(dx: -72, dy: -72)
+        let bounds = WorkflowCanvasLayout.bounds(definition, arrangement: arrangement).insetBy(dx: -72, dy: -72)
         guard !bounds.isNull, bounds.width > 0, bounds.height > 0 else { return }
+        // A line starts at its beginning at a size you can read, and you swipe along it.
+        switch arrangement {
+        case .row:
+            let next = min(max(viewSize.height / bounds.height, Self.scales.lowerBound), 1)
+            scale = next
+            pan = CGSize(width: -bounds.minX * next,
+                         height: (viewSize.height - bounds.height * next) / 2 - bounds.minY * next)
+            return
+        case .column:
+            let next = min(max(viewSize.width / bounds.width, Self.scales.lowerBound), 1)
+            scale = next
+            // Starts below the trigger card in the top corner.
+            pan = CGSize(width: (viewSize.width - bounds.width * next) / 2 - bounds.minX * next,
+                         height: 96 - bounds.minY * next)
+            return
+        case .saved:
+            break
+        }
         let next = min(max(min(viewSize.width / bounds.width, viewSize.height / bounds.height), Self.scales.lowerBound), 1.2)
         scale = next
         pan = CGSize(width: (viewSize.width - bounds.width * next) / 2 - bounds.minX * next,

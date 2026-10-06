@@ -8,6 +8,10 @@ struct WorkflowCanvasView: View {
     @Bindable var model: WorkflowEditorModel
     let context: WorkflowsContext
     let startsRun: Bool
+    /// Your places, or one straight line (a column on wide screens, a row on a phone).
+    var arrangement: WorkflowArrangement = .saved
+    /// The toolbar's layout switch.
+    var switchLayout: (() -> Void)?
     @State private var selected: String?
     @State private var editing: WorkflowStage?
     @State private var inspectorTab: WorkflowStageEditor.Tab = .setup
@@ -17,17 +21,20 @@ struct WorkflowCanvasView: View {
     @State private var isTriggerPresented = false
     @State private var templateSource: WorkflowSummary?
     @State private var didOfferRun = false
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @BighelpThemeReader private var theme
 
     private var definition: WorkflowDefinition? { model.definition }
     private var selectedStage: WorkflowStage? { definition?.stage(selected) }
+    /// A phone's row has no room for the inspector: a tapped stage opens its editor.
+    private var showsInspector: Bool { sizeClass == .regular }
 
     var body: some View {
         Group {
             if definition != nil {
                 HStack(spacing: 0) {
                     BighelpDeferredSection { canvas }
-                    if selectedStage != nil {
+                    if selectedStage != nil, showsInspector {
                         Divider().overlay(theme.separator)
                         BighelpDeferredSection { inspector }
                             .frame(width: 340)
@@ -46,6 +53,13 @@ struct WorkflowCanvasView: View {
         .toolbar(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .principal) { WorkflowTitle(model: model) }
+            if let switchLayout {
+                ToolbarItem(placement: .topBarTrailing) {
+                    // A phone's row goes back to the vertical flow; a wide screen swaps column and your layout.
+                    WorkflowLayoutButton(next: arrangement == .saved ? .column : arrangement == .row ? .column : .saved,
+                                         action: switchLayout)
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     WorkflowAddStageButtons(features: model.features) { addStage($0, after: selected) }
@@ -115,6 +129,11 @@ struct WorkflowCanvasView: View {
                 if model.canRun { isRunSheetPresented = true }
             }
         }
+        .onChange(of: selected) { _, key in
+            guard !showsInspector, let stage = definition?.stage(key) else { return }
+            editing = stage
+            selected = nil
+        }
         .onDisappear { Task { await model.flushSave() } }
         .animation(.snappy, value: selected)
     }
@@ -124,7 +143,7 @@ struct WorkflowCanvasView: View {
     private var canvas: some View {
         WorkflowCanvasBoard(model: model, context: context, selected: $selected,
                             edit: { editing = $0 }, add: { addStage($0, after: $1) },
-                            editInputs: { isInputsPresented = true })
+                            editInputs: { isInputsPresented = true }, arrangement: arrangement)
             .overlay(alignment: .topLeading) {
                 if model.trigger != nil {
                     WorkflowTriggerCard(trigger: model.trigger) { isTriggerPresented = true }

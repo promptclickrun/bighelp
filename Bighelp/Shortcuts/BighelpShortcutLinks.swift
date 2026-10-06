@@ -41,6 +41,17 @@ enum BighelpShortcutLinks {
         return components.url ?? URL(string: "loopdy://agents")!
     }
 
+    /// One workflow, on its computer when it's known; `startsRun` opens its Run sheet.
+    static func workflow(_ id: String, hostID: UUID?, startsRun: Bool) -> URL {
+        var components = URLComponents()
+        components.scheme = "loopdy"; components.host = "workflows"; components.path = "/" + id
+        var items: [URLQueryItem] = []
+        if let hostID { items.append(URLQueryItem(name: "host", value: hostID.uuidString)) }
+        if startsRun { items.append(URLQueryItem(name: "run", value: "1")) }
+        components.queryItems = items.isEmpty ? nil : items
+        return components.url ?? BighelpShortcutDestination.workflows.url
+    }
+
     /// The agent's home: its latest chat, with it as the home agent.
     static func agentHome(_ agentID: String) -> URL {
         var components = URLComponents()
@@ -54,7 +65,7 @@ enum BighelpShortcutLinks {
 /// Group chats aren't here: they're listed on Agents, and Open group chat
 /// opens one directly.
 enum BighelpShortcutDestination: String, CaseIterable, Sendable {
-    case chats, agents, feed, ideas, goals, projects, kanban, scheduledTasks, settings
+    case chats, agents, feed, ideas, goals, projects, kanban, workflows, scheduledTasks, settings
 
     var url: URL {
         switch self {
@@ -65,6 +76,7 @@ enum BighelpShortcutDestination: String, CaseIterable, Sendable {
         case .goals: BighelpWidgetSnapshot.agentURL("goals")
         case .projects: URL(string: "loopdy://projects")!
         case .kanban: URL(string: "loopdy://kanban")!
+        case .workflows: URL(string: "loopdy://workflows")!
         case .scheduledTasks: BighelpWidgetSnapshot.tasksURL
         case .settings: URL(string: "loopdy://settings")!
         }

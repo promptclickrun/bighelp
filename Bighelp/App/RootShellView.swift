@@ -1215,6 +1215,20 @@ struct RootShellView: View {
             openProjects()
         case .settings:
             appState.select(.profile)
+        case .workflows:
+            openWorkflows()
+        case .workflow(let id, let hostID, let startsRun):
+            // A workflow on another computer: switch to it, and open the workflow once it answers.
+            if let hostID, let hostRegistry, hostID != hostRegistry.selectedHostID {
+                guard hostRegistry.hosts.contains(where: { $0.id == hostID }) else {
+                    actionErrorMessage = "That computer isn't in bighelp anymore."
+                    return
+                }
+                pendingIncomingURL = url
+                hostRegistry.select(hostID)
+                return
+            }
+            openWorkflow(id: id, startsRun: startsRun)
         }
     }
 
@@ -1552,7 +1566,7 @@ private extension BighelpIncomingURLRoute {
     /// Routes that open a chat or the agent home need the host's workspace.
     var opensWorkspaceContent: Bool {
         switch self {
-        case .home, .chat, .newChat, .agentChat, .kanban, .approval, .group, .projects: true
+        case .home, .chat, .newChat, .agentChat, .kanban, .approval, .group, .projects, .workflows, .workflow: true
         // Feed, Ideas, Goals and Agents show their saved items and refresh themselves; waiting for
         // the host before even switching tabs made these links feel broken.
         case .agent, .agents, .scheduledTasks, .scheduledTask, .sessions, .settings: false

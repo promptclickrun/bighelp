@@ -261,7 +261,13 @@ struct BighelpApp: App {
                         connections.hosts.selectedWorkspace?.nativeClient?
                             .makeKanbanClient(owner: owner, currentOwner: { connections.owner })
                     })
-            }
+            },
+            workflows: {
+                if demo() { return DemoWorkflowsClient.shared }
+                guard connections.owner != nil else { return nil }
+                return DirectHermesWorkflowsClient(currentWorkspace: { [weak connections] in connections?.workspace })
+            },
+            hostID: { demo() ? nil : connections.selectedDirectHost?.id }
         )
     }
 

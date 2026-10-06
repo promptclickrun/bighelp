@@ -41,6 +41,16 @@ extension RootShellView {
         appState.path = [.workflows]
     }
 
+    /// Opens one workflow (a Shortcut or a link): its flow, or its Run sheet straight away.
+    func openWorkflow(id: String, startsRun: Bool) {
+        guard prepareWorkflowsStore() != nil else {
+            actionErrorMessage = "Connect to your computer to use Workflows."
+            return
+        }
+        if appState.selectedTab != .sessions { appState.select(.sessions) }
+        appState.path = [.workflows, .workflow(id: id, startsRun: startsRun)]
+    }
+
     /// Opens one run (a widget, a link or a notification later).
     func openWorkflows(run: String) {
         guard prepareWorkflowsStore() != nil else { return }

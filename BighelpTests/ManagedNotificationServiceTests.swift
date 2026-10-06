@@ -309,6 +309,32 @@ import UserNotifications
         #expect(fixture.ledger.record(host: fixture.host, profile: "default")?.enabled == true)
     }
 
+    /// iOS asks for notification permission in the middle of setup. Tapping Allow brings bighelp
+    /// back to the foreground, and the foreground refresh must not identify again: that resets the
+    /// provider and cancels the device registration setup is waiting on ("Couldn't confirm setup"
+    /// after a reinstall, which asks for permission again).
+    @Test func returningFromThePermissionPromptDoesNotCancelEnrollment() async throws {
+        let sdk = WakeSDK()
+        let runtime = BighelpBuzzKitRuntime(testingSDK: sdk)
+        let fixture = try Fixture(independent: true, providerOverride: runtime)
+        defer { fixture.cleanup() }
+        fixture.service.activityRuntime = BighelpManagedNativeActivityRuntime(
+            service: fixture.service, environment: .sandbox, topic: "app.loopdy.mobile")
+        let composition = BighelpManagedNotificationComposition(
+            isFixture: false, registry: fixture.registry,
+            applicationHooks: .init(installAPNSToken: { _ in }, installAPNSFailure: { _ in },
+                installWake: { _ in }, installManagedOpen: { _ in }),
+            makeIntegration: { BighelpManagedNotificationIntegration(service: fixture.service) })
+        sdk.onRegister = {
+            await composition.recoverForeground { true }
+            runtime.noteAPNSToken(Data([1, 2]))
+        }
+        let result = try await composition.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+        guard case .enabled = result else { Issue.record("Coming back to the app interrupted setup"); return }
+        #expect(sdk.identifications == 1, "Only setup identifies while it runs")
+        #expect(fixture.ledger.record(host: fixture.host, profile: "default")?.enabled == true)
+    }
+
     @Test func failedNotificationCompositionHasBoundedAutomaticAndExplicitRetry() async throws {
         let fixture = try Fixture(independent: true)
         defer { fixture.cleanup() }

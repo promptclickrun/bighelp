@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import os
 
 /// Main's notification implementation must verify the authenticated plugin
 /// capability and recipient grant. Installed/configured-enabled is not readiness.
@@ -80,6 +81,12 @@ enum HostNotificationState: String, Codable, Sendable {
     case verificationRequired, prerequisitesRequired, permissionDenied, managementRejected, unsupported, replacementRequired, outcomeUnknown
     case notConnected
     case releaseUnavailable
+    /// The connection is signed in to another computer, or as someone else.
+    case signInChanged
+
+    /// The state saved with the host. Older builds can't read `signInChanged` and would refuse the
+    /// whole saved host list, so it's saved as the nearest state they know.
+    var saved: HostNotificationState { self == .signInChanged ? .notConnected : self }
 
     var message: String {
         switch self {
@@ -98,6 +105,7 @@ enum HostNotificationState: String, Codable, Sendable {
         case .outcomeUnknown: "Couldn't confirm setup. Check again before reinstalling."
         case .notConnected: "Can't reach this computer. Reconnect and check setup again."
         case .releaseUnavailable: "Couldn't reach GitHub for the newest bighelp plugin. Check the internet connection and try again."
+        case .signInChanged: "This computer's sign-in changed. Sign in to this computer again, then check setup."
         }
     }
 }
@@ -246,6 +254,8 @@ final class HostNotificationSetupModel {
             "Check Installed State"
         case .notConnected:
             "Retry Connection"
+        case .signInChanged:
+            "Check Setup Again"
         case .installed:
             enrollNotifications ? "Continue Notification Setup" : nil
         case .verificationRequired:
@@ -290,10 +300,8 @@ final class HostNotificationSetupModel {
         do {
             if !management.isConnected { await management.reconnect() }
             guard owns() else { return }
-            guard management.isConnected,
-                  DirectHermesIdentity.matches(management.savedConnection?.identity, host.principalIdentity) else {
-                throw DirectHermesError.notConnected
-            }
+            guard management.isConnected, let saved = management.savedConnection else { throw DirectHermesError.notConnected }
+            guard host.owns(saved) else { throw DirectHermesError.identityChanged }
             let rows = try HostInstalledPlugin.decodeList(
                 await management.managePlugins(["action": .string("list")])
             )
@@ -350,7 +358,7 @@ final class HostNotificationSetupModel {
             if !workspace.isConnected { await workspace.reconnect() }
             guard owns() else { return }
             guard workspace.isConnected else { throw DirectHermesError.notConnected }
-            guard DirectHermesIdentity.matches(workspace.savedConnection?.identity, host.principalIdentity) else {
+            guard let saved = workspace.savedConnection, host.owns(saved) else {
                 throw DirectHermesError.identityChanged
             }
             state = .checking
@@ -522,11 +530,12 @@ final class HostNotificationSetupModel {
             try finish(.installed, host: &host)
             try await enrollInstalled(host: &host, connection: workspace.savedConnection, isCurrent: { owns() })
         } catch {
+            Self.log.error("Setup stopped: \(Self.errorKind(error), privacy: .public)")
             guard owns() else { return }
             state = Self.failureState(error)
             host.notificationBinding = registry.hosts.first(where: { $0.id == host.id })?.notificationBinding
             providerFailure = error as? BighelpManagedNotificationSetupError
-            if enrollNotifications { host.notificationState = state }
+            if enrollNotifications { host.notificationState = state.saved }
             try? registry.update(host)
         }
     }
@@ -568,8 +577,7 @@ final class HostNotificationSetupModel {
     private func enrollInstalled(host: inout BighelpConfiguredHost, connection: DirectHermesSavedConnection?,
                                  isCurrent: @escaping @MainActor () -> Bool) async throws {
         guard enrollNotifications else { return }
-        guard let setup = registry.notificationSetup, let connection,
-              DirectHermesIdentity.matches(connection.identity, host.principalIdentity) else {
+        guard let setup = registry.notificationSetup, let connection, host.owns(connection) else {
             try finish(.prerequisitesRequired, host: &host); return
         }
         let result = try await setup.enroll(host: host, connection: connection, isCurrent: isCurrent)
@@ -591,6 +599,19 @@ final class HostNotificationSetupModel {
         guard key.unicodeScalars.allSatisfy({ $0.value >= 0x21 && $0.value < 0x7f }),
               !key.contains(".."), !key.contains("\\") else { throw DirectHermesError.invalidResponse }
     }
+    private static let log = Logger(subsystem: "app.loopdy.mobile", category: "NotificationSetup")
+
+    /// What stopped setup, for the log: the error's type and case, never a computer, sign-in or account.
+    static func errorKind(_ error: any Error) -> String {
+        switch error {
+        case let error as DirectHermesError: "DirectHermesError.\(error)"
+        case let error as BighelpManagedNotificationSetupError: "NotificationSetupError.\(error.stage.rawValue)"
+        case let error as BighelpLinkAPIError:
+            if case .requestFailed(let status, _) = error { "LinkAPIError.requestFailed(\(status))" } else { "LinkAPIError.\(error)" }
+        default: String(describing: type(of: error))
+        }
+    }
+
     private static func failureState(_ error: any Error) -> HostNotificationState {
         if error is BighelpManagedNotificationSetupError { return .prerequisitesRequired }
         if let linkError = error as? BighelpLinkAPIError,
@@ -607,6 +628,7 @@ final class HostNotificationSetupModel {
         guard let error = error as? DirectHermesError else { return .outcomeUnknown }
         switch error {
         case .notConnected: return .notConnected
+        case .identityChanged: return .signInChanged
         case .rpcRejected(code: -32601): return .unsupported
         case .rpcRejected(code: 403): return .permissionDenied
         case .rpcRejected(code: 5026): return .managementRejected

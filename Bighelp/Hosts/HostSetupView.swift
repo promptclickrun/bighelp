@@ -877,7 +877,7 @@ struct HostNotificationSetupSection: View {
     private var notificationReviewTitle: String {
         switch model.state {
         case .notConfigured: "Enable Notifications"
-        case .verificationRequired, .backendRestartRequired, .outcomeUnknown: "Check Again"
+        case .verificationRequired, .backendRestartRequired, .outcomeUnknown, .signInChanged: "Check Again"
         default: "Try Again"
         }
     }

@@ -67,6 +67,39 @@ import Testing
         #expect(setup.calls == 1)
     }
 
+    /// A connection signed in to another computer (or as someone else) asks to sign in to this
+    /// computer again, and setup reads nothing from it.
+    @Test func aChangedSignInAsksToSignInToThisComputerAgain() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        let other = DirectHermesSavedConnection(endpoint: fixture.saved.endpoint, authentication: .bearer(
+            accessToken: UUID().uuidString, refreshToken: nil, expiresAt: nil), provider: "basic", userID: "someone-else")
+        let management = Manager(saved: other)
+        management.rows = [fixture.plugin(enabled: true)]
+        let setup = Enrollment()
+        fixture.registry.notificationSetup = setup
+        let model = HostNotificationSetupModel(host: fixture.host, registry: fixture.registry,
+            pin: fixture.pin, management: management)
+
+        await model.enable()
+        #expect(model.state == .signInChanged)
+        #expect(model.message == "This computer's sign-in changed. Sign in to this computer again, then check setup.")
+        #expect(model.actionTitle == "Check Setup Again")
+        #expect(management.actions.isEmpty, "Nothing is read from another computer's connection")
+        #expect(setup.calls == 0)
+        #expect(fixture.registry.hosts.first?.notificationState == .notConnected, "Saved as a state older builds read")
+    }
+
+    /// The setup log names what kind of error stopped setup and nothing the computer or service sent.
+    @Test func setupLogNamesOnlyTheKindOfError() {
+        #expect(HostNotificationSetupModel.errorKind(DirectHermesError.identityChanged) == "DirectHermesError.identityChanged")
+        #expect(HostNotificationSetupModel.errorKind(BighelpLinkAPIError.requestFailed(status: 409, code: "fixture-detail"))
+            == "LinkAPIError.requestFailed(409)")
+        #expect(HostNotificationSetupModel.errorKind(BighelpManagedNotificationSetupError(stage: .deviceRegistration, code: "fixture-detail"))
+            == "NotificationSetupError.deviceRegistration")
+        #expect(HostNotificationSetupModel.errorKind(CancellationError()) == "CancellationError")
+    }
+
     @Test func savedNotificationOptInDoesNotPromptAgainOnReopen() throws {
         let fixture = try Fixture()
         defer { fixture.cleanup() }

@@ -867,8 +867,10 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
         )
     }
     func refreshNotificationIdentity() async throws -> BighelpNotificationRuntimeSnapshot {
-        // Never identify again while a turn-off is finishing.
-        guard !turnOffPending, let credentials = try identity.current() else {
+        // Never identify again while a turn-off is finishing, or while setup runs: setup identifies
+        // on its own, and identifying again cancels the device registration it waits on. Tapping
+        // Allow on the permission prompt brings the app back to the foreground in the middle of it.
+        guard !turnOffPending, enrolling.isEmpty, let credentials = try identity.current() else {
             _ = BighelpBuzzKitRuntime.shared.configureIfPossible()
             return .current
         }

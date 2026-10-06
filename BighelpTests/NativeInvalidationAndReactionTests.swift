@@ -56,6 +56,20 @@ struct NativeInvalidationAndReactionTests {
         #expect(last.state == .complete(messageCount: 42))
     }
 
+    /// The feed belongs to the connection, not to whichever agent it last opened: a change that names
+    /// another agent (a chat opened from a notification switched agents) still reaches the screens.
+    @Test func changesFromAnotherAgentStillReachTheScreens() throws {
+        let source = try makeSource()
+        var notices: [NativeWorkspaceInvalidationNotice] = []
+        let coordinator = NativeWorkspaceInvalidationCoordinator(currentSource: { source },
+            refreshSessions: { _ in }, refreshScheduledTasks: { _ in },
+            publish: { _, notice in notices.append(notice) })
+        defer { coordinator.suspend() }
+        let platforms = try decode(#"{"jsonrpc":"2.0","method":"event","params":{"type":"platforms.changed","session_id":"","payload":{},"profile":"alfie"}}"#)
+        #expect(coordinator.receive(platforms, source: source))
+        #expect(notices == [.platformsChanged])
+    }
+
     @Test func reactionIdentityUsesOnlyCanonicalDecimalRowSuffix() {
         #expect(NativeMessageReactionRowIdentity.rowID(from: "saved:row:42") == 42)
         for invalid in ["42", "saved:row:", "saved:row:42:extra", "saved:row:４２", "saved:row:-1"] {
@@ -66,7 +80,7 @@ struct NativeInvalidationAndReactionTests {
     private func makeSource() throws -> NativeWorkspaceEventSource {
         let owner = WorkspaceOwner(authority: try .direct(endpointIdentity: "https://fixture.example.test", providerID: "test", userID: "invalidation"),
             authenticationGeneration: UUID(), connectionGeneration: UUID())
-        return .init(hostID: UUID(), owner: owner, profileID: "default", servingProfileID: "default")
+        return .init(hostID: UUID(), owner: owner, servingProfileID: "default")
     }
 
     private func decode(_ text: String) throws -> DirectHermesEvent {

@@ -63,8 +63,7 @@ final class NativeSessionResumeProgressPresentation {
               binding.clientID == ObjectIdentifier(client),
               binding.connectionGeneration == client.sessionActionsConnectionGeneration,
               Data(binding.runtimeSessionID.utf8) == Data(progress.runtimeSessionID.utf8),
-              Data(source.profileID.utf8) == Data(progress.profileID.utf8),
-              Data(client.profile.utf8) == Data(progress.profileID.utf8),
+              progress.profileID.map({ Data(client.profile.utf8) == Data($0.utf8) }) ?? true,
               Data(client.runtimeID.utf8) == Data(progress.runtimeSessionID.utf8)
         else { return }
 
@@ -147,8 +146,8 @@ final class NativeSessionResumeProgressCoordinator {
               model.nativeConversationClient === client,
               client.nativeWorkspaceAuthority == source.owner.authority,
               let runtimeSessionID = coordinate.runtimeSessionID,
-              Data(coordinate.profileID.utf8) == Data(source.profileID.utf8),
-              Data(client.profile.utf8) == Data(source.profileID.utf8),
+              // The chat's own agent, whichever agent the connection last opened.
+              Data(coordinate.profileID.utf8) == Data(client.profile.utf8),
               Data(client.runtimeID.utf8) == Data(runtimeSessionID.utf8)
         else { return }
 
@@ -169,8 +168,7 @@ final class NativeSessionResumeProgressCoordinator {
     }
 
     func receive(_ progress: NativeWorkspaceResumeProgress, source: NativeWorkspaceEventSource) {
-        guard source.owner.authority.kind == .direct,
-              Data(progress.profileID.utf8) == Data(source.profileID.utf8) else { return }
+        guard source.owner.authority.kind == .direct else { return }
         let route = Route(source: source, runtimeSessionID: progress.runtimeSessionID)
         switch progress.state {
         case .loading:
@@ -200,7 +198,7 @@ final class NativeSessionResumeProgressCoordinator {
               let client = binding.client,
               model.nativeConversationClient === client,
               client.sessionActionsConnectionGeneration == binding.connectionGeneration,
-              Data(client.profile.utf8) == Data(route.source.profileID.utf8),
+              progress.profileID.map({ Data(client.profile.utf8) == Data($0.utf8) }) ?? true,
               Data(client.runtimeID.utf8) == Data(route.runtimeSessionID.utf8) else {
             bindings[route] = nil
             return

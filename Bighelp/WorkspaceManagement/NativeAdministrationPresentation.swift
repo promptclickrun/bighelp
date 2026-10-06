@@ -9,7 +9,6 @@ private final class NativeAdministrationInvalidationObserver {
     private weak var connections: WorkspaceConnectionStore?
     private let expectedSource: NativeWorkspaceEventSource
     private let presentationOwner: WorkspaceOwner
-    private let presentationProfileID: String
     private let presentationServingProfileID: String?
     private let isCurrent: @MainActor () -> Bool
     private let messaging: MessagingOnboardingStore
@@ -23,7 +22,6 @@ private final class NativeAdministrationInvalidationObserver {
         connections: WorkspaceConnectionStore,
         expectedSource: NativeWorkspaceEventSource,
         presentationOwner: WorkspaceOwner,
-        presentationProfileID: String,
         presentationServingProfileID: String?,
         isCurrent: @escaping @MainActor () -> Bool,
         messaging: MessagingOnboardingStore,
@@ -34,7 +32,6 @@ private final class NativeAdministrationInvalidationObserver {
         self.connections = connections
         self.expectedSource = expectedSource
         self.presentationOwner = presentationOwner
-        self.presentationProfileID = presentationProfileID
         self.presentationServingProfileID = presentationServingProfileID
         self.isCurrent = isCurrent
         self.messaging = messaging
@@ -46,7 +43,6 @@ private final class NativeAdministrationInvalidationObserver {
     func install() {
         guard !isInstalled, let connections,
               expectedSource.owner == presentationOwner,
-              Data(expectedSource.profileID.utf8) == Data(presentationProfileID.utf8),
               expectedSource.servingProfileID.map({ Data($0.utf8) })
                 == presentationServingProfileID.map({ Data($0.utf8) }),
               connections.nativeInvalidationSource(authority: presentationOwner.authority) == expectedSource
@@ -68,7 +64,6 @@ private final class NativeAdministrationInvalidationObserver {
               update.source == expectedSource,
               update.revision.source == expectedSource,
               update.source.owner == presentationOwner,
-              Data(update.source.profileID.utf8) == Data(presentationProfileID.utf8),
               update.source.servingProfileID.map({ Data($0.utf8) })
                 == presentationServingProfileID.map({ Data($0.utf8) }),
               connections.nativeInvalidationSource(authority: expectedSource.owner.authority) == expectedSource
@@ -210,7 +205,7 @@ final class NativeAdministrationPresentation: Identifiable {
         guard let connections, let invalidationSource else { return }
         let observer = NativeAdministrationInvalidationObserver(
             connections: connections, expectedSource: invalidationSource,
-            presentationOwner: owner, presentationProfileID: profileID,
+            presentationOwner: owner,
             presentationServingProfileID: servingProfileID,
             isCurrent: { currentOwner() == owner }, messaging: messaging,
             pairing: pairing, providerAccounts: providerAccounts,

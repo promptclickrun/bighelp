@@ -3,10 +3,12 @@ import Foundation
 /// The exact host/socket/profile authority that delivered a native gateway event.
 /// `profileID` is the selected RPC profile; `servingProfileID` separately names
 /// the process-level HTTP profile when the native context advertises one.
+/// One connection's feed of host changes: the computer, its sign-in and socket (`owner`) and the profile
+/// its dashboard serves. Not the agent a screen shows: every agent's changes come through one connection,
+/// and each screen keeps the ones for its own agent (a change can name its agent with `profile`).
 struct NativeWorkspaceEventSource: Hashable, Sendable {
     let hostID: UUID
     let owner: WorkspaceOwner
-    let profileID: String
     let servingProfileID: String?
 }
 
@@ -40,7 +42,8 @@ struct NativeWorkspaceResumeProgress: Equatable, Sendable {
     /// terminal event without that exact live runtime-session flight is dropped.
     let requestID: UUID
     let runtimeSessionID: String
-    let profileID: String
+    /// The agent the change names; nil when it names none (the runtime session already belongs to one).
+    let profileID: String?
     let state: State
 }
 
@@ -114,7 +117,7 @@ enum NativeWorkspaceInvalidationDecoder {
         case platformsChanged
         case pairingChanged
         case setupReady(NativeWorkspaceSetupSnapshot)
-        case resumeProgress(runtimeSessionID: String, state: ResumeState)
+        case resumeProgress(runtimeSessionID: String, profileID: String?, state: ResumeState)
     }
 
     enum ResumeState: Equatable, Sendable {
@@ -151,7 +154,7 @@ enum NativeWorkspaceInvalidationDecoder {
         case "session.resume_progress":
             guard let runtimeID = event.sessionID, validIdentifier(runtimeID, maximumBytes: 1_024),
                   let state = resumeState(event.payload) else { return nil }
-            return .resumeProgress(runtimeSessionID: runtimeID, state: state)
+            return .resumeProgress(runtimeSessionID: runtimeID, profileID: profile(of: event), state: state)
         default:
             return nil
         }
@@ -172,11 +175,16 @@ enum NativeWorkspaceInvalidationDecoder {
                 guard event.parameters["seq"] == nil else { return false }
             }
         }
+        // A change may name its agent; any agent's change belongs to this connection.
         if let profileValue = event.parameters["profile"] {
-            guard let profile = profileValue.string,
-                  Data(profile.utf8) == Data(source.profileID.utf8) else { return false }
+            guard let profile = profileValue.string, validIdentifier(profile, maximumBytes: 128) else { return false }
         }
         return true
+    }
+
+    /// The agent a change names, if it names one.
+    static func profile(of event: DirectHermesEvent) -> String? {
+        event.parameters["profile"]?.string
     }
 
     private static func isGlobal(_ event: DirectHermesEvent) -> Bool {
@@ -293,8 +301,8 @@ final class NativeWorkspaceInvalidationCoordinator {
             publish(incoming, .pairingChanged)
         case .setupReady(let snapshot):
             publish(incoming, .setupReady(snapshot))
-        case .resumeProgress(let runtimeID, let state):
-            receiveResumeProgress(runtimeID: runtimeID, state: state, source: incoming)
+        case .resumeProgress(let runtimeID, let profileID, let state):
+            receiveResumeProgress(runtimeID: runtimeID, profileID: profileID, state: state, source: incoming)
         }
         return true
     }
@@ -344,6 +352,7 @@ final class NativeWorkspaceInvalidationCoordinator {
 
     private func receiveResumeProgress(
         runtimeID: String,
+        profileID: String?,
         state: NativeWorkspaceInvalidationDecoder.ResumeState,
         source incoming: NativeWorkspaceEventSource
     ) {
@@ -358,19 +367,19 @@ final class NativeWorkspaceInvalidationCoordinator {
             resumeFlights[key] = flight
             publish(incoming, .resumeProgress(.init(
                 requestID: flight.requestID, runtimeSessionID: runtimeID,
-                profileID: incoming.profileID, state: .loading
+                profileID: profileID, state: .loading
             )))
         case .complete(let messageCount):
             guard let flight = resumeFlights.removeValue(forKey: key), flight.source == incoming else { return }
             publish(incoming, .resumeProgress(.init(
                 requestID: flight.requestID, runtimeSessionID: runtimeID,
-                profileID: incoming.profileID, state: .complete(messageCount: messageCount)
+                profileID: profileID, state: .complete(messageCount: messageCount)
             )))
         case .failed(let message):
             guard let flight = resumeFlights.removeValue(forKey: key), flight.source == incoming else { return }
             publish(incoming, .resumeProgress(.init(
                 requestID: flight.requestID, runtimeSessionID: runtimeID,
-                profileID: incoming.profileID, state: .failed(message: message)
+                profileID: profileID, state: .failed(message: message)
             )))
         }
     }

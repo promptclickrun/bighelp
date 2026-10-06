@@ -167,19 +167,12 @@ struct FleetHomeView: View {
                         .listRowSeparator(.hidden)
                 }
             }
-            if fleet.showsHostNames || onGroupAction != nil {
+            if fleet.showsHostNames {
                 Section {
-                    HStack(spacing: 0) {
-                        if fleet.showsHostNames {
-                            FleetHostFilter(fleet: fleet, selection: $hostFilter)
-                        } else {
-                            Spacer()
-                        }
-                        if onGroupAction != nil { organizeMenu }
-                    }
-                    .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
+                    FleetHostFilter(fleet: fleet, selection: $hostFilter)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
                 }
             }
             ForEach(blocks(listed)) { block in
@@ -202,6 +195,12 @@ struct FleetHomeView: View {
                 RootComposeButton(identifier: "fleet.new-chat", size: 72, action: onNewChat)
                     .padding(.trailing, BighelpTokens.space20)
                     .padding(.bottom, BighelpTokens.space12)
+            }
+        }
+        .toolbar {
+            // Top right, in place of the one-host switch (☰ has that): new agent, sections, hidden agents.
+            if onGroupAction != nil {
+                ToolbarItem(placement: .topBarTrailing) { organizeMenu }
             }
         }
         .searchable(text: $search, prompt: "Search agents")
@@ -296,15 +295,11 @@ struct FleetHomeView: View {
                 .accessibilityIdentifier("fleet.organize.show-hidden")
             }
         } label: {
-            Image(systemName: "folder.badge.gearshape")
-                .font(.bighelp(.body).weight(.semibold))
-                .frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
-                .contentShape(.rect)
+            // Plus: it adds (an agent, a section), and it isn't New chat's compose button.
+            Image(systemName: "plus").bighelpToolbarIcon()
         }
-        .foregroundStyle(theme.action)
-        .padding(.trailing, BighelpTokens.space8)
-        .accessibilityLabel("Organize")
-        .accessibilityHint("New section, hidden agents.")
+        .bighelpIconLabel("Add")
+        .accessibilityHint("New agent, new section, hidden agents.")
         .accessibilityIdentifier("fleet.organize")
     }
 

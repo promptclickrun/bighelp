@@ -212,6 +212,9 @@ struct ChatDestinationView: View {
             }
         }
         .onDisappear {
+            #if targetEnvironment(macCatalyst)
+            pendingMacPanelRequest = nil
+            #endif
             sessionAppearance?.retire()
             isHapticsSurfaceVisible = false
             // NavigationStack updates its path before the outgoing destination

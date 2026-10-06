@@ -267,6 +267,29 @@ struct FleetStoreTests {
         #expect(fleet.chats(matching: "paris").isEmpty)
     }
 
+    /// All sessions filters like one computer's Sessions: by agent (on its own computer)
+    /// and by where the chats started.
+    @Test func chatFiltersMatchAnAgentOnItsComputerAndWhereChatsStarted() {
+        let fleet = FleetStore(reader: reader(), directory: directory(), saveDelay: .zero)
+        var telegram = chat(home, "travel", "Hotel", minutesAgo: 1)
+        telegram.origin = "telegram"
+        var codex = chat(home, "default", "Menus", minutesAgo: 2)
+        codex.origin = "codex-cli"
+        var studioTravel = chat(studio, "travel", "Flights", minutesAgo: 3)
+        studioTravel.origin = "telegram"
+        fleet.recordLive(FleetSnapshot(agents: [agent(home, "travel", "Mina"), agent(home, "default", "Rio")],
+                                       chats: [telegram, codex], refreshedAt: Date()), hostID: home)
+        fleet.recordLive(FleetSnapshot(agents: [agent(studio, "travel", "Sage")], chats: [studioTravel],
+                                       refreshedAt: Date()), hostID: studio)
+
+        let mina = FleetChatsFilter(agentID: FleetID.make(home, "travel"))
+        #expect(fleet.chats(matching: "", filter: mina).map(\.title) == ["Hotel"], "Same profile on another computer isn't Mina")
+        #expect(fleet.chats(matching: "", filter: FleetChatsFilter(origin: "Telegram")).map(\.title) == ["Hotel", "Flights"])
+        #expect(fleet.chats(on: studio, matching: "", filter: FleetChatsFilter(origin: "Telegram")).map(\.title) == ["Flights"])
+        #expect(fleet.origins() == ["Codex", "Telegram"])
+        #expect(fleet.chats(matching: "", filter: FleetChatsFilter()).count == 3)
+    }
+
     /// Pinned agents from every host stay in the order the person dragged them
     /// into, after a relaunch too; a newly pinned agent joins at the end.
     @Test func pinnedAgentsKeepTheArrangedOrderAcrossHosts() async {
@@ -434,10 +457,12 @@ struct FleetStoreTests {
         let row: BighelpJSONValue = .object([
             "id": .string("abc"), "title": .string("Trip"), "preview": .string("Book the flight"),
             "started_at": .number(1_790_000_000), "last_active": .number(1_790_000_600),
+            "source": .string("telegram"),
         ])
         let chat = try #require(RegistryFleetReader.chat(row, hostID: studio, profileID: "default",
                                                          live: ["abc": "streaming"]))
         #expect(chat.storedSessionID == "abc")
+        #expect(chat.origin == "telegram", "Its channel tag, like one computer's Sessions")
         #expect(chat.title == "Trip")
         #expect(chat.updatedAt == Date(timeIntervalSince1970: 1_790_000_600))
         #expect(chat.isActive)

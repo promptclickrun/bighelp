@@ -34,16 +34,14 @@ struct ChatDestinationView: View {
     @State var photoSelections: [PhotosPickerItem] = []
     @State var attachmentErrorMessage: String?
     @State var attachmentRecoveryKind: PermissionKind?
-    @State private var isWorkspacePresented = false
-    @State private var isVoiceWorkspacePresented = false
-    @State private var isHermesWorkspacePickerPresented = false
+    /// ☰ from the voice screen: the menu opens once voice has closed.
+    @State private var opensMenuAfterVoice = false
     @State private var modelPickerRequest = 0
     @State private var isProjectChangesPresented = false
     @State private var projectChangesPanelWidth: CGFloat = ProjectChangesPanelWidthPolicy.minimum
     @State private var projectChangesPanelDragStartWidth: CGFloat?
 
     let appState: AppState
-    let demoHosts: DemoHosts
     let settings: SettingsStore
     let featureStore: ShellFeatureStore
     let catalog: SessionCatalogStore
@@ -62,20 +60,11 @@ struct ChatDestinationView: View {
     let headerActions: ChatHeaderActions
     let onNewChat: () -> Void
     let onStartSession: () -> Void
-    let onOpenSessions: () -> Void
-    let onOpenSession: (SessionSummary) -> Void
-    let onSelectTab: (AppTab) -> Void
-    let onOpenScheduledTasks: () -> Void
-    /// ☰ lists Projects and Kanban when the host has them.
-    let onOpenProjects: (() -> Void)?
-    let onOpenKanban: (() -> Void)?
-    let onOpenWorkflows: (() -> Void)?
-    let onSelectAgent: (AgentProfile) -> Void
+    /// An edge swipe's place (Settings › Chat › Swipe from the edges), the same as from any other screen.
+    let onEdgeAction: (WorkspaceSwipeAction) -> Void
     let onOpenAgentSessions: (String) -> Void
     let onOpenApproval: (ApprovalRequest) -> Void
     let onForkMessage: ((String) -> Void)?
-    /// The root menu's hosts, so a chat's ☰ has the all-hosts switch too.
-    let menuHosts: BighelpMenuHosts?
 
     private var currentAppearanceScope: SessionAppearanceScope? {
         let authority = model.nativeConversationClient?.nativeWorkspaceAuthority ?? appearanceAuthority
@@ -123,7 +112,6 @@ struct ChatDestinationView: View {
     init(
         model: ChatModel,
         appState: AppState,
-        demoHosts: DemoHosts,
         settings: SettingsStore,
         featureStore: ShellFeatureStore,
         catalog: SessionCatalogStore,
@@ -141,23 +129,14 @@ struct ChatDestinationView: View {
         responseHapticsCoveredByRoot: Bool,
         onNewChat: @escaping () -> Void,
         onStartSession: @escaping () -> Void,
-        onOpenSessions: @escaping () -> Void,
-        onOpenSession: @escaping (SessionSummary) -> Void,
-        onSelectTab: @escaping (AppTab) -> Void,
-        onOpenScheduledTasks: @escaping () -> Void,
-        onOpenProjects: (() -> Void)? = nil,
-        onOpenKanban: (() -> Void)? = nil,
-        onOpenWorkflows: (() -> Void)? = nil,
-        onSelectAgent: @escaping (AgentProfile) -> Void,
+        onEdgeAction: @escaping (WorkspaceSwipeAction) -> Void,
         onOpenAgentSessions: @escaping (String) -> Void,
         onOpenApproval: @escaping (ApprovalRequest) -> Void,
         onForkMessage: ((String) -> Void)?,
-        appearanceAuthority: WorkspaceAuthority? = nil,
-        menuHosts: BighelpMenuHosts? = nil
+        appearanceAuthority: WorkspaceAuthority? = nil
     ) {
         self.model = model
         self.appState = appState
-        self.demoHosts = demoHosts
         self.settings = settings
         self.featureStore = featureStore
         self.catalog = catalog
@@ -177,18 +156,10 @@ struct ChatDestinationView: View {
         self.headerActions = ChatHeaderActions(newChat: onNewChat)
         self.onNewChat = onNewChat
         self.onStartSession = onStartSession
-        self.onOpenSessions = onOpenSessions
-        self.onOpenSession = onOpenSession
-        self.onSelectTab = onSelectTab
-        self.onOpenScheduledTasks = onOpenScheduledTasks
-        self.onOpenProjects = onOpenProjects
-        self.onOpenKanban = onOpenKanban
-        self.onOpenWorkflows = onOpenWorkflows
-        self.onSelectAgent = onSelectAgent
+        self.onEdgeAction = onEdgeAction
         self.onOpenAgentSessions = onOpenAgentSessions
         self.onOpenApproval = onOpenApproval
         self.onForkMessage = onForkMessage
-        self.menuHosts = menuHosts
     }
 
     var body: some View {
@@ -242,11 +213,10 @@ struct ChatDestinationView: View {
               ), current === model else { return false }
         return !responseHapticsCoveredByRoot
             && !isNativeAttentionPresented
-            && !isWorkspacePresented && !isVoiceWorkspacePresented
             && voicePresentation == nil && !isPeopleAndChatPresented && !isChatAppearancePresented
             && !attachmentFlow.isActionMenuPresented && !isPhotoPickerPresented
             && !isFilePickerPresented && !isCameraPickerPresented && !isDocumentScannerPresented
-            && !isHermesWorkspacePickerPresented && !isProjectChangesPresented
+            && !isProjectChangesPresented
             && attachmentErrorMessage == nil
     }
 
@@ -255,9 +225,9 @@ struct ChatDestinationView: View {
     private var isChatInFront: Bool {
         appState.path.last == .chat(conversationID: model.conversationID)
             && !responseHapticsCoveredByRoot && !isNativeAttentionPresented
-            && !isWorkspacePresented && !isVoiceWorkspacePresented && voicePresentation == nil
+            && voicePresentation == nil
             && !isPeopleAndChatPresented && !isSessionFilesPresented && !isChatAppearancePresented
-            && !isHermesWorkspacePickerPresented && !isProjectChangesPresented
+            && !isProjectChangesPresented
     }
 
     /// A question or approval may pop up over the chat: it's on screen, the app
@@ -266,9 +236,8 @@ struct ChatDestinationView: View {
         scenePhase == .active && voicePresentation == nil
             && appState.path.last == .chat(conversationID: model.conversationID)
             && !responseHapticsCoveredByRoot
-            && !isWorkspacePresented && !isVoiceWorkspacePresented
             && !isPeopleAndChatPresented && !isSessionFilesPresented && !isChatAppearancePresented
-            && !isHermesWorkspacePickerPresented && !isProjectChangesPresented
+            && !isProjectChangesPresented
             && !isNativeSessionControlsPresented && !attachmentFlow.isActionMenuPresented
             && !isPhotoPickerPresented && !isFilePickerPresented
             && !isCameraPickerPresented && !isDocumentScannerPresented
@@ -348,9 +317,6 @@ struct ChatDestinationView: View {
             onChatFilesTap: { isSessionFilesPresented = true },
             onChatAppearanceTap: sessionAppearance == nil ? nil : { isChatAppearancePresented = true },
             onSessionToolsTap: nativeSessionControls == nil ? nil : { isNativeSessionControlsPresented = true },
-            onWorkspaceTap: { presentWorkspace() },
-            // "Go to…" (Quick Workspace) is an advanced host tool: Nerd Mode only.
-            showsWorkspaceButton: settings.nerdModeEnabled,
             onNewChatTap: onNewChat,
             onLoadPreviousMessages: loadPreviousMessages,
             onForkMessage: onForkMessage,
@@ -487,10 +453,6 @@ struct ChatDestinationView: View {
         .onChange(of: isChatInFront) { wasInFront, isInFront in
             if !wasInFront, isInFront { refreshOnReturn() }
         }
-        .sheet(isPresented: $isWorkspacePresented) {
-            workspaceOverlay
-                .presentationDetents([.large])
-        }
         .sheet(isPresented: $isPeopleAndChatPresented, onDismiss: {
             if requestsSessionFilesAfterDetails {
                 requestsSessionFilesAfterDetails = false
@@ -517,7 +479,11 @@ struct ChatDestinationView: View {
         .onChange(of: voicePresentation != nil) { _, isPresented in
             if isPresented { VoiceLaunchState.shared.finish() }
         }
-        .fullScreenCover(item: $voicePresentation) { presentation in
+        .fullScreenCover(item: $voicePresentation, onDismiss: {
+            guard opensMenuAfterVoice else { return }
+            opensMenuAfterVoice = false
+            homeChrome.onMenu()
+        }) { presentation in
             VoicePresentationContainer(
                 presentation: presentation,
                 agentID: model.memberIDs.first,
@@ -526,7 +492,7 @@ struct ChatDestinationView: View {
                     .flatMap { agents.avatarURL(for: $0) },
                 permissionCenter: permissionCenter,
                 onEnded: { voicePresentation = nil },
-                onWorkspaceTap: presentVoiceWorkspace,
+                onWorkspaceTap: openMenuFromVoice,
                 onUseTurnBased: useTurnBasedVoice,
                 chatActivity: { [model] in model.liveActivityKind }
             )
@@ -534,9 +500,6 @@ struct ChatDestinationView: View {
                 presentation.model.reconcileAgentRun(isActive: active)
             }
             .interactiveDismissDisabled()
-            .sheet(isPresented: $isVoiceWorkspacePresented) {
-                voiceWorkspaceDrawer
-            }
         }
         .sheet(isPresented: $isNativeSessionControlsPresented) {
             if let presentation = nativeSessionControls {
@@ -649,15 +612,6 @@ struct ChatDestinationView: View {
             .ignoresSafeArea()
         }
         #endif
-        .sheet(isPresented: $isHermesWorkspacePickerPresented) {
-            HermesWorkspacePickerView(
-                store: hermesWorkspaces,
-                agentID: model.memberIDs.first ?? "default",
-                sessionID: model.conversationID
-            )
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-        }
         .navigationDestination(isPresented: compactProjectChangesPresentation) {
             ProjectChangesView(
                 store: projectChanges,
@@ -774,24 +728,6 @@ struct ChatDestinationView: View {
         }
     }
 
-    private var quickWorkspaceContent: QuickWorkspaceContent {
-        let summaries = catalog.recentSummaries
-        let availableKeys = SessionSectionOrganizer.reorderableKeys(
-            in: summaries,
-            organizeByProjects: settings.organizeChatsByProjects
-        )
-        let layout = settings.sessionSectionLayout(
-            accountID: sessionOrganizationAccountID,
-            hostID: sessionOrganizationHostID,
-            availableProjectKeys: availableKeys
-        )
-        return QuickWorkspaceContent(
-            recentSessions: summaries,
-            organizeByProjects: settings.organizeChatsByProjects,
-            projectOrder: layout.projectOrder
-        )
-    }
-
     private var chatOpenURLAction: OpenURLAction {
         OpenURLAction { url in
             let browser = settings.preferredBrowser
@@ -878,7 +814,7 @@ struct ChatDestinationView: View {
         Color.clear
             .frame(width: WorkspaceEdgeSwipeResolver.activationEdgeWidth)
             .contentShape(Rectangle())
-            .allowsHitTesting(action != .none && !isWorkspacePresented)
+            .allowsHitTesting(action != .none)
             .highPriorityGesture(
                 DragGesture(minimumDistance: 12, coordinateSpace: .local)
                     .onEnded { value in
@@ -905,181 +841,13 @@ struct ChatDestinationView: View {
 
     private func performChatEdgeAction(_ action: WorkspaceSwipeAction) {
         BighelpKeyboard.dismiss()
-        switch action {
-        case .quickWorkspace:
-            presentWorkspace()
-        case .newChat:
-            onNewChat()
-        case .sessions:
-            onOpenSessions()
-        case .agents:
-            onSelectTab(.agents)
-        case .home:
-            onSelectTab(.home)
-        case .inbox:
-            onSelectTab(.home)
-        case .profile:
-            onSelectTab(.profile)
-        case .none:
-            break
-        }
+        onEdgeAction(action)
     }
 
-    private var workspaceOverlay: some View {
-        Group {
-            QuickWorkspaceDrawer(
-                content: quickWorkspaceContent,
-                demoHosts: demoHosts,
-                settings: settings,
-                sessionOrganizationAccountID: sessionOrganizationAccountID,
-                sessionOrganizationHostID: sessionOrganizationHostID,
-                agents: agents,
-                userIdentity: userIdentity,
-                activeWorkspaceName: activeHermesWorkspaceName,
-                selectedTab: selectedTab,
-                onDismiss: dismissWorkspace,
-                onNewChat: {
-                    dismissWorkspace()
-                    onNewChat()
-                },
-                onOpenSessions: {
-                    dismissWorkspace()
-                    onOpenSessions()
-                },
-                onOpenSession: { session in
-                    dismissWorkspace()
-                    onOpenSession(session)
-                },
-                onOpenAgents: { openTab(.agents) },
-                onOpenScheduledTasks: {
-                    dismissWorkspace()
-                    onOpenScheduledTasks()
-                },
-                onOpenProjects: onOpenProjects.map { open in { dismissWorkspace(); open() } },
-                onOpenKanban: onOpenKanban.map { open in { dismissWorkspace(); open() } },
-                onOpenWorkflows: onOpenWorkflows.map { open in { dismissWorkspace(); open() } },
-                onOpenWorkspaces: openHermesWorkspaces,
-                onSelectAgent: { agent in
-                    dismissWorkspace()
-                    onSelectAgent(agent)
-                },
-                onOpenMore: { openTab(.profile) },
-                menuHosts: menuHosts
-            )
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("quick-workspace.drawer")
-        .accessibilityAddTraits(.isModal)
-    }
-
-    private var voiceWorkspaceDrawer: some View {
-        Group {
-            QuickWorkspaceDrawer(
-                content: quickWorkspaceContent,
-                demoHosts: demoHosts,
-                settings: settings,
-                sessionOrganizationAccountID: sessionOrganizationAccountID,
-                sessionOrganizationHostID: sessionOrganizationHostID,
-                agents: agents,
-                userIdentity: userIdentity,
-                activeWorkspaceName: activeHermesWorkspaceName,
-                selectedTab: selectedTab,
-                onDismiss: dismissVoiceWorkspace,
-                onNewChat: {
-                    closeVoiceAnd(onNewChat)
-                },
-                onOpenSessions: {
-                    closeVoiceAnd(onOpenSessions)
-                },
-                onOpenSession: { session in
-                    closeVoiceAnd { onOpenSession(session) }
-                },
-                onOpenAgents: {
-                    closeVoiceAnd { onSelectTab(.agents) }
-                },
-                onOpenScheduledTasks: {
-                    closeVoiceAnd(onOpenScheduledTasks)
-                },
-                onOpenProjects: onOpenProjects.map { open in { closeVoiceAnd(open) } },
-                onOpenKanban: onOpenKanban.map { open in { closeVoiceAnd(open) } },
-                onOpenWorkflows: onOpenWorkflows.map { open in { closeVoiceAnd(open) } },
-                onOpenWorkspaces: {
-                    closeVoiceAnd { presentHermesWorkspacePicker() }
-                },
-                onSelectAgent: { agent in
-                    closeVoiceAnd { onSelectAgent(agent) }
-                },
-                onOpenMore: {
-                    closeVoiceAnd { onSelectTab(.profile) }
-                }
-            )
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("quick-workspace.drawer")
-        .accessibilityAddTraits(.isModal)
-        .presentationDetents([.large])
-    }
-
-    private func presentWorkspace() {
-        withAnimation(.snappy(duration: 0.28)) {
-            isWorkspacePresented = true
-        }
-    }
-
-    private func dismissWorkspace() {
-        withAnimation(.snappy(duration: 0.24)) {
-            isWorkspacePresented = false
-        }
-    }
-
-    private func dismissVoiceWorkspace() {
-        withAnimation(.snappy(duration: 0.24)) {
-            isVoiceWorkspacePresented = false
-        }
-    }
-
-    private func presentVoiceWorkspace() {
-        withAnimation(.snappy(duration: 0.28)) {
-            isVoiceWorkspacePresented = true
-        }
-    }
-
-    private func closeVoiceAnd(_ action: () -> Void) {
-        dismissVoiceWorkspace()
+    /// ☰ on the voice screen: the one menu, once voice has closed.
+    private func openMenuFromVoice() {
+        opensMenuAfterVoice = true
         voicePresentation = nil
-        action()
-    }
-
-    private func openTab(_ tab: AppTab) {
-        dismissWorkspace()
-        onSelectTab(tab)
-    }
-
-    private var activeHermesWorkspaceName: String {
-        let sessionWorkspaceID = hermesWorkspaces.workspaceID(
-            forSessionID: model.conversationID
-        )
-        return hermesWorkspaces.catalog?.workspaces.first {
-            $0.id == sessionWorkspaceID
-        }?.name ?? "Workspace"
-    }
-
-    private func openSkillsAndTools() {
-        dismissWorkspace()
-        guard featureStore.prepare(.skillsAndTools) else { return }
-        appState.open(.skillsAndTools)
-    }
-
-    private func openHermesWorkspaces() {
-        dismissWorkspace()
-        presentHermesWorkspacePicker()
-    }
-
-    private func presentHermesWorkspacePicker() {
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(180))
-            isHermesWorkspacePickerPresented = true
-        }
     }
 
     private var identity: ChatDestinationAgentIdentity? {
@@ -1130,6 +898,7 @@ struct ChatDestinationView: View {
     @Environment(\.reflectiveVisionEnabled) var reflectiveVisionEnabled
     @Environment(\.reflectiveVisionCamera) var reflectiveVisionCamera
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.agentHomeChrome) private var homeChrome
 
     private func armAttentionAutoOpen() {
         attentionAutoOpenUntil = .now.addingTimeInterval(8)

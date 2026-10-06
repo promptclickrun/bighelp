@@ -88,16 +88,11 @@ extension BighelpUITestCase {
     @MainActor
     func openChatWorkspaceMenu(in app: XCUIApplication,
                                file: StaticString = #filePath, line: UInt = #line) {
-        let options = app.buttons["chat.options"].firstMatch
-        XCTAssertTrue(options.waitForExistence(timeout: 8), "The chat header must expose its options menu.",
-                      file: file, line: line)
-        guard options.exists else { return }
-        options.tap()
-        let workspace = app.buttons["chat.workspace-menu"].firstMatch
-        XCTAssertTrue(workspace.waitForExistence(timeout: 5),
-                      "The chat options menu must offer the Quick Workspace entry.", file: file, line: line)
-        guard workspace.exists else { return }
-        workspace.tap()
+        // A chat's ☰ is the one menu, top left in its header.
+        let menu = app.buttons["home.drawer.open"].firstMatch
+        XCTAssertTrue(menu.waitForExistence(timeout: 8), "The chat header must expose ☰.", file: file, line: line)
+        guard menu.exists else { return }
+        menu.tap()
     }
 
     @MainActor
@@ -110,7 +105,6 @@ extension BighelpUITestCase {
             let chatOptions = app.buttons["chat.options"].firstMatch
             let nestedMenu = app.buttons["workspace.menu"].firstMatch
             if !(rootMenu.exists && rootMenu.isHittable) && chatOptions.exists && chatOptions.isHittable {
-                // The chat header's Quick Workspace entry now lives inside the ⋯ menu.
                 openChatWorkspaceMenu(in: app, file: file, line: line)
             } else {
                 let menu = rootMenu.exists && rootMenu.isHittable ? rootMenu : nestedMenu

@@ -174,10 +174,11 @@ final class RegistryFleetReader: FleetHostReading {
         let title = ((try? DirectHermesSessionValidation.optionalText(row["title"], maximum: 4_096)) ?? nil) ?? ""
         let preview = ((try? DirectHermesSessionValidation.optionalText(row["preview"], maximum: 64 * 1_024)) ?? nil) ?? ""
         let status = live[id]
+        let source = ((try? DirectHermesSessionValidation.optionalText(row["source"], maximum: 64)) ?? nil)
         return FleetChat(hostID: hostID, profileID: profileID, storedSessionID: id, appSessionID: nil,
                          title: title, preview: HermesUserMessageDisplay.preview(preview),
                          updatedAt: updated ?? started,
-                         isActive: status.map(workingStatuses.contains) ?? false)
+                         isActive: status.map(workingStatuses.contains) ?? false, origin: source)
     }
 }
 

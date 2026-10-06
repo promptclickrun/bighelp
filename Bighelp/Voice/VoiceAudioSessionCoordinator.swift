@@ -35,12 +35,37 @@ final class SystemVoiceAudioSession: VoiceAudioSessionControlling, @unchecked Se
             // Nothing listens, so it plays at the phone's normal media volume.
             try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
         case .conversation:
-            // Voice-chat mode is tuned for holding the phone to your ear: on
-            // the speaker, replies were close to inaudible. Video-chat mode is
-            // the speakerphone tuning: the same voice-tuned microphone, with
-            // replies at speaker volume.
-            try session.setCategory(.playAndRecord, mode: .videoChat, options: Self.conversationOptions)
+            // The call modes (voice chat, video chat) play everything at phone-call volume, so
+            // replies and the hold music came in quiet on the speaker. The default mode plays at
+            // media volume; iPhones that can cancel the speaker's echo there keep the agent
+            // from hearing itself. Others keep video chat's echo cancellation, the speakerphone
+            // tuning of the call modes.
+            try session.setCategory(.playAndRecord, mode: .default, options: Self.conversationOptions)
+            if Self.conversationMode(echoCancellationAvailable: canCancelEcho) == .default {
+                try enableEchoCancellation()
+            } else {
+                try session.setCategory(.playAndRecord, mode: .videoChat, options: Self.conversationOptions)
+            }
         }
+    }
+
+    /// Media volume where the microphone can cancel the speaker's echo; else a call mode.
+    static func conversationMode(echoCancellationAvailable: Bool) -> AVAudioSession.Mode {
+        echoCancellationAvailable ? .default : .videoChat
+    }
+
+    /// Echo-cancelled input in the default mode (certain 2024 and later iPhones, iOS 18.2).
+    private var canCancelEcho: Bool {
+        #if os(iOS) && !targetEnvironment(macCatalyst)
+        if #available(iOS 18.2, *) { return session.isEchoCancelledInputAvailable }
+        #endif
+        return false
+    }
+
+    private func enableEchoCancellation() throws {
+        #if os(iOS) && !targetEnvironment(macCatalyst)
+        if #available(iOS 18.2, *) { try session.setPrefersEchoCancelledInput(true) }
+        #endif
     }
 
     func setActive(_ active: Bool) throws {

@@ -29,7 +29,7 @@ extension RootShellView {
             usageDestination
         case (.allHostsChats, _):
             if let fleet {
-                FleetChatsView(fleet: fleet, onOpen: { openFleetChat($0) })
+                fleetChats(fleet)
             } else {
                 ContentUnavailableView("All sessions", systemImage: "bubble.left.and.bubble.right")
             }
@@ -139,7 +139,6 @@ extension RootShellView {
             ChatDestinationView(
                 model: model,
                 appState: appState,
-                demoHosts: demoHosts,
                 settings: settings,
                 featureStore: featureStore,
                 catalog: sessionCatalog,
@@ -161,25 +160,15 @@ extension RootShellView {
                 onStartSession: {
                     startNewChat(explicitAgentID: model.memberIDs.first)
                 },
-                onOpenSessions: { openSessions(filteredTo: nil) },
-                onOpenSession: openSession,
-                onSelectTab: { appState.select($0) },
-                onOpenScheduledTasks: {
-                    openScheduledTasks(filteredTo: agents.resolvedAgent(explicitID: nil)?.id)
-                },
-                onOpenProjects: canOpenProjects ? { openProjects() } : nil,
-                onOpenKanban: canOpenKanban ? { openKanban() } : nil,
-                onOpenWorkflows: canOpenWorkflows ? { openWorkflows() } : nil,
-                onSelectAgent: { openAgentChat($0.id) },
-                onOpenAgentSessions: { openSessions(filteredTo: $0) },
+                onEdgeAction: { performWorkspaceAction($0) },
+                onOpenAgentSessions: { openAllSessions(filteredTo: $0) },
                 onOpenApproval: {
                     openApproval(request: $0)
                 },
                 onForkMessage: { itemID in
                     forkSession(sourceID: conversationID, throughItemID: itemID)
                 },
-                appearanceAuthority: currentWorkspaceOwner?.authority,
-                menuHosts: fleetMenuHosts
+                appearanceAuthority: currentWorkspaceOwner?.authority
             )
             .environment(\.chatCardInteractions, cardInteractions(for: model))
             .environment(\.agentHomeChrome, homeChrome)

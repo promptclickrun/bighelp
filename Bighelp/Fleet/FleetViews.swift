@@ -143,7 +143,8 @@ struct FleetHomeView: View {
     var onOpenRoutines: ((FleetAgent) -> Void)? = nil
     /// New agent: asks which computer first.
     var onNewAgent: (() -> Void)? = nil
-    @State private var hostFilter: UUID?
+    /// The computer every all-hosts list is narrowed to; nil shows every computer.
+    @Binding var hostFilter: UUID?
     /// Hidden agents show, dimmed, so they can be shown again. For this visit only.
     @State private var showsHidden = false
     @State private var namePrompt: FleetNamePrompt?
@@ -431,6 +432,7 @@ struct FleetHomeView: View {
 /// The list stays up while a tapped agent's host connects, with a note.
 struct FleetConnectingView: View {
     let fleet: FleetStore
+    @Binding var hostFilter: UUID?
     let onOpen: (FleetAgent) -> Void
     /// False once connecting stopped without a connection.
     let isConnecting: Bool
@@ -441,7 +443,7 @@ struct FleetConnectingView: View {
     var body: some View {
         let status = HostConnectionStatus(fleetSwitchTo: fleet.selectedHostID.map(fleet.hostName) ?? "your host",
                                           isConnecting: isConnecting, hasTried: hasTried)
-        FleetHomeView(fleet: fleet, onOpen: onOpen)
+        FleetHomeView(fleet: fleet, onOpen: onOpen, hostFilter: $hostFilter)
             .onChange(of: isConnecting, initial: true) { _, connecting in if connecting { hasTried = true } }
             .onChange(of: fleet.selectedHostID) { _, _ in hasTried = isConnecting }
             .safeAreaInset(edge: .top, spacing: 0) {
@@ -513,16 +515,36 @@ struct FleetHostNotes: View {
     @BighelpThemeReader private var theme
 }
 
-/// Every chat on every host, newest first, each tagged with its host.
+/// Every chat on every host, newest first, each tagged with its host and where it started.
+/// A computer's chip works on that computer the way one-computer mode does: its own Sessions
+/// screen (projects, folders, pins), without leaving all hosts.
 struct FleetChatsView: View {
     let fleet: FleetStore
+    @Binding var hostFilter: UUID?
+    @Binding var filter: FleetChatsFilter
     let onOpen: (FleetChat) -> Void
-    @State private var hostFilter: UUID?
+    /// The picked computer's own Sessions screen once it's the working computer; nil until then.
+    var hostSessions: ((UUID) -> AnyView?)? = nil
     @State private var search = ""
 
     var body: some View {
-        let chats = fleet.chats(on: hostFilter, matching: search)
-        List {
+        if let hostFilter, let sessions = hostSessions?(hostFilter) {
+            sessions
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    if fleet.showsHostNames {
+                        FleetHostFilter(fleet: fleet, selection: $hostFilter)
+                            .padding(.vertical, BighelpTokens.space4)
+                            .background(BighelpThemeCanvas(theme: theme))
+                    }
+                }
+        } else {
+            mergedList
+        }
+    }
+
+    private var mergedList: some View {
+        let chats = visibleChats
+        return List {
             if fleet.showsHostNames {
                 FleetHostFilter(fleet: fleet, selection: $hostFilter)
                     .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
@@ -533,6 +555,7 @@ struct FleetChatsView: View {
                 Button { onOpen(chat) } label: { FleetChatRow(chat: chat, fleet: fleet) }
                     .buttonStyle(.plain)
                     .listRowBackground(Color.clear)
+                    .accessibilityIdentifier("fleet.chat.\(chat.title)")
             }
             FleetHostNotes(fleet: fleet, hostFilter: hostFilter)
         }
@@ -542,22 +565,66 @@ struct FleetChatsView: View {
         .background(BighelpThemeCanvas(theme: theme).ignoresSafeArea())
         // The glass search bar along the bottom, as on All agents.
         .searchable(text: $search, prompt: "Search sessions")
+        .toolbar { ToolbarItem(placement: .topBarTrailing) { filterMenu } }
         .refreshable {
             fleet.refresh(force: true)
             await fleet.waitForReads()
         }
         .overlay {
             if chats.isEmpty {
-                if search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    ContentUnavailableView("No sessions yet", systemImage: "bubble.left.and.bubble.right")
-                } else {
+                if !search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     ContentUnavailableView.search(text: search)
+                } else if filter.isActive {
+                    ContentUnavailableView("No matching chats", systemImage: "line.3.horizontal.decrease.circle",
+                                           description: Text("Try a different agent or place."))
+                } else {
+                    ContentUnavailableView("No sessions yet", systemImage: "bubble.left.and.bubble.right")
                 }
             }
         }
         .task { fleet.refresh() }
         .navigationTitle("All sessions")
         .accessibilityIdentifier("fleet.chats")
+    }
+
+    private var visibleChats: [FleetChat] { fleet.chats(on: hostFilter, matching: search, filter: filter) }
+
+    /// The same filters as one computer's Sessions, for what every computer reports.
+    /// Projects belong to one computer: pick its chip to group or filter by project.
+    private var filterMenu: some View {
+        let agents = fleet.agents(on: hostFilter).sorted {
+            $0.name.localizedStandardCompare($1.name) == .orderedAscending
+        }
+        let origins = fleet.origins(on: hostFilter)
+        return Menu {
+            Picker("Agent", selection: $filter.agentID) {
+                Text("All agents").tag(String?.none)
+                ForEach(agents) { agent in
+                    Text(fleet.showsHostNames && hostFilter == nil ? "\(agent.name) · \(fleet.hostName(agent.hostID))" : agent.name)
+                        .tag(Optional(agent.id))
+                }
+            }
+            .accessibilityIdentifier("fleet.chats.filter.agent")
+            if !origins.isEmpty {
+                Picker("Started in", selection: $filter.origin) {
+                    Text("Everywhere").tag(String?.none)
+                    ForEach(origins, id: \.self) { Text($0).tag(Optional($0)) }
+                }
+                .accessibilityIdentifier("fleet.chats.filter.origin")
+            }
+            if filter.isActive {
+                Divider()
+                Button("Clear Filters", systemImage: "arrow.counterclockwise") { filter = FleetChatsFilter() }
+                    .accessibilityIdentifier("fleet.chats.filters.clear")
+            }
+        } label: {
+            Image(systemName: filter.isActive
+                ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                .frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
+                .contentShape(.rect)
+        }
+        .accessibilityLabel("Filter chats")
+        .accessibilityIdentifier("fleet.chats.filters")
     }
 
     @BighelpThemeReader private var theme
@@ -595,6 +662,7 @@ struct FleetChatRow: View {
                         .foregroundStyle(theme.secondaryText)
                         .lineLimit(1)
                     if fleet.showsHostNames { FleetHostTag(name: fleet.hostName(chat.hostID)) }
+                    if !compact { SessionOriginTag(source: chat.origin, size: 11) }
                 }
             }
         }
@@ -609,8 +677,8 @@ struct FleetChatRow: View {
 /// Scheduled tasks on every host, each tagged with its host.
 struct FleetTasksView: View {
     let fleet: FleetStore
+    @Binding var hostFilter: UUID?
     let onOpen: (FleetTask) -> Void
-    @State private var hostFilter: UUID?
 
     var body: some View {
         List {

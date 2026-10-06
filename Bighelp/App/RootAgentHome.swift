@@ -669,7 +669,7 @@ extension RootShellView {
                     startNewChat(explicitAgentID: homeAgent?.id)
                 }
             },
-            onAllChats: { afterClosingHomeSheets { appState.select(.sessions) } },
+            onAllChats: { afterClosingHomeSheets { openAllSessions() } },
             onProjects: canOpenProjects ? { afterClosingHomeSheets { openProjects() } } : nil,
             onAgents: { afterClosingHomeSheets { appState.select(.agents) } },
             onScheduledTasks: { afterClosingHomeSheets { openScheduledTasks(filteredTo: nil) } },
@@ -722,7 +722,7 @@ extension RootShellView {
         }
         projectsStore = ProjectsStore(source: source, profileID: workspaceAgentID)
         if appState.selectedTab != .sessions { appState.select(.sessions) }
-        appState.path = [.projects]
+        showOneHostPage([.projects])
     }
 
     /// Hermes starts new chats in the current project's folder, so the

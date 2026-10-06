@@ -66,16 +66,17 @@ final class AllHostsUITests: BighelpUITestCase {
         pickHome.tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
 
-        // ☰ › Agents is All agents here, right under New chat. One-host places (Projects,
-        // Kanban, Scheduled tasks) and the one-host Agents row aren't in this menu.
+        // ☰ › Agents is All agents here, right under New chat. One-computer places (Projects,
+        // Kanban) ask which computer; the one-host Agents row isn't in this menu.
         menu.tap()
         let agentsRow = app.buttons["menu.all-agents"]
         XCTAssertTrue(agentsRow.waitForExistence(timeout: 5))
         XCTAssertEqual(agentsRow.label, "Agents")
         XCTAssertLessThan(app.buttons["menu.new-chat"].frame.minY, agentsRow.frame.minY, "New chat comes first")
-        for hidden in ["menu.agents", "menu.projects", "menu.kanban", "menu.new-group"] {
+        for hidden in ["menu.agents", "menu.new-group"] {
             XCTAssertFalse(app.buttons[hidden].exists, "\(hidden) isn't in the all-hosts menu")
         }
+        XCTAssertTrue(app.buttons["menu.projects"].exists, "Projects asks which computer, like Settings")
         save("menu-all-hosts", app)
         agentsRow.tap()
         XCTAssertTrue(app.navigationBars["All agents"].waitForExistence(timeout: 5))

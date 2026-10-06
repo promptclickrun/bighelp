@@ -68,7 +68,7 @@ struct SessionsModelTests {
         #expect(model.filteredSections.flatMap(\.sessions).map(\.id) == ["m"])
     }
 
-    @Test func sidebarUsesTheSameRecencyAndSectionPriorityRules() {
+    @Test func sectionsUseRecencyAndSectionPriorityRules() {
         func record(_ id: String, created: TimeInterval, updated: TimeInterval,
                     pinned: Bool = false, active: Bool = false) -> SessionRecord {
             SessionRecord(id: id, kind: .direct, agentIDs: ["juno"], title: id,
@@ -83,9 +83,9 @@ struct SessionsModelTests {
             record("new-active", created: 4, updated: 4, active: true),
             record("normal", created: 5, updated: 5),
         ]
-        let drawer = QuickWorkspaceContent(recentSessions: records.map(\.summary), organizeByProjects: true)
-        #expect(drawer.sessionGroups.map(\.title) == ["Active Sessions", "Pinned", "Project"])
-        #expect(drawer.sessionGroups.map { $0.sessions.map(\.id) } == [
+        let sections = SessionSectionOrganizer.sections(from: records.map(\.summary), organizeByProjects: true)
+        #expect(sections.map(\.title) == ["Active Sessions", "Pinned", "Project"])
+        #expect(sections.map { $0.sessions.map(\.id) } == [
             ["old-pin-active", "old-active", "new-active"], ["new-pin"], ["normal"],
         ])
     }

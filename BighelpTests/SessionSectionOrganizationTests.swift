@@ -38,23 +38,6 @@ struct SessionSectionOrganizationTests {
         let sections = SessionSectionOrganizer.sections(from: sessions, organizeByProjects: false)
         #expect(sections.map(\.key) == [.active, .pinned, .sessions])
         #expect(sections.flatMap(\.sessions).map(\.id) == ["active", "pin", "old-used", "recent-created"])
-        let quick = QuickWorkspaceContent(recentSessions: sessions)
-        #expect(quick.recentSessions.map(\.id) == sections.flatMap(\.sessions).map(\.id))
-    }
-
-    @Test func quickListBudgetsByRecentActivityBeforeProjectGrouping() {
-        let ordinary = (0..<7).map {
-            summary("new-\($0)", created: TimeInterval(20 + $0), updated: TimeInterval(200 - $0), project: "new")
-        }
-        let sessions = ordinary + [
-            summary("old-used", created: 1, updated: 500, project: "old"),
-            summary("pin", created: 2, updated: 2, pinned: true),
-            summary("active", created: 3, updated: 3, active: true),
-        ]
-        let quick = QuickWorkspaceContent(recentSessions: sessions, organizeByProjects: true,
-                                         projectOrder: [.project("new"), .project("old")])
-        #expect(quick.sessionGroups.map(\.key) == [.active, .pinned, .project("new"), .project("old")])
-        #expect(quick.recentSessions.map(\.id) == ["active", "pin", "new-0", "new-1", "new-2", "new-3", "old-used"])
     }
 
     @Test func projectRecencyUsesLatestActivityAndPreservesExplicitOrder() {
@@ -107,14 +90,6 @@ struct SessionSectionOrganizationTests {
         let settings = SettingsStore(defaults: defaults)
         settings.setSessionSectionCollapsed(true, sectionKey: .project("a"), accountID: "a", hostID: "h")
         #expect(defaults.data(forKey: key) == future)
-    }
-
-    @Test func sidebarKeepsFiveNewestOrdinaryChatsWhenPrioritySectionsAreFull() {
-        let pins = (0..<6).map { summary("pin-\($0)", created: TimeInterval($0), pinned: true) }
-        let ordinary = (0..<7).map { summary("normal-\($0)", created: TimeInterval(100 + $0), project: "p") }
-        let content = QuickWorkspaceContent(recentSessions: pins + ordinary, organizeByProjects: true)
-        #expect(content.sessionGroups.last?.sessions.map(\.id) == ["normal-6", "normal-5", "normal-4", "normal-3", "normal-2"])
-        #expect(content.sessionGroups.first?.sessions.count == pins.count)
     }
 
     @Test func layoutPersistsAndIsolatesAccountsAndHosts() {
@@ -205,25 +180,6 @@ struct SessionSectionOrganizationTests {
         #expect(!SessionSectionKey.pinned.isReorderable)
         #expect(!SessionSectionKey.active.isReorderable)
         #expect(SessionSectionKey.unassigned.isReorderable)
-    }
-
-    @Test func priorityChatsRemainInSidebarEvenBehindRecentOrdinaryChats() {
-        let ordinary = (0..<8).map { summary("normal-\($0)", created: TimeInterval(100 - $0), project: "p") }
-        let sessions = ordinary + [summary("pin", created: 1, pinned: true), summary("active", created: 2, active: true)]
-        let content = QuickWorkspaceContent(recentSessions: sessions, organizeByProjects: true)
-        #expect(content.sessionGroups.prefix(2).map(\.title) == ["Active Sessions", "Pinned"])
-        #expect(content.recentSessions.contains { $0.id == "pin" })
-        #expect(content.recentSessions.contains { $0.id == "active" })
-        #expect(Set(content.recentSessions.map(\.id)).count == content.recentSessions.count)
-    }
-
-    @Test func sidebarDoesNotTruncatePinnedOrActiveSectionsToFiveChats() {
-        let pins = (0..<7).map { summary("pin-\($0)", created: TimeInterval($0), pinned: true) }
-        let active = (0..<6).map { summary("active-\($0)", created: TimeInterval($0), active: true) }
-        let content = QuickWorkspaceContent(recentSessions: pins + active, organizeByProjects: false)
-        #expect(Set(content.recentSessions.map(\.id)) == Set((pins + active).map(\.id)))
-        #expect(content.sessionGroups.first?.sessions.count == active.count)
-        #expect(content.sessionGroups.dropFirst().first?.sessions.count == pins.count)
     }
 
     private func summary(_ id: String, created: TimeInterval, updated: TimeInterval? = nil, project: String? = nil,

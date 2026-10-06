@@ -8,6 +8,8 @@ extension RootShellView {
 
     func setAllHostsMode(_ on: Bool) {
         settings.allHostsMode = on
+        fleetFocus = nil
+        fleetChatsFilter = FleetChatsFilter()
         appState.chatOpenedFromList = false
         appState.select(.sessions)
         if on {
@@ -18,19 +20,72 @@ extension RootShellView {
         }
     }
 
-    /// ☰'s host row, with the all-hosts switch beside it. Picking one host
-    /// while all hosts show means "just this one".
+    /// ☰'s host row, with the all-hosts switch beside it. While all hosts show, picking a
+    /// computer narrows the lists to it and works on it, without leaving all hosts; the
+    /// switch beside it shows one computer again.
     var fleetMenuHosts: BighelpMenuHosts {
         var hosts = BighelpMenuHosts.current(registry: hostRegistry, demoHosts: demoHosts)
-        guard fleet != nil else { return hosts }
+        guard let fleet else { return hosts }
         let isOn = fleetModeOn
-        let select = hosts.select
-        hosts.select = { id in
-            if isOn { setAllHostsMode(false) }
-            select(id)
+        if isOn {
+            // The same computers as the all-hosts chips, the focused one marked.
+            hosts.hosts = fleet.hosts.map { .init(id: $0.id.uuidString, name: $0.name, isSelected: $0.id == fleetFocus) }
+            hosts.select = { id in focusFleet(UUID(uuidString: id)) }
         }
-        hosts.allHosts = .init(isOn: isOn, toggle: { setAllHostsMode(!isOn) })
+        hosts.allHosts = .init(isOn: isOn, isFocused: fleetFocus != nil,
+                               showAll: { focusFleet(nil) }, toggle: { setAllHostsMode(!isOn) })
         return hosts
+    }
+
+    /// Narrows every all-hosts list to one computer (nil: all of them). On All sessions the
+    /// computer becomes the working one, so its own Sessions screen can show.
+    func focusFleet(_ hostID: UUID?) {
+        fleetFocus = hostID
+        fleetChatsFilter = FleetChatsFilter()
+        if appState.path.last == .allHostsChats { workOnFocusedFleetHost() }
+    }
+
+    /// The focused computer becomes the working one (where its own screens open), staying in all hosts.
+    func workOnFocusedFleetHost() {
+        guard let fleet, fleetModeOn, let hostID = fleetFocus, hostID != fleet.selectedHostID,
+              fleet.canOpen(hostID) else { return }
+        recordLiveFleet()
+        fleet.select(hostID)
+    }
+
+    // MARK: Places that look the same in either mode
+
+    /// Every chat: every computer's while all show, else this computer's Sessions list.
+    func openAllSessions(filteredTo agentID: String? = nil) {
+        guard fleetModeOn else {
+            openSessions(filteredTo: agentID)
+            return
+        }
+        fleetChatsFilter = FleetChatsFilter(
+            agentID: agentID.flatMap { id in fleet?.selectedHostID.map { FleetID.make($0, id) } })
+        openFleetChats()
+    }
+
+    /// The agents: All agents while all computers show, else this computer's Agents.
+    func openAgentsList() {
+        if fleetModeOn {
+            appState.chatOpenedFromList = false
+            appState.select(.sessions)
+        } else {
+            appState.select(.agents)
+        }
+    }
+
+    /// Settings belongs to one computer: while all show, the focused one, or ask which.
+    func openSettingsPage() {
+        if fleetModeOn { fleetGate(.settings) } else { appState.select(.profile) }
+    }
+
+    /// A one-computer page (Projects, Kanban, Workflows) over the all-hosts list it was
+    /// opened from, so Back goes there again.
+    func showOneHostPage(_ routes: [AppRoute]) {
+        let base = fleetModeOn ? Array(appState.path.prefix { $0.isAllHosts }) : []
+        appState.path = base + routes
     }
 
     /// ☰'s destinations while all hosts show: lists span hosts, and a screen
@@ -40,7 +95,7 @@ extension RootShellView {
         destinations.onAllAgents = { afterClosingHomeSheets { appState.chatOpenedFromList = false; appState.select(.sessions) } }
         destinations.newChatTitle = "New chat"
         destinations.onNewChat = { afterClosingHomeSheets { isFleetNewChatPresented = true } }
-        destinations.onAllChats = { afterClosingHomeSheets { openFleetChats() } }
+        destinations.onAllChats = { afterClosingHomeSheets { openAllSessions() } }
         destinations.onAgents = { afterClosingHomeSheets { fleetGate(.agents) } }
         destinations.onSettings = { afterClosingHomeSheets { fleetGate(.settings) } }
         // Every host's tasks in one list.
@@ -49,9 +104,9 @@ extension RootShellView {
             appState.chatOpenedFromList = false
             appState.openScheduledTasks()
         } }
-        // Projects and Kanban belong to one host; the all-hosts menu leaves them out.
-        destinations.onProjects = nil
-        destinations.onKanban = nil
+        // Projects and Kanban belong to one computer: the focused one, or ask which.
+        destinations.onProjects = canOpenProjects ? { afterClosingHomeSheets { fleetGate(.projects) } } : nil
+        destinations.onKanban = canOpenKanban ? { afterClosingHomeSheets { fleetGate(.kanban) } } : nil
         // Workflows ask which computer, then open that one's.
         destinations.onWorkflows = { afterClosingHomeSheets { fleetGate(.workflows) } }
         // Usage covers every host while all show; no host to pick.
@@ -67,6 +122,8 @@ extension RootShellView {
     func openFleetChats() {
         if appState.selectedTab != .sessions { appState.select(.sessions) }
         appState.path = [.allHostsChats]
+        // A computer picked on All agents opens its own Sessions here too.
+        workOnFocusedFleetHost()
     }
 
     // MARK: Opening across hosts
@@ -144,14 +201,40 @@ extension RootShellView {
         FleetHomeView(fleet: fleet, onOpen: { openFleetAgent($0) }, onNewChat: { isFleetNewChatPresented = true },
                       onSetPinned: { setFleetPin($0, $1) }, onGroupAction: { performFleetGroupAction($0, $1) },
                       onOpenRoutines: { openFleet(.routines(profileID: $0.profileID), on: $0.hostID) },
-                      onNewAgent: { fleetGate(.newAgent) })
+                      onNewAgent: { fleetGate(.newAgent) }, hostFilter: fleetFocusBinding)
     }
 
-    /// Settings, Projects and other one-host screens: with several hosts, ask
-    /// which one first; with one, just open it.
+    var fleetFocusBinding: Binding<UUID?> {
+        Binding(get: { fleetFocus }, set: { focusFleet($0) })
+    }
+
+    /// All sessions while every computer shows. A picked computer gets its own Sessions screen.
+    func fleetChats(_ fleet: FleetStore) -> FleetChatsView {
+        FleetChatsView(fleet: fleet, hostFilter: fleetFocusBinding, filter: $fleetChatsFilter,
+                       onOpen: { openFleetChat($0) }, hostSessions: { fleetHostSessions($0) })
+    }
+
+    /// The focused computer's Sessions screen, as one-computer mode shows it, once it's the
+    /// working computer and connected.
+    private func fleetHostSessions(_ hostID: UUID) -> AnyView? {
+        guard hostID == fleet?.selectedHostID, isFleetHostReady else { return nil }
+        if case .sessions(let model)? = featureStore.preparedModel(for: .sessions) {
+            return AnyView(oneHostSessions(model))
+        }
+        return AnyView(ProgressView("Loading sessions")
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .task { _ = featureStore.prepareSessions(filteredTo: nil) })
+    }
+
+    /// Settings, Projects and other one-host screens: on the focused computer, else with
+    /// several, ask which one first; with one, just open it.
     func fleetGate(_ destination: FleetDestination) {
         guard let fleet, fleetModeOn, fleet.hosts.count > 1 else {
             performFleetOpen(.destination(destination))
+            return
+        }
+        if let focus = fleetFocus, fleet.hosts.contains(where: { $0.id == focus }), fleet.canOpen(focus) {
+            openFleet(.destination(destination), on: focus)
             return
         }
         fleetGateRequest = destination
@@ -172,7 +255,10 @@ extension RootShellView {
         recordLiveFleet()
         fleet.pendingOpen = FleetPendingOpen(hostID: hostID, open: open)
         appState.chatOpenedFromList = false
-        appState.select(.sessions)
+        // An all-hosts list stays under what opens, so Back goes there again.
+        let onAllHostsList = appState.path.first?.isAllHosts == true
+            || (appState.path.isEmpty && [.sessions, .scheduledTasks].contains(appState.selectedTab))
+        if !onAllHostsList { appState.select(.sessions) }
         fleet.select(hostID)
     }
 
@@ -321,7 +407,7 @@ extension RootShellView {
                 hostID: key.hostID, profileID: profileID,
                 storedSessionID: sessionCatalog.session(id: summary.id)?.remoteStoredID ?? summary.id,
                 appSessionID: summary.id, title: summary.title, preview: summary.preview,
-                updatedAt: summary.updatedAt, isActive: summary.isActive
+                updatedAt: summary.updatedAt, isActive: summary.isActive, origin: summary.origin
             )
         }
         let agentRows = key.agents.map { profile in

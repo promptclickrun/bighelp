@@ -48,16 +48,7 @@ struct SessionRow: View {
                             .frame(width: 8, height: 8)
                             .accessibilityHidden(true)
                     }
-                    if let origin = SessionOrigin.label(session.origin) {
-                        Text(origin)
-                            .font(.system(size: timeSize * 0.85, weight: .semibold))
-                            .foregroundStyle(theme.secondaryText)
-                            .lineLimit(1)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 1)
-                            .background(theme.incomingMessageBackground, in: .capsule)
-                            .fixedSize()
-                    }
+                    SessionOriginTag(source: session.origin, size: timeSize * 0.85)
                     Text(previewLine)
                         .font(.system(size: previewSize))
                         .foregroundStyle(theme.secondaryText)
@@ -345,6 +336,28 @@ struct SessionsGettingStartedView: View {
         }
         .padding(.vertical, BighelpTokens.space8)
         .accessibilityElement(children: .contain)
+    }
+
+    @BighelpThemeReader private var theme
+}
+
+/// Where a chat started (Telegram, Codex, Hermes Desktop…), as a small tag. Nothing when Hermes didn't say.
+struct SessionOriginTag: View {
+    let source: String?
+    var size: CGFloat = 13
+
+    var body: some View {
+        if let origin = SessionOrigin.label(source) {
+            Text(origin)
+                .font(.system(size: size, weight: .semibold))
+                .foregroundStyle(theme.secondaryText)
+                .lineLimit(1)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 1)
+                .background(theme.incomingMessageBackground, in: .capsule)
+                .fixedSize()
+                .accessibilityLabel("Started in \(origin)")
+        }
     }
 
     @BighelpThemeReader private var theme

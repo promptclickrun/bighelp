@@ -70,7 +70,7 @@ extension RootShellView {
         }
         #endif
         if appState.selectedTab != .sessions { appState.select(.sessions) }
-        appState.path = [.kanban]
+        showOneHostPage([.kanban])
     }
 
     @ViewBuilder

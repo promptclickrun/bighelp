@@ -246,7 +246,7 @@ struct WebhookEditorView: View {
         .navigationTitle("Webhooks")
         .navigationBarTitleDisplayMode(.inline)
         .task { if store.catalog == nil { await store.load() } }
-        .sheet(isPresented: $presentsCreate) {
+        .bighelpSheet(isPresented: $presentsCreate) {
             NavigationStack {
                 WebhookCreateForm { draft in
                     presentsCreate = false
@@ -255,7 +255,7 @@ struct WebhookEditorView: View {
             }
             .bighelpSheetSize(.standard)
         }
-        .sheet(isPresented: Binding(
+        .bighelpSheet(isPresented: Binding(
             get: { store.creationReceipt != nil },
             set: { if !$0 { store.discardCreationSecret() } }
         )) {

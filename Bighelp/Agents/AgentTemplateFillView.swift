@@ -241,7 +241,7 @@ private struct AgentTemplateFormPresenter: ViewModifier {
     let model: AgentEditorModel
 
     func body(content: Content) -> some View {
-        content.sheet(item: Binding(get: { model.templateForm },
+        content.bighelpSheet(item: Binding(get: { model.templateForm },
                                     set: { if $0 == nil { model.cancelTemplateForm() } })) { request in
             AgentTemplateFillView(request: request, onContinue: { model.finishTemplateForm($0) },
                                   onCancel: { model.cancelTemplateForm() })

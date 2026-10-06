@@ -219,7 +219,7 @@ struct SessionsView: View {
             otherAppsStore = store
             await store.load()
         }
-        .sheet(isPresented: Binding(get: { otherAppsStore?.preview != nil },
+        .bighelpSheet(isPresented: Binding(get: { otherAppsStore?.preview != nil },
                                     set: { if !$0 { otherAppsStore?.closePreview() } })) {
             if let store = otherAppsStore, let preview = store.preview {
                 OtherAppChatPreviewSheet(preview: preview, isWorking: store.isWorking, onOpen: {

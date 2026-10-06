@@ -119,14 +119,14 @@ struct HomeMenuPresentation<Menu: View>: ViewModifier {
             }
         } else if horizontalSizeClass == .regular {
             content
-                .fullScreenCover(isPresented: $isCoverPresented, onDismiss: onDismiss) {
+                .bighelpFullScreenCover(isPresented: $isCoverPresented, onDismiss: onDismiss) {
                     panel.presentationBackground(.clear)
                 }
                 .onChange(of: isPresented, initial: true) { _, presented in
                     presented ? open() : close()
                 }
         } else {
-            content.sheet(isPresented: $isPresented, onDismiss: onDismiss, content: menu)
+            content.bighelpSheet(isPresented: $isPresented, onDismiss: onDismiss, content: menu)
         }
     }
 

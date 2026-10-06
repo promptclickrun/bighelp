@@ -309,7 +309,7 @@ struct WorkspaceArtifactsView: View {
         }
         .modifier(ArtifactsNavigationChrome(isEmbedded: isEmbedded))
         .task { await store.refresh() }
-        .sheet(isPresented: Binding(
+        .bighelpSheet(isPresented: Binding(
             get: { store.openedAttachment != nil },
             set: { if !$0 { store.closeAttachment() } }
         )) {

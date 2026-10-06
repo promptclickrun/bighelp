@@ -44,7 +44,7 @@ struct ScheduledTaskDetailView: View {
                 }
                 .listStyle(.insetGrouped)
                 .scrollContentBackground(.hidden)
-                .sheet(isPresented: $isEditorPresented) {
+                .bighelpSheet(isPresented: $isEditorPresented) {
                     if let agent = agent(for: task) {
                         NavigationStack {
                             ScheduledTaskEditorView(store: store, agent: agent, task: task, directory: agents)
@@ -52,7 +52,7 @@ struct ScheduledTaskDetailView: View {
                         .bighelpSheetSize(.standard)
                     }
                 }
-                .sheet(isPresented: $isDuplicatePickerPresented) {
+                .bighelpSheet(isPresented: $isDuplicatePickerPresented) {
                     NavigationStack {
                         AgentSelectionView(
                             title: "Duplicate for another agent",

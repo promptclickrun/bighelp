@@ -1259,6 +1259,7 @@
 		E8DF089A91EB2ABB11E218BD /* FleetModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30A97642BFC438C4DD69B21D /* FleetModels.swift */; };
 		E93AE9C0CD311464DD107F29 /* WorkflowsClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 662F6DEE9C28B0A2688B53CE /* WorkflowsClient.swift */; };
 		E95CD5159D7486D80A4BFBC5 /* SkillsAndToolsCatalogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 033B2BFE02C6DE80789B8372 /* SkillsAndToolsCatalogView.swift */; };
+		E9F0842DBF61686F095825E6 /* MacSheetPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07588E35220CDB0BE85082C3 /* MacSheetPresentationTests.swift */; };
 		EA3DDB1619ED472510F1E737 /* get.json in Resources */ = {isa = PBXBuildFile; fileRef = E599788823163963DA112A96 /* get.json */; };
 		EA5BA6383F5EA2038E045B40 /* BighelpHostRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B4E385A914CB050D5C4ADC7 /* BighelpHostRegistry.swift */; };
 		EA63F6D50914EE70D66F7F1B /* KanbanFailure.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9CCFDF24FFE617AF88B26F3 /* KanbanFailure.swift */; };
@@ -1534,6 +1535,7 @@
 		06E0752CDEB93F69DFC3661C /* ModelNameCatalogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelNameCatalogTests.swift; sourceTree = "<group>"; };
 		06FD31C123E82129F64466A0 /* ComposerReturnKeyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerReturnKeyTests.swift; sourceTree = "<group>"; };
 		0719AE56C96E86FC621D9B18 /* BighelpWorkActivityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpWorkActivityTests.swift; sourceTree = "<group>"; };
+		07588E35220CDB0BE85082C3 /* MacSheetPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacSheetPresentationTests.swift; sourceTree = "<group>"; };
 		07658E64F41039CE24E408FE /* AttachmentWireModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachmentWireModels.swift; sourceTree = "<group>"; };
 		07BF4FF759A3046AA465AF14 /* EmberBrand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmberBrand.swift; sourceTree = "<group>"; };
 		07D6D42F8892E938661C3EFE /* soul-anchor.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "soul-anchor.md"; sourceTree = "<group>"; };
@@ -3949,6 +3951,7 @@
 				2EE9CF48D63A477B018A403D /* LiquidOrbPresentationTests.swift */,
 				930BE7C3699C14551E96C567 /* LiveVoiceFailureRecoveryTests.swift */,
 				F50CA5FA31F95111A047BE14 /* LiveVoiceReadinessTests.swift */,
+				07588E35220CDB0BE85082C3 /* MacSheetPresentationTests.swift */,
 				83DB0B11E9248D7C1336AF5E /* ManagedNotificationLedgerMigrationTests.swift */,
 				74B255BFB0C7ACD56433F907 /* ManagedNotificationServiceTests.swift */,
 				66AF282858CB05C3A0DE1D5A /* ManagedWorkSnapshotTests.swift */,
@@ -6598,6 +6601,7 @@
 				D2C62A26D889E650BD2ECBE4 /* LiveVoiceFailureRecoveryTests.swift in Sources */,
 				C5C7D6DF90F63E17E68BD8F9 /* LiveVoiceReadinessTests.swift in Sources */,
 				F9407F5091A037AC44AFF736 /* MCPLargeServerTests.swift in Sources */,
+				E9F0842DBF61686F095825E6 /* MacSheetPresentationTests.swift in Sources */,
 				84DDBF28FDB2C92EE78AF8D6 /* ManagedNotificationLedgerMigrationTests.swift in Sources */,
 				1E63EC1B22266247584C5C61 /* ManagedNotificationServiceTests.swift in Sources */,
 				33447F02B1CE820CDFC11FCC /* ManagedWorkSnapshotTests.swift in Sources */,

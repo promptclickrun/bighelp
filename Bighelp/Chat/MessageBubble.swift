@@ -239,7 +239,7 @@ struct MessageBubble: View {
                         .accessibilityIdentifier("chat.message.copied")
                 }
             }
-            .sheet(isPresented: $isSelectingText) {
+            .bighelpSheet(isPresented: $isSelectingText) {
                 NativeTextSelectionSheet(
                     text: interaction.copyText
                 )
@@ -256,7 +256,7 @@ struct MessageBubble: View {
                     .bighelpPopoverDismissal(isPresented: $isReactionPickerPresented)
             }
             #else
-            .sheet(isPresented: $isReactionPickerPresented) {
+            .bighelpSheet(isPresented: $isReactionPickerPresented) {
                 reactionPicker
                     .presentationDetents([.medium])
                     .presentationDragIndicator(.visible)

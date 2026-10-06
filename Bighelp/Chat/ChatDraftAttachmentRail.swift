@@ -125,7 +125,7 @@ struct DraftAttachmentRail: View {
                 .padding(.leading, leadingInset)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
-                .sheet(isPresented: $isSheetPresented) {
+                .bighelpSheet(isPresented: $isSheetPresented) {
                     DraftAttachmentsSheet(model: model)
                         .presentationDetents([.medium, .large])
                         .presentationDragIndicator(.visible)
@@ -299,7 +299,7 @@ struct DraftAttachmentsSheet: View {
                     }
                 }
             }
-            .sheet(item: $previewing) { attachment in
+            .bighelpSheet(item: $previewing) { attachment in
                 ChatAttachmentPreviewView(attachment: attachment)
                     .bighelpSheetSize(.large)
             }

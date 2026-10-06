@@ -326,7 +326,7 @@ struct ModelAdministrationView: View {
             if store.snapshot == nil { await store.load() }
             _ = await reasoningLoad
         }
-        .sheet(item: $assignmentTarget) { target in
+        .bighelpSheet(item: $assignmentTarget) { target in
             ModelAdministrationPicker(store: store, target: target, agentName: agentName) { assignmentTarget = nil }
                 .bighelpSheetSize(.standard)
         }
@@ -757,7 +757,7 @@ private struct ModelAdministrationMoAView: View {
         }
         .navigationTitle("Mixture of Agents")
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(item: $slotTarget) { target in
+        .bighelpSheet(item: $slotTarget) { target in
             slotPicker(target)
                 .bighelpSheetSize(.standard)
         }

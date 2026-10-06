@@ -32,8 +32,8 @@ struct StockGitReviewView: View {
                 .accessibilityLabel("Manage branches and worktrees")
             }
         }
-        .sheet(isPresented: $showsCommit) { commitSheet.bighelpSheetSize(.standard) }
-        .sheet(item: Binding(
+        .bighelpSheet(isPresented: $showsCommit) { commitSheet.bighelpSheetSize(.standard) }
+        .bighelpSheet(item: Binding(
             get: { store.diff.map { IdentifiedStockGitDiff(value: $0) } },
             set: { if $0 == nil { store.closeDiff() } }
         )) { identified in

@@ -454,7 +454,7 @@ struct FleetSheets: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .sheet(item: $gate, onDismiss: {
+            .bighelpSheet(item: $gate, onDismiss: {
                 guard let picked = pickedHost else { return }
                 pickedHost = nil
                 onGate(picked.destination, picked.hostID)
@@ -466,7 +466,7 @@ struct FleetSheets: ViewModifier {
                     }
                 }
             }
-            .sheet(isPresented: $isNewChatPresented, onDismiss: {
+            .bighelpSheet(isPresented: $isNewChatPresented, onDismiss: {
                 if let group = pickedGroup {
                     pickedGroup = nil
                     onNewGroup?(group)

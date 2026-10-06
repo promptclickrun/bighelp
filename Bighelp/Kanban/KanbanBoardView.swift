@@ -28,11 +28,11 @@ struct KanbanScreen: View {
             .toolbar { toolbar }
             .searchable(text: $model.searchText, placement: .navigationBarDrawer(displayMode: .automatic),
                         prompt: "Find a card")
-            .sheet(item: $openTask) { ref in
+            .bighelpSheet(item: $openTask) { ref in
                 KanbanTaskSheet(model: model, taskID: ref.id, isNerdMode: isNerdMode)
                     .bighelpSheetSize(.large)
             }
-            .sheet(item: $newTaskLane) { lane in
+            .bighelpSheet(item: $newTaskLane) { lane in
                 KanbanNewTaskSheet(model: model, lane: lane)
                     .bighelpSheetSize(.standard)
             }

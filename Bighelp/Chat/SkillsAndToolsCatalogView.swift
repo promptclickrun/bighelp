@@ -59,17 +59,17 @@ struct SkillsAndToolsCatalogView: View {
                 .accessibilityIdentifier("skills-tools.add")
             }
         }
-        .sheet(isPresented: $isPresentingEditor, onDismiss: store.clearDocument) {
+        .bighelpSheet(isPresented: $isPresentingEditor, onDismiss: store.clearDocument) {
             if let document = store.document {
                 SkillEditorSheet(store: store, agentID: agentID, document: document)
                     .bighelpSheetSize(.standard)
             }
         }
-        .sheet(isPresented: $isPresentingWizard) {
+        .bighelpSheet(isPresented: $isPresentingWizard) {
             SkillCreationWizard(store: store, agentID: agentID)
                 .bighelpSheetSize(.standard)
         }
-        .sheet(item: $selectedCapability, onDismiss: store.clearControl) { selection in
+        .bighelpSheet(item: $selectedCapability, onDismiss: store.clearControl) { selection in
             CapabilityControlSheet(store: store, selection: selection)
                 .bighelpSheetSize(.standard)
         }

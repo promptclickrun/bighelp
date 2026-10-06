@@ -159,7 +159,7 @@ struct SettingsView: View {
         .scrollContentBackground(.hidden)
         .background(theme.canvas.ignoresSafeArea())
         .navigationTitle("Settings")
-        .sheet(isPresented: $isPersonalitiesPresented) {
+        .bighelpSheet(isPresented: $isPersonalitiesPresented) {
             NavigationStack {
                 PersonalitiesView(store: personalities)
             }

@@ -53,7 +53,7 @@ struct WorkspaceFileTransferView: View {
                 exportError = "The downloaded file was verified, but the device did not export a copy."
             }
         }
-        .sheet(item: $mediaPlayback) { playback in
+        .bighelpSheet(item: $mediaPlayback) { playback in
             WorkspaceManagedMediaView(playback: playback)
                 .bighelpSheetSize(.large)
         }

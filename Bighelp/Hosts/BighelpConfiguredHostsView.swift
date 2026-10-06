@@ -281,7 +281,7 @@ struct BighelpConfiguredHostView: View {
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .modifier(HostRenamePrompt(host: $renaming, registry: registry))
-        .sheet(isPresented: $isAccessEditorPresented) {
+        .bighelpSheet(isPresented: $isAccessEditorPresented) {
             if let host {
                 HostAccessEditorView(endpoint: host.endpoint) {
                     accessRevision += 1

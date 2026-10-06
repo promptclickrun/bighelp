@@ -82,14 +82,14 @@ struct MCPManagementView: View {
         .searchable(text: $search, prompt: "Search MCP servers")
         .refreshable { await model.load() }
         .task { if model.snapshot == nil { await model.load() } }
-        .sheet(isPresented: $showsAdd) {
+        .bighelpSheet(isPresented: $showsAdd) {
             MCPServerFormView(isBusy: model.isBusy) { draft in
                 showsAdd = false
                 Task { await model.add(draft) }
             }
             .bighelpSheetSize(.standard)
         }
-        .sheet(item: $catalogCandidate) { entry in
+        .bighelpSheet(item: $catalogCandidate) { entry in
             MCPCatalogInstallView(entry: entry, isBusy: model.isBusy) { environment, enabled in
                 catalogCandidate = nil
                 Task { await model.install(entry, environment: environment, enable: enabled) }
@@ -343,7 +343,7 @@ private struct MCPServerDetailView: View {
                   [.starting, .authorizationRequired].contains(flow.status) else { return }
             Task { await model.pollOAuth(server) }
         }
-        .sheet(isPresented: $showsCredentialUpdate) {
+        .bighelpSheet(isPresented: $showsCredentialUpdate) {
             MCPServerCredentialEditorView(model: model, serverName: serverName)
                 .bighelpSheetSize(.standard)
         }

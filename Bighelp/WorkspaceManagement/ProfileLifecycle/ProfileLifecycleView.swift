@@ -65,16 +65,16 @@ struct ProfileLifecycleView: View {
             }
         }
         .onDisappear { if !store.ownsScope { store.retire() } }
-        .sheet(isPresented: reviewBinding(\.renameReview, clear: store.clearRenameReview)) {
+        .bighelpSheet(isPresented: reviewBinding(\.renameReview, clear: store.clearRenameReview)) {
             if let review = store.renameReview { renameReviewSheet(review).bighelpSheetSize(.standard) }
         }
-        .sheet(isPresented: reviewBinding(\.deleteReview, clear: store.clearDeleteReview)) {
+        .bighelpSheet(isPresented: reviewBinding(\.deleteReview, clear: store.clearDeleteReview)) {
             if let review = store.deleteReview { deleteReviewSheet(review).bighelpSheetSize(.standard) }
         }
-        .sheet(isPresented: reviewBinding(\.activationReview, clear: store.clearActivationReview)) {
+        .bighelpSheet(isPresented: reviewBinding(\.activationReview, clear: store.clearActivationReview)) {
             if let review = store.activationReview { activationReviewSheet(review).bighelpSheetSize(.standard) }
         }
-        .sheet(isPresented: reviewBinding(\.importReview, clear: store.clearImportReview)) {
+        .bighelpSheet(isPresented: reviewBinding(\.importReview, clear: store.clearImportReview)) {
             if let review = store.importReview { importReviewSheet(review).bighelpSheetSize(.standard) }
         }
         .confirmationDialog(

@@ -215,11 +215,11 @@ struct RootShellView: View {
             isHostSettled: nativeRuntime.map { $0.isReady && !$0.isSuspended && !$0.isRefreshing } ?? true,
             signIn: $workspaceSignIn, close: closeWorkspacePresentations,
             reattach: reattachWorkspacePresentations))
-        .sheet(item: $workspaceProfileEditor) { editor in
+        .bighelpSheet(item: $workspaceProfileEditor) { editor in
             AgentEditorView(model: editor, runtimeDefaultsClient: agentRuntimeDefaults, onCompleted: { _ in })
                 .environment(\.agentDeletion, agentDeletionAction)
         }
-        .sheet(isPresented: $isGroupCreationPresented) {
+        .bighelpSheet(isPresented: $isGroupCreationPresented) {
             BotModeCreateRoomView(rooms: botModeRooms, agents: agents, seedProfileID: groupCreationSeed) { roomID in
                 // A reconnect while the sheet was open is still this computer.
                 guard let owner = groupCreationOwner, isCurrentSignIn(owner),
@@ -228,7 +228,7 @@ struct RootShellView: View {
             }
             .bighelpSheetSize(.standard)
         }
-        .sheet(isPresented: Binding(
+        .bighelpSheet(isPresented: Binding(
             get: { groupSettingsModel != nil }, set: { if !$0 { groupSettingsModel = nil } }
         )) {
             if let model = groupSettingsModel {
@@ -236,7 +236,7 @@ struct RootShellView: View {
                     .bighelpSheetSize(.standard)
             }
         }
-        .sheet(isPresented: Binding(get: { hostRegistry?.isSetupPresented == true },
+        .bighelpSheet(isPresented: Binding(get: { hostRegistry?.isSetupPresented == true },
                                    set: { if !$0 { hostRegistry?.finishSetup() } })) {
             if let hostRegistry {
                 NavigationStack {
@@ -624,7 +624,7 @@ struct RootShellView: View {
                 .modifier(OpenErrorPresentation(root: self))
         }
         .modifier(OpenErrorPresentation(root: self))
-        .sheet(isPresented: $isUnifiedSettingsPresented, onDismiss: {
+        .bighelpSheet(isPresented: $isUnifiedSettingsPresented, onDismiss: {
             let action = afterSettingsDismiss
             afterSettingsDismiss = nil
             action?()
@@ -641,7 +641,7 @@ struct RootShellView: View {
             .bighelpSheetSize()
             .presentationDragIndicator(.visible)
         }
-        .sheet(isPresented: $isHermesWorkspacePresented) {
+        .bighelpSheet(isPresented: $isHermesWorkspacePresented) {
             HermesWorkspacePickerView(
                 store: hermesWorkspaces,
                 agentID: workspaceAgentID
@@ -1207,7 +1207,7 @@ struct RootShellView: View {
             } message: {
                 Text(actionErrorMessage ?? "Try again.")
             }
-            .sheet(isPresented: $isHostStatusPresented) {
+            .bighelpSheet(isPresented: $isHostStatusPresented) {
                 NavigationStack {
                     Form {
                         HostRuntimeSection(store: currentHostRuntime, agents: agents, theme: theme)

@@ -39,7 +39,7 @@ struct ProjectsLifecycleView: View {
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await store.load() }
         .task { if store.overview == nil { await store.load() } }
-        .sheet(item: $createRepository) { repository in
+        .bighelpSheet(item: $createRepository) { repository in
             createProjectSheet(repository)
                 .presentationDetents([.medium])
         }

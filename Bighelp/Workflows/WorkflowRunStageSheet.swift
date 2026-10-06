@@ -63,7 +63,7 @@ struct WorkflowRunStagePage: View {
                     }
                 }
             }
-            .sheet(item: $opened) { output in
+            .bighelpSheet(item: $opened) { output in
                 WorkflowRunFileSheet(model: model, context: context, output: output)
                     .bighelpSheetSize(.large)
             }

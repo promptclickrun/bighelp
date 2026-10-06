@@ -122,7 +122,7 @@ struct BighelpSessionContentDisclosure: View {
                     .frame(minHeight: 44)
             }
             .accessibilityIdentifier("chat.complete-content.\(rowID)")
-            .sheet(isPresented: $isPresented) {
+            .bighelpSheet(isPresented: $isPresented) {
                 BighelpSessionContentSheet(sessionID: sessionID, rowID: rowID, reader: reader)
                     .bighelpSheetSize(.standard)
             }

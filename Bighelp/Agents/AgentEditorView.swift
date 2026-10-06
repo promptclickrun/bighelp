@@ -248,7 +248,7 @@ struct AgentEditorView: View {
             guard let selection else { return }
             preparePhotoAvatar(selection)
         }
-        .sheet(isPresented: $isAvatarCreatorPresented) {
+        .bighelpSheet(isPresented: $isAvatarCreatorPresented) {
             AvatarCreatorView(
                 start: creatorStart ?? currentCreatorStart, characters: surpriseLook, agentName: heroTitle,
                 faceName: model.faceName,
@@ -271,7 +271,7 @@ struct AgentEditorView: View {
         }
         .agentTemplateForm(model)
         // Modal ownership must outlive the lazy sections while a picker is presented.
-        .sheet(item: $modelPickerScope) { scope in
+        .bighelpSheet(item: $modelPickerScope) { scope in
             if let defaults = runtimeDefaultsModel {
                 agentModelPicker(defaults: defaults, scope: scope)
             }

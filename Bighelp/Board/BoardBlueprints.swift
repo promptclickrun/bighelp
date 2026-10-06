@@ -673,7 +673,7 @@ private struct BoardBlueprintsPresenter: ViewModifier {
     @State private var outcome: BlueprintOutcome?
 
     func body(content: Content) -> some View {
-        content.sheet(isPresented: $isPresented, onDismiss: {
+        content.bighelpSheet(isPresented: $isPresented, onDismiss: {
             guard let outcome else { return }
             self.outcome = nil
             outcome.perform(in: context)
@@ -699,7 +699,7 @@ private struct BlueprintFillPresenter: ViewModifier {
     @State private var outcome: BlueprintOutcome?
 
     func body(content: Content) -> some View {
-        content.sheet(item: $blueprint, onDismiss: {
+        content.bighelpSheet(item: $blueprint, onDismiss: {
             guard let outcome else { return }
             self.outcome = nil
             outcome.perform(in: context)

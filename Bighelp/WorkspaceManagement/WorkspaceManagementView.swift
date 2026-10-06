@@ -28,11 +28,11 @@ struct WorkspaceManagementView: View {
         .navigationBarTitleDisplayMode(.inline)
         .tint(theme.action)
         .task(id: destination) { await store.load(destination) }
-        .sheet(item: $store.review) { mutation in
+        .bighelpSheet(item: $store.review) { mutation in
             WorkspaceMutationReviewView(store: store, mutation: mutation)
                 .bighelpSheetSize(.standard)
         }
-        .sheet(isPresented: Binding(
+        .bighelpSheet(isPresented: Binding(
             get: { store.filePreview != nil },
             set: { if !$0 { store.closePreview() } }
         )) {

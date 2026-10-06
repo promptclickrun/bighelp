@@ -191,7 +191,7 @@ struct ProjectChangesView: View {
                 }
             }
         }
-        .sheet(isPresented: $isCommitPresented) {
+        .bighelpSheet(isPresented: $isCommitPresented) {
             commitSheet
                 .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)

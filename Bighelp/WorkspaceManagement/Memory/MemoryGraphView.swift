@@ -82,7 +82,7 @@ struct MemoryGraphView: View {
         .listStyle(.insetGrouped)
         .searchable(text: $store.search, prompt: "Search memories and learned skills")
         .refreshable { await store.refreshGraph() }
-        .sheet(item: $presentedNode, onDismiss: { store.closeNode() }) { node in
+        .bighelpSheet(item: $presentedNode, onDismiss: { store.closeNode() }) { node in
             MemoryNodeDetailView(store: store, node: node)
                 .bighelpSheetSize(.standard)
         }

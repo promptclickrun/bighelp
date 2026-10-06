@@ -103,7 +103,7 @@ struct WorkflowRunContent: View {
                       document: ChatAttachmentDocument(data: exporting?.data ?? Data()),
                       contentType: UTType(filenameExtension: "md") ?? .plainText,
                       defaultFilename: exporting?.name) { _ in exporting = nil }
-        .sheet(item: $openStage) { selection in
+        .bighelpSheet(item: $openStage) { selection in
             WorkflowRunStageSheet(model: model, context: context, stageKey: selection.id)
                 .bighelpSheetSize(.large)
         }

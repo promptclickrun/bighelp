@@ -30,7 +30,7 @@ struct HostHooksView: View {
         .onChange(of: store.shellHooks?.validEvents ?? []) { _, _ in
             adoptFirstEventIfNeeded()
         }
-        .sheet(
+        .bighelpSheet(
             isPresented: Binding(
                 get: { store.hookCreateReview != nil },
                 set: { if !$0 { store.cancelHookReview() } }
@@ -46,7 +46,7 @@ struct HostHooksView: View {
                 .bighelpSheetSize(.standard)
             }
         }
-        .sheet(
+        .bighelpSheet(
             isPresented: Binding(
                 get: { store.hookDeleteReview != nil },
                 set: { if !$0 { store.cancelHookReview() } }

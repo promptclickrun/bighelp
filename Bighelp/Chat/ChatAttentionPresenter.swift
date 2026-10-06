@@ -116,7 +116,7 @@ private struct ChatAttentionPresenter: ViewModifier {
                     ChatAttentionBar(prompts: prompts, agentName: agentName) { isPresented = true }
                 }
             }
-            .sheet(isPresented: $isPresented) {
+            .bighelpSheet(isPresented: $isPresented) {
                 if let client { DirectHermesAttentionView(client: client) }
             }
             .onChange(of: prompts.map(\.attentionKey), initial: true) { _, _ in popUpNewArrivals() }

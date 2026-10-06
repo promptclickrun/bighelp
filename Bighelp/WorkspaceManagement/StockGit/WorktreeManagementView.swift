@@ -33,7 +33,7 @@ struct WorktreeManagementView: View {
                 .accessibilityLabel("Add worktree")
             }
         }
-        .sheet(isPresented: $showsNewWorktree) {
+        .bighelpSheet(isPresented: $showsNewWorktree) {
             newWorktreeSheet
                 .presentationDetents([.medium])
                 .bighelpSheetSize(.compact)

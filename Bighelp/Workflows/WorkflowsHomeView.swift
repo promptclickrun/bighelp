@@ -111,7 +111,7 @@ struct WorkflowsHomeView: View {
         } message: {
             Text(store.message ?? "")
         }
-        .sheet(isPresented: $isArchivedPresented) {
+        .bighelpSheet(isPresented: $isArchivedPresented) {
             WorkflowsArchivedView(context: context)
                 .bighelpSheetSize(.standard)
         }

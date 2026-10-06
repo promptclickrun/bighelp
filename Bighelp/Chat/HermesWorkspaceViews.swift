@@ -89,7 +89,7 @@ struct HermesWorkspaceManagerContent: View {
                 onArchive: { workspacePendingArchive = $0 }
             )
         }
-        .sheet(isPresented: $isCreatePresented) {
+        .bighelpSheet(isPresented: $isCreatePresented) {
             HermesWorkspaceCreateView(store: store, agentID: agentID)
         }
         .confirmationDialog(

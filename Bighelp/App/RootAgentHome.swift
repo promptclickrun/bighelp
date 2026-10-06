@@ -572,13 +572,13 @@ extension RootShellView {
                 agents: agents, fleet: fleet, isActive: scenePhase == .active,
                 demo: usesWorkspaceFixtures && workspaceConnections?.isDirectSelected != true
                     ? (sessionCatalog, featureStore.scheduledTasks) : nil))
-            .sheet(isPresented: Binding(get: { profileAgentID != nil }, set: { if !$0 { profileAgentID = nil } }),
+            .bighelpSheet(isPresented: Binding(get: { profileAgentID != nil }, set: { if !$0 { profileAgentID = nil } }),
                    onDismiss: runAfterHomeSheet) {
                 if let id = profileAgentID, let agent = agents.profiles.first(where: { $0.id == id }) {
                     agentProfileSheet(agent)
                 }
             }
-            .sheet(item: $newChatPicker) { request in
+            .bighelpSheet(item: $newChatPicker) { request in
                 BotModeCreateRoomView(rooms: botModeRooms, agents: agents, seedProfileID: request.seed,
                                       onStartDirect: { startHomeChat(with: $0) }) { roomID in
                     guard request.owner == currentWorkspaceOwner else { return }
@@ -586,7 +586,7 @@ extension RootShellView {
                 }
                 .bighelpSheetSize(.standard)
             }
-            .sheet(isPresented: $isAgentSwitcherPresented, onDismiss: runAfterHomeSheet) {
+            .bighelpSheet(isPresented: $isAgentSwitcherPresented, onDismiss: runAfterHomeSheet) {
                 agentSwitcherSheet
             }
             .modifier(MacSidebarMemory(isOpen: $isHomeDrawerPresented,

@@ -110,7 +110,7 @@ struct SkillsHubManagementView: View {
         }
         .refreshable { await model.load() }
         .task { if model.snapshot == nil { await model.load() } }
-        .sheet(item: Binding(
+        .bighelpSheet(item: Binding(
             get: { model.review },
             set: { if $0 == nil { model.dismissReview() } }
         )) { review in

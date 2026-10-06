@@ -1038,7 +1038,7 @@ struct DirectHermesSecurePromptOverlay: View {
         Color.clear
             .allowsHitTesting(false)
             .accessibilityHidden(true)
-            .sheet(item: store.presentationBinding()) { prompt in
+            .bighelpSheet(item: store.presentationBinding()) { prompt in
                 DirectHermesSecurePromptView(
                     store: store,
                     prompt: prompt
@@ -1378,7 +1378,7 @@ enum DirectHermesSecurePromptFixture {
             NavigationStack {
                 Text("Chat").navigationTitle("Juniper")
             }
-            .sheet(item: store.presentationBinding()) { prompt in
+            .bighelpSheet(item: store.presentationBinding()) { prompt in
                 DirectHermesSecurePromptView(store: store, prompt: prompt)
             }
             .task { await request() }

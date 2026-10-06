@@ -164,7 +164,7 @@ private struct AgentActionsSheets: ViewModifier {
         content
             .onAppear { actions.adopt(owner: config.owner) }
             .onChange(of: config.owner) { _, owner in actions.adopt(owner: owner) }
-            .sheet(item: $actions.editor) { model in
+            .bighelpSheet(item: $actions.editor) { model in
                 let canReadDefaults = config.supports(.modelsRead, profileID: model.editingAgentID)
                 let canEditDefaults = config.supports(.agentDefaultsEdit, profileID: model.editingAgentID)
                 AgentEditorView(
@@ -176,11 +176,11 @@ private struct AgentActionsSheets: ViewModifier {
                         : nil
                 ) { _ in actions.editor = nil }
             }
-            .sheet(item: $actions.shortcutsAgent) { agent in
+            .bighelpSheet(item: $actions.shortcutsAgent) { agent in
                 AgentShortcutsView(agent: agent)
                     .bighelpSheetSize(.standard)
             }
-            .sheet(item: $actions.duplicateModel) { model in
+            .bighelpSheet(item: $actions.duplicateModel) { model in
                 AgentDuplicateView(model: model) {
                     actions.duplicateModel = nil
                     Task { await config.store.loadReportingErrors() }

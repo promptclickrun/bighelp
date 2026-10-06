@@ -1,4 +1,6 @@
 import CoreGraphics
+import Foundation
+import SwiftUI
 import Testing
 @testable import Bighelp
 
@@ -25,6 +27,23 @@ struct ChatLayoutPreferencesTests {
         let scales = ChatTextSize.allCases.map(\.scale)
         #expect(scales == scales.sorted())
         #expect(ChatTextSize(rawValue: 2) == .larger)
+    }
+
+    @Test func messagesStartOneStepSmallerButASavedSizeStays() throws {
+        let suite = "bighelp.tests.chat-text-size.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        func current() -> ChatTextSize {
+            AppStorage(wrappedValue: ChatTextSize.defaultSize, ChatLayoutPreferences.textSizeKey, store: defaults).wrappedValue
+        }
+
+        #expect(ChatTextSize.defaultSize == .small)
+        #expect(current() == .small)
+        // Someone who picked the old default keeps it.
+        defaults.set(ChatTextSize.standard.rawValue, forKey: ChatLayoutPreferences.textSizeKey)
+        #expect(current() == .standard)
+        defaults.set(ChatTextSize.larger.rawValue, forKey: ChatLayoutPreferences.textSizeKey)
+        #expect(current() == .larger)
     }
 
     @Test func compactSpacingIsTighterThanComfortable() {

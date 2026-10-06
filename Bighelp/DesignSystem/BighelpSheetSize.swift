@@ -31,6 +31,52 @@ enum BighelpSheetSize: Sendable {
 }
 
 extension View {
+    /// `.sheet`, with a Mac fix: Catalyst sometimes leaves a sheet on screen after
+    /// SwiftUI closes it (Done runs, the state says closed, but the sheet stays,
+    /// stops updating and blocks the window until Esc). The screen that opened it
+    /// then closes it through UIKit. Use it for every sheet.
+    func bighelpSheet<Content: View>(isPresented: Binding<Bool>, onDismiss: (() -> Void)? = nil,
+                                     @ViewBuilder content: @escaping () -> Content) -> some View {
+        #if targetEnvironment(macCatalyst)
+        sheet(isPresented: isPresented, onDismiss: onDismiss, content: content)
+            .background { BighelpMacSheetCloser(token: isPresented.wrappedValue ? AnyHashable(true) : nil) }
+        #else
+        sheet(isPresented: isPresented, onDismiss: onDismiss, content: content)
+        #endif
+    }
+
+    func bighelpSheet<Item: Identifiable, Content: View>(item: Binding<Item?>, onDismiss: (() -> Void)? = nil,
+                                                         @ViewBuilder content: @escaping (Item) -> Content) -> some View {
+        #if targetEnvironment(macCatalyst)
+        sheet(item: item, onDismiss: onDismiss, content: content)
+            .background { BighelpMacSheetCloser(token: item.wrappedValue.map { AnyHashable($0.id) }) }
+        #else
+        sheet(item: item, onDismiss: onDismiss, content: content)
+        #endif
+    }
+
+    /// `.fullScreenCover`, with the same Mac fix as `bighelpSheet`.
+    func bighelpFullScreenCover<Content: View>(isPresented: Binding<Bool>, onDismiss: (() -> Void)? = nil,
+                                               @ViewBuilder content: @escaping () -> Content) -> some View {
+        #if targetEnvironment(macCatalyst)
+        fullScreenCover(isPresented: isPresented, onDismiss: onDismiss, content: content)
+            .background { BighelpMacSheetCloser(token: isPresented.wrappedValue ? AnyHashable(true) : nil) }
+        #else
+        fullScreenCover(isPresented: isPresented, onDismiss: onDismiss, content: content)
+        #endif
+    }
+
+    func bighelpFullScreenCover<Item: Identifiable, Content: View>(
+        item: Binding<Item?>, onDismiss: (() -> Void)? = nil, @ViewBuilder content: @escaping (Item) -> Content
+    ) -> some View {
+        #if targetEnvironment(macCatalyst)
+        fullScreenCover(item: item, onDismiss: onDismiss, content: content)
+            .background { BighelpMacSheetCloser(token: item.wrappedValue.map { AnyHashable($0.id) }) }
+        #else
+        fullScreenCover(item: item, onDismiss: onDismiss, content: content)
+        #endif
+    }
+
     /// Keeps UIKit in sync when a reopened Catalyst popover closes in SwiftUI.
     func bighelpPopoverDismissal(isPresented: Binding<Bool>) -> some View {
         #if targetEnvironment(macCatalyst)
@@ -122,6 +168,61 @@ private struct BighelpChatPanelPresenter<Panel: View>: ViewModifier {
                     .bighelpPopoverDismissal(isPresented: $isPresented)
                     .onDisappear { onDismiss?() }
             }
+    }
+}
+
+/// Remembers the sheet UIKit put up for one `bighelpSheet`, and closes it if
+/// it's still up a moment after SwiftUI closed it.
+private struct BighelpMacSheetCloser: UIViewControllerRepresentable {
+    /// What's presented: nil while closed, the item's ID for `item:` sheets.
+    let token: AnyHashable?
+
+    final class Coordinator {
+        weak var sheet: UIViewController?
+        var token: AnyHashable?
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeUIViewController(context: Context) -> UIViewController {
+        let controller = UIViewController()
+        controller.view.isUserInteractionEnabled = false
+        controller.view.backgroundColor = .clear
+        controller.view.isAccessibilityElement = false
+        return controller
+    }
+
+    func updateUIViewController(_ controller: UIViewController, context: Context) {
+        let coordinator = context.coordinator
+        guard token != coordinator.token else { return }
+        coordinator.token = token
+        if let token {
+            let before = coordinator.sheet ?? Self.presenter(of: controller)?.presentedViewController
+            // SwiftUI puts the sheet up after this update.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak controller] in
+                guard coordinator.token == token, let controller,
+                      let sheet = Self.presenter(of: controller)?.presentedViewController, sheet !== before else { return }
+                coordinator.sheet = sheet
+            }
+        } else {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                guard coordinator.token == nil, let sheet = coordinator.sheet else { return }
+                coordinator.sheet = nil
+                // SwiftUI closed it, or is closing it: nothing to do.
+                guard sheet.presentingViewController != nil, sheet.view.window != nil, !sheet.isBeingDismissed else { return }
+                sheet.dismiss(animated: true)
+            }
+        }
+    }
+
+    /// The nearest controller above this one that has something presented.
+    private static func presenter(of controller: UIViewController) -> UIViewController? {
+        var candidate = controller.parent
+        while let current = candidate {
+            if current.presentedViewController != nil { return current }
+            candidate = current.parent
+        }
+        return controller.view.window?.rootViewController
     }
 }
 

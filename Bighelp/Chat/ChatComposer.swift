@@ -139,7 +139,7 @@ struct ChatComposer: View {
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { _ in
             companionAdventureResetToken &+= 1
         }
-        .sheet(item: $presentedSheet, onDismiss: restoreDraftFocus) { _ in
+        .bighelpSheet(item: $presentedSheet, onDismiss: restoreDraftFocus) { _ in
             ExpandedDraftEditor(
                 model: model,
                 agentName: agentName,
@@ -154,7 +154,7 @@ struct ChatComposer: View {
             .presentationDragIndicator(.visible)
             .bighelpSheetSize(.standard)
         }
-        .sheet(item: $presentedStatus) { destination in
+        .bighelpSheet(item: $presentedStatus) { destination in
             Group {
                 switch destination {
                 case .goal:

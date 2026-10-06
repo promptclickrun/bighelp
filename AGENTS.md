@@ -235,6 +235,9 @@ sections can crash only on devices ("Thread stack size exceeded").
 - Sheets open as panels at their content's minimum size and ignore detents: put `.bighelpSheetSize(.compact |
   .standard | .large)` on every sheet's content. Prefer popovers for pickers anchored to a button. Menus draw only
   their label (`BighelpMacMenuStyle`). Long-press-only actions need a `.contextMenu` (right-click) on the Mac.
+- Present with `.bighelpSheet` and `.bighelpFullScreenCover`, never `.sheet` or `.fullScreenCover`. After a few
+  sheets, Catalyst stops closing them: Done runs and the state says closed, but the sheet stays, stops updating
+  and blocks the window until Esc. The bighelp versions close it through UIKit (`MacSheetPresentationTests`).
 - ☰ is the window's sidebar (`BighelpSideMenu`, shared with Vision Pro): it stays open while you pick, and the Mac
   remembers it. The title bar's sidebar button (`MacTitlebarItems`, on every screen), ☰ and ⌃⌘S toggle it. Drag
   its divider to resize it (remembered; double-click for the default width).

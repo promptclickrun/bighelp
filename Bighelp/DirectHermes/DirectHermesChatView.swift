@@ -45,8 +45,8 @@ struct DirectHermesChatView: View {
         .chatAttention(client: chat.client, agentName: agentName, isPresented: $showsAttention,
                        canPopUp: scenePhase == .active && !showsSupport && !showsControls)
         .background(theme.canvas.ignoresSafeArea())
-        .sheet(isPresented: $showsSupport) { DirectHermesSupportView().bighelpSheetSize(.standard) }
-        .sheet(isPresented: $showsControls) { DirectHermesControlsView(chat: chat).bighelpSheetSize(.standard) }
+        .bighelpSheet(isPresented: $showsSupport) { DirectHermesSupportView().bighelpSheetSize(.standard) }
+        .bighelpSheet(isPresented: $showsControls) { DirectHermesControlsView(chat: chat).bighelpSheetSize(.standard) }
         .task(id: chat.id) {
             // Match the app's new-chat preparation: mounting an empty native
             // chat is an explicit request to write, not to reopen account input.

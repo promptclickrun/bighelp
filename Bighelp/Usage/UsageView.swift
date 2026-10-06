@@ -72,7 +72,7 @@ struct UsageView: View {
                 await providerUsage.load(refresh: false)
             }
         }
-        .sheet(isPresented: $isChoosingProviders) {
+        .bighelpSheet(isPresented: $isChoosingProviders) {
             NavigationStack {
                 ProviderUsageSettingsView(store: providerUsage)
                     .toolbar {

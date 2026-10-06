@@ -57,9 +57,9 @@ private struct FocusedTextEditorPresentation: ViewModifier {
             // Save waits for the editor to close, so the form can close its own sheet.
             #if targetEnvironment(macCatalyst)
             // A cover would fill the whole Mac window; a large sheet is the Mac's editor.
-            .sheet(isPresented: $isPresented, onDismiss: closed) { editor.bighelpSheetSize(.large) }
+            .bighelpSheet(isPresented: $isPresented, onDismiss: closed) { editor.bighelpSheetSize(.large) }
             #else
-            .fullScreenCover(isPresented: $isPresented, onDismiss: closed) { editor }
+            .bighelpFullScreenCover(isPresented: $isPresented, onDismiss: closed) { editor }
             #endif
             .onChange(of: isPresented) { _, presented in
                 if presented { savesAfterClosing = false }

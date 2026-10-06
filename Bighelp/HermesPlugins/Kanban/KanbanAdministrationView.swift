@@ -546,7 +546,7 @@ private struct HermesKanbanBulkEditor: View {
         }
         .navigationTitle("Bulk Tasks")
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $isModelPickerPresented) {
+        .bighelpSheet(isPresented: $isModelPickerPresented) {
             // The chat's model picker; the override is applied when the bulk change is reviewed.
             BighelpModelPickerSheet(
                 title: "Model override",

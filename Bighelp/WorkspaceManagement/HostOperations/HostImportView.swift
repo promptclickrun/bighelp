@@ -36,7 +36,7 @@ struct HostImportView: View {
         ) { result in
             importSelectedArchive(result)
         }
-        .sheet(item: Binding(
+        .bighelpSheet(item: Binding(
             get: { store.importReview },
             set: { if $0 == nil { store.cancelImportReview() } }
         )) { review in

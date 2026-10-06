@@ -187,7 +187,7 @@ struct AgentsView: View {
             }
         }
         .refreshable { await refresh() }
-        .sheet(item: $actionAgent, onDismiss: finishAgentActionSheet) { agent in
+        .bighelpSheet(item: $actionAgent, onDismiss: finishAgentActionSheet) { agent in
             AgentActionSheet(
                 agent: agent,
                 imageURL: store.avatarURL(for: agent),

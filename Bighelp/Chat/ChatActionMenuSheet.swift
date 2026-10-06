@@ -98,7 +98,7 @@ struct ChatActionMenuSheet: View {
                 break
             }
         }
-        .sheet(isPresented: $isCapabilityManagerPresented) {
+        .bighelpSheet(isPresented: $isCapabilityManagerPresented) {
             NavigationStack {
                 SkillsAndToolsCatalogView(store: skillsAndTools, agentID: effectiveAgentID)
                     #if targetEnvironment(macCatalyst)
@@ -117,13 +117,13 @@ struct ChatActionMenuSheet: View {
             .presentationDragIndicator(.visible)
             .bighelpSheetSize(.large)
         }
-        .sheet(item: $pdfPagesPickerTarget) { picker in
+        .bighelpSheet(item: $pdfPagesPickerTarget) { picker in
             pdfPagesPicker(picker)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .bighelpSheetSize(.large)
         }
-        .sheet(isPresented: $isModelPickerPresented) {
+        .bighelpSheet(isPresented: $isModelPickerPresented) {
             if let controls = runtimeControls {
                 BighelpModelPickerSheet(
                     title: "Choose model",

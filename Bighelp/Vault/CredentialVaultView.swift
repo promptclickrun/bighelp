@@ -77,12 +77,12 @@ struct CredentialVaultView: View {
             }
             .refreshable { await model.load() }
             .task { await model.load() }
-            .sheet(isPresented: $isAdding) { CredentialVaultAddView(model: model).bighelpSheetSize(.standard) }
-            .sheet(item: $editing) { CredentialVaultAddView(model: model, editing: $0).bighelpSheetSize(.standard) }
-            .sheet(item: $unlocking) { source in
+            .bighelpSheet(isPresented: $isAdding) { CredentialVaultAddView(model: model).bighelpSheetSize(.standard) }
+            .bighelpSheet(item: $editing) { CredentialVaultAddView(model: model, editing: $0).bighelpSheetSize(.standard) }
+            .bighelpSheet(item: $unlocking) { source in
                 CredentialVaultUnlockView(model: model, source: source).bighelpSheetSize(.compact)
             }
-            .sheet(item: $found) { CredentialVaultImportView(model: model, file: $0.file).bighelpSheetSize(.standard) }
+            .bighelpSheet(item: $found) { CredentialVaultImportView(model: model, file: $0.file).bighelpSheetSize(.standard) }
             .fileImporter(isPresented: $isPickingFile,
                           allowedContentTypes: [.commaSeparatedText, .plainText, .text]) { result in
                 if case .success(let url) = result { read(url) }
@@ -556,7 +556,7 @@ struct CredentialVaultSheet: ViewModifier {
     @Binding var model: CredentialVaultModel?
 
     func body(content: Content) -> some View {
-        content.sheet(item: $model) { CredentialVaultView(model: $0).bighelpSheetSize(.standard) }
+        content.bighelpSheet(item: $model) { CredentialVaultView(model: $0).bighelpSheetSize(.standard) }
     }
 }
 

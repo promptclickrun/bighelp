@@ -957,7 +957,7 @@ private struct GenerativeUIFormPreview: View {
             }
         }
         .onAppear(perform: restore)
-        .sheet(isPresented: $showingForm) {
+        .bighelpSheet(isPresented: $showingForm) {
             GenerativeUIFormSheet(card: card, send: send)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)

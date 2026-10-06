@@ -118,7 +118,7 @@ struct MessageBubble: View {
     @State private var isReactionPickerPresented = false
     @State private var contentCache = ChatMessageContentCache()
     @State private var cardCopyContext = ChatCardCopyContext()
-    @AppStorage(ChatLayoutPreferences.textSizeKey) private var chatTextSize: ChatTextSize = .standard
+    @AppStorage(ChatLayoutPreferences.textSizeKey) private var chatTextSize: ChatTextSize = .defaultSize
     @AppStorage(LinkPreviewPreferences.enabledKey) private var showsLinkPreviews = true
 
     init(
@@ -239,7 +239,7 @@ struct MessageBubble: View {
                         .accessibilityIdentifier("chat.message.copied")
                 }
             }
-            .sheet(isPresented: $isSelectingText) {
+            .bighelpSheet(isPresented: $isSelectingText) {
                 NativeTextSelectionSheet(
                     text: interaction.copyText
                 )
@@ -256,7 +256,7 @@ struct MessageBubble: View {
                     .bighelpPopoverDismissal(isPresented: $isReactionPickerPresented)
             }
             #else
-            .sheet(isPresented: $isReactionPickerPresented) {
+            .bighelpSheet(isPresented: $isReactionPickerPresented) {
                 reactionPicker
                     .presentationDetents([.medium])
                     .presentationDragIndicator(.visible)

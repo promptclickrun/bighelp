@@ -453,7 +453,7 @@ struct ChatDestinationView: View {
         .onChange(of: isChatInFront) { wasInFront, isInFront in
             if !wasInFront, isInFront { refreshOnReturn() }
         }
-        .sheet(isPresented: $isPeopleAndChatPresented, onDismiss: {
+        .bighelpSheet(isPresented: $isPeopleAndChatPresented, onDismiss: {
             if requestsSessionFilesAfterDetails {
                 requestsSessionFilesAfterDetails = false
                 isSessionFilesPresented = true
@@ -467,7 +467,7 @@ struct ChatDestinationView: View {
                     isPeopleAndChatPresented = false
                 })
         }
-        .sheet(isPresented: $isSessionFilesPresented) {
+        .bighelpSheet(isPresented: $isSessionFilesPresented) {
             ChatSessionFilesView(model: model)
         }
         .bighelpChatPanel(isPresented: $isChatAppearancePresented, anchor: .appearance) {
@@ -479,7 +479,7 @@ struct ChatDestinationView: View {
         .onChange(of: voicePresentation != nil) { _, isPresented in
             if isPresented { VoiceLaunchState.shared.finish() }
         }
-        .fullScreenCover(item: $voicePresentation, onDismiss: {
+        .bighelpFullScreenCover(item: $voicePresentation, onDismiss: {
             guard opensMenuAfterVoice else { return }
             opensMenuAfterVoice = false
             homeChrome.onMenu()
@@ -501,7 +501,7 @@ struct ChatDestinationView: View {
             }
             .interactiveDismissDisabled()
         }
-        .sheet(isPresented: $isNativeSessionControlsPresented) {
+        .bighelpSheet(isPresented: $isNativeSessionControlsPresented) {
             if let presentation = nativeSessionControls {
                 NavigationStack { NativeSessionControlsView(presentation: presentation) }
                     .id(presentation.clientIdentity)
@@ -564,14 +564,14 @@ struct ChatDestinationView: View {
                 allowsMultipleSelection: true,
                 onCompletion: importFiles
             )
-            .fullScreenCover(isPresented: $isDocumentScannerPresented, onDismiss: finishDocumentScan) {
+            .bighelpFullScreenCover(isPresented: $isDocumentScannerPresented, onDismiss: finishDocumentScan) {
                 ChatDocumentScanner { result in
                     documentScanResult = result
                     isDocumentScannerPresented = false
                 }
                 .ignoresSafeArea()
             }
-            .fullScreenCover(isPresented: $isCameraPickerPresented) {
+            .bighelpFullScreenCover(isPresented: $isCameraPickerPresented) {
                 ChatCameraPicker(
                     onCapture: { image in
                         isCameraPickerPresented = false
@@ -601,7 +601,7 @@ struct ChatDestinationView: View {
             allowsMultipleSelection: true,
             onCompletion: importFiles
         )
-        .fullScreenCover(isPresented: $isCameraPickerPresented) {
+        .bighelpFullScreenCover(isPresented: $isCameraPickerPresented) {
             ChatCameraPicker(
                 onCapture: { image in
                     isCameraPickerPresented = false

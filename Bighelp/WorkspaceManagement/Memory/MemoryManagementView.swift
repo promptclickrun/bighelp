@@ -54,7 +54,7 @@ struct MemoryManagementView: View {
                 .disabled(store.isLoading || store.isMutating)
             }
         }
-        .sheet(item: $configuringProvider) { provider in
+        .bighelpSheet(item: $configuringProvider) { provider in
             MemoryProviderConfigurationView(store: store, provider: provider)
                 .bighelpSheetSize(.standard)
         }

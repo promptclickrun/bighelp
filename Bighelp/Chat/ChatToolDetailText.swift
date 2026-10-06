@@ -81,7 +81,7 @@ struct ChatToolDetailText: View {
                     .accessibilityIdentifier(identifier + ".view-full")
             }
         }
-        .sheet(isPresented: $showsCompleteValue) {
+        .bighelpSheet(isPresented: $showsCompleteValue) {
             if !isCanonicalPreview {
                 ChatToolDetailReader(label: label, value: value)
             }
@@ -131,7 +131,7 @@ struct ChatToolReadableSection: View {
                     .accessibilityIdentifier(identifier + ".view-raw")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .sheet(isPresented: $showsRawValue) {
+            .bighelpSheet(isPresented: $showsRawValue) {
                 ChatToolDetailReader(label: label, value: value)
                     .bighelpSheetSize(.large)
             }

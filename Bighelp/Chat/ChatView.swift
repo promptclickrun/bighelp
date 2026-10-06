@@ -292,14 +292,14 @@ struct ChatView: View {
             }
             .ignoresSafeArea()
         }
-        .sheet(isPresented: $isAllModelsPresented) {
+        .bighelpSheet(isPresented: $isAllModelsPresented) {
             if let controls = model.runtimeControls {
                 allModelsPicker(controls, support: runtimeSupport)
                     .presentationDetents([.large])
                     .presentationDragIndicator(.visible)
             }
         }
-        .sheet(item: $agentEditorRoute) { route in
+        .bighelpSheet(item: $agentEditorRoute) { route in
             AgentEditorView(
                 model: route.model,
                 runtimeDefaultsClient: route.runtimeDefaultsClient,

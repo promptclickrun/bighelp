@@ -84,7 +84,7 @@ struct WorkflowStageEditor: View {
             }
         }
         .accessibilityIdentifier("workflows.stage-editor")
-        .sheet(item: $editingBranch, onDismiss: {
+        .bighelpSheet(item: $editingBranch, onDismiss: {
             // The agent's own editor saved it into the draft; show it as saved.
             if let saved = model.definition?.stage(stage.key) { stage.branches = saved.branches }
         }) { branch in

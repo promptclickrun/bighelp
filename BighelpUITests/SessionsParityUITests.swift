@@ -96,12 +96,19 @@ final class SessionsParityUITests: BighelpUITestCase {
         let filters = app.buttons["fleet.chats.filters"]
         XCTAssertTrue(filters.exists, "The same filter menu as one computer")
         filters.tap()
-        let allAgents = app.buttons["All agents"].firstMatch
-        XCTAssertTrue(allAgents.waitForExistence(timeout: 3), "Agents to filter by")
-        XCTAssertTrue(app.buttons["Everywhere"].firstMatch.exists, "Where chats started, to filter by")
+        // Each filter is its own labeled choice, not one long list.
+        let agentChoice = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Agent,'")).firstMatch
+        XCTAssertTrue(agentChoice.waitForExistence(timeout: 3), "Agent, to filter by")
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Started in,'")).firstMatch.exists,
+                      "Started in, to filter by")
         save("all-sessions-filters", app)
+        agentChoice.tap()
+        let allAgents = app.buttons.matching(NSPredicate(format: "label == 'All agents' AND identifier != 'BackButton'"))
+            .firstMatch
+        XCTAssertTrue(allAgents.waitForExistence(timeout: 3), "Agents to filter by")
+        save("all-sessions-filter-agent", app)
         allAgents.tap()
-        XCTAssertTrue(app.buttons["Everywhere"].firstMatch.waitForNonExistence(timeout: 3), "The menu closes")
+        XCTAssertTrue(agentChoice.waitForNonExistence(timeout: 3), "The menu closes")
 
         // A computer's chip opens its own Sessions screen (folders, agents), still in all hosts.
         app.buttons["fleet.filter.Home Hermes"].tap()

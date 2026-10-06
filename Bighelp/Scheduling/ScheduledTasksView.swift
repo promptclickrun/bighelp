@@ -42,7 +42,7 @@ struct ScheduledTasksView: View {
                 if store.loadState == .idle { await store.load() }
             }
             .refreshable { await store.load() }
-            .sheet(item: $createAgent, onDismiss: presentQueuedBlueprints) { agent in
+            .bighelpSheet(item: $createAgent, onDismiss: presentQueuedBlueprints) { agent in
                 NavigationStack {
                     ScheduledTaskEditorView(
                         store: store,
@@ -56,7 +56,7 @@ struct ScheduledTasksView: View {
                 }
                 .bighelpSheetSize(.standard)
             }
-            .sheet(isPresented: $isAgentPickerPresented) {
+            .bighelpSheet(isPresented: $isAgentPickerPresented) {
                 NavigationStack {
                     AgentSelectionView(
                         title: "Choose an agent",
@@ -70,7 +70,7 @@ struct ScheduledTasksView: View {
                 }
                 .bighelpSheetSize(.compact)
             }
-            .sheet(isPresented: $isBlueprintsPresented) {
+            .bighelpSheet(isPresented: $isBlueprintsPresented) {
                 NavigationStack {
                     ScheduledTaskBlueprintsView(store: store, agents: agents)
                 }

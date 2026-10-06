@@ -54,7 +54,7 @@ struct ScheduledTaskBlueprintsView: View {
             if store.blueprintsLoadState == .idle { await store.loadBlueprints() }
         }
         .refreshable { await store.loadBlueprints() }
-        .sheet(item: $selectedBlueprint) { blueprint in
+        .bighelpSheet(item: $selectedBlueprint) { blueprint in
             NavigationStack {
                 ScheduledTaskBlueprintPreviewView(store: store, agents: agents, blueprint: blueprint)
             }

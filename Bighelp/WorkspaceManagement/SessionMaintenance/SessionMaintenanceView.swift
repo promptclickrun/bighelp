@@ -74,22 +74,22 @@ struct SessionMaintenanceView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task { if store.statistics == nil { await store.load() } }
         .onDisappear { if !store.ownsScope { store.retire() } }
-        .sheet(isPresented: reviewBinding(\.bulkReview, clear: store.clearBulkReview)) {
+        .bighelpSheet(isPresented: reviewBinding(\.bulkReview, clear: store.clearBulkReview)) {
             if let review = store.bulkReview { bulkReviewSheet(review).bighelpSheetSize(.standard) }
         }
-        .sheet(isPresented: reviewBinding(\.ownerBackfillReview, clear: store.clearOwnerBackfillReview)) {
+        .bighelpSheet(isPresented: reviewBinding(\.ownerBackfillReview, clear: store.clearOwnerBackfillReview)) {
             if let review = store.ownerBackfillReview { ownerBackfillReviewSheet(review).bighelpSheetSize(.standard) }
         }
-        .sheet(isPresented: reviewBinding(\.emptyReview, clear: store.clearEmptyReview)) {
+        .bighelpSheet(isPresented: reviewBinding(\.emptyReview, clear: store.clearEmptyReview)) {
             if let review = store.emptyReview { emptyReviewSheet(review).bighelpSheetSize(.standard) }
         }
-        .sheet(isPresented: reviewBinding(\.pruneReview, clear: store.clearPruneReview)) {
+        .bighelpSheet(isPresented: reviewBinding(\.pruneReview, clear: store.clearPruneReview)) {
             if let review = store.pruneReview { pruneReviewSheet(review).bighelpSheetSize(.standard) }
         }
-        .sheet(isPresented: reviewBinding(\.importReview, clear: store.clearImportReview)) {
+        .bighelpSheet(isPresented: reviewBinding(\.importReview, clear: store.clearImportReview)) {
             if let review = store.importReview { importReviewSheet(review).bighelpSheetSize(.standard) }
         }
-        .sheet(isPresented: reviewBinding(\.foreignPreview, clear: store.clearForeignPreview)) {
+        .bighelpSheet(isPresented: reviewBinding(\.foreignPreview, clear: store.clearForeignPreview)) {
             if let preview = store.foreignPreview { foreignPreviewSheet(preview).bighelpSheetSize(.large) }
         }
         .fileImporter(

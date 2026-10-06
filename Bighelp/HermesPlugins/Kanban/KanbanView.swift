@@ -81,11 +81,11 @@ struct HermesKanbanView: View {
                 }
             }
         }
-        .sheet(isPresented: $showsBoardCreator) {
+        .bighelpSheet(isPresented: $showsBoardCreator) {
             NavigationStack { HermesKanbanBoardCreatorView(store: store) { showsBoardCreator = false } }
                 .bighelpSheetSize(.standard)
         }
-        .sheet(isPresented: $showsBoardImporter) {
+        .bighelpSheet(isPresented: $showsBoardImporter) {
             NavigationStack { HermesKanbanBoardImportView(store: store) { showsBoardImporter = false } }
                 .bighelpSheetSize(.standard)
         }
@@ -216,7 +216,7 @@ private struct HermesKanbanBoardView: View {
                         .disabled(!store.canAct)
                     }
                 }
-                .sheet(isPresented: $showsCreate) {
+                .bighelpSheet(isPresented: $showsCreate) {
                     NavigationStack {
                         HermesKanbanTaskCreator(store: store, boardSlug: slug) {
                             showsCreate = false
@@ -400,7 +400,7 @@ private struct HermesKanbanTaskView: View {
                         Button("Edit") { showsEditor = true }.disabled(!store.canAct)
                     }
                 }
-                .sheet(isPresented: $showsEditor) {
+                .bighelpSheet(isPresented: $showsEditor) {
                     NavigationStack {
                         HermesKanbanTaskEditor(store: store, boardSlug: boardSlug, task: detail.task) {
                             showsEditor = false

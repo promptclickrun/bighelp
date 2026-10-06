@@ -50,7 +50,7 @@ struct TeamCallEntry: ViewModifier {
     func body(content: Content) -> some View {
         content
             .environment(\.teamCallAction, action)
-            .fullScreenCover(item: $call) { call in
+            .bighelpFullScreenCover(item: $call) { call in
                 TeamCallView(
                     model: call,
                     permissionCenter: services?.usesDeviceMicrophone == false ? nil : permissionCenter

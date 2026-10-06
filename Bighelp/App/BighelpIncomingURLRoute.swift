@@ -27,6 +27,10 @@ enum BighelpIncomingURLRoute: Equatable, Sendable {
     case workflows
     /// "loopdy://workflows/<id>?host=…&run=1": one workflow, on its computer, or straight to its Run sheet.
     case workflow(id: String, hostID: UUID?, startsRun: Bool)
+    /// "loopdy://workflow-run/<id>": one run, from the Workflows widget.
+    case workflowRun(id: String)
+    /// "loopdy://usage": ☰ › Usage, from the Usage widget.
+    case usage
 
     static func parse(_ url: URL) -> BighelpIncomingURLRoute? {
         let scheme = url.scheme?.lowercased()
@@ -70,6 +74,11 @@ enum BighelpIncomingURLRoute: Equatable, Sendable {
         if url.host?.lowercased() == "workflows" {
             return parseWorkflow(url)
         }
+        if url.host?.lowercased() == "workflow-run" {
+            guard url.pathComponents.count == 2, url.query == nil, let id = url.pathComponents.last,
+                  isPlainID(id, maximum: 128) else { return nil }
+            return .workflowRun(id: id)
+        }
         if url.host?.lowercased() == "approval", url.pathComponents.count == 2,
            let id = url.pathComponents.last, !id.isEmpty, id.utf8.count <= 240 {
             return .approval(id: id)
@@ -83,6 +92,7 @@ enum BighelpIncomingURLRoute: Equatable, Sendable {
             case "agents": return .agents
             case "projects": return .projects
             case "settings": return .settings
+            case "usage": return .usage
             default: break
             }
         }
@@ -111,6 +121,15 @@ enum BighelpIncomingURLRoute: Equatable, Sendable {
         }
         if let run = runs.first, run.value != "1" { return nil }
         return .workflow(id: id, hostID: hostID, startsRun: !runs.isEmpty)
+    }
+
+    /// Letters, digits, "_" and "-" only. Byte checks, not CharacterSet, which misread
+    /// some characters on device.
+    private static func isPlainID(_ value: String, maximum: Int) -> Bool {
+        !value.isEmpty && value.utf8.count <= maximum && value.utf8.allSatisfy { byte in
+            (byte >= 0x30 && byte <= 0x39) || (byte >= 0x41 && byte <= 0x5A) || (byte >= 0x61 && byte <= 0x7A)
+                || byte == 0x5F || byte == 0x2D
+        }
     }
 
     /// One agent, and at most one computer given by its ID. Anything odd isn't a link.

@@ -53,7 +53,7 @@ struct PersonalitiesView: View {
                 .accessibilityIdentifier("personalities.add")
             }
         }
-        .sheet(item: $editor) { presentation in
+        .bighelpSheet(item: $editor) { presentation in
             NavigationStack {
                 PersonalityEditorView(store: store, presentation: presentation)
             }

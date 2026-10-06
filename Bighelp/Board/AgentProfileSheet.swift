@@ -74,7 +74,7 @@ struct AgentProfileSheet: View {
         .background(BighelpThemeCanvas(theme: theme).ignoresSafeArea())
         .bighelpSheetSize(.standard)
         .task(id: agent.id) { await store.loadLogs(agentID: agent.id) }
-        .sheet(isPresented: Binding(get: { document != nil }, set: { if !$0 { document = nil } })) {
+        .bighelpSheet(isPresented: Binding(get: { document != nil }, set: { if !$0 { document = nil } })) {
             if let document {
                 IdentityDocumentView(title: document.title, document: document.body)
                     .bighelpSheetSize(.standard)

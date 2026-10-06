@@ -10,13 +10,41 @@ struct OtherAppChatsTests {
         let source = FakeSource()
         let store = OtherAppChatsStore(source: source)
         await store.load()
-        #expect(store.items.map(\.title) == ["Polish the Mac menus"])
+        #expect(store.items.map(\.title) == ["Polish the Mac menus", "Trip budget script"])
 
         await store.showPreview(try #require(store.items.first))
         #expect(store.preview?.title == "Polish the Mac menus")
         #expect(await store.bringIn() == "hermes-session-1")
         #expect(store.preview == nil)
         #expect(source.broughtIn == 1)
+    }
+
+    @Test func oneAppsChatsAreAskedForByThatApp() async {
+        let source = FakeSource()
+        let store = OtherAppChatsStore(source: source)
+        await store.load(app: SessionAppFilter.claudeCode.foreignSource)
+        #expect(store.items.map(\.title) == ["Trip budget script"])
+        await store.load(app: SessionAppFilter.codex.foreignSource)
+        #expect(store.items.map(\.title) == ["Polish the Mac menus"])
+        #expect(source.askedSources == ["claude", "codex"])
+    }
+
+    @Test func appChoicesSplitChatsByWhereTheyCameFrom() {
+        // Hermes' own chats, and the ones it brought in from each app.
+        #expect(SessionAppFilter.hermes.includes(source: "bighelp"))
+        #expect(SessionAppFilter.hermes.includes(source: "telegram"))
+        #expect(SessionAppFilter.hermes.includes(source: nil))
+        #expect(!SessionAppFilter.hermes.includes(source: "codex-cli"))
+        #expect(!SessionAppFilter.hermes.includes(source: "claude-code"))
+        #expect(SessionAppFilter.codex.includes(source: "codex-cli"))
+        #expect(SessionAppFilter.codex.includes(source: "codex"))
+        #expect(!SessionAppFilter.codex.includes(source: "claude"))
+        #expect(SessionAppFilter.claudeCode.includes(source: "claude-code"))
+        #expect(SessionAppFilter.claudeCode.includes(source: "claude"))
+        #expect(!SessionAppFilter.claudeCode.includes(source: "bighelp"))
+        #expect(SessionAppFilter.all.includes(source: "codex-cli") && SessionAppFilter.all.includes(source: nil))
+        #expect(!SessionAppFilter.hermes.showsOtherAppChats)
+        #expect(SessionAppFilter.codex.foreignSource == "codex" && SessionAppFilter.claudeCode.foreignSource == "claude")
     }
 
     @Test func aChatAlreadyInHermesOpensThatCopyWithoutImportingAgain() async throws {
@@ -43,13 +71,20 @@ struct OtherAppChatsTests {
     @MainActor private final class FakeSource: OtherAppChatsSource {
         var fails = false
         var broughtIn = 0
-        func list(offset: Int) async throws -> HermesForeignSessionPage {
+        var askedSources: [String?] = []
+        func list(offset: Int, source: String?) async throws -> HermesForeignSessionPage {
             if fails { throw HermesSessionMaintenanceError.invalidResponse }
-            return HermesForeignSessionPage(profileID: "default", host: "Studio", sessions: [
+            askedSources.append(source)
+            let items = [
                 HermesForeignSessionItem(id: String(repeating: "c", count: 64), source: "codex", sourceLabel: "Codex CLI",
                                          title: "Polish the Mac menus", cwd: nil, modifiedAt: nil, turnCount: 4,
                                          excerpt: "Menus"),
-            ], nextOffset: nil, unreadable: 0)
+                HermesForeignSessionItem(id: String(repeating: "d", count: 64), source: "claude", sourceLabel: "Claude Code",
+                                         title: "Trip budget script", cwd: nil, modifiedAt: nil, turnCount: 2,
+                                         excerpt: "Hotels"),
+            ].filter { source == nil || $0.source == source }
+            return HermesForeignSessionPage(profileID: "default", host: "Studio", sessions: items,
+                                            nextOffset: nil, unreadable: 0)
         }
         func preview(_ item: HermesForeignSessionItem) async throws -> HermesForeignSessionPreview {
             HermesForeignSessionPreview(demoTitle: item.title, source: item.source, cwd: nil)

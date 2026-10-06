@@ -44,7 +44,7 @@ struct ConfiguredWorkspaceArtifactsView: View {
                 }
             }
         }
-        .sheet(isPresented: $isChoosingFolder) {
+        .bighelpSheet(isPresented: $isChoosingFolder) {
             if let folderChooser {
                 WorkspaceFolderPicker(chooser: folderChooser) { Task { await loadScope() } }
                     .bighelpSheetSize(.standard)

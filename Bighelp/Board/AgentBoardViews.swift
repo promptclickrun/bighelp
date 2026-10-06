@@ -494,7 +494,7 @@ struct AgentFeedView: View {
             }
         }
         .boardBlueprints(isPresented: $showsBlueprints, kind: .feed, context: context)
-        .sheet(item: $openedPost) { post in
+        .bighelpSheet(item: $openedPost) { post in
             FeedPostDetailSheet(itemID: post.id, context: context)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
@@ -746,7 +746,7 @@ struct AgentIdeasView: View {
             }
         }
         .boardBlueprints(isPresented: $showsBlueprints, kind: .idea, context: context)
-        .sheet(item: $selected) { idea in
+        .bighelpSheet(item: $selected) { idea in
             IdeaDetailSheet(idea: idea, context: context)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
@@ -977,7 +977,7 @@ struct AgentAppsView<Artifacts: View>: View {
         }
         .refreshable { await media.load(agentID: context.agentID) }
         .task(id: context.agentID) { await media.load(agentID: context.agentID) }
-        .sheet(item: $preview) { ChatAttachmentPreviewView(attachment: $0).bighelpSheetSize(.large) }
+        .bighelpSheet(item: $preview) { ChatAttachmentPreviewView(attachment: $0).bighelpSheetSize(.large) }
         .padding(.bottom, 100)
         .accessibilityIdentifier("board.media")
     }

@@ -77,7 +77,7 @@ struct NativeSessionControlsView: View {
             await model.loadInitialState()
             adoptGoalControlIfAvailable(afterObservation: observedBeforeRead)
         }
-        .sheet(isPresented: $showsContextBreakdown) {
+        .bighelpSheet(isPresented: $showsContextBreakdown) {
             NavigationStack {
                 if let breakdown = model.contextBreakdown {
                     SessionContextBreakdownView(breakdown: breakdown)
@@ -86,7 +86,7 @@ struct NativeSessionControlsView: View {
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
-        .sheet(item: $rollbackReview, onDismiss: model.closeRollbackReview) { checkpoint in
+        .bighelpSheet(item: $rollbackReview, onDismiss: model.closeRollbackReview) { checkpoint in
             NavigationStack {
                 NativeSessionRollbackReviewView(
                     checkpoint: checkpoint,
@@ -97,7 +97,7 @@ struct NativeSessionControlsView: View {
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         }
-        .sheet(item: $spawnTreeReview, onDismiss: model.closeSpawnTree) { entry in
+        .bighelpSheet(item: $spawnTreeReview, onDismiss: model.closeSpawnTree) { entry in
             NavigationStack {
                 NativeSessionSpawnTreeView(entry: entry, model: model)
             }

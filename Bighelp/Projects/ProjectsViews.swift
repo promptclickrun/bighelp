@@ -77,7 +77,7 @@ struct ProjectsHomeView: View {
         }
         .refreshable { await reload() }
         .task { await reload() }
-        .sheet(isPresented: $isCreating) {
+        .bighelpSheet(isPresented: $isCreating) {
             HermesWorkspaceCreateView(store: context.workspaces, agentID: context.agentID, noun: "Project") {
                 Task { await context.store.refresh() }
             }

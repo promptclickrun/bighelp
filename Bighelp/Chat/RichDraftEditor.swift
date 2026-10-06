@@ -513,7 +513,7 @@ struct RichDraftEditor: View {
                 loadExternalSource()
             }
         }
-        .sheet(isPresented: $isLinkPromptPresented, onDismiss: resumeEditing) {
+        .bighelpSheet(isPresented: $isLinkPromptPresented, onDismiss: resumeEditing) {
             RichDraftLinkSheet(
                 target: $linkTarget,
                 onCancel: { isLinkPromptPresented = false },

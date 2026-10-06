@@ -21,6 +21,7 @@ extension RootShellView {
             // Another computer, or none: nothing from the old one stays.
             workflowsStore?.setOnScreen(false)
             workflowsStore = nil
+            WorkflowsWidgetPublisher.clear()
         }
         guard key.owner != nil, let client = makeWorkflowsClient() else { return }
         await workflowsAvailability.check { try await client.support() }
@@ -37,8 +38,7 @@ extension RootShellView {
             actionErrorMessage = "Connect to your computer to use Workflows."
             return
         }
-        if appState.selectedTab != .sessions { appState.select(.sessions) }
-        showOneHostPage([.workflows])
+        showOneHostPageOnSessions([.workflows])
     }
 
     /// Opens one workflow (a Shortcut or a link): its flow, or its Run sheet straight away.
@@ -47,15 +47,13 @@ extension RootShellView {
             actionErrorMessage = "Connect to your computer to use Workflows."
             return
         }
-        if appState.selectedTab != .sessions { appState.select(.sessions) }
-        showOneHostPage([.workflows, .workflow(id: id, startsRun: startsRun)])
+        showOneHostPageOnSessions([.workflows, .workflow(id: id, startsRun: startsRun)])
     }
 
     /// Opens one run (a widget, a link or a notification later).
     func openWorkflows(run: String) {
         guard prepareWorkflowsStore() != nil else { return }
-        if appState.selectedTab != .sessions { appState.select(.sessions) }
-        showOneHostPage([.workflows, BighelpPlatform.isMac ? .workflowRuns(selected: run) : .workflowRun(id: run)])
+        showOneHostPageOnSessions([.workflows, BighelpPlatform.isMac ? .workflowRuns(selected: run) : .workflowRun(id: run)])
     }
 
     /// A tapped workflow alert names its run only as a chat reference (`workflow.run.<id>`,

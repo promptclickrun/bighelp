@@ -621,7 +621,7 @@ struct ProviderAccountsView: View {
         .navigationTitle("Provider Keys")
         .navigationBarTitleDisplayMode(.inline)
         .task { if store.snapshot == nil { await store.load() } }
-        .sheet(item: $signingIn, onDismiss: {
+        .bighelpSheet(item: $signingIn, onDismiss: {
             if let target = lastSignIn { Task { await store.closeSignIn(target) } }
         }) { provider in
             ProviderSignInSheet(store: store, provider: provider)
@@ -810,13 +810,13 @@ struct ProviderAccountsView: View {
         .navigationTitle("Advanced")
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await store.refresh() }
-        .sheet(isPresented: $addingEndpoint) {
+        .bighelpSheet(isPresented: $addingEndpoint) {
             NavigationStack {
                 ProviderEndpointEditorView(store: store, endpoint: nil) { addingEndpoint = false }
             }
             .bighelpSheetSize(.standard)
         }
-        .sheet(isPresented: $addingPoolCredential) {
+        .bighelpSheet(isPresented: $addingPoolCredential) {
             NavigationStack {
                 ProviderPoolCredentialEditorView(store: store) { addingPoolCredential = false }
             }

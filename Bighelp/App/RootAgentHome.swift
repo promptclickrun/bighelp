@@ -554,6 +554,8 @@ extension RootShellView {
                                                               knownAgentIDs: Set(agents.profiles.map(\.id)))
             }
             .task(id: usageReaderKey) { configureUsage(usageReaderKey) }
+            .task(id: usageWidgetKey) { await refreshUsageWidget() }
+            .task(id: workflowsWidgetKey) { await followWorkflowsWidget() }
             .environment(\.providerUsage, providerUsage)
             .task(id: hostReactionsKey) { await syncHostReactions(hostReactionsKey) }
             // Widgets show the home agent's Feed and Goals in the app's colors.
@@ -572,13 +574,13 @@ extension RootShellView {
                 agents: agents, fleet: fleet, isActive: scenePhase == .active,
                 demo: usesWorkspaceFixtures && workspaceConnections?.isDirectSelected != true
                     ? (sessionCatalog, featureStore.scheduledTasks) : nil))
-            .sheet(isPresented: Binding(get: { profileAgentID != nil }, set: { if !$0 { profileAgentID = nil } }),
+            .bighelpSheet(isPresented: Binding(get: { profileAgentID != nil }, set: { if !$0 { profileAgentID = nil } }),
                    onDismiss: runAfterHomeSheet) {
                 if let id = profileAgentID, let agent = agents.profiles.first(where: { $0.id == id }) {
                     agentProfileSheet(agent)
                 }
             }
-            .sheet(item: $newChatPicker) { request in
+            .bighelpSheet(item: $newChatPicker) { request in
                 BotModeCreateRoomView(rooms: botModeRooms, agents: agents, seedProfileID: request.seed,
                                       onStartDirect: { startHomeChat(with: $0) }) { roomID in
                     guard request.owner == currentWorkspaceOwner else { return }
@@ -586,7 +588,7 @@ extension RootShellView {
                 }
                 .bighelpSheetSize(.standard)
             }
-            .sheet(isPresented: $isAgentSwitcherPresented, onDismiss: runAfterHomeSheet) {
+            .bighelpSheet(isPresented: $isAgentSwitcherPresented, onDismiss: runAfterHomeSheet) {
                 agentSwitcherSheet
             }
             .modifier(MacSidebarMemory(isOpen: $isHomeDrawerPresented,
@@ -721,8 +723,7 @@ extension RootShellView {
             return
         }
         projectsStore = ProjectsStore(source: source, profileID: workspaceAgentID)
-        if appState.selectedTab != .sessions { appState.select(.sessions) }
-        showOneHostPage([.projects])
+        showOneHostPageOnSessions([.projects])
     }
 
     /// Hermes starts new chats in the current project's folder, so the

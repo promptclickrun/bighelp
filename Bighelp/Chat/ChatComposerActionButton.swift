@@ -130,7 +130,7 @@ struct AdaptiveComposerActionButton: View {
                 .onDisappear(perform: midSessionOptionsClosed)
         }
         #else
-        .sheet(isPresented: $isMidSessionOptionsPresented, onDismiss: midSessionOptionsClosed) {
+        .bighelpSheet(isPresented: $isMidSessionOptionsPresented, onDismiss: midSessionOptionsClosed) {
             midSessionOptions
                 .presentationDetents([.height(optionsFromKeyboard ? 380 : 300)])
                 .modifier(FittedSheetSizing())

@@ -24,7 +24,7 @@ struct ChatAttachmentGallery: View {
         .frame(maxWidth: 560, alignment: alignsTrailing ? .trailing : .leading)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("chat.message-attachments")
-        .sheet(item: $previewAttachment) { attachment in
+        .bighelpSheet(item: $previewAttachment) { attachment in
             ChatAttachmentPreviewView(attachment: attachment)
                 .bighelpSheetSize(.large)
         }

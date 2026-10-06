@@ -32,26 +32,27 @@ extension RootShellView {
 
     func configureUsage(_ key: UsageReaderKey) {
         providerUsage.onOpen = { [self] in openUsage() }
+        let made = usageReader(key)
+        usage.configure(reader: made?.reader, scope: made?.scope)
+    }
+
+    /// What Usage (and its widget) reads for this key, and the scope that names it.
+    func usageReader(_ key: UsageReaderKey) -> (reader: any UsageReading, scope: AnyHashable)? {
         let fleet = key.allHosts ? self.fleet : nil
         let agents = self.agents
         let agentList: @MainActor () -> [(id: String, name: String)] = {
             agents.profiles.map { ($0.id, $0.name) }
         }
         if key.fixtures {
-            usage.configure(reader: DemoUsageReader(hostID: key.hostID, hostName: key.hostName, agents: agentList,
-                                                    fleet: fleet),
-                            scope: "fixtures-\(key.allHosts)-\(key.hostID)")
-            return
+            return (DemoUsageReader(hostID: key.hostID, hostName: key.hostName, agents: agentList, fleet: fleet),
+                    AnyHashable("fixtures-\(key.allHosts)-\(key.hostID)"))
         }
-        guard let signIn = key.signIn, let connections = workspaceConnections else {
-            usage.configure(reader: nil, scope: nil)
-            return
-        }
-        usage.configure(reader: LiveUsageReader(
+        guard let signIn = key.signIn, let connections = workspaceConnections else { return nil }
+        return (LiveUsageReader(
             hostID: key.hostID, hostName: key.hostName,
             currentWorkspace: { [weak connections] in connections?.workspace },
             agents: agentList, fleet: fleet
-        ), scope: [AnyHashable(signIn), AnyHashable(key.allHosts)])
+        ), AnyHashable([AnyHashable(signIn), AnyHashable(key.allHosts)]))
     }
 
     /// Usage with the home agent's provider first among the plans.
@@ -67,9 +68,10 @@ extension RootShellView {
     func openUsage() {
         guard appState.path.last != .usage else { return }
         if appState.selectedTab != .sessions {
-            appState.select(.sessions)
+            appState.select(.sessions, thenOpen: [.usage])
+        } else {
+            appState.path.append(.usage)
         }
-        appState.path.append(.usage)
     }
 
     var usageDestination: some View {

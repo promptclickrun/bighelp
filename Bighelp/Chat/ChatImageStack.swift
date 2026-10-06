@@ -76,7 +76,7 @@ struct ChatImageStackView: View {
         }
         .task(id: images.map(\.id)) { saver.prepareShareFiles(images) }
         .onDisappear { saver.removeShareFiles() }
-        .sheet(item: $viewerStart) { start in
+        .bighelpSheet(item: $viewerStart) { start in
             ChatImageStackViewer(images: images, startIndex: start.index)
                 .bighelpSheetSize(.large)
         }

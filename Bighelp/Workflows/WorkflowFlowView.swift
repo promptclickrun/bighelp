@@ -143,23 +143,23 @@ struct WorkflowFlowView: View {
                                  editTrigger: { isTriggerPresented = true })
             }
         }
-        .sheet(isPresented: $isRolesPresented) {
+        .bighelpSheet(isPresented: $isRolesPresented) {
             WorkflowRolesEditor(model: model, context: context)
                 .bighelpSheetSize(.standard)
         }
-        .sheet(isPresented: $isTriggerPresented) {
+        .bighelpSheet(isPresented: $isTriggerPresented) {
             WorkflowTriggerSheet(model: model, context: context)
                 .bighelpSheetSize(.large)
         }
-        .sheet(item: $editing) { stage in
+        .bighelpSheet(item: $editing) { stage in
             WorkflowStageEditor(model: model, context: context, stage: stage)
                 .bighelpSheetSize(.large)
         }
-        .sheet(isPresented: $isRunSheetPresented) {
+        .bighelpSheet(isPresented: $isRunSheetPresented) {
             WorkflowRunSheet(model: model, context: context)
                 .bighelpSheetSize(.standard)
         }
-        .sheet(isPresented: $isInputsPresented) {
+        .bighelpSheet(isPresented: $isInputsPresented) {
             WorkflowInputsEditor(model: model)
                 .bighelpSheetSize(.large)
         }

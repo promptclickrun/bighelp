@@ -58,6 +58,11 @@ struct SessionsView: View {
     /// Opens a chat brought in from another app, by its Hermes session ID.
     let onOpenBroughtIn: ((String) -> Void)?
     @State private var otherAppsStore: OtherAppChatsStore?
+    @State private var otherAppsStoreID: String?
+    /// The Hermes, Codex or Claude Code choice, shared with All sessions; nil keeps it here.
+    let sharedAppFilter: Binding<SessionAppFilter>?
+    /// A Codex or Claude Code chat to preview once the list is there (picked on All sessions).
+    let requestedOtherAppChat: Binding<HermesForeignSessionItem?>?
 
     init(
         model: SessionsModel,
@@ -71,9 +76,13 @@ struct SessionsView: View {
         onSelect: @escaping (SessionSummary) -> Void,
         agentActionsConfig: AgentActionsConfig? = nil,
         otherApps: (source: any OtherAppChatsSource, id: String)? = nil,
-        onOpenBroughtIn: ((String) -> Void)? = nil
+        onOpenBroughtIn: ((String) -> Void)? = nil,
+        appFilter: Binding<SessionAppFilter>? = nil,
+        requestedOtherAppChat: Binding<HermesForeignSessionItem?>? = nil
     ) {
         self.otherApps = otherApps
+        self.sharedAppFilter = appFilter
+        self.requestedOtherAppChat = requestedOtherAppChat
         self.onOpenBroughtIn = onOpenBroughtIn
         self.onNewGroupChat = onNewGroupChat
         model.showsCronSessions = settings.showCronSessions
@@ -213,13 +222,38 @@ struct SessionsView: View {
             }
         }
         .agentActionsPresentation(agentActions, config: agentActionsConfig)
-        .task(id: otherApps?.id) {
-            guard let otherApps else { otherAppsStore = nil; return }
-            let store = OtherAppChatsStore(source: otherApps.source)
-            otherAppsStore = store
-            await store.load()
+        .task(id: OtherAppsKey(id: otherApps?.id, app: model.appFilter)) {
+            guard let otherApps else {
+                otherAppsStore = nil
+                otherAppsStoreID = nil
+                return
+            }
+            let store: OtherAppChatsStore
+            if let current = otherAppsStore, otherAppsStoreID == otherApps.id {
+                store = current
+            } else {
+                store = OtherAppChatsStore(source: otherApps.source)
+                otherAppsStore = store
+                otherAppsStoreID = otherApps.id
+            }
+            guard model.appFilter.showsOtherAppChats else { return }
+            await store.load(app: model.appFilter.foreignSource)
         }
-        .sheet(isPresented: Binding(get: { otherAppsStore?.preview != nil },
+        .task(id: RequestedPreviewKey(item: requestedOtherAppChat?.wrappedValue?.id, list: otherAppsStoreID)) {
+            guard let request = requestedOtherAppChat, let item = request.wrappedValue,
+                  let store = otherAppsStore else { return }
+            request.wrappedValue = nil
+            await store.showPreview(item)
+        }
+        .onAppear {
+            if let sharedAppFilter, sharedAppFilter.wrappedValue != model.appFilter {
+                model.appFilter = sharedAppFilter.wrappedValue
+            }
+        }
+        .onChange(of: model.appFilter) { _, filter in
+            if let sharedAppFilter, sharedAppFilter.wrappedValue != filter { sharedAppFilter.wrappedValue = filter }
+        }
+        .bighelpSheet(isPresented: Binding(get: { otherAppsStore?.preview != nil },
                                     set: { if !$0 { otherAppsStore?.closePreview() } })) {
             if let store = otherAppsStore, let preview = store.preview {
                 OtherAppChatPreviewSheet(preview: preview, isWorking: store.isWorking, onOpen: {
@@ -241,12 +275,11 @@ struct SessionsView: View {
     /// shows the start; Open brings it into Hermes as a chat here.
     @ViewBuilder
     private func otherAppsSection(model: SessionsModel) -> some View {
-        if let store = otherAppsStore, onOpenBroughtIn != nil {
-            let query = model.query.trimmingCharacters(in: .whitespacesAndNewlines)
-            let items = store.items.filter { query.isEmpty || $0.title.localizedCaseInsensitiveContains(query) }
+        if let store = otherAppsStore, onOpenBroughtIn != nil, model.appFilter.showsOtherAppChats {
+            let items = otherAppItems(store, model: model)
             if !items.isEmpty {
                 Section {
-                    sectionCaption("In Codex and Claude Code")
+                    sectionCaption(otherAppsCaption(model.appFilter))
                         .accessibilityIdentifier("sessions.section.other-apps")
                         .modifier(SessionCaptionRow())
                     ForEach(items) { item in
@@ -257,7 +290,7 @@ struct SessionsView: View {
                             .listRowBackground(Color.clear)
                             .accessibilityIdentifier("sessions.other-app.\(item.title)")
                     }
-                    if store.nextOffset != nil, query.isEmpty {
+                    if store.nextOffset != nil, !isSearching(model) {
                         Button("Show more") { Task { await store.loadMore() } }
                             .font(.bighelp(.subheadline).weight(.semibold))
                             .tint(theme.action)
@@ -271,7 +304,15 @@ struct SessionsView: View {
     }
 
     private func nativeDirectory(model: SessionsModel) -> some View {
-        List {
+        @Bindable var model = model
+        return List {
+            if showsAppFilter(model) {
+                SessionAppFilterBar(selection: $model.appFilter)
+                    .listRowInsets(EdgeInsets(top: BighelpTokens.space4, leading: BighelpTokens.space16,
+                                              bottom: BighelpTokens.space8, trailing: BighelpTokens.space16))
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+            }
             if isSearching(model) {
                 Text("Search covers chats already loaded on this device.")
                     .font(.bighelp(.footnote))
@@ -290,6 +331,28 @@ struct SessionsView: View {
         .dismissesKeyboardOnScroll(true, immediately: true)
         .background(theme.canvas)
         .environment(\.defaultMinListRowHeight, BighelpTokens.hitTarget)
+    }
+
+    /// Hermes, Codex and Claude Code, once there's a list to choose from.
+    private func showsAppFilter(_ model: SessionsModel) -> Bool {
+        model.hasLoadedSessions || model.appFilter != .all || !(otherAppsStore?.items.isEmpty ?? true)
+    }
+
+    /// Chats still in Codex or Claude Code under the app chosen, matching the search.
+    private func otherAppItems(_ store: OtherAppChatsStore, model: SessionsModel) -> [HermesForeignSessionItem] {
+        let query = model.query.trimmingCharacters(in: .whitespacesAndNewlines)
+        return store.items.filter {
+            model.appFilter.includes(source: $0.source)
+                && (query.isEmpty || $0.title.localizedCaseInsensitiveContains(query))
+        }
+    }
+
+    private func otherAppsCaption(_ filter: SessionAppFilter) -> String {
+        switch filter {
+        case .codex: "In Codex"
+        case .claudeCode: "In Claude Code"
+        case .all, .hermes: "In Codex and Claude Code"
+        }
     }
 
     private func isSearching(_ model: SessionsModel) -> Bool {
@@ -312,59 +375,80 @@ struct SessionsView: View {
     private func nativeFilterMenu(model: SessionsModel) -> some View {
         @Bindable var model = model
         @Bindable var settings = self.settings
+        // Each filter is its own labeled submenu that shows its current choice, so
+        // the menu reads as four short questions instead of one long list.
         return Menu {
-            Picker("Conversation type", selection: $model.typeFilter) {
-                ForEach(SessionTypeFilter.allCases, id: \.self) { filter in
-                    Text(filter.title).tag(filter)
-                }
-            }
-            .accessibilityIdentifier("sessions.filter.type")
-
-            Picker("Agent", selection: $model.agentFilter) {
-                Text("All agents").tag(SessionAgentFilter.all)
-                ForEach(model.availableAgents, id: \.id) { agent in
-                    Text(agent.name).tag(SessionAgentFilter.agent(agent.id))
-                }
-            }
-            .accessibilityIdentifier("sessions.filter.agent")
-
-            Picker("Project", selection: $model.projectFilter) {
-                Text("All projects").tag(SessionProjectFilter.all)
-                ForEach(model.availableProjects) { project in
-                    Text(project.name).tag(SessionProjectFilter.project(project))
-                }
-                Text("Unassigned").tag(SessionProjectFilter.unassigned)
-                if case .project(let selected) = model.projectFilter,
-                   !model.availableProjects.contains(selected) {
-                    Text("Unavailable: \(selected.name)").tag(model.projectFilter)
-                }
-            }
-            .accessibilityIdentifier("sessions.filter.project")
-
-            if !model.availableOrigins.isEmpty {
-                Picker("Started in", selection: $model.originFilter) {
-                    Text("Everywhere").tag(SessionOriginFilter.all)
-                    ForEach(model.availableOrigins, id: \.self) { label in
-                        Text(label).tag(SessionOriginFilter.origin(label))
+            Section("Filter by") {
+                Picker(selection: $model.typeFilter) {
+                    ForEach(SessionTypeFilter.allCases, id: \.self) { filter in
+                        Text(filter.title).tag(filter)
                     }
+                } label: {
+                    Label("Type", systemImage: "bubble.left.and.bubble.right")
+                    Text(model.typeFilter.title)
                 }
-                .accessibilityIdentifier("sessions.filter.origin")
+                .pickerStyle(.menu)
+                .accessibilityIdentifier("sessions.filter.type")
+
+                Picker(selection: $model.agentFilter) {
+                    Text("All agents").tag(SessionAgentFilter.all)
+                    ForEach(model.availableAgents, id: \.id) { agent in
+                        Text(agent.name).tag(SessionAgentFilter.agent(agent.id))
+                    }
+                } label: {
+                    Label("Agent", systemImage: "person.crop.circle")
+                    Text(agentFilterTitle(model.agentFilter, model: model))
+                }
+                .pickerStyle(.menu)
+                .accessibilityIdentifier("sessions.filter.agent")
+
+                Picker(selection: $model.projectFilter) {
+                    Text("All projects").tag(SessionProjectFilter.all)
+                    ForEach(model.availableProjects) { project in
+                        Text(project.name).tag(SessionProjectFilter.project(project))
+                    }
+                    Text("Unassigned").tag(SessionProjectFilter.unassigned)
+                    if case .project(let selected) = model.projectFilter,
+                       !model.availableProjects.contains(selected) {
+                        Text("Unavailable: \(selected.name)").tag(model.projectFilter)
+                    }
+                } label: {
+                    Label("Project", systemImage: "folder")
+                    Text(projectFilterTitle(model.projectFilter))
+                }
+                .pickerStyle(.menu)
+                .accessibilityIdentifier("sessions.filter.project")
+
+                if !model.availableOrigins.isEmpty {
+                    Picker(selection: $model.originFilter) {
+                        Text("Everywhere").tag(SessionOriginFilter.all)
+                        ForEach(model.availableOrigins, id: \.self) { label in
+                            Text(label).tag(SessionOriginFilter.origin(label))
+                        }
+                    } label: {
+                        Label("Started in", systemImage: "arrow.down.app")
+                        Text(model.originFilter.title)
+                    }
+                    .pickerStyle(.menu)
+                    .accessibilityIdentifier("sessions.filter.origin")
+                }
             }
 
             if hasActiveFilters(model) {
-                Divider()
-                Button("Clear Filters", systemImage: "arrow.counterclockwise") {
-                    model.typeFilter = .all
-                    model.agentFilter = .all
-                    model.projectFilter = .all
-                    model.originFilter = .all
+                Section {
+                    Button("Clear Filters", systemImage: "arrow.counterclockwise") {
+                        model.typeFilter = .all
+                        model.agentFilter = .all
+                        model.projectFilter = .all
+                        model.originFilter = .all
+                    }
+                    .accessibilityIdentifier("sessions.filters.clear")
                 }
-                .accessibilityIdentifier("sessions.filters.clear")
             }
 
             // List options that used to live only in Settings.
             Section("View") {
-                Toggle("Group by Project", systemImage: "folder", isOn: $settings.organizeChatsByProjects)
+                Toggle("Group by Project", systemImage: "folder.badge.gearshape", isOn: $settings.organizeChatsByProjects)
                     .accessibilityIdentifier("sessions.options.organize-by-projects")
                 Toggle("Show Scheduled Runs", systemImage: "calendar.badge.clock", isOn: $settings.showCronSessions)
                     .accessibilityIdentifier("sessions.options.show-cron-sessions")
@@ -572,12 +656,16 @@ struct SessionsView: View {
                     .accessibilityIdentifier("sessions.empty")
             }
             .listSectionSeparator(.hidden)
+        } else if sections.isEmpty, let store = otherAppsStore, model.appFilter != .all, model.appFilter.showsOtherAppChats,
+                  !otherAppItems(store, model: model).isEmpty {
+            // Only chats still in Codex or Claude Code: their own section says so.
+            EmptyView()
         } else if sections.isEmpty {
             Section {
                 ContentUnavailableView(
-                    "No matching chats",
-                    systemImage: "magnifyingglass",
-                    description: Text("Try a different keyword, agent, project, or type.")
+                    model.appFilter.emptyTitle,
+                    systemImage: model.appFilter == .all || model.appFilter == .hermes ? "magnifyingglass" : "chevron.left.forwardslash.chevron.right",
+                    description: Text(emptyDescription(model))
                 )
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
@@ -1172,6 +1260,14 @@ struct SessionsView: View {
         }
     }
 
+    private func emptyDescription(_ model: SessionsModel) -> String {
+        switch model.appFilter {
+        case .codex where !isSearching(model): "Chats from Codex on this computer show here."
+        case .claudeCode where !isSearching(model): "Chats from Claude Code on this computer show here."
+        default: "Try a different keyword, agent, project, or type."
+        }
+    }
+
     private func hasActiveFilters(_ model: SessionsModel) -> Bool {
         model.typeFilter != .all || model.agentFilter != .all || model.projectFilter != .all
             || model.originFilter != .all
@@ -1258,4 +1354,16 @@ private struct SessionCaptionRow: ViewModifier {
             .listRowSeparator(.hidden)
             .listRowBackground(Color.clear)
     }
+}
+
+/// What the Codex and Claude Code list reads: its computer and agent, and the app chosen.
+private struct OtherAppsKey: Equatable {
+    let id: String?
+    let app: SessionAppFilter
+}
+
+/// A chat to preview, and the list that can show it.
+private struct RequestedPreviewKey: Equatable {
+    let item: String?
+    let list: String?
 }

@@ -84,7 +84,7 @@ struct PluginLifecycleManagementView: View {
         .searchable(text: $search, prompt: "Search plugins")
         .refreshable { await model.load() }
         .task { if model.snapshot == nil { await model.load() } }
-        .sheet(item: $installCandidate) { entry in
+        .bighelpSheet(item: $installCandidate) { entry in
             PluginInstallReviewView(entry: entry, isBusy: model.isBusy) {
                 installCandidate = nil
                 Task { await model.install(entry) }

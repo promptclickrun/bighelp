@@ -152,8 +152,16 @@ final class RegistryFleetReader: FleetHostReading {
                        avatarFile: profile.avatar.flatMap { avatars.store($0) }, isPinned: pinned.contains(profile.id),
                        isDefault: profile.isDefault, activity: activity[profile.id], placement: profile.placement)
         }
+        // Codex and Claude Code chats on that computer; an older Hermes can't list them.
+        let defaultProfile = profiles.first(where: \.isDefault)?.id ?? profiles.first?.id ?? "default"
+        let otherApps = try? await DirectHermesSessionMaintenanceClient(
+            rpc: client, http: client, owner: owner, currentOwner: current,
+            resolveClosableRuntime: { _ in throw HermesSessionMaintenanceError.invalidRequest },
+            reconcileClosedRuntime: { _ in throw HermesSessionMaintenanceError.invalidRequest }
+        ).foreignSessions(profileID: defaultProfile, source: nil, offset: 0, limit: 10)
         return FleetSnapshot(agents: agents, chats: chats,
-                             tasks: tasks.map { FleetTask(hostID: hostID, scheduledTask: $0) }, refreshedAt: Date())
+                             tasks: tasks.map { FleetTask(hostID: hostID, scheduledTask: $0) }, refreshedAt: Date(),
+                             otherAppChats: otherApps.map { $0.sessions.map { FleetOtherAppChat(hostID: hostID, item: $0) } })
     }
 
     static let workingStatuses: Set<String> = ["starting", "working", "streaming", "resuming"]

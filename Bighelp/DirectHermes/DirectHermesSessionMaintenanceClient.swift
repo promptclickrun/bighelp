@@ -174,7 +174,7 @@ struct HermesSessionImportResult: Equatable, Sendable {
     let detached: Int
 }
 
-struct HermesForeignSessionItem: Identifiable, Equatable, Sendable {
+struct HermesForeignSessionItem: Identifiable, Equatable, Codable, Sendable {
     let id: String
     let source: String
     let sourceLabel: String

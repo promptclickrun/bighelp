@@ -97,7 +97,7 @@ private struct ToolsetDetailView: View {
         .navigationTitle(toolset?.label ?? toolsetName)
         .navigationBarTitleDisplayMode(.inline)
         .task { if model.details[toolsetName] == nil { await model.loadDetail(toolsetName) } }
-        .sheet(item: $credentialProvider) { provider in
+        .bighelpSheet(item: $credentialProvider) { provider in
             if let toolset {
                 ToolsetCredentialForm(provider: provider, isBusy: model.isBusy) { values in
                     credentialProvider = nil

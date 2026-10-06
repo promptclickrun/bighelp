@@ -99,7 +99,7 @@ struct ChatSessionSettingsView: View {
                     }
                 }
             }
-            .sheet(isPresented: $isFilesPresented) { ChatSessionFilesView(model: model) }
+            .bighelpSheet(isPresented: $isFilesPresented) { ChatSessionFilesView(model: model) }
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }

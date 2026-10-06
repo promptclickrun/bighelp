@@ -114,7 +114,7 @@ struct CapabilityControlSheet: View {
             }
         }
         .task(id: selection.id) { await reload() }
-        .sheet(isPresented: $isPresentingEditor, onDismiss: store.clearDocument) {
+        .bighelpSheet(isPresented: $isPresentingEditor, onDismiss: store.clearDocument) {
             if let document = store.document, document.agentID == selection.agentID,
                document.skillID == selection.itemID {
                 SkillEditorSheet(store: store, agentID: selection.agentID, document: document)

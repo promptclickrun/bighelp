@@ -108,7 +108,7 @@ struct AgentStartPicker: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .sheet(isPresented: $isBrowsingTemplates, onDismiss: {
+        .bighelpSheet(isPresented: $isBrowsingTemplates, onDismiss: {
             guard let browsedTemplate else { return }
             self.browsedTemplate = nil
             pick(browsedTemplate)

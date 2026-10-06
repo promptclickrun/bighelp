@@ -502,11 +502,11 @@ private struct BoardFilePreview: ViewModifier {
 
     func body(content: Content) -> some View {
         #if targetEnvironment(macCatalyst) || os(visionOS)
-        content.sheet(item: $attachment) { ChatAttachmentPreviewView(attachment: $0).bighelpSheetSize(.large) }
+        content.bighelpSheet(item: $attachment) { ChatAttachmentPreviewView(attachment: $0).bighelpSheetSize(.large) }
         #else
         content
-            .sheet(item: binding(pictures: false)) { ChatAttachmentPreviewView(attachment: $0).bighelpSheetSize(.large) }
-            .fullScreenCover(item: binding(pictures: true)) { ChatAttachmentPreviewView(attachment: $0) }
+            .bighelpSheet(item: binding(pictures: false)) { ChatAttachmentPreviewView(attachment: $0).bighelpSheetSize(.large) }
+            .bighelpFullScreenCover(item: binding(pictures: true)) { ChatAttachmentPreviewView(attachment: $0) }
         #endif
     }
 

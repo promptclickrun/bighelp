@@ -72,7 +72,7 @@ struct RawConfigurationView: View {
         } message: {
             Text("Reloading replaces your unsaved changes with the file on the host.")
         }
-        .sheet(isPresented: $isExpanded, onDismiss: {
+        .bighelpSheet(isPresented: $isExpanded, onDismiss: {
             // Save from the big editor opens the review once the editor is gone.
             if saveAfterExpandedEditor {
                 saveAfterExpandedEditor = false
@@ -87,7 +87,7 @@ struct RawConfigurationView: View {
         }
         .task { if store.snapshot == nil { await store.load() } }
         .onDisappear { store.closePrivateEditor() }
-        .sheet(
+        .bighelpSheet(
             isPresented: Binding(
                 get: { store.review != nil },
                 set: { if !$0 { store.cancelReview() } }

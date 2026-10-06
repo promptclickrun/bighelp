@@ -41,7 +41,7 @@ extension RootShellView {
     /// computer becomes the working one, so its own Sessions screen can show.
     func focusFleet(_ hostID: UUID?) {
         fleetFocus = hostID
-        fleetChatsFilter = FleetChatsFilter()
+        fleetChatsFilter = FleetChatsFilter(app: fleetChatsFilter.app)
         if appState.path.last == .allHostsChats { workOnFocusedFleetHost() }
     }
 
@@ -86,6 +86,16 @@ extension RootShellView {
     func showOneHostPage(_ routes: [AppRoute]) {
         let base = fleetModeOn ? Array(appState.path.prefix { $0.isAllHosts }) : []
         appState.path = base + routes
+    }
+
+    /// One host's pages on the Sessions tab; from another tab, after the switch
+    /// (`AppState.select(_:thenOpen:)`).
+    func showOneHostPageOnSessions(_ routes: [AppRoute]) {
+        if appState.selectedTab != .sessions {
+            appState.select(.sessions, thenOpen: routes)
+        } else {
+            showOneHostPage(routes)
+        }
     }
 
     /// ☰'s destinations while all hosts show: lists span hosts, and a screen
@@ -211,7 +221,20 @@ extension RootShellView {
     /// All sessions while every computer shows. A picked computer gets its own Sessions screen.
     func fleetChats(_ fleet: FleetStore) -> FleetChatsView {
         FleetChatsView(fleet: fleet, hostFilter: fleetFocusBinding, filter: $fleetChatsFilter,
-                       onOpen: { openFleetChat($0) }, hostSessions: { fleetHostSessions($0) })
+                       onOpen: { openFleetChat($0) }, hostSessions: { fleetHostSessions($0) },
+                       otherApps: otherAppChats, onOpenOtherApp: { openFleetOtherAppChat($0) })
+    }
+
+    /// A chat still in Codex or Claude Code: its computer's own Sessions screen
+    /// opens (staying in all hosts) and shows it, ready to bring in.
+    func openFleetOtherAppChat(_ chat: FleetOtherAppChat) {
+        guard let fleet else { return }
+        guard chat.hostID == fleet.selectedHostID || fleet.canOpen(chat.hostID) else {
+            actionErrorMessage = "\(fleet.hostName(chat.hostID)) can't be opened from here."
+            return
+        }
+        requestedOtherAppChat = chat.item
+        focusFleet(chat.hostID)
     }
 
     /// The focused computer's Sessions screen, as one-computer mode shows it, once it's the
@@ -454,7 +477,7 @@ struct FleetSheets: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .sheet(item: $gate, onDismiss: {
+            .bighelpSheet(item: $gate, onDismiss: {
                 guard let picked = pickedHost else { return }
                 pickedHost = nil
                 onGate(picked.destination, picked.hostID)
@@ -466,7 +489,7 @@ struct FleetSheets: ViewModifier {
                     }
                 }
             }
-            .sheet(isPresented: $isNewChatPresented, onDismiss: {
+            .bighelpSheet(isPresented: $isNewChatPresented, onDismiss: {
                 if let group = pickedGroup {
                     pickedGroup = nil
                     onNewGroup?(group)

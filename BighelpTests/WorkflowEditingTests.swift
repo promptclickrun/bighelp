@@ -860,3 +860,22 @@ struct WorkflowDeliveryAndOutcomeTests {
                 == [.delivery, .outcomes])
     }
 }
+
+/// The app's real path: the ☰ menu already asked whether the computer has Workflows, and the
+/// Workflows screen starts with that answer. What the plugin adds (parallel blocks, delivery,
+/// outcomes) must still be asked, or the editor hides every one of them.
+@MainActor
+struct WorkflowFeatureLoadingTests {
+    @Test func aStoreThatStartsWithTheMenusAnswerStillAsksForTheFeatures() async {
+        let store = WorkflowsStore(client: DemoWorkflowsClient(delays: false), support: .available(canEdit: true))
+        await store.load()
+        #expect(store.features == .all)
+    }
+
+    @Test func theEditorAsksForTheFeaturesWhenTheStoreHasNone() async {
+        let editor = WorkflowEditorModel(workflowID: "wf-research", client: DemoWorkflowsClient(delays: false),
+                                         canEditFlow: true)
+        await editor.load()
+        #expect(editor.features == .all)
+    }
+}

@@ -58,7 +58,7 @@ struct AgentHomeDrawer: View {
                 } label: {
                     FleetChatRow(chat: chat, fleet: fleetChats.fleet, compact: true)
                 }
-                .buttonStyle(.plain)
+                .bighelpPlainButtonStyle(.rounded(BighelpTokens.radius12), padding: BighelpTokens.space4)
                 .accessibilityIdentifier("menu.fleet-chat.\(chat.title)")
             }
         } else {

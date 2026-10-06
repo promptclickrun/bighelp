@@ -165,7 +165,7 @@ struct BighelpV3MessageAudioView: View {
             .frame(width: 280)
             .background(theme.incomingMessageBackground, in: .rect(cornerRadius: BighelpTokens.radius20))
         }
-        .buttonStyle(.plain)
+        .bighelpPlainButtonStyle(.rounded(BighelpTokens.radius20))
         .accessibilityLabel("Preview \(attachment.fileName)")
         .accessibilityHint("Opens the existing audio preview with playback and save options")
     }

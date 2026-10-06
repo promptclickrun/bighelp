@@ -381,6 +381,7 @@ struct ChatComposer: View {
             .accessibilityLabel("Attachments and actions")
             .accessibilityHint("Choose camera, photo, file, voice, or chat actions.")
             .accessibilityIdentifier("chat.attachment")
+            .bighelpChatPanelAnchor(.attachments)
             .disabled(model.isComposerAttachmentInputDisabled)
         }
     }

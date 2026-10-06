@@ -3,9 +3,50 @@ import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
+#if targetEnvironment(macCatalyst)
+enum BighelpMacChatPanelRequest {
+    case action(ChatActionMenuAction)
+    case nativeSessionControls
+}
+#endif
+
 // Attachment work remains bound to the existing conversation and view state.
 extension ChatDestinationView {
+    #if targetEnvironment(macCatalyst)
+    @discardableResult
+    func queueMacPanelActionIfNeeded(_ action: ChatActionMenuAction) -> Bool {
+        guard attachmentFlow.isActionMenuPresented || pendingMacPanelRequest != nil else {
+            return false
+        }
+        pendingMacPanelRequest = .action(action)
+        attachmentFlow.isActionMenuPresented = false
+        return true
+    }
+
+    /// Finish the popover before starting the next native panel.
+    func attachmentPanelDidDismiss(
+        onNativeSessionControls: @MainActor () -> Void
+    ) {
+        guard let request = pendingMacPanelRequest else { return }
+        pendingMacPanelRequest = nil
+        switch request {
+        case .action(let action):
+            performChatAction(action)
+        case .nativeSessionControls:
+            onNativeSessionControls()
+        }
+    }
+    #endif
+
     func performChatAction(_ action: ChatActionMenuAction) {
+        #if targetEnvironment(macCatalyst)
+        switch action {
+        case .camera, .photo, .file, .voice, .startSession:
+            if queueMacPanelActionIfNeeded(action) { return }
+        default:
+            break
+        }
+        #endif
         switch action {
             case .camera:
                 guard ChatCameraPicker.isAvailable else {

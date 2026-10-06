@@ -663,6 +663,7 @@ private struct FeedPostView: View {
                 }
                 .padding()
                 .presentationCompactAdaptation(.popover)
+                .bighelpPopoverDismissal(isPresented: $isShowingInfo)
             }
         }
     }

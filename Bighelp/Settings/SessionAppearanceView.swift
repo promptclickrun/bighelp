@@ -106,10 +106,13 @@ struct SessionAppearanceView: View {
                 Button("Cancel") { dismiss() }
                     .disabled(isApplying)
                     .bighelpToolbarText()
+                    .bighelpCancelAction()
             }
             ToolbarItem(placement: .confirmationAction) {
                 Button(isApplying ? "Applying…" : "Apply") { apply() }
                     .disabled(!hasChanges || isLoadingPhoto || isApplying || (choice == .photo && !hasPhoto))
+                    .bighelpToolbarText()
+                    .bighelpDefaultAction()
                     .accessibilityIdentifier("session-appearance.apply")
             }
         }
@@ -188,7 +191,9 @@ struct SessionAppearanceView: View {
                     Button { select(option) } label: {
                         choiceTile(option)
                     }
-                    .buttonStyle(.plain)
+                    // A plain button on Catalyst only receives clicks where its
+                    // label paints. Keep the whole tile targetable with a mouse.
+                    .bighelpPlainButtonStyle(.rounded(BighelpTokens.radius12))
                     .accessibilityValue(choice == option ? "Selected" : "")
                 }
 

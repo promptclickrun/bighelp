@@ -67,7 +67,8 @@ struct BighelpSideMenuHost: ViewModifier {
                 panel
                     .frame(width: sidebarWidth)
                     .frame(maxHeight: .infinity)
-                    .transition(.move(edge: .leading).combined(with: .opacity))
+                    // Keep the column solid while the chat changes width.
+                    .transition(.move(edge: .leading))
                 MacSidebarDivider(width: sidebarWidth, clamp: clamped, draggedWidth: $draggedWidth) { width in
                     savedWidth = width.map { Double($0) } ?? 0
                 }
@@ -76,7 +77,8 @@ struct BighelpSideMenuHost: ViewModifier {
             content
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { windowWidth = $0 }
-        .animation(reduceMotion ? nil : .snappy(duration: 0.3), value: menu.isOpen)
+        // A short non-springing transition avoids a bounce during relayout.
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: menu.isOpen)
         .environment(\.bighelpSideMenu, menu)
         #elseif os(visionOS)
         HStack(spacing: 0) {

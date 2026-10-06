@@ -15,7 +15,11 @@ struct ChatDestinationView: View {
     /// notification tap), a question or approval waiting on you opens focused.
     @State private var attentionAutoOpenUntil: Date?
     @State private var isNativeSessionControlsPresented = false
+    #if targetEnvironment(macCatalyst)
+    @State var pendingMacPanelRequest: BighelpMacChatPanelRequest?
+    #else
     @State private var requestsNativeControlsAfterMenu = false
+    #endif
     @State private var responseHaptics = ResponseHapticsController()
     @State private var isHapticsSurfaceVisible = false
     @State private var projectChanges: ProjectChangesStore
@@ -208,6 +212,9 @@ struct ChatDestinationView: View {
             }
         }
         .onDisappear {
+            #if targetEnvironment(macCatalyst)
+            pendingMacPanelRequest = nil
+            #endif
             sessionAppearance?.retire()
             isHapticsSurfaceVisible = false
             // NavigationStack updates its path before the outgoing destination
@@ -315,7 +322,12 @@ struct ChatDestinationView: View {
                 ? projectChanges.railSummary
                 : nil,
             composerFocusRequest: attachmentFlow.composerFocusRequest,
-            onAttachmentTap: { attachmentFlow.isActionMenuPresented = true },
+            onAttachmentTap: {
+                #if targetEnvironment(macCatalyst)
+                pendingMacPanelRequest = nil
+                #endif
+                attachmentFlow.isActionMenuPresented = true
+            },
             onProjectChangesTap: {
                 withAnimation(.snappy(duration: 0.28)) {
                     isProjectChangesPresented = true
@@ -496,11 +508,10 @@ struct ChatDestinationView: View {
         .sheet(isPresented: $isSessionFilesPresented) {
             ChatSessionFilesView(model: model)
         }
-        .sheet(isPresented: $isChatAppearancePresented) {
+        .bighelpChatPanel(isPresented: $isChatAppearancePresented, anchor: .appearance) {
             if let sessionAppearance {
                 NavigationStack { SessionAppearanceView(store: sessionAppearance) }
                     .presentationDragIndicator(.visible)
-                    .bighelpSheetSize(.standard)
             }
         }
         .onChange(of: voicePresentation != nil) { _, isPresented in
@@ -535,11 +546,17 @@ struct ChatDestinationView: View {
                     .presentationDragIndicator(.visible)
             }
         }
-        .sheet(isPresented: $attachmentFlow.isActionMenuPresented, onDismiss: {
+        .bighelpChatPanel(isPresented: $attachmentFlow.isActionMenuPresented, anchor: .attachments, onDismiss: {
+            #if targetEnvironment(macCatalyst)
+            attachmentPanelDidDismiss {
+                isNativeSessionControlsPresented = model.nativeConversationClient != nil
+            }
+            #else
             if requestsNativeControlsAfterMenu {
                 requestsNativeControlsAfterMenu = false
                 isNativeSessionControlsPresented = model.nativeConversationClient != nil
             }
+            #endif
         }) {
             ChatActionMenuSheet(
                 agentName: identity?.name ?? "your agent",
@@ -563,10 +580,15 @@ struct ChatDestinationView: View {
                 allowsImages: model.supportedAttachmentKinds.contains(.image),
                 allowsFiles: model.supportedAttachmentKinds.contains(.file),
                 onNativeSessionControls: model.nativeConversationClient == nil ? nil : {
+                    #if targetEnvironment(macCatalyst)
+                    pendingMacPanelRequest = .nativeSessionControls
+                    #else
                     requestsNativeControlsAfterMenu = true
+                    #endif
                     attachmentFlow.isActionMenuPresented = false
                 }
             )
+            #if !targetEnvironment(macCatalyst)
             .photosPicker(
                 isPresented: $isPhotoPickerPresented,
                 selection: $photoSelections,
@@ -596,13 +618,37 @@ struct ChatDestinationView: View {
                 )
                 .ignoresSafeArea()
             }
+            #endif
             .presentationDetents([.fraction(0.72), .large])
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(BighelpTokens.radius20)
-            // A sheet, not a popover, on the Mac too: its rows open pickers,
-            // file panels and pages of their own.
-            .bighelpSheetSize(.standard)
         }
+        // Native Mac panels need a stable presenter outside the transient
+        // popover; presenting from inside it leaves the first click pending.
+        #if targetEnvironment(macCatalyst)
+        .photosPicker(
+            isPresented: $isPhotoPickerPresented,
+            selection: $photoSelections,
+            maxSelectionCount: max(0, 10 - model.draftAttachments.count),
+            matching: .images
+        )
+        .fileImporter(
+            isPresented: $isFilePickerPresented,
+            allowedContentTypes: [.item],
+            allowsMultipleSelection: true,
+            onCompletion: importFiles
+        )
+        .fullScreenCover(isPresented: $isCameraPickerPresented) {
+            ChatCameraPicker(
+                onCapture: { image in
+                    isCameraPickerPresented = false
+                    importCameraImage(image)
+                },
+                onCancel: { isCameraPickerPresented = false }
+            )
+            .ignoresSafeArea()
+        }
+        #endif
         .sheet(isPresented: $isHermesWorkspacePickerPresented) {
             HermesWorkspacePickerView(
                 store: hermesWorkspaces,

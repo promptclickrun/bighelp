@@ -54,13 +54,17 @@ enum ChatTextSize: Int, CaseIterable, Identifiable, Sendable {
     case large = 1
     case larger = 2
 
+    /// Out of the box, one step under the system size. A size someone picked is
+    /// saved and stays, even when it's this one.
+    static let defaultSize: ChatTextSize = .small
+
     var id: Self { self }
 
     var title: String {
         switch self {
         case .smaller: "Smaller"
         case .small: "Small"
-        case .standard: "Default"
+        case .standard: "Medium"
         case .large: "Large"
         case .larger: "Larger"
         }
@@ -103,7 +107,7 @@ enum ChatDensity: String, CaseIterable, Identifiable, Sendable {
 struct ChatLayoutSettingsView: View {
     @AppStorage(ChatLayoutPreferences.avatarSizeKey) private var avatarSize: ChatAvatarSize = .automatic
     @AppStorage(ChatLayoutPreferences.showsAgentNameKey) private var showsAgentName = true
-    @AppStorage(ChatLayoutPreferences.textSizeKey) private var textSize: ChatTextSize = .standard
+    @AppStorage(ChatLayoutPreferences.textSizeKey) private var textSize: ChatTextSize = .defaultSize
     @AppStorage(ChatLayoutPreferences.densityKey) private var density: ChatDensity = .comfortable
     @AppStorage(LinkPreviewPreferences.enabledKey) private var showsLinkPreviews = true
     @BighelpThemeReader private var theme
@@ -162,7 +166,7 @@ struct ChatLayoutSettingsView: View {
                 Button("Reset to defaults") {
                     avatarSize = .automatic
                     showsAgentName = true
-                    textSize = .standard
+                    textSize = .defaultSize
                     density = .comfortable
                     showsLinkPreviews = true
                 }
@@ -208,7 +212,7 @@ struct ChatLayoutSettingsView: View {
 
     private var textSizeValue: Binding<Double> {
         Binding(get: { Double(textSize.rawValue) },
-                set: { textSize = ChatTextSize(rawValue: Int($0.rounded())) ?? .standard })
+                set: { textSize = ChatTextSize(rawValue: Int($0.rounded())) ?? .defaultSize })
     }
 }
 

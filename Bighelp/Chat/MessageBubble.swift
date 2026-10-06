@@ -118,7 +118,7 @@ struct MessageBubble: View {
     @State private var isReactionPickerPresented = false
     @State private var contentCache = ChatMessageContentCache()
     @State private var cardCopyContext = ChatCardCopyContext()
-    @AppStorage(ChatLayoutPreferences.textSizeKey) private var chatTextSize: ChatTextSize = .standard
+    @AppStorage(ChatLayoutPreferences.textSizeKey) private var chatTextSize: ChatTextSize = .defaultSize
     @AppStorage(LinkPreviewPreferences.enabledKey) private var showsLinkPreviews = true
 
     init(

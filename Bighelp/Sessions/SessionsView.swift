@@ -53,6 +53,11 @@ struct SessionsView: View {
     /// The Agents list's hold menu for the "Your agents" rail.
     var agentActionsConfig: AgentActionsConfig? = nil
     @State private var agentActions = AgentActions()
+    /// Codex and Claude Code chats on this computer, and what identifies that list; nil hides them.
+    let otherApps: (source: any OtherAppChatsSource, id: String)?
+    /// Opens a chat brought in from another app, by its Hermes session ID.
+    let onOpenBroughtIn: ((String) -> Void)?
+    @State private var otherAppsStore: OtherAppChatsStore?
 
     init(
         model: SessionsModel,
@@ -64,8 +69,12 @@ struct SessionsView: View {
         onStartChat: ((String?) -> Void)? = nil,
         onNewGroupChat: (() -> Void)? = nil,
         onSelect: @escaping (SessionSummary) -> Void,
-        agentActionsConfig: AgentActionsConfig? = nil
+        agentActionsConfig: AgentActionsConfig? = nil,
+        otherApps: (source: any OtherAppChatsSource, id: String)? = nil,
+        onOpenBroughtIn: ((String) -> Void)? = nil
     ) {
+        self.otherApps = otherApps
+        self.onOpenBroughtIn = onOpenBroughtIn
         self.onNewGroupChat = onNewGroupChat
         model.showsCronSessions = settings.showCronSessions
         _model = State(initialValue: model)
@@ -204,6 +213,61 @@ struct SessionsView: View {
             }
         }
         .agentActionsPresentation(agentActions, config: agentActionsConfig)
+        .task(id: otherApps?.id) {
+            guard let otherApps else { otherAppsStore = nil; return }
+            let store = OtherAppChatsStore(source: otherApps.source)
+            otherAppsStore = store
+            await store.load()
+        }
+        .sheet(isPresented: Binding(get: { otherAppsStore?.preview != nil },
+                                    set: { if !$0 { otherAppsStore?.closePreview() } })) {
+            if let store = otherAppsStore, let preview = store.preview {
+                OtherAppChatPreviewSheet(preview: preview, isWorking: store.isWorking, onOpen: {
+                    Task { @MainActor in
+                        if let id = await store.bringIn() { onOpenBroughtIn?(id) }
+                    }
+                }, onCancel: { store.closePreview() })
+            }
+        }
+        .alert("Codex and Claude Code", isPresented: Binding(get: { otherAppsStore?.errorMessage != nil },
+                                                           set: { if !$0 { otherAppsStore?.errorMessage = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(otherAppsStore?.errorMessage ?? "")
+        }
+    }
+
+    /// Chats in Codex and Claude Code on this computer, after this computer's own. One tap
+    /// shows the start; Open brings it into Hermes as a chat here.
+    @ViewBuilder
+    private func otherAppsSection(model: SessionsModel) -> some View {
+        if let store = otherAppsStore, onOpenBroughtIn != nil {
+            let query = model.query.trimmingCharacters(in: .whitespacesAndNewlines)
+            let items = store.items.filter { query.isEmpty || $0.title.localizedCaseInsensitiveContains(query) }
+            if !items.isEmpty {
+                Section {
+                    sectionCaption("In Codex and Claude Code")
+                        .accessibilityIdentifier("sessions.section.other-apps")
+                        .modifier(SessionCaptionRow())
+                    ForEach(items) { item in
+                        Button { Task { await store.showPreview(item) } } label: { OtherAppChatRow(item: item) }
+                            .buttonStyle(.plain)
+                            .disabled(store.isWorking)
+                            .listRowInsets(rowInsets)
+                            .listRowBackground(Color.clear)
+                            .accessibilityIdentifier("sessions.other-app.\(item.title)")
+                    }
+                    if store.nextOffset != nil, query.isEmpty {
+                        Button("Show more") { Task { await store.loadMore() } }
+                            .font(.bighelp(.subheadline).weight(.semibold))
+                            .tint(theme.action)
+                            .listRowBackground(Color.clear)
+                            .accessibilityIdentifier("sessions.other-apps.more")
+                    }
+                }
+                .listSectionSeparator(.hidden)
+            }
+        }
     }
 
     private func nativeDirectory(model: SessionsModel) -> some View {
@@ -219,6 +283,7 @@ struct SessionsView: View {
                 agentStrip(onStartChat, activeAgentIDs: activeAgentIDs(model))
             }
             nativeContent(model: model)
+            otherAppsSection(model: model)
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)

@@ -87,11 +87,17 @@ final class AppState {
         pendingVoiceConversationID = conversationID
     }
 
-    func resetForHostBoundary() {
+    /// `keepsAllHostsScreens`: with every computer showing, its lists (All agents, All sessions,
+    /// every computer's tasks) stay up while the working computer changes; that computer's own
+    /// pages above them go.
+    func resetForHostBoundary(keepsAllHostsScreens: Bool = false) {
         // The connections screen stays up while you switch hosts from it.
         // Host-owned routes do not.
         let showsOnlyConnections = !path.isEmpty && path.allSatisfy { $0 == .workspaceConnections }
-        if !showsOnlyConnections {
+        if keepsAllHostsScreens {
+            if ![.sessions, .scheduledTasks].contains(selectedTab) { selectedTab = .sessions }
+            path = Array(path.prefix { $0.isAllHosts })
+        } else if !showsOnlyConnections {
             selectedTab = .sessions
             path.removeAll()
         }

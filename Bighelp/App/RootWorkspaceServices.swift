@@ -149,25 +149,6 @@ extension RootShellView {
         }
     }
 
-    var quickWorkspaceContent: QuickWorkspaceContent {
-        let summaries = sessionCatalog.recentSummaries(includeCronSessions: settings.showCronSessions)
-        let availableKeys = SessionSectionOrganizer.reorderableKeys(
-            in: summaries,
-            organizeByProjects: settings.organizeChatsByProjects
-        )
-        let layout = settings.sessionSectionLayout(
-            accountID: sessionOrganizationAccountID,
-            hostID: sessionOrganizationHostID,
-            availableProjectKeys: availableKeys
-        )
-        return QuickWorkspaceContent(
-            recentSessions: summaries,
-            organizeByProjects: settings.organizeChatsByProjects,
-            projectOrder: layout.projectOrder,
-            includeCronSessions: settings.showCronSessions
-        )
-    }
-
     var voiceSettingsScope: String? {
         if let owner = currentWorkspaceOwner, owner.authority.kind == .direct {
             return owner.authority.cacheScopeID + ":" + owner.authenticationGeneration.uuidString + ":" + owner.connectionGeneration.uuidString

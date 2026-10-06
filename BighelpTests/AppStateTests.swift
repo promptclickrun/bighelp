@@ -28,6 +28,24 @@ struct AppStateTests {
         #expect(state.path.isEmpty)
     }
 
+    /// With every computer showing, its lists stay put when the working computer changes;
+    /// the old computer's own pages above them go.
+    @Test func aComputerSwitchInAllHostsKeepsItsLists() {
+        let state = AppState()
+        state.path = [.allHostsChats, .projects, .chat(conversationID: "old")]
+        state.resetForHostBoundary(keepsAllHostsScreens: true)
+        #expect(state.selectedTab == .sessions)
+        #expect(state.path == [.allHostsChats])
+
+        state.select(.scheduledTasks)
+        state.resetForHostBoundary(keepsAllHostsScreens: true)
+        #expect(state.selectedTab == .scheduledTasks, "Every computer's tasks stay up")
+
+        state.path = [.allHostsChats]
+        state.resetForHostBoundary()
+        #expect(state.path.isEmpty, "One computer: nothing of the old one stays")
+    }
+
     @Test func conversationActivationTracksTheCanonicalSessionID() {
         let state = AppState()
 

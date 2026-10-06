@@ -57,6 +57,9 @@ struct FloatingTabBar: View {
     let unread: Set<AppTab>
     /// In a chat, Chat is the current tab whichever page the chat was opened from.
     var isInChat = false
+    /// A search field along the bottom below the tabs (Sessions, iOS 26): the tabs keep a
+    /// small gap above it instead of sinking onto it toward the home indicator.
+    var clearsBottomSearch = false
 
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -66,7 +69,8 @@ struct FloatingTabBar: View {
     @ScaledMetric(relativeTo: .caption2) private var iconSize: CGFloat = 26
 
     init(selection: Binding<AppTab>, onNewChat: (() -> Void)? = nil, homeIndicatorSink: CGFloat = 0,
-         unread: Set<AppTab> = [], isInChat: Bool = false) {
+         unread: Set<AppTab> = [], isInChat: Bool = false, clearsBottomSearch: Bool = false) {
+        self.clearsBottomSearch = clearsBottomSearch
         self._selection = selection
         self.onNewChat = onNewChat
         self.homeIndicatorSink = homeIndicatorSink
@@ -111,7 +115,7 @@ struct FloatingTabBar: View {
         .padding(.horizontal, 12)
         .padding(.vertical, isVerticallyCompact ? 4 : 8)
         .frame(maxWidth: .infinity)
-        .padding(.bottom, -homeIndicatorSink)
+        .padding(.bottom, clearsBottomSearch ? BighelpTokens.space8 - homeIndicatorSink : -homeIndicatorSink)
     }
 
     private var isVerticallyCompact: Bool { verticalSizeClass == .compact }

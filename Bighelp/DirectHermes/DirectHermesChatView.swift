@@ -33,16 +33,13 @@ struct DirectHermesChatView: View {
                 onVoiceTap: { showsSupport = true },
                 onApprovalTap: { _ in showsAttention = true },
                 onPeopleTap: { showsSupport = true },
-                onWorkspaceTap: { store.showSessions() },
-                showsWorkspaceButton: true,
                 onNewChatTap: { Task { await store.newChat() } },
                 sessionControlAccessory: ChatSessionControlAccessory(
                     title: chat.client.modelName,
                     isEnabled: chat.client.connected,
                     accessibilityIdentifier: "direct-hermes.controls",
                     action: { showsControls = true }
-                ),
-                workspaceButtonLabel: "Sessions")
+                ))
                 .environment(\.chatSurfaceCapabilities, .standaloneDirect)
         }
         .chatAttention(client: chat.client, agentName: agentName, isPresented: $showsAttention,

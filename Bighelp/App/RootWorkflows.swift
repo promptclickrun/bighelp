@@ -38,7 +38,7 @@ extension RootShellView {
             return
         }
         if appState.selectedTab != .sessions { appState.select(.sessions) }
-        appState.path = [.workflows]
+        showOneHostPage([.workflows])
     }
 
     /// Opens one workflow (a Shortcut or a link): its flow, or its Run sheet straight away.
@@ -48,14 +48,14 @@ extension RootShellView {
             return
         }
         if appState.selectedTab != .sessions { appState.select(.sessions) }
-        appState.path = [.workflows, .workflow(id: id, startsRun: startsRun)]
+        showOneHostPage([.workflows, .workflow(id: id, startsRun: startsRun)])
     }
 
     /// Opens one run (a widget, a link or a notification later).
     func openWorkflows(run: String) {
         guard prepareWorkflowsStore() != nil else { return }
         if appState.selectedTab != .sessions { appState.select(.sessions) }
-        appState.path = [.workflows, BighelpPlatform.isMac ? .workflowRuns(selected: run) : .workflowRun(id: run)]
+        showOneHostPage([.workflows, BighelpPlatform.isMac ? .workflowRuns(selected: run) : .workflowRun(id: run)])
     }
 
     /// A tapped workflow alert names its run only as a chat reference (`workflow.run.<id>`,

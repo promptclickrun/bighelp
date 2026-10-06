@@ -11,6 +11,10 @@ struct BighelpMenuHosts {
     /// The all-hosts view's switch: every agent on every host in one list.
     struct AllHosts {
         let isOn: Bool
+        /// All hosts narrowed to one computer (the host marked selected).
+        var isFocused = false
+        /// Every computer again, still in all hosts.
+        var showAll: () -> Void = {}
         let toggle: () -> Void
     }
 
@@ -108,6 +112,13 @@ struct BighelpMenu<Recent: View>: View {
         Section {
             if let onAllAgents = destinations.onAllAgents {
                 row("Agents", symbol: "person.2", id: "menu.all-agents", action: onAllAgents)
+                // One computer's places: the focused computer's, or they ask which.
+                if let onProjects = destinations.onProjects {
+                    row("Projects", symbol: "folder", id: "menu.projects", action: onProjects)
+                }
+                if let onKanban = destinations.onKanban {
+                    row("Kanban", symbol: "rectangle.split.3x1", id: "menu.kanban", action: onKanban)
+                }
                 if let onWorkflows = destinations.onWorkflows {
                     row("Workflows", symbol: "flowchart", id: "menu.workflows", action: onWorkflows)
                 }
@@ -169,7 +180,13 @@ struct BighelpMenu<Recent: View>: View {
     /// The host you're on, as one row. Hosts and Add host are one tap away.
     private var hostSwitcher: some View {
         Menu {
-            Section("Switch host") {
+            Section(hosts.allHosts?.isOn == true ? "Show" : "Switch host") {
+                if let allHosts = hosts.allHosts, allHosts.isOn {
+                    Button { choose(allHosts.showAll) } label: {
+                        if allHosts.isFocused { Text("All hosts") } else { Label("All hosts", systemImage: "checkmark") }
+                    }
+                    .accessibilityIdentifier("menu.host.all")
+                }
                 ForEach(hosts.hosts) { host in
                     Button { choose { hosts.select(host.id) } } label: {
                         if host.isSelected { Label(host.name, systemImage: "checkmark") } else { Text(host.name) }
@@ -203,7 +220,9 @@ struct BighelpMenu<Recent: View>: View {
     }
 
     private var hostTitle: String {
-        if hosts.allHosts?.isOn == true { return "All hosts" }
+        if let allHosts = hosts.allHosts, allHosts.isOn {
+            return allHosts.isFocused ? hosts.hosts.first(where: \.isSelected)?.name ?? "All hosts" : "All hosts"
+        }
         return hosts.hosts.first(where: \.isSelected)?.name ?? "Choose a host"
     }
 

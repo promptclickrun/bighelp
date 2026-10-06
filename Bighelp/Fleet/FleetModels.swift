@@ -74,8 +74,20 @@ struct FleetChat: Codable, Equatable, Sendable, Identifiable {
     var preview: String
     var updatedAt: Date
     var isActive: Bool
+    /// Hermes' `source` for the chat (where it started); see `SessionOrigin`.
+    var origin: String? = nil
 
     var id: String { FleetID.make(hostID, storedSessionID) }
+}
+
+/// All sessions' filters while every computer shows. A computer is picked with its chip.
+struct FleetChatsFilter: Equatable {
+    /// One agent, by its `FleetAgent.id` (its computer and profile).
+    var agentID: String?
+    /// Where the chats started, by `SessionOrigin` label.
+    var origin: String?
+
+    var isActive: Bool { agentID != nil || origin != nil }
 }
 
 struct FleetTask: Codable, Equatable, Sendable, Identifiable {

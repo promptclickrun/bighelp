@@ -78,6 +78,9 @@ struct RootShellView: View {
     @State private var cardInteractionStore = BighelpCardInteractionStore()
     /// The all-hosts view asking which host a one-host screen is for.
     @State var fleetGateRequest: FleetDestination?
+    /// All hosts narrowed to one computer (its chips, or ☰'s computer row); nil shows every computer.
+    @State var fleetFocus: UUID?
+    @State var fleetChatsFilter = FleetChatsFilter()
     @State var isFleetNewChatPresented = false
     @Environment(\.workspaceConnections) var workspaceConnections
     @Environment(\.scenePhase) var scenePhase
@@ -243,7 +246,7 @@ struct RootShellView: View {
             }
         }
         .onChange(of: hostRegistry?.selectedHostID) { _, _ in
-            appState.resetForHostBoundary()
+            appState.resetForHostBoundary(keepsAllHostsScreens: fleetModeOn)
         }
         .task(id: hostRegistry?.selectedHostID) {
             connectionKeeper.bind { [hostRegistry] in
@@ -351,7 +354,7 @@ struct RootShellView: View {
                 if nativeRuntime != nil { workspace }
                 else if fleetModeOn, let fleet {
                     FleetConnectingView(
-                        fleet: fleet, onOpen: openFleetAgent,
+                        fleet: fleet, hostFilter: fleetFocusBinding, onOpen: openFleetAgent,
                         isConnecting: nativeWorkspaceStore?.isConnecting == true || nativeRuntime?.isRefreshing == true
                             || nativeWorkspaceStore?.isConnected == true,
                         retry: { Task { await nativeWorkspaceStore?.reconnect() } })
@@ -597,7 +600,7 @@ struct RootShellView: View {
                                    startNewChat(explicitAgentID: nil)
                                } : nil,
                                homeIndicatorSink: FloatingTabBar.homeIndicatorSink(forBottomInset: rootBottomSafeArea),
-                               unread: boardUnreadTabs)
+                               unread: boardUnreadTabs, clearsBottomSearch: tabsClearBottomSearch)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
@@ -683,6 +686,12 @@ struct RootShellView: View {
             sessionRestoreTask = nil
             sessionRestoreRequest = nil
         }
+    }
+
+    /// The Sessions list's search field runs along the bottom on iOS 26 iPhones and iPads.
+    private var tabsClearBottomSearch: Bool {
+        guard #available(iOS 26, *), !BighelpPlatform.isMac else { return false }
+        return appState.selectedTab == .sessions && !fleetModeOn
     }
 
     private var showsBottomNavigation: Bool {
@@ -802,27 +811,39 @@ struct RootShellView: View {
     }
 
     /// Every way into the menu (☰, edge swipes, inner pages) opens the same ☰ sheet.
-    private func presentQuickWorkspace() {
+    private func presentMenu() {
         BighelpKeyboard.dismiss()
         // ☰ toggles: the Mac and Vision Pro sidebar stays reachable while open.
         isHomeDrawerPresented.toggle()
     }
 
-    private func performWorkspaceAction(_ action: WorkspaceSwipeAction) {
+    /// Where an edge swipe goes, from any screen (a chat included) and in either mode.
+    func performWorkspaceAction(_ action: WorkspaceSwipeAction) {
         BighelpKeyboard.dismiss()
         switch action {
         case .quickWorkspace:
-            presentQuickWorkspace()
+            presentMenu()
         case .newChat:
-            startNewChat(explicitAgentID: nil)
+            if fleetModeOn { isFleetNewChatPresented = true } else { startNewChat(explicitAgentID: nil) }
         case .sessions:
-            openSessions(filteredTo: nil)
+            if fleetModeOn {
+                // Back to the list the chat came from: All sessions, else All agents.
+                appState.chatOpenedFromList = false
+                if appState.path.first?.isAllHosts == true {
+                    appState.path = Array(appState.path.prefix { $0.isAllHosts })
+                } else {
+                    appState.select(.sessions)
+                }
+            } else {
+                openAllSessions()
+            }
         case .agents:
-            appState.select(.agents)
+            openAgentsList()
         case .home, .inbox:
-            openHomeChat()
+            // All hosts has no home chat; its home is All agents.
+            if fleetModeOn { openAgentsList() } else { openHomeChat() }
         case .profile:
-            appState.select(.profile)
+            openSettingsPage()
         case .none:
             break
         }
@@ -875,24 +896,71 @@ struct RootShellView: View {
         if fleetModeOn, let fleet {
             fleetHome(fleet)
         } else if case .sessions(let model)? = featureStore.preparedModel(for: .sessions) {
-            SessionsView(
-                model: model,
-                agents: agents,
-                settings: settings,
-                organizeByProjects: settings.organizeChatsByProjects,
-                sessionOrganizationAccountID: sessionOrganizationAccountID,
-                sessionOrganizationHostID: sessionOrganizationHostID,
-                onStartChat: { appState.chatOpenedFromList = true; startNewChat(explicitAgentID: $0) },
-                onNewGroupChat: newGroupChatAction.map { action in { appState.chatOpenedFromList = true; action() } },
-                onSelect: { appState.chatOpenedFromList = true; openSessionSelection($0) },
-                agentActionsConfig: agentActionsConfig
-            )
+            oneHostSessions(model)
         } else {
             ProgressView("Loading sessions")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .task {
                     _ = featureStore.prepareSessions(filteredTo: nil)
                 }
+        }
+    }
+
+    /// One computer's Sessions screen: the Chat list in one-computer mode, and a picked
+    /// computer's chip on All sessions.
+    func oneHostSessions(_ model: SessionsModel) -> SessionsView {
+        SessionsView(
+            model: model,
+            agents: agents,
+            settings: settings,
+            organizeByProjects: settings.organizeChatsByProjects,
+            sessionOrganizationAccountID: sessionOrganizationAccountID,
+            sessionOrganizationHostID: sessionOrganizationHostID,
+            onStartChat: { appState.chatOpenedFromList = true; startNewChat(explicitAgentID: $0) },
+            onNewGroupChat: newGroupChatAction.map { action in { appState.chatOpenedFromList = true; action() } },
+            onSelect: { appState.chatOpenedFromList = true; openSessionSelection($0) },
+            agentActionsConfig: agentActionsConfig,
+            otherApps: otherAppChats,
+            onOpenBroughtIn: { openBroughtInChat($0) }
+        )
+    }
+
+    /// Codex and Claude Code chats on the working computer, through its own Hermes; demo mode
+    /// has samples. What it's for (sign-in and agent) names the list, so another one reloads it.
+    var otherAppChats: (source: any OtherAppChatsSource, id: String)? {
+        if usesWorkspaceFixtures, workspaceConnections?.isDirectSelected != true {
+            let opened = sessionCatalog.recentSummaries(includeCronSessions: false).first { $0.kind == .direct }?.id
+            return opened.map { (DemoOtherAppChats(openedSessionID: $0), "demo") }
+        }
+        guard let owner = currentWorkspaceOwner, let connections = workspaceConnections, connections.owner == owner,
+              let direct = connections.hosts.selectedWorkspace?.nativeClient else { return nil }
+        let client = DirectHermesSessionMaintenanceClient(
+            rpc: direct, http: direct, owner: owner, currentOwner: { [weak connections] in connections?.owner },
+            // Bringing a chat in never closes a running one.
+            resolveClosableRuntime: { _ in throw HermesSessionMaintenanceError.invalidRequest },
+            reconcileClosedRuntime: { _ in throw HermesSessionMaintenanceError.invalidRequest })
+        return (LiveOtherAppChats(client: client, profileID: workspaceAgentID),
+                "\(owner.authority.cacheScopeID)|\(owner.connectionGeneration)|\(workspaceAgentID)")
+    }
+
+    /// A chat brought in from Codex or Claude Code opens like any other, once Hermes lists it.
+    func openBroughtInChat(_ storedSessionID: String) {
+        if let record = sessionCatalog.session(id: storedSessionID) {
+            appState.chatOpenedFromList = true
+            openSession(record.summary)
+            return
+        }
+        let profileID = workspaceAgentID
+        Task { @MainActor in
+            do {
+                let record = try await sessionCatalog.resolveStoredSession(profileID: profileID,
+                                                                           storedSessionID: storedSessionID)
+                appState.chatOpenedFromList = true
+                openSession(record.summary)
+            } catch is CancellationError {
+            } catch {
+                actionErrorMessage = "The chat is in Hermes now, but it couldn't be opened. Find it in Sessions."
+            }
         }
     }
 
@@ -909,7 +977,7 @@ struct RootShellView: View {
     @ViewBuilder
     private var scheduledTasksRootTab: some View {
         if fleetModeOn, let fleet {
-            FleetTasksView(fleet: fleet, onOpen: openFleetTask)
+            FleetTasksView(fleet: fleet, hostFilter: fleetFocusBinding, onOpen: openFleetTask)
                 // This host's own tasks, as its Scheduled tasks screen would load them.
                 .task { if featureStore.scheduledTasks?.loadState == .idle { await featureStore.scheduledTasks?.load() } }
         } else if let store = featureStore.scheduledTasks {
@@ -980,7 +1048,7 @@ struct RootShellView: View {
                     ToolbarItem(placement: .topBarTrailing) {
                         // The native toolbar supplies its own Liquid Glass surface.
                         Button {
-                            presentQuickWorkspace()
+                            presentMenu()
                         } label: {
                             Image(systemName: "line.3.horizontal").bighelpToolbarIcon()
                         }

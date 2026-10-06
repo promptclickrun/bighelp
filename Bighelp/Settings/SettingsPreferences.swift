@@ -236,7 +236,7 @@ enum WorkspaceSwipeAction: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .quickWorkspace: "Quick Workspace"
+        case .quickWorkspace: "Menu"
         case .newChat: "New Chat"
         case .sessions: "Sessions"
         case .agents: "Agents"

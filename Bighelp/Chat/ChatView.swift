@@ -131,7 +131,6 @@ struct ChatView: View {
     let foldCompletedTurns: Bool
     let showsHeader: Bool
     let sessionControlAccessory: ChatSessionControlAccessory?
-    let workspaceButtonLabel: String
     let agentName: String
     let agentRole: String
     let agentStatus: String
@@ -156,8 +155,6 @@ struct ChatView: View {
     let onChatFilesTap: (() -> Void)?
     let onChatAppearanceTap: (() -> Void)?
     let onSessionToolsTap: (() -> Void)?
-    let onWorkspaceTap: () -> Void
-    let showsWorkspaceButton: Bool
     let onNewChatTap: () -> Void
     let onLoadPreviousMessages: () -> Void
     let onForkMessage: ((String) -> Void)?
@@ -231,8 +228,6 @@ struct ChatView: View {
         onChatFilesTap: (() -> Void)? = nil,
         onChatAppearanceTap: (() -> Void)? = nil,
         onSessionToolsTap: (() -> Void)? = nil,
-        onWorkspaceTap: @escaping () -> Void = {},
-        showsWorkspaceButton: Bool = true,
         onNewChatTap: @escaping () -> Void = {},
         onLoadPreviousMessages: @escaping () -> Void = {},
         onForkMessage: ((String) -> Void)? = nil,
@@ -242,7 +237,6 @@ struct ChatView: View {
         foldCompletedTurns: Bool = true,
         showsHeader: Bool = true,
         sessionControlAccessory: ChatSessionControlAccessory? = nil,
-        workspaceButtonLabel: String = "Open Quick Workspace",
         sessionAppearance: SessionAppearanceSnapshot = .inherited,
         onForceRefresh: (@MainActor () async throws -> Void)? = nil
     ) {
@@ -252,7 +246,6 @@ struct ChatView: View {
         self.foldCompletedTurns = foldCompletedTurns
         self.showsHeader = showsHeader
         self.sessionControlAccessory = sessionControlAccessory
-        self.workspaceButtonLabel = workspaceButtonLabel
         self.agentName = agentName
         self.agentRole = agentRole
         self.agentStatus = agentStatus
@@ -275,8 +268,6 @@ struct ChatView: View {
         self.onChatFilesTap = onChatFilesTap
         self.onChatAppearanceTap = onChatAppearanceTap
         self.onSessionToolsTap = onSessionToolsTap
-        self.onWorkspaceTap = onWorkspaceTap
-        self.showsWorkspaceButton = showsWorkspaceButton
         self.onNewChatTap = onNewChatTap
         self.onLoadPreviousMessages = onLoadPreviousMessages
         self.onForkMessage = onForkMessage
@@ -960,19 +951,12 @@ struct ChatView: View {
         }
     }
 
-    /// Grouped by how often each is needed: where to go, this chat's project
-    /// changes, the model (shown, so a glance says which one), this chat, its
+    /// Grouped by how often each is needed: this chat's project changes, the model (shown, so a glance says which one), this chat, its
     /// agent, then technical tools under Advanced. Dividers (not Sections) group
     /// items so each keeps its accessibility identifier.
     private var chatOptionsMenu: some View {
         Menu {
-            if showsWorkspaceButton {
-                Button("Go to…", systemImage: "square.grid.2x2", action: dismissKeyboardAndOpenWorkspace)
-                    .accessibilityLabel(workspaceButtonLabel)
-                    .accessibilityIdentifier("chat.workspace-menu")
-            }
             if let changes = projectChangesSummary {
-                if showsWorkspaceButton { Divider() }
                 Button {
                     dismissKeyboard()
                     onProjectChangesTap()
@@ -984,7 +968,7 @@ struct ChatView: View {
                 .accessibilityLabel(ProjectChangesRailPresentation.accessibilityLabel(for: changes))
                 .accessibilityIdentifier("chat.file-changes")
             }
-            if showsWorkspaceButton || projectChangesSummary != nil { Divider() }
+            if projectChangesSummary != nil { Divider() }
             modelMenuItems
             Divider()
             if sessionCatalog != nil {
@@ -1296,11 +1280,6 @@ struct ChatView: View {
         }
     }
 
-    private func dismissKeyboardAndOpenWorkspace() {
-        (referenceHub ?? fallbackReferenceHub).dismiss()
-        dismissKeyboard()
-        onWorkspaceTap()
-    }
 
     private var attachmentAction: (() -> Void)? {
         guard let onAttachmentTap else { return nil }

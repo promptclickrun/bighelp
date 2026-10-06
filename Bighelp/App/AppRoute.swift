@@ -40,4 +40,7 @@ enum AppRoute: Hashable {
     case usage
     /// The all-hosts view's chat list: every host's chats.
     case allHostsChats
+
+    /// Screens about every computer, which stay put when the working computer changes.
+    var isAllHosts: Bool { self == .allHostsChats }
 }

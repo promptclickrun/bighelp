@@ -61,12 +61,6 @@ struct DesignSystemTests {
         ).width == 88)
     }
 
-    @Test func workspaceHeaderUsesCompactLayoutBeforeControlsCanOverlap() {
-        #expect(WorkspaceHeaderLayout.mode(for: 320) == .compact)
-        #expect(WorkspaceHeaderLayout.mode(for: 390) == .compact)
-        #expect(WorkspaceHeaderLayout.mode(for: 430) == .regular)
-    }
-
     @Test func sessionControlsUseAvailableHeightResponsively() {
         #expect(
             ChatSessionControlsPresentation.preferredHeight(isVerticallyCompact: true)
@@ -218,17 +212,7 @@ struct DesignSystemTests {
         #expect(ChatHeaderLiveActivityPresentation.resolve(phrase: nil, isActive: true) == nil)
     }
 
-    @Test func compactChatHeaderKeepsSessionAndActionsOnOneTopRow() {
-        #expect(WorkspaceHeaderLayout.compactControlPlacement == .singleRow)
-    }
-
     @Test func compactChatHeaderCentersThePickerAndSeparatesTrailingActions() {
-        #expect(WorkspaceHeaderLayout.compactCentersSessionControl)
-        #expect(WorkspaceHeaderLayout.compactSessionControlMaximumWidth == 160)
-        #expect(WorkspaceHeaderLayout.compactSessionControlWidth(isBotMode: false) == 160)
-        #expect(WorkspaceHeaderLayout.compactSessionControlWidth(isBotMode: true) == 136)
-        #expect(WorkspaceHeaderLayout.compactTrailingActionSpacing == 12)
-        #expect(WorkspaceHeaderLayout.headerTopPadding < WorkspaceHeaderLayout.headerBottomPadding)
         #expect(ChatSessionControlsPresentation.choiceAlignment == .center)
         #expect(ChatSessionControlsPresentation.choicesFillAvailableWidth)
         #expect(ChatSessionControlsPresentation.quickChoiceCentersTextIndependentlyOfAccessories)
@@ -425,7 +409,6 @@ struct DesignSystemTests {
     }
 
     @Test func rootAndDashboardHeadersExposeOnlyTheRequestedItems() {
-        #expect(ShellWorkspaceMenuBarPresentation.trailingTitle == nil)
         #expect(DashboardHeaderPresentation.showsSessionsShortcut == false)
         #expect(DashboardHeaderPresentation.logoPlacement == .greetingRow)
     }

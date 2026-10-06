@@ -242,4 +242,14 @@ struct VoiceTurnCaptureTests {
         #expect(options.contains(.defaultToSpeaker), "Still loud on the phone's speaker")
         #expect(options.contains(.allowBluetooth), "Car and headset microphones work")
     }
+
+    /// Replies and the hold music play at media volume, not phone-call volume, wherever the
+    /// iPhone can cancel the speaker's echo in that mode; others keep a call mode's echo
+    /// cancellation so the agent doesn't hear itself.
+    @Test func aVoiceChatPlaysAtMediaVolumeWhereEchoCanBeCancelled() {
+        #expect(SystemVoiceAudioSession.conversationMode(echoCancellationAvailable: true) == .default)
+        #expect(SystemVoiceAudioSession.conversationMode(echoCancellationAvailable: false) == .videoChat)
+        #expect(SystemVoiceAudioSession.conversationMode(echoCancellationAvailable: false) != .voiceChat,
+                "Never the hold-it-to-your-ear tuning")
+    }
 }

@@ -421,10 +421,6 @@ struct AgentDirectoryStoreTests {
     @Test func pinLimitCopyMatchesTheStoreLimit() {
         #expect(AgentActionPresentation.pinnedAgentLimit == AgentDirectoryStore.pinnedAgentLimit)
         #expect(AgentActionPresentation.pinLimitHint.contains("5"))
-        #expect(
-            QuickWorkspacePinnedAgentsPresentation.emptyStateText
-                == "No agents currently pinned."
-        )
     }
 
     @Test func deletingTheAccountErasesPersistedAgentPreferences() async throws {

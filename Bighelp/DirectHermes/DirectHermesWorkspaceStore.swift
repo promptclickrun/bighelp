@@ -500,21 +500,6 @@ final class DirectHermesWorkspaceStore {
         }
         await open(summary)
     }
-    func showSessions() {
-        navigationGeneration = UUID()
-        isOpening = false
-        earlyEvents = []
-        selectedChat?.model.flushPersistence()
-        selectedChat = nil
-        let owner = generation
-        let navigation = navigationGeneration
-        Task { @MainActor [weak self] in
-            guard let self, self.generation == owner, self.navigationGeneration == navigation,
-                  self.selectedChat == nil else { return }
-            await self.loadSessions()
-        }
-    }
-
     private func open(_ summary: DirectHermesSessionSummary?) async {
         guard let client, let saved, isConnected, !isOpening, !selectedProfile.isEmpty else { return }
         isOpening = true

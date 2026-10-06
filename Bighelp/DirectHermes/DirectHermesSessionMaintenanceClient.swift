@@ -213,6 +213,17 @@ struct HermesForeignSessionPreview: Equatable, Sendable {
     fileprivate let reviewToken: Data
 }
 
+extension HermesForeignSessionPreview {
+    /// Demo mode's preview: made-up messages, nothing to review against a host.
+    init(demoTitle: String, source: String, cwd: String?, alreadyImported: String? = nil) {
+        self.init(profileID: "default", foreignID: String(repeating: "a", count: 64), title: demoTitle, source: source,
+                  cwd: cwd, totalMessages: 2, isTruncated: false, alreadyImportedSessionID: alreadyImported,
+                  messages: [.init(index: 0, role: "user", content: "Can you look at this with me?"),
+                             .init(index: 1, role: "assistant", content: "Sure. Here's where I'd start.")],
+                  reviewToken: Data())
+    }
+}
+
 struct HermesForeignSessionImportResult: Equatable, Sendable {
     let profileID: String
     let foreignID: String

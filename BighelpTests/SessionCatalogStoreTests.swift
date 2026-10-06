@@ -21,7 +21,7 @@ struct SessionCatalogStoreTests {
         for store in [catalog, SessionCatalogStore(client: DemoSessionCatalogClient(), repository: repository, defaults: defaults)] {
             let model = SessionsModel(fixtures: store.presentedRecords, calendar: Calendar(identifier: .gregorian))
             #expect(model.filteredSections.flatMap(\.sessions).map(\.id) == ["old-used", "new-created"])
-            #expect(QuickWorkspaceContent(recentSessions: store.recentSummaries).recentSessions.map(\.id) == ["old-used", "new-created"])
+            #expect(store.recentSummaries.map(\.id) == ["old-used", "new-created"], "☰'s recent chats too")
             #expect(store.session(id: old.id)?.createdAt == old.createdAt)
         }
     }

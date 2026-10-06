@@ -304,6 +304,19 @@ final class FleetStore {
         }
     }
 
+    /// All sessions' list: the search and filters on top of one computer or all of them.
+    func chats(on hostID: UUID? = nil, matching query: String, filter: FleetChatsFilter) -> [FleetChat] {
+        chats(on: hostID, matching: query).filter { chat in
+            (filter.agentID.map { $0 == FleetID.make(chat.hostID, chat.profileID) } ?? true)
+                && (filter.origin.map { $0 == SessionOrigin.label(chat.origin) } ?? true)
+        }
+    }
+
+    /// Where the listed chats started, by name, for All sessions' Started in filter.
+    func origins(on hostID: UUID? = nil) -> [String] {
+        Array(Set(chats(on: hostID).compactMap { SessionOrigin.label($0.origin) })).sorted()
+    }
+
     /// Every scheduled task, the next to run first.
     func tasks(on hostID: UUID? = nil) -> [FleetTask] {
         hosts.filter { hostID == nil || $0.id == hostID }

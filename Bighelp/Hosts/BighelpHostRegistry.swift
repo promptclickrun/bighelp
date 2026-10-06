@@ -286,7 +286,7 @@ final class BighelpHostRegistry {
     func acceptAuthentication(for host: BighelpConfiguredHost, workspace: DirectHermesWorkspaceStore) throws -> BighelpConfiguredHost {
         guard host.accountScope == accountScope, hosts.contains(where: { $0.id == host.id }),
               workspaces[host.id] === workspace, workspace.isConnected,
-              DirectHermesIdentity.matches(workspace.savedConnection?.identity, host.principalIdentity) else {
+              let saved = workspace.savedConnection, host.owns(saved) else {
             throw DirectHermesError.identityChanged
         }
         try persist(hosts: hosts, selected: host.id)

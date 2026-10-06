@@ -951,6 +951,7 @@
 		AE5A79DA64189A49AD9F5719 /* NativeDeviceToolSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6889347DEEE3C4D54499D7E5 /* NativeDeviceToolSessionTests.swift */; };
 		AE61062391F2AF1D5431F7FE /* BotModeCatalogFixtureClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52F5FEDC372FADF6E0C549AD /* BotModeCatalogFixtureClient.swift */; };
 		AE85745E270D801B6B92F8C0 /* NewChatCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BAB935FB2C454D6B7A963BB /* NewChatCoordinator.swift */; };
+		AF04E8EFFE6ED299C757798D /* VerifiedHostConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B85E99EAB6136CE00D0E00B2 /* VerifiedHostConnection.swift */; };
 		AF7FE22D884A130746B614BA /* FirstRunOnboardingUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17E85F9A6AACB46250206A20 /* FirstRunOnboardingUITests.swift */; };
 		AF8AA5920753C371484B345A /* BighelpLocalDataSecurityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A39DE9FC69A2C9572A9B85B /* BighelpLocalDataSecurityTests.swift */; };
 		AFE4E87E05EF8C41208DD2BB /* BighelpLinkHermesBotModeApprovalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90D323B62C4717D94A3BA3D8 /* BighelpLinkHermesBotModeApprovalTests.swift */; };
@@ -2496,6 +2497,7 @@
 		B7B99CFF0AD27EEAE58ECFBB /* AppCompositionSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppCompositionSupport.swift; sourceTree = "<group>"; };
 		B81B8950A6D2FC8F59414ED3 /* DirectHermesHostOperationsClient+BackupImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DirectHermesHostOperationsClient+BackupImport.swift"; sourceTree = "<group>"; };
 		B8439FC19E8957B01F36C2F3 /* HostToolBackendsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostToolBackendsView.swift; sourceTree = "<group>"; };
+		B85E99EAB6136CE00D0E00B2 /* VerifiedHostConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifiedHostConnection.swift; sourceTree = "<group>"; };
 		B91881A6573A7A65075C53EE /* BighelpApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpApp.swift; sourceTree = "<group>"; };
 		B91ABB8C2C1BF7387E5890E0 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B92A64B932A98ACC81A60866 /* HermesShapeFace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesShapeFace.swift; sourceTree = "<group>"; };
@@ -3655,6 +3657,7 @@
 				2AC0C5C21B939C2BC28A21F4 /* HostPluginUpdate.swift */,
 				156C7F4C9BC8078DA0D133C3 /* HostSetupView.swift */,
 				7385541FFF9E467FFE1AB338 /* PluginLatestRelease.swift */,
+				B85E99EAB6136CE00D0E00B2 /* VerifiedHostConnection.swift */,
 			);
 			path = Hosts;
 			sourceTree = "<group>";
@@ -6184,6 +6187,7 @@
 				E266B93BAD01B706DE1A752F /* UsageSummary.swift in Sources */,
 				9AADAB540E2060246F178570 /* UsageView.swift in Sources */,
 				1D434F8E937522A7FA6C6414 /* UserIdentityStore.swift in Sources */,
+				AF04E8EFFE6ED299C757798D /* VerifiedHostConnection.swift in Sources */,
 				0E31617A00ECF02044C0507B /* VoiceAudioSessionCoordinator.swift in Sources */,
 				992DD07AD07D98260F5A7333 /* VoiceConfigurationRecordingController.swift in Sources */,
 				4A6A450AD330A5CC0A65E9F7 /* VoiceConfigurationRecordingControls.swift in Sources */,

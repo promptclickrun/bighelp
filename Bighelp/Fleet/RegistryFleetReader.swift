@@ -85,16 +85,13 @@ final class RegistryFleetReader: FleetHostReading {
             }
         }
         guard registry.selectedHostID != hostID else { throw CancellationError() }
-        guard store.isConnected, let client = store.nativeClient, let saved = store.savedConnection,
-              DirectHermesIdentity.matches(saved.identity, host.principalIdentity),
-              let authority = saved.workspaceAuthority else {
+        guard let verified = try? store.verifiedConnection(for: host, generation: registry.generation) else {
             throw FleetReadError(message: store.hasSavedConnection
                 ? "Couldn't reach this host." : "Sign in to this host again in Settings.")
         }
 
-        let generation = store.connectionGeneration
-        let owner = WorkspaceOwner(authority: authority, authenticationGeneration: generation,
-                                   connectionGeneration: generation)
+        let client = verified.client, owner = verified.owner
+        let generation = owner.connectionGeneration
         let current: @MainActor () -> WorkspaceOwner? = { [weak registry, weak store] in
             guard let registry, let store, registry.selectedHostID != hostID, store.isConnected,
                   store.connectionGeneration == generation else { return nil }

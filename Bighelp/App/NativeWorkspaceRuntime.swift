@@ -325,21 +325,27 @@ final class NativeWorkspaceRuntime {
             nativeWarmSessionIsCurrent: { [weak bridge] record, model in
                 bridge?.isWarmSession(record, model: model) == true
             },
+            // Found when voice needs it, not when it opens: right after launch the connection may not be ready.
             voiceClient: { [weak connections, weak bridge] record, _ in
-                guard let connections, let owner = connections.owner, owner.authority == authority,
-                      let workspace = connections.workspace,
-                      let conversation = bridge?.conversationClient(for: record) as? DirectHermesConversationClient,
-                      let coordinate = bridge?.currentCoordinate(for: record.id), coordinate.owner == owner else {
-                    return NativeWorkspaceUnavailableClient()
-                }
-                let output = DirectHermesVoiceSpeechOutput(workspace: workspace, owner: owner,
-                    profileID: coordinate.profileID, currentOwner: { [weak connections] in connections?.owner })
-                let transcriber = connections.hosts.selectedWorkspace?.nativeClient?.makeVoiceTranscriber(
-                    profileID: coordinate.profileID, owner: owner,
-                    currentOwner: { [weak connections] in connections?.owner })
-                return DirectHermesVoiceSessionClient(conversation: conversation, output: output,
-                                                      speechRate: { settings.voiceSpeed.hermesTTSSpeed },
-                                                      transcriber: transcriber)
+                DeferredVoiceSessionClient(currentKey: { [weak connections] in
+                    guard let owner = connections?.owner, owner.authority == authority else { return nil }
+                    return owner
+                }, make: { [weak connections, weak bridge] in
+                    guard let connections, let owner = connections.owner, owner.authority == authority,
+                          let workspace = connections.workspace,
+                          let conversation = bridge?.conversationClient(for: record) as? DirectHermesConversationClient,
+                          let coordinate = bridge?.currentCoordinate(for: record.id), coordinate.owner == owner else {
+                        return nil
+                    }
+                    let output = DirectHermesVoiceSpeechOutput(workspace: workspace, owner: owner,
+                        profileID: coordinate.profileID, currentOwner: { [weak connections] in connections?.owner })
+                    let transcriber = connections.hosts.selectedWorkspace?.nativeClient?.makeVoiceTranscriber(
+                        profileID: coordinate.profileID, owner: owner,
+                        currentOwner: { [weak connections] in connections?.owner })
+                    return DirectHermesVoiceSessionClient(conversation: conversation, output: output,
+                                                          speechRate: { settings.voiceSpeed.hermesTTSSpeed },
+                                                          transcriber: transcriber)
+                })
             },
             sessionControlMessaging: sessionControls,
             slashCommandCatalogClient: WorkspaceSlashCommandCatalogProxy(box: slashCommandsBox),

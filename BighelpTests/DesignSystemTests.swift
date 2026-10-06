@@ -361,8 +361,21 @@ struct DesignSystemTests {
                 let shippingColor = UIColor(theme.outgoingMessageBackground).resolvedColor(with: traits)
                 #expect(previewColor.isEqual(shippingColor))
             }
-            // Incoming chrome is the warm Ember neutral whatever the bubble color.
+            // Agent bubbles keep their neutral whatever your bubble color.
             #expect(BighelpV3MessageSurface(role: .assistant, theme: theme, increasedContrast: true).fillColor == theme.incomingMessageBackground)
+        }
+    }
+
+    /// Agent bubbles are a see-through neutral on every background, so no background or bubble
+    /// color can clash with them. They were a fixed warm beige by day and brown at night.
+    @Test func agentBubblesAreASeeThroughNeutralOnEveryBackground() {
+        let themes = BighelpLightBackground.allCases.map(\.neutral) + BighelpDarkBackground.allCases.map(\.neutral)
+            + [BighelpTheme.lightHighContrast, .darkHighContrast]
+        for theme in themes {
+            var (red, green, blue, alpha): (CGFloat, CGFloat, CGFloat, CGFloat) = (0, 0, 0, 0)
+            UIColor(theme.incomingMessageBackground).getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+            #expect(red == green && green == blue, "Neutral on \(theme.canvasHex)")
+            #expect(alpha > 0 && alpha < 0.2, "See-through on \(theme.canvasHex)")
         }
     }
 

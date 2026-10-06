@@ -303,10 +303,18 @@ struct BighelpTheme: Codable, Equatable, Sendable {
     }
     var actionGlow: Color { Color(hex: actionGlowHex) }
 
-    /// Agent replies sit on a warm neutral that matches the canvas.
+    /// Agent replies sit on a see-through neutral: a shade darker than the background by day and a
+    /// shade lighter at night. It takes on the background behind it, so no theme clashes with it.
     var incomingMessageBackground: Color {
-        Color(hex: isDarkPalette ? "292624" : "F3ECE6")
+        Color(white: isDarkPalette ? 1 : 0, opacity: incomingMessageOpacity)
     }
+
+    /// The same neutral laid over the background, for colors that are mixed from it (loaders).
+    var incomingMessageSolid: Color {
+        BighelpLoaderColor.mix(Color(hex: canvasHex), Color(white: isDarkPalette ? 1 : 0), by: incomingMessageOpacity)
+    }
+
+    private var incomingMessageOpacity: Double { isDarkPalette ? 0.11 : 0.055 }
 
     var isDarkPalette: Bool {
         let value = UInt64(canvasHex, radix: 16) ?? 0

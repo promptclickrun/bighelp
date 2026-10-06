@@ -13,6 +13,14 @@ extension SettingsView {
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("settings.appearance.chat-layout")
+            NavigationLink {
+                AppLayoutSettingsView(settings: settings)
+            } label: {
+                AppearanceStudioRow(title: "App layout", detail: "Bottom bar and menu order",
+                                    systemImage: "rectangle.bottomthird.inset.filled")
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("settings.appearance.app-layout")
             #if os(visionOS)
             transparency
                 .padding(BighelpTokens.space16)

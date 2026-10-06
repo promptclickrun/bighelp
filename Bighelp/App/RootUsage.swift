@@ -67,7 +67,9 @@ extension RootShellView {
     /// Pushes Usage over whatever is open, so Back returns there.
     func openUsage() {
         guard appState.path.last != .usage else { return }
-        if appState.selectedTab != .sessions {
+        if barTabs.contains(.usage) {
+            appState.select(.usage)
+        } else if appState.selectedTab != .sessions {
             appState.select(.sessions, thenOpen: [.usage])
         } else {
             appState.path.append(.usage)

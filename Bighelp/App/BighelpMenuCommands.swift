@@ -34,7 +34,7 @@ struct BighelpMenuCommands: Commands {
         #if targetEnvironment(macCatalyst)
         // The bottom bar's tabs, like a Mac app's View menu. iPad keeps its own keys.
         CommandGroup(before: .sidebar) {
-            ForEach(Array(AppTab.allCases.enumerated()), id: \.element) { index, tab in
+            ForEach(Array((actions?.tabs ?? AppTab.allCases).enumerated()), id: \.element) { index, tab in
                 Button(tab.commandTitle) { actions?.selectTab?(tab) }
                     .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")))
                     .disabled(actions?.selectTab == nil)
@@ -58,6 +58,8 @@ struct BighelpShellActions {
     let toggleSidebar: @MainActor () -> Void
     /// The bottom bar's tabs (Mac ⌘1–⌘5), while the bar shows.
     var selectTab: (@MainActor (AppTab) -> Void)? = nil
+    /// The bar's tabs in its order (Appearance › App layout).
+    var tabs: [AppTab] = AppTab.allCases
 }
 
 extension AppTab {
@@ -69,13 +71,9 @@ extension AppTab {
         case .ideas: "Ideas"
         case .goals: "Goals"
         case .apps: "Files"
+        case .scheduledTasks: "Scheduled Tasks"
         default: rawValue.capitalized
         }
-    }
-
-    /// Mac: the tab's key in the View menu ("⌘1"), shown in its tooltip.
-    var macShortcut: String? {
-        AppTab.allCases.firstIndex(of: self).map { "⌘\($0 + 1)" }
     }
 }
 

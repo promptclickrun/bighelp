@@ -75,7 +75,8 @@ extension RootShellView {
             onNewChat: { presentNewChatPicker(seed: $0) },
             onStartChat: { startHomeChat(with: $0) },
             tabSelection: tabSelection,
-            unreadTabs: boardUnreadTabs
+            unreadTabs: boardUnreadTabs,
+            barTabs: barTabs
         )
     }
 
@@ -299,7 +300,8 @@ extension RootShellView {
             onMenu: { isHomeDrawerPresented.toggle() },
             onNewChat: { startHomeChat(with: agent.id) },
             onPickAgents: { presentNewChatPicker(seed: agent.id) },
-            tools: appsTools(for: agent)
+            tools: appsTools(for: agent),
+            menuHasUnread: menuHasUnread
         )
     }
 
@@ -682,9 +684,16 @@ extension RootShellView {
                 : nil,
             onUsage: usage.isAvailable ? { afterClosingHomeSheets { showUsage() } } : nil,
             onCredentialVault: canOpenCredentialVault ? { afterClosingHomeSheets { openCredentialVault() } } : nil,
-            onSettings: { afterClosingHomeSheets { appState.select(.profile) } }
+            onSettings: { afterClosingHomeSheets { appState.select(.profile) } },
+            places: settings.appLayout.menuPlaces,
+            // Feed, Ideas, Goals and Files open as their tabs, bar or not.
+            onBoard: { [tabSelection] tab in afterClosingHomeSheets { tabSelection.wrappedValue = tab } },
+            unread: boardUnreadTabs
         )
     }
+
+    /// Something new in Feed, Ideas or Goals while ☰ is the only way there: a dot on ☰.
+    var menuHasUnread: Bool { !boardUnreadTabs.subtracting(barTabs).isEmpty }
 
 }
 

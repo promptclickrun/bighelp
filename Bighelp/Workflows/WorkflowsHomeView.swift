@@ -48,7 +48,6 @@ struct WorkflowsHomeView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: BighelpTokens.space24) {
-                if !isCantRunHere { BighelpDeferredSection { statusLine } }
                 if case .cantRunHere = store.state {
                     WorkflowLoadStateView(state: store.state) { Task { await store.load() } }
                 } else if store.list == nil, store.state != .loaded {
@@ -115,51 +114,6 @@ struct WorkflowsHomeView: View {
             WorkflowsArchivedView(context: context)
                 .bighelpSheetSize(.standard)
         }
-    }
-
-    // MARK: Status
-
-    private var statusLine: some View {
-        HStack(spacing: BighelpTokens.space8) {
-            Circle()
-                .fill(statusColor)
-                .frame(width: 8, height: 8)
-            Text(statusText)
-                .font(.bighelp(.subheadline))
-                .foregroundStyle(theme.secondaryText)
-                .lineLimit(2)
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, BighelpTokens.space4)
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("workflows.status")
-    }
-
-    private var statusColor: Color {
-        switch store.status?.coordinator {
-        case .online?: theme.success
-        case .starting?: theme.warning
-        case .offline?: theme.danger
-        default: theme.tertiaryText
-        }
-    }
-
-    private var statusText: String {
-        let host = store.status?.hostName ?? context.hostName
-        guard let status = store.status else { return "Asking \(host)…" }
-        var text: String
-        switch status.coordinator {
-        case .online: text = "Workflows are on, on \(host)"
-        case .starting: text = "Workflows are starting on \(host)"
-        case .offline: text = "Workflows are off on \(host). They start again with the next run."
-        case .unknown: text = host
-        }
-        if context.isNerdMode {
-            text += " · \(status.slotsUsed) of \(status.slotsTotal) slots"
-            if let heartbeat = status.heartbeatAt { text += " · heartbeat \(WorkflowWords.ago(heartbeat)) ago" }
-            if let epoch = status.epoch { text += " · epoch \(epoch)" }
-        }
-        return text
     }
 
     private var isCantRunHere: Bool {

@@ -43,8 +43,10 @@ final class WorkflowsStore {
     private(set) var isOnScreen = false
     /// What the computer's plugin says about Workflows; nil until it's asked.
     private(set) var support: WorkflowsSupport?
-    /// The plugin runs parallel blocks: the editor offers them.
+    /// What the plugin adds (parallel blocks, delivery, outcomes): the editor offers only these.
     private(set) var features: WorkflowFeatures = []
+    /// Asked once per visit, apart from `support`: the ☰ menu's check fills that before this screen opens.
+    @ObservationIgnored private var askedFeatures = false
     var canParallel: Bool { features.contains(.parallel) }
     /// A change from a long-press menu that didn't work, in plain words.
     var message: String?
@@ -74,6 +76,8 @@ final class WorkflowsStore {
     func setOnScreen(_ onScreen: Bool) {
         guard onScreen != isOnScreen else { return }
         isOnScreen = onScreen
+        // A plugin updated meanwhile shows its features on the next visit.
+        if onScreen { askedFeatures = false }
         pollTask?.cancel()
         pollTask = nil
         guard onScreen else { return }
@@ -89,7 +93,10 @@ final class WorkflowsStore {
         if list == nil { state = .loading }
         if support == nil || state == .needsPluginUpdate || isCantRunHere {
             if let answer = try? await client.support() { support = answer }
+        }
+        if !askedFeatures || state == .needsPluginUpdate {
             features = await client.features()
+            askedFeatures = true
         }
         if case .unavailable(let code)? = support {
             state = .cantRunHere(code)

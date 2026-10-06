@@ -30,7 +30,7 @@ final class WorkflowEditorModel {
     @ObservationIgnored private let saveDelay: Duration
 
     /// What the plugin runs beyond the first Workflows; the editor offers only these.
-    let features: WorkflowFeatures
+    private(set) var features: WorkflowFeatures
     var canParallel: Bool { features.contains(.parallel) }
 
     init(workflowID: String, client: any WorkflowsClient, hasDraft: Bool = false, canEditFlow: Bool = false,
@@ -79,6 +79,8 @@ final class WorkflowEditorModel {
         } catch {
             state = WorkflowsLoadState.from(error, hasContent: detail != nil)
         }
+        // Opened before the home asked the plugin (a link, a notification): ask here.
+        if features.isEmpty { features = await client.features() }
     }
 
     private func apply(_ value: WorkflowDetail) {

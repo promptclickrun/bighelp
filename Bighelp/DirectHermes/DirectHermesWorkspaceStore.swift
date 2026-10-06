@@ -13,7 +13,6 @@ final class DirectHermesWorkspaceStore {
     private(set) var status = "Connect your Hermes host."
     private(set) var profiles: [DirectHermesProfile] = []
     private(set) var sessions: [DirectHermesSessionSummary] = []
-    private(set) var localRecovery: [DirectHermesDraftStore.RecoveryRecord] = []
     private(set) var selectedChat: DirectHermesChat?
     private(set) var hasSavedConnection = false
     private(set) var isLoadingSessions = false
@@ -27,11 +26,19 @@ final class DirectHermesWorkspaceStore {
                 earlyEvents = []
                 selectedChat = nil
                 sessions = []
-                localRecovery = []
             }
         }
     }
-    @ObservationIgnored var onChatOpened: ((DirectHermesChat) -> Void)?
+    /// Checks another agent's chat for a moment (a tapped alert proves its chat is on the host), then
+    /// goes back to the agent it had. Gateway restarts and alert setup use `selectedProfile`; left on
+    /// the alert's agent, they acted for it until the next reconnect.
+    func visiting<T>(profile: String, _ body: () async throws -> T) async rethrows -> T {
+        let previous = selectedProfile
+        selectedProfile = profile
+        defer { if !previous.isEmpty, selectedProfile == profile { selectedProfile = previous } }
+        return try await body()
+    }
+
     @ObservationIgnored var prepareChat: ((DirectHermesChat) async -> Void)?
     @ObservationIgnored var onNativeEvent: ((DirectHermesEvent) -> Void)?
     /// Called synchronously before this store revokes its connection owner.
@@ -81,7 +88,6 @@ final class DirectHermesWorkspaceStore {
             saved = try vault.load()
             hasSavedConnection = saved != nil
             address = saved?.endpoint.baseURL.absoluteString ?? ""
-            if let saved { localRecovery = try drafts.recoveryRecords(hostIdentity: saved.identity) }
         } catch { status = DirectHermesConversationClient.safeMessage(error) }
     }
 
@@ -102,7 +108,6 @@ final class DirectHermesWorkspaceStore {
             catch { await connection.disconnect(); throw error }
             if !DirectHermesIdentity.matches(saved?.identity, connection.savedConnection.identity) {
                 chats.removeAll()
-                localRecovery = []
                 selectedChat = nil
                 selectedProfile = ""
                 sessions = []
@@ -404,7 +409,6 @@ final class DirectHermesWorkspaceStore {
             selectedProfile = ""
             sessions = []
             profiles = []
-            localRecovery = []
         }
         saved = latest
         hasSavedConnection = latest != nil
@@ -482,7 +486,6 @@ final class DirectHermesWorkspaceStore {
             guard owner == generation, request == catalogGeneration, profile == selectedProfile else { return }
             guard let values = result.object?["sessions"]?.array else { throw DirectHermesError.invalidResponse }
             sessions = values.compactMap { DirectHermesSessionSummary($0, profile: profile) }
-            if let saved { localRecovery = try drafts.recoveryRecords(hostIdentity: saved.identity, profile: profile) }
         } catch {
             guard owner == generation, request == catalogGeneration else { return }
             status = DirectHermesConversationClient.safeMessage(error)
@@ -503,10 +506,6 @@ final class DirectHermesWorkspaceStore {
         earlyEvents = []
         selectedChat?.model.flushPersistence()
         selectedChat = nil
-        if let saved {
-            do { localRecovery = try drafts.recoveryRecords(hostIdentity: saved.identity, profile: selectedProfile) }
-            catch { status = "Some local recovery files could not be read. They have not been deleted." }
-        }
         let owner = generation
         let navigation = navigationGeneration
         Task { @MainActor [weak self] in
@@ -606,7 +605,6 @@ final class DirectHermesWorkspaceStore {
             await prepareChat?(chat)
             guard owner == generation, navigation == navigationGeneration, profile == selectedProfile else { return }
             selectedChat = chat
-            onChatOpened?(chat)
             for event in earlyEvents where event.sessionID == runtime { chat.client.receive(event) }
             retainsPromptBinding = true
             status = "Connected directly · \(profile)"

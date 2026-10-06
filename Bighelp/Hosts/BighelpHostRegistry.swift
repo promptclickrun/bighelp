@@ -97,7 +97,6 @@ final class BighelpHostRegistry {
     var notificationSetupError: String?
     @ObservationIgnored var nativeChatPrepared: ((BighelpConfiguredHost, DirectHermesChat) -> Void)?
     @ObservationIgnored var prepareChat: ((BighelpConfiguredHost, DirectHermesChat) async throws -> Void)?
-    @ObservationIgnored var onChatOpened: ((BighelpConfiguredHost, DirectHermesChat) -> Void)?
     @ObservationIgnored var onNativeEvent: ((BighelpConfiguredHost, DirectHermesEvent) -> Void)?
     @ObservationIgnored private var workspaces: [UUID: DirectHermesWorkspaceStore] = [:]
     @ObservationIgnored private var vaults: [UUID: DirectHermesKeychainVault] = [:]
@@ -459,10 +458,6 @@ final class BighelpHostRegistry {
             guard let self, let host = self.hosts.first(where: { $0.id == id }) else { return }
             do { try await self.prepareChat?(host, chat) }
             catch { self.notificationSetupError = "Chat is connected, but notifications for this session could not be prepared. Retry notification setup in Accounts and Devices." }
-        }
-        store.onChatOpened = { [weak self] chat in
-            guard let self, let host = self.hosts.first(where: { $0.id == id }) else { return }
-            self.onChatOpened?(host, chat)
         }
         store.onNativeEvent = { [weak self] event in
             guard let self, let host = self.hosts.first(where: { $0.id == id }) else { return }

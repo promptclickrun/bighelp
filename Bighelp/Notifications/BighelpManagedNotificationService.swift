@@ -619,18 +619,20 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
         try requireCurrent(host, credentials: credentials)
         guard isCurrent(), opening == navigation, registry.generation == selectedGeneration, registry.selectedHostID == host.id,
               workspace.isConnected else { throw DirectHermesError.notConnected }
-        workspace.selectedProfile = detail.profile
-        await workspace.loadSessions()
-        try requireCurrent(host, credentials: credentials)
-        guard isCurrent(), opening == navigation, registry.generation == selectedGeneration, workspace.selectedProfile == detail.profile,
-              let summary = workspace.sessions.first(where: { $0.storedID == detail.sessionId && $0.profile == detail.profile }),
-              summary.supportsNativeResume else { throw DirectHermesError.invalidResponse }
-        await workspace.openSession(summary)
-        try requireCurrent(host, credentials: credentials)
-        guard isCurrent(), opening == navigation, registry.generation == selectedGeneration, registry.selectedHostID == host.id,
-              let chat = workspace.selectedChat, chat.client.profile == detail.profile,
-              chat.client.storedID == detail.sessionId else { throw DirectHermesError.invalidResponse }
-        return chat
+        return try await workspace.visiting(profile: detail.profile) {
+            await workspace.loadSessions()
+            try requireCurrent(host, credentials: credentials)
+            guard isCurrent(), opening == navigation, registry.generation == selectedGeneration,
+                  workspace.selectedProfile == detail.profile,
+                  let summary = workspace.sessions.first(where: { $0.storedID == detail.sessionId && $0.profile == detail.profile }),
+                  summary.supportsNativeResume else { throw DirectHermesError.invalidResponse }
+            await workspace.openSession(summary)
+            try requireCurrent(host, credentials: credentials)
+            guard isCurrent(), opening == navigation, registry.generation == selectedGeneration, registry.selectedHostID == host.id,
+                  let chat = workspace.selectedChat, chat.client.profile == detail.profile,
+                  chat.client.storedID == detail.sessionId else { throw DirectHermesError.invalidResponse }
+            return chat
+        }
     }
 
     /// Synchronous removal preserves cloud revoke intent before local retirement.

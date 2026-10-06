@@ -291,7 +291,7 @@ private final class Counter: @unchecked Sendable {
 }
 
 @MainActor
-private final class MemoryVault: DirectHermesCredentialVault {
+final class MemoryVault: DirectHermesCredentialVault {
     private(set) var stored: DirectHermesSavedConnection?
     init(_ stored: DirectHermesSavedConnection?) { self.stored = stored }
     func load() throws -> DirectHermesSavedConnection? { stored }

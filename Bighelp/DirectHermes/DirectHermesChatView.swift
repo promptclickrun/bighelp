@@ -410,3 +410,29 @@ struct DirectHermesPromptResponseView: View {
         }
     }
 }
+
+struct DirectHermesSupportView: View {
+    @Environment(\.dismiss) private var dismiss
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Native Hermes") {
+                    Text("Messages, reasoning, tools, subagents, profiles, and saved sessions come directly from Hermes.")
+                    Text("Stop, steer, queued prompts, approvals, clarification, and commands use native requests. Acceptance does not prove a queued prompt or steer was consumed; review retained submissions after an interrupted connection.")
+                }
+                Section("Separate integrations") {
+                    Text("Wiki, Cards and forms, phone tools, voice, project changes, and notifications need their own supported integrations. They are never silently forwarded through Link.")
+                    Text("Standalone hosts do not yet expose attachments, full provider picking, multi-question clarification, or subagent control windows in bighelp. Hermes may support more than this client shows.")
+                }
+                Section("History & recovery") {
+                    Text("Saved history can have tool summaries without live IDs or results and may be less detailed than the live stream. Local text and uncertain submissions stay bound to the exact account, host, and profile.")
+                    Text("Reopening reattaches without resending prompts. If the runtime is gone, choose a saved session. \(BighelpPlatform.isMac ? "macOS" : "iOS") can suspend sockets; notifications require separate verified enrollment.")
+                }
+            }
+            .navigationTitle("Host support")
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+        }
+    }
+}
+
+/// A host without an activity feed must not masquerade as an empty inbox or

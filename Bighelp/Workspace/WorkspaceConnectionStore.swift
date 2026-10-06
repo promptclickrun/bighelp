@@ -64,8 +64,9 @@ final class WorkspaceConnectionStore {
 
     /// Returns the exact currently selected event authority. The WebSocket
     /// callback already fences its private transport generation; this adds the
-    /// account, selected host and public workspace owner/profile coordinates
-    /// consumed by native invalidation observers.
+    /// account, selected host and public workspace owner coordinates consumed by
+    /// native invalidation observers. It names no agent: which agent the
+    /// connection last opened (a chat from a notification) never changes it.
     func nativeInvalidationSource(authority: WorkspaceAuthority) -> NativeWorkspaceEventSource? {
         guard let host = hosts.selectedHost,
               host.id == hosts.selectedHostID,
@@ -73,14 +74,9 @@ final class WorkspaceConnectionStore {
               owner.authority == authority,
               let selected = hosts.selectedWorkspace,
               selected.connectionGeneration == owner.connectionGeneration,
-              selected.nativeClient != nil,
-              !selected.selectedProfile.isEmpty,
-              selected.selectedProfile.utf8.count <= 128 else { return nil }
+              selected.nativeClient != nil else { return nil }
         let servingProfile = workspace?.nativeContext?.servingProfileID
-        return NativeWorkspaceEventSource(
-            hostID: host.id, owner: owner, profileID: selected.selectedProfile,
-            servingProfileID: servingProfile
-        )
+        return NativeWorkspaceEventSource(hostID: host.id, owner: owner, servingProfileID: servingProfile)
     }
 
     func addInvalidationObserver(

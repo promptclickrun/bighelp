@@ -133,7 +133,6 @@ extension RootShellView {
                 let profileID = workspaceAgentID
                 let servingProfileID = connections.workspace?.nativeContext?.servingProfileID
                 guard invalidationSource.owner == owner,
-                      Data(invalidationSource.profileID.utf8) == Data(profileID.utf8),
                       invalidationSource.servingProfileID.map({ Data($0.utf8) })
                         == servingProfileID.map({ Data($0.utf8) }) else {
                     if !reattaching {

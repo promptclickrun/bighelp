@@ -26,16 +26,17 @@ extension BighelpManagedNotificationService {
         await workspace.reconnect()
         try requireCurrent(host, credentials: credentials)
         guard registry.generation == generation, registry.selectedHostID == host.id else { throw DirectHermesError.secureStorageChanged }
-        workspace.selectedProfile = owner.profile
-        await workspace.loadSessions()
-        try requireCurrent(host, credentials: credentials)
-        guard registry.generation == generation, let session = workspace.sessions.first(where: {
-            $0.storedID == owner.storedSessionID && $0.profile == owner.profile && $0.supportsNativeResume
-        }) else { throw DirectHermesError.invalidResponse }
-        await workspace.openSession(session)
-        try requireCurrent(host, credentials: credentials)
-        guard registry.generation == generation, workspace.selectedChat?.client.storedID == owner.storedSessionID else {
-            throw DirectHermesError.secureStorageChanged
+        try await workspace.visiting(profile: owner.profile) {
+            await workspace.loadSessions()
+            try requireCurrent(host, credentials: credentials)
+            guard registry.generation == generation, let session = workspace.sessions.first(where: {
+                $0.storedID == owner.storedSessionID && $0.profile == owner.profile && $0.supportsNativeResume
+            }) else { throw DirectHermesError.invalidResponse }
+            await workspace.openSession(session)
+            try requireCurrent(host, credentials: credentials)
+            guard registry.generation == generation, workspace.selectedChat?.client.storedID == owner.storedSessionID else {
+                throw DirectHermesError.secureStorageChanged
+            }
         }
         BighelpExternalSessionOpenCenter.shared.request(profileID: owner.profile, storedSessionID: owner.storedSessionID)
     }

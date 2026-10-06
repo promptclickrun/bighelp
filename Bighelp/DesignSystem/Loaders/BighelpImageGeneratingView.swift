@@ -52,7 +52,7 @@ struct BighelpImageGeneratingView: View {
                                      style: .continuous)
         GeometryReader { proxy in
             ZStack {
-                theme.incomingMessageBackground
+                theme.incomingMessageSolid
                 let colors = BighelpImageGlowColors(palette: palette, theme: theme)
                 BighelpLoaderClock(cadence: .ambient) { time in
                     BighelpImageGeneratingLayers(time: time, offset: phaseOffset, variant: variant, size: proxy.size,
@@ -215,7 +215,7 @@ private struct BighelpImageGlowColors {
     let dots: Color
 
     init(palette: BighelpImageGlowPalette, theme: BighelpTheme) {
-        let base = theme.incomingMessageBackground
+        let base = theme.incomingMessageSolid
         self.base = base
         sheen = Color.white.opacity(theme.isDarkPalette ? 0.08 : 0.35)
         dots = theme.primaryText.opacity(0.3)

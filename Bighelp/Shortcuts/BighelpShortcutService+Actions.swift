@@ -12,6 +12,46 @@ struct BighelpShortcutHostServices {
     var boards: @MainActor () -> (any AgentBoardClient)? = { nil }
     /// Hermes' Kanban plugin.
     var kanban: @MainActor () -> (any KanbanService)? = { nil }
+    /// The bighelp plugin's Workflows.
+    var workflows: @MainActor () -> (any WorkflowsClient)? = { nil }
+    /// The computer in use, so a saved workflow opens on its own computer.
+    var hostID: @MainActor () -> UUID? = { nil }
+}
+
+struct BighelpShortcutWorkflow: Identifiable, Equatable, Hashable, Sendable {
+    /// The workflow and its computer: workflow IDs are only unique on one computer.
+    let id: String
+    let workflowID: String
+    let hostID: UUID?
+    let name: String
+    let isPinned: Bool
+    let stageCount: Int
+
+    static func entityID(hostID: UUID?, workflowID: String) -> String {
+        hostID.map { $0.uuidString + "\u{1F}" + workflowID } ?? workflowID
+    }
+
+    init(workflowID: String, hostID: UUID?, name: String, isPinned: Bool, stageCount: Int) {
+        id = Self.entityID(hostID: hostID, workflowID: workflowID)
+        self.workflowID = workflowID
+        self.hostID = hostID
+        self.name = name
+        self.isPinned = isPinned
+        self.stageCount = stageCount
+    }
+
+    /// From a saved Shortcut's ID alone, when its computer doesn't answer: enough to open it there.
+    init?(entityID: String) {
+        let parts = entityID.split(separator: "\u{1F}", omittingEmptySubsequences: false).map(String.init)
+        guard (1...2).contains(parts.count), let workflowID = parts.last, !workflowID.isEmpty, workflowID.utf8.count <= 128
+        else { return nil }
+        var hostID: UUID?
+        if parts.count == 2 {
+            guard let host = UUID(uuidString: parts[0]) else { return nil }
+            hostID = host
+        }
+        self.init(workflowID: workflowID, hostID: hostID, name: "Workflow", isPinned: false, stageCount: 0)
+    }
 }
 
 struct BighelpShortcutScheduledTask: Identifiable, Equatable, Hashable, Sendable {
@@ -210,6 +250,41 @@ extension BighelpShortcutService {
     }
 
     // MARK: Scheduled tasks
+
+    // MARK: Workflows
+
+    /// The computer's workflows, pinned ones first: pinning a workflow makes it a favorite in Shortcuts.
+    func availableWorkflows() async throws -> [BighelpShortcutWorkflow] {
+        _ = try await liveWorkspace()
+        guard let client = hostServices.workflows() else { throw BighelpShortcutServiceError.workflowsUnavailable }
+        let list: WorkflowsList
+        do {
+            list = try await client.list(includeArchived: false)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw BighelpShortcutServiceError.workflowsUnavailable
+        }
+        let host = hostServices.hostID()
+        let pinnedFirst = list.workflows.filter(\.pinned) + list.workflows.filter { !$0.pinned }
+        return pinnedFirst.prefix(Self.listLimit).map {
+            BighelpShortcutWorkflow(workflowID: $0.id, hostID: host, name: $0.name, isPinned: $0.pinned,
+                                    stageCount: $0.stageCount)
+        }
+    }
+
+    /// Opens a workflow, or its Run sheet. One on another computer opens there: the app switches to it.
+    func openWorkflow(id: String, startsRun: Bool) async throws {
+        guard let saved = BighelpShortcutWorkflow(entityID: id) else {
+            throw BighelpShortcutServiceError.workflowUnavailable
+        }
+        if saved.hostID == nil || saved.hostID == hostServices.hostID() {
+            guard try await availableWorkflows().contains(where: { $0.workflowID == saved.workflowID }) else {
+                throw BighelpShortcutServiceError.workflowUnavailable
+            }
+        }
+        openLink(BighelpShortcutLinks.workflow(saved.workflowID, hostID: saved.hostID, startsRun: startsRun))
+    }
 
     func availableScheduledTasks() async throws -> [BighelpShortcutScheduledTask] {
         let workspace = try await liveWorkspace()

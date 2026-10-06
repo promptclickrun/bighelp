@@ -75,6 +75,8 @@ enum BighelpShortcutServiceError: LocalizedError, Equatable {
     case kanbanNoBoard
     case kanbanFailed
     case emptyTitle
+    case workflowsUnavailable
+    case workflowUnavailable
 
     var errorDescription: String? {
         switch self {
@@ -112,6 +114,10 @@ enum BighelpShortcutServiceError: LocalizedError, Equatable {
             "bighelp couldn't add the card. Check that your computer is connected, then try again."
         case .emptyTitle:
             "Enter a title for the card."
+        case .workflowsUnavailable:
+            "This computer doesn't have Workflows. Update the bighelp plugin to use them."
+        case .workflowUnavailable:
+            "That workflow isn't on your computer anymore."
         }
     }
 }

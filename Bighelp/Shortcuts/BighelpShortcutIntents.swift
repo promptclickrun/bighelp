@@ -27,6 +27,7 @@ extension BighelpShortcutDestination: AppEnum {
         .goals: .init(title: "Goals", image: .init(systemName: "target")),
         .projects: .init(title: "Projects", image: .init(systemName: "folder")),
         .kanban: .init(title: "Kanban", image: .init(systemName: "rectangle.split.3x1")),
+        .workflows: .init(title: "Workflows", image: .init(systemName: "flowchart")),
         .scheduledTasks: .init(title: "Scheduled tasks", image: .init(systemName: "calendar.badge.clock")),
         .settings: .init(title: "Settings", image: .init(systemName: "gearshape")),
     ]
@@ -118,6 +119,90 @@ struct BighelpShortcutGroupChatQuery: EntityQuery {
 
     func suggestedEntities() async throws -> [BighelpShortcutGroupChatEntity] {
         try await service.availableGroupChats().map(BighelpShortcutGroupChatEntity.init)
+    }
+}
+
+// MARK: - Workflows
+
+struct BighelpShortcutWorkflowEntity: AppEntity {
+    static let typeDisplayRepresentation = TypeDisplayRepresentation(
+        name: "Workflow",
+        numericFormat: "\(placeholder: .int) workflows"
+    )
+    static let defaultQuery = BighelpShortcutWorkflowQuery()
+
+    let id: String
+    let name: String
+    let isPinned: Bool
+    let stageCount: Int
+
+    init(_ workflow: BighelpShortcutWorkflow) {
+        id = workflow.id
+        name = workflow.name
+        isPinned = workflow.isPinned
+        stageCount = workflow.stageCount
+    }
+
+    var displayRepresentation: DisplayRepresentation {
+        let details = [isPinned ? "Pinned" : nil,
+                       stageCount == 0 ? nil : stageCount == 1 ? "1 stage" : "\(stageCount) stages"].compactMap { $0 }
+        return DisplayRepresentation(
+            title: "\(name)",
+            subtitle: "\(details.joined(separator: " · "))",
+            image: .init(systemName: isPinned ? "pin.fill" : "flowchart")
+        )
+    }
+}
+
+/// Pinned workflows first: pinning one in bighelp makes it a favorite here.
+struct BighelpShortcutWorkflowQuery: EntityQuery {
+    @Dependency private var service: BighelpShortcutService
+
+    func entities(for identifiers: [String]) async throws -> [BighelpShortcutWorkflowEntity] {
+        // Names come from the computer when it answers. A workflow saved in a Shortcut keeps its computer,
+        // so one on another computer still opens there.
+        let live = (try? await service.availableWorkflows()) ?? []
+        return identifiers.compactMap { id in
+            (live.first { $0.id == id } ?? BighelpShortcutWorkflow(entityID: id)).map(BighelpShortcutWorkflowEntity.init)
+        }
+    }
+
+    func suggestedEntities() async throws -> [BighelpShortcutWorkflowEntity] {
+        try await service.availableWorkflows().map(BighelpShortcutWorkflowEntity.init)
+    }
+}
+
+struct BighelpOpenWorkflowIntent: AppIntent {
+    static let title: LocalizedStringResource = "Open workflow"
+    static let description = IntentDescription(
+        "Opens one of your workflows in bighelp, or its Run sheet to start a run. Pinned workflows come first.",
+        categoryName: "Workflows"
+    )
+    static let openAppWhenRun = true
+
+    /// Opens bighelp at once, without asking to continue in the app first.
+    @available(iOS 26.0, *)
+    static var supportedModes: IntentModes { .foreground(.immediate) }
+
+    @Parameter(title: "Workflow")
+    var workflow: BighelpShortcutWorkflowEntity
+
+    @Parameter(title: "Start a run", default: false)
+    var startsRun: Bool
+
+    static var parameterSummary: some ParameterSummary {
+        When(\.$startsRun, .equalTo, true, {
+            Summary("Open \(\.$workflow) and start a run") { \.$startsRun }
+        }, otherwise: {
+            Summary("Open \(\.$workflow)") { \.$startsRun }
+        })
+    }
+
+    @Dependency private var service: BighelpShortcutService
+
+    func perform() async throws -> some IntentResult {
+        try await service.openWorkflow(id: workflow.id, startsRun: startsRun)
+        return .result()
     }
 }
 
@@ -311,7 +396,7 @@ struct BighelpBoardItemsIntent: AppIntent {
 struct BighelpOpenSectionIntent: AppIntent {
     static let title: LocalizedStringResource = "Open in bighelp"
     static let description = IntentDescription(
-        "Opens bighelp on Chats, Agents, Feed, Ideas, Goals, Projects, Kanban, Scheduled tasks or Settings.",
+        "Opens bighelp on Chats, Agents, Feed, Ideas, Goals, Projects, Kanban, Workflows, Scheduled tasks or Settings.",
         categoryName: "Navigation"
     )
     static let openAppWhenRun = true

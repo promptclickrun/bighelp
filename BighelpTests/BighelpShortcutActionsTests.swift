@@ -238,6 +238,72 @@ struct BighelpShortcutActionsTests {
         }
     }
 
+    // MARK: Workflows
+
+    private func workflowHarness() async throws -> (ShortcutServiceHarness, DemoWorkflowsClient, LinkRecorder, UUID) {
+        let (harness, _, links) = try await harness()
+        let demo = DemoWorkflowsClient(delays: false)
+        let host = UUID()
+        harness.service.hostServices.workflows = { demo }
+        harness.service.hostServices.hostID = { host }
+        return (harness, demo, links, host)
+    }
+
+    @Test func pinnedWorkflowsComeFirstAndKnowTheirComputer() async throws {
+        let (harness, demo, _, host) = try await workflowHarness()
+        _ = try await demo.pin(workflowID: "wf-morning", pinned: true)
+        let workflows = try await harness.service.availableWorkflows()
+        #expect(workflows.first?.workflowID == "wf-morning" && workflows.first?.isPinned == true,
+                "A pinned workflow is a favorite: it comes first")
+        #expect(Set(workflows.map(\.workflowID)) == ["wf-research", "wf-triage", "wf-captions", "wf-morning"])
+        #expect(workflows.allSatisfy { $0.hostID == host })
+        #expect(workflows.first?.id == BighelpShortcutWorkflow.entityID(hostID: host, workflowID: "wf-morning"))
+    }
+
+    @Test func openWorkflowOpensItOnItsComputerOrStraightToARun() async throws {
+        let (harness, _, links, host) = try await workflowHarness()
+        let id = BighelpShortcutWorkflow.entityID(hostID: host, workflowID: "wf-morning")
+        try await harness.service.openWorkflow(id: id, startsRun: false)
+        try await harness.service.openWorkflow(id: id, startsRun: true)
+        #expect(links.urls.map { BighelpIncomingURLRoute.parse($0) } == [
+            .workflow(id: "wf-morning", hostID: host, startsRun: false),
+            .workflow(id: "wf-morning", hostID: host, startsRun: true),
+        ])
+    }
+
+    @Test func aWorkflowOnAnotherComputerOpensThereWithoutAskingThisOne() async throws {
+        let (harness, _, links, _) = try await workflowHarness()
+        let other = UUID()
+        try await harness.service.openWorkflow(id: BighelpShortcutWorkflow.entityID(hostID: other, workflowID: "wf_elsewhere"),
+                                              startsRun: false)
+        #expect(BighelpIncomingURLRoute.parse(try #require(links.urls.first))
+                == .workflow(id: "wf_elsewhere", hostID: other, startsRun: false))
+    }
+
+    @Test func aWorkflowThatIsGoneOrAComputerWithoutWorkflowsSaysSo() async throws {
+        let (harness, _, links, host) = try await workflowHarness()
+        await #expect(throws: BighelpShortcutServiceError.workflowUnavailable) {
+            try await harness.service.openWorkflow(id: BighelpShortcutWorkflow.entityID(hostID: host, workflowID: "gone"),
+                                                  startsRun: false)
+        }
+        #expect(links.urls.isEmpty)
+        harness.service.hostServices.workflows = { nil }
+        await #expect(throws: BighelpShortcutServiceError.workflowsUnavailable) {
+            try await harness.service.availableWorkflows()
+        }
+    }
+
+    @Test func workflowLinksAreStrict() {
+        #expect(BighelpIncomingURLRoute.parse(URL(string: "loopdy://workflows")!) == .workflows)
+        #expect(BighelpIncomingURLRoute.parse(BighelpShortcutDestination.workflows.url) == .workflows)
+        #expect(BighelpIncomingURLRoute.parse(URL(string: "loopdy://workflows/wf_1")!)
+                == .workflow(id: "wf_1", hostID: nil, startsRun: false))
+        for bad in ["loopdy://workflows/a/b", "loopdy://workflows/wf_1?host=not-a-uuid",
+                    "loopdy://workflows/wf_1?run=1&run=1", "loopdy://workflows/" + String(repeating: "x", count: 200)] {
+            #expect(BighelpIncomingURLRoute.parse(URL(string: bad)!) == nil, "\(bad)")
+        }
+    }
+
     // MARK: Kanban
 
     @Test func addKanbanTaskFilesALaterCardOnTheBoard() async throws {

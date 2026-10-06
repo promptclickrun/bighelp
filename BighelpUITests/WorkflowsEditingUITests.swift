@@ -311,6 +311,22 @@ final class WorkflowsEditingUITests: BighelpUITestCase {
         row.tap()
     }
 
+    /// A Shortcut's link opens one workflow, or its Run sheet (demo).
+    @MainActor
+    func testAWorkflowLinkOpensItOrItsRunSheet() throws {
+        let app = launch()
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier IN %@", ["home.drawer.open", "chat.menu"]))
+            .firstMatch.waitForExistence(timeout: 15))
+        app.open(URL(string: "loopdy://workflows/wf-morning")!)
+        let pad = app.userInterfaceIdiom == .pad
+        let make = element(pad ? "workflows.canvas.node.make" : "workflows.flow.stage.make", app)
+        XCTAssertTrue(make.waitForExistence(timeout: 10), "The workflow opens")
+        save("60-link-workflow", app)
+        app.open(URL(string: "loopdy://workflows/wf-research?run=1")!)
+        XCTAssertTrue(app.buttons["workflows.run-sheet.run"].waitForExistence(timeout: 10), "Its Run sheet opens")
+        save("61-link-run-sheet", app)
+    }
+
     // MARK: iPhone
 
     /// Compact width: every stage in one line, top to bottom, inside the screen,

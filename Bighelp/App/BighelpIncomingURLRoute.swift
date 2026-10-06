@@ -23,6 +23,10 @@ enum BighelpIncomingURLRoute: Equatable, Sendable {
     case agents
     case projects
     case settings
+    /// "loopdy://workflows": the Workflows home, from Shortcuts.
+    case workflows
+    /// "loopdy://workflows/<id>?host=…&run=1": one workflow, on its computer, or straight to its Run sheet.
+    case workflow(id: String, hostID: UUID?, startsRun: Bool)
 
     static func parse(_ url: URL) -> BighelpIncomingURLRoute? {
         let scheme = url.scheme?.lowercased()
@@ -63,6 +67,9 @@ enum BighelpIncomingURLRoute: Equatable, Sendable {
         if url.host?.lowercased() == "agent-chat" {
             return parseAgentChat(url)
         }
+        if url.host?.lowercased() == "workflows" {
+            return parseWorkflow(url)
+        }
         if url.host?.lowercased() == "approval", url.pathComponents.count == 2,
            let id = url.pathComponents.last, !id.isEmpty, id.utf8.count <= 240 {
             return .approval(id: id)
@@ -86,6 +93,24 @@ enum BighelpIncomingURLRoute: Equatable, Sendable {
             !sessionID.isEmpty
         else { return nil }
         return .chat(sessionID: sessionID)
+    }
+
+    /// The home, or one workflow by its ID with at most one computer and one `run`. Anything odd isn't a link.
+    private static func parseWorkflow(_ url: URL) -> BighelpIncomingURLRoute? {
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        if url.pathComponents.count <= 1 { return items.isEmpty ? .workflows : nil }
+        guard url.pathComponents.count == 2, let id = url.pathComponents.last, !id.isEmpty, id.utf8.count <= 128,
+              id.unicodeScalars.allSatisfy({ $0.isASCII && (CharacterSet.alphanumerics.contains($0) || "_-".contains(Character($0))) })
+        else { return nil }
+        let hosts = items.filter { $0.name == "host" }, runs = items.filter { $0.name == "run" }
+        guard hosts.count <= 1, runs.count <= 1, items.count == hosts.count + runs.count else { return nil }
+        var hostID: UUID?
+        if let host = hosts.first {
+            guard let value = host.value, value.utf8.count <= 36, let id = UUID(uuidString: value) else { return nil }
+            hostID = id
+        }
+        if let run = runs.first, run.value != "1" { return nil }
+        return .workflow(id: id, hostID: hostID, startsRun: !runs.isEmpty)
     }
 
     /// One agent, and at most one computer given by its ID. Anything odd isn't a link.

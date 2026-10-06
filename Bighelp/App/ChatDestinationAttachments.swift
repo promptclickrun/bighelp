@@ -41,7 +41,7 @@ extension ChatDestinationView {
     func performChatAction(_ action: ChatActionMenuAction) {
         #if targetEnvironment(macCatalyst)
         switch action {
-        case .photo, .file, .voice, .startSession:
+        case .camera, .photo, .file, .voice, .startSession:
             if queueMacPanelActionIfNeeded(action) { return }
         default:
             break

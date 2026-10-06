@@ -638,6 +638,16 @@ struct ChatDestinationView: View {
             allowsMultipleSelection: true,
             onCompletion: importFiles
         )
+        .fullScreenCover(isPresented: $isCameraPickerPresented) {
+            ChatCameraPicker(
+                onCapture: { image in
+                    isCameraPickerPresented = false
+                    importCameraImage(image)
+                },
+                onCancel: { isCameraPickerPresented = false }
+            )
+            .ignoresSafeArea()
+        }
         #endif
         .sheet(isPresented: $isHermesWorkspacePickerPresented) {
             HermesWorkspacePickerView(

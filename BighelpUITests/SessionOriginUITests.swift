@@ -16,13 +16,11 @@ final class SessionOriginUITests: BighelpUITestCase {
         let filters = app.descendants(matching: .any).matching(identifier: "sessions.filters").firstMatch
         XCTAssertTrue(filters.waitForExistence(timeout: 10))
         filters.tap()
-        // In the filter menu the choices are items of their own; in the list's filters, a menu.
+        // Started in is its own labeled choice in the filter menu; its places open from it.
         let choice = app.buttons["Telegram"].firstMatch
-        if !choice.waitForExistence(timeout: 5) {
-            let origin = app.buttons["sessions.filter.origin"].firstMatch
-            XCTAssertTrue(origin.waitForExistence(timeout: 5))
-            origin.tap()
-        }
+        let origin = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Started in,'")).firstMatch
+        XCTAssertTrue(origin.waitForExistence(timeout: 5))
+        origin.tap()
         XCTAssertTrue(choice.waitForExistence(timeout: 5))
         choice.tap()
         XCTAssertTrue(row(containing: "Started in Telegram", in: app).waitForExistence(timeout: 5))

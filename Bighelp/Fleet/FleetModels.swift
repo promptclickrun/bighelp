@@ -17,6 +17,18 @@ struct FleetSnapshot: Codable, Equatable, Sendable {
     /// Group chats; nil in snapshots saved before groups were listed.
     var groups: [FleetGroup]? = nil
     var refreshedAt: Date
+    /// The newest chats in Codex and Claude Code on that computer, not yet brought
+    /// into Hermes; nil when its Hermes can't list them (or before they were read).
+    var otherAppChats: [FleetOtherAppChat]? = nil
+}
+
+/// A chat in Codex or Claude Code on one computer (Hermes' `session.foreign.list`).
+/// Opening one goes to that computer's own Sessions screen, which brings it in.
+struct FleetOtherAppChat: Codable, Equatable, Sendable, Identifiable {
+    let hostID: UUID
+    let item: HermesForeignSessionItem
+
+    var id: String { FleetID.make(hostID, item.id) }
 }
 
 /// Agent IDs are only unique within one host.
@@ -86,6 +98,9 @@ struct FleetChatsFilter: Equatable {
     var agentID: String?
     /// Where the chats started, by `SessionOrigin` label.
     var origin: String?
+    /// Hermes, Codex or Claude Code, from the choice above the list. Kept apart from
+    /// the menu's filters: it stays when a computer is picked.
+    var app: SessionAppFilter = .all
 
     var isActive: Bool { agentID != nil || origin != nil }
 }

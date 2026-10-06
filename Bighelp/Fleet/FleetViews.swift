@@ -525,7 +525,13 @@ struct FleetChatsView: View {
     let onOpen: (FleetChat) -> Void
     /// The picked computer's own Sessions screen once it's the working computer; nil until then.
     var hostSessions: ((UUID) -> AnyView?)? = nil
+    /// Codex and Claude Code chats on the working computer, through its live connection.
+    var otherApps: (source: any OtherAppChatsSource, id: String)? = nil
+    /// Opens a chat still in Codex or Claude Code: on its computer's own Sessions screen.
+    var onOpenOtherApp: ((FleetOtherAppChat) -> Void)? = nil
     @State private var search = ""
+    @State private var liveOtherApps: OtherAppChatsStore?
+    @State private var liveOtherAppsID: String?
 
     var body: some View {
         if let hostFilter, let sessions = hostSessions?(hostFilter) {
@@ -544,6 +550,7 @@ struct FleetChatsView: View {
 
     private var mergedList: some View {
         let chats = visibleChats
+        let otherAppChats = visibleOtherAppChats
         return List {
             if fleet.showsHostNames {
                 FleetHostFilter(fleet: fleet, selection: $hostFilter)
@@ -551,11 +558,35 @@ struct FleetChatsView: View {
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
             }
+            SessionAppFilterBar(selection: $filter.app)
+                .listRowInsets(EdgeInsets(top: 4, leading: BighelpTokens.space16, bottom: 8, trailing: BighelpTokens.space16))
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
             ForEach(chats) { chat in
                 Button { onOpen(chat) } label: { FleetChatRow(chat: chat, fleet: fleet) }
                     .buttonStyle(.plain)
                     .listRowBackground(Color.clear)
                     .accessibilityIdentifier("fleet.chat.\(chat.title)")
+            }
+            if !otherAppChats.isEmpty {
+                Section {
+                    ForEach(otherAppChats) { chat in
+                        Button { onOpenOtherApp?(chat) } label: {
+                            OtherAppChatRow(item: chat.item,
+                                            hostName: fleet.showsHostNames ? fleet.hostName(chat.hostID) : nil)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(onOpenOtherApp == nil)
+                        .listRowBackground(Color.clear)
+                        .accessibilityIdentifier("fleet.other-app.\(chat.item.title)")
+                    }
+                } header: {
+                    Text(otherAppsTitle)
+                        .font(.bighelp(.caption).weight(.semibold))
+                        .foregroundStyle(theme.secondaryText)
+                        .textCase(nil)
+                        .accessibilityIdentifier("fleet.other-apps")
+                }
             }
             FleetHostNotes(fleet: fleet, hostFilter: hostFilter)
         }
@@ -571,23 +602,65 @@ struct FleetChatsView: View {
             await fleet.waitForReads()
         }
         .overlay {
-            if chats.isEmpty {
+            if chats.isEmpty, otherAppChats.isEmpty {
                 if !search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     ContentUnavailableView.search(text: search)
-                } else if filter.isActive {
-                    ContentUnavailableView("No matching chats", systemImage: "line.3.horizontal.decrease.circle",
-                                           description: Text("Try a different agent or place."))
+                } else if filter.isActive || filter.app != .all {
+                    ContentUnavailableView(filter.app.emptyTitle, systemImage: "line.3.horizontal.decrease.circle",
+                                           description: Text("Try a different agent, place or app."))
                 } else {
                     ContentUnavailableView("No sessions yet", systemImage: "bubble.left.and.bubble.right")
                 }
             }
         }
         .task { fleet.refresh() }
+        .task(id: LiveOtherAppsKey(id: otherApps?.id, app: filter.app)) { await loadLiveOtherApps() }
         .navigationTitle("All sessions")
         .accessibilityIdentifier("fleet.chats")
     }
 
     private var visibleChats: [FleetChat] { fleet.chats(on: hostFilter, matching: search, filter: filter) }
+
+    /// Chats still in Codex or Claude Code: the working computer's live, the others' as last read.
+    private var visibleOtherAppChats: [FleetOtherAppChat] {
+        guard filter.app.showsOtherAppChats, filter.agentID == nil, filter.origin == nil else { return [] }
+        let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
+        var live: [FleetOtherAppChat] = []
+        if let selected = fleet.selectedHostID, hostFilter == nil || hostFilter == selected, let store = liveOtherApps {
+            live = store.items
+                .filter { filter.app.includes(source: $0.source) }
+                .filter { query.isEmpty || $0.title.localizedCaseInsensitiveContains(query) }
+                .map { FleetOtherAppChat(hostID: selected, item: $0) }
+        }
+        return (live + fleet.otherAppChats(on: hostFilter, matching: query, app: filter.app))
+            .sorted { ($0.item.modifiedAt ?? .distantPast) > ($1.item.modifiedAt ?? .distantPast) }
+    }
+
+    private var otherAppsTitle: String {
+        switch filter.app {
+        case .codex: "In Codex"
+        case .claudeCode: "In Claude Code"
+        case .all, .hermes: "In Codex and Claude Code"
+        }
+    }
+
+    private func loadLiveOtherApps() async {
+        guard let otherApps else {
+            liveOtherApps = nil
+            liveOtherAppsID = nil
+            return
+        }
+        let store: OtherAppChatsStore
+        if let current = liveOtherApps, liveOtherAppsID == otherApps.id {
+            store = current
+        } else {
+            store = OtherAppChatsStore(source: otherApps.source)
+            liveOtherApps = store
+            liveOtherAppsID = otherApps.id
+        }
+        guard filter.app.showsOtherAppChats else { return }
+        await store.load(app: filter.app.foreignSource)
+    }
 
     /// The same filters as one computer's Sessions, for what every computer reports.
     /// Projects belong to one computer: pick its chip to group or filter by project.
@@ -596,26 +669,40 @@ struct FleetChatsView: View {
             $0.name.localizedStandardCompare($1.name) == .orderedAscending
         }
         let origins = fleet.origins(on: hostFilter)
+        // Each filter is its own labeled submenu that shows its current choice.
         return Menu {
-            Picker("Agent", selection: $filter.agentID) {
-                Text("All agents").tag(String?.none)
-                ForEach(agents) { agent in
-                    Text(fleet.showsHostNames && hostFilter == nil ? "\(agent.name) · \(fleet.hostName(agent.hostID))" : agent.name)
-                        .tag(Optional(agent.id))
+            Section("Filter by") {
+                Picker(selection: $filter.agentID) {
+                    Text("All agents").tag(String?.none)
+                    ForEach(agents) { agent in
+                        Text(fleet.showsHostNames && hostFilter == nil ? "\(agent.name) · \(fleet.hostName(agent.hostID))" : agent.name)
+                            .tag(Optional(agent.id))
+                    }
+                } label: {
+                    Label("Agent", systemImage: "person.crop.circle")
+                    Text(filter.agentID.flatMap { id in agents.first { $0.id == id }?.name } ?? "All agents")
                 }
-            }
-            .accessibilityIdentifier("fleet.chats.filter.agent")
-            if !origins.isEmpty {
-                Picker("Started in", selection: $filter.origin) {
-                    Text("Everywhere").tag(String?.none)
-                    ForEach(origins, id: \.self) { Text($0).tag(Optional($0)) }
+                .pickerStyle(.menu)
+                .accessibilityIdentifier("fleet.chats.filter.agent")
+                if !origins.isEmpty {
+                    Picker(selection: $filter.origin) {
+                        Text("Everywhere").tag(String?.none)
+                        ForEach(origins, id: \.self) { Text($0).tag(Optional($0)) }
+                    } label: {
+                        Label("Started in", systemImage: "arrow.down.app")
+                        Text(filter.origin ?? "Everywhere")
+                    }
+                    .pickerStyle(.menu)
+                    .accessibilityIdentifier("fleet.chats.filter.origin")
                 }
-                .accessibilityIdentifier("fleet.chats.filter.origin")
             }
             if filter.isActive {
-                Divider()
-                Button("Clear Filters", systemImage: "arrow.counterclockwise") { filter = FleetChatsFilter() }
+                Section {
+                    Button("Clear Filters", systemImage: "arrow.counterclockwise") {
+                        filter = FleetChatsFilter(app: filter.app)
+                    }
                     .accessibilityIdentifier("fleet.chats.filters.clear")
+                }
             }
         } label: {
             Image(systemName: filter.isActive
@@ -967,4 +1054,10 @@ struct FleetAgentPicker: View {
     }
 
     @BighelpThemeReader private var theme
+}
+
+/// What the working computer's Codex and Claude Code list reads, and the app chosen.
+private struct LiveOtherAppsKey: Equatable {
+    let id: String?
+    let app: SessionAppFilter
 }

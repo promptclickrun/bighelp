@@ -309,7 +309,20 @@ final class FleetStore {
         chats(on: hostID, matching: query).filter { chat in
             (filter.agentID.map { $0 == FleetID.make(chat.hostID, chat.profileID) } ?? true)
                 && (filter.origin.map { $0 == SessionOrigin.label(chat.origin) } ?? true)
+                && filter.app.includes(source: chat.origin)
         }
+    }
+
+    /// Chats still in Codex or Claude Code on the computers read, newest first.
+    /// The selected computer's come from its live connection instead (Sessions).
+    func otherAppChats(on hostID: UUID? = nil, matching query: String = "",
+                       app: SessionAppFilter = .all) -> [FleetOtherAppChat] {
+        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        return hosts.filter { (hostID == nil || $0.id == hostID) && $0.id != selectedHostID }
+            .flatMap { snapshots[$0.id]?.otherAppChats ?? [] }
+            .filter { app.showsOtherAppChats && app.includes(source: $0.item.source) }
+            .filter { query.isEmpty || $0.item.title.localizedCaseInsensitiveContains(query) }
+            .sorted { ($0.item.modifiedAt ?? .distantPast) > ($1.item.modifiedAt ?? .distantPast) }
     }
 
     /// Where the listed chats started, by name, for All sessions' Started in filter.

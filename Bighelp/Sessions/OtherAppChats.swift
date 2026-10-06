@@ -4,7 +4,8 @@ import SwiftUI
 /// keep them and can bring one in as its own chat (Hermes' `session.foreign.*`).
 @MainActor
 protocol OtherAppChatsSource: AnyObject {
-    func list(offset: Int) async throws -> HermesForeignSessionPage
+    /// A page of chats; `source` ("codex" or "claude") keeps one app's.
+    func list(offset: Int, source: String?) async throws -> HermesForeignSessionPage
     func preview(_ item: HermesForeignSessionItem) async throws -> HermesForeignSessionPreview
     /// Brings the previewed chat into Hermes; its Hermes session ID. A chat brought in
     /// before opens the copy Hermes already has.
@@ -21,8 +22,8 @@ final class LiveOtherAppChats: OtherAppChatsSource {
         self.profileID = profileID
     }
 
-    func list(offset: Int) async throws -> HermesForeignSessionPage {
-        try await client.foreignSessions(profileID: profileID, source: nil, offset: offset, limit: 10)
+    func list(offset: Int, source: String?) async throws -> HermesForeignSessionPage {
+        try await client.foreignSessions(profileID: profileID, source: source, offset: offset, limit: 10)
     }
 
     func preview(_ item: HermesForeignSessionItem) async throws -> HermesForeignSessionPreview {
@@ -43,15 +44,22 @@ final class OtherAppChatsStore {
     private(set) var nextOffset: Int?
     private(set) var preview: HermesForeignSessionPreview?
     private(set) var isWorking = false
+    /// The app listed ("codex" or "claude"), or nil for both.
+    private(set) var app: String?
     var errorMessage: String?
     @ObservationIgnored private let source: any OtherAppChatsSource
 
     init(source: any OtherAppChatsSource) { self.source = source }
 
-    /// The newest chats. A computer whose Hermes can't list them shows nothing.
-    func load() async {
+    /// The newest chats, of one app or both. A computer whose Hermes can't list them shows nothing.
+    func load(app: String? = nil) async {
+        if app != self.app {
+            self.app = app
+            items = []
+            nextOffset = nil
+        }
         do {
-            let page = try await source.list(offset: 0)
+            let page = try await source.list(offset: 0, source: app)
             items = page.sessions
             nextOffset = page.nextOffset
         } catch is CancellationError {
@@ -66,7 +74,7 @@ final class OtherAppChatsStore {
         isWorking = true
         defer { isWorking = false }
         do {
-            let page = try await source.list(offset: offset)
+            let page = try await source.list(offset: offset, source: app)
             let known = Set(items.map(\.id))
             items += page.sessions.filter { !known.contains($0.id) }
             nextOffset = page.nextOffset
@@ -111,6 +119,8 @@ final class OtherAppChatsStore {
 /// A chat from another app, as a row: its app, title, last change and how it starts.
 struct OtherAppChatRow: View {
     let item: HermesForeignSessionItem
+    /// The computer it's on, while several show.
+    var hostName: String? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -129,6 +139,7 @@ struct OtherAppChatRow: View {
             }
             HStack(spacing: 6) {
                 SessionOriginTag(source: item.source, size: 11)
+                if let hostName { FleetHostTag(name: hostName) }
                 Text(item.excerpt.isEmpty ? "\(item.turnCount) messages" : item.excerpt)
                     .font(.bighelp(.subheadline))
                     .foregroundStyle(theme.secondaryText)
@@ -221,9 +232,10 @@ final class DemoOtherAppChats: OtherAppChatsSource {
 
     init(openedSessionID: String) { self.openedSessionID = openedSessionID }
 
-    func list(offset: Int) async throws -> HermesForeignSessionPage {
-        HermesForeignSessionPage(profileID: "default", host: "Demo Mac", sessions: offset == 0 ? Self.items : [],
-                                 nextOffset: nil, unreadable: 0)
+    func list(offset: Int, source: String?) async throws -> HermesForeignSessionPage {
+        let items = Self.items.filter { source == nil || $0.source == source }
+        return HermesForeignSessionPage(profileID: "default", host: "Demo Mac", sessions: offset == 0 ? items : [],
+                                        nextOffset: nil, unreadable: 0)
     }
 
     func preview(_ item: HermesForeignSessionItem) async throws -> HermesForeignSessionPreview {

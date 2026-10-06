@@ -199,6 +199,8 @@ final class SessionsModel {
     var query = ""
     var agentFilter: SessionAgentFilter = .all
     var originFilter: SessionOriginFilter = .all
+    /// Hermes, Codex or Claude Code (or all), from the choice above the list.
+    var appFilter: SessionAppFilter = .all
     var typeFilter: SessionTypeFilter = .all
     var projectFilter: SessionProjectFilter = .all
     var showsCronSessions = false
@@ -464,6 +466,7 @@ final class SessionsModel {
         guard typeFilter.includes(record.kind) else { return false }
         guard effectiveProjectFilter.includes(record) else { return false }
         guard originFilter.includes(record) else { return false }
+        guard appFilter.includes(source: record.remoteSource) else { return false }
         if case .agent(let agentID) = agentFilter, !record.agentIDs.contains(agentID) {
             return false
         }

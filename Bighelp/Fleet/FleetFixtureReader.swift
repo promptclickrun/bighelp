@@ -68,6 +68,9 @@ final class FleetFixtureReader: FleetHostReading {
                 FleetChat(hostID: id, profileID: "reviewer", storedSessionID: "studio-2", title: "Pull request review",
                           preview: "Two small fixes before this can merge.",
                           updatedAt: now.addingTimeInterval(-2 * 60 * 60), isActive: true),
+                FleetChat(hostID: id, profileID: "reviewer", storedSessionID: "studio-3", title: "Release checklist",
+                          preview: "Brought in from Codex.", updatedAt: now.addingTimeInterval(-3 * 60 * 60),
+                          isActive: false, origin: "codex-cli"),
             ],
             tasks: [
                 FleetTask(hostID: id, jobID: "digest", profileID: "research", name: "Morning research digest",
@@ -83,7 +86,17 @@ final class FleetFixtureReader: FleetHostReading {
                            memberNames: ["Rio Tanaka", "Sage Ortiz"], updatedAt: now.addingTimeInterval(-50 * 60),
                            isWorking: false, canRename: false, canDelete: false),
             ],
-            refreshedAt: now
+            refreshedAt: now,
+            otherAppChats: [
+                FleetOtherAppChat(hostID: id, item: HermesForeignSessionItem(
+                    id: String(repeating: "e", count: 64), source: "codex", sourceLabel: "Codex CLI",
+                    title: "Speed up the test suite", cwd: "~/Projects/site", modifiedAt: now.addingTimeInterval(-40 * 60),
+                    turnCount: 9, excerpt: "Run the slow tests in parallel")),
+                FleetOtherAppChat(hostID: id, item: HermesForeignSessionItem(
+                    id: String(repeating: "f", count: 64), source: "claude", sourceLabel: "Claude Code",
+                    title: "Draft the launch post", cwd: "~/Projects/blog", modifiedAt: now.addingTimeInterval(-5 * 60 * 60),
+                    turnCount: 5, excerpt: "Three short paragraphs")),
+            ]
         )
     }
 }

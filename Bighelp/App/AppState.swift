@@ -57,6 +57,26 @@ final class AppState {
         path.append(route)
     }
 
+    /// Switches to `tab` and opens `routes` on it. On the Mac they open a moment
+    /// after the switch: pushed in the same update, the tab's title-bar search
+    /// field stayed drawn over the pushed page's Back button and blocked it.
+    func select(_ tab: AppTab, thenOpen routes: [AppRoute]) {
+        guard selectedTab != tab || !path.isEmpty else {
+            path = routes
+            return
+        }
+        select(tab)
+        #if targetEnvironment(macCatalyst)
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(150))
+            guard let self, self.selectedTab == tab, self.path.isEmpty else { return }
+            self.path = routes
+        }
+        #else
+        path = routes
+        #endif
+    }
+
     func openSessions() {
         select(.sessions)
     }

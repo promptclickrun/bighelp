@@ -81,6 +81,8 @@ struct RootShellView: View {
     /// All hosts narrowed to one computer (its chips, or ☰'s computer row); nil shows every computer.
     @State var fleetFocus: UUID?
     @State var fleetChatsFilter = FleetChatsFilter()
+    /// A Codex or Claude Code chat picked on All sessions, previewed once its computer's Sessions shows.
+    @State var requestedOtherAppChat: HermesForeignSessionItem?
     @State var isFleetNewChatPresented = false
     @Environment(\.workspaceConnections) var workspaceConnections
     @Environment(\.scenePhase) var scenePhase
@@ -921,7 +923,10 @@ struct RootShellView: View {
             onSelect: { appState.chatOpenedFromList = true; openSessionSelection($0) },
             agentActionsConfig: agentActionsConfig,
             otherApps: otherAppChats,
-            onOpenBroughtIn: { openBroughtInChat($0) }
+            onOpenBroughtIn: { openBroughtInChat($0) },
+            // All sessions and a picked computer's Sessions share the Hermes, Codex, Claude Code choice.
+            appFilter: fleetModeOn ? $fleetChatsFilter.app : nil,
+            requestedOtherAppChat: $requestedOtherAppChat
         )
     }
 
@@ -1297,6 +1302,10 @@ struct RootShellView: View {
                 return
             }
             openWorkflow(id: id, startsRun: startsRun)
+        case .workflowRun(let id):
+            openWorkflows(run: id)
+        case .usage:
+            openUsage()
         }
     }
 
@@ -1634,10 +1643,11 @@ private extension BighelpIncomingURLRoute {
     /// Routes that open a chat or the agent home need the host's workspace.
     var opensWorkspaceContent: Bool {
         switch self {
-        case .home, .chat, .newChat, .agentChat, .kanban, .approval, .group, .projects, .workflows, .workflow: true
+        case .home, .chat, .newChat, .agentChat, .kanban, .approval, .group, .projects, .workflows, .workflow,
+             .workflowRun: true
         // Feed, Ideas, Goals and Agents show their saved items and refresh themselves; waiting for
         // the host before even switching tabs made these links feel broken.
-        case .agent, .agents, .scheduledTasks, .scheduledTask, .sessions, .settings: false
+        case .agent, .agents, .scheduledTasks, .scheduledTask, .sessions, .settings, .usage: false
         }
     }
 }

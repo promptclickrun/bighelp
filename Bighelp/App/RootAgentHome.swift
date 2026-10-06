@@ -554,6 +554,8 @@ extension RootShellView {
                                                               knownAgentIDs: Set(agents.profiles.map(\.id)))
             }
             .task(id: usageReaderKey) { configureUsage(usageReaderKey) }
+            .task(id: usageWidgetKey) { await refreshUsageWidget() }
+            .task(id: workflowsWidgetKey) { await followWorkflowsWidget() }
             .environment(\.providerUsage, providerUsage)
             .task(id: hostReactionsKey) { await syncHostReactions(hostReactionsKey) }
             // Widgets show the home agent's Feed and Goals in the app's colors.
@@ -721,8 +723,7 @@ extension RootShellView {
             return
         }
         projectsStore = ProjectsStore(source: source, profileID: workspaceAgentID)
-        if appState.selectedTab != .sessions { appState.select(.sessions) }
-        showOneHostPage([.projects])
+        showOneHostPageOnSessions([.projects])
     }
 
     /// Hermes starts new chats in the current project's folder, so the

@@ -1,5 +1,19 @@
 import CoreGraphics
 import Foundation
+import SwiftUI
+
+/// How the canvas lines its nodes up. Only `saved` uses (and changes) the places people give
+/// nodes; the straight lines are worked out each time, so switching never loses a place.
+enum WorkflowArrangement: String, Sendable {
+    /// Saved places (`layout`), the rest left to right: the canvas as people arranged it.
+    case saved
+    /// One column, top to bottom in reading order.
+    case column
+    /// One row, left to right in reading order: a phone's side-by-side view.
+    case row
+
+    var axis: Axis { self == .column ? .vertical : .horizontal }
+}
 
 /// Where the canvas draws each node. Saved places (`layout`) win; stages
 /// without one are laid out left to right in reading order on a clean grid.
@@ -13,6 +27,8 @@ enum WorkflowCanvasLayout {
     static let origin = CGPoint(x: 40, y: 60)
     /// The room kept clear around a new node.
     static let clearance: CGFloat = 20
+    /// Between two nodes in a column: room for the wire, its label and the End marker.
+    static let lineGap: CGFloat = 80
 
     static func size(_ kind: WorkflowStage.Kind?) -> CGSize {
         CGSize(width: nodeWidth, height: kind == .decision ? 132 : 76)
@@ -21,6 +37,35 @@ enum WorkflowCanvasLayout {
     /// Compact widths: one line, in list order. Places are ignored there.
     static func compactOrder(_ definition: WorkflowDefinition) -> [String] {
         definition.stages.map(\.key)
+    }
+
+    /// Every node's top-left corner in an arrangement. Never changes the saved places.
+    static func positions(_ definition: WorkflowDefinition, arrangement: WorkflowArrangement) -> [String: CGPoint] {
+        switch arrangement {
+        case .saved: positions(definition)
+        case .column: lined(definition, axis: .vertical)
+        case .row: lined(definition, axis: .horizontal)
+        }
+    }
+
+    /// Inputs, then every stage in reading order, in one straight line; stages nothing reaches go last.
+    static func lined(_ definition: WorkflowDefinition, axis: Axis) -> [String: CGPoint] {
+        let graph = definition.graph
+        let reached = graph.reachable(from: graph.start)
+        let order = graph.readingOrder(start: graph.start)
+        let kinds = Dictionary(definition.stages.map { ($0.key, $0.kind) }, uniquingKeysWith: { first, _ in first })
+        var result: [String: CGPoint] = [inputsKey: origin]
+        var next = axis == .vertical ? origin.y + size(nil).height + lineGap : origin.x + columnStep
+        for key in order.filter(reached.contains) + order.filter({ !reached.contains($0) }) {
+            if axis == .vertical {
+                result[key] = CGPoint(x: origin.x, y: next)
+                next += size(kinds[key]).height + lineGap
+            } else {
+                result[key] = CGPoint(x: next, y: origin.y)
+                next += columnStep
+            }
+        }
+        return result
     }
 
     /// Every node's top-left corner (stages and `inputs`).
@@ -92,8 +137,8 @@ enum WorkflowCanvasLayout {
     }
 
     /// The rectangle around every node, for Fit.
-    static func bounds(_ definition: WorkflowDefinition) -> CGRect {
-        let positions = positions(definition)
+    static func bounds(_ definition: WorkflowDefinition, arrangement: WorkflowArrangement = .saved) -> CGRect {
+        let positions = positions(definition, arrangement: arrangement)
         let kinds = Dictionary(definition.stages.map { ($0.key, $0.kind) }, uniquingKeysWith: { first, _ in first })
         return positions.reduce(CGRect.null) { rect, entry in
             rect.union(CGRect(origin: entry.value, size: size(entry.key == inputsKey ? nil : kinds[entry.key])))

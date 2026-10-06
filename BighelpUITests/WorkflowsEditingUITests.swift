@@ -327,6 +327,60 @@ final class WorkflowsEditingUITests: BighelpUITestCase {
         save("61-link-run-sheet", app)
     }
 
+    /// The layout switch on a phone: the vertical flow becomes one row to swipe through, and back.
+    @MainActor
+    func testThePhoneFlowCanShowItsStagesSideBySide() throws {
+        let app = launch()
+        if app.userInterfaceIdiom == .pad { throw XCTSkip("For a phone in portrait") }
+        openWorkflows(app)
+        app.buttons["workflows.workflow.wf-research"].tap()
+        let toggle = app.buttons["workflows.layout"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 8))
+        // The choice is remembered: a run before may have left it side by side.
+        if element("workflows.canvas.board", app).exists { toggle.tap() }
+        XCTAssertTrue(element("workflows.flow.stage.research", app).waitForExistence(timeout: 5))
+        XCTAssertEqual(toggle.label, "Show side by side")
+        save("70-layout-top-to-bottom", app)
+        toggle.tap()
+        let research = app.buttons["workflows.canvas.node.research"], draft = app.buttons["workflows.canvas.node.draft"]
+        XCTAssertTrue(research.waitForExistence(timeout: 5), "Side by side, on the canvas")
+        XCTAssertEqual(research.frame.midY, draft.frame.midY, accuracy: 2, "One row")
+        XCTAssertLessThan(research.frame.maxX, draft.frame.minX)
+        save("71-layout-side-by-side", app)
+        app.buttons["workflows.layout"].tap()
+        XCTAssertTrue(element("workflows.flow.stage.research", app).waitForExistence(timeout: 5), "Top to bottom again")
+    }
+
+    /// The layout switch on a wide screen (a big phone in landscape): your canvas becomes one column,
+    /// and back, and the places you gave the nodes never change.
+    @MainActor
+    func testAWideCanvasCanStackItsStagesAndKeepsYourPlaces() throws {
+        let app = launch()
+        XCUIDevice.shared.orientation = .landscapeLeft
+        defer { XCUIDevice.shared.orientation = .portrait }
+        openWorkflows(app)
+        app.buttons["workflows.workflow.wf-research"].tap()
+        guard element("workflows.canvas.board", app).waitForExistence(timeout: 8) else {
+            throw XCTSkip("This screen is compact in landscape")
+        }
+        let toggle = app.buttons["workflows.layout"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+        if toggle.label == "Show your layout" { toggle.tap() }
+        let research = app.buttons["workflows.canvas.node.research"], draft = app.buttons["workflows.canvas.node.draft"]
+        XCTAssertTrue(waitUntil { abs(research.frame.midY - draft.frame.midY) < 2 }, "Your layout: side by side")
+        let place = draft.value as? String
+        save("72-layout-yours", app)
+        toggle.tap()
+        XCTAssertTrue(waitUntil { abs(research.frame.midX - draft.frame.midX) < 2 && research.frame.maxY < draft.frame.minY },
+                      "One column, top to bottom")
+        XCTAssertEqual(toggle.label, "Show your layout")
+        XCTAssertEqual(draft.value as? String, place, "The place you gave it stays saved")
+        save("73-layout-stacked", app)
+        toggle.tap()
+        XCTAssertTrue(waitUntil { abs(research.frame.midY - draft.frame.midY) < 2 }, "Your layout again")
+        XCTAssertEqual(draft.value as? String, place)
+    }
+
     // MARK: iPhone
 
     /// Compact width: every stage in one line, top to bottom, inside the screen,

@@ -879,3 +879,48 @@ struct WorkflowFeatureLoadingTests {
         #expect(editor.features == .all)
     }
 }
+
+/// The layout switch: one column or one row, worked out each time; the places people set stay saved.
+@MainActor
+struct WorkflowArrangementTests {
+    @Test func aColumnStacksTheStagesInReadingOrderAndKeepsTheSavedPlaces() {
+        let definition = Flow.definition([Flow.agent("research"), Flow.agent("draft"), Flow.agent("review"),
+                                          Flow.decision("decide", goTo: "draft"), Flow.signoff()],
+                                         layout: ["stages": .object(["draft": .object(["x": .integer(900), "y": .integer(40)])])])
+        let saved = definition.layout
+        let column = WorkflowCanvasLayout.positions(definition, arrangement: .column)
+        let order = [WorkflowCanvasLayout.inputsKey, "research", "draft", "review", "decide", "signoff"]
+        let points = order.compactMap { column[$0] }
+        #expect(points.count == order.count)
+        #expect(Set(points.map(\.x)).count == 1, "One column")
+        #expect(zip(points, points.dropFirst()).allSatisfy { $0.y < $1.y }, "Top to bottom in reading order")
+        // The decision is taller: the next stage starts below it, with room for the wire.
+        let decide = column["decide"]!, signoff = column["signoff"]!
+        #expect(signoff.y - decide.y == WorkflowCanvasLayout.size(.decision).height + WorkflowCanvasLayout.lineGap)
+        #expect(definition.layout == saved)
+        #expect(WorkflowCanvasLayout.positions(definition, arrangement: .saved)["draft"] == CGPoint(x: 900, y: 40),
+                "Your layout still has the place you gave it")
+    }
+
+    @Test func aRowLinesTheStagesUpSideBySide() {
+        let definition = Flow.loop
+        let row = WorkflowCanvasLayout.positions(definition, arrangement: .row)
+        let points = ([WorkflowCanvasLayout.inputsKey] + definition.graph.readingOrder(start: definition.graph.start))
+            .compactMap { row[$0] }
+        #expect(Set(points.map(\.y)).count == 1, "One row")
+        #expect(zip(points, points.dropFirst()).allSatisfy { $0.x < $1.x })
+        #expect(WorkflowCanvasLayout.bounds(definition, arrangement: .row).width
+                > WorkflowCanvasLayout.bounds(definition, arrangement: .row).height)
+    }
+
+    @Test func topToBottomWiresLeaveFromTheBottomAndArriveOnTheTop() {
+        let origin = CGPoint(x: 100, y: 100)
+        let size = WorkflowCanvasLayout.size(.agent)
+        #expect(WorkflowCanvasGeometry.outPort(.next, origin: origin, kind: .agent, axis: .vertical)
+                == CGPoint(x: 100 + size.width / 2, y: 100 + size.height))
+        #expect(WorkflowCanvasGeometry.inPort(origin: origin, kind: .agent, axis: .vertical) == CGPoint(x: 100 + size.width / 2, y: 100))
+        // A decision's changes still leave from its side, to loop back up.
+        #expect(WorkflowCanvasGeometry.outPort(.changes, origin: origin, kind: .decision, axis: .vertical)
+                == WorkflowCanvasGeometry.outPort(.changes, origin: origin, kind: .decision))
+    }
+}

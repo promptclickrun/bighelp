@@ -1,11 +1,17 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Opens one workflow: the vertical flow at compact width, the canvas at regular width.
+/// Opens one workflow: the vertical flow at compact width, the canvas at regular width. Each has a
+/// switch: a phone can show the stages side by side in one row, and a wider screen top to bottom in one
+/// column. The choice is remembered; the canvas places people set are never changed by it.
 struct WorkflowScreen: View {
     let context: WorkflowsContext
     let startsRun: Bool
     @State private var model: WorkflowEditorModel
+    /// A layout switch shows the other view; it doesn't offer the run again.
+    @State private var switched = false
+    @AppStorage("bighelp.workflows.compact-row") private var compactRow = false
+    @AppStorage("bighelp.workflows.regular-column") private var regularColumn = false
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     init(context: WorkflowsContext, workflowID: String, startsRun: Bool) {
@@ -20,12 +26,47 @@ struct WorkflowScreen: View {
     var body: some View {
         Group {
             if sizeClass == .regular {
-                WorkflowCanvasView(model: model, context: context, startsRun: startsRun)
+                WorkflowCanvasView(model: model, context: context, startsRun: startsRun && !switched,
+                                   arrangement: regularColumn ? .column : .saved,
+                                   switchLayout: { switchLayout { regularColumn.toggle() } })
+            } else if compactRow {
+                WorkflowCanvasView(model: model, context: context, startsRun: startsRun && !switched,
+                                   arrangement: .row, switchLayout: { switchLayout { compactRow = false } })
             } else {
-                WorkflowFlowView(model: model, context: context, startsRun: startsRun)
+                WorkflowFlowView(model: model, context: context, startsRun: startsRun && !switched,
+                                 switchLayout: { switchLayout { compactRow = true } })
             }
         }
         .task { if model.detail == nil { await model.load() } }
+    }
+
+    private func switchLayout(_ change: () -> Void) {
+        switched = true
+        withAnimation(.snappy) { change() }
+    }
+}
+
+/// The switch between a workflow's two layouts, in the toolbar. It names where it goes.
+struct WorkflowLayoutButton: View {
+    /// The layout a tap shows: one column, one row, or the canvas as you arranged it.
+    let next: WorkflowArrangement
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: next == .column ? "rectangle.split.1x2" : "rectangle.split.3x1")
+                .bighelpToolbarIcon()
+        }
+        .bighelpIconLabel(label)
+        .accessibilityIdentifier("workflows.layout")
+    }
+
+    private var label: String {
+        switch next {
+        case .column: "Show top to bottom"
+        case .row: "Show side by side"
+        case .saved: "Show your layout"
+        }
     }
 }
 
@@ -46,6 +87,8 @@ struct WorkflowFlowView: View {
     @Bindable var model: WorkflowEditorModel
     let context: WorkflowsContext
     let startsRun: Bool
+    /// Shows the stages side by side in one row instead.
+    var switchLayout: (() -> Void)?
     @State private var editing: WorkflowStage?
     @State private var isRunSheetPresented = false
     @State private var isInputsPresented = false
@@ -89,6 +132,11 @@ struct WorkflowFlowView: View {
         .toolbar(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .principal) { WorkflowTitle(model: model) }
+            if let switchLayout {
+                ToolbarItem(placement: .topBarTrailing) {
+                    WorkflowLayoutButton(next: .row, action: switchLayout)
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 WorkflowMoreMenu(model: model, context: context, templateSource: $templateSource,
                                  editInputs: { isInputsPresented = true }, editRoles: { isRolesPresented = true },

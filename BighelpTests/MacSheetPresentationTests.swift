@@ -9,14 +9,16 @@ struct MacSheetPresentationTests {
     @Test func everySheetAndCoverUsesTheMacSafePresentation() throws {
         let repository = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         let folder = repository.appending(path: "Bighelp")
-        let pattern = try Regex(#"(?<![A-Za-z0-9_])\.(sheet|fullScreenCover)\((\s*$|isPresented:|item:)"#)
-            .anchorsMatchLineEndings()
+        let pattern = try NSRegularExpression(pattern: #"(?<![A-Za-z0-9_])\.(sheet|fullScreenCover)\((\s*$|isPresented:|item:)"#,
+                                              options: [.anchorsMatchLines])
         var offenders: [String] = []
         let files = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: nil)
         while let file = files?.nextObject() as? URL {
             guard file.pathExtension == "swift", file.lastPathComponent != "BighelpSheetSize.swift" else { continue }
             let source = try String(contentsOf: file, encoding: .utf8)
-            if source.contains(pattern) { offenders.append(file.lastPathComponent) }
+            if pattern.firstMatch(in: source, range: NSRange(source.startIndex..., in: source)) != nil {
+                offenders.append(file.lastPathComponent)
+            }
         }
         #expect(offenders.isEmpty, "Use .bighelpSheet / .bighelpFullScreenCover in: \(offenders.sorted())")
     }

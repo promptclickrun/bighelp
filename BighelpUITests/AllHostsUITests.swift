@@ -80,9 +80,11 @@ final class AllHostsUITests: BighelpUITestCase {
         agentsRow.tap()
         XCTAssertTrue(app.navigationBars["All agents"].waitForExistence(timeout: 5))
 
-        // Off again: one host, its own chat list.
-        XCTAssertEqual(app.buttons["fleet.toggle"].label, "Show one host")
-        app.buttons["fleet.toggle"].tap()
+        // Top right is All agents' options now; ☰'s switch goes back to one host, its own chat list.
+        XCTAssertFalse(app.buttons["fleet.toggle"].exists)
+        XCTAssertTrue(app.buttons["fleet.organize"].exists)
+        menu.tap()
+        app.buttons["menu.all-hosts"].tap()
         XCTAssertTrue(app.navigationBars["Sessions"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.descendants(matching: .any)["fleet.home"].exists)
     }
@@ -299,7 +301,8 @@ final class AllHostsUITests: BighelpUITestCase {
         XCTAssertTrue(app.buttons["fleet.organize.new-section"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["fleet.organize.new-group"].exists, "Group chats start from New chat now")
         XCTAssertFalse(app.buttons["New group chat"].exists)
-        app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.12)).tap()
+        // Outside the menu, which opens down from the top right.
+        app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.6)).tap()
 
         // One agent: its chat opens, as before.
         let newChat = app.buttons["fleet.new-chat"]

@@ -71,7 +71,8 @@ final class AllHostsHostUITests: BighelpUITestCase {
         timings["4-same-host"] = try timeToOpen(named("Desk agent", in: app), showing: "Hello desk", in: app)
         swipeBackFromLeadingEdge(in: app)
         report(timings)
-        app.buttons["fleet.toggle"].tap()
+        menu.tap()
+        app.buttons["menu.all-hosts"].tap()
         menu.tap()
         let hosts = app.buttons["menu.hosts"]
         XCTAssertTrue(hosts.waitForExistence(timeout: 5))

@@ -126,6 +126,7 @@ struct AdaptiveComposerActionButton: View {
                 .frame(width: 380)
                 .fixedSize(horizontal: false, vertical: true)
                 .presentationCompactAdaptation(.popover)
+                .bighelpPopoverDismissal(isPresented: $isMidSessionOptionsPresented)
                 .onDisappear(perform: midSessionOptionsClosed)
         }
         #else

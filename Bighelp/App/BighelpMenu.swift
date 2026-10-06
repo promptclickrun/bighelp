@@ -249,6 +249,9 @@ struct BighelpMenu<Recent: View>: View {
                 Button("See all") { choose(destinations.onAllChats) }
                     .font(.bighelp(.subheadline).weight(.semibold))
                     .textCase(nil)
+                    #if targetEnvironment(macCatalyst)
+                    .bighelpPlainButtonStyle(padding: BighelpTokens.space4)
+                    #endif
                     .accessibilityLabel("See all sessions")
                     .accessibilityIdentifier("menu.chats")
             }

@@ -453,9 +453,11 @@ struct BighelpApp: App {
                     .modifier(BighelpSideMenuHost(menu: sideMenu))
                     // Around the Dynamic Island: which agent is working, on what.
                     .environment(\.agentActivityInIsland, agentIsland.isAvailable)
+                    #if !targetEnvironment(macCatalyst)
                     .overlay(alignment: .top) { AgentActivityIslandLayer(model: agentIsland) }
                     // Reconnecting after time away, shown without closing what's open.
                     .overlay { ConnectionIslandLayer().allowsHitTesting(false) }
+                    #endif
                     .modifier(VoiceLaunchCoverOverlay())
                     .statusBarHidden(agentIsland.hidesStatusBar)
                     .animation(.snappy, value: agentIsland.hidesStatusBar)

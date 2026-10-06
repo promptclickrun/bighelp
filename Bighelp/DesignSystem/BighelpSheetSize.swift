@@ -31,6 +31,15 @@ enum BighelpSheetSize: Sendable {
 }
 
 extension View {
+    /// Keeps UIKit in sync when a reopened Catalyst popover closes in SwiftUI.
+    func bighelpPopoverDismissal(isPresented: Binding<Bool>) -> some View {
+        #if targetEnvironment(macCatalyst)
+        background { BighelpMacPopoverDismissal(isPresented: isPresented) }
+        #else
+        self
+        #endif
+    }
+
     /// The sheet's size on the Mac; put it on the sheet's content.
     func bighelpSheetSize(_ size: BighelpSheetSize = .standard) -> some View {
         #if targetEnvironment(macCatalyst)
@@ -110,8 +119,40 @@ private struct BighelpChatPanelPresenter<Panel: View>: ViewModifier {
                     .frame(width: min(560, max(280, layout.availableSize.width - 32)),
                            height: min(620, max(300, layout.availableSize.height - 100)))
                     .presentationCompactAdaptation(.popover)
+                    .bighelpPopoverDismissal(isPresented: $isPresented)
                     .onDisappear { onDismiss?() }
             }
+    }
+}
+
+// Catalyst can leave a reopened SwiftUI popover visible after its binding is
+// false. Dismiss from within that popover, without touching another window.
+private struct BighelpMacPopoverDismissal: UIViewControllerRepresentable {
+    @Binding var isPresented: Bool
+
+    func makeUIViewController(context: Context) -> UIViewController {
+        let controller = UIViewController()
+        controller.view.isUserInteractionEnabled = false
+        controller.view.backgroundColor = .clear
+        return controller
+    }
+
+    func updateUIViewController(_ controller: UIViewController, context: Context) {
+        guard !isPresented, controller.view.window != nil else { return }
+        var candidate: UIViewController? = controller
+        while let current = candidate, current.presentingViewController == nil {
+            candidate = current.parent
+        }
+        guard let presented = candidate else { return }
+        guard !presented.isBeingDismissed else { return }
+        let presentation = _isPresented
+        DispatchQueue.main.async { [weak presented] in
+            guard !presentation.wrappedValue, let presented,
+                  presented.view.window != nil,
+                  presented.presentingViewController != nil,
+                  !presented.isBeingDismissed else { return }
+            presented.dismiss(animated: true)
+        }
     }
 }
 

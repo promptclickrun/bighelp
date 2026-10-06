@@ -253,6 +253,7 @@ struct MessageBubble: View {
                 reactionPicker
                     .frame(width: 360, height: 380)
                     .presentationCompactAdaptation(.popover)
+                    .bighelpPopoverDismissal(isPresented: $isReactionPickerPresented)
             }
             #else
             .sheet(isPresented: $isReactionPickerPresented) {

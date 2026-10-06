@@ -111,6 +111,7 @@ struct SessionAppearanceView: View {
             ToolbarItem(placement: .confirmationAction) {
                 Button(isApplying ? "Applying…" : "Apply") { apply() }
                     .disabled(!hasChanges || isLoadingPhoto || isApplying || (choice == .photo && !hasPhoto))
+                    .bighelpToolbarText()
                     .bighelpDefaultAction()
                     .accessibilityIdentifier("session-appearance.apply")
             }

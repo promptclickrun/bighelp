@@ -824,6 +824,7 @@ struct ChatView: View {
                 }
             }
             .presentationCompactAdaptation(.popover)
+            .bighelpPopoverDismissal(isPresented: $isSessionControlsPresented)
         }
     }
 
@@ -1163,6 +1164,7 @@ struct ChatView: View {
                 onChangeModel: changeModelFromContext
             )
             .presentationCompactAdaptation(.popover)
+            .bighelpPopoverDismissal(isPresented: $isContextWindowPresented)
             .onDisappear(perform: contextWindowDidClose)
         }
     }

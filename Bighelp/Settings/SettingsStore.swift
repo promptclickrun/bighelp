@@ -213,6 +213,18 @@ final class SettingsStore {
         didSet { defaults.set(showCronSessions, forKey: Keys.showCronSessions) }
     }
 
+    /// The bottom bar's tabs after Chat and the order of ☰ (Appearance › App layout).
+    var appLayout: BighelpAppLayout {
+        didSet {
+            guard appLayout != oldValue else { return }
+            if appLayout == .standard {
+                defaults.removeObject(forKey: Keys.appLayout)
+            } else {
+                defaults.set(appLayout.saved, forKey: Keys.appLayout)
+            }
+        }
+    }
+
     /// Reveals host administration (files, gateways, plugins, logs, ...) in Settings.
     /// Off by default so everyday use stays a simple messaging app.
     var nerdModeEnabled: Bool {
@@ -364,6 +376,7 @@ final class SettingsStore {
             forKey: Keys.showCronSessions,
             default: false
         )
+        appLayout = BighelpAppLayout(saved: defaults.string(forKey: Keys.appLayout))
         nerdModeEnabled = defaults.bool(forKey: Keys.nerdMode, default: false)
         allHostsMode = defaults.bool(forKey: Keys.allHostsMode, default: false)
         let landing = defaults.string(forKey: BighelpLanding.screenKey).flatMap(BighelpLandingScreen.init(rawValue:))
@@ -663,6 +676,7 @@ private extension SettingsStore {
         static let showProjectChanges = "loopdy.chat.showProjectChanges"
         static let organizeChatsByProjects = "loopdy.sessions.organizeByProjects"
         static let showCronSessions = "loopdy.sessions.showCronSessions"
+        static let appLayout = "bighelp.app-layout"
         static let nerdMode = "loopdy.settings.nerd-mode"
         static let allHostsMode = "bighelp.hosts.all-hosts"
         static let sessionSectionPreferences = "loopdy.sessions.section-preferences.v1"

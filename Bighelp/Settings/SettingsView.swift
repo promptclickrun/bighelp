@@ -192,6 +192,9 @@ struct SettingsView: View {
         if destination == .appearance {
             appearancePage
                 .accessibilityIdentifier("settings.detail.appearance")
+        } else if destination == .tabBar {
+            // One place for the bottom bar: Appearance › App layout.
+            AppLayoutSettingsView(settings: settings)
         } else {
             focusedFormPage(destination)
         }
@@ -200,15 +203,6 @@ struct SettingsView: View {
     private func focusedFormPage(_ destination: WorkspaceDestination) -> some View {
         settingsPage(title: destination.title) {
             switch destination {
-            case .tabBar:
-                Section("Bottom menu") {
-                    Label("Chats", systemImage: "bubble.left.and.bubble.right")
-                    Label("Agents", systemImage: "person.2")
-                    Label("Tasks", systemImage: "calendar.badge.clock")
-                    Label("Workspace", systemImage: "square.grid.2x2")
-                    Text(Self.bottomMenuNote).font(.bighelp(.footnote)).foregroundStyle(.secondary)
-                }
-                edgeGestures
             case .caching:
                 localCache
                 Section { Text("Agents, groups and chat history stay on this device between connections. Hermes remains the source for changes.").foregroundStyle(.secondary) }
@@ -457,14 +451,6 @@ struct SettingsView: View {
         notificationContext?.turnOff ?? BighelpNotificationTurnOff.demoShared
         #else
         notificationContext?.turnOff
-        #endif
-    }
-
-    private static var bottomMenuNote: String {
-        #if targetEnvironment(macCatalyst)
-        "The bottom menu shows on these four screens and hides while you chat."
-        #else
-        "On iPhone, the bottom menu shows on these four screens and hides while you chat or type."
         #endif
     }
 

@@ -567,7 +567,7 @@ struct ChatView: View {
                         // Chats keep the bottom bar under the composer.
                         if homeChrome.isEnabled, homeChrome.showsTabBar, let selection = homeChrome.tabSelection,
                            !isDraftFocused, !BighelpPlatform.usesTabOrnament {
-                            FloatingTabBar(selection: selection,
+                            FloatingTabBar(selection: selection, tabs: homeChrome.barTabs,
                                            homeIndicatorSink: FloatingTabBar.homeIndicatorSink(forBottomInset: bottomSafeArea),
                                            unread: homeChrome.unreadTabs, isInChat: true)
                                 .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -590,7 +590,8 @@ struct ChatView: View {
                           ? .visible : .hidden,
                       attachmentAnchor: .scene(.leading), contentAlignment: .trailing) {
                 if let selection = homeChrome.tabSelection {
-                    VisionTabOrnament(selection: selection, unread: homeChrome.unreadTabs, isInChat: true)
+                    VisionTabOrnament(selection: selection, tabs: homeChrome.barTabs, unread: homeChrome.unreadTabs,
+                                      isInChat: true)
                 }
             }
             #endif

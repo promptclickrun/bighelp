@@ -21,6 +21,8 @@ struct AgentBoardContext {
     let onPickAgents: () -> Void
     /// This agent's places on the host, for ⋯ (Files, Memory, Skills & tools…).
     let tools: [(title: String, systemImage: String, action: () -> Void)]
+    /// Something new on a board that's only in ☰, for a dot on ☰.
+    var menuHasUnread = false
 }
 
 // MARK: - Shared pieces

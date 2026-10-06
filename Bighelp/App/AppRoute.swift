@@ -1,10 +1,15 @@
 enum AppTab: String, CaseIterable, Identifiable {
     case home, agents, sessions, inbox, profile, scheduledTasks, workspace
     case feed, ideas, goals, apps
+    /// Pages ☰ opens, as tabs when the person pins them to the bottom bar.
+    case projects, kanban, workflows, usage
 
-    /// The bottom bar: the agent's chat, then its Feed, Ideas, Goals and Apps.
-    /// Agents, Tasks and Settings live in the ☰ drawer and the iPad sidebar.
+    /// The standard bottom bar: the agent's chat, then its Feed, Ideas, Goals and Apps.
+    /// Settings › Appearance › App layout changes it (`BighelpAppLayout.barTabs`).
     static let allCases: [AppTab] = [.sessions, .feed, .ideas, .goals, .apps]
+
+    /// One computer's pages, opened from ☰ or pinned to the bar.
+    var isHostPage: Bool { [.projects, .kanban, .workflows, .usage].contains(self) }
 
     /// Tabs drawn as the selected agent's board (no navigation bar).
     var isAgentBoard: Bool { [.feed, .ideas, .goals, .apps].contains(self) }

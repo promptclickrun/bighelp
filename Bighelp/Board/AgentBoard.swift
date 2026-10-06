@@ -569,11 +569,22 @@ final class DirectHermesAgentBoardClient: AgentBoardClient {
         return try await files.boardFile(agentID: agentID, itemID: itemID, file: file)
     }
 
+    /// One call. When the plugin's context changed (412: Hermes restarted, a feature came or
+    /// went) a change that's safe to repeat goes once more with the new context; without it,
+    /// reads were dropped and Feed, Ideas and Goals showed their dots again.
     private func perform(_ operation: WorkspaceOperation, _ payload: [String: BighelpJSONValue]) async throws
         -> [String: BighelpJSONValue] {
         guard workspace.owner == owner else { throw WorkspaceClientError.ownerChanged }
-        return try await workspace.perform(operation, payload: payload, owner: owner)
+        do {
+            return try await workspace.perform(operation, payload: payload, owner: owner)
+        } catch WorkspaceClientError.conflict where !Self.notRepeatable.contains(operation) {
+            guard workspace.owner == owner else { throw WorkspaceClientError.ownerChanged }
+            return try await workspace.perform(operation, payload: payload, owner: owner)
+        }
     }
+
+    /// The plugin can answer 412 after making these: a second try could make a second goal.
+    private static let notRepeatable: Set<WorkspaceOperation> = [.boardPromote, .boardAccept]
 
     func items(agentID: String) async throws -> [AgentBoardItem] {
         let result = try await perform(.boardList, ["agentId": .string(agentID), "limit": .integer(200)])
@@ -725,6 +736,7 @@ final class AgentBoardStore {
         isWaiting = false; pendingAgentID = nil; scope = nil
         self.client = client
         generation &+= 1
+        pendingReads = [:]
         items = []; activity = []; approvals = []; pictures = [:]; identity = nil; recentlyHidden = nil
         fileStates = [:]; fileThumbnails = [:]; pendingThumbnails = []; openingFile = nil
         state = client == nil ? .unavailable : .idle
@@ -779,10 +791,16 @@ final class AgentBoardStore {
         }
         if !isRefresh { state = .loading }
         do {
-            let loaded = try await client.items(agentID: agentID)
+            var loaded = try await client.items(agentID: agentID)
             guard generation == self.generation, self.agentID == agentID else { return }
+            // What the person already saw stays read while the computer catches up.
+            if let pending = pendingReads[agentID], !pending.isEmpty {
+                pendingReads[agentID] = pending.intersection(loaded.filter { !$0.read }.map(\.id))
+                for index in loaded.indices where pending.contains(loaded[index].id) { loaded[index].read = true }
+            }
             items = loaded
             state = .loaded
+            await sendPendingReads(agentID: agentID)
         } catch is CancellationError {
         } catch {
             guard generation == self.generation, self.agentID == agentID else { return }
@@ -821,18 +839,35 @@ final class AgentBoardStore {
 
     func setRead(_ item: AgentBoardItem, _ read: Bool) async {
         guard supportsFeedback else { return }
+        // Marked unread on purpose: a read still waiting to be sent mustn't undo that.
+        if !read, let agentID { pendingReads[agentID]?.remove(item.id) }
         await mutate(item) { $0.read = read } send: { client, agent in
             try await client.update(agentID: agent, itemID: item.id, change: .init(read: read))
         }
     }
 
-    /// Items on screen count as read. Quietly retried on the next load if it fails.
+    /// Items on screen count as read. If the computer doesn't take it, they stay read here
+    /// and the next load sends it again, so the tab's dot doesn't come back for them.
     func markSeen(_ seen: [AgentBoardItem]) async {
-        guard supportsFeedback, let client, let agentID else { return }
+        guard supportsFeedback, let agentID else { return }
         let ids = Set(seen.filter { !$0.read }.map(\.id))
         guard !ids.isEmpty else { return }
         for index in items.indices where ids.contains(items[index].id) { items[index].read = true }
-        try? await client.markRead(agentID: agentID, itemIDs: Array(ids).sorted())
+        pendingReads[agentID, default: []].formUnion(ids)
+        await sendPendingReads(agentID: agentID)
+    }
+
+    /// Seen here but not yet saved on the computer, by agent.
+    @ObservationIgnored private var pendingReads: [String: Set<String>] = [:]
+
+    private func sendPendingReads(agentID: String) async {
+        guard let client, let ids = pendingReads[agentID], !ids.isEmpty else { return }
+        do {
+            try await client.markRead(agentID: agentID, itemIDs: Array(ids).sorted())
+            pendingReads[agentID]?.subtract(ids)
+        } catch {
+            // Kept for the next load.
+        }
     }
 
     func unreadCount(_ kind: AgentBoardItem.Kind) -> Int {

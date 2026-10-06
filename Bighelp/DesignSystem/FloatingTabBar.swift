@@ -60,6 +60,8 @@ struct FloatingTabBar: View {
     /// A search field along the bottom below the tabs (Sessions, iOS 26): the tabs keep a
     /// small gap above it instead of sinking onto it toward the home indicator.
     var clearsBottomSearch = false
+    /// Chat, then what the person pinned (Settings › Appearance › App layout).
+    let tabs: [AppTab]
 
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -68,8 +70,10 @@ struct FloatingTabBar: View {
     /// The glyphs keep a 3-pt margin on their 24-pt grid, so 26 draws them about 20pt.
     @ScaledMetric(relativeTo: .caption2) private var iconSize: CGFloat = 26
 
-    init(selection: Binding<AppTab>, onNewChat: (() -> Void)? = nil, homeIndicatorSink: CGFloat = 0,
-         unread: Set<AppTab> = [], isInChat: Bool = false, clearsBottomSearch: Bool = false) {
+    init(selection: Binding<AppTab>, tabs: [AppTab] = AppTab.allCases, onNewChat: (() -> Void)? = nil,
+         homeIndicatorSink: CGFloat = 0, unread: Set<AppTab> = [], isInChat: Bool = false,
+         clearsBottomSearch: Bool = false) {
+        self.tabs = tabs
         self.clearsBottomSearch = clearsBottomSearch
         self._selection = selection
         self.onNewChat = onNewChat
@@ -98,9 +102,9 @@ struct FloatingTabBar: View {
                         Label(Self.newChatVisibleLabel, systemImage: "square.and.pencil")
                     }
             }
-            // Five tabs in one row, each named under its icon.
+            // Up to five tabs in one row, each named under its icon.
             navigationRow(constrainsWidth: true) {
-                ForEach(AppTab.allCases) { tab in
+                ForEach(tabs) { tab in
                     destination(tab)
                 }
             }
@@ -153,7 +157,7 @@ struct FloatingTabBar: View {
         }
         .buttonStyle(.bighelpTilePress)
         .bighelpHover(in: Self.selectionShape)
-        .bighelpHelp(tab.title, shortcut: tab.macShortcut)
+        .bighelpHelp(tab.title, shortcut: tabs.firstIndex(of: tab).map { "⌘\($0 + 1)" })
         .accessibilityLabel(tab.title)
         .accessibilityValue(unread.contains(tab) && !isSelected ? "New" : "")
         .accessibilityShowsLargeContentViewer {
@@ -342,6 +346,7 @@ private struct InteractiveGlassHover<S: Shape>: ViewModifier {
 /// well away from the window's move and close controls under it.
 struct VisionTabOrnament: View {
     @Binding var selection: AppTab
+    var tabs: [AppTab] = AppTab.allCases
     var unread: Set<AppTab> = []
     var onNewChat: (() -> Void)?
     /// In a chat, Chat is the current tab.
@@ -349,7 +354,7 @@ struct VisionTabOrnament: View {
 
     var body: some View {
         VStack(spacing: BighelpTokens.space8) {
-            ForEach(AppTab.allCases) { tab in
+            ForEach(tabs) { tab in
                 let isSelected = (isInChat ? .sessions : selection) == tab
                 Button {
                     if isInChat, isSelected { return }
@@ -449,6 +454,10 @@ private extension AppTab {
         case .ideas: "Ideas"
         case .goals: "Goals"
         case .apps: "Files"
+        case .projects: "Projects"
+        case .kanban: "Kanban"
+        case .workflows: "Workflows"
+        case .usage: "Usage"
         }
     }
 
@@ -475,6 +484,11 @@ private extension AppTab {
         case (.goals, false): "checkmark.square"
         case (.apps, true): "square.on.circle.fill"
         case (.apps, false): "square.on.circle"
+        case (.projects, true): "folder.fill"
+        case (.projects, false): "folder"
+        case (.kanban, _): "rectangle.split.3x1"
+        case (.workflows, _): "flowchart"
+        case (.usage, _): "gauge.with.dots.needle.50percent"
         }
     }
 
@@ -491,6 +505,10 @@ private extension AppTab {
         case .ideas: "tab.ideas"
         case .goals: "tab.goals"
         case .apps: "tab.apps"
+        case .projects: "tab.projects"
+        case .kanban: "tab.kanban"
+        case .workflows: "tab.workflows"
+        case .usage: "tab.usage"
         }
     }
 }

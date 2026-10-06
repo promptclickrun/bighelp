@@ -91,10 +91,26 @@ extension RootShellView {
     /// One host's pages on the Sessions tab; from another tab, after the switch
     /// (`AppState.select(_:thenOpen:)`).
     func showOneHostPageOnSessions(_ routes: [AppRoute]) {
+        // Pinned to the bottom bar (Appearance › App layout): its tab, not a page pushed over Chat.
+        if routes.count == 1, let tab = Self.pinnableTab(routes[0]), barTabs.contains(tab) {
+            appState.select(tab)
+            return
+        }
         if appState.selectedTab != .sessions {
             appState.select(.sessions, thenOpen: routes)
         } else {
             showOneHostPage(routes)
+        }
+    }
+
+    /// The tab a page becomes when it's pinned to the bottom bar.
+    static func pinnableTab(_ route: AppRoute) -> AppTab? {
+        switch route {
+        case .projects: .projects
+        case .kanban: .kanban
+        case .workflows: .workflows
+        case .usage: .usage
+        default: nil
         }
     }
 

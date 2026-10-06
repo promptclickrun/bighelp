@@ -17,6 +17,8 @@ struct AgentHomeChrome {
     var tabSelection: Binding<AppTab>?
     /// Board tabs with something new, for the dots on the tab bar.
     var unreadTabs: Set<AppTab> = []
+    /// The bar's tabs: Chat, then what's pinned (Appearance › App layout).
+    var barTabs: [AppTab] = AppTab.allCases
 }
 
 private struct AgentHomeChromeKey: EnvironmentKey {
@@ -76,6 +78,7 @@ struct AgentHomeChatHeader: View {
                         .font(.bighelp(.title3).weight(.semibold))
                         .frame(width: HeaderButtonMetrics.glass, height: HeaderButtonMetrics.glass)
                         .bighelpNavigationGlass(in: Circle(), isInteractive: true)
+                        .bighelpMenuDot(!chrome.unreadTabs.subtracting(chrome.barTabs).isEmpty)
                         .padding(HeaderButtonMetrics.slop)
                         .contentShape(.rect)
                 }
@@ -143,7 +146,7 @@ struct AgentBoardHeaderButtons: View {
 
     var body: some View {
         HStack(alignment: .top) {
-            Button(action: context.onMenu) { glyph("line.3.horizontal") }
+            Button(action: context.onMenu) { glyph("line.3.horizontal").bighelpMenuDot(context.menuHasUnread) }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Chats and menu")
                 .accessibilityIdentifier("home.drawer.open")

@@ -71,6 +71,13 @@ struct BighelpMenuDestinations {
     /// Logins, cards and addresses an agent's browser can use (Hermes' vault).
     var onCredentialVault: (() -> Void)? = nil
     var onSettings: () -> Void
+    /// ☰'s places in the person's order: whatever the bottom bar doesn't hold
+    /// (Appearance › App layout).
+    var places: [BighelpPlace] = BighelpAppLayout.standard.menuPlaces
+    /// Opens Feed, Ideas, Goals or Files when they aren't in the bottom bar.
+    var onBoard: ((AppTab) -> Void)? = nil
+    /// Feed, Ideas and Goals with something new, for a dot on their rows.
+    var unread: Set<AppTab> = []
 }
 
 /// bighelp's one menu (☰). The first screen is short on purpose: New chat (top right),
@@ -110,38 +117,9 @@ struct BighelpMenu<Recent: View>: View {
 
     private var mainSection: some View {
         Section {
-            if let onAllAgents = destinations.onAllAgents {
-                row("Agents", symbol: "person.2", id: "menu.all-agents", action: onAllAgents)
-                // One computer's places: the focused computer's, or they ask which.
-                if let onProjects = destinations.onProjects {
-                    row("Projects", symbol: "folder", id: "menu.projects", action: onProjects)
-                }
-                if let onKanban = destinations.onKanban {
-                    row("Kanban", symbol: "rectangle.split.3x1", id: "menu.kanban", action: onKanban)
-                }
-                if let onWorkflows = destinations.onWorkflows {
-                    row("Workflows", symbol: "flowchart", id: "menu.workflows", action: onWorkflows)
-                }
-                row("Scheduled tasks", symbol: "calendar.badge.clock", id: "menu.scheduled-tasks",
-                    action: destinations.onScheduledTasks)
-            } else {
-                row("Agents", symbol: "person.2", id: "menu.agents", action: destinations.onAgents)
-                if let onProjects = destinations.onProjects {
-                    row("Projects", symbol: "folder", id: "menu.projects", action: onProjects)
-                }
-                if let onKanban = destinations.onKanban {
-                    row("Kanban", symbol: "rectangle.split.3x1", id: "menu.kanban", action: onKanban)
-                }
-                if let onWorkflows = destinations.onWorkflows {
-                    row("Workflows", symbol: "flowchart", id: "menu.workflows", action: onWorkflows)
-                }
-                row("Scheduled tasks", symbol: "calendar.badge.clock", id: "menu.scheduled-tasks",
-                    action: destinations.onScheduledTasks)
-            }
-            if let onUsage = destinations.onUsage {
-                row("Usage", symbol: "gauge.with.dots.needle.50percent", id: "menu.usage", action: onUsage)
-            }
-            row("Settings", symbol: "gearshape", id: "menu.settings", action: destinations.onSettings)
+            // In the person's order (Appearance › App layout). With all hosts showing, Agents
+            // is All agents and the one-computer places ask which computer.
+            ForEach(destinations.places) { place in placeRow(place) }
         } header: {
             HStack(spacing: BighelpTokens.space8) {
                 if !hosts.hosts.isEmpty || hosts.add != nil {
@@ -154,6 +132,43 @@ struct BighelpMenu<Recent: View>: View {
             .padding(.bottom, BighelpTokens.space4)
         }
         .listRowBackground(theme.surface)
+    }
+
+    @ViewBuilder
+    private func placeRow(_ place: BighelpPlace) -> some View {
+        switch place {
+        case .agents:
+            if let onAllAgents = destinations.onAllAgents {
+                row("Agents", symbol: place.symbol, id: "menu.all-agents", action: onAllAgents)
+            } else {
+                row("Agents", symbol: place.symbol, id: "menu.agents", action: destinations.onAgents)
+            }
+        case .projects:
+            if let onProjects = destinations.onProjects {
+                row(place.title, symbol: place.symbol, id: "menu.projects", action: onProjects)
+            }
+        case .kanban:
+            if let onKanban = destinations.onKanban {
+                row(place.title, symbol: place.symbol, id: "menu.kanban", action: onKanban)
+            }
+        case .workflows:
+            if let onWorkflows = destinations.onWorkflows {
+                row(place.title, symbol: place.symbol, id: "menu.workflows", action: onWorkflows)
+            }
+        case .scheduledTasks:
+            row(place.title, symbol: place.symbol, id: "menu.scheduled-tasks", action: destinations.onScheduledTasks)
+        case .usage:
+            if let onUsage = destinations.onUsage {
+                row(place.title, symbol: place.symbol, id: "menu.usage", action: onUsage)
+            }
+        case .settings:
+            row(place.title, symbol: place.symbol, id: "menu.settings", action: destinations.onSettings)
+        case .feed, .ideas, .goals, .files:
+            if let onBoard = destinations.onBoard {
+                row(place.title, symbol: place.symbol, id: "menu.\(place.rawValue)",
+                    isNew: destinations.unread.contains(place.tab)) { onBoard(place.tab) }
+            }
+        }
     }
 
     /// Compact rows, so the whole first screen fits without scrolling.
@@ -309,10 +324,10 @@ struct BighelpMenu<Recent: View>: View {
         #endif
     }
 
-    private func row(_ title: String, detail: String? = nil, symbol: String, id: String,
+    private func row(_ title: String, detail: String? = nil, symbol: String, id: String, isNew: Bool = false,
                      action: @escaping () -> Void) -> some View {
         Button { choose(action) } label: {
-            BighelpMenuRowLabel(title: title, detail: detail, symbol: symbol, trailing: .none)
+            BighelpMenuRowLabel(title: title, detail: detail, symbol: symbol, trailing: isNew ? .new : .none)
         }
         .bighelpPlainButtonStyle(.rounded(BighelpTokens.radius12), padding: BighelpTokens.space4)
         .listRowInsets(Self.rowInsets)
@@ -329,7 +344,7 @@ struct BighelpMenu<Recent: View>: View {
 
 /// A branded menu row: icon tile, title, optional detail, and a trailing mark.
 struct BighelpMenuRowLabel: View {
-    enum Trailing { case chevron, selected, none }
+    enum Trailing { case chevron, selected, none, new }
 
     let title: String
     var detail: String?
@@ -365,6 +380,12 @@ struct BighelpMenuRowLabel: View {
                     .accessibilityHidden(true)
             case .none:
                 EmptyView()
+            case .new:
+                // Like the bottom bar's dot: something here hasn't been seen.
+                Circle()
+                    .fill(theme.action)
+                    .frame(width: 8, height: 8)
+                    .accessibilityLabel("New")
             }
         }
         .frame(minHeight: BighelpTokens.hitTarget)
@@ -462,4 +483,32 @@ struct EmberHostSwitcherLockup: View {
                 .accessibilityIdentifier("brand.host.add")
         }
     }
+}
+
+extension View {
+    /// A dot on ☰ when Feed, Ideas or Goals has something new and ☰ is the way there
+    /// (it isn't in the bottom bar).
+    func bighelpMenuDot(_ isVisible: Bool) -> some View {
+        modifier(BighelpMenuDot(isVisible: isVisible))
+    }
+}
+
+private struct BighelpMenuDot: ViewModifier {
+    let isVisible: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(alignment: .topTrailing) {
+                if isVisible {
+                    Circle()
+                        .fill(theme.action)
+                        .frame(width: 8, height: 8)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
+            }
+            .accessibilityValue(isVisible ? "New items" : "")
+    }
+
+    @BighelpThemeReader private var theme
 }

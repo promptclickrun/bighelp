@@ -571,6 +571,7 @@ struct RootShellView: View {
                         isHomeDrawerPresented.toggle()
                     } label: {
                         Image(systemName: "line.3.horizontal").bighelpToolbarIcon()
+                            .bighelpMenuDot(menuHasUnread)
                     }
                     .bighelpIconLabel("Chats and menu", shortcut: "⌃⌘S")
                     .accessibilityIdentifier("home.drawer.open")
@@ -586,7 +587,7 @@ struct RootShellView: View {
         // Beside the window, not along its bottom edge by the close control.
         .ornament(visibility: visionTabsVisible ? .visible : .hidden,
                   attachmentAnchor: .scene(.leading), contentAlignment: .trailing) {
-            VisionTabOrnament(selection: tabSelection, unread: boardUnreadTabs,
+            VisionTabOrnament(selection: tabSelection, tabs: barTabs, unread: boardUnreadTabs,
                               onNewChat: appState.selectedTab == .sessions && appState.path.isEmpty && !fleetModeOn ? {
                                   appState.chatOpenedFromList = true
                                   startNewChat(explicitAgentID: nil)
@@ -596,7 +597,7 @@ struct RootShellView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if showsBottomNavigation && !BighelpPlatform.usesTabOrnament {
                 // All agents has its own New chat, bottom right.
-                FloatingTabBar(selection: tabSelection,
+                FloatingTabBar(selection: tabSelection, tabs: barTabs,
                                onNewChat: appState.selectedTab == .sessions && !fleetModeOn ? {
                                    appState.chatOpenedFromList = true
                                    startNewChat(explicitAgentID: nil)
@@ -697,17 +698,26 @@ struct RootShellView: View {
     }
 
     private var showsBottomNavigation: Bool {
-        // The all-hosts view is just its list. Feed, Ideas and Goals keep the
-        // bar if something opens them, so its Chat tab always leads back.
-        // Not on Agents: pick an agent first, so Feed, Ideas and Goals are clearly its own.
-        appState.path.isEmpty && !isKeyboardVisible && appState.selectedTab != .agents
-            && (!fleetModeOn || appState.selectedTab.isAgentBoard)
+        appState.path.isEmpty && !isKeyboardVisible && showsTabsOnRoot
     }
 
     /// Vision Pro's tab strip on root screens. The agent's own chat draws its
     /// own: a screen covered by a pushed one doesn't show its ornaments.
     private var visionTabsVisible: Bool {
-        appState.path.isEmpty && appState.selectedTab != .agents && (!fleetModeOn || appState.selectedTab.isAgentBoard)
+        appState.path.isEmpty && showsTabsOnRoot
+    }
+
+    /// The bottom bar: Chat, then what the person pinned (Appearance › App layout).
+    var barTabs: [AppTab] { settings.appLayout.barTabs }
+
+    /// The all-hosts view is just its list. Feed, Ideas and Goals keep the bar if
+    /// something opens them, so its Chat tab always leads back, and so do the pages
+    /// pinned to it. Not on Agents unless it's pinned: pick an agent first, so Feed,
+    /// Ideas and Goals are clearly its own.
+    private var showsTabsOnRoot: Bool {
+        let tab = appState.selectedTab
+        let pinned = tab != .sessions && barTabs.contains(tab)
+        return (tab != .agents || pinned) && (!fleetModeOn || tab.isAgentBoard || pinned)
     }
 
     @ViewBuilder
@@ -733,6 +743,15 @@ struct RootShellView: View {
             sessionsRootTab
         case .feed, .ideas, .goals, .apps:
             agentBoardTab(appState.selectedTab)
+        // Pinned to the bottom bar: the page ☰ opens, as a tab.
+        case .projects:
+            routeDestination(.projects)
+        case .kanban:
+            routeDestination(.kanban)
+        case .workflows:
+            routeDestination(.workflows)
+        case .usage:
+            routeDestination(.usage)
         }
     }
 
@@ -748,6 +767,10 @@ struct RootShellView: View {
         case .ideas: "Ideas"
         case .goals: "Goals"
         case .apps: "Apps"
+        case .projects: "Projects"
+        case .kanban: "Kanban"
+        case .workflows: "Workflows"
+        case .usage: "Usage"
         }
     }
 
@@ -888,7 +911,27 @@ struct RootShellView: View {
             openSessions(filteredTo: nil)
         } else if tab == .scheduledTasks {
             openScheduledTasks(filteredTo: nil)
+        } else if tab.isHostPage {
+            openHostPageTab(tab)
         } else {
+            appState.select(tab)
+        }
+    }
+
+    /// Projects, Kanban, Workflows or Usage from the bottom bar: opened the way ☰ opens
+    /// them (which makes a pinned one a tab), without ☰'s wait for its sheet to close.
+    /// Where this computer has none, the tab says so.
+    private func openHostPageTab(_ tab: AppTab) {
+        switch tab {
+        case .projects where canOpenProjects:
+            if fleetModeOn { fleetGate(.projects) } else { openProjects() }
+        case .kanban where canOpenKanban:
+            if fleetModeOn { fleetGate(.kanban) } else { openKanban() }
+        case .workflows:
+            if fleetModeOn { fleetGate(.workflows) } else { openWorkflows() }
+        case .usage where usage.isAvailable:
+            showUsage()
+        default:
             appState.select(tab)
         }
     }
@@ -1075,6 +1118,7 @@ struct RootShellView: View {
         if appState.path.isEmpty, !fleetModeOn {
             let selection = tabSelection
             actions.selectTab = { tab in selection.wrappedValue = tab }
+            actions.tabs = barTabs
         }
         return actions
     }

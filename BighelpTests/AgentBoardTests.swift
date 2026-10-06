@@ -233,6 +233,48 @@ struct AgentBoardTests {
         #expect(rated.rating == .down && rated.reason == "Wrong timing" && !rated.read)
     }
 
+    /// Hermes restarting or a plugin feature changing changes the plugin's context; the next
+    /// request answers 412. Marking read (and other repeatable changes) tries once more.
+    @Test func markingReadSurvivesAChangedPluginContext() async throws {
+        let performer = try BoardPerformer()
+        let client = DirectHermesAgentBoardClient(workspace: performer, owner: performer.owner!, supportsFeedback: true)
+        performer.conflicts = 1
+        try await client.markRead(agentID: "default", itemIDs: ["a", "b"])
+        #expect(performer.calls.map(\.operation) == [.boardRead, .boardRead], "Sent again with the new context")
+        performer.conflicts = 1
+        _ = try await client.update(agentID: "default", itemID: "a", change: .init(read: true))
+        #expect(performer.calls.suffix(2).map(\.operation) == [.boardUpdate, .boardUpdate])
+        // Bringing an idea in isn't repeatable: a second try could make a second goal.
+        performer.conflicts = 1
+        await #expect(throws: WorkspaceClientError.conflict) {
+            _ = try await client.promote(agentID: "default", itemID: "i")
+        }
+        #expect(performer.calls.last?.operation == .boardPromote && performer.calls.filter { $0.operation == .boardPromote }.count == 1)
+    }
+
+    /// Items seen while the computer turned the read down stay read: the next load keeps
+    /// them read and sends it again, so the tab's dot doesn't come back.
+    @Test func readItemsStayReadWhenTheComputerDidNotSaveItYet() async {
+        let client = FakeBoardClient(items: [
+            AgentBoardItem(id: "a", kind: .feed, title: "One", read: false),
+            AgentBoardItem(id: "g", kind: .goal, title: "Run", section: "goal", status: "active", read: false),
+        ])
+        let store = AgentBoardStore()
+        store.configure(client: client)
+        await store.load(agentID: "default")
+        client.failsMarkRead = true
+        await store.markSeen(store.feed + store.goals)
+        #expect(store.unreadCount(.feed) == 0 && store.unreadCount(.goal) == 0)
+
+        // Later the board reloads; the computer still has them unread.
+        client.failsMarkRead = false
+        await store.load(agentID: "default")
+        #expect(store.unreadCount(.feed) == 0 && store.unreadCount(.goal) == 0, "No dot for what was already seen")
+        #expect(Set(client.markedRead) == ["a", "g"], "Sent again once the computer takes it")
+        await store.load(agentID: "default")
+        #expect(store.unreadCount(.feed) == 0 && store.unreadCount(.goal) == 0)
+    }
+
     @Test func goalsToggleDoneAndANewConnectionClearsTheBoard() async {
         let client = FakeBoardClient(items: [
             AgentBoardItem(id: "g", kind: .goal, title: "Sleep", section: "goal", status: "active"),
@@ -385,7 +427,14 @@ private final class FakeBoardClient: AgentBoardClient {
         return items[index]
     }
 
-    func markRead(agentID: String, itemIDs: [String]) async throws { markedRead += itemIDs }
+    /// Like a computer that turned the request down: nothing is saved there.
+    var failsMarkRead = false
+
+    func markRead(agentID: String, itemIDs: [String]) async throws {
+        if failsMarkRead { throw WorkspaceClientError.conflict }
+        markedRead += itemIDs
+        for index in items.indices where itemIDs.contains(items[index].id) { items[index].read = true }
+    }
 
     func promote(agentID: String, itemID: String) async throws -> AgentBoardItem {
         guard let index = items.firstIndex(where: { $0.id == itemID }) else { throw WorkspaceClientError.invalidRequest }
@@ -423,6 +472,8 @@ private final class BoardPerformer: WorkspaceOperationPerforming {
     var owner: WorkspaceOwner?
     var capabilities: WorkspaceCapabilities { .init(owner: owner) }
     var calls: [Call] = []
+    /// The plugin's context changes this many times: each answers 412 once.
+    var conflicts = 0
 
     init() throws {
         owner = .init(authority: try .fixture(id: "board-test"), authenticationGeneration: UUID(), connectionGeneration: UUID())
@@ -431,6 +482,10 @@ private final class BoardPerformer: WorkspaceOperationPerforming {
     func perform(_ operation: WorkspaceOperation, payload: [String: BighelpJSONValue], owner: WorkspaceOwner) async throws
         -> [String: BighelpJSONValue] {
         calls.append(.init(operation: operation, payload: payload))
+        if conflicts > 0 {
+            conflicts -= 1
+            throw WorkspaceClientError.conflict
+        }
         if operation == .boardRead { return ["updated": .integer(1)] }
         return ["item": .object(["id": payload["itemId"] ?? .string("a"), "kind": .string("feed"), "title": .string("t")])]
     }

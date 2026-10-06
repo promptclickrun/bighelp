@@ -127,7 +127,7 @@ final class DirectHostNotificationClient: DirectHostNotificationServing {
             guard connectionIsCurrent(), isCurrent() else { throw DirectHermesError.secureStorageChanged }
         }
         try check()
-        guard let saved = try vault.load(), DirectHermesIdentity.matches(saved.identity, host.principalIdentity),
+        guard let saved = try vault.load(), host.owns(saved),
               saved.endpoint == host.endpoint else { throw DirectHermesError.secureStorageChanged }
         let auth = DirectHermesAuthenticator(endpoint: host.endpoint)
         defer { auth.http.invalidate() }

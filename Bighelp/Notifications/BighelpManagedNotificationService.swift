@@ -135,7 +135,7 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
         try ledger.pruneExpiredRevocations(accountScope: host.notificationScope, now: timestamp)
         let profile = registry.workspace(for: host).selectedProfile
         guard ManagedNotificationValidation.profile(profile), connection.endpoint == host.endpoint,
-              DirectHermesIdentity.matches(connection.identity, host.principalIdentity) else { throw DirectHermesError.identityChanged }
+              host.owns(connection) else { throw DirectHermesError.identityChanged }
         let key = BighelpManagedNotificationLedger.key(scope: host.notificationScope, host: host.hostConnectionID, profile: profile)
         guard enrolling.insert(key).inserted else { throw DirectHermesError.tooManyRequests }
         defer { enrolling.remove(key) }

@@ -25,12 +25,8 @@ final class WorkspaceConnectionStore {
     var isDirectSelected: Bool { hosts.selectedHostID != nil }
 
     var owner: WorkspaceOwner? {
-        guard let selected = hosts.selectedHost, let store = hosts.selectedWorkspace,
-              store.isConnected, let saved = store.savedConnection,
-              DirectHermesIdentity.matches(saved.identity, selected.principalIdentity),
-              let authority = saved.workspaceAuthority else { return nil }
-        return WorkspaceOwner(authority: authority, authenticationGeneration: hosts.generation,
-                              connectionGeneration: store.connectionGeneration)
+        guard let selected = hosts.selectedHost, let store = hosts.selectedWorkspace else { return nil }
+        return try? store.verifiedConnection(for: selected, generation: hosts.generation).owner
     }
 
     var workspace: DirectHermesWorkspaceClient? {

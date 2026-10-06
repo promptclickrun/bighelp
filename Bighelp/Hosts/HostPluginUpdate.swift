@@ -187,13 +187,10 @@ final class HostPluginUpdateModel {
     private func currentConnection() -> Connection? {
         guard let registry, let host = registry.hosts.first(where: { $0.id == hostID }) else { return nil }
         let workspace = registry.workspace(for: host)
-        guard workspace.isConnected, let direct = workspace.nativeClient,
-              let authority = workspace.savedConnection?.workspaceAuthority,
-              DirectHermesIdentity.matches(workspace.savedConnection?.identity, host.principalIdentity) else { return nil }
         let generation = registry.generation
-        let connectionGeneration = workspace.connectionGeneration
-        let owner = WorkspaceOwner(authority: authority, authenticationGeneration: generation,
-                                   connectionGeneration: connectionGeneration)
+        guard let verified = try? workspace.verifiedConnection(for: host, generation: generation) else { return nil }
+        let direct = verified.client, owner = verified.owner
+        let connectionGeneration = owner.connectionGeneration
         let plugin = DirectHermesNativePluginClient(http: direct, owner: owner, currentOwner: { [weak registry] in
             registry?.generation == generation && workspace.connectionGeneration == connectionGeneration
                 && workspace.isConnected ? owner : nil

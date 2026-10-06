@@ -24,15 +24,12 @@ final class RegistryFleetMaintenance: FleetMaintenanceConnecting {
             do { try await Task.sleep(for: .milliseconds(200)) } catch { return .offline("Couldn't reach this host.") }
         }
         if !workspace.isConnected { await workspace.reconnect() }
-        guard workspace.isConnected, let direct = workspace.nativeClient, let saved = workspace.savedConnection,
-              DirectHermesIdentity.matches(saved.identity, host.principalIdentity),
-              let authority = saved.workspaceAuthority else {
+        let generation = registry.generation
+        guard let verified = try? workspace.verifiedConnection(for: host, generation: generation) else {
             return workspace.hasSavedConnection ? .offline("Offline. Couldn't reach this host.") : .signedOut
         }
-        let generation = registry.generation
-        let connectionGeneration = workspace.connectionGeneration
-        let owner = WorkspaceOwner(authority: authority, authenticationGeneration: generation,
-                                   connectionGeneration: connectionGeneration)
+        let direct = verified.client, owner = verified.owner
+        let connectionGeneration = owner.connectionGeneration
         let current: @MainActor () -> WorkspaceOwner? = { [weak registry, weak workspace] in
             guard let registry, let workspace, registry.generation == generation,
                   workspace.connectionGeneration == connectionGeneration, workspace.isConnected else { return nil }

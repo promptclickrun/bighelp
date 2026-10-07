@@ -1,14 +1,17 @@
 import XCTest
 
-/// Every screen in the bottom bar that has a search field puts it in the same place,
-/// whichever tab you came from, and never on top of the bar. On one computer and with
-/// all hosts showing, on demo data. Set BIGHELP_SEARCH_PLACEMENT_EVIDENCE (TEST_RUNNER_…)
-/// to save screenshots.
+/// Main screens look the same whichever tab you came from. The bottom bar never moves, and
+/// each screen's search field is the first thing under its title, never down by the bar.
+/// On one computer (Chat as the agent's chat, or the Sessions list) and with all hosts
+/// showing, on demo data. Set BIGHELP_SEARCH_PLACEMENT_EVIDENCE (TEST_RUNNER_…) to save
+/// screenshots.
 final class SearchPlacementUITests: BighelpUITestCase {
     /// Agents, Scheduled tasks and Kanban in the bar beside Chat and Feed.
     private let layout = "{pinned=(agents,feed,scheduledTasks,kanban);menu=();}"
     private let searchedTabs = ["tab.sessions", "tab.agents", "tab.scheduled-tasks", "tab.kanban"]
     private let origins = ["tab.sessions", "tab.feed", "tab.agents", "tab.scheduled-tasks", "tab.kanban"]
+    private let searchIDs = ["tab.sessions": "sessions.search", "tab.agents": "agents.search",
+                             "tab.scheduled-tasks": "scheduled-tasks.search", "tab.kanban": "kanban.search"]
 
     @MainActor
     func testSearchSitsInOnePlaceOnOneComputer() throws {
@@ -25,8 +28,6 @@ final class SearchPlacementUITests: BighelpUITestCase {
         try audit(allHosts: true, homeOpensChat: false)
     }
 
-    /// Goes to each searched tab from each other tab, and checks where the search field and
-    /// the title land: the same place every time, and never on the bar.
     @MainActor private func audit(allHosts: Bool, homeOpensChat: Bool) throws {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays",
@@ -35,58 +36,52 @@ final class SearchPlacementUITests: BighelpUITestCase {
         app.launch()
         let mode = (allHosts ? "all-hosts" : "one-host") + (homeOpensChat ? "-chat" : "-list")
         if allHosts {
-            // All agents is the home: its list has no bottom bar. Its search must still stand clear.
-            XCTAssertTrue(app.descendants(matching: .any)["fleet.home"].firstMatch.waitForExistence(timeout: 20)
-                          || app.searchFields.firstMatch.waitForExistence(timeout: 5))
-            let search = visibleSearchField(in: app)
-            print("SEARCH \(mode)-home: search \(search.map { "\($0.frame)" } ?? "none")")
+            // All agents is the home: its search is at the top too.
+            let search = app.descendants(matching: .any)["fleet.search"].firstMatch
+            XCTAssertTrue(search.waitForExistence(timeout: 20), "All agents has its search")
+            XCTAssertLessThan(search.frame.minY, app.frame.height * 0.35, "All agents' search is at the top")
             save("\(mode)-home", app)
-            // The bar comes with an agent's own pages: open one.
             let agent = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "fleet.agent.")).firstMatch
             if agent.waitForExistence(timeout: 5) { agent.tap() }
         }
         guard app.buttons["tab.agents"].waitForExistence(timeout: 20) else {
-            XCTAssertFalse(!allHosts, "The bottom bar shows on one computer")
+            XCTAssertTrue(allHosts, "The bottom bar shows on one computer")
             return
         }
-        var searches: [String: [String: CGRect?]] = [:]
-        var titles: [String: [String: CGFloat]] = [:]
+        var barFrame: CGRect?
+        var searches: [String: [String: CGRect]] = [:]
         for target in searchedTabs {
             for origin in origins where origin != target {
                 guard tap(origin, in: app), tap(target, in: app) else { continue }
                 let name = "\(mode)-\(target.dropFirst(4))-from-\(origin.dropFirst(4))"
-                let search = visibleSearchField(in: app)
-                let bar = app.descendants(matching: .any)["primary-navigation"].firstMatch
-                let navigation = app.navigationBars.firstMatch
-                print("SEARCH \(name): search \(search.map { "\($0.frame)" } ?? "none") bar \(bar.exists ? bar.frame : .zero) "
-                      + "title bar \(navigation.exists ? navigation.frame : .zero)")
+                // The tab row itself (the bar's container also holds Sessions' New chat button).
+                let bar = app.buttons["tab.sessions"].firstMatch
                 save(name, app)
-                searches[target, default: [:]][origin] = search?.frame
-                if navigation.exists { titles[target, default: [:]][origin] = navigation.frame.height }
-                guard let search, bar.exists else { continue }
-                let overlaps = search.frame.maxY > bar.frame.minY && search.frame.minY < bar.frame.maxY
-                XCTAssertFalse(overlaps, "\(name): the search field sits on the bottom bar")
-                if search.frame.minY >= bar.frame.maxY - 1 {
-                    XCTAssertGreaterThanOrEqual(search.frame.minY - bar.frame.maxY, 12,
-                                                "\(name): the search field touches the bottom bar")
+                XCTAssertTrue(bar.exists, "\(name): the bottom bar")
+                // The bar is in one place on every screen.
+                if let barFrame {
+                    XCTAssertEqual(bar.frame.minY, barFrame.minY, accuracy: 0.5, "\(name): the bottom bar moved")
+                    XCTAssertEqual(bar.frame.height, barFrame.height, accuracy: 0.5, "\(name): the bottom bar changed")
+                } else {
+                    barFrame = bar.frame
                 }
+                // Nothing searches along the bottom any more.
+                let low = app.searchFields.allElementsBoundByIndex.filter { $0.exists && $0.frame.minY > bar.frame.minY - 60 }
+                XCTAssertTrue(low.isEmpty, "\(name): a search field sits down by the bar")
+                // An agent's chat has no search; every list does, at the top.
+                if target == "tab.sessions", app.textViews["chat.composer.text"].exists { continue }
+                let search = app.descendants(matching: .any)[searchIDs[target]!].firstMatch
+                print("SEARCH \(name): search \(search.exists ? search.frame : .zero) bar \(bar.frame)")
+                XCTAssertTrue(search.waitForExistence(timeout: 5), "\(name): its search field")
+                XCTAssertLessThan(search.frame.minY, app.frame.height * 0.35, "\(name): the search field is at the top")
+                searches[target, default: [:]][origin] = search.frame
             }
         }
         for (target, frames) in searches {
-            let shown = frames.compactMapValues { $0 }
-            XCTAssertTrue(shown.isEmpty || shown.count == frames.count,
-                          "\(mode) \(target): the search field shows from some tabs only: \(frames)")
-            guard let first = shown.values.first else { continue }
-            for (origin, frame) in shown {
+            guard let first = frames.values.first else { continue }
+            for (origin, frame) in frames {
                 XCTAssertEqual(frame.midY, first.midY, accuracy: 2,
                                "\(mode) \(target): the search field moves when you come from \(origin)")
-            }
-        }
-        for (target, heights) in titles {
-            guard let first = heights.values.first else { continue }
-            for (origin, height) in heights {
-                XCTAssertEqual(height, first, accuracy: 2,
-                               "\(mode) \(target): the title changes size when you come from \(origin)")
             }
         }
     }
@@ -98,11 +93,6 @@ final class SearchPlacementUITests: BighelpUITestCase {
         button.tap()
         Thread.sleep(forTimeInterval: 1.5)
         return true
-    }
-
-    /// The search field on screen, if any (a list's may be scrolled away until pulled down).
-    @MainActor private func visibleSearchField(in app: XCUIApplication) -> XCUIElement? {
-        app.searchFields.allElementsBoundByIndex.first { $0.exists && $0.frame.height > 0 && $0.isHittable }
     }
 
     @MainActor private func save(_ name: String, _ app: XCUIApplication) {

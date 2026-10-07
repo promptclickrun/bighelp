@@ -25,9 +25,11 @@ struct KanbanScreen: View {
         content
             .background(BighelpThemeCanvas(theme: theme).ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
+            // The board's name is the title, as other screens' names are; its menu switches boards
+            // and holds the board's options. One button on the right, so the title has room.
+            .navigationTitle(model.board?.name ?? "Kanban")
+            .toolbarTitleMenu { boardMenu }
             .toolbar { toolbar }
-            // The system's place, like every other searchable screen (see AgentsView).
-            .searchable(text: $model.searchText, prompt: "Find a card")
             .bighelpSheet(item: $openTask) { ref in
                 KanbanTaskSheet(model: model, taskID: ref.id, isNerdMode: isNerdMode)
                     .bighelpSheetSize(.large)
@@ -88,6 +90,12 @@ struct KanbanScreen: View {
                 noBoards
             } else {
                 VStack(spacing: 0) {
+                    // Search first, then who: like every main screen (`bighelpListSearchRow`).
+                    BighelpSearchField(text: $model.searchText, prompt: "Find a card", accessibilityLabel: "Find a card",
+                                       accessibilityIdentifier: "kanban.search")
+                        .padding(.horizontal, BighelpTokens.space16)
+                        .padding(.top, BighelpTokens.space4)
+                        .padding(.bottom, BighelpTokens.space8)
                     KanbanAgentFilterBar(model: model)
                     if model.nobodyIsPickingUpWork { idleBanner }
                     if usesColumns { columns } else { pages }
@@ -213,30 +221,39 @@ struct KanbanScreen: View {
     // MARK: Toolbar
 
     @ToolbarContentBuilder private var toolbar: some ToolbarContent {
-        ToolbarItem(placement: .principal) { KanbanBoardSwitcher(model: model, newBoard: { isNamingBoard = true }) }
-        ToolbarItemGroup(placement: .topBarTrailing) {
+        ToolbarItem(placement: .topBarTrailing) {
             Button { newTaskLane = .later } label: { Image(systemName: "plus") }
                 .accessibilityLabel("New card")
                 .accessibilityIdentifier("kanban.new")
                 .disabled(model.snapshot == nil)
-            Menu {
-                Button { Task { await model.refresh() } } label: { Label("Refresh", systemImage: "arrow.clockwise") }
-                if let autoPlan = model.autoPlan {
-                    Toggle(isOn: Binding(get: { autoPlan }, set: { isOn in
-                        if isOn, !autoPlanExplained { confirmsAutoPlan = true } else { Task { await model.setAutoPlan(isOn) } }
-                    })) {
-                        Label("Auto plan (uses AI)", systemImage: "sparkles")
-                    }
+        }
+    }
+
+    /// The title's menu: the boards, then this board's options.
+    @ViewBuilder private var boardMenu: some View {
+        Section("Boards") {
+            ForEach(model.boards.filter { !$0.isArchived }) { board in
+                Button { Task { await model.select(board: board.slug) } } label: {
+                    let open = board.total - (board.counts["done"] ?? 0) - (board.counts["archived"] ?? 0)
+                    Label("\(board.name) · \(max(0, open))",
+                          systemImage: board.slug == model.board?.slug ? "checkmark" : "circle")
                 }
-                Button { isNamingBoard = true } label: { Label("New board", systemImage: "plus.rectangle.on.rectangle") }
-                if let openInWindow {
-                    Button(action: openInWindow) { Label("Open in its own window", systemImage: "macwindow.badge.plus") }
-                }
-            } label: {
-                Image(systemName: "ellipsis")
+                .accessibilityIdentifier("kanban.board.\(board.slug)")
             }
-            .accessibilityLabel("Board options")
-            .accessibilityIdentifier("kanban.options")
+            Button { isNamingBoard = true } label: { Label("New board", systemImage: "plus.rectangle.on.rectangle") }
+        }
+        Section {
+            Button { Task { await model.refresh() } } label: { Label("Refresh", systemImage: "arrow.clockwise") }
+            if let autoPlan = model.autoPlan {
+                Toggle(isOn: Binding(get: { autoPlan }, set: { isOn in
+                    if isOn, !autoPlanExplained { confirmsAutoPlan = true } else { Task { await model.setAutoPlan(isOn) } }
+                })) {
+                    Label("Auto plan (uses AI)", systemImage: "sparkles")
+                }
+            }
+            if let openInWindow {
+                Button(action: openInWindow) { Label("Open in its own window", systemImage: "macwindow.badge.plus") }
+            }
         }
     }
 
@@ -275,53 +292,6 @@ extension KanbanLane {
 }
 
 // MARK: - Board switcher
-
-struct KanbanBoardSwitcher: View {
-    @Bindable var model: KanbanBoardModel
-    let newBoard: () -> Void
-
-    var body: some View {
-        Menu {
-            Section("Boards") {
-                ForEach(model.boards.filter { !$0.isArchived }) { board in
-                    Button { Task { await model.select(board: board.slug) } } label: {
-                        let open = board.total - (board.counts["done"] ?? 0) - (board.counts["archived"] ?? 0)
-                        Label("\(board.name) · \(max(0, open))",
-                              systemImage: board.slug == model.board?.slug ? "checkmark" : "circle")
-                    }
-                    .accessibilityIdentifier("kanban.board.\(board.slug)")
-                }
-            }
-            Button(action: newBoard) { Label("New board", systemImage: "plus") }
-        } label: {
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(model.board?.color.map { Color(hex: $0.replacingOccurrences(of: "#", with: "")) } ?? theme.action)
-                    .frame(width: 8, height: 8)
-                Text(model.board?.name ?? "Kanban")
-                    .font(.bighelp(.headline))
-                    .foregroundStyle(theme.primaryText)
-                    .lineLimit(1)
-                Image(systemName: "chevron.down")
-                    .font(.bighelp(.caption).weight(.bold))
-                    .foregroundStyle(theme.secondaryText)
-                if model.isLive {
-                    Circle().fill(KanbanLane.done.tint).frame(width: 6, height: 6)
-                        .accessibilityLabel("Live")
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .contentShape(.capsule)
-        }
-        .kanbanMacMenu(.asDrawn)
-        .accessibilityLabel("Board: \(model.board?.name ?? "none")")
-        .accessibilityHint("Switch boards or make a new one.")
-        .accessibilityIdentifier("kanban.board-switcher")
-    }
-
-    @BighelpThemeReader private var theme
-}
 
 // MARK: - Mac menus
 

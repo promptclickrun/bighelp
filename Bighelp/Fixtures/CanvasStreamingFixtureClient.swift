@@ -46,7 +46,13 @@ final class CanvasStreamingFixtureClient: ConversationFixtureClient, StreamingCo
                                                     occurredAt: index * 2 + 1))
         }
         let id = "\(turnID)-reply"
-        let text = "Tomorrow looks sunny with a high of 72. You have two meetings in the morning."
+        // Long enough to scroll on a phone, so voice mode shows a reply in full.
+        let text = "Tomorrow looks sunny with a high of 72. You have two meetings in the morning: the design "
+            + "review at 9 and a call with the print shop at 11. The afternoon is open, so it's a good time for "
+            + "the bike ride you wanted. I cloned the weather app and its forecast agrees: light wind, no rain "
+            + "until Thursday. On Thursday, take a jacket; showers start around four and last into the evening. "
+            + "Your calendar also has a reminder to water the plants on Friday, and the library books are due "
+            + "on Saturday. Want me to move the print shop call so the morning is free?"
         func reply(_ text: String, delivery: String) -> TimelineItem {
             TimelineItem(id: id, role: .assistant, sender: .agent(id: senderID, snapshot: .init(name: "Canvas fixture")),
                          content: .message(text), metadata: .init(source: "UI fixture", delivery: delivery))

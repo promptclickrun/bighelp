@@ -26,8 +26,8 @@ struct KanbanScreen: View {
             .background(BighelpThemeCanvas(theme: theme).ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { toolbar }
-            .searchable(text: $model.searchText, placement: .navigationBarDrawer(displayMode: .automatic),
-                        prompt: "Find a card")
+            // The system's place, like every other searchable screen (see AgentsView).
+            .searchable(text: $model.searchText, prompt: "Find a card")
             .bighelpSheet(item: $openTask) { ref in
                 KanbanTaskSheet(model: model, taskID: ref.id, isNerdMode: isNerdMode)
                     .bighelpSheetSize(.large)

@@ -424,6 +424,33 @@ final class WorkflowEditorModel {
         return false
     }
 
+    /// What's on screen isn't what runs use yet: a draft never published, or changes since.
+    var needsPublish: Bool {
+        definition != nil && (detail?.latestRevision == nil || hasUnpublishedDraft || isDirty)
+    }
+
+    /// Saves what's on screen and makes it the version runs use (schedules, Shortcuts,
+    /// agents). True when the computer took it.
+    func publish() async -> Bool {
+        guard !isSaving else { return false }
+        if isDirty, await !save() { return false }
+        isSaving = true
+        defer { isSaving = false }
+        do {
+            _ = try await publishIfNeeded()
+            message = nil
+            return true
+        } catch WorkspaceClientError.rejected(let code) where code == "not_valid" {
+            message = "Your computer found a problem with this workflow. Fix it, then publish again."
+            if let validation = try? await client.validate(workflowID: workflowID) { self.validation = validation }
+        } catch WorkspaceClientError.rejected(let code) where code == "inputs_invalid" {
+            message = "A default value doesn't fit its field. Fix it in Inputs, then publish again."
+        } catch {
+            message = WorkflowsStore.reason(error)
+        }
+        return false
+    }
+
     /// Publishes the draft when it has changes the published version doesn't. Returns the newest revision.
     private func publishIfNeeded() async throws -> Int? {
         var revision = detail?.latestRevision

@@ -294,6 +294,7 @@
 		35781E5C253B94D0517FC009 /* CompanionViewportObserver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C5A91E15AA0B368521FDA43 /* CompanionViewportObserver.swift */; };
 		35EC027775436A574ACB755D /* ChatPictureActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87C4EF9F4B011D283679DB4D /* ChatPictureActions.swift */; };
 		35F9E51CCF032CAFC59A2CAC /* DirectHermesProjectClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD6C73C58CE6825A6B97228F /* DirectHermesProjectClient.swift */; };
+		36299B66F8DDA4336F73A110 /* WorkflowPublishBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = F612CF2AD1CD6C6CF51B1A50 /* WorkflowPublishBar.swift */; };
 		363055840E29C8FAF115F30D /* DirectHermesAdministrationCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC6852D3CBD505DB72BC5F00 /* DirectHermesAdministrationCodec.swift */; };
 		3636C8733259472FEA47FAB4 /* ReferenceSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = B626CC553921E60F230F7A70 /* ReferenceSnapshot.swift */; };
 		366E76186FAAE029F87223E3 /* BighelpSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F02766D9D4984C22732DDBF /* BighelpSurface.swift */; };
@@ -359,6 +360,7 @@
 		3F0425028A8D9FBA99ABAA85 /* VoiceStepLineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18869FCEF37622904146C4D3 /* VoiceStepLineTests.swift */; };
 		3F0C4BAF80C369849AF98E48 /* AgentProfileID.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82585A099C0B2200151BF919 /* AgentProfileID.swift */; };
 		3F1147E8EDFBBDA25542FDBD /* BighelpExternalSessionOpen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4903CB5D015E3FA9F21B0F19 /* BighelpExternalSessionOpen.swift */; };
+		3F5B1F0CFCD0C4AC6B12BD56 /* SearchPlacementUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 067FBC1424A9C5BFAF72DFEC /* SearchPlacementUITests.swift */; };
 		3F795BCF05532D5802FE81EA /* SpatialAvatarSettingsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B147B77930BA89891FE3634C /* SpatialAvatarSettingsSection.swift */; };
 		3F81DB96172E670921A4490E /* BotModeRoomCacheSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = 321B9D6AC07FA23E8A77C13D /* BotModeRoomCacheSchema.swift */; };
 		3F9B09435FB28A088F244847 /* BighelpJSONValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = B77583FA75E9E50C09A3C6A3 /* BighelpJSONValue.swift */; };
@@ -722,6 +724,7 @@
 		81406203332A0F2B89545623 /* NativeSessionControlsPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 277843BDC2756F401D455A55 /* NativeSessionControlsPresentation.swift */; };
 		8158488B976A7C682435DF64 /* ScheduleRequestBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67523907B748CF380DF5E276 /* ScheduleRequestBuilder.swift */; };
 		816F98FB81CA1837D0671A86 /* NativeSessionControlsReadOnlyViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C743815F5232ED6FDD5A64D /* NativeSessionControlsReadOnlyViews.swift */; };
+		81A09A62D28B0F020F0A9EE2 /* WorkflowPublishUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D5B09FF189F3E04B594D313 /* WorkflowPublishUITests.swift */; };
 		81B006E8BEBEC3F398368DC7 /* TeamCallModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EC842A92E069219C4BFDBC9 /* TeamCallModel.swift */; };
 		81E8A31E76A3D6764A275CD3 /* AgentSelectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CF7C685B0AB5D146A3A9831 /* AgentSelectionView.swift */; };
 		81F4515DE6FD011FA76CD44F /* PersonalityWireModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73A11354869D7210B3F78458 /* PersonalityWireModels.swift */; };
@@ -1548,6 +1551,7 @@
 		064E0E78CD6C7255C6EC0E57 /* RootKanban.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootKanban.swift; sourceTree = "<group>"; };
 		06604943C1C5D780822F64D6 /* DirectHermesNativeAttachmentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectHermesNativeAttachmentTests.swift; sourceTree = "<group>"; };
 		0663AEB0E7CD26EC96D3578C /* status-offline.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "status-offline.json"; sourceTree = "<group>"; };
+		067FBC1424A9C5BFAF72DFEC /* SearchPlacementUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchPlacementUITests.swift; sourceTree = "<group>"; };
 		06823B4FCA08768A2CCB471A /* OptionalReferenceServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OptionalReferenceServices.swift; sourceTree = "<group>"; };
 		068D61A6A87AA9FEA4157D48 /* GitHubResource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubResource.swift; sourceTree = "<group>"; };
 		069FD09F2F97855A9292B399 /* BighelpPlatform.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpPlatform.swift; sourceTree = "<group>"; };
@@ -1934,6 +1938,7 @@
 		4C2530CDD9E8256830CACEC6 /* NativeHermesSessionForkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeHermesSessionForkTests.swift; sourceTree = "<group>"; };
 		4C6DBCCBBC55CBBA9186BEF1 /* soul-lens.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "soul-lens.md"; sourceTree = "<group>"; };
 		4CA565F0CEECC8289EB2F045 /* ScratchpadFormattingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScratchpadFormattingTests.swift; sourceTree = "<group>"; };
+		4D5B09FF189F3E04B594D313 /* WorkflowPublishUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowPublishUITests.swift; sourceTree = "<group>"; };
 		4D5BB3FF93B2BFBE1309307F /* sealed-alert-v2-vector.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "sealed-alert-v2-vector.json"; sourceTree = "<group>"; };
 		4D88AAE29CD127FD229FF04B /* HermesLogsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesLogsTests.swift; sourceTree = "<group>"; };
 		4DA121DC4F3462AA6F8C58F6 /* BoardBlueprintAndGoalCategoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardBlueprintAndGoalCategoryTests.swift; sourceTree = "<group>"; };
@@ -2844,6 +2849,7 @@
 		F5639CCA1C95FC8441701764 /* WorkflowEditingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowEditingTests.swift; sourceTree = "<group>"; };
 		F5AC35A79ACACE81F456243E /* list.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = list.json; sourceTree = "<group>"; };
 		F605047400252670A1610388 /* WikiDraftStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WikiDraftStore.swift; sourceTree = "<group>"; };
+		F612CF2AD1CD6C6CF51B1A50 /* WorkflowPublishBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowPublishBar.swift; sourceTree = "<group>"; };
 		F62835AF1B54DF0076781B3E /* ReferenceCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReferenceCodec.swift; sourceTree = "<group>"; };
 		F6370FE65444B974BB2D3DA1 /* SkillsAndToolsCatalogContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkillsAndToolsCatalogContent.swift; sourceTree = "<group>"; };
 		F67531847A62207D0A37AEBB /* AvatarCatalogKit.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = AvatarCatalogKit.json; sourceTree = "<group>"; };
@@ -4243,6 +4249,7 @@
 				9B421A02FAA46B05C25DC0D6 /* ReferenceHubUITests.swift */,
 				EFAB21B494DC7BB11FC84213 /* ReleaseScreensWalkthroughUITests.swift */,
 				D7595D1299CAF78E35FDA83F /* ScreenKindsUITests.swift */,
+				067FBC1424A9C5BFAF72DFEC /* SearchPlacementUITests.swift */,
 				7D334DCC005C4E04E1883E0A /* SessionAppFilterUITests.swift */,
 				E51CE6C1FF8C2646AD519F69 /* SessionOriginUITests.swift */,
 				8566C86C4F77121118FC017C /* SessionsParityUITests.swift */,
@@ -4256,6 +4263,7 @@
 				14C003502E8D8B3552E45D0F /* VoiceStepLineUITests.swift */,
 				148206AE5A6AE634180F1E0B /* WeatherCardsUITests.swift */,
 				69B714A6F7D3438FE4CF9ED0 /* WidgetLinkHostUITests.swift */,
+				4D5B09FF189F3E04B594D313 /* WorkflowPublishUITests.swift */,
 				CEA7CE183DB9ED1863F32864 /* WorkflowsEditingUITests.swift */,
 				ED58013B1EF5580D7BE0CAEF /* WorkflowsStagesAndTriggersUITests.swift */,
 				BEB2EB68074BFE00C9154498 /* WorkflowsUITests.swift */,
@@ -5060,6 +5068,7 @@
 				976873BD4A04753268CBA227 /* WorkflowFlowView.swift */,
 				062669CFA46ECDAC5147F56F /* WorkflowInputsEditor.swift */,
 				31147A0236EB23CB0FD2A125 /* WorkflowModels.swift */,
+				F612CF2AD1CD6C6CF51B1A50 /* WorkflowPublishBar.swift */,
 				5F429F2AD807B0999625A25C /* WorkflowRunModel.swift */,
 				D885EEDB742B2589822E2135 /* WorkflowRunMonitorView.swift */,
 				B2134123E3894BA3AE1CCD71 /* WorkflowRunStageSheet.swift */,
@@ -6311,6 +6320,7 @@
 				35525A5B16DE40233E85EC0B /* WorkflowFlowView.swift in Sources */,
 				C0ED3BF07307E96DE1A25711 /* WorkflowInputsEditor.swift in Sources */,
 				66E818C2CBEDE04E7D74D6D3 /* WorkflowModels.swift in Sources */,
+				36299B66F8DDA4336F73A110 /* WorkflowPublishBar.swift in Sources */,
 				98045BC274A9F07486257E23 /* WorkflowRunModel.swift in Sources */,
 				C8C8B15A43459F011DE41FEA /* WorkflowRunMonitorView.swift in Sources */,
 				32B24C1CCC94C9ABC1719931 /* WorkflowRunStageSheet.swift in Sources */,
@@ -6845,6 +6855,7 @@
 				592929733948DB5DD30E29B1 /* ReferenceHubUITests.swift in Sources */,
 				9622B5EF6600D45BD3B139CC /* ReleaseScreensWalkthroughUITests.swift in Sources */,
 				5351C368F37F73C06EC1D560 /* ScreenKindsUITests.swift in Sources */,
+				3F5B1F0CFCD0C4AC6B12BD56 /* SearchPlacementUITests.swift in Sources */,
 				08FCCE2CF4C3804DD3219F14 /* SessionAppFilterUITests.swift in Sources */,
 				8664D79F9C79317862920F24 /* SessionOriginUITests.swift in Sources */,
 				5417D3AD02852FA16A18B8D0 /* SessionsParityUITests.swift in Sources */,
@@ -6858,6 +6869,7 @@
 				18E32B9C51AC602321493A7F /* VoiceStepLineUITests.swift in Sources */,
 				B05C0BE552D68EDA30874BB8 /* WeatherCardsUITests.swift in Sources */,
 				4998F2F458DEA2AC652F6DD3 /* WidgetLinkHostUITests.swift in Sources */,
+				81A09A62D28B0F020F0A9EE2 /* WorkflowPublishUITests.swift in Sources */,
 				AAEB8982D7E6FF8DFF842F7F /* WorkflowsEditingUITests.swift in Sources */,
 				91E8B0585743515DF6C47DED /* WorkflowsStagesAndTriggersUITests.swift in Sources */,
 				6BEB521EBB0F1E16CF88B875 /* WorkflowsUITests.swift in Sources */,

@@ -124,8 +124,10 @@ struct AgentsView: View {
             .environment(\.defaultMinListRowHeight, BighelpTokens.hitTarget)
             .dismissesKeyboardOnScroll(true)
             .accessibilityIdentifier("agents.screen")
-            .searchable(text: $query, isPresented: $isSearchPresented,
-                        placement: .navigationBarDrawer, prompt: "Search agents and groups")
+            // The system's place, like Sessions and Scheduled tasks: along the bottom on an iOS 26
+            // iPhone, under the bottom bar. A drawer under the title went to the bottom anyway when
+            // the screen opened from Chat, on top of the bar.
+            .searchable(text: $query, isPresented: $isSearchPresented, prompt: "Search agents and groups")
             .toolbar {
                 #if targetEnvironment(macCatalyst)
                 // A Mac list can't be pulled down to refresh.

@@ -562,7 +562,9 @@ struct RootShellView: View {
         .toolbar(.hidden, for: .tabBar)
         .toolbar(showsAgentBoard ? .hidden : .automatic, for: .navigationBar)
         .navigationTitle(showsAgentBoard ? "" : rootNavigationTitle)
-        .navigationBarTitleDisplayMode(showsAgentBoard ? .inline : .large)
+        // One title size on every tab: the bar's. A large title kept the size of the tab before
+        // (small after Feed or Kanban, large after Chat), so the same screen looked different.
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             // ☰ always opens chats, agents, tasks and settings, on iPad too. Always part of the
             // root screen's bar (a pushed chat has its own, and boards hide it): added only once
@@ -687,13 +689,13 @@ struct RootShellView: View {
         }
     }
 
-    /// Sessions' and Scheduled tasks' search fields run along the bottom on iOS 26
-    /// iPhones and iPads.
+    /// The tabs whose search field runs along the bottom on iOS 26 iPhones and iPads, under
+    /// the bar: the bar keeps the same gap above it on each (`SearchPlacementUITests`).
     private var tabsClearBottomSearch: Bool {
         guard #available(iOS 26, *), !BighelpPlatform.isMac else { return false }
         switch appState.selectedTab {
         case .sessions: return !fleetModeOn
-        case .scheduledTasks: return true
+        case .agents, .scheduledTasks, .kanban: return true
         default: return false
         }
     }
@@ -760,7 +762,8 @@ struct RootShellView: View {
         switch appState.selectedTab {
         case .sessions: fleetModeOn ? "All agents" : "Sessions"
         case .agents: "Agents"
-        case .scheduledTasks: "Scheduled Tasks"
+        // Its tab's name: the long one didn't fit beside its buttons.
+        case .scheduledTasks: "Tasks"
         case .home, .inbox: "Activity"
         case .workspace: "Hermes Tools"
         case .profile: "Settings"

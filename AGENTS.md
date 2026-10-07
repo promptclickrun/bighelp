@@ -37,6 +37,10 @@ change in both repos.
     it, Done closes it. Whatever the bar holds is a tab. Headers drawn by the app place ☰ with
     `bighelpHeaderButtonsPlacement()`, so it sits where the top bar puts it on every screen
     (`MenuButtonPlacementUITests`).
+  - Main screens look the same whichever tab you came from (`SearchPlacementUITests`). Their title is the
+    bar's small one (a large title kept the size of the tab before). Search uses the system's place, never
+    `.navigationBarDrawer`: along the bottom on iOS 26, under the bottom bar, which keeps the same gap above
+    it (`tabsClearBottomSearch` lists the tabs).
   - Never show "bighelp account" or "Link" wording. That pairing system is retired.
 - **Real data only.**
   - Avatars, activity poses and badges must come from what the agent is actually doing.
@@ -203,7 +207,8 @@ change in both repos.
   `Menu(primaryAction:)` or its own gesture (`AgentPinnedGrid`).
 - **Owners change on every reconnect:** `WorkspaceOwner` includes the connection generation, so returning to the app
   makes a new one. Keep per-computer state (like "this host has Kanban") by `cacheScopeID`, and don't turn a failed
-  check during a reconnect into "unavailable" (`KanbanAvailability`).
+  check during a reconnect into "unavailable" (`KanbanAvailability`). The owner is nil while the connection is
+  closed: that gap isn't another computer, so a page's data stays (`use(host:)` ignores nil).
 
 ### Crashes that only happen on a real iPhone
 

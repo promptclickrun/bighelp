@@ -128,6 +128,10 @@ struct WorkflowFlowView: View {
         .scrollIndicators(.hidden)
         .background(BighelpThemeCanvas(theme: theme).ignoresSafeArea())
         .safeAreaInset(edge: .bottom) { if model.definition != nil { bottomBar } }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            WorkflowPublishBar(model: model) { Task { await context.store.load() } }
+        }
+        .animation(.snappy, value: model.needsPublish)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
         .toolbar {

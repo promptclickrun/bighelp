@@ -61,8 +61,6 @@ struct LiveVoiceView: View {
                             .tracking(-0.2)
                             .foregroundStyle(hasCaption ? theme.primaryText : theme.secondaryText)
                             .multilineTextAlignment(.center)
-                            .lineLimit(6)
-                            .truncationMode(.head)
                             .frame(maxWidth: 520)
                             .fixedSize(horizontal: false, vertical: true)
                         if model.workStatus == .resultSent {
@@ -89,6 +87,7 @@ struct LiveVoiceView: View {
                     .frame(maxWidth: .infinity, minHeight: proxy.size.height)
                 }
                 .scrollBounceBehavior(.basedOnSize)
+                .scrollIndicators(.hidden)
             }
             controls
                 .frame(maxWidth: 560)

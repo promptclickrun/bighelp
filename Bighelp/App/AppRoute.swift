@@ -11,6 +11,11 @@ enum AppTab: String, CaseIterable, Identifiable {
     /// One computer's pages, opened from ☰ or pinned to the bar.
     var isHostPage: Bool { [.projects, .kanban, .workflows, .usage].contains(self) }
 
+    /// Screens people stay on (Projects, Kanban, Workflows): from ☰ they open as screens of
+    /// their own, with ☰ in the corner. Quick ones (Usage, and Feed, Ideas or Goals when the
+    /// bottom bar doesn't hold them) slide in over where you are, with Back.
+    var isLongStay: Bool { [.projects, .kanban, .workflows].contains(self) }
+
     /// Tabs drawn as the selected agent's board (no navigation bar).
     var isAgentBoard: Bool { [.feed, .ideas, .goals, .apps].contains(self) }
 
@@ -45,6 +50,8 @@ enum AppRoute: Hashable {
     case usage
     /// The all-hosts view's chat list: every host's chats.
     case allHostsChats
+    /// Feed, Ideas, Goals or Files as a quick screen with Back, when the bottom bar doesn't hold it.
+    case board(AppTab)
 
     /// Screens about every computer, which stay put when the working computer changes.
     var isAllHosts: Bool { self == .allHostsChats }

@@ -14,6 +14,7 @@ final class BighelpMenuUITests: BighelpUITestCase {
         openSettings(in: app)
         XCTAssertFalse(app.buttons["quick-workspace.menu"].exists, "The grid button is gone.")
         save("01-settings", app)
+        closeSettings(in: app)
 
         // ☰: the host on top as one row, then the places you go, then recent chats.
         tap(app.buttons["home.drawer.open"])

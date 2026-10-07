@@ -616,11 +616,7 @@ struct ChatView: View {
         }
         .background(alignment: .bottom) { sessionControlsAnchor }
         .foregroundStyle(theme.primaryText)
-        // The home header's buttons carry their own touch margin.
-        .padding(.horizontal, (BighelpPlatform.usesTabOrnament ? 22 : 12)
-                 - (homeChrome.isEnabled ? HeaderButtonMetrics.slop : 0))
-        // Vision Pro's rounded window corner clipped ☰; keep it clear.
-        .padding(.top, BighelpPlatform.usesTabOrnament ? 12 : max(0, 4 - (homeChrome.isEnabled ? HeaderButtonMetrics.slop : 0)))
+        .modifier(ChatHeaderPlacement(isHome: homeChrome.isEnabled))
         .padding(.bottom, 8)
         #if !os(visionOS)
         .background {
@@ -1407,4 +1403,21 @@ struct ChatView: View {
             initialItems: []
         )
     )
+}
+
+/// The home header's ☰ and buttons sit where a root screen's top bar puts them, the
+/// same as on Feed, Ideas, Goals and Files. The plain header keeps its own margins
+/// (Vision Pro's rounded window corner clipped ☰, so it stays clear).
+private struct ChatHeaderPlacement: ViewModifier {
+    let isHome: Bool
+
+    func body(content: Content) -> some View {
+        if isHome {
+            content.bighelpHeaderButtonsPlacement()
+        } else {
+            content
+                .padding(.horizontal, BighelpPlatform.usesTabOrnament ? 22 : 12)
+                .padding(.top, BighelpPlatform.usesTabOrnament ? 12 : 4)
+        }
+    }
 }

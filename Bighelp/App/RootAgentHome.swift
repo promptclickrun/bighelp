@@ -289,7 +289,7 @@ extension RootShellView {
 
     // MARK: Board tabs
 
-    func boardContext(for agent: AgentProfile) -> AgentBoardContext {
+    func boardContext(for agent: AgentProfile, onBack: (() -> Void)? = nil) -> AgentBoardContext {
         AgentBoardContext(
             agentID: agent.id, agentName: agent.name, imageURL: agents.avatarURL(for: agent),
             activity: homeActivity, store: agentBoard,
@@ -301,14 +301,15 @@ extension RootShellView {
             onNewChat: { startHomeChat(with: agent.id) },
             onPickAgents: { presentNewChatPicker(seed: agent.id) },
             tools: appsTools(for: agent),
-            menuHasUnread: menuHasUnread
+            menuHasUnread: menuHasUnread,
+            onBack: onBack
         )
     }
 
     @ViewBuilder
-    func agentBoardTab(_ tab: AppTab) -> some View {
+    func agentBoardTab(_ tab: AppTab, onBack: (() -> Void)? = nil) -> some View {
         if let agent = homeAgent {
-            let context = boardContext(for: agent)
+            let context = boardContext(for: agent, onBack: onBack)
             switch tab {
             case .feed: AgentFeedView(context: context)
             case .ideas: AgentIdeasView(context: context)
@@ -318,6 +319,24 @@ extension RootShellView {
         } else {
             ContentUnavailableView("No agent yet", systemImage: "person.crop.circle.badge.questionmark",
                 description: Text("Connect to Hermes to see your agent's feed, ideas and goals."))
+        }
+    }
+
+    /// Feed, Ideas, Goals or Files as a quick screen, from ☰ while the bottom bar doesn't hold
+    /// it: over where you were, with Back where ☰ would be.
+    func agentBoardPage(_ tab: AppTab) -> some View {
+        agentBoardTab(tab, onBack: { [appState] in
+            if case .board? = appState.path.last { appState.path.removeLast() }
+        })
+        .toolbar(.hidden, for: .navigationBar)
+    }
+
+    /// From ☰: its tab when the bottom bar holds it, else a quick screen over where you are.
+    func openBoard(_ tab: AppTab) {
+        if barTabs.contains(tab) {
+            tabSelection.wrappedValue = tab
+        } else if appState.path.last != .board(tab) {
+            appState.path.append(.board(tab))
         }
     }
 
@@ -684,10 +703,9 @@ extension RootShellView {
                 : nil,
             onUsage: usage.isAvailable ? { afterClosingHomeSheets { showUsage() } } : nil,
             onCredentialVault: canOpenCredentialVault ? { afterClosingHomeSheets { openCredentialVault() } } : nil,
-            onSettings: { afterClosingHomeSheets { appState.select(.profile) } },
+            onSettings: { afterClosingHomeSheets { openSettingsPage() } },
             places: settings.appLayout.menuPlaces,
-            // Feed, Ideas, Goals and Files open as their tabs, bar or not.
-            onBoard: { [tabSelection] tab in afterClosingHomeSheets { tabSelection.wrappedValue = tab } },
+            onBoard: { tab in afterClosingHomeSheets { openBoard(tab) } },
             unread: boardUnreadTabs
         )
     }

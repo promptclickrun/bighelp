@@ -376,7 +376,7 @@ final class SettingsStore {
             forKey: Keys.showCronSessions,
             default: false
         )
-        appLayout = BighelpAppLayout(saved: defaults.string(forKey: Keys.appLayout))
+        appLayout = BighelpAppLayout(savedObject: defaults.object(forKey: Keys.appLayout))
         nerdModeEnabled = defaults.bool(forKey: Keys.nerdMode, default: false)
         allHostsMode = defaults.bool(forKey: Keys.allHostsMode, default: false)
         let landing = defaults.string(forKey: BighelpLanding.screenKey).flatMap(BighelpLandingScreen.init(rawValue:))

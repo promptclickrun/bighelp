@@ -6,7 +6,7 @@ extension SettingsView {
     var appearancePage: some View {
         AppearanceStudioView(settings: settings) {
             NavigationLink {
-                ChatLayoutSettingsView()
+                settingsDone(ChatLayoutSettingsView())
             } label: {
                 AppearanceStudioRow(title: "Chat layout", detail: "Avatar, name, text size and spacing",
                                     systemImage: "text.bubble")
@@ -14,7 +14,7 @@ extension SettingsView {
             .buttonStyle(.plain)
             .accessibilityIdentifier("settings.appearance.chat-layout")
             NavigationLink {
-                AppLayoutSettingsView(settings: settings)
+                settingsDone(AppLayoutSettingsView(settings: settings))
             } label: {
                 AppearanceStudioRow(title: "App layout", detail: "Bottom bar and menu order",
                                     systemImage: "rectangle.bottomthird.inset.filled")

@@ -65,6 +65,7 @@ final class AllHostsUITests: BighelpUITestCase {
         save("which-host", app)
         pickHome.tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
+        closeSettings(in: app)
 
         // ☰ › Agents is All agents here, right under New chat. One-computer places (Projects,
         // Kanban) ask which computer; the one-host Agents row isn't in this menu.

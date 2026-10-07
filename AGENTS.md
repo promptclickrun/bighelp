@@ -30,6 +30,12 @@ change in both repos.
   - People choose the bottom bar (Chat plus up to four) and ☰'s order in Appearance › App layout
     (`BighelpAppLayout`). ☰ lists every place the bar doesn't hold, so nothing is out of reach. A new place
     in ☰ is a `BighelpPlace` case; a page that can be pinned also needs an `AppTab` and a root in `rootTabs`.
+  - Long-stay screens (Chat, Agents, Projects, Kanban, Workflows, Scheduled tasks) open from ☰ as screens of
+    their own, with ☰ in the corner (`AppTab.isLongStay`). Quick ones (Usage; Feed, Ideas, Goals and Files when
+    the bar doesn't hold them) slide in over where you are, with Back. Settings is a sheet: Back steps through
+    it, Done closes it. Whatever the bar holds is a tab. Headers drawn by the app place ☰ with
+    `bighelpHeaderButtonsPlacement()`, so it sits where the top bar puts it on every screen
+    (`MenuButtonPlacementUITests`).
   - Never show "bighelp account" or "Link" wording. That pairing system is retired.
 - **Real data only.**
   - Avatars, activity poses and badges must come from what the agent is actually doing.

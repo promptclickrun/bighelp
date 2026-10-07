@@ -132,8 +132,12 @@ final class SessionsParityUITests: BighelpUITestCase {
         XCTAssertFalse(app.buttons["fleet.gate.host.Home Hermes"].waitForExistence(timeout: 2),
                        "The focused computer doesn't need asking")
         XCTAssertTrue(app.navigationBars["Projects"].waitForExistence(timeout: 8))
-        let projectsBack = app.navigationBars.buttons["BackButton"].firstMatch
-        if projectsBack.exists { projectsBack.tap() } else { swipeBackFromLeadingEdge(in: app) }
+        // Projects is a screen people stay on: ☰ in the corner, no Back. ☰ leads to All agents.
+        XCTAssertFalse(app.navigationBars.buttons["BackButton"].exists, "Projects is a screen of its own")
+        menu.tap()
+        let allAgentsRow = app.buttons["menu.all-agents"]
+        XCTAssertTrue(allAgentsRow.waitForExistence(timeout: 5))
+        allAgentsRow.tap()
         let homeChip = app.buttons["fleet.filter.Home Hermes"]
         XCTAssertTrue(homeChip.waitForExistence(timeout: 8))
         XCTAssertTrue(homeChip.isSelected, "All agents shows the focused computer too")

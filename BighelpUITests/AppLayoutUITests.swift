@@ -100,15 +100,6 @@ final class AppLayoutUITests: BighelpUITestCase {
         XCTAssertTrue(app.descendants(matching: .any)["app-layout"].waitForExistence(timeout: 5))
     }
 
-    /// Back out of App layout and Appearance to Settings, where the bar shows.
-    @MainActor private func closeSettings(in app: XCUIApplication) {
-        for _ in 0..<4 where !app.buttons["tab.kanban"].isHittable {
-            let back = app.navigationBars.buttons.element(boundBy: 0)
-            if back.exists, back.isHittable { back.tap() } else { swipeBackFromLeadingEdge(in: app) }
-            _ = app.buttons["tab.kanban"].waitForExistence(timeout: 2)
-        }
-    }
-
     @MainActor private func scrollTo(_ element: XCUIElement, in app: XCUIApplication) -> Bool {
         for _ in 0..<8 {
             if element.waitForExistence(timeout: 1), element.isHittable { return true }

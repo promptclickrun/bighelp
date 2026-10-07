@@ -30,4 +30,15 @@ struct MacSheetPresentationTests {
         #expect(source.contains("BighelpMacSheetCloser"))
         #expect(source.contains("sheet.dismiss(animated: true)"))
     }
+
+    /// The closer sits behind every sheet's owner, chat message rows included, and those rows are
+    /// UIKit cells (`UIHostingConfiguration`). A cell can't host a view controller: SwiftUI drew a
+    /// yellow box with a "no" sign behind every chat message on the Mac instead (build 88 to 94).
+    @Test func theMacCloserIsAViewThatCellsCanHost() throws {
+        let repository = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let source = try String(contentsOf: repository.appending(path: "Bighelp/DesignSystem/BighelpSheetSize.swift"),
+                                encoding: .utf8)
+        #expect(source.contains("struct BighelpMacSheetCloser: UIViewRepresentable"))
+        #expect(!source.contains("BighelpMacSheetCloser: UIViewControllerRepresentable"))
+    }
 }

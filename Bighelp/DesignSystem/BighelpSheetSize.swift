@@ -173,7 +173,7 @@ private struct BighelpChatPanelPresenter<Panel: View>: ViewModifier {
 
 /// Remembers the sheet UIKit put up for one `bighelpSheet`, and closes it if
 /// it's still up a moment after SwiftUI closed it.
-private struct BighelpMacSheetCloser: UIViewControllerRepresentable {
+private struct BighelpMacSheetCloser: UIViewRepresentable {
     /// What's presented: nil while closed, the item's ID for `item:` sheets.
     let token: AnyHashable?
 
@@ -184,24 +184,27 @@ private struct BighelpMacSheetCloser: UIViewControllerRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
-    func makeUIViewController(context: Context) -> UIViewController {
-        let controller = UIViewController()
-        controller.view.isUserInteractionEnabled = false
-        controller.view.backgroundColor = .clear
-        controller.view.isAccessibilityElement = false
-        return controller
+    /// A plain view, never a view controller: chat message rows (which own sheets) are UIKit
+    /// cells, and a cell can't host a view controller. SwiftUI drew a yellow box with a "no"
+    /// sign in its place, behind every message (`MacSheetPresentationTests`).
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.isUserInteractionEnabled = false
+        view.backgroundColor = .clear
+        view.isAccessibilityElement = false
+        return view
     }
 
-    func updateUIViewController(_ controller: UIViewController, context: Context) {
+    func updateUIView(_ view: UIView, context: Context) {
         let coordinator = context.coordinator
         guard token != coordinator.token else { return }
         coordinator.token = token
         if let token {
-            let before = coordinator.sheet ?? Self.presenter(of: controller)?.presentedViewController
+            let before = coordinator.sheet ?? Self.presenter(of: view)?.presentedViewController
             // SwiftUI puts the sheet up after this update.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak controller] in
-                guard coordinator.token == token, let controller,
-                      let sheet = Self.presenter(of: controller)?.presentedViewController, sheet !== before else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak view] in
+                guard coordinator.token == token, let view,
+                      let sheet = Self.presenter(of: view)?.presentedViewController, sheet !== before else { return }
                 coordinator.sheet = sheet
             }
         } else {
@@ -215,14 +218,16 @@ private struct BighelpMacSheetCloser: UIViewControllerRepresentable {
         }
     }
 
-    /// The nearest controller above this one that has something presented.
-    private static func presenter(of controller: UIViewController) -> UIViewController? {
-        var candidate = controller.parent
+    /// The nearest controller above this view that has something presented.
+    private static func presenter(of view: UIView) -> UIViewController? {
+        var responder: UIResponder? = view.next
+        while let current = responder, !(current is UIViewController) { responder = current.next }
+        var candidate = responder as? UIViewController
         while let current = candidate {
             if current.presentedViewController != nil { return current }
             candidate = current.parent
         }
-        return controller.view.window?.rootViewController
+        return view.window?.rootViewController
     }
 }
 

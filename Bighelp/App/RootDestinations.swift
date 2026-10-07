@@ -27,6 +27,8 @@ extension RootShellView {
             workflowsDestination(route)
         case (.usage, _):
             usageDestination
+        case (.board(let tab), _):
+            agentBoardPage(tab)
         case (.allHostsChats, _):
             if let fleet {
                 fleetChats(fleet)

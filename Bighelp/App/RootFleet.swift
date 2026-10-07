@@ -77,8 +77,10 @@ extension RootShellView {
     }
 
     /// Settings belongs to one computer: while all show, the focused one, or ask which.
+    /// Settings is a quick screen: a sheet over where you are. Back steps through its
+    /// pages and Done closes it. With several computers, All hosts asks which first.
     func openSettingsPage() {
-        if fleetModeOn { fleetGate(.settings) } else { appState.select(.profile) }
+        if fleetModeOn { fleetGate(.settings) } else { isUnifiedSettingsPresented = true }
     }
 
     /// A one-computer page (Projects, Kanban, Workflows) over the all-hosts list it was
@@ -91,9 +93,10 @@ extension RootShellView {
     /// One host's pages on the Sessions tab; from another tab, after the switch
     /// (`AppState.select(_:thenOpen:)`).
     func showOneHostPageOnSessions(_ routes: [AppRoute]) {
-        // Pinned to the bottom bar (Appearance › App layout): its tab, not a page pushed over Chat.
-        if routes.count == 1, let tab = Self.pinnableTab(routes[0]), barTabs.contains(tab) {
-            appState.select(tab)
+        // A long-stay page (Projects, Kanban, Workflows) is a screen of its own with ☰, and so is
+        // anything pinned to the bottom bar. What opens on it (a workflow, a run) slides in with Back.
+        if let first = routes.first, let tab = Self.pinnableTab(first), tab.isLongStay || barTabs.contains(tab) {
+            appState.select(tab, thenOpen: Array(routes.dropFirst()))
             return
         }
         if appState.selectedTab != .sessions {
@@ -388,7 +391,7 @@ extension RootShellView {
             openPrepared(.scheduledTask(id: jobID, agentID: profileID))
         case .destination(let destination):
             switch destination {
-            case .settings: appState.select(.profile)
+            case .settings: isUnifiedSettingsPresented = true
             case .agents: appState.select(.agents)
             case .newAgent:
                 // That computer's Agents screen opens its new-agent editor once it's connected.

@@ -30,10 +30,21 @@ extension BighelpUITestCase {
 
     @MainActor
     func openSettings(in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        // Already open: Settings is a sheet over the screen it was opened from.
+        if app.descendants(matching: .any)["settings.screen"].firstMatch.waitForExistence(timeout: 1) { return }
         // Settings sits in ☰ on iPhone and iPad.
         openRootTab("tab.profile", in: app, timeout: 10, file: file, line: line)
         XCTAssertTrue(app.descendants(matching: .any)["settings.screen"].firstMatch.waitForExistence(timeout: 5),
                       "The Settings destination must open through ☰.", file: file, line: line)
+    }
+
+    /// Settings is a sheet: Done closes it and shows the screen under it again.
+    @MainActor
+    func closeSettings(in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let done = app.buttons["settings.done"].firstMatch
+        guard done.waitForExistence(timeout: 3) else { return }
+        done.tap()
+        XCTAssertTrue(done.waitForNonExistence(timeout: 5), "Done closes Settings", file: file, line: line)
     }
 
     /// Root lists keep search under the large title; it appears on pull-down.

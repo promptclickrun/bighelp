@@ -56,6 +56,28 @@ struct SettingsView: View {
     @Environment(\.companionStore) private var companionStore
     @Environment(\.companionAgentScope) private var companionAgentScope
 
+    /// In the Settings sheet: Done on its pages too, beside Back. Done closes Settings.
+    private(set) var onDone: (() -> Void)?
+
+    /// Settings as a sheet, with Done on its pages.
+    func withDone(_ action: @escaping () -> Void) -> SettingsView {
+        var copy = self
+        copy.onDone = action
+        return copy
+    }
+
+    /// Done on a page pushed inside the sheet: pushed pages don't get the sheet's own toolbar.
+    func settingsDone<Page: View>(_ page: Page) -> some View {
+        page.toolbar {
+            if let onDone {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done", action: onDone)
+                        .accessibilityIdentifier("settings.done")
+                }
+            }
+        }
+    }
+
     init(
         settings: SettingsStore,
         focusedDestination: WorkspaceDestination? = nil,
@@ -248,13 +270,13 @@ struct SettingsView: View {
             } extras: {
                 if settings.nerdModeEnabled {
                     NavigationLink {
-                        settingsPage(title: "Connection") {
+                        settingsDone(settingsPage(title: "Connection") {
                             currentConnection
                             BighelpPluginCapabilitiesSection(connections: workspaceConnections,
                                                              permissionCenter: permissionCenter,
                                                              showsPluginSummary: false)
                             localCache
-                        }
+                        })
                     } label: {
                         Label("Connection & plugin features", systemImage: "point.3.connected.trianglepath.dotted")
                     }
@@ -328,7 +350,7 @@ struct SettingsView: View {
         Section {
             ForEach(sections) { section in
                 NavigationLink {
-                    destination(for: section)
+                    settingsDone(destination(for: section))
                 } label: {
                     settingsMenuRow(section)
                 }

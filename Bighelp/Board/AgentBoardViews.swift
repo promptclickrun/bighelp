@@ -23,6 +23,8 @@ struct AgentBoardContext {
     let tools: [(title: String, systemImage: String, action: () -> Void)]
     /// Something new on a board that's only in ☰, for a dot on ☰.
     var menuHasUnread = false
+    /// Opened as a quick screen (from ☰, not in the bottom bar): Back where ☰ would be.
+    var onBack: (() -> Void)? = nil
 }
 
 // MARK: - Shared pieces

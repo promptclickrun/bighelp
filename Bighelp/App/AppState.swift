@@ -65,6 +65,10 @@ final class AppState {
             path = routes
             return
         }
+        guard !routes.isEmpty else {
+            select(tab)
+            return
+        }
         select(tab)
         #if targetEnvironment(macCatalyst)
         Task { @MainActor [weak self] in

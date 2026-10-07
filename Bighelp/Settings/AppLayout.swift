@@ -136,6 +136,20 @@ struct BighelpAppLayout: Equatable, Sendable {
                   menuOrder: raw.menu.compactMap(BighelpPlace.init(rawValue:)))
     }
 
+    /// What UserDefaults holds: the saved JSON text, or a dictionary of names (how a
+    /// launch argument like `-bighelp.app-layout '{pinned=(agents,feed);menu=();}'` arrives).
+    init(savedObject object: Any?) {
+        if let text = object as? String {
+            self.init(saved: text)
+        } else if let dictionary = object as? [String: Any],
+                  let pinned = dictionary["pinned"] as? [String] {
+            self.init(pinned: pinned.compactMap(BighelpPlace.init(rawValue:)),
+                      menuOrder: ((dictionary["menu"] as? [String]) ?? []).compactMap(BighelpPlace.init(rawValue:)))
+        } else {
+            self = .standard
+        }
+    }
+
     var saved: String? {
         (try? JSONEncoder().encode(Raw(pinned: pinned.map(\.rawValue), menu: menuOrder.map(\.rawValue))))
             .flatMap { String(data: $0, encoding: .utf8) }

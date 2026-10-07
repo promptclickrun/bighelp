@@ -76,9 +76,10 @@ struct AgentHomeChatHeader: View {
                 } label: {
                     Image(systemName: "line.3.horizontal")
                         .font(.bighelp(.title3).weight(.semibold))
+                        // On the glyph, where the top bar's ☰ shows it.
+                        .bighelpMenuDot(!chrome.unreadTabs.subtracting(chrome.barTabs).isEmpty)
                         .frame(width: HeaderButtonMetrics.glass, height: HeaderButtonMetrics.glass)
                         .bighelpNavigationGlass(in: Circle(), isInteractive: true)
-                        .bighelpMenuDot(!chrome.unreadTabs.subtracting(chrome.barTabs).isEmpty)
                         .padding(HeaderButtonMetrics.slop)
                         .contentShape(.rect)
                 }
@@ -146,10 +147,17 @@ struct AgentBoardHeaderButtons: View {
 
     var body: some View {
         HStack(alignment: .top) {
-            Button(action: context.onMenu) { glyph("line.3.horizontal").bighelpMenuDot(context.menuHasUnread) }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Chats and menu")
-                .accessibilityIdentifier("home.drawer.open")
+            if let onBack = context.onBack {
+                Button(action: onBack) { glyph("chevron.left") }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Back")
+                    .accessibilityIdentifier("board.back")
+            } else {
+                Button(action: context.onMenu) { glyph("line.3.horizontal", dot: context.menuHasUnread) }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Chats and menu")
+                    .accessibilityIdentifier("home.drawer.open")
+            }
             Spacer()
             HStack(spacing: 0) {
                 newChatButton
@@ -175,6 +183,7 @@ struct AgentBoardHeaderButtons: View {
                 .accessibilityIdentifier("board.more")
             }
         }
+        .bighelpHeaderButtonsPlacement()
     }
 
     /// Tap: a new chat with this agent. Touch and hold: the picker, for another agent or a group.
@@ -196,10 +205,11 @@ struct AgentBoardHeaderButtons: View {
             .accessibilityIdentifier("board.new-chat")
     }
 
-    private func glyph(_ systemImage: String) -> some View {
+    private func glyph(_ systemImage: String, dot: Bool = false) -> some View {
         Image(systemName: systemImage)
             .font(.bighelp(.title3).weight(.semibold))
             .foregroundStyle(theme.primaryText)
+            .bighelpMenuDot(dot)
             .frame(width: HeaderButtonMetrics.glass, height: HeaderButtonMetrics.glass)
             .bighelpNavigationGlass(in: Circle(), isInteractive: true)
             .padding(HeaderButtonMetrics.slop)
@@ -222,6 +232,41 @@ enum HeaderButtonMetrics {
     static var glass: CGFloat { BighelpTokens.scaled(44) }
     static let slop: CGFloat = 5
     #endif
+
+    /// From the screen's side to the first glass button: where the top bar puts ☰ on
+    /// Agents and the other root screens, so ☰ never moves between them and Chat, Feed,
+    /// Ideas, Goals and Files. Measured on iOS 26: 16 points on iPhone, 10 on iPad.
+    static func edgeInset(regularWidth: Bool) -> CGFloat {
+        if BighelpPlatform.usesTabOrnament { return 22 }
+        if BighelpPlatform.isMac { return 12 }
+        return regularWidth ? 10 : 16
+    }
+
+    /// From the top of the safe area to the glass: centered in the 44-point top bar.
+    static var topInset: CGFloat {
+        if BighelpPlatform.usesTabOrnament { return 18 }
+        if BighelpPlatform.isMac { return slop }
+        return max(0, (44 - glass) / 2)
+    }
+}
+
+extension View {
+    /// Places a row of header glass buttons (each with `HeaderButtonMetrics.slop` around it)
+    /// where a root screen's top bar puts its buttons.
+    func bighelpHeaderButtonsPlacement() -> some View {
+        modifier(HeaderButtonsPlacement())
+    }
+}
+
+private struct HeaderButtonsPlacement: ViewModifier {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    func body(content: Content) -> some View {
+        content
+            .padding(.horizontal, HeaderButtonMetrics.edgeInset(regularWidth: horizontalSizeClass == .regular)
+                     - HeaderButtonMetrics.slop)
+            .padding(.top, HeaderButtonMetrics.topInset - HeaderButtonMetrics.slop)
+    }
 }
 
 private enum NewChatButtonCopy {

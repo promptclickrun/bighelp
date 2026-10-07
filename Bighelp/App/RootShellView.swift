@@ -564,24 +564,24 @@ struct RootShellView: View {
         .navigationTitle(showsAgentBoard ? "" : rootNavigationTitle)
         .navigationBarTitleDisplayMode(showsAgentBoard ? .inline : .large)
         .toolbar {
-            if appState.path.isEmpty, !appState.selectedTab.isAgentBoard {
-                // ☰ always opens chats, agents, tasks and settings, on iPad too.
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        isHomeDrawerPresented.toggle()
-                    } label: {
-                        Image(systemName: "line.3.horizontal").bighelpToolbarIcon()
-                            .bighelpMenuDot(menuHasUnread)
-                    }
-                    .bighelpIconLabel("Chats and menu", shortcut: "⌃⌘S")
-                    .accessibilityIdentifier("home.drawer.open")
+            // ☰ always opens chats, agents, tasks and settings, on iPad too. Always part of the
+            // root screen's bar (a pushed chat has its own, and boards hide it): added only once
+            // a chat closed, it was sometimes dropped mid-switch, and Agents had no ☰.
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    isHomeDrawerPresented.toggle()
+                } label: {
+                    Image(systemName: "line.3.horizontal").bighelpToolbarIcon()
+                        .bighelpMenuDot(menuHasUnread)
                 }
-                // Ember lives only in chrome: the brand bar on root screens.
-                // Touch and hold it to switch hosts.
-                EmberBrandToolbarItem(demoHosts: demoHosts)
-                // All agents has its own options there instead (☰ switches back to one host).
-                if fleetModeOn, appState.selectedTab == .scheduledTasks { fleetToolbar }
+                .bighelpIconLabel("Chats and menu", shortcut: "⌃⌘S")
+                .accessibilityIdentifier("home.drawer.open")
             }
+            // Ember lives only in chrome: the brand bar on root screens.
+            // Touch and hold it to switch hosts.
+            EmberBrandToolbarItem(demoHosts: demoHosts)
+            // All agents has its own options there instead (☰ switches back to one host).
+            if fleetModeOn, appState.path.isEmpty, appState.selectedTab == .scheduledTasks { fleetToolbar }
         }
         #if os(visionOS)
         // Beside the window, not along its bottom edge by the close control.
@@ -633,13 +633,9 @@ struct RootShellView: View {
             action?()
         }) {
             NavigationStack {
-                workspaceSettings()
-                    .toolbar {
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button("Done") { isUnifiedSettingsPresented = false }
-                                .accessibilityIdentifier("settings.done")
-                        }
-                    }
+                // Done on every page closes Settings; Back steps through its pages.
+                let settingsSheet = workspaceSettings().withDone { isUnifiedSettingsPresented = false }
+                settingsSheet.settingsDone(settingsSheet)
             }
             .bighelpSheetSize()
             .presentationDragIndicator(.visible)
@@ -889,8 +885,9 @@ struct RootShellView: View {
                     _ = agents.setPrimaryAgent(members[0])
                 }
                 var transaction = Transaction()
-                transaction.disablesAnimations = !appState.path.isEmpty
-                    || (tab == .sessions && appState.selectedTab.isAgentBoard)
+                // Chat opens its chat as a page under the hood; from any tab it swaps in like
+                // the others instead of sliding in like a page turn.
+                transaction.disablesAnimations = !appState.path.isEmpty || tab == .sessions
                 withTransaction(transaction) { selectTab(tab) }
             }
         )
@@ -1331,7 +1328,7 @@ struct RootShellView: View {
         case .projects:
             openProjects()
         case .settings:
-            appState.select(.profile)
+            openSettingsPage()
         case .workflows:
             openWorkflows()
         case .workflow(let id, let hostID, let startsRun):

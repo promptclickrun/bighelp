@@ -56,6 +56,10 @@ struct AppLayoutTests {
         let odd = BighelpAppLayout(saved: #"{"pinned":["kanban","teleporter","kanban","settings"],"menu":["usage"]}"#)
         #expect(odd.barTabs == [.sessions, .kanban])
         #expect(odd.menuPlaces.first == .usage && Set(odd.menuPlaces + [.kanban]) == Set(BighelpPlace.allCases))
+        // A launch argument arrives as a dictionary of names.
+        let argument = BighelpAppLayout(savedObject: ["pinned": ["agents", "feed"], "menu": [String]()])
+        #expect(argument.barTabs == [.sessions, .agents, .feed])
+        #expect(BighelpAppLayout(savedObject: 42) == .standard)
     }
 
     @MainActor

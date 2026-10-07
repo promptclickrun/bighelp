@@ -606,6 +606,7 @@ final class HostNotificationSetupModel {
         switch error {
         case let error as DirectHermesError: "DirectHermesError.\(error)"
         case let error as BighelpManagedNotificationSetupError: "NotificationSetupError.\(error.stage.rawValue)"
+        case let error as BighelpLinkCryptoError: "LinkCryptoError.\(error)"
         case let error as BighelpLinkAPIError:
             if case .requestFailed(let status, _) = error { "LinkAPIError.requestFailed(\(status))" } else { "LinkAPIError.\(error)" }
         default: String(describing: type(of: error))

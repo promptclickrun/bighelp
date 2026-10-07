@@ -46,6 +46,9 @@ struct BighelpNotificationTurnOffResult: Equatable, Sendable {
     /// Hosts that couldn't delete their copy yet. They can no longer send
     /// notifications, and bighelp asks them again later.
     let unreachableHosts: [String]
+    /// This device's saved identity couldn't be read, so the notification service wasn't asked to
+    /// cancel it; only this device's copy was deleted.
+    var registrationLeftOnService = false
 }
 
 @MainActor
@@ -769,7 +772,7 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
         } catch {
             // Revoking the installation below revokes every grant it holds.
         }
-        try await identity.erase()
+        let erasure = try await identity.erase()
 
         progress(.device)
         try ledger.erase()
@@ -783,7 +786,8 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
         }
         retiredHosts.removeAll()
         defaults.removeObject(forKey: Self.turnOffPendingKey)
-        return BighelpNotificationTurnOffResult(unreachableHosts: unreachable)
+        return BighelpNotificationTurnOffResult(unreachableHosts: unreachable,
+                                                registrationLeftOnService: erasure == .removedHereOnly)
     }
 
     /// A turn-off the notification service hasn't confirmed yet.

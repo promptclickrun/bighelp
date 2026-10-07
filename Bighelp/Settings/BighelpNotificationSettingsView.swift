@@ -272,7 +272,10 @@ struct BighelpNotificationSettingsView: View {
         do {
             let result = try await turnOff.run { step in turnOffStep = step }
             turnOffStep = nil
-            if result.unreachableHosts.isEmpty {
+            if result.registrationLeftOnService {
+                // Honest about what wasn't done: the old key couldn't be read, so it wasn't cancelled.
+                turnOffMessage = "Notifications are off, and this device's notification data was deleted. bighelp couldn't read this device's old notification key, so the notification service may keep its old registration. If alerts still come, turn them off for bighelp in iOS Settings."
+            } else if result.unreachableHosts.isEmpty {
                 turnOffMessage = "Notifications are off, and this device's notification data was deleted. To stop bighelp asking iOS for alerts too, turn them off in iOS Settings."
             } else {
                 turnOffMessage = awaitingCleanupMessage(turnOff)

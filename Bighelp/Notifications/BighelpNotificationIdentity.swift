@@ -1,4 +1,5 @@
 import CryptoKit
+import os
 import Foundation
 import Security
 
@@ -92,6 +93,19 @@ enum BighelpNotificationIdentityLoad: Equatable {
     case none
     case current(BighelpNotificationIdentityRecord)
     case orphaned(BighelpNotificationIdentityRecord)
+    /// Saved, but it can't be read back (damaged, or from an older build). Its key is lost, so
+    /// the registration it made can't be cancelled from this device.
+    case unreadable
+}
+
+/// What turning notifications off did with this device's identity.
+enum BighelpNotificationIdentityErasure: Equatable {
+    /// The notification service cancelled it, then it was deleted here.
+    case revoked
+    /// Nothing was saved.
+    case nothingSaved
+    /// It couldn't be read, so it was deleted here only; the service may still hold the old one.
+    case removedHereOnly
 }
 
 @MainActor
@@ -129,9 +143,20 @@ final class BighelpNotificationKeychainIdentityVault: BighelpNotificationIdentit
     }
 
     func load() throws -> BighelpNotificationIdentityLoad {
-        let stored = try loadStored()
-        guard let stored else { return .none }
-        let record = try decode(stored)
+        // A Keychain that won't answer (a locked phone) is an error; a record that won't read isn't.
+        let stored: Stored
+        do {
+            guard let value = try loadStored() else { return .none }
+            stored = value
+        } catch is DecodingError {
+            return .unreadable
+        }
+        let record: BighelpNotificationIdentityRecord
+        do {
+            record = try decode(stored)
+        } catch {
+            return .unreadable
+        }
         guard let marker = try readMarker(), marker == stored.installationMarker else {
             return .orphaned(record)
         }
@@ -378,7 +403,7 @@ final class BighelpNotificationIdentityCoordinator {
     func current() throws -> BighelpManagedNotificationCredentials? {
         switch try vault.load() {
         case .current(.active(let credentials)): return credentials
-        case .current(.pending(_)), .orphaned(_), .none: return nil
+        case .current(.pending(_)), .orphaned(_), .none, .unreadable: return nil
         }
     }
 
@@ -407,7 +432,8 @@ final class BighelpNotificationIdentityCoordinator {
         }
     }
 
-    func erase() async throws {
+    @discardableResult
+    func erase() async throws -> BighelpNotificationIdentityErasure {
         try await serialized {
             try await self.eraseUnserialized()
         }
@@ -427,6 +453,10 @@ final class BighelpNotificationIdentityCoordinator {
             }
             try await broker.revokeInstallation(credentials)
             try vault.delete()
+        case .unreadable:
+            // Its key is lost: start over with a new identity. Only notification data goes.
+            Self.log.notice("Notification identity: the saved one can't be read; starting a new one")
+            try vault.delete()
         case .none:
             break
         }
@@ -435,21 +465,31 @@ final class BighelpNotificationIdentityCoordinator {
         return try await complete(intent)
     }
 
-    private func eraseUnserialized() async throws {
+    private func eraseUnserialized() async throws -> BighelpNotificationIdentityErasure {
+        let erasure: BighelpNotificationIdentityErasure
         switch try vault.load() {
         case .current(.active(let credentials)), .orphaned(.active(let credentials)):
             try await broker.revokeInstallation(credentials)
+            erasure = .revoked
         case .current(.pending(let intent)):
             let credentials = try await recover(intent)
             try await broker.revokeInstallation(credentials)
+            erasure = .revoked
         case .orphaned(.pending(let intent)):
             let credentials = try await recover(intent, persistRefresh: false)
             try await broker.revokeInstallation(credentials)
+            erasure = .revoked
+        case .unreadable:
+            Self.log.notice("Notification identity: the saved one can't be read; deleting it on this device only")
+            erasure = .removedHereOnly
         case .none:
-            break
+            erasure = .nothingSaved
         }
         try vault.delete()
+        return erasure
     }
+
+    private static let log = Logger(subsystem: "app.loopdy.mobile", category: "notification-identity")
 
     private func serialized<Value>(
         _ operation: () async throws -> Value

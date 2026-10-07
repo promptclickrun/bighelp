@@ -653,13 +653,6 @@ struct AgentEditorView: View {
         }
     }
 
-    private func companionBackdrop(_ look: CompanionAppearance) -> Color {
-        let hex = look.matchesTheme
-            ? CompanionAppearance.validatedColorHex(theme.actionHex) ?? CompanionAppearance.fallbackColorHex
-            : look.colorHex
-        return Color(hex: String(hex.dropFirst()))
-    }
-
     /// The creator's look also becomes this agent's animated chat companion.
     private func applyCompanionLook(to profile: AgentProfile) {
         guard let store = companionStore, !companionAgentScope.isEmpty else { return }
@@ -699,14 +692,9 @@ struct AgentEditorView: View {
     @ViewBuilder
     private func avatarPreview(model: AgentEditorModel, size: CGFloat = 72) -> some View {
         if model.pendingAvatar != nil, let look = model.selectedCompanionAppearance {
-            // A creator look plays its chosen moves right here.
-            Circle()
-                .fill(companionBackdrop(look).opacity(0.18))
-                .overlay(Circle().strokeBorder(companionBackdrop(look).opacity(0.25), lineWidth: 1))
-                .overlay {
-                    CompanionAvatar(appearance: look, reaction: .idle, isAnimating: true)
-                        .frame(width: size * 0.8, height: size * 0.8)
-                }
+            // A creator look plays its chosen moves right here, with nothing behind it.
+            CompanionAvatar(appearance: look, reaction: .idle, isAnimating: true)
+                .frame(width: size * 0.8, height: size * 0.8)
                 .frame(width: size, height: size)
         } else if model.pendingAvatar != nil, let look = model.pendingLook, look.style != .photo {
             // A Hermes face stays sharp at any size, as Hermes Desktop draws it.

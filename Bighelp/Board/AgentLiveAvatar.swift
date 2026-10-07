@@ -43,8 +43,6 @@ struct AgentLiveAvatar: View {
     var activity: AgentActivityKind = .idle
     var size: CGFloat = 88
     var showsBadge = true
-    /// Off on the island's stage, where the pet walks around bare.
-    var showsBackdrop = true
     /// How the face rests with no work (voice mode shows listening).
     var restingState: AgentLiveState = .idle
 
@@ -52,7 +50,6 @@ struct AgentLiveAvatar: View {
     @Environment(\.agentActivityInIsland) private var activityInIsland
     @Environment(\.companionAgentScope) private var companionAgentScope
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -85,28 +82,19 @@ struct AgentLiveAvatar: View {
 
     @ViewBuilder
     private var face: some View {
+        // Characters and pets stand on nothing, like Hermes's faces: no circle behind them
+        // (`AgentAvatarBackdropTests`).
         if let look {
-            Circle()
-                .fill(backdrop(look).opacity(showsBackdrop ? 0.18 : 0))
-                .overlay(Circle().strokeBorder(backdrop(look).opacity(showsBackdrop ? 0.25 : 0), lineWidth: 1))
-                .overlay {
-                    CompanionAvatar(
-                        appearance: look,
-                        reaction: companionReaction,
-                        isAnimating: true,
-                        activityMood: activity.moodID
-                    )
-                    .frame(width: size * 0.82, height: size * 0.82)
-                }
+            CompanionAvatar(
+                appearance: look,
+                reaction: companionReaction,
+                isAnimating: true,
+                activityMood: activity.moodID
+            )
+            .frame(width: size * 0.82, height: size * 0.82)
         } else if let petFrames {
-            // Pets are drawn with dark outlines, so the disc stays light in dark mode.
-            Circle()
-                .fill(theme.action.opacity(showsBackdrop ? (colorScheme == .dark ? 0.45 : 0.12) : 0))
-                .overlay(Circle().strokeBorder(theme.action.opacity(showsBackdrop ? 0.2 : 0), lineWidth: 1))
-                .overlay {
-                    PetdexAnimatedAvatar(frames: petFrames)
-                        .frame(width: size * 0.86, height: size * 0.86)
-                }
+            PetdexAnimatedAvatar(frames: petFrames)
+                .frame(width: size * 0.86, height: size * 0.86)
         } else {
             AvatarView(stableID: agentID, displayName: displayName, imageURL: imageURL,
                        size: size, state: liveState)
@@ -143,13 +131,6 @@ struct AgentLiveAvatar: View {
             .symbolEffect(.pulse, options: .repeating, isActive: activity.isWorking && !reduceMotion)
             .contentTransition(.symbolEffect(.replace))
             .accessibilityHidden(true)
-    }
-
-    private func backdrop(_ look: CompanionAppearance) -> Color {
-        let hex = look.matchesTheme
-            ? CompanionAppearance.validatedColorHex(theme.actionHex) ?? CompanionAppearance.fallbackColorHex
-            : look.colorHex
-        return Color(hex: String(hex.dropFirst()))
     }
 
     @BighelpThemeReader private var theme

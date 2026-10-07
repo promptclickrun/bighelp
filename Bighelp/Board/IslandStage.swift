@@ -19,7 +19,7 @@ struct IslandStage: View {
                     Canvas { context, _ in scene.drawBehind(&context) }
                     AgentLiveAvatar(agentID: activity.agentID, displayName: activity.name,
                                     imageURL: activity.imageURL, activity: activity.kind,
-                                    size: Self.avatarSize, showsBadge: false, showsBackdrop: false)
+                                    size: Self.avatarSize, showsBadge: false)
                         .rotationEffect(.degrees(scene.avatarTilt))
                         .position(scene.avatarCenter)
                     Canvas { context, _ in scene.drawInFront(&context) }

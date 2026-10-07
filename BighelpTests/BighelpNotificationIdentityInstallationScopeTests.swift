@@ -147,6 +147,92 @@ struct BighelpNotificationIdentityInstallationScopeTests {
         }
     }
 
+    // MARK: An unreadable saved identity (#254)
+
+    /// On a TestFlight iPhone, setup and turn-off both stopped at "BighelpLinkCryptoError" right after
+    /// the Keychain read: the saved identity couldn't be read, and nothing went past it.
+    @Test
+    func setupStartsFreshWhenTheSavedIdentityCantBeRead() async throws {
+        let notificationVault = MemoryNotificationIdentityVault(value: .unreadable)
+        let transport = NotificationBootstrapTransport()
+        let coordinator = makeCoordinator(notificationVault: notificationVault, transport: transport)
+
+        let credentials = try await coordinator.resolveForEnrollment()
+
+        #expect(transport.requestOrder == ["bootstrap"], "A new identity registers; nothing else is asked")
+        #expect(try coordinator.current() == credentials)
+    }
+
+    @Test
+    func turnOffRemovesAnUnreadableIdentityAndSaysTheOldOneWasntCancelled() async throws {
+        let notificationVault = MemoryNotificationIdentityVault(value: .unreadable)
+        let transport = NotificationBootstrapTransport()
+        let coordinator = makeCoordinator(notificationVault: notificationVault, transport: transport)
+
+        let erasure = try await coordinator.erase()
+
+        #expect(erasure == .removedHereOnly, "Without its key, the old registration can't be cancelled from here")
+        #expect(transport.requestOrder.isEmpty)
+        #expect(notificationVault.value == .none)
+    }
+
+    @Test
+    func turnOffCancelsAReadableIdentity() async throws {
+        let notificationVault = MemoryNotificationIdentityVault()
+        let transport = NotificationBootstrapTransport()
+        let coordinator = makeCoordinator(notificationVault: notificationVault, transport: transport)
+        _ = try await coordinator.resolveForEnrollment()
+
+        #expect(try await coordinator.erase() == .revoked)
+        #expect(try await coordinator.erase() == .nothingSaved)
+    }
+
+    /// A damaged record in the real Keychain vault reads as unreadable instead of stopping setup.
+    @Test
+    func theKeychainVaultReportsADamagedRecordAsUnreadable() throws {
+        let service = "app.loopdy.mobile.tests.notification-identity.\(UUID().uuidString)"
+        let marker = FileManager.default.temporaryDirectory.appending(path: "marker-\(UUID().uuidString)")
+        let vault = BighelpNotificationKeychainIdentityVault(service: service, markerFile: marker)
+        defer { try? vault.delete() }
+        let installation = UUID().uuidString.lowercased()
+        let damaged = """
+        {"version":2,"state":"active","installationMarker":"\(UUID().uuidString.lowercased())",
+         "installationID":"\(installation)","authorizationEpoch":1,"signingPrivateKey":"not a key!"}
+        """
+        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+                                    kSecAttrService as String: service,
+                                    kSecAttrAccount as String: "notification-identity-v2",
+                                    kSecValueData as String: Data(damaged.utf8)]
+        #expect(SecItemAdd(query as CFDictionary, nil) == errSecSuccess)
+
+        #expect(try vault.load() == .unreadable)
+        try vault.delete()
+        #expect(try vault.load() == .none)
+
+        // A good record still reads back after the damaged one is gone.
+        let key = P256.Signing.PrivateKey()
+        let credentials = BighelpManagedNotificationCredentials(deviceID: installation, authorizationEpoch: 1,
+                                                               signingPrivateKey: key)
+        try vault.save(.active(credentials))
+        #expect(try vault.load() == .current(.active(credentials)))
+    }
+
+    /// Base64url is checked byte by byte: Foundation's CharacterSet rejected valid text on one iPhone
+    /// (the build 77 avatar colors), and a saved key that won't decode stops notification setup.
+    @Test
+    func base64URLRoundTripsAndRefusesOtherText() throws {
+        for count in [0, 1, 2, 3, 32, 65] {
+            let data = Data((0..<count).map { UInt8(truncatingIfNeeded: $0 &* 37 &+ 11) })
+            if count == 0 { continue }
+            #expect(try BighelpLinkBase64URL.decode(BighelpLinkBase64URL.encode(data)) == data)
+        }
+        let key = P256.Signing.PrivateKey()
+        #expect(try BighelpLinkBase64URL.decode(BighelpLinkBase64URL.encode(key.rawRepresentation)) == key.rawRepresentation)
+        for bad in ["", "a", "abc=", "ab+c", "ab/c", "ab c", "abcé", "abc\n"] {
+            #expect(throws: BighelpLinkCryptoError.invalidBase64URL) { try BighelpLinkBase64URL.decode(bad) }
+        }
+    }
+
     private func makeCoordinator(
         notificationVault: MemoryNotificationIdentityVault,
         transport: NotificationBootstrapTransport

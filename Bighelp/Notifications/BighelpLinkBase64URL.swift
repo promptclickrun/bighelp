@@ -6,9 +6,13 @@ enum BighelpLinkCryptoError: Error, Equatable {
 }
 
 enum BighelpLinkBase64URL {
-    private static let allowed = CharacterSet(
-        charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
-    )
+    /// A-Z, a-z, 0-9, - and _, checked byte by byte: Foundation's CharacterSet rejected valid
+    /// text on a real iPhone (the build 77 avatar colors), and here that stopped notification
+    /// setup at the saved key (#254).
+    private static func isAllowed(_ byte: UInt8) -> Bool {
+        (0x41...0x5A).contains(byte) || (0x61...0x7A).contains(byte) || (0x30...0x39).contains(byte)
+            || byte == 0x2D || byte == 0x5F
+    }
 
     static func encode(_ value: Data) -> String {
         value.base64EncodedString()
@@ -20,8 +24,8 @@ enum BighelpLinkBase64URL {
     static func decode(_ value: String) throws -> Data {
         guard
             !value.isEmpty,
-            value.unicodeScalars.allSatisfy(allowed.contains),
-            value.count % 4 != 1
+            value.utf8.allSatisfy(isAllowed),
+            value.utf8.count % 4 != 1
         else {
             throw BighelpLinkCryptoError.invalidBase64URL
         }

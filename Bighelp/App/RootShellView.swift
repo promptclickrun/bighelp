@@ -687,10 +687,15 @@ struct RootShellView: View {
         }
     }
 
-    /// The Sessions list's search field runs along the bottom on iOS 26 iPhones and iPads.
+    /// Sessions' and Scheduled tasks' search fields run along the bottom on iOS 26
+    /// iPhones and iPads.
     private var tabsClearBottomSearch: Bool {
         guard #available(iOS 26, *), !BighelpPlatform.isMac else { return false }
-        return appState.selectedTab == .sessions && !fleetModeOn
+        switch appState.selectedTab {
+        case .sessions: return !fleetModeOn
+        case .scheduledTasks: return true
+        default: return false
+        }
     }
 
     private var showsBottomNavigation: Bool {

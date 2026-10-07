@@ -11,7 +11,6 @@ struct VoiceView: View {
     #if targetEnvironment(macCatalyst)
     @State private var lastSpacePress = Date.distantPast
     #endif
-    @ScaledMetric(relativeTo: .title2) private var captionSize: CGFloat = 24
     let agentID: String?
     let agentImageURL: URL?
     let transcriptRows: [VoiceTranscriptRow]?
@@ -20,6 +19,8 @@ struct VoiceView: View {
     let onWorkspaceTap: () -> Void
     /// The chat's live work (a running tool, thinking), for the avatar's moves.
     var chatActivity: () -> AgentActivityKind = { .idle }
+    /// The step the agent is on, in plain words, for the line under the bars.
+    var chatStep: () -> String? = { nil }
 
     init(
         model: VoiceModel,
@@ -30,10 +31,12 @@ struct VoiceView: View {
         permissionCenter: PermissionCenter? = nil,
         onEnded: @escaping () -> Void = {},
         onWorkspaceTap: @escaping () -> Void = {},
-        chatActivity: @escaping () -> AgentActivityKind = { .idle }
+        chatActivity: @escaping () -> AgentActivityKind = { .idle },
+        chatStep: @escaping () -> String? = { nil }
     ) {
         _model = State(initialValue: model)
         self.chatActivity = chatActivity
+        self.chatStep = chatStep
         self.agentID = agentID
         self.agentImageURL = agentImageURL
         self.transcriptRows = transcriptRows
@@ -108,9 +111,16 @@ struct VoiceView: View {
                 ScrollView {
                     VStack(spacing: BighelpTokens.space24) {
                         Spacer(minLength: BighelpTokens.space24)
-                        orb(size: stageAvatarSize)
-                        caption
-                        VoiceWaveformBars(level: waveformLevel, color: agentPersona.color)
+                        // The face and its voice together, then the words: what the
+                        // agent is doing, and what's being said.
+                        VStack(spacing: BighelpTokens.space16) {
+                            orb(size: stageAvatarSize)
+                            VoiceWaveformBars(level: waveformLevel, color: agentPersona.color)
+                        }
+                        VStack(spacing: BighelpTokens.space12) {
+                            VoiceStepLine(step: chatStep)
+                            caption
+                        }
                         sendNowControl
                         endFailure
                         permissionRecovery
@@ -142,12 +152,12 @@ struct VoiceView: View {
     }
 
     /// The one line that matters right now: what the agent is saying, else what
-    /// you are saying, else the last finished turn.
+    /// you are saying, else the last finished turn, dimmed once it's said.
     private var caption: some View {
         Text(captionText)
-            .font(.system(size: captionSize, weight: .semibold))
+            .bighelpFont(.screenTitle, weight: .semibold)
             .tracking(-0.2)
-            .foregroundStyle(hasCaption ? theme.primaryText : theme.secondaryText)
+            .foregroundStyle(captionIsLive ? theme.primaryText : theme.secondaryText)
             .multilineTextAlignment(.center)
             .lineLimit(6)
             .truncationMode(.head)
@@ -185,13 +195,21 @@ struct VoiceView: View {
         if model.isTranscribing { return model.partialUserTranscript.map { $0 + " …" } ?? "Transcribing…" }
         if let partial = model.partialUserTranscript, !partial.isEmpty { return partial }
         if let last = displayedTranscriptRows.last { return last.text }
-        return "Start speaking when you’re ready"
+        return readyPrompt
     }
 
-    private var hasCaption: Bool {
+    /// Words being said right now, or the reply being spoken.
+    private var captionIsLive: Bool {
         !(model.liveAgentTranscript ?? "").isEmpty
             || !(model.partialUserTranscript ?? "").isEmpty
-            || !displayedTranscriptRows.isEmpty
+            || model.isTranscribing
+            || (model.status == .speaking && !displayedTranscriptRows.isEmpty)
+    }
+
+    /// Hands-free listens for you; walkie-talkie waits for the button.
+    private var readyPrompt: String {
+        guard model.mode == .walkieTalkie else { return "Start speaking when you’re ready" }
+        return BighelpPlatform.isMac ? "Hold the mic or press Space to talk" : "Hold the mic to talk"
     }
 
     /// Bars follow real audio: playback while the agent speaks, otherwise the
@@ -256,7 +274,7 @@ struct VoiceView: View {
             if isTranscriptExpanded {
                 if displayedTranscriptRows.isEmpty,
                    model.partialUserTranscript == nil, model.liveAgentTranscript == nil {
-                    Text("Start speaking when you’re ready")
+                    Text(readyPrompt)
                         .bighelpFont(.body)
                         .foregroundStyle(theme.secondaryText)
                 }

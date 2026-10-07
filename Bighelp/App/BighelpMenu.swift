@@ -71,8 +71,8 @@ struct BighelpMenuDestinations {
     /// Logins, cards and addresses an agent's browser can use (Hermes' vault).
     var onCredentialVault: (() -> Void)? = nil
     var onSettings: () -> Void
-    /// ☰'s places in the person's order: whatever the bottom bar doesn't hold
-    /// (Appearance › App layout).
+    /// ☰'s places in the person's order: whatever the bottom bar doesn't hold,
+    /// and always Agents and Settings (Appearance › App layout).
     var places: [BighelpPlace] = BighelpAppLayout.standard.menuPlaces
     /// Opens Feed, Ideas, Goals or Files when they aren't in the bottom bar.
     var onBoard: ((AppTab) -> Void)? = nil

@@ -32,6 +32,20 @@ struct AppLayoutTests {
         #expect(layout.barTabs.last == .kanban)
     }
 
+    @Test func agentsAndSettingsStayInTheMenuWhenPinned() {
+        var layout = BighelpAppLayout.standard
+        layout.unpin(.files)
+        layout.pin(.agents)
+        #expect(layout.barTabs.last == .agents)
+        #expect(layout.menuPlaces.first == .agents, "Quick screens hide the bar; ☰ still reaches Agents")
+        #expect(layout.menuPlaces.last == .settings)
+        #expect(!layout.menuPlaces.contains(.feed), "Other pinned places aren't listed twice")
+        layout.moveMenu(from: [0], to: 2)
+        #expect(layout.menuPlaces.filter { $0 == .agents }.count == 1)
+        #expect(layout.menuPlaces[1] == .agents)
+        #expect(BighelpAppLayout(saved: layout.saved) == layout)
+    }
+
     @Test func barAndMenuOrdersMove() {
         var layout = BighelpAppLayout.standard
         layout.movePinned(from: [3], to: 0)

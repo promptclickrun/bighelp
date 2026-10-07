@@ -13,6 +13,51 @@ final class CanvasStreamingFixtureClient: ConversationFixtureClient, StreamingCo
     private let toolStress = ProcessInfo.processInfo.arguments.contains("-test-tool-stream")
     private let silentReply = ProcessInfo.processInfo.arguments.contains("-test-silent-reply")
     private let tableReply = ProcessInfo.processInfo.arguments.contains("-test-table-reply")
+    private let voiceSteps = ProcessInfo.processInfo.arguments.contains("-test-voice-steps")
+
+    /// A turn with a few slow steps, the way Hermes reports them: the agent's own
+    /// tools, and a helper whose own tool must stay inside its folder.
+    private func runVoiceSteps(onDraft: @escaping (TimelineItem) -> Void) async throws -> ConversationResponse {
+        guard let model else { throw CancellationError() }
+        let sessionID = model.conversationID
+        let turnID = "voice-steps-\(UUID().uuidString)"
+        let steps: [(name: String, arguments: String?, kind: ChatActivityKind)] = [
+            ("mcp_google_calendar_list_events", #"{"day":"tomorrow"}"#, .tool),
+            ("delegate_task", nil, .subagent),
+            ("terminal", #"{"command":"git clone https://github.com/example/weather-app"}"#, .tool),
+            ("get_weather_forecast", #"{"when":"tomorrow"}"#, .tool),
+        ]
+        for (index, step) in steps.enumerated() {
+            let event = ChatActivityEvent(eventID: "\(turnID)-\(index)", sessionID: sessionID, turnID: turnID,
+                kind: step.kind, lifecycle: .running, title: step.kind == .subagent ? "Compare routes" : step.name,
+                summary: nil, detail: nil, occurredAt: index * 2,
+                toolCallID: step.kind == .tool ? "\(turnID)-call-\(index)" : nil, toolName: step.name,
+                arguments: step.arguments, subagentID: step.kind == .subagent ? "\(turnID)-helper" : nil)
+            _ = model.acceptActivity(event)
+            if step.kind == .subagent {
+                try await Task.sleep(for: .milliseconds(300))
+                _ = model.acceptActivity(ChatActivityEvent(eventID: "\(turnID)-helper-read", sessionID: sessionID,
+                    turnID: turnID, kind: .tool, lifecycle: .running, title: "read_file", summary: nil, detail: nil,
+                    occurredAt: index * 2, toolCallID: "\(turnID)-helper-call", toolName: "read_file",
+                    arguments: #"{"path":"routes.md"}"#, subagentID: "\(turnID)-helper"))
+            }
+            try await Task.sleep(for: .milliseconds(2_600))
+            _ = model.acceptActivity(event.updating(lifecycle: .succeeded, summary: nil, detail: nil,
+                                                    occurredAt: index * 2 + 1))
+        }
+        let id = "\(turnID)-reply"
+        let text = "Tomorrow looks sunny with a high of 72. You have two meetings in the morning."
+        func reply(_ text: String, delivery: String) -> TimelineItem {
+            TimelineItem(id: id, role: .assistant, sender: .agent(id: senderID, snapshot: .init(name: "Canvas fixture")),
+                         content: .message(text), metadata: .init(source: "UI fixture", delivery: delivery))
+        }
+        let words = text.split(separator: " ")
+        for count in stride(from: 3, through: words.count, by: 3) {
+            try await Task.sleep(for: .milliseconds(150))
+            onDraft(reply(words.prefix(count).joined(separator: " "), delivery: "Streaming"))
+        }
+        return ConversationResponse(items: [reply(text, delivery: "Delivered")])
+    }
 
     /// A reply with a pipe table, a divider and a checklist, streamed in pieces.
     private func runTableReply(onDraft: @escaping (TimelineItem) -> Void) async throws -> ConversationResponse {
@@ -180,6 +225,7 @@ final class CanvasStreamingFixtureClient: ConversationFixtureClient, StreamingCo
         if toolStress { return try await runToolStream(onDraft: onDraft) }
         if silentReply { return try await runSilentReply(onDraft: onDraft) }
         if tableReply { return try await runTableReply(onDraft: onDraft) }
+        if voiceSteps { return try await runVoiceSteps(onDraft: onDraft) }
         var text = "CANVAS STREAM START\n"
         var item = TimelineItem(id: "canvas-stream-\(UUID().uuidString)", role: .assistant,
                                 sender: .agent(id: senderID, snapshot: TimelineSenderSnapshot(name: "Canvas fixture")),

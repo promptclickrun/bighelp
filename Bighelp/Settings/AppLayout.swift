@@ -61,6 +61,10 @@ enum BighelpPlace: String, CaseIterable, Codable, Identifiable, Sendable {
     /// Settings stays in ☰, so it can always be reached.
     var canPin: Bool { self != .settings }
 
+    /// Listed in ☰ even while the bar holds it: quick screens hide the bar, and
+    /// these are how you get around from there.
+    var staysInMenu: Bool { self == .agents || self == .settings }
+
     /// The selected agent's Feed, Ideas, Goals and Files.
     var isAgentBoard: Bool { tab.isAgentBoard }
 
@@ -71,7 +75,8 @@ enum BighelpPlace: String, CaseIterable, Codable, Identifiable, Sendable {
 }
 
 /// What the bottom bar holds after Chat, and the order of ☰ (Settings › Appearance ›
-/// App layout). ☰ lists every place the bar doesn't, so each stays one tap away.
+/// App layout). ☰ lists every place the bar doesn't, plus Agents and Settings
+/// always, so each stays one tap away.
 struct BighelpAppLayout: Equatable, Sendable {
     /// Chat comes first; four more fill the bar.
     static let maximumPinned = 4
@@ -96,8 +101,8 @@ struct BighelpAppLayout: Equatable, Sendable {
     /// The bottom bar's tabs, Chat first.
     var barTabs: [AppTab] { [.sessions] + pinned.map(\.tab) }
 
-    /// ☰'s places, in order: whatever the bar doesn't hold.
-    var menuPlaces: [BighelpPlace] { menuOrder.filter { !pinned.contains($0) } }
+    /// ☰'s places, in order: whatever the bar doesn't hold, and Agents and Settings.
+    var menuPlaces: [BighelpPlace] { menuOrder.filter { $0.staysInMenu || !pinned.contains($0) } }
 
     var canPinMore: Bool { pinned.count < Self.maximumPinned }
 
@@ -121,7 +126,7 @@ struct BighelpAppLayout: Equatable, Sendable {
     mutating func moveMenu(from source: IndexSet, to destination: Int) {
         var shown = menuPlaces
         shown.move(fromOffsets: source, toOffset: destination)
-        menuOrder = shown + menuOrder.filter { pinned.contains($0) }
+        menuOrder = shown + menuOrder.filter { !shown.contains($0) }
     }
 
     /// Saved as JSON text; anything unreadable is the standard layout.

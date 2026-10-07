@@ -59,7 +59,6 @@ struct ProjectsHomeView: View {
         .scrollIndicators(.hidden)
         .background(BighelpThemeCanvas(theme: theme).ignoresSafeArea())
         .navigationTitle("Projects")
-        .navigationBarTitleDisplayMode(.large)
         .toolbar {
             #if targetEnvironment(macCatalyst)
             // A Mac list can't be pulled down to refresh.

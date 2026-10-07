@@ -115,6 +115,9 @@ struct SessionsView: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: BighelpTokens.space20) {
+                        BighelpSearchField(text: $model.query, prompt: "Search sessions",
+                                           accessibilityLabel: "Search sessions",
+                                           accessibilityIdentifier: "sessions.search")
                         if !model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                             Text("Searching loaded chats")
                                 .bighelpFont(.metadata)
@@ -137,9 +140,6 @@ struct SessionsView: View {
         }
         .background(theme.canvas.ignoresSafeArea())
         .navigationTitle("Sessions")
-        .navigationBarTitleDisplayMode(.large)
-        // The glass search bar along the bottom, as on All agents.
-        .searchable(text: $model.query, prompt: "Search sessions")
         .toolbar {
             #if targetEnvironment(macCatalyst)
             // A Mac list can't be pulled down to refresh.
@@ -306,6 +306,11 @@ struct SessionsView: View {
     private func nativeDirectory(model: SessionsModel) -> some View {
         @Bindable var model = model
         return List {
+            if model.hasLoadedSessions || isSearching(model) {
+                BighelpSearchField(text: $model.query, prompt: "Search sessions", accessibilityLabel: "Search sessions",
+                                   accessibilityIdentifier: "sessions.search")
+                    .bighelpListSearchRow()
+            }
             if showsAppFilter(model) {
                 SessionAppFilterBar(selection: $model.appFilter)
                     .listRowInsets(EdgeInsets(top: BighelpTokens.space4, leading: BighelpTokens.space16,

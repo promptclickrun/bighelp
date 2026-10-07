@@ -29,13 +29,9 @@ struct ScheduledTasksView: View {
         taskList
             .background(theme.canvas.ignoresSafeArea())
             .navigationTitle("Tasks")
-            .navigationBarTitleDisplayMode(.large)
-            .searchable(text: $searchQuery, prompt: "Search tasks")
             .toolbar {
-                ToolbarItemGroup(placement: .topBarTrailing) {
-                    moreMenu
-                    createButton
-                }
+                // One button, like Agents, so the title fits beside it; the filters sit under search.
+                ToolbarItem(placement: .topBarTrailing) { createButton }
             }
             .accessibilityIdentifier("scheduled-tasks.screen")
             .task {
@@ -82,6 +78,13 @@ struct ScheduledTasksView: View {
 
     private var taskList: some View {
         List {
+            if !store.tasks.isEmpty || !searchQuery.isEmpty || isFiltered {
+                BighelpSearchField(text: $searchQuery, prompt: "Search tasks", accessibilityLabel: "Search tasks",
+                                   accessibilityIdentifier: "scheduled-tasks.search")
+                    .bighelpListSearchRow()
+                filterRow
+                    .bighelpListSearchRow()
+            }
             statusRows
             if let toggleErrorMessage {
                 errorRow(toggleErrorMessage) { self.toggleErrorMessage = nil }
@@ -323,51 +326,58 @@ struct ScheduledTasksView: View {
 
     // MARK: - Toolbar
 
+    /// Tap for a new task; hold to start from an idea instead (the editor offers ideas too).
     private var createButton: some View {
-        Button(action: startCreate) {
-            Image(systemName: "plus").frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
-        }
-        .accessibilityLabel("New task")
-        .accessibilityIdentifier("scheduled-tasks.create")
-    }
-
-    /// Ideas and the status/agent filters live here, out of the way.
-    private var moreMenu: some View {
         Menu {
+            Button("New task", systemImage: "plus", action: startCreate)
             Button("Start from an idea", systemImage: "lightbulb") {
                 isBlueprintsPresented = true
             }
             .accessibilityLabel("Browse task ideas")
             .accessibilityIdentifier("scheduled-tasks.blueprints")
-            Section("Show") {
-                Picker("Status", selection: Bindable(store).statusFilter) {
-                    ForEach(ScheduledTaskFilter.allCases) { filter in
-                        Text(filter.title).tag(filter)
-                    }
+        } label: {
+            Image(systemName: "plus").frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
+        } primaryAction: {
+            startCreate()
+        }
+        .accessibilityLabel("New task")
+        .accessibilityIdentifier("scheduled-tasks.create")
+    }
+
+    /// Which tasks show, under the search like the filter rows on Sessions and Kanban.
+    private var filterRow: some View {
+        HStack(spacing: BighelpTokens.space8) {
+            Picker("Status", selection: Bindable(store).statusFilter) {
+                ForEach(ScheduledTaskFilter.allCases) { filter in
+                    Text(filter.title).tag(filter)
                 }
-                .accessibilityIdentifier("scheduled-tasks.filter.status")
-                Picker(selection: Bindable(store).agentFilterID) {
+            }
+            .labelsHidden()
+            .bighelpSegmentedPicker()
+            .accessibilityIdentifier("scheduled-tasks.filter.status")
+            Menu {
+                Picker("Agent", selection: Bindable(store).agentFilterID) {
                     Text("All agents").tag(String?.none)
                     ForEach(agents.profiles) { agent in
                         Text(agent.name).tag(String?.some(agent.id))
                     }
-                } label: {
-                    Label(agentFilterTitle(store.agentFilterID), systemImage: "person.2")
                 }
-                .pickerStyle(.menu)
-                .accessibilityLabel("Agent filter")
-                .accessibilityValue(agentFilterTitle(store.agentFilterID))
-                .accessibilityIdentifier("scheduled-tasks.filter.agent")
+            } label: {
+                Label(agentFilterTitle(store.agentFilterID), systemImage: "person.2")
+                    .labelStyle(.titleAndIcon)
+                    .font(.bighelp(.subheadline).weight(.semibold))
+                    .lineLimit(1)
+                    .foregroundStyle(store.agentFilterID == nil ? theme.primaryText : theme.actionForeground)
+                    .padding(.horizontal, BighelpTokens.space12)
+                    .frame(minHeight: 32)
+                    .background(store.agentFilterID == nil ? theme.surface : theme.action, in: .capsule)
+                    .contentShape(.capsule)
             }
-        } label: {
-            Image(systemName: isFiltered
-                ? "line.3.horizontal.decrease.circle.fill"
-                : "ellipsis.circle")
-                .frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
+            .fixedSize()
+            .accessibilityLabel("Agent filter")
+            .accessibilityValue(agentFilterTitle(store.agentFilterID))
+            .accessibilityIdentifier("scheduled-tasks.filter.agent")
         }
-        .accessibilityLabel("Ideas and filters")
-        .accessibilityValue(isFiltered ? "Filtered" : "")
-        .accessibilityIdentifier("scheduled-tasks.more")
     }
 
     private var isFiltered: Bool {

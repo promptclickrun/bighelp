@@ -160,6 +160,9 @@ struct FleetHomeView: View {
         let pinned = pinnedAgents
         let listed = listedAgents(excluding: Set(pinned.map(\.id)))
         List {
+            BighelpSearchField(text: $search, prompt: "Search agents", accessibilityLabel: "Search agents",
+                               accessibilityIdentifier: "fleet.search")
+                .bighelpListSearchRow()
             if !pinned.isEmpty {
                 Section {
                     pinnedRow(pinned)
@@ -190,7 +193,7 @@ struct FleetHomeView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .scrollDisabled(isArrangingPinned)
-        // The one main action, where a thumb rests: above the search bar, on the right.
+        // The one main action, where a thumb rests, on the right.
         .overlay(alignment: .bottomTrailing) {
             if let onNewChat {
                 RootComposeButton(identifier: "fleet.new-chat", size: 72, action: onNewChat)
@@ -204,7 +207,6 @@ struct FleetHomeView: View {
                 ToolbarItem(placement: .topBarTrailing) { organizeMenu }
             }
         }
-        .searchable(text: $search, prompt: "Search agents")
         .refreshable {
             fleet.refresh(force: true)
             await fleet.waitForReads()
@@ -552,6 +554,9 @@ struct FleetChatsView: View {
         let chats = visibleChats
         let otherAppChats = visibleOtherAppChats
         return List {
+            BighelpSearchField(text: $search, prompt: "Search sessions", accessibilityLabel: "Search sessions",
+                               accessibilityIdentifier: "fleet.sessions.search")
+                .bighelpListSearchRow()
             if fleet.showsHostNames {
                 FleetHostFilter(fleet: fleet, selection: $hostFilter)
                     .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
@@ -594,24 +599,26 @@ struct FleetChatsView: View {
         .scrollContentBackground(.hidden)
         .dismissesKeyboardOnScroll(true, immediately: true)
         .background(BighelpThemeCanvas(theme: theme).ignoresSafeArea())
-        // The glass search bar along the bottom, as on All agents.
-        .searchable(text: $search, prompt: "Search sessions")
         .toolbar { ToolbarItem(placement: .topBarTrailing) { filterMenu } }
         .refreshable {
             fleet.refresh(force: true)
             await fleet.waitForReads()
         }
         .overlay {
-            if chats.isEmpty, otherAppChats.isEmpty {
-                if !search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    ContentUnavailableView.search(text: search)
-                } else if filter.isActive || filter.app != .all {
-                    ContentUnavailableView(filter.app.emptyTitle, systemImage: "line.3.horizontal.decrease.circle",
-                                           description: Text("Try a different agent, place or app."))
-                } else {
-                    ContentUnavailableView("No sessions yet", systemImage: "bubble.left.and.bubble.right")
+            Group {
+                if chats.isEmpty, otherAppChats.isEmpty {
+                    if !search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        ContentUnavailableView.search(text: search)
+                    } else if filter.isActive || filter.app != .all {
+                        ContentUnavailableView(filter.app.emptyTitle, systemImage: "line.3.horizontal.decrease.circle",
+                                               description: Text("Try a different agent, place or app."))
+                    } else {
+                        ContentUnavailableView("No sessions yet", systemImage: "bubble.left.and.bubble.right")
+                    }
                 }
             }
+            // A message, not a control: the search field at the top stays usable through it.
+            .allowsHitTesting(false)
         }
         .task { fleet.refresh() }
         .task(id: LiveOtherAppsKey(id: otherApps?.id, app: filter.app)) { await loadLiveOtherApps() }

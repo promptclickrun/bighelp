@@ -38,9 +38,9 @@ change in both repos.
     `bighelpHeaderButtonsPlacement()`, so it sits where the top bar puts it on every screen
     (`MenuButtonPlacementUITests`).
   - Main screens look the same whichever tab you came from (`SearchPlacementUITests`). Their title is the
-    bar's small one (a large title kept the size of the tab before). Search uses the system's place, never
-    `.navigationBarDrawer`: along the bottom on iOS 26, under the bottom bar, which keeps the same gap above
-    it (`tabsClearBottomSearch` lists the tabs).
+    bar's small one (a large title kept the size of the tab before). The bottom bar never moves. Search is
+    a `BighelpSearchField` as the first row under the title (`bighelpListSearchRow()`), filter chips below
+    it; never `.searchable` on a screen with the bar (iOS 26 puts it along the bottom, on the bar).
   - Never show "bighelp account" or "Link" wording. That pairing system is retired.
 - **Real data only.**
   - Avatars, activity poses and badges must come from what the agent is actually doing.

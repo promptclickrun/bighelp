@@ -605,7 +605,7 @@ struct RootShellView: View {
                                    startNewChat(explicitAgentID: nil)
                                } : nil,
                                homeIndicatorSink: FloatingTabBar.homeIndicatorSink(forBottomInset: rootBottomSafeArea),
-                               unread: boardUnreadTabs, clearsBottomSearch: tabsClearBottomSearch)
+                               unread: boardUnreadTabs)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
@@ -686,17 +686,6 @@ struct RootShellView: View {
             sessionRestoreTask?.cancel()
             sessionRestoreTask = nil
             sessionRestoreRequest = nil
-        }
-    }
-
-    /// The tabs whose search field runs along the bottom on iOS 26 iPhones and iPads, under
-    /// the bar: the bar keeps the same gap above it on each (`SearchPlacementUITests`).
-    private var tabsClearBottomSearch: Bool {
-        guard #available(iOS 26, *), !BighelpPlatform.isMac else { return false }
-        switch appState.selectedTab {
-        case .sessions: return !fleetModeOn
-        case .agents, .scheduledTasks, .kanban: return true
-        default: return false
         }
     }
 

@@ -34,7 +34,6 @@ struct AgentsView: View {
     @State private var shownSignIn: WorkspaceSignIn?
     @State private var actionOwner: WorkspaceOwner?
     @State private var deferredAction: DeferredAgentAction?
-    @State private var isSearchPresented = false
     /// A pinned agent is lifted: the list holds still while it moves.
     @State private var isArrangingPinned = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -101,6 +100,12 @@ struct AgentsView: View {
         GeometryReader { geometry in
             let states = liveStates
             List {
+                if !isDirectoryEmpty {
+                    BighelpSearchField(text: $query, prompt: "Search agents and groups",
+                                       accessibilityLabel: "Search agents and groups",
+                                       accessibilityIdentifier: "agents.search")
+                        .bighelpListSearchRow()
+                }
                 if showsFeatured { featuredSection(states) }
                 ForEach(
                     AgentDirectoryPresentation.sectionOrder(filteredToProfileID: groupFilterProfileID),
@@ -124,10 +129,6 @@ struct AgentsView: View {
             .environment(\.defaultMinListRowHeight, BighelpTokens.hitTarget)
             .dismissesKeyboardOnScroll(true)
             .accessibilityIdentifier("agents.screen")
-            // The system's place, like Sessions and Scheduled tasks: along the bottom on an iOS 26
-            // iPhone, under the bottom bar. A drawer under the title went to the bottom anyway when
-            // the screen opened from Chat, on top of the bar.
-            .searchable(text: $query, isPresented: $isSearchPresented, prompt: "Search agents and groups")
             .toolbar {
                 #if targetEnvironment(macCatalyst)
                 // A Mac list can't be pulled down to refresh.

@@ -16,8 +16,11 @@ enum DirectHermesFileAttachments {
             guard (1...ChatAttachment.maximumBytes).contains(attachment.data.count),
                   attachment.fileName.utf8.count <= 720 else { throw ChatAttachmentError.invalidSize }
             let extensionType = UTType(filenameExtension: URL(fileURLWithPath: attachment.fileName).pathExtension)
+            // Only an image type counts: Image I/O also opens PDFs (as pages), and those are files.
             let recognizedImage = CGImageSourceCreateWithData(attachment.data as CFData, nil)
-                .map { CGImageSourceGetType($0) != nil } ?? false
+                .flatMap { CGImageSourceGetType($0) }
+                .flatMap { UTType($0 as String) }?
+                .conforms(to: .image) ?? false
             guard attachment.kind != .image, extensionType?.conforms(to: .image) != true,
                   !recognizedImage else {
                 throw ChatAttachmentError.unsupportedKind

@@ -315,6 +315,10 @@ extension ChatModel {
                         }) == true {
                 failureMessage = "\(message.hasPrefix("/") ? "Command" : "Message") delivery is unconfirmed. It will not be sent again automatically."
                 retryRequest = nil
+            } else if let refused = error as? ChatAttachmentError, let reason = refused.errorDescription {
+                // Nothing was sent: say why, instead of a delivery failure.
+                failureMessage = reason
+                retryRequest = .send(message, attachments)
             } else {
                 failureMessage = "Message could not be delivered. Try again."
                 retryRequest = .send(message, attachments)

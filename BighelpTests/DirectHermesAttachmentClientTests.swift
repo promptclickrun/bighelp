@@ -1,9 +1,51 @@
 import Foundation
+import UIKit
 import Testing
 @testable import Bighelp
 
 @MainActor
 struct DirectHermesAttachmentClientTests {
+    /// Image I/O now opens a PDF as an image source (its pages), so a PDF counted as a photo and
+    /// was refused before upload: "Message could not be delivered" for any chat with a PDF.
+    @Test func aPDFIsAFileNotAnImage() async throws {
+        let pdf = Self.pdf(pages: 3)
+        let attachment = try ChatAttachment(id: "attachment_pdf_fixture", fileName: "findings.pdf",
+                                            mimeType: "application/pdf", data: pdf)
+        #expect(attachment.kind == .file)
+        try DirectHermesFileAttachments.validate([attachment], message: "Look at these findings")
+        try DirectHermesAttachmentClient.validate([attachment], message: "Look at these findings")
+
+        let fixture = try Fixture()
+        fixture.rpc.response = .object([
+            "attached": .boolean(true), "name": .string("findings.pdf"),
+            "path": .string("/private/hermes/attachments/findings.pdf"),
+            "ref_path": .string("/private/hermes/attachments/findings.pdf"),
+            "ref_text": .string("@file:/private/hermes/attachments/findings.pdf"), "uploaded": .boolean(true),
+        ])
+        let receipt = try await fixture.client.upload(attachment, runtimeID: "runtime", owner: fixture.owner)
+        #expect(receipt.kind == .file)
+        #expect(receipt.referenceText == "@file:/private/hermes/attachments/findings.pdf")
+        #expect(fixture.rpc.calls.map(\.method) == ["file.attach"])
+    }
+
+    @Test func aPhotoSentAsAFileIsStillTurnedAway() throws {
+        let attachment = try ChatAttachment(id: "attachment_png_file", fileName: "notes.bin",
+                                            mimeType: "application/octet-stream", data: try Self.png())
+        #expect(throws: ChatAttachmentError.unsupportedKind) {
+            try DirectHermesFileAttachments.validate([attachment], message: "")
+        }
+    }
+
+    private static func pdf(pages: Int) -> Data {
+        let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 200, height: 200))
+        return renderer.pdfData { context in
+            for page in 1...pages {
+                context.beginPage()
+                ("Page \(page)" as NSString).draw(at: CGPoint(x: 20, y: 20), withAttributes: nil)
+            }
+        }
+    }
+
     @Test func imageUploadUsesOfficialImageAttachBytesAndReturnsPathFreeReceipt() async throws {
         let fixture = try Fixture()
         let image = try Self.png()

@@ -49,6 +49,10 @@ struct WorkflowCanvasView: View {
         .background(BighelpThemeCanvas(theme: theme).ignoresSafeArea())
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("workflows.canvas")
+        .safeAreaInset(edge: .top, spacing: 0) {
+            WorkflowPublishBar(model: model) { Task { await context.store.load() } }
+        }
+        .animation(.snappy, value: model.needsPublish)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
         .toolbar {

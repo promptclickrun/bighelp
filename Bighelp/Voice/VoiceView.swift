@@ -49,6 +49,8 @@ struct VoiceView: View {
     var body: some View {
         voiceLayout
         .background { VoiceStageBackground(agentColor: agentPersona.color) }
+        // Contain, so the controls keep their own identifiers (and VoiceOver reaches each).
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("voice.screen")
         .onAppear {
             isVoiceVisible = true
@@ -108,31 +110,24 @@ struct VoiceView: View {
             .padding(.vertical, BighelpTokens.space8)
             .bighelpShellContentWidth()
             GeometryReader { proxy in
-                ScrollView {
-                    VStack(spacing: BighelpTokens.space24) {
-                        Spacer(minLength: BighelpTokens.space24)
-                        // The face and its voice together, then the words: what the
-                        // agent is doing, and what's being said.
-                        VStack(spacing: BighelpTokens.space16) {
-                            orb(size: stageAvatarSize)
-                            VoiceWaveformBars(level: waveformLevel, color: agentPersona.color)
-                        }
-                        VStack(spacing: BighelpTokens.space12) {
-                            VoiceStepLine(step: chatStep)
-                            caption
-                        }
-                        sendNowControl
-                        endFailure
-                        permissionRecovery
-                        Spacer(minLength: BighelpTokens.space16)
-                        transcript
+                // The face and its voice together, then the words: what the agent is
+                // doing, and what's being said, in full. Only the words scroll.
+                VStack(spacing: BighelpTokens.space16) {
+                    VStack(spacing: BighelpTokens.space16) {
+                        orb(size: stageAvatarSize(height: proxy.size.height))
+                        VoiceWaveformBars(level: waveformLevel, color: agentPersona.color)
                     }
-                    .padding(.horizontal, BighelpTokens.space20)
-                    .padding(.bottom, BighelpTokens.space16)
-                    .frame(minHeight: proxy.size.height)
-                    .bighelpShellContentWidth()
+                    .padding(.top, BighelpTokens.space16)
+                    VoiceStepLine(step: chatStep)
+                    words
+                    sendNowControl
+                    endFailure
+                    permissionRecovery
+                    transcriptToggle
                 }
-                .scrollBounceBehavior(.basedOnSize)
+                .padding(.horizontal, BighelpTokens.space20)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .bighelpShellContentWidth()
             }
             controls
                 .frame(maxWidth: 620)
@@ -145,25 +140,71 @@ struct VoiceView: View {
         }
     }
 
-    /// The avatar owns the stage; large accessibility text sizes give some of
-    /// that room back to the caption.
-    private var stageAvatarSize: CGFloat {
-        dynamicTypeSize.isAccessibilitySize ? 140 : 200
+    /// The avatar owns the stage, but leaves the words room to read: a short screen
+    /// or large accessibility text gets a smaller face.
+    private func stageAvatarSize(height: CGFloat) -> CGFloat {
+        let largest: CGFloat = dynamicTypeSize.isAccessibilitySize ? 140 : 200
+        // The bars, the step line, the transcript button, spacing, and about five lines of words.
+        return min(largest, max(88, height - 360))
     }
+
+    /// What's being said, in full, scrolling when it's long (no scroll bar). A new reply
+    /// starts at its top, so you can read along as it's spoken; words still coming in
+    /// keep their newest line in view. With Transcript open, the whole conversation.
+    private var words: some View {
+        ScrollViewReader { reader in
+            ScrollView {
+                VStack(spacing: 0) {
+                    Color.clear.frame(height: BighelpTokens.space8).id(Self.wordsTop)
+                    if isTranscriptExpanded { transcriptRowsList } else { caption }
+                    Color.clear.frame(height: BighelpTokens.space8).id(Self.wordsBottom)
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .scrollIndicators(.hidden)
+            .scrollBounceBehavior(.basedOnSize)
+            .mask {
+                LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.05),
+                                       .init(color: .black, location: 0.93), .init(color: .clear, location: 1)],
+                               startPoint: .top, endPoint: .bottom)
+            }
+            .frame(maxHeight: .infinity)
+            .onChange(of: model.liveAgentTranscript) { _, draft in
+                guard draft?.isEmpty == false, !isTranscriptExpanded else { return }
+                withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { reader.scrollTo(Self.wordsBottom, anchor: .bottom) }
+            }
+            .onChange(of: displayedTranscriptRows.last?.id) { _, _ in
+                guard !isTranscriptExpanded else { return }
+                reader.scrollTo(Self.wordsTop, anchor: .top)
+            }
+            .onChange(of: isTranscriptExpanded) { _, expanded in
+                reader.scrollTo(expanded ? Self.wordsBottom : Self.wordsTop, anchor: expanded ? .bottom : .top)
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("voice.words")
+    }
+
+    private static let wordsTop = "voice.words.top"
+    private static let wordsBottom = "voice.words.bottom"
+
+    /// A long reply reads better left-aligned at body size, like a message.
+    private var captionIsLong: Bool { captionText.count > 160 }
 
     /// The one line that matters right now: what the agent is saying, else what
     /// you are saying, else the last finished turn, dimmed once it's said.
     private var caption: some View {
         Text(captionText)
-            .bighelpFont(.screenTitle, weight: .semibold)
-            .tracking(-0.2)
+            .bighelpFont(captionIsLong ? .sectionTitle : .screenTitle, weight: captionIsLong ? .medium : .semibold)
+            .tracking(captionIsLong ? 0 : -0.2)
+            .lineSpacing(captionIsLong ? 4 : 0)
             .foregroundStyle(captionIsLive ? theme.primaryText : theme.secondaryText)
-            .multilineTextAlignment(.center)
-            .lineLimit(6)
-            .truncationMode(.head)
-            .frame(maxWidth: 520)
+            .multilineTextAlignment(captionIsLong ? .leading : .center)
+            .frame(maxWidth: 520, alignment: captionIsLong ? .leading : .center)
             .padding(.horizontal, BighelpTokens.space12)
             .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity)
+            .textSelection(.enabled)
             .accessibilityIdentifier("voice.caption")
     }
 
@@ -248,52 +289,54 @@ struct VoiceView: View {
         }
     }
 
-    private var transcript: some View {
-        VStack(alignment: .leading, spacing: BighelpTokens.space12) {
-            Button {
-                isTranscriptExpanded.toggle()
-            } label: {
-                HStack(spacing: BighelpTokens.space8) {
-                    Text("Transcript")
-                        .bighelpFont(.label, weight: .semibold)
-                    Spacer(minLength: BighelpTokens.space8)
-                    Image(systemName: "chevron.down")
-                        .bighelpFont(.metadata, weight: .semibold)
-                        .rotationEffect(.degrees(isTranscriptExpanded ? 180 : 0))
-                        .accessibilityHidden(true)
-                }
-                .foregroundStyle(theme.secondaryText)
-                .frame(maxWidth: .infinity, minHeight: BighelpTokens.hitTarget)
-                .contentShape(.rect)
+    private var transcriptToggle: some View {
+        Button {
+            isTranscriptExpanded.toggle()
+        } label: {
+            HStack(spacing: BighelpTokens.space8) {
+                Text("Transcript")
+                    .bighelpFont(.label, weight: .semibold)
+                Spacer(minLength: BighelpTokens.space8)
+                Image(systemName: "chevron.up")
+                    .bighelpFont(.metadata, weight: .semibold)
+                    .rotationEffect(.degrees(isTranscriptExpanded ? 180 : 0))
+                    .accessibilityHidden(true)
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Transcript")
-            .accessibilityValue(isTranscriptExpanded ? "Expanded" : "Collapsed")
-            .accessibilityAddTraits(.isHeader)
-            .accessibilityIdentifier("voice.transcript.toggle")
-            if isTranscriptExpanded {
-                if displayedTranscriptRows.isEmpty,
-                   model.partialUserTranscript == nil, model.liveAgentTranscript == nil {
-                    Text(readyPrompt)
-                        .bighelpFont(.body)
-                        .foregroundStyle(theme.secondaryText)
-                }
-                ForEach(displayedTranscriptRows) { row in
-                    transcriptCard(row)
-                }
-                if let partial = model.partialUserTranscript, !partial.isEmpty {
-                    transcriptCard(VoiceTranscriptRow(id: "voice-partial-user", speaker: "You", time: "Now", text: partial), isLive: true)
-                }
-                if let draft = model.liveAgentTranscript, !draft.isEmpty {
-                    transcriptCard(VoiceTranscriptRow(id: "voice-partial-agent", speaker: model.agentName, time: "Now", text: draft), isLive: true)
-                }
-                Label("Choose your speaking mode in Voice settings.", systemImage: "slider.horizontal.3")
-                    .bighelpFont(.metadata)
-                    .foregroundStyle(theme.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            .foregroundStyle(theme.secondaryText)
+            .frame(maxWidth: 560, minHeight: BighelpTokens.hitTarget)
+            .contentShape(.rect)
         }
-        .frame(maxWidth: 560)
+        .buttonStyle(.plain)
+        .accessibilityLabel("Transcript")
+        .accessibilityValue(isTranscriptExpanded ? "Expanded" : "Collapsed")
+        .accessibilityAddTraits(.isHeader)
+        .accessibilityIdentifier("voice.transcript.toggle")
+    }
+
+    /// The whole conversation, in the words area while Transcript is open.
+    private var transcriptRowsList: some View {
+        VStack(alignment: .leading, spacing: BighelpTokens.space12) {
+            if displayedTranscriptRows.isEmpty,
+               model.partialUserTranscript == nil, model.liveAgentTranscript == nil {
+                Text(readyPrompt)
+                    .bighelpFont(.body)
+                    .foregroundStyle(theme.secondaryText)
+            }
+            ForEach(displayedTranscriptRows) { row in
+                transcriptCard(row)
+            }
+            if let partial = model.partialUserTranscript, !partial.isEmpty {
+                transcriptCard(VoiceTranscriptRow(id: "voice-partial-user", speaker: "You", time: "Now", text: partial), isLive: true)
+            }
+            if let draft = model.liveAgentTranscript, !draft.isEmpty {
+                transcriptCard(VoiceTranscriptRow(id: "voice-partial-agent", speaker: model.agentName, time: "Now", text: draft), isLive: true)
+            }
+            Label("Choose your speaking mode in Voice settings.", systemImage: "slider.horizontal.3")
+                .bighelpFont(.metadata)
+                .foregroundStyle(theme.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: 560, alignment: .leading)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("voice.transcript")
     }

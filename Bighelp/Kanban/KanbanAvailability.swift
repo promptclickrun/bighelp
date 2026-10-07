@@ -19,13 +19,14 @@ final class KanbanAvailability {
         self.retryDelays = retryDelays
     }
 
-    /// Switches to a computer (nil: none). True when it's a different one;
-    /// the last answer for it comes back at once.
+    /// Switches to a computer. True when it's a different one; the last answer for it
+    /// comes back at once. No computer (the connection closes on every return to the
+    /// app) keeps the one there was, so its open board stays.
     @discardableResult
     func use(host: String?) -> Bool {
-        guard host != self.host else { return false }
+        guard let host, host != self.host else { return false }
         self.host = host
-        isAvailable = host.flatMap { defaults.object(forKey: Self.key($0)) as? Bool }
+        isAvailable = defaults.object(forKey: Self.key(host)) as? Bool
         return true
     }
 

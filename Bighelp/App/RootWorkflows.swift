@@ -18,13 +18,23 @@ extension RootShellView {
     /// only a clear answer from the host changes the row (`WorkflowsAvailability`).
     func configureWorkflows(_ key: AgentBoardClientKey) async {
         if workflowsAvailability.use(host: key.owner?.cacheScopeID) {
-            // Another computer, or none: nothing from the old one stays.
+            // Another computer: nothing from the old one stays.
             workflowsStore?.setOnScreen(false)
             workflowsStore = nil
             WorkflowsWidgetPublisher.clear()
         }
         guard key.owner != nil, let client = makeWorkflowsClient() else { return }
+        // A page that showed before the computer answered gets its data now.
+        if workflowsStore == nil, isWorkflowsPageOpen { prepareWorkflowsStore() }
         await workflowsAvailability.check { try await client.support() }
+        // What the page shows comes from the new connection, not the closed one.
+        if isWorkflowsPageOpen { await workflowsStore?.load() }
+    }
+
+    private var isWorkflowsPageOpen: Bool {
+        appState.selectedTab == .workflows || appState.path.contains { route in
+            if case .workflows = route { true } else { false }
+        }
     }
 
     /// ☰ shows Workflows for any connected computer. Where the plugin lacks them
@@ -104,6 +114,11 @@ extension RootShellView {
             default:
                 WorkflowsHomeView(context: context)
             }
+        } else if currentWorkspaceOwner == nil, workspaceConnections != nil {
+            // Back in the app, the connection opens again in a moment.
+            ProgressView("Connecting to your computer…")
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .accessibilityIdentifier("workflows.connecting")
         } else {
             ContentUnavailableView("Workflows aren't available", systemImage: "flowchart",
                 description: Text("Connect to your computer, then open Workflows from the menu."))

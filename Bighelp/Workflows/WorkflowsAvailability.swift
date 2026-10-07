@@ -88,17 +88,16 @@ final class WorkflowsAvailability {
     /// The ☰ row: shown for a computer that has Workflows or says why it can't run them.
     var isAvailable: Bool? { support.map(\.showsMenuRow) }
 
-    /// Switches to a computer (nil: none). True when it's a different one;
-    /// the last answer for it comes back at once.
+    /// Switches to a computer. True when it's a different one; the last answer for it
+    /// comes back at once. No computer (the connection closes on every return to the
+    /// app) keeps the one there was, so its open page and data stay.
     @discardableResult
     func use(host: String?) -> Bool {
-        guard host != self.host else { return false }
+        guard let host, host != self.host else { return false }
         self.host = host
-        support = host.flatMap { host in
-            (defaults.string(forKey: Self.key(host))).flatMap(WorkflowsSupport.init(stored:))
-                // Saved by an older version: it only knew "has Workflows".
-                ?? (defaults.object(forKey: Self.oldKey(host)) as? Bool).map { $0 ? .available(canEdit: false) : .missing }
-        }
+        support = defaults.string(forKey: Self.key(host)).flatMap(WorkflowsSupport.init(stored:))
+            // Saved by an older version: it only knew "has Workflows".
+            ?? (defaults.object(forKey: Self.oldKey(host)) as? Bool).map { $0 ? .available(canEdit: false) : .missing }
         return true
     }
 

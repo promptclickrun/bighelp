@@ -165,6 +165,20 @@ struct WorkflowsSupportTests {
         }
     }
 
+    /// Returning to the app closes and reopens the connection. The Workflows page showed
+    /// "Workflows aren't available" because the gap counted as another computer and
+    /// dropped the page's data.
+    @Test func theGapWhileReconnectingKeepsTheComputer() async throws {
+        let defaults = try #require(UserDefaults(suiteName: "workflows-gap-\(UUID().uuidString)"))
+        let availability = WorkflowsAvailability(defaults: defaults, retryDelays: [])
+        #expect(availability.use(host: "home"))
+        await availability.check { .available(canEdit: true) }
+        #expect(availability.use(host: nil) == false, "A closed connection isn't another computer")
+        #expect(availability.host == "home" && availability.isAvailable == true)
+        #expect(availability.use(host: "home") == false, "Back on the same computer")
+        #expect(availability.use(host: "office"), "Another computer starts fresh")
+    }
+
     @Test func supportIsRememberedPerComputerAndOlderAnswersStillShowTheRow() async throws {
         let defaults = try #require(UserDefaults(suiteName: "workflows-support-\(UUID().uuidString)"))
         defaults.set(true, forKey: "bighelp.workflows.available.old-host")
@@ -922,5 +936,55 @@ struct WorkflowArrangementTests {
         // A decision's changes still leave from its side, to loop back up.
         #expect(WorkflowCanvasGeometry.outPort(.changes, origin: origin, kind: .decision, axis: .vertical)
                 == WorkflowCanvasGeometry.outPort(.changes, origin: origin, kind: .decision))
+    }
+}
+
+// MARK: - Publishing and default values
+
+/// A workflow an agent built stays a draft. Publish makes it the version schedules,
+/// Shortcuts and agents run, without running it once first.
+@MainActor
+struct WorkflowPublishTests {
+    @Test func publishMakesADraftLiveWithoutARun() async throws {
+        let demo = DemoWorkflowsClient(delays: false)
+        let model = WorkflowEditorModel(workflowID: "wf-captions", client: demo, hasDraft: true,
+                                        saveDelay: .milliseconds(10))
+        await model.load()
+        #expect(model.detail?.latestRevision == nil && model.needsPublish, "Never published: a draft")
+        let before = try await demo.runs(workflowID: nil, filter: .all, before: nil, limit: 50).runs.count
+        #expect(await model.publish())
+        #expect(!model.needsPublish)
+        #expect(try await demo.workflow(id: "wf-captions", revision: .latest).latestRevision != nil)
+        let after = try await demo.runs(workflowID: nil, filter: .all, before: nil, limit: 50).runs.count
+        #expect(after == before, "Publishing doesn't run it")
+    }
+
+    @Test func changesAfterPublishingNeedPublishingAgain() async throws {
+        let demo = DemoWorkflowsClient(delays: false)
+        let model = WorkflowEditorModel(workflowID: "wf-triage", client: demo, saveDelay: .milliseconds(10))
+        await model.load()
+        #expect(!model.needsPublish, "Live and up to date")
+        model.definition?.inputs[0].label = "Inbox to read"
+        #expect(await model.save())
+        #expect(model.needsPublish, "Runs still use the published version")
+        #expect(await model.publish())
+        #expect(!model.needsPublish)
+    }
+
+    @Test func defaultValuesSaveAsTheirFieldsKind() {
+        func input(_ type: String, choices: [String] = []) -> WorkflowDefinition.Input {
+            .init(key: "field", label: "Field", type: type, required: false, choices: choices, sampleValue: nil)
+        }
+        #expect(WorkflowInputsEditor.savedDefault("  Weekly notes ", for: input("text")) == .string("Weekly notes"))
+        #expect(WorkflowInputsEditor.savedDefault("", for: input("text")) == nil, "Empty: no default")
+        #expect(WorkflowInputsEditor.savedDefault("12", for: input("number")) == .integer(12))
+        #expect(WorkflowInputsEditor.savedDefault("2,5", for: input("number")) == .number(2.5))
+        #expect(WorkflowInputsEditor.savedDefault("twelve", for: input("number")) == nil)
+        #expect(WorkflowInputsEditor.savedDefault("Long", for: input("choice", choices: ["Short", "Long"])) == .string("Long"))
+        #expect(WorkflowInputsEditor.savedDefault("Huge", for: input("choice", choices: ["Short", "Long"])) == nil,
+                "A choice that's gone isn't kept")
+        #expect(WorkflowInputsEditor.editableDefault(.integer(1200)) == "1200", "No grouping, so it reads back the same")
+        #expect(WorkflowInputsEditor.editableDefault(.number(2.5)) == "2.5")
+        #expect(WorkflowInputsEditor.editableDefault(nil) == "")
     }
 }

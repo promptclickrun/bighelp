@@ -25,6 +25,18 @@ struct KanbanAvailabilityTests {
         #expect(kanban.isAvailable == true, "A failed question isn't a no")
     }
 
+    /// Returning to the app closes and reopens the connection; in between there's no
+    /// computer at all. That gap isn't another computer, so the open page stays.
+    @Test func theGapWhileReconnectingKeepsTheComputer() async {
+        let kanban = availability()
+        kanban.use(host: "home")
+        await kanban.check { true }
+        #expect(kanban.use(host: nil) == false, "A closed connection isn't another computer")
+        #expect(kanban.host == "home" && kanban.isAvailable == true)
+        #expect(kanban.use(host: "home") == false, "Back on the same computer")
+        #expect(kanban.use(host: "office"), "Another computer starts fresh")
+    }
+
     @Test func aFailedCheckIsTriedAgain() async {
         let kanban = availability()
         kanban.use(host: "home")
@@ -61,8 +73,8 @@ struct KanbanAvailabilityTests {
         let relaunched = KanbanAvailability(defaults: defaults, retryDelays: [])
         relaunched.use(host: "office")
         #expect(relaunched.isAvailable == false)
-        relaunched.use(host: nil)
-        #expect(relaunched.isAvailable == nil, "No computer, no Kanban")
+        #expect(relaunched.use(host: nil) == false, "A closed connection keeps the computer")
+        #expect(relaunched.isAvailable == false)
     }
 
     @Test func anAnswerForAnotherComputerIsDropped() async {

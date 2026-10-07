@@ -5,6 +5,8 @@ struct WorkflowInputsEditor: View {
     let model: WorkflowEditorModel
     @State private var inputs: [WorkflowDefinition.Input]
     @State private var choices: [String: String]
+    /// Each field's default value as typed, by key: filled in when a run starts.
+    @State private var defaults: [String: String]
     /// Fields added here: their key follows their name until saved (or until its own field is typed in).
     @State private var added: Set<String> = []
     /// New fields' variable names as typed, by key; a typed one no longer follows the name.
@@ -19,16 +21,18 @@ struct WorkflowInputsEditor: View {
         _inputs = State(initialValue: inputs)
         _choices = State(initialValue: Dictionary(inputs.map { ($0.key, $0.choices.joined(separator: ", ")) },
                                                   uniquingKeysWith: { first, _ in first }))
+        _defaults = State(initialValue: Dictionary(inputs.map { ($0.key, Self.editableDefault($0.sampleValue)) },
+                                                   uniquingKeysWith: { first, _ in first }))
     }
 
     var body: some View {
         NavigationStack {
             Form {
-                if inputs.isEmpty {
-                    Section {
-                        Text("No fields yet. A run asks for these before it starts, and stages can use them.")
-                            .foregroundStyle(theme.secondaryText)
-                    }
+                Section {
+                    Text(inputs.isEmpty
+                         ? "No fields yet. A run asks for these before it starts, and stages can use them."
+                         : "A run asks for these before it starts. A default value is filled in for you, and you can still change it on each run.")
+                        .foregroundStyle(theme.secondaryText)
                 }
                 ForEach($inputs) { $input in
                     Section {
@@ -59,13 +63,21 @@ struct WorkflowInputsEditor: View {
                                       prompt: Text("Short, Medium, Long").bighelpFieldHint(theme))
                                 .bighelpMacField()
                         }
+                        defaultField(input)
                         Toggle("Required", isOn: $input.required)
                         Button("Delete field", role: .destructive) {
                             inputs.removeAll { $0.key == input.key }
                         }
                     } footer: {
-                        Text("Stages use it as inputs.\(shownKey(input)).")
-                            .font(.bighelp(.footnote).monospaced())
+                        VStack(alignment: .leading, spacing: 2) {
+                            if input.kind == .number, !isNumberOrEmpty(defaults[input.key]) {
+                                Text("The default value must be a number.")
+                                    .font(.bighelp(.footnote))
+                                    .foregroundStyle(theme.danger)
+                            }
+                            Text("Stages use it as inputs.\(shownKey(input)).")
+                                .font(.bighelp(.footnote).monospaced())
+                        }
                     }
                 }
                 Section {
@@ -84,13 +96,83 @@ struct WorkflowInputsEditor: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { save() }
-                        .disabled(isSaving || inputs.contains { $0.label.trimmingCharacters(in: .whitespaces).isEmpty })
+                        .disabled(isSaving || inputs.contains { $0.label.trimmingCharacters(in: .whitespaces).isEmpty }
+                                  || inputs.contains { $0.kind == .number && !isNumberOrEmpty(defaults[$0.key]) })
                         .bighelpDefaultAction()
                         .accessibilityIdentifier("workflows.inputs.done")
                 }
             }
         }
         .accessibilityIdentifier("workflows.inputs-editor")
+    }
+
+    /// The value a run starts with. Typed for text and numbers, picked for a choice.
+    @ViewBuilder
+    private func defaultField(_ input: WorkflowDefinition.Input) -> some View {
+        let value = Binding(get: { defaults[input.key] ?? "" }, set: { defaults[input.key] = $0 })
+        switch input.kind {
+        case .choice:
+            Picker("Default value", selection: value) {
+                Text("None").tag("")
+                ForEach(choiceList(input.key), id: \.self) { Text($0).tag($0) }
+            }
+            .accessibilityIdentifier("workflows.input.\(input.key).default")
+        case .longText:
+            VStack(alignment: .leading, spacing: BighelpTokens.space4) {
+                Text("Default value").font(.bighelp(.footnote)).foregroundStyle(theme.secondaryText)
+                TextField("Default value", text: value, prompt: Text("None").bighelpFieldHint(theme), axis: .vertical)
+                    .lineLimit(2...6)
+                    .bighelpMacField()
+                    .accessibilityIdentifier("workflows.input.\(input.key).default")
+            }
+        case .number, .text:
+            LabeledContent("Default value") {
+                TextField("Default value", text: value, prompt: Text("None").bighelpFieldHint(theme))
+                    .keyboardType(input.kind == .number ? .decimalPad : .default)
+                    .multilineTextAlignment(.trailing)
+                    .bighelpMacField()
+                    .accessibilityIdentifier("workflows.input.\(input.key).default")
+            }
+        }
+    }
+
+    private func choiceList(_ key: String) -> [String] {
+        (choices[key] ?? "").split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    }
+
+    private func isNumberOrEmpty(_ text: String?) -> Bool {
+        let value = (text ?? "").trimmingCharacters(in: .whitespaces)
+        return value.isEmpty || Self.number(value) != nil
+    }
+
+    /// A default as it's edited: numbers without grouping, so they read back the same.
+    static func editableDefault(_ value: BighelpJSONValue?) -> String {
+        switch value {
+        case .string(let text): text
+        case .integer(let number): String(number)
+        case .number(let number): number.rounded() == number && abs(number) < 1e15 ? String(Int(number)) : String(number)
+        default: ""
+        }
+    }
+
+    /// What's saved for a typed default: nothing when it's empty, a number for a number field,
+    /// and a choice only when it's still one of the choices.
+    static func savedDefault(_ text: String?, for input: WorkflowDefinition.Input) -> BighelpJSONValue? {
+        let value = (text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return nil }
+        switch input.kind {
+        case .number:
+            guard let number = number(value) else { return nil }
+            return number.rounded() == number && abs(number) < 1e15 ? .integer(Int(number)) : .number(number)
+        case .choice:
+            return input.choices.contains(value) ? .string(value) : nil
+        case .text, .longText:
+            return .string(String(value.prefix(input.kind == .longText ? 20_000 : 2_000)))
+        }
+    }
+
+    private static func number(_ text: String) -> Double? {
+        Double(text.replacingOccurrences(of: ",", with: ".")).flatMap { $0.isFinite ? $0 : nil }
     }
 
     /// The key a field will have: as it is once saved, or as it will be for a new one.
@@ -116,6 +198,7 @@ struct WorkflowInputsEditor: View {
             let key = WorkflowInputKey.finished(typedKeys[old] ?? result[index].label, fallback: "field", existing: others)
             result[index].key = key
             choices[key] = choices[old]
+            defaults[key] = defaults[old]
         }
         for index in result.indices {
             result[index].label = String(result[index].label.trimmingCharacters(in: .whitespaces).prefix(200))
@@ -124,6 +207,7 @@ struct WorkflowInputsEditor: View {
                     .map { String($0.trimmingCharacters(in: .whitespaces).prefix(200)) }
                     .filter { !$0.isEmpty }.prefix(20).map { $0 }
                 : []
+            result[index].sampleValue = Self.savedDefault(defaults[result[index].key], for: result[index])
         }
         model.definition?.inputs = Array(result.prefix(20))
         isSaving = true

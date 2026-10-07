@@ -21,7 +21,9 @@ final class VoiceStepLineUITests: BighelpUITestCase {
         let allow = XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons["Allow"]
         if allow.waitForExistence(timeout: 3) { allow.tap() }
         let sendNow = app.buttons["voice.send-now"]
-        XCTAssertTrue(sendNow.waitForExistence(timeout: 10), "The demo hears a sentence")
+        let heard = sendNow.waitForExistence(timeout: 10)
+        if !heard { save("voice-0-not-hearing", app) }
+        XCTAssertTrue(heard, "The demo hears a sentence")
         save("voice-1-hearing", app)
         sendNow.tap()
 
@@ -44,10 +46,23 @@ final class VoiceStepLineUITests: BighelpUITestCase {
         let replied = NSPredicate(format: "label CONTAINS %@", "Tomorrow looks sunny")
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: replied, object: caption)],
                                       timeout: 15), .completed, "The reply shows: \(caption.label)")
-        let cleared = NSPredicate(format: "exists == false")
+        let cleared = NSPredicate(format: "exists == false OR label == ''")
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: cleared, object: step)],
                                       timeout: 5), .completed, "The step line clears once the agent answers")
         save("voice-4-reply", app)
+
+        // The whole reply is there to read along, scrolling in its own area (no cut-off text).
+        let words = app.descendants(matching: .any)["voice.words"].firstMatch
+        XCTAssertTrue(words.exists)
+        let whole = NSPredicate(format: "label ENDSWITH %@", "so the morning is free?")
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: whole, object: caption)],
+                                      timeout: 15), .completed, "The reply isn't cut short")
+        XCTAssertGreaterThan(caption.frame.height, words.frame.height, "A long reply is taller than its area")
+        let top = caption.frame.minY
+        words.swipeUp()
+        Thread.sleep(forTimeInterval: 0.8)
+        XCTAssertLessThan(caption.frame.minY, top - 40, "The reply scrolls")
+        save("voice-5-reply-scrolled", app)
     }
 
     @MainActor private func waitFor(_ element: XCUIElement, label: String, timeout: TimeInterval = 12) -> Bool {

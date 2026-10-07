@@ -34,18 +34,26 @@ extension RootShellView {
     func configureKanban(_ key: AgentBoardClientKey) async {
         let isNewHost = kanbanAvailability.use(host: key.owner?.cacheScopeID)
         if isNewHost {
-            // Another computer, or none: nothing from the old one stays.
+            // Another computer: nothing from the old one stays.
             kanbanModel?.setOnScreen(false)
             kanbanModel = nil
             if !key.fixtures { KanbanWidgetPublisher.clear() }
         }
         guard key.owner != nil, let service = makeKanbanService() else { return }
+        // A board that showed before the computer answered gets its data now.
+        if kanbanModel == nil, isKanbanPageOpen { kanbanModel = KanbanBoardModel(service: service, agents: kanbanAgents) }
         await kanbanAvailability.check { try await service.isAvailable() }
         guard !Task.isCancelled, !key.fixtures, kanbanAvailability.isAvailable == true else { return }
         await KanbanWidgetPublisher.refreshAll(service: service, agents: kanbanAgents, force: isNewHost)
     }
 
     var canOpenKanban: Bool { kanbanAvailability.isAvailable == true }
+
+    private var isKanbanPageOpen: Bool {
+        appState.selectedTab == .kanban || appState.path.contains { route in
+            if case .kanban = route { true } else { false }
+        }
+    }
 
     /// Opens the board (or one of its cards). On Vision Pro it gets its own window.
     func openKanban(board: String? = nil, task: String? = nil) {
@@ -76,6 +84,11 @@ extension RootShellView {
     var kanbanDestination: some View {
         if let model = kanbanModel {
             KanbanScreen(model: model, isNerdMode: settings.nerdModeEnabled, initialTaskID: kanbanTaskToOpen)
+        } else if currentWorkspaceOwner == nil, workspaceConnections != nil {
+            // Back in the app, the connection opens again in a moment.
+            ProgressView("Connecting to your computer…")
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .accessibilityIdentifier("kanban.connecting")
         } else {
             ContentUnavailableView("Kanban isn't available", systemImage: "rectangle.split.3x1",
                 description: Text("Connect to your computer, then open Kanban from the menu."))

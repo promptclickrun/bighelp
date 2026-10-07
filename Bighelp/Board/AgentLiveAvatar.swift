@@ -19,6 +19,17 @@ extension ChatModel {
         }
         return .thinking
     }
+
+    /// The step the agent itself is on, in plain words ("Checking your
+    /// calendars…"), for voice mode's status line. A helper's own steps stay
+    /// inside its folder; its delegation reads "Asking another agent…".
+    var liveStepPhrase: String? {
+        guard isSending else { return nil }
+        return activityLedger.allEvents.last { event in
+            event.lifecycle == .running
+                && (event.kind == .subagent || (event.kind == .tool && event.subagentID == nil))
+        }?.toolPhrase.live
+    }
 }
 
 /// The agent's face across the app. A designed pet plays a move for each kind

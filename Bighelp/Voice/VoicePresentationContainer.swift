@@ -15,6 +15,8 @@ struct VoicePresentationContainer: View {
     var onUseTurnBased: (() -> Void)? = nil
     /// The chat's live work, so the avatar acts out what the agent is doing.
     var chatActivity: () -> AgentActivityKind = { .idle }
+    /// The step the agent is on, in plain words ("Checking your calendars…").
+    var chatStep: () -> String? = { nil }
 
     var body: some View {
         Group {
@@ -23,12 +25,13 @@ struct VoicePresentationContainer: View {
                           agentImageURL: agentImageURL,
                           permissionCenter: permissionCenter,
                           onEnded: onEnded, onWorkspaceTap: onWorkspaceTap,
-                          chatActivity: chatActivity)
+                          chatActivity: chatActivity, chatStep: chatStep)
             } else if let live = presentation.liveModel {
                 NavigationStack {
                     LiveVoiceView(model: live, agentID: agentID,
                                   agentImageURL: agentImageURL, onEnded: onEnded,
-                                  onUseTurnBased: onUseTurnBased, chatActivity: chatActivity)
+                                  onUseTurnBased: onUseTurnBased, chatActivity: chatActivity,
+                                  chatStep: chatStep)
                 }
             } else {
                 NavigationStack {

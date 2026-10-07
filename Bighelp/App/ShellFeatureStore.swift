@@ -1520,12 +1520,21 @@ final class ShellFeatureStore {
         let agent = session?.agentIDs.first.flatMap { agentID in
             agents?.profiles.first(where: { $0.id == agentID })
         }
-        let client: any VoiceSessionClient
+        var client: any VoiceSessionClient
         if let session, let voiceClientFactory {
             client = voiceClientFactory(session, agent)
         } else {
             client = VoiceFixtureClient(confirmationDelay: timing.voiceDelay)
         }
+        #if DEBUG
+        // Demo voice answers through the chat's demo client, so its steps reach the chat
+        // the way a host's do.
+        if voiceClientFactory == nil, ProcessInfo.processInfo.arguments.contains("-test-voice-steps"),
+           let demo = chatModels[conversationID]?.client as? CanvasStreamingFixtureClient {
+            client = BighelpVoiceSessionClient(conversation: demo, output: SilentVoiceSpeechOutput(),
+                                               speechRate: { 1 })
+        }
+        #endif
         let initialTranscript = voiceClientFactory == nil
             ? VoiceFixture.transcript
             : Self.voiceTranscript(from: session?.items ?? [])

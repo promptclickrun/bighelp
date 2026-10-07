@@ -42,6 +42,29 @@ final class MenuButtonPlacementUITests: BighelpUITestCase {
         }
     }
 
+    /// Agents in the bottom bar still has its ☰ row, like Settings: quick screens hide the bar.
+    @MainActor
+    func testPinnedAgentsAndSettingsStayInTheMenu() throws {
+        let app = launch()
+        app.buttons["tab.feed"].firstMatch.tap()
+        let menu = app.buttons["home.drawer.open"].firstMatch
+        XCTAssertTrue(menu.waitForExistence(timeout: 10))
+        menu.tap()
+        let agents = app.buttons["menu.agents"]
+        XCTAssertTrue(agents.waitForExistence(timeout: 5), "Agents stays in ☰ while pinned")
+        XCTAssertFalse(app.buttons["menu.feed"].exists, "Other pinned places aren't listed twice")
+        save("menu-pinned-agents", app)
+        agents.tap()
+        XCTAssertTrue(app.buttons["tab.agents"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["tab.agents"].isSelected, "☰'s Agents opens the Agents tab")
+
+        XCTAssertTrue(menu.waitForExistence(timeout: 10))
+        menu.tap()
+        let settings = app.buttons["menu.settings"]
+        for _ in 0..<4 where !settings.isHittable { app.collectionViews.firstMatch.swipeUp() }
+        XCTAssertTrue(settings.isHittable, "Settings stays in ☰")
+    }
+
     @MainActor private func launch() -> XCUIApplication {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.home.opens-chat", "YES",

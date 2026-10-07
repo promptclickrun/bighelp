@@ -115,7 +115,7 @@ struct AppLayoutSettingsView: View {
         } header: {
             Text("Menu")
         } footer: {
-            Text("The menu shows everything that isn't in the bottom bar. Drag to change the order.")
+            Text("The menu shows everything that isn't in the bottom bar, and always Agents and Settings. Drag to change the order.")
         }
         .listRowBackground(theme.surface)
     }

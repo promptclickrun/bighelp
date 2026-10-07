@@ -14,9 +14,12 @@ final class ScriptedVoiceInputLevelSource: VoiceInputLevelSource {
     var onTranscript: ((VoiceRecognitionUpdate, UInt64) -> Void)?
     var onUnavailable: ((VoiceInputLevelError, UInt64) -> Void)?
     private var generation: UInt64 = 0
+    /// The sentence is heard once; listening again after it's sent hears nothing.
+    private var hasSpoken = false
 
     func start(generation: UInt64) async throws {
         self.generation = generation
+        guard !hasSpoken else { return }
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(400))
             guard let self, self.generation == generation else { return }
@@ -26,6 +29,7 @@ final class ScriptedVoiceInputLevelSource: VoiceInputLevelSource {
     }
 
     func finishNow() {
+        hasSpoken = true
         onTranscript?(.init(text: Self.final, isFinal: true), generation)
     }
 

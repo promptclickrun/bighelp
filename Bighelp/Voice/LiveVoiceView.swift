@@ -6,7 +6,6 @@ struct LiveVoiceView: View {
     @State private var model: LiveVoiceModel
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @ScaledMetric(relativeTo: .title2) private var captionSize: CGFloat = 24
     let agentID: String?
     let agentImageURL: URL?
     let onEnded: () -> Void
@@ -16,6 +15,8 @@ struct LiveVoiceView: View {
     let onUseTurnBased: (() -> Void)?
     /// The chat's live work (a running tool, thinking), for the avatar's moves.
     var chatActivity: () -> AgentActivityKind = { .idle }
+    /// The step the agent is on while it works for the call, in plain words.
+    var chatStep: () -> String? = { nil }
 
     init(
         model: LiveVoiceModel,
@@ -23,10 +24,12 @@ struct LiveVoiceView: View {
         agentImageURL: URL? = nil,
         onEnded: @escaping () -> Void = {},
         onUseTurnBased: (() -> Void)? = nil,
-        chatActivity: @escaping () -> AgentActivityKind = { .idle }
+        chatActivity: @escaping () -> AgentActivityKind = { .idle },
+        chatStep: @escaping () -> String? = { nil }
     ) {
         _model = State(initialValue: model)
         self.chatActivity = chatActivity
+        self.chatStep = chatStep
         self.agentID = agentID
         self.agentImageURL = agentImageURL
         self.onEnded = onEnded
@@ -54,7 +57,7 @@ struct LiveVoiceView: View {
                         )
                         .accessibilityHidden(true)
                         Text(captionText)
-                            .font(.system(size: captionSize, weight: .semibold))
+                            .bighelpFont(.screenTitle, weight: .semibold)
                             .tracking(-0.2)
                             .foregroundStyle(hasCaption ? theme.primaryText : theme.secondaryText)
                             .multilineTextAlignment(.center)
@@ -62,10 +65,15 @@ struct LiveVoiceView: View {
                             .truncationMode(.head)
                             .frame(maxWidth: 520)
                             .fixedSize(horizontal: false, vertical: true)
-                        if model.workStatus != .idle {
+                        if model.workStatus == .resultSent {
                             Label(model.workStatus.title, systemImage: model.workStatus.systemImage)
                                 .bighelpFont(.label, weight: .semibold)
                                 .foregroundStyle(theme.secondaryText)
+                        } else {
+                            // While Hermes works for the call: its step, else that it's working.
+                            VoiceStepLine(step: { [model, chatStep] in
+                                model.workStatus == .working ? chatStep() ?? model.workStatus.title : nil
+                            })
                         }
                         messages
                         Spacer(minLength: BighelpTokens.space16)

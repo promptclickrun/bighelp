@@ -494,7 +494,8 @@ struct ChatDestinationView: View {
                 onEnded: { voicePresentation = nil },
                 onWorkspaceTap: openMenuFromVoice,
                 onUseTurnBased: useTurnBasedVoice,
-                chatActivity: { [model] in model.liveActivityKind }
+                chatActivity: { [model] in model.liveActivityKind },
+                chatStep: { [model] in model.liveStepPhrase }
             )
             .onChange(of: model.isSending, initial: true) { _, active in
                 presentation.model.reconcileAgentRun(isActive: active)

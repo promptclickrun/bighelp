@@ -34,6 +34,18 @@ struct VoiceFixtureClient: VoiceSessionClient {
     }
 }
 
+#if DEBUG
+/// Demo replies "play" for a moment, without sound.
+@MainActor
+final class SilentVoiceSpeechOutput: VoiceSpeechOutput {
+    func speak(_ text: String, rate: Float) async throws {
+        try await Task.sleep(for: .seconds(2))
+    }
+
+    func stop() {}
+}
+#endif
+
 enum VoiceFixture {
     static let transcript = [
         VoiceTranscriptRow(

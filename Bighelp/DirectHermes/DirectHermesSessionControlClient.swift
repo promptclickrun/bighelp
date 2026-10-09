@@ -33,6 +33,7 @@ final class DirectHermesSessionControlClient: SessionRuntimeControlConfirming, S
 
     private struct ModelState {
         let provider: String
+        let runtimeProvider: String
         let model: String
         let providers: [BighelpLinkModelProvider]
         let fastMode: FastMode?
@@ -42,8 +43,9 @@ final class DirectHermesSessionControlClient: SessionRuntimeControlConfirming, S
             guard let fastMode else {
                 return SessionFastMode(mode: nil, unavailableReason: "Update Hermes to read this chat’s Fast Mode.")
             }
+            // Picker aliases are display hints, not proof of a billable route.
             return SessionFastMode(mode: fastMode, unavailableReason: FastMode.unavailableReason(
-                provider: providers.first { $0.id == provider }, model: model))
+                provider: providers.first { $0.id == runtimeProvider }, model: model))
         }
     }
 
@@ -406,7 +408,7 @@ final class DirectHermesSessionControlClient: SessionRuntimeControlConfirming, S
             let current = try await proof(sessionID: sessionID, coordinate: coordinate)
             return ModelState(
                 provider: Self.catalogProvider(for: current.provider, model: current.model, providers: cached.providers),
-                model: current.model, providers: cached.providers,
+                runtimeProvider: current.provider, model: current.model, providers: cached.providers,
                 fastMode: current.fastMode, isRunning: current.isRunning
             )
         }
@@ -424,7 +426,7 @@ final class DirectHermesSessionControlClient: SessionRuntimeControlConfirming, S
         }
         return ModelState(
             provider: Self.catalogProvider(for: verified.provider, model: verified.model, providers: providers),
-            model: verified.model, providers: providers,
+            runtimeProvider: verified.provider, model: verified.model, providers: providers,
             fastMode: verified.fastMode, isRunning: verified.isRunning
         )
     }

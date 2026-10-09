@@ -635,6 +635,19 @@ struct DirectHermesSessionControlClientTests {
         }
     }
 
+    @Test func cachedFirstPartyModelsCannotEnableFastModeForAnotherRuntimeRoute() async throws {
+        let fixture = try fastFixture()
+        let client = fixture.client()
+        #expect(try await client.loadFastMode(sessionID: fixture.appID, agentID: "studio").unavailableReason == nil)
+        fixture.providerID = "openrouter"
+        let state = try await client.loadFastMode(sessionID: fixture.appID, agentID: "studio")
+        #expect(state.unavailableReason != nil)
+        await #expect(throws: WorkspaceClientError.unavailable(.unsupportedOperation)) {
+            _ = try await client.setFastMode(.on, sessionID: fixture.appID, agentID: "studio")
+        }
+        #expect(!fixture.calls.contains { $0.operation == .configSet })
+    }
+
     @Test func fastModeRejectsAnActiveTurnOrRetiredMappingBeforeMutation() async throws {
         for retire in [false, true] {
             let fixture = try fastFixture()
@@ -679,7 +692,7 @@ struct DirectHermesSessionControlClientTests {
         fixture.providerID = "openai"
         fixture.model = "gpt-5.5"
         fixture.models = ["gpt-5.5"]
-        fixture.fastValue = "normal"
+        fixture.fastValue = ""
         return fixture
     }
 
@@ -863,9 +876,10 @@ private final class SessionControlWorkspace: WorkspaceOperationPerforming {
                     throw WorkspaceClientError.invalidRequest
                 }
                 if rejectFast { throw WorkspaceClientError.rejected(code: nil) }
-                fastValue = FastMode(value).value
+                // session.info carries the tier; config.get/set use mode names.
+                fastValue = FastMode(value) == .on ? "priority" : ""
                 if loseFastReceipt { throw WorkspaceClientError.outcomeUnknown }
-                return ["key": .string("fast"), "value": .string(fastValue!)]
+                return ["key": .string("fast"), "value": .string(FastMode(value).value)]
             }
             if payload["key"] == .string("reasoning") {
                 guard payload["scope"] == .string("session"), let value = payload["value"]?.string else { throw WorkspaceClientError.invalidRequest }

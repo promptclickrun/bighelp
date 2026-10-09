@@ -41,6 +41,7 @@ final class AgentRuntimeDefaultsEditorModel {
     }
 
     func load() async {
+        guard !isSaving else { return }
         loadGeneration += 1
         let generation = loadGeneration
         isLoading = true
@@ -51,12 +52,8 @@ final class AgentRuntimeDefaultsEditorModel {
         for attempt in 0...retryDelays.count {
             do {
                 let catalog = try await client.loadCatalog(agentID: agentID)
-                guard generation == loadGeneration else { return }
-                persisted = catalog.defaults
-                draft = catalog.defaults
-                providers = catalog.providers
-                support = catalog.support
-                hasLoaded = true
+                guard !Task.isCancelled, generation == loadGeneration else { return }
+                adopt(catalog)
                 return
             } catch is CancellationError {
                 return
@@ -119,6 +116,63 @@ final class AgentRuntimeDefaultsEditorModel {
         errorMessage = nil
     }
 
+    var fastModeUnavailableReason: String? {
+        guard hasLoaded else { return "Loading Fast Mode…" }
+        return FastMode.unavailableReason(
+            provider: providers.first { $0.id == draft.mainChats.providerID }, model: draft.mainChats.modelID)
+    }
+
+    func selectFastMode(_ mode: FastMode) {
+        guard !isSaving, hasLoaded, mode == .off || mode == .on else { return }
+        if mode == .on, let reason = fastModeUnavailableReason {
+            errorMessage = reason
+            return
+        }
+        draft.mainChats.fastMode = mode
+        errorMessage = nil
+    }
+
+    /// The Models page also edits reasoning and model independently. Re-read
+    /// their latest values so a speed-only save cannot put those choices back.
+    func saveFastMode(_ mode: FastMode) async {
+        guard !isSaving, !isLoading, mode == .off || mode == .on else { return }
+        isSaving = true
+        errorMessage = nil
+        defer { isSaving = false }
+        do {
+            let catalog = try await client.loadCatalog(agentID: agentID)
+            try Task.checkCancellation()
+            adopt(catalog)
+            if mode == .on, let reason = fastModeUnavailableReason {
+                errorMessage = reason
+                return
+            }
+            var desired = catalog.defaults
+            desired.mainChats.fastMode = mode
+            try await client.saveDefaults(desired, agentID: agentID)
+            try Task.checkCancellation()
+            persisted = desired
+            draft = desired
+        } catch is CancellationError {
+        } catch let partial as AgentRuntimeDefaultsPartialSaveError {
+            guard !Task.isCancelled else { return }
+            persisted = partial.committed
+            draft = partial.committed
+            errorMessage = "The Fast Mode change wasn’t confirmed. Reload to check the saved value."
+        } catch {
+            guard !Task.isCancelled else { return }
+            errorMessage = "Fast Mode couldn’t be saved. Reload to check the current value."
+        }
+    }
+
+    private func adopt(_ catalog: AgentRuntimeDefaultsCatalog) {
+        persisted = catalog.defaults
+        draft = catalog.defaults
+        providers = catalog.providers
+        support = catalog.support
+        hasLoaded = true
+    }
+
     func saveIfNeeded() async throws {
         guard !isSaving else { throw WorkspaceClientError.conflict }
         guard isDirty else { return }
@@ -178,6 +232,10 @@ final class AgentRuntimeDefaultsEditorModel {
             if submitted[scope].modelID == persisted[scope].modelID,
                draft[scope].modelID == submitted[scope].modelID {
                 draft[scope].modelID = committed[scope].modelID
+            }
+            if submitted[scope].fastMode == persisted[scope].fastMode,
+               draft[scope].fastMode == submitted[scope].fastMode {
+                draft[scope].fastMode = committed[scope].fastMode
             }
             if submitted[scope].reasoningEffort == persisted[scope].reasoningEffort,
                draft[scope].reasoningEffort == submitted[scope].reasoningEffort {

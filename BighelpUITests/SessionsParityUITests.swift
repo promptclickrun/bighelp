@@ -12,8 +12,7 @@ final class SessionsParityUITests: BighelpUITestCase {
         XCTAssertTrue(menu.waitForExistence(timeout: 15))
 
         // A chat's ⋯ has no second menu of its own.
-        app.buttons["chat.options"].firstMatch.tap()
-        XCTAssertTrue(app.buttons["chat.rename"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(chatMenuItem("chat.rename", in: app).waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["chat.workspace-menu"].exists, "Go to… is gone: ☰ is the menu")
         // Close it with a tap on the chat, away from the menu.
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.6)).tap()

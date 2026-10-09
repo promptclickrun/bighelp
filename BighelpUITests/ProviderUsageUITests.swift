@@ -206,8 +206,7 @@ final class ProviderUsageUITests: BighelpUITestCase {
         conversation.tap()
         let options = app.buttons["chat.options"]
         XCTAssertTrue(options.waitForExistence(timeout: 10))
-        options.tap()
-        let usage = app.buttons["chat.provider-usage"]
+        let usage = chatMenuItem("chat.provider-usage", in: app)
         XCTAssertTrue(usage.waitForExistence(timeout: 5))
         usage.tap()
         _ = expectPage(app)

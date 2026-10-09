@@ -109,8 +109,7 @@ final class AllHostsHostUITests: BighelpUITestCase {
         XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 45), "Desk Hermes' chat opens")
         let options = app.buttons["chat.options"].firstMatch
         XCTAssertTrue(options.waitForExistence(timeout: 10))
-        options.tap()
-        let usage = app.buttons["chat.provider-usage"].firstMatch
+        let usage = chatMenuItem("chat.provider-usage", in: app)
         XCTAssertTrue(usage.waitForExistence(timeout: 10), "Usage is in the chat's ⋯ menu")
         usage.tap()
         XCTAssertTrue(app.descendants(matching: .any)["usage"].waitForExistence(timeout: 10))

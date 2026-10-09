@@ -600,6 +600,89 @@ struct DirectHermesSessionControlClientTests {
         #expect(picker.providers.first?.models.last == "old-model")
     }
 
+    @Test func fastModeChangesOnlyTheVerifiedChatAndReadsBackTheSavedValue() async throws {
+        let fixture = try fastFixture()
+        let client = fixture.client()
+        #expect(try await client.loadFastMode(sessionID: fixture.appID, agentID: "studio").mode == .off)
+        #expect(try await client.setFastMode(.on, sessionID: fixture.appID, agentID: "studio").mode == .on)
+        #expect(try await client.setFastMode(.off, sessionID: fixture.appID, agentID: "studio").mode == .off)
+        let writes = fixture.calls.filter { $0.operation == .configSet }
+        #expect(writes.count == 2)
+        for write in writes {
+            #expect(write.payload["profile"] == .string("studio"))
+            #expect(write.payload["session_id"] == .string("runtime-chat"))
+            #expect(write.payload["scope"] == .string("session"))
+            #expect(write.payload["key"] == .string("fast"))
+        }
+        #expect(fixture.calls.filter { $0.operation == .configGet }.count == 2)
+        #expect(fixture.model == "gpt-5.5")
+        #expect(fixture.reasoning == "medium")
+    }
+
+    @Test func unsupportedRouteAndMissingHostFieldsNeverClaimFastModeIsEffective() async throws {
+        for provider in ["openrouter", "custom:proxy", "openai"] {
+            let fixture = try fastFixture()
+            fixture.providerID = provider
+            if provider == "openai" { fixture.fastValue = nil }
+            let client = fixture.client()
+            let state = try await client.loadFastMode(sessionID: fixture.appID, agentID: "studio")
+            #expect(state.title == "Unavailable")
+            #expect(state.unavailableReason != nil)
+            await #expect(throws: WorkspaceClientError.unavailable(.unsupportedOperation)) {
+                _ = try await client.setFastMode(.on, sessionID: fixture.appID, agentID: "studio")
+            }
+            #expect(!fixture.calls.contains { $0.operation == .configSet })
+        }
+    }
+
+    @Test func fastModeRejectsAnActiveTurnOrRetiredMappingBeforeMutation() async throws {
+        for retire in [false, true] {
+            let fixture = try fastFixture()
+            fixture.running = !retire
+            fixture.retireMappingAfterOptions = retire
+            let client = fixture.client()
+            await #expect(throws: (any Error).self) {
+                _ = try await client.setFastMode(.on, sessionID: fixture.appID, agentID: "studio")
+            }
+            #expect(!fixture.calls.contains { $0.operation == .configSet })
+        }
+    }
+
+    @Test func rejectedAndUncertainFastSavesNeverInventSuccessOrRetryTheWrite() async throws {
+        for uncertain in [false, true] {
+            let fixture = try fastFixture()
+            fixture.rejectFast = !uncertain
+            fixture.loseFastReceipt = uncertain
+            let controls = SessionRuntimeControlModel(sessionID: fixture.appID, agentID: "studio", messaging: fixture.client())
+            await controls.loadFastModeIfNeeded()
+            await controls.selectFastMode(.on)
+            #expect(controls.fastModeError != nil)
+            #expect(controls.fastMode?.mode == (uncertain ? .on : .off))
+            #expect(fixture.calls.filter { $0.operation == .configSet }.count == 1)
+        }
+    }
+
+    @Test func newerHostFastModesRemainDistinctFromOffAndOldEventsCannotUndoAChoice() async throws {
+        let fixture = try fastFixture()
+        fixture.fastValue = "future-mode"
+        let controls = SessionRuntimeControlModel(sessionID: fixture.appID, agentID: "studio", messaging: fixture.client())
+        await controls.loadFastModeIfNeeded()
+        #expect(controls.fastMode?.mode == FastMode("future-mode"))
+        #expect(controls.fastMode?.title == "Set on host")
+        await controls.selectFastMode(.on)
+        controls.reconcileFastMode(.off, observedAt: .distantPast)
+        #expect(controls.fastMode?.mode == .on)
+    }
+
+    private func fastFixture() throws -> SessionControlWorkspace {
+        let fixture = try SessionControlWorkspace()
+        fixture.providerID = "openai"
+        fixture.model = "gpt-5.5"
+        fixture.models = ["gpt-5.5"]
+        fixture.fastValue = "normal"
+        return fixture
+    }
+
     private func requiredConfirmation(
         _ client: DirectHermesSessionControlClient, _ selection: BighelpLinkPickerSelection
     ) async throws -> SessionRuntimeModelConfirmation {
@@ -670,6 +753,11 @@ private final class SessionControlWorkspace: WorkspaceOperationPerforming {
     var coordinate: WorkspaceSessionCoordinate?
     var calls: [Call] = []
     var model = "old-model"
+    var providerID = "native-provider"
+    var fastValue: String?
+    var rejectFast = false
+    var loseFastReceipt = false
+    var running = false
     var models = ["old-model", "new-model"]
     var reasoning: String? = "medium"
     var lazy = false
@@ -738,31 +826,47 @@ private final class SessionControlWorkspace: WorkspaceOperationPerforming {
             if yieldOnActivation { await Task.yield() }
             var info: [String: BighelpJSONValue] = [
                 "stored_session_id": .string("stored-chat"), "profile_name": .string("studio"),
-                "model": .string(pendingInfoModel ?? model), "provider": .string(runtimeProviderAlias ?? "native-provider"),
+                "model": .string(pendingInfoModel ?? model), "provider": .string(runtimeProviderAlias ?? providerID),
                 "system_prompt": .string("Synthetic private data must not enter picker models")
             ]
             if let reasoning { info["reasoning_effort"] = .string(reasoning) }
+            if let fastValue { info["service_tier"] = .string(fastValue) }
             if lazy { info["lazy"] = .boolean(true) }
             if let invalidInfoField { info[invalidInfoField] = .string("wrong") }
             return [
                 "session_id": .string("runtime-chat"), "session_key": .string("stored-chat"),
-                "info": .object(info), "running": .boolean(false),
+                "info": .object(info), "running": .boolean(running),
                 "messages": .array([]), "messages_omitted": .boolean(true)
             ]
         case .modelOptions:
             if retireMappingAfterOptions { coordinate = nil }
             return [
-                "model": .string(model), "provider": .string("native-provider"),
+                "model": .string(model), "provider": .string(providerID),
                 "providers": .array([.object([
-                    "slug": .string("native-provider"), "name": .string("Native Provider"),
+                    "slug": .string(providerID), "name": .string("Native Provider"),
                     "is_current": .boolean(catalogMarksCurrent), "is_user_defined": .boolean(false),
-                    "models": .array(models.map(BighelpJSONValue.string))
+                    "models": .array(models.map(BighelpJSONValue.string)),
+                    "capabilities": .object(Dictionary(uniqueKeysWithValues: models.map {
+                        ($0, .object(["fast": .boolean(true)]))
+                    }))
                 ])])
             ]
         case .configGet:
+            if payload["key"] == .string("fast"), let fastValue {
+                return ["value": .string(FastMode(fastValue).value)]
+            }
             guard payload["key"] == .string("reasoning"), let reasoning else { throw WorkspaceClientError.invalidResponse }
             return ["value": .string(reasoning), "display": .string("show")]
         case .configSet:
+            if payload["key"] == .string("fast") {
+                guard payload["scope"] == .string("session"), let value = payload["value"]?.string else {
+                    throw WorkspaceClientError.invalidRequest
+                }
+                if rejectFast { throw WorkspaceClientError.rejected(code: nil) }
+                fastValue = FastMode(value).value
+                if loseFastReceipt { throw WorkspaceClientError.outcomeUnknown }
+                return ["key": .string("fast"), "value": .string(fastValue!)]
+            }
             if payload["key"] == .string("reasoning") {
                 guard payload["scope"] == .string("session"), let value = payload["value"]?.string else { throw WorkspaceClientError.invalidRequest }
                 reasoning = value

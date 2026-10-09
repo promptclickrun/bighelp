@@ -260,6 +260,8 @@ struct ModelAdministrationView: View {
     let onOpenProviderAccounts: (() -> Void)?
     let onOpenAgentDefaults: (() -> Void)?
     @State private var reasoning: ModelReasoningDefaults?
+    @State private var fastModeDefaults: AgentRuntimeDefaultsEditorModel?
+    private let runtimeDefaults: (any AgentRuntimeDefaultsClient)?
 
     init(
         hostName: String,
@@ -270,6 +272,10 @@ struct ModelAdministrationView: View {
         onOpenProviderAccounts: (() -> Void)? = nil,
         onOpenAgentDefaults: (() -> Void)? = nil
     ) {
+        runtimeDefaults = reasoningDefaults
+        _fastModeDefaults = State(initialValue: reasoningDefaults.map {
+            AgentRuntimeDefaultsEditorModel(agentID: profileID, client: $0)
+        })
         _reasoning = State(initialValue: reasoningDefaults.map(ModelReasoningDefaults.init(client:)))
         _store = State(initialValue: ModelAdministrationStore(
             hostName: hostName, profileID: profileID, client: client
@@ -287,10 +293,11 @@ struct ModelAdministrationView: View {
 
     /// Each agent has its own default; the page shows the chosen one's.
     private func showAgent(_ id: String) {
-        guard id != store.profileID, !store.isBusy else { return }
+        guard id != store.profileID, !store.isBusy, fastModeDefaults?.isSaving != true else { return }
         assignmentTarget = nil
         store.retire()
         store = ModelAdministrationStore(hostName: store.hostName, profileID: id, client: client)
+        fastModeDefaults = runtimeDefaults.map { AgentRuntimeDefaultsEditorModel(agentID: id, client: $0) }
     }
 
     var body: some View {
@@ -301,6 +308,7 @@ struct ModelAdministrationView: View {
                     statusSections
                     if let snapshot = store.snapshot {
                         mainModelSection(snapshot)
+                        if let fastModeDefaults { fastModeSection(fastModeDefaults) }
                         if let reasoning { reasoningSection(reasoning) }
                         if let runtime = snapshot.runtime { runtimeSection(runtime) }
                         modelCapabilitiesSection(snapshot)
@@ -311,6 +319,7 @@ struct ModelAdministrationView: View {
                     }
                 }
                 .listStyle(.insetGrouped)
+                .disabled(fastModeDefaults?.isSaving == true)
                 .refreshable { await store.refresh() }
             } else {
                 ContentUnavailableView(
@@ -325,6 +334,9 @@ struct ModelAdministrationView: View {
             async let reasoningLoad: Void? = reasoning?.load(agentID: store.profileID)
             if store.snapshot == nil { await store.load() }
             _ = await reasoningLoad
+        }
+        .task(id: store.snapshot?.info) {
+            if store.snapshot != nil { await fastModeDefaults?.load() }
         }
         .bighelpSheet(item: $assignmentTarget) { target in
             ModelAdministrationPicker(store: store, target: target, agentName: agentName) { assignmentTarget = nil }
@@ -479,6 +491,21 @@ struct ModelAdministrationView: View {
                 Button("Agent runtime defaults", action: onOpenAgentDefaults)
                     .frame(minHeight: BighelpTokens.hitTarget)
             }
+        }
+    }
+
+    private func fastModeSection(_ defaults: AgentRuntimeDefaultsEditorModel) -> some View {
+        Section {
+            AgentFastModeRow(model: defaults, allowsEdits: !store.isBusy && reasoning?.isSaving != true,
+                             saveImmediately: true)
+            if let error = defaults.errorMessage {
+                Text(error).foregroundStyle(theme.danger).font(.bighelp(.footnote))
+                Button("Try again") { Task { await defaults.load() } }
+            }
+        } header: {
+            Text("Fast Mode")
+        } footer: {
+            Text("Default for new chats with \(agentName). Existing chat overrides stay unchanged. Fast Mode may cost more.")
         }
     }
 

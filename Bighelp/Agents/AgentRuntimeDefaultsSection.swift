@@ -75,6 +75,9 @@ struct AgentRuntimeDefaultsSection: View {
             .accessibilityLabel("Choose model and reasoning for \(scope.title)")
             .accessibilityValue("\(modelLabel(for: selection)), reasoning \(reasoningTitle(for: scope))")
             .accessibilityIdentifier("agent.runtime.\(scope.rawValue).model")
+            if scope == .mainChats {
+                AgentFastModeRow(model: model, allowsEdits: allowsEdits)
+            }
             if let reason = model.support.modelUnavailableReasons[scope] {
                 Text(reason)
                     .font(.bighelp(.footnote))

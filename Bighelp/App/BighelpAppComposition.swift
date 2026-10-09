@@ -421,7 +421,7 @@ struct BighelpAppComposition {
             sessionControlMessaging: usesFixtures
                 ? DemoSessionControlMessaging(reasoning: arguments.contains("-test-session-reasoning-high")
                     ? ["demo-finance": "high"]
-                    : [:])
+                    : [:], defaults: agentRuntimeDefaults)
                 : nil,
             slashCommandCatalogClient: usesFixtures
                 ? FixtureSlashCommandCatalogClient()

@@ -57,7 +57,14 @@ extension RootShellView {
         if case .chat(let id)? = appState.path.last,
            featureStore.preparedChatModel(id: id)?.memberIDs.first == activity.agentID { return }
         if homeAgent?.id != activity.agentID { agents.select(activity.agentID) }
-        openHomeChat(replacing: true)
+        if let working = sessionCatalog.recentSummaries(includeCronSessions: false).first(where: {
+            $0.kind == .direct && $0.agentIDs.first == activity.agentID
+                && featureStore.preparedChatModel(id: $0.id)?.isSending == true
+        }) {
+            openAsHomeChat(working)
+        } else {
+            openHomeChat(replacing: true)
+        }
     }
 
     /// Every phone chat uses the agent-home look (big live avatar), ☰ in the
@@ -96,7 +103,7 @@ extension RootShellView {
         return defaults.object(forKey: "loopdy.home.opens-chat") == nil || defaults.bool(forKey: "loopdy.home.opens-chat")
     }
 
-    /// Opens the home agent's latest direct chat, or a new one.
+    /// Opens the same canonical Bot Chat as the agent's entry in Hermes Desktop.
     func openHomeChat(replacing: Bool = false) {
         // Already there: tapping Chat again keeps the chat as it is. A chat
         // with Back (picked from the list) isn't the home chat; Chat leaves it.
@@ -106,20 +113,49 @@ extension RootShellView {
             appState.select(.sessions)
             return
         }
-        let latest = sessionCatalog.recentSummaries(includeCronSessions: false)
-            .first { $0.kind == .direct && $0.agentIDs.first == agent.id }
-        appState.chatOpenedFromList = false
-        if let latest {
+        openCanonicalAgentChat(agent.id, fromList: false)
+    }
+
+    func openCanonicalAgentChat(_ profileID: String, fromList: Bool) {
+        guard let owner = currentWorkspaceOwner else {
+            actionErrorMessage = "Connect to this computer to open the agent’s chat."
+            return
+        }
+        let originTab = appState.selectedTab
+        let originPath = appState.path
+        canonicalChatCoordinator.open(profileID: profileID, owner: owner, resolve: { profile, expectedOwner in
+            if usesWorkspaceFixtures {
+                return try DemoSessionCatalogClient.canonicalID(profileID: profile, records: sessionCatalog.records)
+            }
+            guard let connections = workspaceConnections else { throw WorkspaceClientError.ownerChanged }
+            return try await connections.openCanonicalSession(profile, expectedOwner)
+        }, canPresent: {
+            currentWorkspaceOwner == owner && homeAgent?.id == profileID
+                && appState.selectedTab == originTab && appState.path == originPath
+        }, present: { id in
+            guard let record = sessionCatalog.session(id: id), record.kind == .direct,
+                  record.agentIDs == [profileID] else {
+                canonicalChatOpenFailed(profileID, fromList: fromList)
+                return
+            }
             var instant = Transaction()
             instant.disablesAnimations = true
             withTransaction(instant) {
                 appState.select(.sessions)
-                openSession(latest)
+                appState.chatOpenedFromList = fromList
+                openSession(record.summary)
             }
-        } else {
-            // A new chat replaces the open one in place, so only leave other tabs.
-            if appState.selectedTab != .sessions { appState.select(.sessions) }
-            startNewChat(explicitAgentID: agent.id)
+        }, failed: {
+            canonicalChatOpenFailed(profileID, fromList: fromList)
+        })
+    }
+
+    private func canonicalChatOpenFailed(_ profileID: String, fromList: Bool) {
+        actionErrorMessage = "The agent’s Bot Chat couldn’t be opened. Your conversations and drafts are unchanged."
+        let signIn = currentWorkspaceOwner?.signIn
+        actionErrorRetry = {
+            guard currentWorkspaceOwner?.signIn == signIn, homeAgent?.id == profileID else { return }
+            openCanonicalAgentChat(profileID, fromList: fromList)
         }
     }
 
@@ -211,16 +247,11 @@ extension RootShellView {
         startNewChat(explicitAgentID: agentID)
     }
 
-    /// Agents: tapping an agent chats with it. On one computer that's the Chat
-    /// tab's own chat, like New chat: ☰ (which leads back to Agents) and the
-    /// Chat tab lit. The all-hosts view has no home chat and keeps Back.
+    /// Message resumes the agent's Bot Chat. Only explicit New chat allocates
+    /// an ordinary conversation; the all-hosts view keeps its Back navigation.
     func openAgentChat(_ agentID: String) {
-        guard !fleetModeOn else {
-            agents.select(agentID)
-            startNewChat(explicitAgentID: agentID)
-            return
-        }
-        startHomeChat(with: agentID)
+        agents.select(agentID)
+        openCanonicalAgentChat(agentID, fromList: fleetModeOn)
     }
 
     func inviteToGroup(seed: String?) {

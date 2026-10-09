@@ -76,7 +76,10 @@ final class DirectHermesAgentRuntimeDefaultsClient: AgentRuntimeDefaultsConfirmi
             guard totalModels <= 20_000 else { throw WorkspaceClientError.capacityExceeded }
             providers.append(BighelpLinkModelProvider(
                 id: id, name: name, isCurrent: isCurrent, isCustom: isCustom,
-                models: models.filter { !unavailable.contains($0) }
+                models: models.filter { !unavailable.contains($0) },
+                fastModeModels: row["capabilities"]?.object.map { capabilities in
+                    Set(models.filter { capabilities[$0]?.object?["fast"]?.boolean == true })
+                }
             ))
         }
         guard Set(providers.map(\.id)).count == providers.count else { throw WorkspaceClientError.invalidResponse }
@@ -115,11 +118,12 @@ final class DirectHermesAgentRuntimeDefaultsClient: AgentRuntimeDefaultsConfirmi
         let mainModelChanged = desired.mainChats.providerID != current.defaults.mainChats.providerID
             || desired.mainChats.modelID != current.defaults.mainChats.modelID
         let mainReasoningChanged = desired.mainChats.reasoningEffort != current.defaults.mainChats.reasoningEffort
+        let fastModeChanged = desired.mainChats.fastMode != current.defaults.mainChats.fastMode
         var childConfig = Self.childChanges(desired, old: current.defaults)
         if mainReasoningChanged, desired.mainChats.reasoningEffort.isEmpty {
             childConfig["agent"] = .object(["reasoning_effort": .string("")])
         }
-        guard mainModelChanged || mainReasoningChanged || !childConfig.isEmpty else { return }
+        guard mainModelChanged || mainReasoningChanged || fastModeChanged || !childConfig.isEmpty else { return }
         var didSubmitMutation = false
         do {
             if mainModelChanged {
@@ -156,6 +160,19 @@ final class DirectHermesAgentRuntimeDefaultsClient: AgentRuntimeDefaultsConfirmi
                 guard result["key"]?.string == "reasoning",
                       try Self.effort(result["value"]) == desired.mainChats.reasoningEffort else {
                     throw WorkspaceClientError.invalidResponse
+                }
+            }
+            if fastModeChanged {
+                didSubmitMutation = true
+                // No session ID: the host writes this profile's default, never
+                // a currently open conversation's explicit override.
+                let result = try await service.request(.configSet, [
+                    "profile": .string(agentID), "key": .string("fast"),
+                    "value": .string(desired.mainChats.fastMode.value), "scope": .string("global")
+                ], capability: .agentDefaultsEdit, profileID: agentID)
+                guard result["key"]?.string == "fast", let value = result["value"]?.string,
+                      FastMode(value) == desired.mainChats.fastMode else {
+                    throw WorkspaceClientError.outcomeUnknown
                 }
             }
             if !childConfig.isEmpty {
@@ -211,7 +228,9 @@ final class DirectHermesAgentRuntimeDefaultsClient: AgentRuntimeDefaultsConfirmi
                 "Hermes uses a custom endpoint for subagents. Change that override on the host before choosing a different provider here."
         }
         let defaults = AgentRuntimeDefaults(
-            mainChats: AgentRuntimeSelection(providerID: provider, modelID: modelID, reasoningEffort: try Self.effort(agent["reasoning_effort"])),
+            mainChats: AgentRuntimeSelection(providerID: provider, modelID: modelID,
+                reasoningEffort: try Self.effort(agent["reasoning_effort"]),
+                fastMode: FastMode(try Self.string(agent["service_tier"]))),
             subagents: AgentRuntimeSelection(
                 providerID: try Self.string(delegation["provider"]), modelID: try Self.string(delegation["model"]),
                 reasoningEffort: try Self.effort(delegation["reasoning_effort"])
@@ -229,8 +248,24 @@ final class DirectHermesAgentRuntimeDefaultsClient: AgentRuntimeDefaultsConfirmi
     }
 
     private func validate(_ desired: AgentRuntimeDefaults, baseline: Snapshot, agentID: String) throws {
-        guard desired.scheduledTasks.reasoningEffort.isEmpty else {
+        guard desired.scheduledTasks.reasoningEffort.isEmpty,
+              desired.scheduledTasks.fastMode == baseline.defaults.scheduledTasks.fastMode,
+              desired.subagents.fastMode == baseline.defaults.subagents.fastMode else {
             throw WorkspaceClientError.unavailable(.unsupportedOperation)
+        }
+        if desired.mainChats.fastMode != baseline.defaults.mainChats.fastMode {
+            guard desired.mainChats.fastMode == .on || desired.mainChats.fastMode == .off else {
+                throw WorkspaceClientError.invalidRequest
+            }
+            // Turning it off is always safe, including a default left behind
+            // after switching to an unsupported model on another client.
+            if desired.mainChats.fastMode == .on {
+                let providers = providerCache[agentID] ?? []
+                guard FastMode.unavailableReason(provider: providers.first { $0.id == desired.mainChats.providerID },
+                                                 model: desired.mainChats.modelID) == nil else {
+                    throw WorkspaceClientError.unavailable(.unsupportedOperation)
+                }
+            }
         }
         for scope in AgentRuntimeScope.allCases {
             let new = desired[scope], old = baseline.defaults[scope]

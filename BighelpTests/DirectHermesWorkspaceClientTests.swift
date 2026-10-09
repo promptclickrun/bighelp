@@ -34,6 +34,25 @@ struct DirectHermesWorkspaceClientTests {
             }
         }
     }
+    @Test func fastModeUsesExplicitSessionOrDefaultScope() throws {
+        let session: [String: BighelpJSONValue] = [
+            "profile": .string("studio"), "session_id": .string("runtime-chat"),
+            "key": .string("fast"), "value": .string("on"), "scope": .string("session")
+        ]
+        #expect(try DirectHermesWorkspaceClient.route(.configSet, payload: session) == .rpc("config.set", session))
+        let defaults: [String: BighelpJSONValue] = [
+            "profile": .string("studio"), "key": .string("fast"),
+            "value": .string("off"), "scope": .string("global")
+        ]
+        #expect(try DirectHermesWorkspaceClient.route(.configSet, payload: defaults) == .rpc("config.set", defaults))
+        #expect(throws: WorkspaceClientError.invalidRequest) {
+            try DirectHermesWorkspaceClient.route(.configSet, payload: ["key": .string("fast"), "value": .string("on")])
+        }
+        #expect(throws: WorkspaceClientError.invalidRequest) {
+            try DirectHermesWorkspaceClient.route(.configSet, payload: session.merging(["scope": .string("global")]) { _, new in new })
+        }
+    }
+
     @Test func firstCanonicalBirthUsesExplicitNativeRegistryAndPersistenceOperations() throws {
         let lookup: [String: BighelpJSONValue] = [
             "profile": .string("studio"), "title": .string("Bot Chat"), "include_hidden": .boolean(true),

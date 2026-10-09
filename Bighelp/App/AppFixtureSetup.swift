@@ -20,6 +20,15 @@ enum AppFixtureSetup {
             initialSessions[index] = ConversationFixtures.uiV3Preview
         }
         #if DEBUG
+        if usesFixtures, arguments.contains("-test-canonical-agent-chat") {
+            initialSessions.append(SessionRecord(
+                id: "demo-canonical-finance", kind: .direct, agentIDs: ["finance"], title: "Bot Chat",
+                items: [TimelineItem(id: "canonical-marker", role: .assistant,
+                    sender: .agent(id: "finance", snapshot: .init(name: "Avery Park")),
+                    content: .message("This is the shared Bot Chat."), metadata: .init(sourceOrder: 1))],
+                createdAt: .distantPast, updatedAt: .distantPast, hasAcceptedMessage: true
+            ))
+        }
         if usesFixtures, arguments.contains("-test-native-reaction-ui"),
            let index = initialSessions.firstIndex(where: { $0.id == "demo-finance" }) {
             initialSessions[index] = ConversationFixtures.nativeReactionPreview

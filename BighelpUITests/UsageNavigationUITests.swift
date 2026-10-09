@@ -9,8 +9,7 @@ final class UsageNavigationUITests: BighelpUITestCase {
         let app = launch()
         let options = app.buttons["chat.options"].firstMatch
         XCTAssertTrue(options.waitForExistence(timeout: 15), "Opens on the agent's chat")
-        options.tap()
-        let usage = app.buttons["chat.provider-usage"].firstMatch
+        let usage = chatMenuItem("chat.provider-usage", in: app)
         XCTAssertTrue(usage.waitForExistence(timeout: 5))
         usage.tap()
         XCTAssertTrue(app.descendants(matching: .any)["usage"].firstMatch.waitForExistence(timeout: 8))

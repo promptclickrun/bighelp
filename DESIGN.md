@@ -56,7 +56,7 @@ are historical (`docs/ui-v3-design.md`).
 
 iPhone is an agent home. The bottom bar is **Chat, Feed, Ideas, Goals, Files** (the Apps page), all for the selected agent;
 it is always open and names each tab under its icon. In a chat, Chat is the lit tab and tapping it does nothing.
-Chat opens that agent's latest chat with its live avatar big at the top: tap the avatar for its profile (This chat's
+Chat opens that agent's canonical Bot Chat (the same conversation as Hermes Desktop's bot entry) with its live avatar big at the top: tap the avatar for its profile (This chat's
 model and reasoning, then Activity, Approvals, Schedules, Identity), tap the name to switch agents or open a group
 chat, and ☰ for everything else. ☰'s first screen fits without
 scrolling: the host as one switcher row on top, then New chat (Group beside it), Agents, Projects, Kanban, Workflows
@@ -182,7 +182,7 @@ each computer's plans sit under its own name; it changes only Limits and is reme
 or 90 days of Hermes' own numbers (`/api/analytics/usage` and `/api/analytics/models`, per agent): estimated cost or
 processed tokens per day as bars (tap one for its day), totals with the cache rate, when you use it (weekdays, and
 hours with the plugin's `usage/activity`), and ranked rows by model, by agent and, with All hosts on, by computer.
-Tap a row to chart it against everything else. Chat ⋯ › Usage and the context window open the same page; there is
+Tap a row to chart it against everything else. Chat ⋯ › Usage › Usage and the context window open the same page; there is
 no overlay or Settings copy. Subscriptions report no cost, so a host where nothing cost money opens on Tokens.
 Share (top right, beside Refresh) sends the page as a PDF (paged, never cutting a card in two), a PNG (one tall
 picture), a web page (one file, inline styles and SVG charts, nothing loaded) or a CSV (one table of full-precision
@@ -245,7 +245,7 @@ chats (source `workflow`) stay out of Sessions, recents and widgets.
 host, like Messages: pinned agents up top as big pictures with their name and role (no host name; touch and hold
 to drag them into a new order, kept on this device across hosts), host filter chips, then each agent with its host's
 name, its role and its latest chat, newest first. One big round New chat sits bottom right, above the search bar,
-where a thumb rests. A tap opens that agent's own chat (☰ top left, the edge swipe goes back); if it's on another host, the app switches hosts
+where a thumb rests. A tap opens that agent's canonical Bot Chat (☰ top left, the edge swipe goes back); if it's on another host, the app switches hosts
 first while the list stays up. ☰'s recent chats, All chats and Scheduled tasks then list every host's, each with
 its host's name. Screens that belong to one host (Settings, Agents, Projects, Kanban, Workflows, the credential
 vault, the folder, New group) ask which host first; Usage instead adds up every host, with a row for each; Settings' pop-up also leads with **Fleet settings**, one page
@@ -282,10 +282,24 @@ plugin and notifications, with its address and access folded away and Remove at 
 
 Nerd Mode (`settings.nerdModeEnabled`, also the `nerdModeEnabled` environment value) also gates technical detail
 inside everyday screens: the chat ⋯ Advanced submenu, the chat Info sheet's visibility toggles and host details,
-Project Changes, the context window (⋯ › Context window, between Model & reasoning and provider usage; nothing sits
+Project Changes, the context window (⋯ › Usage › Context window; nothing sits
 above the message box for it) and the subagent rail, Skills/Workspace/Session rows in the + sheet, Agent
 Studio's Advanced page and templates, the task editor/detail Advanced groups, and the extra sections on
 Settings › Chat. Everyday controls must never live only behind it.
+
+The chat's ⋯ menu has at most five rows: File changes when available, Model & speed, This chat, Usage and
+Nerd Mode's Advanced. Model & speed contains Model & reasoning and Fast Mode. This chat contains Rename chat,
+Chat files, Chat appearance and Edit this agent. Usage contains provider usage and Nerd Mode's Context window.
+Existing technical controls stay in Advanced. Keep every level short enough to navigate without scrolling.
+
+Fast Mode is explicit about scope: the chat menu changes only this chat; Settings › Default model changes the
+selected agent's default for new chats. Fast Mode may cost more. Read the host's current value and verify saves;
+unknown modes stay labeled as host-managed. A model/provider without verified support shows Unavailable and a
+reason, not an effective On switch. A running reply locks chat speed changes just like model and reasoning.
+
+Agent entries (including Agents → Message and All hosts) use the canonical Bot Chat resolver. New chat still
+creates an ordinary conversation, and picking a saved chat still opens that exact conversation. A failed Bot Chat
+lookup offers a retry rather than silently falling back to an unrelated chat; stale navigation results are ignored.
 
 A chat's model and reasoning (`ChatModelSummaryRow`) show in the avatar's profile, at the top of Info and at the top of
 the context pop-up, each with Change into Model & reasoning. Showing them reads the reasoning once, never while the agent

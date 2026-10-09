@@ -89,8 +89,19 @@ class BighelpUITestCase: XCTestCase {
     func chatMenuItem(_ identifier: String, in app: XCUIApplication, timeout: TimeInterval = 5) -> XCUIElement {
         let item = app.buttons[identifier].firstMatch
         if item.exists, item.isHittable { return item }
-        let options = app.buttons["chat.options"].firstMatch
-        if options.waitForExistence(timeout: timeout) { options.tap() }
+        let group: String?
+        switch identifier {
+        case "chat.session-controls", "chat.fast-mode": group = "chat.options.model-speed"
+        case "chat.context-window", "chat.provider-usage": group = "chat.options.usage"
+        case "chat.rename", "chat.files", "chat.appearance", "chat.edit-current-agent": group = "chat.options.this-chat"
+        default: group = nil
+        }
+        let submenu = group.map { app.buttons[$0].firstMatch }
+        if submenu?.exists != true {
+            let options = app.buttons["chat.options"].firstMatch
+            if options.waitForExistence(timeout: timeout) { options.tap() }
+        }
+        if let submenu, submenu.waitForExistence(timeout: timeout) { submenu.tap() }
         _ = item.waitForExistence(timeout: timeout)
         return item
     }

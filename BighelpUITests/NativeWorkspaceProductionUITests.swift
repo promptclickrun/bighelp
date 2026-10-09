@@ -635,7 +635,7 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         app.buttons["root.new-chat"].tap()
         let composer = app.textViews["chat.composer.text"]
         XCTAssertTrue(composer.waitForExistence(timeout: 10)); composer.tap()
-        let controls = app.buttons["chat.session-controls"]
+        let controls = chatMenuItem("chat.session-controls", in: app)
         XCTAssertTrue(controls.waitForExistence(timeout: 20))
         let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: controls)
         XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 20), .completed)
@@ -1366,8 +1366,7 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         composer.tap()
         // This synthetic provider reports zero token usage. Verify the actual
         // reopened send transaction rather than requiring an unavailable meter.
-        app.buttons["chat.options"].tap()
-        XCTAssertTrue(app.buttons["chat.session-controls"].waitForExistence(timeout: 10))
+        XCTAssertTrue(chatMenuItem("chat.session-controls", in: app).waitForExistence(timeout: 10))
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.01, dy: 0.4)).tap()
         XCTAssertTrue(app.buttons["chat.session-controls"].waitForNonExistence(timeout: 5))
         composer.tap()

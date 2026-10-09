@@ -626,6 +626,80 @@ struct DirectHermesAgentAdapterTests {
         DirectHermesAgentDirectoryClient(workspace: workspace, owner: workspace.initialOwner, currentOwner: { workspace.owner })
     }
 
+    @Test func fastDefaultIsSavedForOneProfileWithoutChangingModelOrReasoning() async throws {
+        let workspace = try AgentNativeWorkspace()
+        workspace.mainProvider = "openai"
+        workspace.mainModel = "gpt-5.5"
+        workspace.availableModels = ["gpt-5.5"]
+        let client = runtime(workspace)
+        var desired = try await client.loadCatalog(agentID: "studio").defaults
+        #expect(desired.mainChats.fastMode == .off)
+        desired.mainChats.fastMode = .on
+        try await client.saveDefaults(desired, agentID: "studio")
+        #expect(try await client.loadDefaults(agentID: "studio") == desired)
+        let writes = workspace.calls.filter { $0.operation == .configSet }
+        #expect(writes.count == 1)
+        #expect(writes.first?.payload == ["profile": .string("studio"), "key": .string("fast"),
+                                         "value": .string("fast"), "scope": .string("global")])
+        #expect(workspace.config["agent"]?.object?["reasoning_effort"] == .string("medium"))
+        #expect(workspace.mainModel == "gpt-5.5")
+    }
+
+    @Test func fastDefaultRejectsAggregatorsAndKeepsUnknownHostModesWhenSavingReasoning() async throws {
+        let workspace = try AgentNativeWorkspace()
+        workspace.mainProvider = "openrouter"
+        workspace.mainModel = "gpt-5.5"
+        workspace.availableModels = ["gpt-5.5"]
+        workspace.config["agent"] = .object(["reasoning_effort": .string("medium"), "service_tier": .string("future-mode")])
+        let client = runtime(workspace)
+        var desired = try await client.loadCatalog(agentID: "studio").defaults
+        #expect(desired.mainChats.fastMode == FastMode("future-mode"))
+        desired.mainChats.fastMode = .on
+        await #expect(throws: WorkspaceClientError.unavailable(.unsupportedOperation)) {
+            try await client.saveDefaults(desired, agentID: "studio")
+        }
+        #expect(!workspace.calls.contains { $0.operation == .configSet })
+        desired.mainChats.fastMode = FastMode("future-mode")
+        desired.mainChats.reasoningEffort = "high"
+        try await client.saveDefaults(desired, agentID: "studio")
+        #expect(workspace.config["agent"]?.object?["service_tier"] == .string("future-mode"))
+        #expect(!workspace.calls.contains { $0.payload["key"] == .string("fast") })
+    }
+
+    @Test func speedOnlySaveKeepsReasoningChangedElsewhereOnTheModelsPage() async throws {
+        let workspace = try AgentNativeWorkspace()
+        workspace.mainProvider = "openai"
+        workspace.mainModel = "gpt-5.5"
+        workspace.availableModels = ["gpt-5.5"]
+        let client = runtime(workspace)
+        let editor = AgentRuntimeDefaultsEditorModel(agentID: "studio", client: client)
+        await editor.load()
+        var changed = try await client.loadDefaults(agentID: "studio")
+        changed.mainChats.reasoningEffort = "high"
+        try await client.saveDefaults(changed, agentID: "studio")
+        await editor.saveFastMode(.on)
+        #expect(editor.errorMessage == nil)
+        #expect(editor.draft.mainChats.reasoningEffort == "high")
+        #expect(workspace.config["agent"]?.object?["reasoning_effort"] == .string("high"))
+        #expect(workspace.calls.filter { $0.payload["key"] == .string("reasoning") }.count == 1)
+    }
+
+    @Test func uncertainFastDefaultSaveReportsWhatWasActuallyCommitted() async throws {
+        let workspace = try AgentNativeWorkspace()
+        workspace.mainProvider = "openai"
+        workspace.mainModel = "gpt-5.5"
+        workspace.availableModels = ["gpt-5.5"]
+        workspace.loseFastReceipt = true
+        let editor = AgentRuntimeDefaultsEditorModel(agentID: "studio", client: runtime(workspace))
+        await editor.load()
+        editor.selectFastMode(.on)
+        await #expect(throws: AgentRuntimeDefaultsPartialSaveError.self) { try await editor.saveIfNeeded() }
+        #expect(editor.draft.mainChats.fastMode == .on)
+        #expect(!editor.isDirty)
+        #expect(editor.errorMessage != nil)
+        #expect(workspace.calls.filter { $0.payload["key"] == .string("fast") }.count == 1)
+    }
+
     private func runtime(_ workspace: AgentNativeWorkspace) -> DirectHermesAgentRuntimeDefaultsClient {
         DirectHermesAgentRuntimeDefaultsClient(workspace: workspace, owner: workspace.initialOwner, currentOwner: { workspace.owner })
     }
@@ -662,6 +736,9 @@ private final class AgentNativeWorkspace: WorkspaceOperationPerforming {
     var replaceOwnerAfterSoul = false
     var warnBeforeModelChange = false
     var mainModel = "one"
+    var mainProvider = "native-provider"
+    var availableModels = ["one", "two", "unavailable"]
+    var loseFastReceipt = false
     var config: [String: BighelpJSONValue] = [
         "agent": .object(["reasoning_effort": .string("medium")]),
         "delegation": .object(["reasoning_effort": .boolean(false), "has_base_url_override": .boolean(false)]),
@@ -783,12 +860,15 @@ private final class AgentNativeWorkspace: WorkspaceOperationPerforming {
             guard let uri = petThumbURI else { return ["ok": .boolean(false), "slug": payload["slug"] ?? .null] }
             return ["ok": .boolean(true), "slug": payload["slug"] ?? .null, "dataUri": .string(uri)]
         case .profilesDescribe:
-            return ["name": .string(id), "model": .object(["provider": .string("native-provider"), "default": .string(mainModel)])]
+            return ["name": .string(id), "model": .object(["provider": .string(mainProvider), "default": .string(mainModel)])]
         case .modelOptions:
             return ["providers": .array([.object([
-                "slug": .string("native-provider"), "name": .string("Native Provider"),
+                "slug": .string(mainProvider), "name": .string("Native Provider"),
                 "is_current": .boolean(true), "is_user_defined": .boolean(false),
-                "models": .array([.string("one"), .string("two"), .string("unavailable")]),
+                "models": .array(availableModels.map(BighelpJSONValue.string)),
+                "capabilities": .object(Dictionary(uniqueKeysWithValues: availableModels.map {
+                    ($0, .object(["fast": .boolean(true)]))
+                })),
                 "unavailable_models": .array([.string("unavailable")])
             ])]), "model": .string(mainModel), "provider": .string("native-provider")]
         case .agentDefaultsGet:
@@ -802,10 +882,14 @@ private final class AgentNativeWorkspace: WorkspaceOperationPerforming {
             }
             return ["ok": .boolean(true)]
         case .configSet:
-            guard payload["key"] == .string("reasoning"), payload["scope"] == .string("global"),
+            guard let key = payload["key"]?.string, ["reasoning", "fast"].contains(key),
+                  payload["scope"] == .string("global"), payload["session_id"] == nil,
                   let value = payload["value"] else { throw WorkspaceClientError.invalidRequest }
-            config["agent"] = .object(["reasoning_effort": value])
-            return ["key": .string("reasoning"), "value": value]
+            var agent = config["agent"]?.object ?? [:]
+            agent[key == "fast" ? "service_tier" : "reasoning_effort"] = value
+            config["agent"] = .object(agent)
+            if key == "fast", loseFastReceipt { throw WorkspaceClientError.outcomeUnknown }
+            return ["key": .string(key), "value": value]
         default:
             throw WorkspaceClientError.unavailable(.unsupportedOperation)
         }

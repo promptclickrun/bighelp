@@ -89,8 +89,25 @@ class BighelpUITestCase: XCTestCase {
     func chatMenuItem(_ identifier: String, in app: XCUIApplication, timeout: TimeInterval = 5) -> XCUIElement {
         let item = app.buttons[identifier].firstMatch
         if item.exists, item.isHittable { return item }
-        let options = app.buttons["chat.options"].firstMatch
-        if options.waitForExistence(timeout: timeout) { options.tap() }
+        let groups: [String]
+        switch identifier {
+        case "chat.session-controls", "chat.fast-mode": groups = ["chat.options.model-speed"]
+        case "chat.context-window", "chat.provider-usage": groups = ["chat.options.more", "chat.options.usage"]
+        case "chat.rename", "chat.appearance": groups = ["chat.options.this-chat", "chat.options.settings"]
+        case "chat.files", "chat.edit-current-agent", "chat.options.settings": groups = ["chat.options.this-chat"]
+        case "chat.options.usage", "chat.options.advanced", "chat.file-changes": groups = ["chat.options.more"]
+        case "chat.session-tools", "chat.force-refresh", "chat.options.display": groups = ["chat.options.more", "chat.options.advanced"]
+        case "chat.visibility.reasoning", "chat.visibility.tool-calls": groups = ["chat.options.more", "chat.options.advanced", "chat.options.display"]
+        default: groups = []
+        }
+        if !app.buttons["chat.options.this-chat"].exists {
+            let options = app.buttons["chat.options"].firstMatch
+            if options.waitForExistence(timeout: timeout) { options.tap() }
+        }
+        for group in groups {
+            let submenu = app.buttons[group].firstMatch
+            if submenu.exists, submenu.isHittable { submenu.tap() }
+        }
         _ = item.waitForExistence(timeout: timeout)
         return item
     }

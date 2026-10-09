@@ -1,13 +1,21 @@
 import Foundation
 
 @MainActor
-final class WorkspaceSessionControlProxy: SessionRuntimeControlConfirming, SessionRuntimeControlSupporting {
+final class WorkspaceSessionControlProxy: SessionRuntimeControlConfirming, SessionRuntimeControlSupporting, SessionFastModeControlling {
     private let box: WorkspaceOwnedClientBox<DirectHermesSessionControlClient>
 
     init(box: WorkspaceOwnedClientBox<DirectHermesSessionControlClient>) { self.box = box }
 
     func cachedModelProviders(agentID: String) -> [BighelpLinkModelProvider] {
         (try? box.value().cachedModelProviders(agentID: agentID)) ?? []
+    }
+
+    func loadFastMode(sessionID: String, agentID: String) async throws -> SessionFastMode {
+        try await box.value().loadFastMode(sessionID: sessionID, agentID: agentID)
+    }
+
+    func setFastMode(_ mode: FastMode, sessionID: String, agentID: String) async throws -> SessionFastMode {
+        try await box.value().setFastMode(mode, sessionID: sessionID, agentID: agentID)
     }
 
     func openPicker(_ request: BighelpLinkPickerOpenRequest) async throws -> BighelpLinkPicker {

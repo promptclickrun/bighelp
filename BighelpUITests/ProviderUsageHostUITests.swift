@@ -40,8 +40,7 @@ final class ProviderUsageHostUITests: BighelpUITestCase {
         let usage = app.buttons["chat.provider-usage"].firstMatch
         let deadline = Date().addingTimeInterval(30)
         repeat {
-            options.tap()
-            if usage.waitForExistence(timeout: 3) { break }
+            if chatMenuItem("chat.provider-usage", in: app, timeout: 3).exists { break }
             app.tap() // close the menu; the entry shows once the host connects
         } while Date() < deadline
         XCTAssertTrue(usage.exists, "Usage is in the chat's ⋯ menu (\(name))")

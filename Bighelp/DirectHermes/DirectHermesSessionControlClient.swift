@@ -2,7 +2,7 @@ import Foundation
 
 /// Adapts controls to the selected live session and verifies mutations by readback.
 @MainActor
-final class DirectHermesSessionControlClient: SessionRuntimeControlConfirming, SessionRuntimeControlSupporting {
+final class DirectHermesSessionControlClient: SessionRuntimeControlConfirming, SessionRuntimeControlSupporting, SessionFastModeControlling {
     private struct Key: Hashable {
         let sessionID: String
         let kind: BighelpLinkPickerKind
@@ -27,12 +27,26 @@ final class DirectHermesSessionControlClient: SessionRuntimeControlConfirming, S
         let reasoning: String
         let model: String
         let provider: String
+        let fastMode: FastMode?
+        let isRunning: Bool
     }
 
     private struct ModelState {
         let provider: String
+        let runtimeProvider: String
         let model: String
         let providers: [BighelpLinkModelProvider]
+        let fastMode: FastMode?
+        let isRunning: Bool
+
+        var speed: SessionFastMode {
+            guard let fastMode else {
+                return SessionFastMode(mode: nil, unavailableReason: "Update Hermes to read this chat’s Fast Mode.")
+            }
+            // Picker aliases are display hints, not proof of a billable route.
+            return SessionFastMode(mode: fastMode, unavailableReason: FastMode.unavailableReason(
+                provider: providers.first { $0.id == runtimeProvider }, model: model))
+        }
     }
 
     private let workspace: any WorkspaceOperationPerforming
@@ -84,6 +98,35 @@ final class DirectHermesSessionControlClient: SessionRuntimeControlConfirming, S
                 workspace.capabilities.availability(for: .reasoningEdit, owner: owner, profileID: agentID)
             )
         )
+    }
+
+    func loadFastMode(sessionID: String, agentID: String) async throws -> SessionFastMode {
+        let coordinate = try coordinate(sessionID: sessionID, agentID: agentID)
+        let speed = try await modelState(sessionID: sessionID, coordinate: coordinate).speed
+        return SessionFastMode(mode: speed.mode, unavailableReason:
+            selectionSupport(sessionID: sessionID, agentID: agentID).reasoningUnavailableReason ?? speed.unavailableReason)
+    }
+
+    func setFastMode(_ mode: FastMode, sessionID: String, agentID: String) async throws -> SessionFastMode {
+        guard mode == .on || mode == .off else { throw WorkspaceClientError.invalidRequest }
+        let coordinate = try coordinate(sessionID: sessionID, agentID: agentID)
+        guard let runtimeID = coordinate.runtimeSessionID else { throw WorkspaceClientError.invalidRequest }
+        let state = try await modelState(sessionID: sessionID, coordinate: coordinate)
+        guard state.speed.unavailableReason == nil else { throw WorkspaceClientError.unavailable(.unsupportedOperation) }
+        guard !state.isRunning else { throw WorkspaceClientError.conflict }
+        let response = try await perform(.configSet, payload: [
+            "profile": .string(agentID), "session_id": .string(runtimeID),
+            "key": .string("fast"), "value": .string(mode.value), "scope": .string("session")
+        ], sessionID: sessionID, coordinate: coordinate, capability: .reasoningEdit)
+        guard response["key"]?.string == "fast", let value = response["value"]?.string,
+              FastMode(value) == mode else { throw WorkspaceClientError.outcomeUnknown }
+        let readback = try await perform(.configGet, payload: [
+            "profile": .string(agentID), "session_id": .string(runtimeID), "key": .string("fast")
+        ], sessionID: sessionID, coordinate: coordinate, capability: .reasoningEdit)
+        guard let verified = readback["value"]?.string, FastMode(verified) == mode else {
+            throw WorkspaceClientError.outcomeUnknown
+        }
+        return SessionFastMode(mode: mode, unavailableReason: nil)
     }
 
     func openPicker(_ request: BighelpLinkPickerOpenRequest) async throws -> BighelpLinkPicker {
@@ -365,7 +408,8 @@ final class DirectHermesSessionControlClient: SessionRuntimeControlConfirming, S
             let current = try await proof(sessionID: sessionID, coordinate: coordinate)
             return ModelState(
                 provider: Self.catalogProvider(for: current.provider, model: current.model, providers: cached.providers),
-                model: current.model, providers: cached.providers
+                runtimeProvider: current.provider, model: current.model, providers: cached.providers,
+                fastMode: current.fastMode, isRunning: current.isRunning
             )
         }
 
@@ -382,7 +426,8 @@ final class DirectHermesSessionControlClient: SessionRuntimeControlConfirming, S
         }
         return ModelState(
             provider: Self.catalogProvider(for: verified.provider, model: verified.model, providers: providers),
-            model: verified.model, providers: providers
+            runtimeProvider: verified.provider, model: verified.model, providers: providers,
+            fastMode: verified.fastMode, isRunning: verified.isRunning
         )
     }
 
@@ -425,7 +470,9 @@ final class DirectHermesSessionControlClient: SessionRuntimeControlConfirming, S
         guard reasoning.isEmpty || ["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"].contains(reasoning) else {
             throw WorkspaceClientError.invalidResponse
         }
-        return Proof(reasoning: reasoning, model: model, provider: provider)
+        let tier = try DirectHermesAdministrationCodec.optionalString(info["service_tier"], maximum: 64)
+        return Proof(reasoning: reasoning, model: model, provider: provider,
+                     fastMode: tier.map(FastMode.init), isRunning: response["running"]?.boolean == true)
     }
 
     private func perform(

@@ -8,6 +8,16 @@ final class DemoSessionCatalogClient: SessionCatalogClient {
         self.records = records
     }
 
+    static func canonicalID(profileID: String, records: [SessionRecord]) throws -> String {
+        if let canonical = records.first(where: {
+            $0.id == "demo-canonical-\(profileID)" && $0.agentIDs == [profileID]
+        }) { return canonical.id }
+        guard let canonical = records.first(where: {
+            $0.id == "demo-\(profileID)" && $0.agentIDs == [profileID]
+        }) else { throw SessionCatalogError.invalidSession }
+        return canonical.id
+    }
+
     func list() async throws -> [SessionRecord] {
         records
     }

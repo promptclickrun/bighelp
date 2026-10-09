@@ -50,11 +50,12 @@ struct RootShellView: View {
     @State var agentGroupFilterRequest: String?
     @State var agentCreateRequest = false
     /// Offered as "Try Again" in the error alert.
-    @State private var actionErrorRetry: (@MainActor () -> Void)?
+    @State var actionErrorRetry: (@MainActor () -> Void)?
     @State var isHermesWorkspacePresented = false
     @State var credentialVault: CredentialVaultModel?
     @State var sessionRestoreRequest: SessionRestoreRequest?
     @State var sessionRestoreTask: Task<Void, Never>?
+    @State var canonicalChatCoordinator = CanonicalChatCoordinator()
     @State var managementStore: WorkspaceManagementStore?
     /// Host pages open in the stack, one per destination (`WorkspaceOpenScreens`).
     @State var capabilitiesPresentations = WorkspaceOpenScreens<NativeCapabilitiesPresentation>()
@@ -212,6 +213,8 @@ struct RootShellView: View {
         .modifier(DemoReconnectOnReturn(scenePhase: scenePhase, connection: $workspaceFixtureConnection,
                                         isEnabled: usesWorkspaceFixtures))
         .onChange(of: appState.path) { _, _ in retireClosedWorkspacePresentations() }
+        .modifier(CanonicalChatLifetime(coordinator: canonicalChatCoordinator, appState: appState,
+                                        owner: currentWorkspaceOwner, agentID: homeAgent?.id))
         .modifier(WorkspacePresentationContinuity(
             owner: currentWorkspaceOwner, registryGeneration: hostRegistry?.generation,
             isHostSettled: nativeRuntime.map { $0.isReady && !$0.isSuspended && !$0.isRefreshing } ?? true,

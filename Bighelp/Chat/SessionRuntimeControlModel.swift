@@ -12,6 +12,9 @@ final class SessionRuntimeControlModel {
     private(set) var currentProvider: String?
     private(set) var currentModel: String?
     private(set) var currentReasoningValue: String?
+    private(set) var fastMode: SessionFastMode?
+    private(set) var isLoadingFastMode = false
+    private(set) var fastModeError: String?
     private(set) var isLoadingModel = false
     private(set) var isLoadingReasoning = false
     private(set) var isApplyingSelection = false
@@ -38,6 +41,7 @@ final class SessionRuntimeControlModel {
     private var cachedModelProviders: [BighelpLinkModelProvider] = []
     private var modelObservedAt = Date.distantPast
     private var reasoningObservedAt = Date.distantPast
+    private var fastModeObservedAt = Date.distantPast
     private var allowsAgentDefaults: Bool
     private var confirmationCompletion: (@MainActor () -> Void)?
     private var deferredSelection: BighelpLinkPickerSelection?
@@ -160,6 +164,7 @@ final class SessionRuntimeControlModel {
               !snapshot.model.isEmpty else { return }
         if currentModel != snapshot.model || currentProvider != snapshot.provider {
             modelPicker = nil
+            fastMode = nil
         }
         modelObservedAt = snapshot.observedAt
         allowsAgentDefaults = false
@@ -228,6 +233,66 @@ final class SessionRuntimeControlModel {
     func loadSummaryIfNeeded() async {
         guard !isTurnActive, currentReasoningValue == nil, reasoningPicker == nil else { return }
         await loadReasoningPickerIfNeeded()
+    }
+
+    func reconcileFastMode(_ mode: FastMode, observedAt: Date) {
+        guard !isApplyingSelection, observedAt >= fastModeObservedAt, let current = fastMode else { return }
+        fastModeObservedAt = observedAt
+        fastMode = SessionFastMode(mode: mode, unavailableReason: current.unavailableReason)
+    }
+
+    func loadFastModeIfNeeded() async {
+        guard fastMode == nil, !isLoadingFastMode, !isTurnActive, !isApplyingSelection else { return }
+        guard let client = messaging as? any SessionFastModeControlling else {
+            fastMode = SessionFastMode(mode: nil, unavailableReason: "Fast Mode is unavailable for this chat.")
+            return
+        }
+        isLoadingFastMode = true
+        fastModeError = nil
+        let generation = selectionGeneration
+        let startedAt = Date()
+        defer { isLoadingFastMode = false }
+        do {
+            let value = try await client.loadFastMode(sessionID: sessionID, agentID: agentID)
+            guard !Task.isCancelled, generation == selectionGeneration, startedAt >= fastModeObservedAt else { return }
+            fastModeObservedAt = startedAt
+            fastMode = value
+        } catch is CancellationError {
+        } catch {
+            guard !Task.isCancelled, generation == selectionGeneration else { return }
+            fastModeError = "Couldn’t read Fast Mode. Try again."
+        }
+    }
+
+    func selectFastMode(_ mode: FastMode) async {
+        guard !isApplyingSelection, !isLoadingFastMode, !hasPendingSelection,
+              let client = messaging as? any SessionFastModeControlling else { return }
+        guard !isTurnActive else {
+            fastModeError = ChatRuntimeSelectionLockout.message
+            return
+        }
+        guard mode == .on || mode == .off, fastMode?.unavailableReason == nil, fastMode != nil else { return }
+        selectionGeneration += 1
+        let generation = selectionGeneration
+        isApplyingSelection = true
+        fastModeError = nil
+        defer { if generation == selectionGeneration { isApplyingSelection = false } }
+        do {
+            let verified = try await client.setFastMode(mode, sessionID: sessionID, agentID: agentID)
+            guard !Task.isCancelled, generation == selectionGeneration else { return }
+            fastModeObservedAt = Date()
+            fastMode = verified
+        } catch is CancellationError {
+        } catch {
+            guard !Task.isCancelled, generation == selectionGeneration else { return }
+            // A lost acknowledgement is not proof that nothing was saved.
+            // Read it back; if that fails, show Unknown, never a guessed value.
+            let readback = try? await client.loadFastMode(sessionID: sessionID, agentID: agentID)
+            guard !Task.isCancelled, generation == selectionGeneration else { return }
+            fastModeObservedAt = Date()
+            fastMode = readback
+            fastModeError = "The Fast Mode change wasn’t confirmed. Check the current value before trying again."
+        }
     }
 
     func loadModelPickerIfNeeded() async {
@@ -391,11 +456,13 @@ final class SessionRuntimeControlModel {
             self?.allowsAgentDefaults = false
             self?.currentProvider = providerID
             self?.currentModel = modelID
+            self?.fastMode = nil
             self?.modelHistory.record(providerID: providerID, modelID: modelID)
         }
     }
 
     func selectReasoning(value: String) async {
+        guard !isApplyingSelection else { return }
         if let reason = selectionSupport.reasoningUnavailableReason {
             errorMessage = reason
             return

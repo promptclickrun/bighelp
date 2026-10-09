@@ -346,14 +346,7 @@ extension RootShellView {
         switch open {
         case .agent(let profileID):
             agents.select(profileID)
-            if appState.selectedTab != .sessions { appState.select(.sessions) }
-            appState.chatOpenedFromList = true
-            if let latest = sessionCatalog.recentSummaries(includeCronSessions: false)
-                .first(where: { $0.kind == .direct && $0.agentIDs.first == profileID }) {
-                openSession(latest)
-            } else {
-                startNewChat(explicitAgentID: profileID)
-            }
+            openCanonicalAgentChat(profileID, fromList: true)
         case .newChat(let profileID):
             agents.select(profileID)
             if appState.selectedTab != .sessions { appState.select(.sessions) }

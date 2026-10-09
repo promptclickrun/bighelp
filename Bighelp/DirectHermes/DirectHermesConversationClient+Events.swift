@@ -84,6 +84,9 @@ extension DirectHermesConversationClient {
             if let value = event.payload["reasoning_effort"]?.string {
                 model?.reconcileNativeReasoning(value, isLive: !isReplayingActivity, from: self)
             }
+            if let value = event.payload["service_tier"]?.string {
+                model?.reconcileNativeFastMode(value, isLive: !isReplayingActivity, from: self)
+            }
             if let value = event.payload["title"]?.string, !value.isEmpty { title = value; model?.applyRenamedSessionTitle(value) }
             if let value = event.payload["stored_session_id"]?.string { adoptStoredID(value) }
         }

@@ -278,6 +278,18 @@ final class DirectHermesWorkspaceClient: WorkspaceOperationPerforming {
                path.utf8.count <= 4_096, !path.unicodeScalars.contains(where: { $0.value < 0x20 }) {
                 return .rpc(operation.rawValue, payload)
             }
+            if payload["key"] == .string("fast") {
+                guard payload["profile"]?.string != nil else { throw WorkspaceClientError.invalidRequest }
+                if operation == .configSet {
+                    let isSession = payload["session_id"]?.string != nil && payload["scope"] == .string("session")
+                    let isDefault = payload["session_id"] == nil && payload["scope"] == .string("global")
+                    guard isSession || isDefault,
+                          ["on", "off", "fast", "normal"].contains(payload["value"]?.string ?? "") else {
+                        throw WorkspaceClientError.invalidRequest
+                    }
+                }
+                return .rpc(operation.rawValue, payload)
+            }
             guard let key = payload["key"]?.string, ["reasoning", "model"].contains(key),
                   payload["scope"] == nil || payload["scope"] == .string("global")
                     || (payload["scope"] == .string("session") && payload["session_id"]?.string != nil),
@@ -634,7 +646,7 @@ final class DirectHermesWorkspaceClient: WorkspaceOperationPerforming {
     private static func projectDefaults(_ source: [String: BighelpJSONValue]) throws -> [String: BighelpJSONValue] {
         var result: [String: BighelpJSONValue] = [:]
         let keys: [String: Set<String>] = [
-            "agent": ["reasoning_effort"],
+            "agent": ["reasoning_effort", "service_tier"],
             "delegation": ["provider", "model", "reasoning_effort"],
             "cron": ["model", "model_provider"],
         ]

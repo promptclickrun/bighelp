@@ -1,7 +1,7 @@
 import XCTest
 
-/// The context window opens from the chat's ⋯ menu, between Model & reasoning
-/// and provider usage, as the same pop-up the ring above the message box used
+/// The context window opens from the chat's ⋯ › Usage submenu,
+/// as the same pop-up the ring above the message box used
 /// to open. Screenshots go to BIGHELP_UI_EVIDENCE (TEST_RUNNER_BIGHELP_UI_EVIDENCE) when set.
 final class ChatContextWindowUITests: BighelpUITestCase {
     @MainActor
@@ -12,7 +12,7 @@ final class ChatContextWindowUITests: BighelpUITestCase {
 
             let item = chatMenuItem("chat.context-window", in: app)
             XCTAssertTrue(item.waitForExistence(timeout: 5), "⋯ has Context window")
-            let order = ["chat.session-controls", "chat.context-window", "chat.provider-usage"].map {
+            let order = ["chat.provider-usage", "chat.context-window"].map {
                 app.buttons[$0].firstMatch
             }
             for element in order { XCTAssertTrue(element.exists, element.identifier) }

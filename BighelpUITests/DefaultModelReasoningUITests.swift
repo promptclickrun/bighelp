@@ -20,7 +20,7 @@ final class DefaultModelReasoningUITests: BighelpUITestCase {
         let high = app.buttons["High"].firstMatch
         XCTAssertTrue(high.waitForExistence(timeout: 5))
         high.tap()
-        let saved = app.descendants(matching: .any)["models.reasoning.saved"].firstMatch
+        let saved = app.staticTexts["models.reasoning.saved"].firstMatch
         XCTAssertTrue(saved.waitForExistence(timeout: 5))
         XCTAssertTrue(saved.label.contains("every agent"), saved.label)
         save("reasoning-saved", app)

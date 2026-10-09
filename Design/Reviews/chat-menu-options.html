@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>bighelp · Chat menu options</title>
+<style>
+:root { color-scheme: light; --canvas:#fff9f5; --surface:#fff; --soft:#f3ece6; --ink:#1c1a19; --muted:#655d58; --line:#ddd3cd; --action:#7b52e0; --accent:#ff8a7a; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--canvas); color:var(--ink); font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+main { max-width:1280px; margin:auto; padding:40px 24px 64px; }
+h1,h2,h3,p { margin:0 0 12px; } h1 { font-size:clamp(30px,4vw,48px); line-height:1.12; letter-spacing:-1.5px; } h2 { font-size:25px; line-height:1.2; } h3 { font-size:18px; }
+a { color:var(--action); } .eyebrow { text-transform:uppercase; letter-spacing:1.6px; font-size:12px; font-weight:750; }
+.intro { max-width:790px; margin-bottom:28px; } .muted { color:var(--muted); } .notice { border-left:4px solid var(--accent); padding:10px 16px; background:var(--surface); margin:20px 0; }
+.options { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:24px; align-items:start; }
+.option { min-width:0; } .option > p { min-height:76px; } .tag { display:inline-block; font-size:12px; padding:3px 9px; border-radius:20px; background:var(--soft); margin-bottom:12px; font-weight:650; }
+.phone { width:100%; max-width:375px; min-height:540px; border:1px solid var(--line); border-radius:28px; padding:16px; background:var(--canvas); margin:0 auto 18px; box-shadow:0 10px 32px #1c1a1909; }
+.chrome { display:flex; align-items:center; justify-content:space-between; min-height:46px; margin-bottom:18px; font-weight:650; }
+.avatar { display:inline-grid; place-content:center; width:30px; height:30px; border-radius:50%; background:var(--accent); color:#1c1a19; font-size:12px; margin-right:8px; }
+.dots { display:grid; place-content:center; height:36px; width:36px; border-radius:50%; background:var(--surface); font-size:20px; }
+.bubble { background:var(--soft); border-radius:16px; padding:11px 14px; width:86%; font-size:14px; margin:10px 0 16px; }
+.menu { background:var(--surface); border:1px solid var(--line); border-radius:16px; width:100%; overflow:visible; }
+.row { display:flex; align-items:center; gap:10px; padding:13px 14px; min-height:49px; border-bottom:1px solid var(--line); font-size:16px; line-height:1.25; }
+.row:last-child { border-bottom:0; } .row > span:first-child { flex:1; min-width:0; overflow-wrap:anywhere; } .row small { display:block; font-size:.76em; line-height:1.3; color:var(--muted); margin-top:4px; } .chevron { color:var(--muted); font-weight:400; flex:none; } .value { color:var(--muted); font-size:.88em; } .check { color:var(--action); }
+.context { font-size:12px; margin-top:16px; color:var(--muted); } .map { padding:14px 16px; border-radius:14px; background:var(--soft); font-size:14px; } .map p:last-child { margin-bottom:0; }
+section { margin-top:42px; } .subgrid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:24px; } .subgrid h3 { margin-bottom:14px; } .caption { margin:10px 0; font-size:14px; color:var(--muted); }
+.settings { border:1px solid var(--line); background:var(--canvas); border-radius:24px; padding:20px; } .settings h3 { text-align:center; margin-bottom:24px; } .settings .eyebrow { margin:20px 0 8px; color:var(--muted); } .disabled { color:var(--muted); } .disabled .value { font-size:13px; }
+.dark { color-scheme:dark; --canvas:#121110; --surface:#1e1c1b; --soft:#292624; --ink:#fff9f5; --muted:#c0b6af; --line:#49413c; --action:#c9b6ff; background:var(--canvas); color:var(--ink); }
+.stress { display:flex; flex-wrap:wrap; gap:24px; align-items:start; } .stress figure { margin:0; max-width:100%; } .stress figcaption { max-width:320px; margin-top:12px; font-size:14px; color:var(--muted); } .small { width:320px; max-width:100%; min-height:568px; } .large .row { font-size:26px; padding:12px 14px; } .large .chrome { font-size:20px; margin-bottom:14px; }
+footer { margin-top:40px; border-top:1px solid var(--line); padding-top:20px; font-size:14px; color:var(--muted); } ul { padding-left:21px; } li { margin:7px 0; }
+@media (max-width:960px) { .options,.subgrid { grid-template-columns:1fr; } .option { max-width:600px; margin:0 auto 20px; width:100%; } .option > p { min-height:0; } main { padding:28px 18px 48px; } }
+@media (prefers-color-scheme:dark) { :root { color-scheme:dark; --canvas:#121110; --surface:#1e1c1b; --soft:#292624; --ink:#fff9f5; --muted:#c0b6af; --line:#49413c; --action:#c9b6ff; } }
+</style>
+</head>
+<body>
+<main>
+<header class="intro">
+<p class="eyebrow">bighelp · Design choice</p>
+<h1>A shorter chat menu.<br>Room for Fast Mode.</h1>
+<p class="muted">Three approaches for <a href="https://github.com/promptclickrun/bighelp/issues/289">the chat menu</a> and <a href="https://github.com/promptclickrun/bighelp/issues/288">Fast Mode</a>. All preserve the existing actions. Nerd Mode adds technical options, never basic controls.</p>
+<div class="notice"><strong>Static proposals, not app screenshots.</strong> All names and values are sample data. This page has no working app controls, animations, external assets or analytics. Native layout and accessibility still need device/simulator verification.</div>
+</header>
+<div class="options">
+<article class="option">
+<span class="tag">A · Recommended</span>
+<h2>Group by task</h2>
+<p class="muted">Up to five top-level rows. Live file changes stay visible; model, reasoning and speed live together.</p>
+<div class="phone">
+<div class="chrome"><span>☰</span><span><span class="avatar">••</span>Avery</span><span class="dots">···</span></div>
+<div class="bubble">The draft is ready to review.</div>
+<div class="menu" aria-label="Option A menu mock">
+<div class="row"><span>File changes<small>2 files changed</small></span><span class="chevron">±</span></div>
+<div class="row"><span>Model &amp; speed<small>GPT-5.5 · Fast Mode off</small></span><span class="chevron">›</span></div>
+<div class="row"><span>This chat</span><span class="chevron">›</span></div>
+<div class="row"><span>Usage</span><span class="chevron">›</span></div>
+<div class="row"><span>Advanced</span><span class="chevron">›</span></div>
+</div>
+<p class="context">Worst case shown: file changes and Nerd Mode available.</p>
+</div>
+<div class="map"><p><strong>Model &amp; speed →</strong> Model &amp; reasoning; Fast Mode.</p><p><strong>This chat →</strong> Rename chat; Chat files; Chat appearance; Edit this agent.</p><p><strong>Usage →</strong> Provider usage; Context window (Nerd Mode).</p><p><strong>Advanced →</strong> Session tools; Show reasoning; Show tool calls; Force refresh.</p></div>
+<p class="caption">Trade-off: Fast Mode is one level down, keeping the top menu short even when every optional action is present.</p>
+</article>
+<article class="option">
+<span class="tag">B · Speed first</span>
+<h2>Fast Mode up front</h2>
+<p class="muted">Up to five top-level rows. Fast Mode is quicker to reach; file changes move inside This chat.</p>
+<div class="phone">
+<div class="chrome"><span>☰</span><span><span class="avatar">••</span>Avery</span><span class="dots">···</span></div>
+<div class="bubble">The draft is ready to review.</div>
+<div class="menu" aria-label="Option B menu mock">
+<div class="row"><span>Fast Mode<small>Off · This chat</small></span><span class="chevron">›</span></div>
+<div class="row"><span>Model &amp; reasoning<small>GPT-5.5 · High</small></span><span class="chevron">›</span></div>
+<div class="row"><span>This chat<small>2 files changed</small></span><span class="chevron">›</span></div>
+<div class="row"><span>Usage</span><span class="chevron">›</span></div>
+<div class="row"><span>Advanced</span><span class="chevron">›</span></div>
+</div>
+<p class="context">Worst case shown: file changes and Nerd Mode available.</p>
+</div>
+<div class="map"><p><strong>Fast Mode →</strong> Off; On. The selected value is checked.</p><p><strong>This chat →</strong> File changes; Rename chat; Chat files; Chat appearance; Edit this agent.</p><p><strong>Usage →</strong> Provider usage; Context window (Nerd Mode).</p><p><strong>Advanced →</strong> Same four technical actions as A.</p></div>
+<p class="caption">Trade-off: prioritizes speed switching over the file-change action; its live summary remains visible.</p>
+</article>
+<article class="option">
+<span class="tag">C · Shortest first menu</span>
+<h2>Four destinations</h2>
+<p class="muted">Four top-level rows. Files get their own group; usage and technical tools move under More.</p>
+<div class="phone">
+<div class="chrome"><span>☰</span><span><span class="avatar">••</span>Avery</span><span class="dots">···</span></div>
+<div class="bubble">The draft is ready to review.</div>
+<div class="menu" aria-label="Option C menu mock">
+<div class="row"><span>Model &amp; speed<small>GPT-5.5 · Fast Mode off</small></span><span class="chevron">›</span></div>
+<div class="row"><span>Files &amp; changes<small>2 files changed</small></span><span class="chevron">›</span></div>
+<div class="row"><span>Chat settings</span><span class="chevron">›</span></div>
+<div class="row"><span>More</span><span class="chevron">›</span></div>
+</div>
+<p class="context">Worst case shown: file changes and Nerd Mode available.</p>
+</div>
+<div class="map"><p><strong>Model &amp; speed →</strong> Model &amp; reasoning; Fast Mode.</p><p><strong>Files &amp; changes →</strong> Chat files; File changes.</p><p><strong>Chat settings →</strong> Rename chat; Chat appearance; Edit this agent.</p><p><strong>More →</strong> Usage; Context window; Advanced. The last two remain Nerd Mode only.</p></div>
+<p class="caption">Trade-off: the most compact first menu, but More is less descriptive and adds a step to reach usage.</p>
+</article>
+</div>
+<section>
+<h2>Fast Mode in both places</h2>
+<p class="muted">Shared behavior whichever menu layout you choose. A new chat starts with its agent’s default; an explicit chat choice applies only to that chat.</p>
+<div class="subgrid">
+<div>
+<h3>A → Model &amp; speed</h3>
+<div class="menu">
+<div class="row"><span>Model &amp; reasoning<small>GPT-5.5 · High</small></span><span class="chevron">›</span></div>
+<div class="row"><span>Fast Mode<small>Off · This chat</small></span><span class="chevron">›</span></div>
+</div>
+<p class="caption">Fast Mode submenu</p>
+<div class="menu">
+<div class="row"><span>Off</span><span class="check">✓</span></div>
+<div class="row"><span>On<small>May cost more</small></span></div>
+</div>
+<p class="caption">Use the host’s actual saved value. Do not replace an unknown or newer mode with a guessed Off value. Changing speed must not change the model or reasoning.</p>
+</div>
+<div class="settings">
+<h3>Default model</h3>
+<p class="eyebrow">Agent</p>
+<div class="menu"><div class="row"><span>Avery</span><span class="chevron">›</span></div></div>
+<p class="eyebrow">Model</p>
+<div class="menu">
+<div class="row"><span>GPT-5.5<small>OpenAI · Reasoning: High</small></span><span class="chevron">›</span></div>
+<div class="row"><span>Fast Mode</span><span class="value">Off</span><span class="chevron">›</span></div>
+</div>
+<p class="caption">Default for new chats with Avery. Existing chat overrides stay unchanged. Fast Mode may cost more.</p>
+</div>
+<div class="settings">
+<h3>When unavailable</h3>
+<p class="eyebrow">This chat</p>
+<div class="menu"><div class="row disabled"><span>Fast Mode<small>Not supported by this model and provider.</small></span></div></div>
+<p class="caption">Disabled, with a reason. Never show On as effective when the host cannot apply it.</p>
+<p class="eyebrow">If the save fails</p>
+<p>“Fast Mode wasn’t changed. Try again.”</p>
+<p class="caption">Keep the last confirmed value. If a save’s outcome is uncertain, read it back before offering another change.</p>
+</div>
+</div>
+</section>
+<section>
+<h2>A at small sizes, in light and dark</h2>
+<p class="muted">320-point width, 568-point minimum height. The right-hand samples use enlarged type, with labels wrapping rather than clipping. These illustrate layout intent, not a native Dynamic Type test.</p>
+<div class="stress">
+<figure>
+<div class="phone small">
+<div class="chrome"><span>☰</span><span>Avery</span><span class="dots">···</span></div>
+<div class="menu">
+<div class="row"><span>File changes<small>2 files changed</small></span><span class="chevron">±</span></div>
+<div class="row"><span>Model &amp; speed<small>GPT-5.5 · Fast Mode off</small></span><span class="chevron">›</span></div>
+<div class="row"><span>This chat</span><span class="chevron">›</span></div>
+<div class="row"><span>Usage</span><span class="chevron">›</span></div>
+<div class="row"><span>Advanced</span><span class="chevron">›</span></div>
+</div>
+</div><figcaption>Standard type. No menu scroll area; all optional top-level rows included.</figcaption>
+</figure>
+<figure>
+<div class="phone small large">
+<div class="chrome"><span>☰</span><span>Avery</span><span class="dots">···</span></div>
+<div class="menu">
+<div class="row"><span>File changes<small>2 files changed</small></span><span class="chevron">±</span></div>
+<div class="row"><span>Model &amp; speed<small>GPT-5.5 · Fast Mode off</small></span><span class="chevron">›</span></div>
+<div class="row"><span>This chat</span><span class="chevron">›</span></div>
+<div class="row"><span>Usage</span><span class="chevron">›</span></div>
+<div class="row"><span>Advanced</span><span class="chevron">›</span></div>
+</div>
+</div><figcaption>Enlarged type. The actual largest accessibility sizes must also be checked in native menus and every submenu.</figcaption>
+</figure>
+<figure>
+<div class="phone small large dark">
+<div class="chrome"><span>☰</span><span>Avery</span><span class="dots">···</span></div>
+<div class="menu">
+<div class="row"><span>File changes<small>2 files changed</small></span><span class="chevron">±</span></div>
+<div class="row"><span>Model &amp; speed<small>GPT-5.5 · Fast Mode off</small></span><span class="chevron">›</span></div>
+<div class="row"><span>This chat</span><span class="chevron">›</span></div>
+<div class="row"><span>Usage</span><span class="chevron">›</span></div>
+<div class="row"><span>Advanced</span><span class="chevron">›</span></div>
+</div>
+</div><figcaption>Dark palette. No animation; the same grouping and readable secondary labels.</figcaption>
+</figure>
+</div>
+</section>
+<section class="intro">
+<h2>The Bot Chat fix</h2>
+<p>For <a href="https://github.com/promptclickrun/bighelp/issues/287">the conversation mismatch</a>, make both the home Chat entry and Agents → Message resolve the selected profile’s canonical Bot Chat, like Hermes Desktop. Keep explicit New chat and saved-history entries unchanged.</p>
+<p>If the canonical lookup fails, keep the current screen and offer a retry rather than silently opening an unrelated conversation. Ignore a lookup that finishes after you switch agents, computers or screens. Preserve drafts and both conversations.</p>
+<h3>After your pick</h3>
+<ul>
+<li>Write failing tests for session selection and Fast Mode scope, saving and unsupported combinations.</li>
+<li>Wire the existing canonical resolver into the agent entries. Verify the host contract for supported Hermes versions before adding Fast Mode fields.</li>
+<li>Check the selected menu in basic and Nerd Mode, light and dark, on a small iPhone and with large accessibility text. Build iOS, Mac Catalyst and Vision Pro.</li>
+<li>Commit the fixes, rebase onto the latest main, and open one non-draft PR closing all three issues. No release or live-host changes.</li>
+</ul>
+</section>
+<footer>Awaiting a design choice. This committed review artifact is not an implemented fix or evidence that app tests passed.</footer>
+</main>
+</body>
+</html>

@@ -39,6 +39,7 @@ struct AgentRuntimeSelection: Equatable, Sendable {
     var providerID: String
     var modelID: String
     var reasoningEffort: String
+    var fastMode: FastMode = .off
 
     static let automatic = AgentRuntimeSelection(
         providerID: "",
@@ -433,7 +434,8 @@ final class FixtureAgentRuntimeDefaultsClient: AgentRuntimeDefaultsClient {
                 name: "OpenAI",
                 isCurrent: false,
                 isCustom: false,
-                models: ["gpt-5.6", "gpt-5.6-mini"]
+                models: ["gpt-5.6", "gpt-5.6-mini"],
+                fastModeModels: ["gpt-5.6", "gpt-5.6-mini"]
             ),
             BighelpLinkModelProvider(
                 id: "anthropic",
@@ -446,7 +448,7 @@ final class FixtureAgentRuntimeDefaultsClient: AgentRuntimeDefaultsClient {
     }
 
     func loadDefaults(agentID: String) async throws -> AgentRuntimeDefaults {
-        values[agentID] ?? AgentRuntimeDefaults(
+        var defaults = values[agentID] ?? AgentRuntimeDefaults(
             mainChats: AgentRuntimeSelection(
                 providerID: "nous",
                 modelID: "Hermes-4-405B",
@@ -455,6 +457,14 @@ final class FixtureAgentRuntimeDefaultsClient: AgentRuntimeDefaultsClient {
             subagents: .automatic,
             scheduledTasks: .automatic
         )
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-use-demo-fixtures") {
+            let current = DemoModels.transport.main(for: agentID)
+            defaults.mainChats.providerID = current.provider
+            defaults.mainChats.modelID = current.model
+        }
+        #endif
+        return defaults
     }
 
     func loadModelProviders(agentID: String) async throws -> [BighelpLinkModelProvider] {

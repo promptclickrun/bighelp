@@ -84,6 +84,11 @@ extension ChatModel {
         runtimeControls?.reconcileSessionReasoning(value, observedAt: isLive ? Date() : .distantPast)
     }
 
+    func reconcileNativeFastMode(_ value: String, isLive: Bool, from owner: DirectHermesConversationClient) {
+        guard (client as? DirectHermesConversationClient) === owner, value.utf8.count <= 64 else { return }
+        runtimeControls?.reconcileFastMode(FastMode(value), observedAt: isLive ? Date() : .distantPast)
+    }
+
     func applyRenamedSessionTitle(_ title: String) {
         sessionTitle = title
     }

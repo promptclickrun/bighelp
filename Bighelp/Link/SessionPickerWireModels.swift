@@ -109,19 +109,23 @@ struct BighelpLinkModelProvider: Decodable, Equatable, Identifiable, Sendable {
     let isCurrent: Bool
     let isCustom: Bool
     let models: [String]
+    /// Native catalog metadata only; the retired Link wire format stays unchanged.
+    let fastModeModels: Set<String>?
 
     init(
         id: String,
         name: String,
         isCurrent: Bool,
         isCustom: Bool,
-        models: [String]
+        models: [String],
+        fastModeModels: Set<String>? = nil
     ) {
         self.id = id
         self.name = name
         self.isCurrent = isCurrent
         self.isCustom = isCustom
         self.models = models
+        self.fastModeModels = fastModeModels
     }
 
     private enum CodingKeys: String, CodingKey, CaseIterable {
@@ -143,6 +147,7 @@ struct BighelpLinkModelProvider: Decodable, Equatable, Identifiable, Sendable {
         isCurrent = try container.decode(Bool.self, forKey: .isCurrent)
         isCustom = try container.decode(Bool.self, forKey: .isCustom)
         models = try container.decode([String].self, forKey: .models)
+        fastModeModels = nil
         guard
             BighelpLinkPickerValidation.identifier(id, maximum: 128) != nil,
             BighelpLinkPickerValidation.label(name, maximum: 80) != nil,

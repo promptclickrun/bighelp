@@ -1,12 +1,38 @@
 import Foundation
 
 @MainActor
-final class DemoSessionControlMessaging: BighelpLinkSessionControlMessaging {
+final class DemoSessionControlMessaging: BighelpLinkSessionControlMessaging, SessionFastModeControlling {
     private var models: [String: (provider: String, model: String)] = [:]
     private var reasoning: [String: String]
+    private var fastModes: [String: FastMode] = [:]
+    private let defaults: (any AgentRuntimeDefaultsClient)?
 
-    init(reasoning: [String: String] = [:]) {
+    init(reasoning: [String: String] = [:], defaults: (any AgentRuntimeDefaultsClient)? = nil) {
         self.reasoning = reasoning
+        self.defaults = defaults
+        if ProcessInfo.processInfo.arguments.contains("-test-fast-mode") {
+            models["demo-finance"] = ("openai", "gpt-5.6")
+        }
+    }
+
+    func loadFastMode(sessionID: String, agentID: String) async throws -> SessionFastMode {
+        let current = models[sessionID] ?? ("nous", "Hermes-4-405B")
+        if fastModes[sessionID] == nil {
+            fastModes[sessionID] = try await defaults?.loadDefaults(agentID: agentID).mainChats.fastMode ?? .off
+        }
+        let provider = BighelpLinkModelProvider(id: current.0, name: current.0, isCurrent: true,
+            isCustom: false, models: [current.1], fastModeModels: ["gpt-5.6", "gpt-5.6-mini"])
+        return SessionFastMode(mode: fastModes[sessionID],
+            unavailableReason: FastMode.unavailableReason(provider: provider, model: current.1))
+    }
+
+    func setFastMode(_ mode: FastMode, sessionID: String, agentID: String) async throws -> SessionFastMode {
+        let state = try await loadFastMode(sessionID: sessionID, agentID: agentID)
+        guard state.unavailableReason == nil, mode == .on || mode == .off else {
+            throw WorkspaceClientError.unavailable(.unsupportedOperation)
+        }
+        fastModes[sessionID] = mode
+        return SessionFastMode(mode: mode, unavailableReason: nil)
     }
 
     func openPicker(_ request: BighelpLinkPickerOpenRequest) async throws -> BighelpLinkPicker {

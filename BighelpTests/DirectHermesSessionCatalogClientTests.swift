@@ -756,6 +756,8 @@ struct DirectHermesSessionCatalogClientTests {
             switch operation {
             case .profilesList: Self.profiles()
             case .nativeSessionList: ["sessions": .array([])]
+            // Hermes answers a resume by a name nobody holds with 4007.
+            case .sessionResume: throw WorkspaceClientError.rejected(code: "4007")
             default: throw WorkspaceClientError.invalidRequest
             }
         }
@@ -764,6 +766,30 @@ struct DirectHermesSessionCatalogClientTests {
         await #expect(throws: DirectHermesSessionError.canonicalMissing(profileID: "alpha", knownID: "known")) {
             try await client.resolveCanonicalChat(profileID: "alpha", previouslyKnownID: "known")
         }
+        #expect(!workspace.calls.contains { $0.operation == .sessionCreate })
+    }
+
+    /// The list lookup skips an archived Bot Chat; Hermes still resumes it by name.
+    @Test func archivedBotChatOpensByNameInsteadOfANewOne() async throws {
+        let workspace = try SessionWorkspaceStub()
+        workspace.handler = { operation, payload in
+            switch operation {
+            case .profilesList: return Self.profiles()
+            case .nativeSessionList: return ["sessions": .array([])]
+            case .sessionResume:
+                #expect(payload["session_id"] == .string("Bot Chat"))
+                return Self.attached(stored: "archived")
+            default: throw WorkspaceClientError.invalidRequest
+            }
+        }
+        let client = Self.client(workspace)
+        guard case .resolved(let resolved) = try await client.resolveCanonicalChat(profileID: "alpha") else {
+            Issue.record("Expected the archived Bot Chat")
+            return
+        }
+        #expect(resolved.coordinate.storedSessionID == "archived")
+        #expect(try DirectHermesSessionIdentity.decode(resolved.record.id, owner: workspace.owner!).anchorID == "archived")
+        #expect(workspace.calls.filter { $0.operation == .sessionResume }.count == 1)
         #expect(!workspace.calls.contains { $0.operation == .sessionCreate })
     }
 

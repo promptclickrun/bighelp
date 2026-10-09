@@ -645,7 +645,8 @@ extension RootShellView {
             }
             .modifier(MacSidebarMemory(isOpen: $isHomeDrawerPresented,
                                        canShow: !presentsFirstRunOnboarding && !needsInitialHostSetup))
-            .modifier(HomeMenuPresentation(isPresented: $isHomeDrawerPresented, onDismiss: runAfterHomeSheet) {
+            .modifier(HomeMenuPresentation(isPresented: $isHomeDrawerPresented, onDismiss: runAfterHomeSheet,
+                                           contentID: ObjectIdentifier(featureStore)) {
                 homeDrawer
             })
     }

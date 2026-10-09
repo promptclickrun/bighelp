@@ -90,6 +90,8 @@ extension EnvironmentValues {
 struct HomeMenuPresentation<Menu: View>: ViewModifier {
     @Binding var isPresented: Bool
     let onDismiss: () -> Void
+    /// A new host/runtime supplies new stores and actions, not just new values.
+    var contentID: ObjectIdentifier? = nil
     @ViewBuilder let menu: () -> Menu
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -105,17 +107,10 @@ struct HomeMenuPresentation<Menu: View>: ViewModifier {
             // Vision Pro and Mac: a column beside the app, which narrows to make
             // room. The Mac's stays open while you pick chats and pages.
             content.onChange(of: isPresented, initial: true) { _, presented in
-                if presented {
-                    let panel = BighelpPlatform.isMac
-                        ? AnyView(menu().environment(\.homeMenuClose, {}))
-                        : AnyView(menu().environment(\.homeMenuClose, { isPresented = false }))
-                    sideMenu.show(panel) {
-                        isPresented = false
-                        onDismiss()
-                    }
-                } else {
-                    sideMenu.hide()
-                }
+                if presented { showSideMenu(sideMenu) } else { sideMenu.hide() }
+            }
+            .onChange(of: contentID) {
+                if isPresented { showSideMenu(sideMenu) }
             }
         } else if horizontalSizeClass == .regular {
             content
@@ -127,6 +122,17 @@ struct HomeMenuPresentation<Menu: View>: ViewModifier {
                 }
         } else {
             content.bighelpSheet(isPresented: $isPresented, onDismiss: onDismiss, content: menu)
+        }
+    }
+
+    private func showSideMenu(_ sideMenu: BighelpSideMenu) {
+        // Build inside a SwiftUI update, not the presentation callback, so
+        // readiness keeps updating. contentID also replaces captured stores.
+        let panel = BighelpDeferredSection { menu() }
+            .environment(\.homeMenuClose, { if !BighelpPlatform.isMac { isPresented = false } })
+        sideMenu.show(AnyView(panel)) {
+            isPresented = false
+            onDismiss()
         }
     }
 

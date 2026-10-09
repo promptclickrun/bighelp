@@ -171,7 +171,8 @@ change in both repos.
   recently opened go first), so a reopened chat shows them at once. Until a file lands, its message shows a loading
   tile (`PendingAgentFilesView`), never the raw line. Hosted image tools (Nous Portal, FAL) report the picture's
   https address instead of a host file; the card reads it from there (public hosts only, no cookies, bounded).
-- **Supported Hermes versions:** 0.21.2 to 0.21.5.
+- **Hermes versions never gate connections or features.** Older, newer, custom and absent version strings are
+  metadata, not an allowlist. Check actual host capabilities and route responses instead.
   - Hosts differ, so parse leniently: ignore unknown keys and treat most parts as optional.
   - A missing part should hide one row, not break a screen.
 

@@ -32,7 +32,7 @@ enum WorkspaceCapability: String, CaseIterable, Sendable {
 }
 
 enum WorkspaceUnavailableReason: String, Equatable, Sendable {
-    case notConnected, authenticationRequired, unsupportedHost, unsupportedHermesVersion, unsupportedOperation
+    case notConnected, authenticationRequired, unsupportedHost, unsupportedOperation
     case pluginRequired, driverUnavailable, permissionRequired, policyRestricted
     case hostRestartRequired, identityContextUnavailable
     case conversationDeletionUnsupported
@@ -42,7 +42,6 @@ enum WorkspaceUnavailableReason: String, Equatable, Sendable {
         case .notConnected: "Connect to this host before continuing."
         case .authenticationRequired: "Sign in to this Hermes host again."
         case .unsupportedHost: "This host does not support this feature."
-        case .unsupportedHermesVersion: DirectHermesError.unsupportedHermesVersion.errorDescription ?? ""
         case .unsupportedOperation: "This operation is unavailable on this host."
         case .pluginRequired: "This feature requires a compatible bighelp plugin on the host."
         case .driverUnavailable: "The host's room driver is not running."

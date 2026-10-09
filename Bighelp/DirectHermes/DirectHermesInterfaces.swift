@@ -304,7 +304,7 @@ struct DirectHermesSavedConnection: Codable, Equatable, Sendable {
 /// NSError.localizedDescription, server messages, URLs, cookies, or RPC error.data.
 enum DirectHermesError: Error, LocalizedError, Sendable, Equatable {
     case invalidEndpoint, plaintextNotAllowed, invalidCredentials, authenticationRequired
-    case unsupportedAuthentication, unsupportedHermesVersion, ambiguousPasswordProvider, authModeChanged, identityChanged
+    case unsupportedAuthentication, ambiguousPasswordProvider, authModeChanged, identityChanged
     case savedConnectionInvalid, secureStorageUnavailable, secureStorageChanged
     case redirectRefused, invalidResponse, messageTooLarge, tooManyRequests, notConnected
     case connectionFailed, tlsRequired, rateLimited, serverUnavailable
@@ -330,8 +330,6 @@ enum DirectHermesError: Error, LocalizedError, Sendable, Equatable {
         case .invalidCredentials: "The host rejected these credentials. Use a provider-issued access token or check your username and password."
         case .authenticationRequired: "Your host session has expired. Sign in again."
         case .unsupportedAuthentication: "This host does not support the selected sign-in method."
-        case .unsupportedHermesVersion:
-            "This version of Hermes isn't supported by this version of bighelp yet. Update bighelp from TestFlight, or run Hermes \(DirectHermesReleaseContract.supportedVersions.joined(separator: ", "))."
         case .ambiguousPasswordProvider: "Choose a password provider, use browser sign-in, or connect with a provider-issued access token."
         case .authModeChanged: "The host authentication mode changed. Sign in again; credentials were not sent using another mode."
         case .identityChanged: "The authenticated host account changed. Sign in again to keep chats separate."

@@ -1,7 +1,7 @@
 import Foundation
 
-/// Compatibility with the tested released serve contract, not a claim about
-/// the server's commit, policy decisions, or main-only capabilities.
+/// Shared Hermes wire contracts. Version metadata never gates connection or
+/// features; availability comes from the host's actual capabilities.
 enum DirectHermesReleaseContract {
     struct ResumedSession: Equatable, Sendable {
         let runtimeID: String
@@ -12,16 +12,7 @@ enum DirectHermesReleaseContract {
         guard value["ok"]?.boolean == true, value["auth_required"]?.boolean != nil else {
             throw WorkspaceClientError.authenticationRequired
         }
-        guard let version = value["version"]?.string,
-              supportedVersions.contains(version) else {
-            throw WorkspaceClientError.unavailable(.unsupportedHermesVersion)
-        }
     }
-
-    /// Exact stock releases verified against the production clients. 0.21.4 and
-    /// 0.21.5 only add routes and RPC methods over 0.21.3 (none removed); both were
-    /// exercised with the auth, protocol and streaming probes before admission.
-    static let supportedVersions: [String] = ["0.21.2", "0.21.3", "0.21.4", "0.21.5"]
 
     static let readOperations: Set<WorkspaceCapability> = [
         .profilesRead, .sessionsRead, .modelsRead, .schedulesRead, .projectsRead,

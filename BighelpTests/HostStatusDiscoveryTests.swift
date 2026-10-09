@@ -55,6 +55,18 @@ struct HostStatusDiscoveryTests {
         #expect(host.paths == ["/api/status"])
     }
 
+    @Test(arguments: ["0.20.0", "0.21.6", "1.0.0", "custom-build", ""])
+    func signInDiscoveryDoesNotGateOnHermesVersion(_ version: String) async throws {
+        let status = Self.stoppedGatewayStatus.replacingOccurrences(
+            of: #""version":"0.21.5","#,
+            with: version.isEmpty ? "" : "\"version\":\"\(version)\",")
+        let host = try ScriptedHermes { _ in .json(status) }
+        let discovery = try await HostAuthenticationDiscovery.discover(endpoint: endpoint(try await host.start()))
+        #expect(!discovery.requiresAuthentication)
+        #expect(HostAuthenticationDiscovery.preferredMethod(for: discovery) == .dashboard)
+        #expect(host.paths == ["/api/status"])
+    }
+
     @Test func aNullListOfSignInFlowsMeansNone() async throws {
         let status = Self.stoppedGatewayStatus.replacingOccurrences(of: #""auth_flows":[]"#, with: #""auth_flows":null"#)
         let host = try ScriptedHermes { _ in .json(status) }

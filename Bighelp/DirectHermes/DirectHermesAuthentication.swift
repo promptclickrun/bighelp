@@ -517,20 +517,6 @@ final class DirectHermesAuthenticator {
             throw DirectHermesError.invalidResponse
         }
 
-        // Reuse the parent-owned exact release matrix without requiring /api/status
-        // to expose the health-only `ok` field.
-        var releaseProjection = status
-        releaseProjection["ok"] = .boolean(true)
-        releaseProjection["auth_required"] = .boolean(authRequired)
-        do {
-            try DirectHermesReleaseContract.validateHealth(releaseProjection)
-        } catch WorkspaceClientError.unavailable(.unsupportedHermesVersion) {
-            // A version outside the verified matrix is not a sign-in problem; say so.
-            throw DirectHermesError.unsupportedHermesVersion
-        } catch {
-            throw DirectHermesError.invalidResponse
-        }
-
         let flows: [String]
         if let advertisedFlows = status["auth_flows"], advertisedFlows != .null {
             guard let rawFlows = advertisedFlows.array, rawFlows.count <= 32 else {

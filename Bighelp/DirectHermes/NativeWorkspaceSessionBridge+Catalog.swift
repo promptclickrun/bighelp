@@ -304,7 +304,11 @@ extension NativeWorkspaceSessionBridge {
             descriptor = try await client.createFirstCanonicalChat(profileID: profileID)
             wasCreated = true
         }
-        let hydrated = try await client.hydrate(descriptor.record)
+        var hydrated = try await client.hydrate(descriptor.record)
+        // The registry doesn't report the chat's source, but a stream retained
+        // across a reconnect does. Without it, prepare() reads the gap as another
+        // chat and retires the stream, so the first tap after a reconnect failed.
+        if hydrated.remoteSource == nil { hydrated.remoteSource = streams[hydrated.id]?.record.remoteSource }
         return try await prepare(hydrated, catalog: client,
                                  preserveIfOmitted: Self.preservesUnpublishedCanonical(
                                     hydrated, wasCreated: wasCreated, durability: descriptor.durability))

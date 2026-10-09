@@ -24,14 +24,17 @@ struct BighelpModelConfirmationModifier: ViewModifier {
             .onChange(of: isPresented) { _, presented in
                 if !presented, !didSubmit, let confirmation { onCancel?(confirmation) }
             }
-            .alert("Confirm model change", isPresented: $isPresented, presenting: confirmation) { confirmation in
-                Button("Approve") {
-                    didSubmit = true
-                    onConfirm?(confirmation)
+            // A sheet, not an alert: a long warning at large text sizes pushed an alert's buttons off screen.
+            .bighelpSheet(isPresented: $isPresented) {
+                if let confirmation {
+                    BighelpModelWarningSheet(title: "Confirm model change", message: confirmation.message) {
+                        didSubmit = true
+                        onConfirm?(confirmation)
+                        isPresented = false
+                    } onCancel: {
+                        isPresented = false
+                    }
                 }
-                Button("Cancel", role: .cancel) { onCancel?(confirmation) }
-            } message: { confirmation in
-                Text(confirmation.message)
             }
             .onDisappear {
                 isVisible = false
@@ -43,5 +46,65 @@ struct BighelpModelConfirmationModifier: ViewModifier {
     private func updatePresentation() {
         didSubmit = false
         isPresented = confirmation != nil && onConfirm != nil
+    }
+}
+
+/// Hermes's model warnings (training on your data, cost). Scrolls as a whole, with the warning
+/// folded behind Read more, so Approve stays reachable on small screens and at any text size.
+struct BighelpModelWarningSheet: View {
+    let title: String
+    let message: String
+    let onApprove: () -> Void
+    let onCancel: () -> Void
+
+    @BighelpThemeReader private var theme
+    @State private var isExpanded = false
+
+    private var isLong: Bool { message.count > 120 }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: BighelpTokens.space12) {
+                Text(title)
+                    .font(.bighelp(.headline))
+                    .foregroundStyle(theme.primaryText)
+                Text(message)
+                    .font(.bighelp(.footnote))
+                    .foregroundStyle(theme.secondaryText)
+                    .lineLimit(isExpanded || !isLong ? nil : 3)
+                    .fixedSize(horizontal: false, vertical: true)
+                if isLong {
+                    Button(isExpanded ? "Read less" : "Read more") { isExpanded.toggle() }
+                        .font(.bighelp(.footnote).weight(.semibold))
+                        .tint(theme.action)
+                        .accessibilityIdentifier("model-confirmation.read-more")
+                }
+                VStack(spacing: BighelpTokens.space8) {
+                    Button(action: onApprove) {
+                        Text("Approve").frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .tint(theme.action)
+                    .accessibilityIdentifier("model-confirmation.approve")
+                    Button(role: .cancel, action: onCancel) {
+                        Text("Cancel").frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+                    .accessibilityIdentifier("model-confirmation.cancel")
+                }
+                .font(.bighelp(.body).weight(.semibold))
+                .padding(.top, BighelpTokens.space8)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(BighelpTokens.space20)
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(theme.canvas)
+        // Approve or Cancel only, so a swipe never leaves the host waiting on an answer.
+        .interactiveDismissDisabled()
+        .bighelpSheetSize(.compact)
     }
 }

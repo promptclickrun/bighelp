@@ -20,14 +20,14 @@ final class ModelConfirmationUITests: BighelpUITestCase {
         app.launch()
         openPicker(in: app, full: fullPicker)
         selectModel(in: app, full: fullPicker)
-        let approve = app.alerts.buttons["Approve"].firstMatch
+        let approve = app.buttons["model-confirmation.approve"].firstMatch
         guard approve.waitForExistence(timeout: 8) else {
             XCTFail("The host's pending model warning must offer Approve and Cancel")
             return
         }
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "train on prompts and completions")).firstMatch.exists)
         evidence("model-approval-\(appearance)")
-        app.alerts.buttons["Cancel"].tap()
+        app.buttons["model-confirmation.cancel"].tap()
         XCTAssertTrue(approve.waitForNonExistence(timeout: 5))
         if !fullPicker {
             XCTAssertTrue(app.buttons["chat.quick-model.openai:gpt-5.6"].exists,

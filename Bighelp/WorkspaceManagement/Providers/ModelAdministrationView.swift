@@ -661,18 +661,18 @@ private struct ModelAdministrationPicker: View {
             }
         )
         .presentationDetents([.large])
-        .confirmationDialog(
-            "Confirm model cost?", isPresented: Binding(
-                get: { store.pendingConfirmation != nil },
-                set: { if !$0 { store.cancelAssignmentConfirmation() } }
-            ), titleVisibility: .visible
-        ) {
-            Button("Confirm assignment") {
+        .bighelpSheet(isPresented: Binding(
+            get: { store.pendingConfirmation != nil },
+            set: { if !$0 { store.cancelAssignmentConfirmation() } }
+        )) {
+            BighelpModelWarningSheet(
+                title: "Confirm model cost?",
+                message: store.pendingConfirmation?.message ?? "Review this model assignment before continuing."
+            ) {
                 Task { if await store.confirmAssignment() { close() } }
+            } onCancel: {
+                store.cancelAssignmentConfirmation()
             }
-            Button("Cancel", role: .cancel) { store.cancelAssignmentConfirmation() }
-        } message: {
-            Text(store.pendingConfirmation?.message ?? "Review this model assignment before continuing.")
         }
         .accessibilityIdentifier("models.picker")
     }

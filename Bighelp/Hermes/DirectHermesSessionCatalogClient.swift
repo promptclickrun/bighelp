@@ -148,6 +148,8 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
     private var canonicalIDs: [String: Registry] = [:]
     private var creations: [String: DirectHermesSessionCreationState] = [:]
     private var creatingProfiles: Set<String> = []
+    /// Agents whose "Bot Chat" title a hidden chat holds; asked once per connection.
+    private var canonicalTitleTaken: Set<String> = []
     private var hydrationTokens: [String: UUID] = [:]
     private var historyWindows: [String: HistoryWindow] = [:]
     private var historyCacheOrder: [String] = []
@@ -593,9 +595,22 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         // ordinary new chat can at most leave one unused empty chat on the host,
         // so a new attempt replaces it. (Blocking here used to lock an agent out
         // of new chats for good, across restarts, after one timed-out create.)
-        if let pending = creations[key], pending.purpose == .firstCanonical,
+        if var pending = creations[key], pending.purpose == .firstCanonical,
            pending.phase != .complete, pending.phase != .canonicalResolved {
-            throw DirectHermesSessionError.creationUnconfirmed(profileID: profileID)
+            // A Bot Chat whose title was asked for is settled by the registry: it
+            // has the chat, or the title never landed. Either way a new chat is safe.
+            // (Left pending, a refused title locked the agent out of new chats.)
+            guard pending.phase == .titleRequested || pending.phase == .awaitingRegistry else {
+                throw DirectHermesSessionError.creationUnconfirmed(profileID: profileID)
+            }
+            if let found = try await registry(profileID: profileID) {
+                canonicalIDs[key] = found
+                pending.phase = .canonicalResolved
+                pending.canonicalRegistryID = found.id
+            } else {
+                pending.phase = .complete
+            }
+            try retain(pending)
         }
         var state = try await newCreation(profile: profile, purpose: .ordinary)
         let binding: Binding
@@ -619,6 +634,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
     func createFirstCanonicalChat(profileID: String) async throws -> DirectHermesResolvedSession {
         let profile = try await requireProfile(profileID)
         let key = DirectHermesSessionIdentity.key(profileID)
+        guard !canonicalTitleTaken.contains(key) else { throw WorkspaceClientError.rejected(code: "4022") }
         try beginCreation(key: key, profileID: profileID)
         defer { creatingProfiles.remove(key) }
         if let found = try await registry(profileID: profileID) {
@@ -669,14 +685,25 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
                 throw DirectHermesSessionError.creationUnconfirmed(profileID: profileID)
             }
         } catch let error as WorkspaceClientError {
-            if case .rejected(code: "4022") = error,
-               let winner = try await registry(profileID: profileID) {
-                canonicalIDs[key] = winner
-                let resolved = try await openRegistry(winner, profile: profile)
-                state.phase = .canonicalResolved
-                state.canonicalRegistryID = winner.id
+            if case .rejected(code: "4022") = error {
+                if let winner = try await registry(profileID: profileID) {
+                    canonicalIDs[key] = winner
+                    let resolved = try await openRegistry(winner, profile: profile)
+                    state.phase = .canonicalResolved
+                    state.canonicalRegistryID = winner.id
+                    try retain(state)
+                    return resolved
+                }
+                // A chat Hermes doesn't list (one from its API server) holds the
+                // title, so this agent has no Bot Chat here. Settle the attempt: it
+                // must not block new chats or make another empty chat every tap.
+                canonicalTitleTaken.insert(key)
+                state.phase = .complete
                 try retain(state)
-                return resolved
+                // The empty chat made for it goes too, so none piles up on the host.
+                if let stored = binding.coordinate.storedSessionID {
+                    _ = try? await perform(.sessionDelete, ["session_id": .string(stored), "profile": .string(profileID)])
+                }
             }
             throw error
         }

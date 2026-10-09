@@ -1475,6 +1475,65 @@ struct DirectHermesConversationTests {
         #expect(client.journal.unresolved.isEmpty)
     }
 
+    @Test func successiveToolTurnsReturnTheirAnswersToTheSameLiveVoiceCall() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let rpc = DirectTestRPC()
+        rpc.handler = { _, _ in .object(["status": .string("streaming")]) }
+        let client = try DirectHermesConversationClient(rpc: rpc, hostIdentity: "native-host", profile: "default",
+            runtimeID: "runtime", storedID: "stored", title: "Native", epoch: "epoch", drafts: DirectHermesDraftStore(root: root))
+        let chat = ChatModel(conversationID: client.conversationID, client: client, initialItems: [])
+        client.model = chat
+        var results: [String] = []
+        let voice = NativeLiveVoiceSession(
+            owner: .init(hostID: "native-host", authorizationID: "auth", agentID: "default", sessionID: "stored"),
+            operation: { operation, fields in
+                switch operation {
+                case .nativeVoiceOffer: return ["voiceId": fields["voiceId"]!]
+                case .nativeVoicePoll: return ["voiceId": fields["voiceId"]!, "events": .array([]),
+                                               "next": fields["after"]!, "closed": .boolean(false)]
+                case .nativeVoiceResult:
+                    results.append(try #require(fields["text"]?.string))
+                    return ["voiceId": fields["voiceId"]!, "appended": .boolean(true)]
+                case .nativeVoiceClose: return ["closed": .boolean(true)]
+                default: throw LiveVoiceControlError.unavailable
+                }
+            }, isCurrent: { true }, submit: { text in
+                let reply = try await chat.sendNativeVoiceMessage(text)
+                return reply.items.compactMap { item in
+                    if item.role == .assistant, case .message(let text) = item.content { return text }
+                    return nil
+                }.joined(separator: "\n\n")
+            })
+        let voiceModel = voice.makeModel(agentName: "Example")
+        defer { voiceModel.invalidateOwner(); client.suspend() }
+        _ = try await voice.perform("voice.live.offer", fields: ["voiceId": .string("call")])
+        for turn in 0..<3 {
+            voice.receiveEvent(["kind": .string("delegation"), "id": .string("request-\(turn)"),
+                                "text": .string("Check schedule \(turn)")], voiceID: "call")
+            for _ in 0..<1_000 where rpc.requests.filter({ $0.method == "prompt.submit" }).count <= turn {
+                try await Task.sleep(for: .milliseconds(1))
+            }
+            try #require(rpc.requests.filter { $0.method == "prompt.submit" }.count == turn + 1)
+            let base = turn * 5
+            client.receive(.init(type: "message.start", sessionID: "runtime", payload: [:], sequence: base + 1))
+            client.receive(.init(type: "tool.start", sessionID: "runtime",
+                                 payload: ["tool_id": .string("tool-\(turn)"), "name": .string("calendar")], sequence: base + 2))
+            try await Task.sleep(for: .milliseconds(50))
+            #expect(results.count == turn)
+            client.receive(.init(type: "tool.complete", sessionID: "runtime",
+                                 payload: ["tool_id": .string("tool-\(turn)")], sequence: base + 3))
+            client.receive(.init(type: "message.complete", sessionID: "runtime",
+                                 payload: ["text": .string("Schedule answer \(turn)")], sequence: base + 4))
+            client.receive(.init(type: "session.info", sessionID: "runtime",
+                                 payload: ["running": .boolean(false)], sequence: base + 5))
+            for _ in 0..<1_000 where results.count <= turn { try await Task.sleep(for: .milliseconds(1)) }
+            try #require(results == (0...turn).map { "Schedule answer \($0)" })
+        }
+        #expect(chat.items.filter { $0.role == .assistant }.count == 3)
+        #expect(client.journal.unresolved.isEmpty)
+    }
+
     @Test func createdNativeSessionCannotBeRetargetedByLocalAgentSelection() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }

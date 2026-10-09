@@ -509,6 +509,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
             canonicalIDs[key] = canonical
             return .resolved(try await openRegistry(canonical, profile: profile))
         }
+        if let resolved = try await resumeCanonicalByTitle(profile: profile) { return .resolved(resolved) }
         if let known = canonicalIDs[key] {
             throw DirectHermesSessionError.canonicalMissing(profileID: profile.id, knownID: known.id)
         }
@@ -693,6 +694,15 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
                     state.canonicalRegistryID = winner.id
                     try retain(state)
                     return resolved
+                }
+                if let holder = try await resumeCanonicalByTitle(profile: profile) {
+                    state.phase = .canonicalResolved
+                    state.canonicalRegistryID = canonicalIDs[key]?.id
+                    try retain(state)
+                    if let stored = binding.coordinate.storedSessionID {
+                        _ = try? await perform(.sessionDelete, ["session_id": .string(stored), "profile": .string(profileID)])
+                    }
+                    return holder
                 }
                 // A chat Hermes doesn't list (one from its API server) holds the
                 // title, so this agent has no Bot Chat here. Settle the attempt: it
@@ -1277,9 +1287,29 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         return try registryValue(value)
     }
 
-    private func openRegistry(_ registry: Registry, profile: Profile) async throws -> DirectHermesResolvedSession {
+    /// Hermes finds an agent's Bot Chat by name on resume, as `hermes -c "Bot Chat"` and its
+    /// message routes do, wherever the chat started and even when archived. The list
+    /// lookup skips archived chats, so a Bot Chat archived elsewhere never opened here.
+    /// Nil when the agent has none (4007).
+    private func resumeCanonicalByTitle(profile: Profile) async throws -> DirectHermesResolvedSession? {
+        let receipt: (response: [String: BighelpJSONValue], epoch: String?)
+        do {
+            receipt = try await resume(profileID: profile.id, storedID: "Bot Chat")
+        } catch WorkspaceClientError.rejected(code: "4007") {
+            return nil
+        }
+        let stored = try DirectHermesSessionValidation.string(receipt.response["session_key"] ?? receipt.response["resumed"])
+        try DirectHermesSessionValidation.coordinate(stored)
+        let canonical = Registry(id: stored, resolvedID: nil)
+        canonicalIDs[DirectHermesSessionIdentity.key(profile.id)] = canonical
+        return try await openRegistry(canonical, profile: profile, receipt: receipt)
+    }
+
+    private func openRegistry(_ registry: Registry, profile: Profile,
+                              receipt resumed: (response: [String: BighelpJSONValue], epoch: String?)? = nil)
+        async throws -> DirectHermesResolvedSession {
         let appID = try DirectHermesSessionIdentity.appID(owner: owner, profileID: profile.id, anchorID: registry.id)
-        if let current = bindings[appID], current.coordinate.runtimeSessionID != nil {
+        if resumed == nil, let current = bindings[appID], current.coordinate.runtimeSessionID != nil {
             return try await resolveSession(current.record)
         }
         let record = try draftRecord(profile: profile, storedID: registry.id, title: "Bot Chat")
@@ -1289,7 +1319,8 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
             anchorID: registry.id, record: record, durability: .persisted, cwd: nil,
             canonicalRegistryID: registry.id
         )
-        let receipt = try await resume(profileID: profile.id, storedID: registry.id)
+        let receipt: (response: [String: BighelpJSONValue], epoch: String?)
+        if let resumed { receipt = resumed } else { receipt = try await resume(profileID: profile.id, storedID: registry.id) }
         let binding = try attachedBinding(receipt.response, original: candidate, profile: profile, receiptEpoch: receipt.epoch)
         setBinding(binding, for: appID)
         return descriptor(binding)

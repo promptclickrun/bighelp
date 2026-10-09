@@ -95,6 +95,58 @@ final class AgentOpenRealHostUITests: BighelpUITestCase {
         XCTAssertEqual(results.filter { !$0.hasSuffix(": chat") }, [], report)
     }
 
+    /// Leaving the agent's chat and coming back, also after the app was away long
+    /// enough for its connections to close, reopens it on the first tap.
+    @MainActor func testAgentChatReopensAfterLeavingAndReturning() throws {
+        guard let path = ProcessInfo.processInfo.environment["BIGHELP_AGENT_OPEN_PROBE"] else {
+            throw XCTSkip("Needs BIGHELP_AGENT_OPEN_PROBE")
+        }
+        probe = try JSONDecoder().decode([String: String].self, from: Data(contentsOf: URL(fileURLWithPath: path)))
+        let app = makeApp()
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-test-no-configured-hosts",
+                               "-bighelp.hosts.all-hosts", "NO"]
+        app.launch()
+        try addHost(app, address: try XCTUnwrap(probe["address_a"]), name: "Desk Hermes")
+        let menu = app.buttons["home.drawer.open"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 20))
+        menu.tap()
+        app.buttons["menu.hosts"].tap()
+        app.buttons["menu.host.add"].tap()
+        try addHost(app, address: try XCTUnwrap(probe["address_b"]), name: "Lab Hermes")
+        XCTAssertTrue(menu.waitForExistence(timeout: 20))
+        menu.tap()
+        app.buttons["menu.all-hosts"].tap()
+        XCTAssertTrue(app.navigationBars["All agents"].waitForExistence(timeout: 10))
+        let agentName = try XCTUnwrap(probe["agent"])
+        var results: [String] = []
+        func open(_ step: String, on host: String) {
+            let agent = fleetAgent(agentName, on: host, in: app)
+            guard agent.waitForExistence(timeout: 45) else { results.append("\(step): not listed"); return }
+            print("BHSTEP \(step)")
+            agent.tap()
+            let outcome = waitForOutcome(in: app)
+            save("reopen-\(step)", app)
+            results.append("\(step): \(outcome)")
+            if outcome == "error" { app.alerts.buttons["OK"].firstMatch.tap() }
+            if outcome == "chat" { swipeBackFromLeadingEdge(in: app) }
+            _ = app.navigationBars["All agents"].waitForExistence(timeout: 15)
+        }
+        open("1-first", on: "Lab Hermes")
+        open("2-again", on: "Lab Hermes")
+        XCUIDevice.shared.press(.home)
+        XCTAssertTrue(app.wait(for: .runningBackground, timeout: 10))
+        sleep(40)
+        app.activate()
+        XCTAssertTrue(app.navigationBars["All agents"].waitForExistence(timeout: 30))
+        open("3-after-away", on: "Lab Hermes")
+        open("4-other-host", on: "Desk Hermes")
+        open("5-other-host-again", on: "Desk Hermes")
+        open("6-back-to-first", on: "Lab Hermes")
+        let report = results.joined(separator: "\n")
+        print("AGENT-REOPEN-RESULTS\n\(report)")
+        XCTAssertEqual(results.filter { !$0.hasSuffix(": chat") }, [], report)
+    }
+
     /// "chat" when the composer shows, "error" for the Unable to open alert, "nothing" otherwise.
     @MainActor private func waitForOutcome(in app: XCUIApplication) -> String {
         let composer = app.textViews["chat.composer.text"]

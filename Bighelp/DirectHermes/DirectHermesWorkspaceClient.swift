@@ -683,6 +683,10 @@ final class DirectHermesWorkspaceClient: WorkspaceOperationPerforming {
         if operation == .sessionCreate, (error as? DirectHermesError) == .rpcRejected(code: 4000) {
             return WorkspaceClientError.rejected(code: "invalid_params")
         }
+        // 4007: no such chat. Resuming "Bot Chat" by name tells an agent without one this way.
+        if operation == .sessionResume, (error as? DirectHermesError) == .rpcRejected(code: 4007) {
+            return WorkspaceClientError.rejected(code: "4007")
+        }
         // 4022: the title is taken. A first Bot Chat checks who holds it.
         if operation == .sessionTitle, (error as? DirectHermesError) == .rpcRejected(code: 4022) {
             return WorkspaceClientError.rejected(code: "4022")

@@ -123,6 +123,14 @@ extension RootShellView {
             actionErrorMessage = "Connect to this computer to open the agent’s chat."
             return
         }
+        // A Bot Chat opened before is saved here: open it at once (its chat loads from
+        // Hermes as usual) rather than wait a second or two on the lookup.
+        if let saved = sessionCatalog.records.first(where: {
+            $0.kind == .direct && $0.agentIDs == [profileID] && $0.title == "Bot Chat"
+        }) {
+            showAgentChat(saved, fromList: fromList)
+            return
+        }
         let originTab = appState.selectedTab
         let originPath = appState.path
         canonicalChatCoordinator.open(profileID: profileID, owner: owner, resolve: { profile, expectedOwner in
@@ -142,16 +150,20 @@ extension RootShellView {
                 openLatestAgentChat(profileID, fromList: fromList)
                 return
             }
-            var instant = Transaction()
-            instant.disablesAnimations = true
-            withTransaction(instant) {
-                appState.select(.sessions)
-                appState.chatOpenedFromList = fromList
-                openSession(record.summary)
-            }
+            showAgentChat(record, fromList: fromList)
         }, failed: {
             openLatestAgentChat(profileID, fromList: fromList)
         })
+    }
+
+    private func showAgentChat(_ record: SessionRecord, fromList: Bool) {
+        var instant = Transaction()
+        instant.disablesAnimations = true
+        withTransaction(instant) {
+            appState.select(.sessions)
+            appState.chatOpenedFromList = fromList
+            openSession(record.summary)
+        }
     }
 
     /// A computer the all-hosts list just switched to shows its saved chats before

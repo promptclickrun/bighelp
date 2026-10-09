@@ -42,6 +42,7 @@ struct ChatSessionControlsPopover: View {
     var onContentHeight: ((CGFloat) -> Void)? = nil
 
     @State private var draft: SessionRuntimeSelectionDraft
+    @State private var confirmationToSubmit: SessionRuntimeModelConfirmation?
     #if targetEnvironment(macCatalyst)
     /// Off while All models covers this page, so Return and Esc reach that page's buttons.
     @State private var isFrontmost = true
@@ -133,6 +134,19 @@ struct ChatSessionControlsPopover: View {
                     .accessibilityLabel("Updating this session")
             }
         }
+        .modifier(BighelpModelConfirmationModifier(
+            confirmation: controls.pendingModelConfirmation,
+            onConfirm: { confirmationToSubmit = $0 },
+            onCancel: { controls.cancelModelConfirmation(expected: $0) }
+        ))
+        .task(id: confirmationToSubmit?.id) {
+            guard !Task.isCancelled, let confirmationToSubmit,
+                  await controls.confirmModelSelection(confirmationToSubmit), !Task.isCancelled else { return }
+            await controls.loadPickersIfNeeded()
+            guard !Task.isCancelled, controls.errorMessage == nil else { return }
+            onApplied()
+        }
+        .onDisappear { confirmationToSubmit = nil }
         .onChange(of: [controls.currentProvider, controls.currentModel, controls.currentReasoningValue]) { _, _ in
             draft.reconcile(providerID: controls.currentProvider, modelID: controls.currentModel,
                             reasoningValue: controls.currentReasoningValue)
@@ -172,7 +186,8 @@ struct ChatSessionControlsPopover: View {
                 .accessibilityLabel("See all models")
                 .accessibilityIdentifier("chat.models.see-all")
             }
-            if (controls.isLoadingModel || controls.modelPicker == nil) && controls.errorMessage == nil {
+            if (controls.isLoadingModel || (controls.modelPicker == nil && controls.modelProviders.isEmpty))
+                && controls.errorMessage == nil {
                 BighelpThinkingOrb(scenario: .searching, scale: .inline, visibleLabel: "Loading models")
             } else {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: BighelpTokens.space8),
@@ -267,6 +282,7 @@ struct ChatSessionControlsPopover: View {
         #if targetEnvironment(macCatalyst)
         .keyboardShortcut(isFrontmost ? .defaultAction : nil)
         #endif
+        .disabled(controls.pendingModelConfirmation != nil)
         .accessibilityIdentifier("chat.session-controls.apply")
     }
 

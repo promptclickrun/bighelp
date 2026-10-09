@@ -90,7 +90,7 @@ targets:
         INFOPLIST_KEY_UIApplicationPreferredDefaultSceneSessionRole[sdk=xros*]: UIWindowSceneSessionRoleApplication
         INFOPLIST_KEY_UIApplicationPreferredDefaultSceneSessionRole[sdk=xrsimulator*]: UIWindowSceneSessionRoleApplication
         MARKETING_VERSION: 2.3.0
-        CURRENT_PROJECT_VERSION: 97
+        CURRENT_PROJECT_VERSION: 101
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_ENTITLEMENTS: Bighelp/Bighelp.entitlements
         # CarPlay voice needs Apple's CarPlay entitlement, which device builds
@@ -124,7 +124,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: app.loopdy.mobile.watchkitapp
         PRODUCT_NAME: BighelpWatch
         MARKETING_VERSION: 2.3.0
-        CURRENT_PROJECT_VERSION: 97
+        CURRENT_PROJECT_VERSION: 101
         CODE_SIGN_STYLE: Automatic
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: BighelpWatch/Info.plist
@@ -146,7 +146,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: app.loopdy.mobile.notification-service
         PRODUCT_NAME: BighelpNotificationService
         MARKETING_VERSION: 2.3.0
-        CURRENT_PROJECT_VERSION: 97
+        CURRENT_PROJECT_VERSION: 101
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_ENTITLEMENTS: BighelpNotificationService/BighelpNotificationService.entitlements
         CODE_SIGN_ENTITLEMENTS[sdk=macosx*]: BighelpNotificationService/BighelpNotificationServiceCatalyst.entitlements
@@ -172,7 +172,7 @@ targets:
         XROS_DEPLOYMENT_TARGET: "26.0"
         EXCLUDED_ARCHS[sdk=xrsimulator*]: x86_64
         MARKETING_VERSION: 2.3.0
-        CURRENT_PROJECT_VERSION: 97
+        CURRENT_PROJECT_VERSION: 101
         CODE_SIGN_STYLE: Automatic
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: BighelpLiveActivity/Info.plist
@@ -195,7 +195,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: app.loopdy.mobile.mac-updater
         PRODUCT_NAME: BighelpMacUpdater
         MARKETING_VERSION: 2.3.0
-        CURRENT_PROJECT_VERSION: 97
+        CURRENT_PROJECT_VERSION: 101
         CODE_SIGN_STYLE: Automatic
         ENABLE_HARDENED_RUNTIME: YES
         GENERATE_INFOPLIST_FILE: YES
@@ -215,7 +215,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.loopdy.desktop
         MARKETING_VERSION: 2.3.0
-        CURRENT_PROJECT_VERSION: 97
+        CURRENT_PROJECT_VERSION: 101
         CODE_SIGN_STYLE: Automatic
         GENERATE_INFOPLIST_FILE: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: ""

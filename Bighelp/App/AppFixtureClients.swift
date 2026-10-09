@@ -1,10 +1,12 @@
 import Foundation
 
 @MainActor
-final class DemoSessionControlMessaging: BighelpLinkSessionControlMessaging, SessionFastModeControlling {
+final class DemoSessionControlMessaging: SessionRuntimeControlConfirming, SessionRuntimeControlSupporting, SessionFastModeControlling {
     private var models: [String: (provider: String, model: String)] = [:]
     private var reasoning: [String: String]
     private var fastModes: [String: FastMode] = [:]
+    private var pickerAgents: [String: String] = [:]
+    private var pendingConfirmation: SessionRuntimeModelConfirmation?
     private let defaults: (any AgentRuntimeDefaultsClient)?
 
     init(reasoning: [String: String] = [:], defaults: (any AgentRuntimeDefaultsClient)? = nil) {
@@ -35,7 +37,10 @@ final class DemoSessionControlMessaging: BighelpLinkSessionControlMessaging, Ses
         return SessionFastMode(mode: mode, unavailableReason: nil)
     }
 
+    func selectionSupport(sessionID: String, agentID: String) -> SessionRuntimeControlSupport { .available }
+
     func openPicker(_ request: BighelpLinkPickerOpenRequest) async throws -> BighelpLinkPicker {
+        pickerAgents[request.sessionID] = request.agentID
         switch request.kind {
         case .model:
             let current = models[request.sessionID] ?? ("nous", "Hermes-4-405B")
@@ -107,6 +112,35 @@ final class DemoSessionControlMessaging: BighelpLinkSessionControlMessaging, Ses
     }
 
     func selectPicker(_ selection: BighelpLinkPickerSelection) async throws -> BighelpLinkPickerResult {
+        if ProcessInfo.processInfo.arguments.contains("-test-model-confirmation"), selection.kind == .model {
+            guard let agentID = pickerAgents[selection.sessionID] else { throw WorkspaceClientError.invalidRequest }
+            let owner = WorkspaceOwner(authority: try .fixture(id: "model-confirmation"),
+                                       authenticationGeneration: UUID(), connectionGeneration: UUID())
+            let coordinate = try WorkspaceSessionCoordinate(
+                owner: owner, profileID: agentID,
+                sessionID: selection.sessionID, storedSessionID: selection.sessionID, runtimeSessionID: selection.sessionID
+            )
+            let confirmation = SessionRuntimeModelConfirmation(
+                id: UUID(), selection: selection, coordinate: coordinate,
+                message: "This demo model allows its vendor to train on prompts and completions. Approve to use it in this chat."
+            )
+            pendingConfirmation = confirmation
+            throw SessionRuntimeModelConfirmationRequired(confirmation: confirmation)
+        }
+        return try applySelection(selection)
+    }
+
+    func confirmPicker(_ confirmation: SessionRuntimeModelConfirmation) async throws -> BighelpLinkPickerResult {
+        guard pendingConfirmation == confirmation else { throw WorkspaceClientError.conflict }
+        pendingConfirmation = nil
+        return try applySelection(confirmation.selection)
+    }
+
+    func cancelPickerConfirmation(_ confirmation: SessionRuntimeModelConfirmation) {
+        if pendingConfirmation == confirmation { pendingConfirmation = nil }
+    }
+
+    private func applySelection(_ selection: BighelpLinkPickerSelection) throws -> BighelpLinkPickerResult {
         switch selection.kind {
         case .model:
             if let provider = selection.provider, let model = selection.model {

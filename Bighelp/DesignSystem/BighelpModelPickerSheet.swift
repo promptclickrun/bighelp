@@ -353,8 +353,6 @@ struct BighelpModelPickerSheet: View {
     @State private var draft: SessionRuntimeSelectionDraft
     @State private var isReasoningPresented = false
     @State private var pinMutationRevision = 0
-    @State private var isModelConfirmationPresented = false
-    @State private var didSubmitModelConfirmation = false
     #if targetEnvironment(macCatalyst)
     @FocusState private var isSearchFocused: Bool
     #endif
@@ -578,31 +576,11 @@ struct BighelpModelPickerSheet: View {
         .onChange(of: [currentProviderID, currentModelID, currentReasoningValue], initial: true) { _, _ in
             draft.reconcile(providerID: currentProviderID, modelID: currentModelID, reasoningValue: currentReasoningValue)
         }
-        .onChange(of: modelConfirmation, initial: true) { _, confirmation in
-            didSubmitModelConfirmation = false
-            isModelConfirmationPresented = confirmation != nil && onConfirmModel != nil
-        }
-        .onChange(of: isModelConfirmationPresented) { _, isPresented in
-            if !isPresented, !didSubmitModelConfirmation, let modelConfirmation {
-                onCancelModelConfirmation?(modelConfirmation)
-            }
-        }
-        .confirmationDialog("Confirm model change", isPresented: $isModelConfirmationPresented,
-                            titleVisibility: .visible) {
-            Button("Change model") {
-                guard let modelConfirmation else { return }
-                didSubmitModelConfirmation = true
-                onConfirmModel?(modelConfirmation)
-            }
-            Button("Cancel", role: .cancel) {
-                if let modelConfirmation { onCancelModelConfirmation?(modelConfirmation) }
-            }
-        } message: {
-            Text(modelConfirmation?.message ?? "")
-        }
-        .onDisappear {
-            if let modelConfirmation { onCancelModelConfirmation?(modelConfirmation) }
-        }
+        .modifier(BighelpModelConfirmationModifier(
+            confirmation: modelConfirmation,
+            onConfirm: onConfirmModel,
+            onCancel: onCancelModelConfirmation
+        ))
     }
 
     private var isStagedFlow: Bool { onApply != nil }

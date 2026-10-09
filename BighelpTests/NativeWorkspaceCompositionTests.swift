@@ -137,19 +137,28 @@ struct NativeWorkspaceCompositionTests {
         #expect(composition.featureStore.prepare(.chat(conversationID: record.id)))
     }
 
-    @Test func testedReleaseContractDoesNotClaimUnknownVersionsOrOptionalCapabilities() throws {
-        for version in ["0.21.2", "0.21.3", "0.21.4", "0.21.5"] {
-            try DirectHermesReleaseContract.validateHealth([
-                "ok": .boolean(true), "auth_required": .boolean(true), "version": .string(version)
-            ])
+    @Test(arguments: ["0.20.0", "0.21.1", "0.21.5", "0.21.6", "1.0.0", "unknown", "0.21.6-custom", ""])
+    func hostVersionDoesNotBlockConnection(_ version: String) throws {
+        try DirectHermesReleaseContract.validateHealth([
+            "ok": .boolean(true), "auth_required": .boolean(true), "version": .string(version)
+        ])
+    }
+
+    @Test func hostVersionMetadataIsOptionalButHealthAndAuthenticationAreNot() throws {
+        for version: BighelpJSONValue? in [nil, .null, .integer(21)] {
+            var health: [String: BighelpJSONValue] = ["ok": .boolean(true), "auth_required": .boolean(false)]
+            health["version"] = version
+            try DirectHermesReleaseContract.validateHealth(health)
         }
-        for version in ["0.21.6", "1.0.0", "unknown", "0.21.2-custom", "0.21.4-custom"] {
-            #expect(throws: WorkspaceClientError.unavailable(.unsupportedHermesVersion)) {
-                try DirectHermesReleaseContract.validateHealth([
-                    "ok": .boolean(true), "auth_required": .boolean(true), "version": .string(version)
-                ])
+        for health: [String: BighelpJSONValue] in [[:], ["ok": .boolean(true)],
+            ["ok": .boolean(false), "auth_required": .boolean(true)]] {
+            #expect(throws: WorkspaceClientError.authenticationRequired) {
+                try DirectHermesReleaseContract.validateHealth(health)
             }
         }
+    }
+
+    @Test func baselineCapabilitiesDoNotClaimOptionalHostFeatures() {
         let common = DirectHermesReleaseContract.readOperations
             .union(DirectHermesReleaseContract.sessionOperations)
             .union(DirectHermesReleaseContract.profileOperations)

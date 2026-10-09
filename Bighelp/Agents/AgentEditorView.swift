@@ -292,12 +292,12 @@ struct AgentEditorView: View {
         .onChange(of: runtimeDefaultsModel?.pendingConfirmation) { _, confirmation in
             isModelConfirmationPresented = confirmation != nil
         }
-        .confirmationDialog(
-            "Confirm model defaults",
-            isPresented: $isModelConfirmationPresented,
-            titleVisibility: .visible
-        ) {
-            Button("Apply model defaults") {
+        .bighelpSheet(isPresented: $isModelConfirmationPresented) {
+            BighelpModelWarningSheet(
+                title: "Confirm model defaults",
+                message: runtimeDefaultsModel?.pendingConfirmation?.message ?? ""
+            ) {
+                isModelConfirmationPresented = false
                 Task {
                     do {
                         try await runtimeDefaultsModel?.confirmPendingSave()
@@ -311,10 +311,10 @@ struct AgentEditorView: View {
                         // The defaults model retains the choices and reports the failed confirmation.
                     }
                 }
+            } onCancel: {
+                isModelConfirmationPresented = false
+                runtimeDefaultsModel?.dismissConfirmation()
             }
-            Button("Cancel", role: .cancel) { runtimeDefaultsModel?.dismissConfirmation() }
-        } message: {
-            Text(runtimeDefaultsModel?.pendingConfirmation?.message ?? "")
         }
         .accessibilityIdentifier(model.isEditing ? "agent.editor.edit" : "agent.editor.create")
     }

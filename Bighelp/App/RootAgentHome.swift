@@ -116,6 +116,8 @@ extension RootShellView {
         openCanonicalAgentChat(agent.id, fromList: false)
     }
 
+    /// The tapped agent's Bot Chat; if the host can't give one, its latest chat or a new one.
+    /// Cancelled only when the person moves on (another screen, tab or computer).
     func openCanonicalAgentChat(_ profileID: String, fromList: Bool) {
         guard let owner = currentWorkspaceOwner else {
             actionErrorMessage = "Connect to this computer to open the agent’s chat."
@@ -124,18 +126,20 @@ extension RootShellView {
         let originTab = appState.selectedTab
         let originPath = appState.path
         canonicalChatCoordinator.open(profileID: profileID, owner: owner, resolve: { profile, expectedOwner in
-            if usesWorkspaceFixtures {
+            // Demo data only when no real computer is selected (tests add real ones to a demo launch).
+            if usesWorkspaceFixtures, workspaceConnections?.isDirectSelected != true {
                 return try DemoSessionCatalogClient.canonicalID(profileID: profile, records: sessionCatalog.records)
             }
+            let ready = try await connectedOwner(signedInAs: expectedOwner)
             guard let connections = workspaceConnections else { throw WorkspaceClientError.ownerChanged }
-            return try await connections.openCanonicalSession(profile, expectedOwner)
+            return try await connections.openCanonicalSession(profile, ready)
         }, canPresent: {
-            currentWorkspaceOwner == owner && homeAgent?.id == profileID
+            currentWorkspaceOwner?.signIn == owner.signIn
                 && appState.selectedTab == originTab && appState.path == originPath
         }, present: { id in
             guard let record = sessionCatalog.session(id: id), record.kind == .direct,
                   record.agentIDs == [profileID] else {
-                canonicalChatOpenFailed(profileID, fromList: fromList)
+                openLatestAgentChat(profileID, fromList: fromList)
                 return
             }
             var instant = Transaction()
@@ -146,16 +150,40 @@ extension RootShellView {
                 openSession(record.summary)
             }
         }, failed: {
-            canonicalChatOpenFailed(profileID, fromList: fromList)
+            openLatestAgentChat(profileID, fromList: fromList)
         })
     }
 
-    private func canonicalChatOpenFailed(_ profileID: String, fromList: Bool) {
-        actionErrorMessage = "The agent’s Bot Chat couldn’t be opened. Your conversations and drafts are unchanged."
-        let signIn = currentWorkspaceOwner?.signIn
-        actionErrorRetry = {
-            guard currentWorkspaceOwner?.signIn == signIn, homeAgent?.id == profileID else { return }
-            openCanonicalAgentChat(profileID, fromList: fromList)
+    /// A computer the all-hosts list just switched to shows its saved chats before
+    /// it finishes connecting, and its Bot Chat lookup works only once it has.
+    private func connectedOwner(signedInAs owner: WorkspaceOwner) async throws -> WorkspaceOwner {
+        let deadline = ContinuousClock.now + .seconds(30)
+        while ContinuousClock.now < deadline {
+            if let current = currentWorkspaceOwner, current.signIn == owner.signIn,
+               let runtime = nativeRuntime, runtime.isReady, !runtime.isSuspended,
+               runtime.authority == current.authority {
+                return current
+            }
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        throw WorkspaceClientError.transportUnavailable
+    }
+
+    /// Some hosts can't give an agent its Bot Chat: one already titled "Bot Chat"
+    /// from Hermes' API server is hidden from the app but keeps the title. The
+    /// agent still opens, on its latest chat or a new one, never an error.
+    private func openLatestAgentChat(_ profileID: String, fromList: Bool) {
+        var instant = Transaction()
+        instant.disablesAnimations = true
+        withTransaction(instant) {
+            if appState.selectedTab != .sessions { appState.select(.sessions) }
+            appState.chatOpenedFromList = fromList
+            if let latest = sessionCatalog.recentSummaries(includeCronSessions: false)
+                .first(where: { $0.kind == .direct && $0.agentIDs == [profileID] }) {
+                openSession(latest)
+            } else {
+                startNewChat(explicitAgentID: profileID)
+            }
         }
     }
 
@@ -645,7 +673,8 @@ extension RootShellView {
             }
             .modifier(MacSidebarMemory(isOpen: $isHomeDrawerPresented,
                                        canShow: !presentsFirstRunOnboarding && !needsInitialHostSetup))
-            .modifier(HomeMenuPresentation(isPresented: $isHomeDrawerPresented, onDismiss: runAfterHomeSheet) {
+            .modifier(HomeMenuPresentation(isPresented: $isHomeDrawerPresented, onDismiss: runAfterHomeSheet,
+                                           contentID: ObjectIdentifier(featureStore)) {
                 homeDrawer
             })
     }

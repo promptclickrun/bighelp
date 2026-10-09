@@ -27,30 +27,44 @@ final class CompactChatMenuUITests: BighelpUITestCase {
             XCTAssertTrue(options.waitForExistence(timeout: 20))
             options.tap()
             evidence("compact-menu-\(appearance)")
-            for title in ["chat.options.model-speed", "chat.options.this-chat", "chat.options.usage", "chat.options.advanced"] {
+            let rootRows = large
+                ? ["chat.options.model-speed", "chat.options.this-chat", "chat.options.more"]
+                : ["chat.file-changes", "chat.options.model-speed", "chat.options.this-chat", "chat.options.usage", "chat.options.advanced"]
+            for title in rootRows {
                 let row = app.buttons[title].firstMatch
                 XCTAssertTrue(row.waitForExistence(timeout: 5), title)
                 XCTAssertTrue(row.isHittable, "\(title) must be reachable without scrolling")
                 XCTAssertTrue(app.windows.firstMatch.frame.contains(row.frame), "\(title) must fit on screen")
             }
-            if app.buttons["chat.file-changes"].exists {
-                XCTAssertTrue(app.buttons["chat.file-changes"].isHittable)
-            }
             app.buttons["chat.options.model-speed"].tap()
             let fast = app.buttons["chat.fast-mode"].firstMatch
             XCTAssertTrue(fast.waitForExistence(timeout: 8))
-            XCTAssertTrue(app.buttons["chat.session-controls"].exists)
+            XCTAssertTrue(app.buttons["chat.session-controls"].isHittable)
             fast.tap()
             let on = app.buttons["chat.fast-mode.on"].firstMatch
             XCTAssertTrue(on.waitForExistence(timeout: 8))
             XCTAssertTrue(on.isHittable)
+            XCTAssertTrue(app.windows.firstMatch.frame.contains(on.frame), "The cost notice must fit, too")
             evidence("fast-mode-\(appearance)")
             on.tap()
             let reopened = chatMenuItem("chat.fast-mode", in: app)
             XCTAssertTrue(reopened.waitForExistence(timeout: 5))
             XCTAssertTrue(reopened.label.contains("On"), "The saved chat value is visible")
-            for identifiers in [["chat.rename", "chat.files", "chat.appearance", "chat.edit-current-agent"],
-                                ["chat.provider-usage", "chat.context-window"]] {
+            // Demo chats have no native session, so Session tools and Force
+            // refresh are absent. More and This chat still exercise full rows.
+            let submenus = large ? [
+                ["chat.options.settings", "chat.files", "chat.edit-current-agent"],
+                ["chat.rename", "chat.appearance"],
+                ["chat.file-changes", "chat.options.usage", "chat.options.advanced"],
+                ["chat.provider-usage", "chat.context-window"],
+                ["chat.options.display"],
+                ["chat.visibility.reasoning", "chat.visibility.tool-calls"]
+            ] : [
+                ["chat.rename", "chat.files", "chat.appearance", "chat.edit-current-agent"],
+                ["chat.provider-usage", "chat.context-window"],
+                ["chat.visibility.reasoning", "chat.visibility.tool-calls"]
+            ]
+            for identifiers in submenus {
                 app.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.55)).tap()
                 _ = chatMenuItem(identifiers[0], in: app)
                 evidence("submenu-\(identifiers[0])-\(appearance)")
@@ -79,13 +93,18 @@ final class CompactChatMenuUITests: BighelpUITestCase {
         let on = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "On")).firstMatch
         XCTAssertTrue(on.waitForExistence(timeout: 5))
         on.tap()
-        XCTAssertTrue(NSPredicate(format: "label CONTAINS %@", "On").evaluate(with: row))
+        XCTAssertTrue(waitForElement(row, predicate: NSPredicate(format: "label CONTAINS %@", "On")))
         evidence("default-fast-mode")
         row.tap()
         let off = app.buttons["Off"].firstMatch
         XCTAssertTrue(off.waitForExistence(timeout: 5))
         off.tap()
-        XCTAssertTrue(row.label.contains("Off"))
+        XCTAssertTrue(waitForElement(row, predicate: NSPredicate(format: "label CONTAINS %@", "Off")))
+    }
+
+    @MainActor
+    private func waitForElement(_ element: XCUIElement, predicate: NSPredicate) -> Bool {
+        XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: predicate, object: element)], timeout: 5) == .completed
     }
 
     @MainActor

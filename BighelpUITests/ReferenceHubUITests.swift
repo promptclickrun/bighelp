@@ -89,19 +89,25 @@ class BighelpUITestCase: XCTestCase {
     func chatMenuItem(_ identifier: String, in app: XCUIApplication, timeout: TimeInterval = 5) -> XCUIElement {
         let item = app.buttons[identifier].firstMatch
         if item.exists, item.isHittable { return item }
-        let group: String?
+        let groups: [String]
         switch identifier {
-        case "chat.session-controls", "chat.fast-mode": group = "chat.options.model-speed"
-        case "chat.context-window", "chat.provider-usage": group = "chat.options.usage"
-        case "chat.rename", "chat.files", "chat.appearance", "chat.edit-current-agent": group = "chat.options.this-chat"
-        default: group = nil
+        case "chat.session-controls", "chat.fast-mode": groups = ["chat.options.model-speed"]
+        case "chat.context-window", "chat.provider-usage": groups = ["chat.options.more", "chat.options.usage"]
+        case "chat.rename", "chat.appearance": groups = ["chat.options.this-chat", "chat.options.settings"]
+        case "chat.files", "chat.edit-current-agent", "chat.options.settings": groups = ["chat.options.this-chat"]
+        case "chat.options.usage", "chat.options.advanced", "chat.file-changes": groups = ["chat.options.more"]
+        case "chat.session-tools", "chat.force-refresh", "chat.options.display": groups = ["chat.options.more", "chat.options.advanced"]
+        case "chat.visibility.reasoning", "chat.visibility.tool-calls": groups = ["chat.options.more", "chat.options.advanced", "chat.options.display"]
+        default: groups = []
         }
-        let submenu = group.map { app.buttons[$0].firstMatch }
-        if submenu?.exists != true {
+        if !app.buttons["chat.options.this-chat"].exists {
             let options = app.buttons["chat.options"].firstMatch
             if options.waitForExistence(timeout: timeout) { options.tap() }
         }
-        if let submenu, submenu.waitForExistence(timeout: timeout) { submenu.tap() }
+        for group in groups {
+            let submenu = app.buttons[group].firstMatch
+            if submenu.exists, submenu.isHittable { submenu.tap() }
+        }
         _ = item.waitForExistence(timeout: timeout)
         return item
     }

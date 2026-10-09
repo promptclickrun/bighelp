@@ -106,7 +106,7 @@ agent picked in the widget or Auto (the agent picked in the app). The app reads 
 (`BighelpWidgetBoardLoader`, a few agents at most) and the widget says so until it has. **Pinned Agents** is a
 grid of faces with names under them, like contacts: Current Gateway shows the computer in use's pinned agents,
 Multi Gateway every computer's (All agents' pinned row), with a small computer name under each when they're on
-more than one. A tap opens that agent's latest chat or a new one (`loopdy://agent-chat?agent=…&host=…`), switching
+more than one. A tap opens that agent's canonical Bot Chat (`loopdy://agent-chat?agent=…&host=…`), switching
 computers first like All agents. Pictures are copied per agent and computer (`BighelpPinnedAvatarStore`), and a
 computer called only by its address shows as "Computer 2". On Vision Pro the same widgets sit on a wall or table as glass,
 without the Lock Screen sizes.
@@ -291,6 +291,9 @@ The chat's ⋯ menu has at most five rows: File changes when available, Model & 
 Nerd Mode's Advanced. Model & speed contains Model & reasoning and Fast Mode. This chat contains Rename chat,
 Chat files, Chat appearance and Edit this agent. Usage contains provider usage and Nerd Mode's Context window.
 Existing technical controls stay in Advanced. Keep every level short enough to navigate without scrolling.
+At accessibility text sizes, keep the full font size: the top level is Model & speed, This chat and More.
+More holds File changes, Usage and Advanced; This chat groups Rename and Appearance under Settings, and
+Advanced groups its visibility switches under Display. Omit secondary summaries and shorten redundant labels.
 
 Fast Mode is explicit about scope: the chat menu changes only this chat; Settings › Default model changes the
 selected agent's default for new chats. Fast Mode may cost more. Read the host's current value and verify saves;

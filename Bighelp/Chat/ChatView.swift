@@ -935,24 +935,10 @@ struct ChatView: View {
         }
     }
 
-    /// At most five top-level rows, even with file changes and Nerd Mode.
-    /// Every secondary menu is focused and keeps the existing action identifiers.
+    /// Five rows normally; three at accessibility sizes, without reducing the font.
     private var chatOptionsMenu: some View {
         Menu {
-            if let changes = projectChangesSummary {
-                Button {
-                    dismissKeyboard()
-                    onProjectChangesTap()
-                } label: {
-                    Text("File changes")
-                    if !dynamicTypeSize.isAccessibilitySize {
-                        Text(ProjectChangesRailPresentation.visibleLabels(for: changes).joined(separator: " "))
-                    }
-                    Image(systemName: "plusminus")
-                }
-                .accessibilityLabel(ProjectChangesRailPresentation.accessibilityLabel(for: changes))
-                .accessibilityIdentifier("chat.file-changes")
-            }
+            if !dynamicTypeSize.isAccessibilitySize { fileChangesMenuItem }
             if sessionControlAccessory != nil || model.runtimeControls != nil {
                 Menu {
                     modelAndReasoningMenuItem
@@ -966,74 +952,21 @@ struct ChatView: View {
                 }
                 .accessibilityIdentifier("chat.options.model-speed")
             }
-            Menu {
-            if sessionCatalog != nil {
-                Button(dynamicTypeSize.isAccessibilitySize ? "Rename" : "Rename chat", systemImage: "pencil", action: presentSessionTitleRename)
-                    .disabled(isRenamingSessionTitle)
-                    .accessibilityIdentifier("chat.rename")
-            }
-            if let onChatFilesTap {
-                Button(dynamicTypeSize.isAccessibilitySize ? "Files" : "Chat files", systemImage: "folder") {
-                    dismissKeyboard()
-                    onChatFilesTap()
-                }
-                .accessibilityIdentifier("chat.files")
-            }
-            if let onChatAppearanceTap {
-                Button(dynamicTypeSize.isAccessibilitySize ? "Appearance" : "Chat appearance", systemImage: "photo.on.rectangle.angled") {
-                    dismissKeyboard()
-                    onChatAppearanceTap()
-                }
-                .accessibilityIdentifier("chat.appearance")
-            }
-            if !model.isBotMode {
-                Button(dynamicTypeSize.isAccessibilitySize ? "Edit agent" : "Edit this agent", systemImage: "person.crop.circle") {
-                    presentCurrentAgentEditor()
-                }
-                .disabled(!canEditCurrentAgent)
-                .accessibilityIdentifier("chat.edit-current-agent")
-            }
-            } label: {
-                Label("This chat", systemImage: "bubble.left")
-            }
-            .accessibilityIdentifier("chat.options.this-chat")
-            if contextWindowSnapshot != nil || providerUsage?.isAvailable == true {
-                Menu {
-                    providerUsageMenuItem
-                    contextWindowMenuItem
-                } label: {
-                    Label("Usage", systemImage: "gauge.with.dots.needle.50percent")
-                }
-                .accessibilityIdentifier("chat.options.usage")
-            }
-            // Display, recovery and session tools are technical: Nerd Mode only.
-            if nerdModeEnabled {
-            Menu {
-                if let onSessionToolsTap {
-                    Button("Session tools", systemImage: "wrench.and.screwdriver") {
-                        dismissKeyboard()
-                        onSessionToolsTap()
+            thisChatMenu
+            if dynamicTypeSize.isAccessibilitySize {
+                if projectChangesSummary != nil || contextWindowSnapshot != nil || providerUsage?.isAvailable == true || nerdModeEnabled {
+                    Menu {
+                        fileChangesMenuItem
+                        usageMenu
+                        advancedMenu
+                    } label: {
+                        Label("More", systemImage: "ellipsis")
                     }
-                    .accessibilityIdentifier("chat.session-tools")
+                    .accessibilityIdentifier("chat.options.more")
                 }
-                Toggle(isOn: reasoningVisibilityBinding) {
-                    Label(dynamicTypeSize.isAccessibilitySize ? "Reasoning" : "Show reasoning", systemImage: "sparkles")
-                }
-                .accessibilityHint("Shows or hides Thinking cards for this chat.")
-                .accessibilityIdentifier("chat.visibility.reasoning")
-                Toggle(isOn: toolCallVisibilityBinding) {
-                    Label(dynamicTypeSize.isAccessibilitySize ? "Tool calls" : "Show tool calls", systemImage: "terminal")
-                }
-                .accessibilityIdentifier("chat.visibility.tool-calls")
-                if onForceRefresh != nil {
-                    Button(isForceRefreshing ? "Refreshing…" : "Force refresh", systemImage: "arrow.clockwise", action: forceRefresh)
-                        .disabled(isForceRefreshing)
-                        .accessibilityIdentifier("chat.force-refresh")
-                }
-            } label: {
-                Label("Advanced", systemImage: "gearshape.2")
-            }
-            .accessibilityIdentifier("chat.options.advanced")
+            } else {
+                usageMenu
+                advancedMenu
             }
         } label: {
             Image(systemName: "ellipsis")
@@ -1063,23 +996,158 @@ struct ChatView: View {
     }
 
     @ViewBuilder
+    private var fileChangesMenuItem: some View {
+        if let changes = projectChangesSummary {
+            Button {
+                dismissKeyboard()
+                onProjectChangesTap()
+            } label: {
+                Text("File changes")
+                if !dynamicTypeSize.isAccessibilitySize {
+                    Text(ProjectChangesRailPresentation.visibleLabels(for: changes).joined(separator: " "))
+                }
+                Image(systemName: "plusminus")
+            }
+            .accessibilityLabel(ProjectChangesRailPresentation.accessibilityLabel(for: changes))
+            .accessibilityIdentifier("chat.file-changes")
+        }
+    }
+
+    private var thisChatMenu: some View {
+        Menu {
+            if dynamicTypeSize.isAccessibilitySize {
+                Menu {
+                    renameChatMenuItem
+                    chatAppearanceMenuItem
+                } label: {
+                    Label("Settings", systemImage: "slider.horizontal.3")
+                }
+                .accessibilityIdentifier("chat.options.settings")
+            } else {
+                renameChatMenuItem
+            }
+            if let onChatFilesTap {
+                Button(dynamicTypeSize.isAccessibilitySize ? "Files" : "Chat files", systemImage: "folder") {
+                    dismissKeyboard()
+                    onChatFilesTap()
+                }
+                .accessibilityIdentifier("chat.files")
+            }
+            if !dynamicTypeSize.isAccessibilitySize { chatAppearanceMenuItem }
+            if !model.isBotMode {
+                Button(dynamicTypeSize.isAccessibilitySize ? "Edit agent" : "Edit this agent", systemImage: "person.crop.circle") {
+                    presentCurrentAgentEditor()
+                }
+                .disabled(!canEditCurrentAgent)
+                .accessibilityIdentifier("chat.edit-current-agent")
+            }
+        } label: {
+            Label("This chat", systemImage: "bubble.left")
+        }
+        .accessibilityIdentifier("chat.options.this-chat")
+    }
+
+    @ViewBuilder
+    private var renameChatMenuItem: some View {
+        if sessionCatalog != nil {
+            Button(dynamicTypeSize.isAccessibilitySize ? "Rename" : "Rename chat", systemImage: "pencil", action: presentSessionTitleRename)
+                .disabled(isRenamingSessionTitle)
+                .accessibilityIdentifier("chat.rename")
+        }
+    }
+
+    @ViewBuilder
+    private var chatAppearanceMenuItem: some View {
+        if let onChatAppearanceTap {
+            Button(dynamicTypeSize.isAccessibilitySize ? "Appearance" : "Chat appearance", systemImage: "photo.on.rectangle.angled") {
+                dismissKeyboard()
+                onChatAppearanceTap()
+            }
+            .accessibilityIdentifier("chat.appearance")
+        }
+    }
+
+    @ViewBuilder
+    private var usageMenu: some View {
+        if contextWindowSnapshot != nil || providerUsage?.isAvailable == true {
+            Menu {
+                providerUsageMenuItem
+                contextWindowMenuItem
+            } label: {
+                Label("Usage", systemImage: "gauge.with.dots.needle.50percent")
+            }
+            .accessibilityIdentifier("chat.options.usage")
+        }
+    }
+
+    @ViewBuilder
+    private var advancedMenu: some View {
+        if nerdModeEnabled {
+            Menu {
+                if let onSessionToolsTap {
+                    Button(dynamicTypeSize.isAccessibilitySize ? "Tools" : "Session tools", systemImage: "wrench.and.screwdriver") {
+                        dismissKeyboard()
+                        onSessionToolsTap()
+                    }
+                    .accessibilityLabel("Session tools")
+                    .accessibilityIdentifier("chat.session-tools")
+                }
+                if dynamicTypeSize.isAccessibilitySize {
+                    Menu {
+                        displayMenuItems
+                    } label: {
+                        Label("Display", systemImage: "eye")
+                    }
+                    .accessibilityIdentifier("chat.options.display")
+                } else {
+                    displayMenuItems
+                }
+                if onForceRefresh != nil {
+                    Button(isForceRefreshing ? "Refreshing…" : (dynamicTypeSize.isAccessibilitySize ? "Refresh" : "Force refresh"),
+                           systemImage: "arrow.clockwise", action: forceRefresh)
+                        .disabled(isForceRefreshing)
+                        .accessibilityIdentifier("chat.force-refresh")
+                }
+            } label: {
+                Label("Advanced", systemImage: "gearshape.2")
+            }
+            .accessibilityIdentifier("chat.options.advanced")
+        }
+    }
+
+    @ViewBuilder
+    private var displayMenuItems: some View {
+        Toggle(isOn: reasoningVisibilityBinding) {
+            Label(dynamicTypeSize.isAccessibilitySize ? "Reasoning" : "Show reasoning", systemImage: "sparkles")
+        }
+        .accessibilityHint("Shows or hides Thinking cards for this chat.")
+        .accessibilityIdentifier("chat.visibility.reasoning")
+        Toggle(isOn: toolCallVisibilityBinding) {
+            Label(dynamicTypeSize.isAccessibilitySize ? "Tool calls" : "Show tool calls", systemImage: "terminal")
+        }
+        .accessibilityIdentifier("chat.visibility.tool-calls")
+    }
+
+    @ViewBuilder
     private var modelAndReasoningMenuItem: some View {
         if let accessory = sessionControlAccessory {
             Button(action: accessory.action) {
-                Text("Model & reasoning")
+                Text(dynamicTypeSize.isAccessibilitySize ? "Model" : "Model & reasoning")
                 if !dynamicTypeSize.isAccessibilitySize, let summary = modelSummary { Text(summary) }
                 Image(systemName: "slider.horizontal.3")
             }
+            .accessibilityLabel("Model & reasoning")
             .disabled(!accessory.isEnabled || model.isAwaitingAuthoritativeSessionAllocation)
             .accessibilityIdentifier(accessory.accessibilityIdentifier)
         } else if let controls = model.runtimeControls {
             Button {
                 openSessionControls(controls)
             } label: {
-                Text("Model & reasoning")
+                Text(dynamicTypeSize.isAccessibilitySize ? "Model" : "Model & reasoning")
                 if !dynamicTypeSize.isAccessibilitySize, let summary = modelSummary { Text(summary) }
                 Image(systemName: "slider.horizontal.3")
             }
+            .accessibilityLabel("Model & reasoning")
             .disabled(ChatRuntimeSelectionLockout.isLocked(isTurnActive: controls.isTurnActive)
                 || model.isAwaitingAuthoritativeSessionAllocation)
             .accessibilityIdentifier("chat.session-controls")

@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Kept inside Model & speed so adding speed choices never grows the main menu.
 struct SessionFastModeMenu: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let controls: SessionRuntimeControlModel
     var isAllocating = false
 
@@ -20,8 +21,12 @@ struct SessionFastModeMenu: View {
                 Button {
                     Task { await controls.selectFastMode(.on) }
                 } label: {
-                    Text("On")
-                    Text("May cost more")
+                    if dynamicTypeSize.isAccessibilitySize {
+                        Text("On · costs more")
+                    } else {
+                        Text("On")
+                        Text("May cost more")
+                    }
                     if controls.fastMode?.mode == .on { Image(systemName: "checkmark") }
                 }
                 .accessibilityIdentifier("chat.fast-mode.on")
@@ -33,11 +38,16 @@ struct SessionFastModeMenu: View {
             }
             if let message = controls.fastModeError { Text(message) }
         } label: {
-            Text("Fast Mode")
-            Text("\(controls.fastMode?.title ?? "Unknown") · This chat")
+            if dynamicTypeSize.isAccessibilitySize {
+                Text("Fast Mode: \(controls.fastMode?.title ?? "Unknown")")
+            } else {
+                Text("Fast Mode")
+                Text("\(controls.fastMode?.title ?? "Unknown") · This chat")
+            }
             Image(systemName: "bolt")
         }
         .disabled(isAllocating || controls.isTurnActive || controls.isApplyingSelection || controls.hasPendingSelection)
+        .accessibilityHint("Changes only this chat. Turning on Fast Mode may cost more.")
         .accessibilityIdentifier("chat.fast-mode")
     }
 }

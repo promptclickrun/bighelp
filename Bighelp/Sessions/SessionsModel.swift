@@ -29,6 +29,9 @@ enum HostedRoomSessionProjection {
     static let remoteSource = "hermes-room"
     private static let identityPrefix = "hermes-room:"
 
+    /// The chat list's ID for a hosted room.
+    static func listID(roomID: String) -> String { identityPrefix + roomID }
+
     static func summary(for room: HermesBotModeRoomSummary) -> SessionSummary {
         record(for: room).summary
     }
@@ -65,7 +68,7 @@ enum HostedRoomSessionProjection {
 
     private static func record(for room: HermesBotModeRoomSummary) -> SessionRecord {
         SessionRecord(
-            id: identityPrefix + room.roomID,
+            id: listID(roomID: room.roomID),
             kind: .botMode,
             agentIDs: uniqueProfiles(room.members.map(\.profile)),
             title: room.name,

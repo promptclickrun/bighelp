@@ -52,6 +52,21 @@ enum BighelpShortcutLinks {
         return components.url ?? BighelpShortcutDestination.workflows.url
     }
 
+    /// The agent's Bot Chat in voice; no agent is the gateway's home agent.
+    static func voice(agentID: String?, hostID: UUID?) -> URL {
+        var components = URLComponents()
+        components.scheme = "loopdy"; components.host = "voice"
+        let items = (agentID.map { [URLQueryItem(name: "agent", value: $0)] } ?? [])
+            + (hostID.map { [URLQueryItem(name: "host", value: $0.uuidString)] } ?? [])
+        components.queryItems = items.isEmpty ? nil : items
+        return components.url ?? URL(string: "loopdy://voice")!
+    }
+
+    /// A link that opens on a gateway: bighelp switches to it first. Nil keeps the one in use.
+    static func on(_ hostID: UUID?, _ url: URL) -> URL {
+        BighelpWidgetSnapshot.link(url, onGateway: hostID?.uuidString)
+    }
+
     /// The agent's home: its latest chat, with it as the home agent.
     static func agentHome(_ agentID: String) -> URL {
         var components = URLComponents()

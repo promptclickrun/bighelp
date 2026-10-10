@@ -7,7 +7,8 @@ import WidgetKit
 struct BighelpAgentWidget: Widget {
     var body: some WidgetConfiguration {
         // Widget kinds keep their original names so widgets already on home screens stay.
-        StaticConfiguration(kind: "LoopdyAgentWidget", provider: BighelpWidgetProvider()) { entry in
+        AppIntentConfiguration(kind: "LoopdyAgentWidget", intent: GatewayWidgetIntent.self,
+                               provider: GatewayWidgetProvider()) { entry in
             BighelpWidgetScaffold(snapshot: entry.snapshot) {
                 BighelpAgentWidgetView(snapshot: entry.snapshot)
             }
@@ -53,7 +54,7 @@ struct BighelpAgentWidgetView: View {
     private var name: String { snapshot.agentDisplayName }
     private var feed: [BighelpWidgetSnapshot.BoardItem] { snapshot.feed ?? [] }
     private var goals: [BighelpWidgetSnapshot.BoardItem] { snapshot.goals ?? [] }
-    private var newChat: URL { BighelpWidgetSnapshot.newChatURL(agentID: snapshot.defaultAgentID) }
+    private var newChat: URL { snapshot.newChatURL(agentID: snapshot.defaultAgentID) }
 
     private var statusText: String { pose?.label ?? BighelpActivityPose.idle.label }
 
@@ -80,8 +81,8 @@ struct BighelpAgentWidgetView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .widgetURL(snapshot.agentRunningSession.map { BighelpWidgetSnapshot.chatURL($0.id) }
-                   ?? BighelpWidgetSnapshot.agentURL())
+        .widgetURL(snapshot.agentRunningSession.map { snapshot.chatURL($0.id) }
+                   ?? snapshot.agentURL())
     }
 
     private var medium: some View {
@@ -98,7 +99,7 @@ struct BighelpAgentWidgetView: View {
             VStack(alignment: .leading, spacing: 7) {
                 if let session = snapshot.agentRunningSession {
                     BighelpWidgetSectionTitle(title: "Now", symbol: "bolt.fill")
-                    Link(destination: BighelpWidgetSnapshot.chatURL(session.id)) {
+                    Link(destination: snapshot.chatURL(session.id)) {
                         boardRow(symbol: pose?.symbolName ?? "sparkles", title: session.title,
                                  detail: session.status, highlighted: true)
                     }
@@ -106,7 +107,7 @@ struct BighelpAgentWidgetView: View {
                 if !feed.isEmpty {
                     BighelpWidgetSectionTitle(title: "Feed", glyph: .feed)
                     ForEach(feed.prefix(snapshot.agentRunningSession == nil ? 3 : 1)) { post in
-                        Link(destination: BighelpWidgetSnapshot.agentURL("feed")) {
+                        Link(destination: snapshot.agentURL("feed")) {
                             boardRow(emoji: post.icon, symbol: "newspaper", title: post.title, date: post.date)
                         }
                     }
@@ -117,7 +118,7 @@ struct BighelpAgentWidgetView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .widgetURL(BighelpWidgetSnapshot.agentURL())
+        .widgetURL(snapshot.agentURL())
     }
 
     private var large: some View {
@@ -132,7 +133,7 @@ struct BighelpAgentWidgetView: View {
                 Link(destination: newChat) { newChatGlyph(size: 36) }
             }
             if let session = snapshot.agentRunningSession {
-                Link(destination: BighelpWidgetSnapshot.chatURL(session.id)) {
+                Link(destination: snapshot.chatURL(session.id)) {
                     boardRow(symbol: pose?.symbolName ?? "sparkles", title: session.title,
                              detail: session.status, highlighted: true)
                 }
@@ -140,7 +141,7 @@ struct BighelpAgentWidgetView: View {
             if !feed.isEmpty {
                 section("Feed", glyph: .feed) {
                     ForEach(feed.prefix(snapshot.agentRunningSession == nil ? 3 : 2)) { post in
-                        Link(destination: BighelpWidgetSnapshot.agentURL("feed")) {
+                        Link(destination: snapshot.agentURL("feed")) {
                             boardRow(emoji: post.icon, symbol: "newspaper", title: post.title, date: post.date)
                         }
                     }
@@ -149,7 +150,7 @@ struct BighelpAgentWidgetView: View {
             if !goals.isEmpty {
                 section("Goals", glyph: .goals) {
                     ForEach(goals.prefix(feed.isEmpty ? 4 : 2)) { goal in
-                        Link(destination: BighelpWidgetSnapshot.agentURL("goals")) { goalRow(goal) }
+                        Link(destination: snapshot.agentURL("goals")) { goalRow(goal) }
                     }
                 }
             }
@@ -159,7 +160,7 @@ struct BighelpAgentWidgetView: View {
             Spacer(minLength: 0)
             tabStrip
         }
-        .widgetURL(BighelpWidgetSnapshot.agentURL())
+        .widgetURL(snapshot.agentURL())
     }
 
     #if os(iOS)
@@ -185,8 +186,8 @@ struct BighelpAgentWidgetView: View {
             }
         }
         .accessibilityLabel("\(name), \(statusText)")
-        .widgetURL(snapshot.agentRunningSession.map { BighelpWidgetSnapshot.chatURL($0.id) }
-                   ?? BighelpWidgetSnapshot.agentURL())
+        .widgetURL(snapshot.agentRunningSession.map { snapshot.chatURL($0.id) }
+                   ?? snapshot.agentURL())
     }
 
     private var rectangular: some View {
@@ -203,13 +204,13 @@ struct BighelpAgentWidgetView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .widgetURL(snapshot.agentRunningSession.map { BighelpWidgetSnapshot.chatURL($0.id) }
-                   ?? BighelpWidgetSnapshot.agentURL())
+        .widgetURL(snapshot.agentRunningSession.map { snapshot.chatURL($0.id) }
+                   ?? snapshot.agentURL())
     }
 
     private var inline: some View {
         Label("\(name): \(statusText)", systemImage: pose?.symbolName ?? "sparkles")
-            .widgetURL(BighelpWidgetSnapshot.agentURL())
+            .widgetURL(snapshot.agentURL())
     }
     #endif
 
@@ -327,7 +328,7 @@ struct BighelpAgentWidgetView: View {
         } else {
             BighelpWidgetSectionTitle(title: "Recent chats", symbol: "bubble.left.and.bubble.right.fill")
             ForEach(Array(recent)) { session in
-                Link(destination: BighelpWidgetSnapshot.chatURL(session.id)) {
+                Link(destination: snapshot.chatURL(session.id)) {
                     boardRow(symbol: "bubble.left.fill", title: session.title, date: session.updatedAt)
                 }
             }
@@ -339,7 +340,7 @@ struct BighelpAgentWidgetView: View {
         HStack(spacing: 6) {
             ForEach([("chat", "Chat", BighelpTabGlyph.chat), ("feed", "Feed", .feed),
                      ("ideas", "Ideas", .ideas), ("goals", "Goals", .goals)], id: \.0) { tab in
-                Link(destination: BighelpWidgetSnapshot.agentURL(tab.0)) {
+                Link(destination: snapshot.agentURL(tab.0)) {
                     VStack(spacing: 2) {
                         BighelpTabGlyphShape(glyph: tab.2).frame(width: 18, height: 18)
                         Text(tab.1).font(.system(size: 10, weight: .semibold))

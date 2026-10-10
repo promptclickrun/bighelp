@@ -445,7 +445,9 @@ final class NativeWorkspaceRuntime {
                   owner.authority == self.authority else { return }
             self.scheduleActiveSessionsRefresh(expectedOwner: owner)
         }
-        widgetPublisher = BighelpWidgetSnapshotPublisher(sessions: sessions, scheduledTasks: scheduledTasks, agents: agents)
+        // A runtime serves the host selected when it's made; another host gets a new one.
+        widgetPublisher = BighelpWidgetSnapshotPublisher(sessions: sessions, scheduledTasks: scheduledTasks, agents: agents,
+                                                         hostID: connections.hosts.selectedHostID?.uuidString)
     }
 
     /// Features the bighelp plugin serves (from its `/native/context`), not Hermes itself.

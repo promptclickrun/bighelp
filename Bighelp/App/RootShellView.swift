@@ -199,7 +199,7 @@ struct RootShellView: View {
             liveKey: liveFleetKey, readiness: fleetOpenReadiness, hostsKey: fleetHostsKey, scenePhase: scenePhase,
             keepsConnected: keepsFleetHostsConnected,
             recordLive: recordLiveFleet, openPending: openPendingFleetIfReady,
-            syncHosts: { fleet?.syncHosts() }, cancelReads: { fleet?.cancelReads() },
+            syncHosts: syncFleetHosts, cancelReads: { fleet?.cancelReads() },
             setKeepsConnected: setKeepsFleetHostsConnected))
         .environment(\.agentDeletion, agentDeletionAction)
         .focusedSceneValue(\.bighelpShellActions, menuCommandActions)
@@ -316,6 +316,8 @@ struct RootShellView: View {
             Task { await currentHostRuntime?.refresh() }
         }
         .modifier(IncomingLinks(open: handleIncomingURL))
+        // A voice start that can't open says why; the voice stage mustn't hide that.
+        .onChange(of: actionErrorMessage != nil) { _, failed in if failed { VoiceLaunchState.shared.finish() } }
         .onAppear { watchForLostChats() }
         .modifier(BighelpShortcutParameterUpdates(agents: agents, scheduledTasks: featureStore.scheduledTasks,
                                                   rooms: botModeRooms, catalog: sessionCatalog))
@@ -1120,9 +1122,10 @@ struct RootShellView: View {
         return actions
     }
 
-    func startNewChat(explicitAgentID: String?) {
-        runNewChatStart(retry: { startNewChat(explicitAgentID: explicitAgentID) }) {
-            _ = try await newChatCoordinator.start(explicitAgentID: explicitAgentID)
+    func startNewChat(explicitAgentID: String?, startsVoice: Bool = false) {
+        runNewChatStart(retry: { startNewChat(explicitAgentID: explicitAgentID, startsVoice: startsVoice) }) {
+            let outcome = try await newChatCoordinator.start(explicitAgentID: explicitAgentID)
+            if startsVoice, case .opened(let id, _) = outcome { appState.requestVoiceMode(for: id) }
         }
     }
 
@@ -1278,6 +1281,7 @@ struct RootShellView: View {
         // A link opening the app wins over Settings › Chat › Open on, and keeps the mode you were in.
         didAutoOpenHomeChat = true
         settings.restoreAllHostsModeForOutsideOpen()
+        if holdsLinkForItsComputer(url) { return }
         // Opened while the app starts or comes back, a link found no workspace
         // ("host unavailable") or opened its chat under an alert. It waits for
         // a host that answers instead; the latest one wins.
@@ -1306,6 +1310,8 @@ struct RootShellView: View {
             startIncomingNewChat(agentID: agentID)
         case .agentChat(let agentID, let hostID):
             openIncomingAgentChat(agentID: agentID, hostID: hostID)
+        case .voice(let agentID, let hostID):
+            openIncomingAgentChat(agentID: agentID, hostID: hostID, startsVoice: true)
         case .scheduledTasks:
             appState.select(.scheduledTasks)
         case .scheduledTask(let id):
@@ -1331,23 +1337,34 @@ struct RootShellView: View {
             openSettingsPage()
         case .workflows:
             openWorkflows()
-        case .workflow(let id, let hostID, let startsRun):
-            // A workflow on another computer: switch to it, and open the workflow once it answers.
-            if let hostID, let hostRegistry, hostID != hostRegistry.selectedHostID {
-                guard hostRegistry.hosts.contains(where: { $0.id == hostID }) else {
-                    actionErrorMessage = "That computer isn't in bighelp anymore."
-                    return
-                }
-                pendingIncomingURL = url
-                hostRegistry.select(hostID)
-                return
-            }
+        case .workflow(let id, _, let startsRun):
             openWorkflow(id: id, startsRun: startsRun)
         case .workflowRun(let id):
             openWorkflows(run: id)
         case .usage:
             openUsage()
         }
+    }
+
+    /// A link naming a computer (a widget or Shortcut set to one gateway, a workflow)
+    /// opens there. True when it can't open yet: bighelp switched to that computer
+    /// and the link waits until it answers, or it can't be opened and says why.
+    private func holdsLinkForItsComputer(_ url: URL) -> Bool {
+        guard let hostID = BighelpIncomingURLRoute.hostID(in: url), let fleet else { return false }
+        guard let host = fleet.reader.hosts.first(where: { $0.id == hostID }) else {
+            actionErrorMessage = "That computer isn't in bighelp anymore."
+            return true
+        }
+        guard !host.isSelected else { return false }
+        guard fleet.canOpen(hostID) else {
+            actionErrorMessage = "\(host.name) is a sample host in this demo."
+            return true
+        }
+        if fleetModeOn { recordLiveFleet() }
+        pendingIncomingURL = url
+        appState.chatOpenedFromList = false
+        fleet.select(hostID)
+        return true
     }
 
     private func openIncomingChat(sessionID: String) {
@@ -1684,7 +1701,7 @@ private extension BighelpIncomingURLRoute {
     /// Routes that open a chat or the agent home need the host's workspace.
     var opensWorkspaceContent: Bool {
         switch self {
-        case .home, .chat, .newChat, .agentChat, .kanban, .approval, .group, .projects, .workflows, .workflow,
+        case .home, .chat, .newChat, .agentChat, .voice, .kanban, .approval, .group, .projects, .workflows, .workflow,
              .workflowRun: true
         // Feed, Ideas, Goals and Agents show their saved items and refresh themselves; waiting for
         // the host before even switching tabs made these links feel broken.

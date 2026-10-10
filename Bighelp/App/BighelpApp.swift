@@ -180,6 +180,10 @@ struct BighelpApp: App {
         )
         composition.shortcutService.hostServices = Self.shortcutHostServices(connections: connections,
                                                                             arguments: arguments)
+        if !usesDemoWorkspace {
+            composition.shortcutService.gatewayDirectory = RegistryShortcutGateways(
+                registry: hostRegistry, fleet: fleet, liveAgents: { nativeWorkspaces.current?.agents.profiles ?? [] })
+        }
         AppDependencyManager.shared.add(dependency: composition.shortcutService)
         let notificationComposition = BighelpManagedNotificationComposition(
             factory: composition.managedNotificationFactory,

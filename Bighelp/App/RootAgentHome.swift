@@ -117,8 +117,9 @@ extension RootShellView {
     }
 
     /// The tapped agent's Bot Chat; if the host can't give one, its latest chat or a new one.
-    /// Cancelled only when the person moves on (another screen, tab or computer).
-    func openCanonicalAgentChat(_ profileID: String, fromList: Bool) {
+    /// `startsVoice` opens voice on it. Cancelled only when the person moves on (another
+    /// screen, tab or computer).
+    func openCanonicalAgentChat(_ profileID: String, fromList: Bool, startsVoice: Bool = false) {
         guard let owner = currentWorkspaceOwner else {
             actionErrorMessage = "Connect to this computer to open the agent’s chat."
             return
@@ -128,7 +129,7 @@ extension RootShellView {
         if let saved = sessionCatalog.records.first(where: {
             $0.kind == .direct && $0.agentIDs == [profileID] && $0.title == "Bot Chat"
         }) {
-            showAgentChat(saved, fromList: fromList)
+            showAgentChat(saved, fromList: fromList, startsVoice: startsVoice)
             return
         }
         let originTab = appState.selectedTab
@@ -147,16 +148,16 @@ extension RootShellView {
         }, present: { id in
             guard let record = sessionCatalog.session(id: id), record.kind == .direct,
                   record.agentIDs == [profileID] else {
-                openLatestAgentChat(profileID, fromList: fromList)
+                openLatestAgentChat(profileID, fromList: fromList, startsVoice: startsVoice)
                 return
             }
-            showAgentChat(record, fromList: fromList)
+            showAgentChat(record, fromList: fromList, startsVoice: startsVoice)
         }, failed: {
-            openLatestAgentChat(profileID, fromList: fromList)
+            openLatestAgentChat(profileID, fromList: fromList, startsVoice: startsVoice)
         })
     }
 
-    private func showAgentChat(_ record: SessionRecord, fromList: Bool) {
+    private func showAgentChat(_ record: SessionRecord, fromList: Bool, startsVoice: Bool) {
         var instant = Transaction()
         instant.disablesAnimations = true
         withTransaction(instant) {
@@ -164,6 +165,7 @@ extension RootShellView {
             appState.chatOpenedFromList = fromList
             openSession(record.summary)
         }
+        if startsVoice { appState.requestVoiceMode(for: record.id) }
     }
 
     /// A computer the all-hosts list just switched to shows its saved chats before
@@ -184,7 +186,7 @@ extension RootShellView {
     /// Some hosts can't give an agent its Bot Chat: one already titled "Bot Chat"
     /// from Hermes' API server is hidden from the app but keeps the title. The
     /// agent still opens, on its latest chat or a new one, never an error.
-    private func openLatestAgentChat(_ profileID: String, fromList: Bool) {
+    private func openLatestAgentChat(_ profileID: String, fromList: Bool, startsVoice: Bool) {
         var instant = Transaction()
         instant.disablesAnimations = true
         withTransaction(instant) {
@@ -193,8 +195,9 @@ extension RootShellView {
             if let latest = sessionCatalog.recentSummaries(includeCronSessions: false)
                 .first(where: { $0.kind == .direct && $0.agentIDs == [profileID] }) {
                 openSession(latest)
+                if startsVoice { appState.requestVoiceMode(for: latest.id) }
             } else {
-                startNewChat(explicitAgentID: profileID)
+                startNewChat(explicitAgentID: profileID, startsVoice: startsVoice)
             }
         }
     }

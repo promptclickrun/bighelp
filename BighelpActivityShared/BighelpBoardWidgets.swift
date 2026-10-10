@@ -1,5 +1,6 @@
 // Feed, Ideas and Goals on the Home Screen, each for the agent picked in the app
-// (Auto) or for one chosen agent. The app writes the boards; widgets only read.
+// (Auto) or for one chosen agent, on the gateway in use or one chosen gateway.
+// The app writes the boards; widgets only read.
 import AppIntents
 import SwiftUI
 import WidgetKit
@@ -22,13 +23,19 @@ struct BoardWidgetAgent: AppEntity {
     }
 }
 
+/// The agents on the widget's gateway.
 struct BoardWidgetAgentQuery: EntityQuery {
+    @IntentParameterDependency<BoardWidgetIntent>(\.$gateway) private var board
+    @IntentParameterDependency<NewChatWidgetIntent>(\.$gateway) private var newChat
+
     func entities(for identifiers: [String]) async throws -> [BoardWidgetAgent] {
         try await suggestedEntities().filter { identifiers.contains($0.id) }
     }
 
     func suggestedEntities() async throws -> [BoardWidgetAgent] {
-        [.auto] + (BighelpWidgetSnapshot.load().agents ?? []).map { BoardWidgetAgent(id: $0.id, name: $0.name) }
+        let gateway: BighelpWidgetGateway? = board?.gateway ?? newChat?.gateway
+        return [.auto] + (BighelpWidgetSnapshot.load(gateway: gateway?.hostID).agents ?? [])
+            .map { BoardWidgetAgent(id: $0.id, name: $0.name) }
     }
 
     func defaultResult() async -> BoardWidgetAgent? { .auto }
@@ -37,6 +44,9 @@ struct BoardWidgetAgentQuery: EntityQuery {
 struct BoardWidgetIntent: WidgetConfigurationIntent {
     static let title: LocalizedStringResource = "Agent"
     static let description = IntentDescription("Choose whose board to show, or Auto for the agent you're using.")
+
+    @Parameter(title: "Gateway")
+    var gateway: BighelpWidgetGateway?
 
     @Parameter(title: "Agent")
     var agent: BoardWidgetAgent?
@@ -92,14 +102,15 @@ struct BoardWidgetProvider: AppIntentTimelineProvider {
     }
 
     func snapshot(for configuration: BoardWidgetIntent, in context: Context) async -> BoardWidgetEntry {
-        let snapshot = BighelpWidgetSnapshot.load()
+        let snapshot = BighelpWidgetSnapshot.load(gateway: configuration.gateway?.hostID)
         return context.isPreview && snapshot.defaultAgentID == nil
             ? placeholder(in: context) : entry(snapshot, configuration)
     }
 
     func timeline(for configuration: BoardWidgetIntent, in context: Context) async -> Timeline<BoardWidgetEntry> {
         // The app reloads these whenever a board changes; this is only a safety net.
-        Timeline(entries: [entry(.load(), configuration)], policy: .after(.now.addingTimeInterval(60 * 60)))
+        Timeline(entries: [entry(.load(gateway: configuration.gateway?.hostID), configuration)],
+                 policy: .after(.now.addingTimeInterval(60 * 60)))
     }
 
     private func entry(_ snapshot: BighelpWidgetSnapshot, _ configuration: BoardWidgetIntent) -> BoardWidgetEntry {
@@ -137,7 +148,7 @@ struct BighelpBoardWidgetView: View {
 
     private var family: WidgetFamily { familyOverride ?? environmentFamily }
     private var board: BighelpWidgetSnapshot.ResolvedBoard? { snapshot.board(section, agentID: agentID) }
-    private var link: URL { BighelpWidgetSnapshot.agentURL(section.rawValue, agentID: agentID) }
+    private var link: URL { snapshot.agentURL(section.rawValue, agentID: agentID) }
 
     var body: some View {
         content.widgetURL(link)

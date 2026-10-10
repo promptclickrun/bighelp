@@ -6,6 +6,10 @@ struct BighelpShortcutAgent: Identifiable, Equatable, Hashable, Sendable {
     let name: String
     let role: String
     let isDefault: Bool
+    /// The gateway it's on; nil when bighelp doesn't know it (demo data, or an
+    /// agent saved in a Shortcut before gateways, which means the one in use).
+    var hostID: UUID? = nil
+    var hostName: String? = nil
 }
 
 struct BighelpShortcutModel: Identifiable, Equatable, Hashable, Sendable {
@@ -77,6 +81,9 @@ enum BighelpShortcutServiceError: LocalizedError, Equatable {
     case emptyTitle
     case workflowsUnavailable
     case workflowUnavailable
+    case gatewayUnavailable
+    case gatewayUnreachable
+    case agentNotOnGateway
 
     var errorDescription: String? {
         switch self {
@@ -118,6 +125,12 @@ enum BighelpShortcutServiceError: LocalizedError, Equatable {
             "This computer doesn't have Workflows. Update the bighelp plugin to use them."
         case .workflowUnavailable:
             "That workflow isn't on your computer anymore."
+        case .gatewayUnavailable:
+            "That gateway isn't in bighelp anymore. Pick another one in the Shortcut."
+        case .gatewayUnreachable:
+            "bighelp couldn't reach that gateway. Check that it's online, then try again."
+        case .agentNotOnGateway:
+            "That agent isn't on the gateway this Shortcut uses. Pick the agent again."
         }
     }
 }
@@ -224,6 +237,8 @@ final class BighelpShortcutService: @unchecked Sendable {
     var openLink: @MainActor (URL) -> Void = { BighelpIncomingLinkCenter.shared.open($0) }
     /// Where Kanban remembers the last board, the same place the app reads.
     var kanbanDefaults: UserDefaults = .standard
+    /// The gateways Shortcuts can be set to. The app binds them; until then there are none.
+    var gatewayDirectory: any BighelpShortcutGatewayDirectory = BighelpNoShortcutGateways()
 
     init(
         appState: AppState,
@@ -263,16 +278,31 @@ final class BighelpShortcutService: @unchecked Sendable {
         preparation = nil
     }
 
+    /// The agents on the gateway in use, marked with it, so a Shortcut keeps that gateway.
     func availableAgents() async throws -> [BighelpShortcutAgent] {
         let workspace = try await liveWorkspace()
+        let hostID = hostServices.hostID()
+        let hostName = hostID == nil ? nil : hostServices.hostName()
         return workspace.agents.profiles.map {
-            BighelpShortcutAgent(
-                id: $0.id,
-                name: $0.name,
-                role: $0.role,
-                isDefault: $0.isDefault
-            )
+            BighelpShortcutAgent(id: $0.id, name: $0.name, role: $0.role, isDefault: $0.isDefault,
+                                 hostID: hostID, hostName: hostName)
         }
+    }
+
+    /// The app's own agents (demo data), for Shortcuts made before gateways when none is set up.
+    var fallbackAgents: [BighelpShortcutAgent] {
+        fallbackWorkspace.agents.profiles.map {
+            BighelpShortcutAgent(id: $0.id, name: $0.name, role: $0.role, isDefault: $0.isDefault)
+        }
+    }
+
+    /// Another gateway was picked: checks on the old one must not be shared with, or fail,
+    /// what runs on the new one.
+    func forgetWorkspaceChecks() {
+        liveCheck?.task.cancel()
+        liveCheck = nil
+        preparation?.task.cancel()
+        preparation = nil
     }
 
     func availableModels(agentID: String?) async throws -> [BighelpShortcutModel] {
@@ -435,23 +465,6 @@ final class BighelpShortcutService: @unchecked Sendable {
         }
     }
 
-    func startVoiceChat(agentID: String?) async throws -> BighelpShortcutVoiceResult {
-        // Show the voice stage now; reconnecting and creating the chat take a few seconds.
-        let launch = VoiceLaunchState.shared
-        launch.begin(agent: nil)
-        do {
-            let (workspace, result) = try await openChat(agentID: agentID) { workspace, agent in
-                launch.update(agent: .init(id: agent.id, name: agent.name,
-                                           imageURL: workspace.agents.avatarURL(for: agent)))
-            }
-            workspace.appState.requestVoiceMode(for: result.sessionID)
-            return result
-        } catch {
-            launch.finish()
-            throw error
-        }
-    }
-
     /// A host that answers, for the agent in the room on Vision Pro. Reconnects
     /// once if the socket went quiet, like every other outside entry point.
     func connectedWorkspace() async throws -> BighelpShortcutWorkspace {
@@ -466,15 +479,11 @@ final class BighelpShortcutService: @unchecked Sendable {
         try await openChat(agentID: agentID).1
     }
 
-    func openChat(
-        agentID: String?,
-        onAgent: (@MainActor (BighelpShortcutWorkspace, AgentProfile) -> Void)? = nil
-    ) async throws -> (BighelpShortcutWorkspace, BighelpShortcutVoiceResult) {
+    func openChat(agentID: String?) async throws -> (BighelpShortcutWorkspace, BighelpShortcutVoiceResult) {
         let workspace = try await liveWorkspace()
         // A widget remembers the agent it last drew; if that agent is gone, use the default.
         let known = agentID.flatMap { id in workspace.agents.profiles.contains { $0.id == id } ? id : nil }
         let agent = try resolveAgent(explicitID: known, in: workspace)
-        onAgent?(workspace, agent)
         let outcome = try await workspace.newChatCoordinator.start(explicitAgentID: agent.id)
         guard case .opened(let sessionID, _) = outcome else {
             throw BighelpShortcutServiceError.sessionUnavailable

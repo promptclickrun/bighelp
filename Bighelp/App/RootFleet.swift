@@ -161,31 +161,29 @@ extension RootShellView {
         openFleet(.agent(profileID: agent.profileID), on: agent.hostID)
     }
 
-    /// A pinned agent from the widget: its latest chat or a new one, on its own
-    /// computer when the link names one (switching there first, like All agents).
-    func openIncomingAgentChat(agentID: String, hostID: UUID?) {
-        if let hostID, let fleet, hostID != fleet.selectedHostID {
-            guard fleet.hosts.contains(where: { $0.id == hostID }) else {
-                actionErrorMessage = "That computer isn't in bighelp anymore."
-                return
-            }
-            if let known = fleet.snapshots[hostID]?.agents, !known.isEmpty,
-               !known.contains(where: { $0.profileID == agentID }) {
-                actionErrorMessage = "That agent isn't on \(fleet.hostName(hostID)) anymore."
-                return
-            }
-            openFleet(.agent(profileID: agentID), on: hostID)
-            return
-        }
+    /// An agent from a widget, Shortcut or link: its Bot Chat, or with `startsVoice`
+    /// its Bot Chat in voice. A link naming another computer switched there first
+    /// (`holdsLinkForItsComputer`); no agent is the home agent.
+    func openIncomingAgentChat(agentID: String?, hostID: UUID?, startsVoice: Bool = false) {
         let place = hostID.flatMap { id in fleet?.hosts.first { $0.id == id }?.name } ?? "this computer"
         Task { @MainActor in
             // Opened as the app starts: the agent list may still be on its way.
             if agents.profiles.isEmpty { try? await agents.load() }
-            guard agents.profiles.contains(where: { $0.id == agentID }) else {
+            // No agent named: the home agent. One that's gone is never swapped for another.
+            let agent = agentID.map { id in agents.profiles.first { $0.id == id } } ?? homeAgent
+            guard let agent else {
                 actionErrorMessage = "That agent isn't on \(place) anymore."
                 return
             }
-            performFleetOpen(.agent(profileID: agentID))
+            guard startsVoice else {
+                performFleetOpen(.agent(profileID: agent.id))
+                return
+            }
+            VoiceLaunchState.shared.update(agent: .init(id: agent.id, name: agent.name,
+                                                        imageURL: agents.avatarURL(for: agent)))
+            // Voice talks with the agent on its home chat, like tapping it on home.
+            if homeAgent?.id != agent.id { agents.select(agent.id) }
+            openCanonicalAgentChat(agent.id, fromList: false, startsVoice: true)
         }
     }
 
@@ -545,6 +543,13 @@ extension RootShellView {
         }
     }
 
+    /// The computers changed: the all-hosts view and widgets' Gateway choice follow.
+    func syncFleetHosts() {
+        guard let fleet else { return }
+        fleet.syncHosts()
+        BighelpWidgetGatewayPublisher.publish(fleet.hosts)
+    }
+
     /// Hosts, their names (a rename shows at once) and which is selected.
     var fleetHostsKey: [String] {
         guard let fleet else { return [] }
@@ -571,7 +576,7 @@ struct FleetHooks: ViewModifier {
         content
             .onChange(of: liveKey, initial: true) { _, _ in recordLive() }
             .onChange(of: readiness, initial: true) { _, _ in openPending() }
-            .onChange(of: hostsKey) { _, _ in syncHosts() }
+            .onChange(of: hostsKey, initial: true) { _, _ in syncHosts() }
             .onChange(of: scenePhase) { _, phase in if phase != .active { cancelReads() } }
             .onChange(of: keepsConnected, initial: true) { _, keep in setKeepsConnected(keep) }
     }

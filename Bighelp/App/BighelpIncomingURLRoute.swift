@@ -19,6 +19,9 @@ enum BighelpIncomingURLRoute: Equatable, Sendable {
     /// "loopdy://agent-chat?agent=…&host=…": a chat with one agent, from the
     /// Pinned Agents widget. With a host, on that computer.
     case agentChat(agentID: String, hostID: UUID?)
+    /// "loopdy://voice?agent=…&host=…": the agent's Bot Chat in voice, from Start voice chat.
+    /// No agent is the home agent of that computer.
+    case voice(agentID: String?, hostID: UUID?)
     /// "loopdy://agents", "loopdy://projects", "loopdy://settings": ☰'s pages.
     case agents
     case projects
@@ -70,6 +73,9 @@ enum BighelpIncomingURLRoute: Equatable, Sendable {
         }
         if url.host?.lowercased() == "agent-chat" {
             return parseAgentChat(url)
+        }
+        if url.host?.lowercased() == "voice" {
+            return parseVoice(url)
         }
         if url.host?.lowercased() == "workflows" {
             return parseWorkflow(url)
@@ -132,15 +138,42 @@ enum BighelpIncomingURLRoute: Equatable, Sendable {
         }
     }
 
+    /// The computer a link names with `host=<its ID>`, so it opens there. Nil when
+    /// it names none, or more than one, or something that isn't an ID.
+    static func hostID(in url: URL) -> UUID? {
+        let hosts = (URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? [])
+            .filter { $0.name == "host" }
+        guard hosts.count == 1, let value = hosts[0].value, value.utf8.count <= 36 else { return nil }
+        return UUID(uuidString: value)
+    }
+
+    /// At most one agent and one computer. Anything odd isn't a link.
+    private static func parseVoice(_ url: URL) -> BighelpIncomingURLRoute? {
+        guard url.pathComponents.count <= 1 else { return nil }
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        let agents = items.filter { $0.name == "agent" }, hosts = items.filter { $0.name == "host" }
+        guard agents.count <= 1, hosts.count <= 1, items.count == agents.count + hosts.count else { return nil }
+        var agentID: String?
+        if let agent = agents.first {
+            guard let value = agent.value, isAgentID(value) else { return nil }
+            agentID = value
+        }
+        guard hosts.isEmpty || hostID(in: url) != nil else { return nil }
+        return .voice(agentID: agentID, hostID: hostID(in: url))
+    }
+
+    /// Hermes profile names: short, no spaces at the ends, no control characters.
+    private static func isAgentID(_ value: String) -> Bool {
+        !value.isEmpty && value.utf8.count <= 96 && value == value.trimmingCharacters(in: .whitespacesAndNewlines)
+            && !value.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains)
+    }
+
     /// One agent, and at most one computer given by its ID. Anything odd isn't a link.
     private static func parseAgentChat(_ url: URL) -> BighelpIncomingURLRoute? {
         guard url.pathComponents.count <= 1 else { return nil }
         let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
         let agents = items.filter { $0.name == "agent" }, hosts = items.filter { $0.name == "host" }
-        guard agents.count == 1, hosts.count <= 1, let agent = agents[0].value,
-              !agent.isEmpty, agent.utf8.count <= 96,
-              agent == agent.trimmingCharacters(in: .whitespacesAndNewlines),
-              !agent.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains) else { return nil }
+        guard agents.count == 1, hosts.count <= 1, let agent = agents[0].value, isAgentID(agent) else { return nil }
         guard let host = hosts.first else { return .agentChat(agentID: agent, hostID: nil) }
         guard let value = host.value, value.utf8.count <= 36, let hostID = UUID(uuidString: value) else { return nil }
         return .agentChat(agentID: agent, hostID: hostID)

@@ -100,6 +100,40 @@ struct DirectHermesNativeContextTests {
         #expect(http.calls.last?.guardValue?.etag == etag, "If-Match carries the plugin's own tag")
     }
 
+    /// Caddy's `encode` keeps the tag strong but adds the coding inside the quotes:
+    /// `"sha256:…-gzip"`, only on replies big enough to compress. The app refused it, so
+    /// every plugin feature behind Caddy failed ("Hermes returned an unsupported or
+    /// invalid response", "older bighelp plugin"), while the plugin itself was current.
+    @Test(arguments: ["gzip", "zstd", "br"])
+    func caddysEncodedETagStillMatchesThePluginContext(coding: String) async throws {
+        let owner = try owner()
+        let http = HTTP()
+        let encoded = { (tag: String) in String(tag.dropLast()) + "-\(coding)\"" }
+        http.handler = { request, guardValue in
+            if let guardValue {
+                return try self.response(request, body: ["providers": .array([])],
+                    headers: ["ETag": encoded(guardValue.etag), "X-Loopdy-Request-ID": guardValue.requestIDHeader,
+                              "Cache-Control": "no-store"])
+            }
+            return try self.response(request, body: self.context(features: [
+                "native-context-v1", "serving-profile-v1", "native-provider-usage-v1"
+            ]), headers: ["ETag": encoded(self.etag), "Cache-Control": "no-store"])
+        }
+        let client = DirectHermesNativePluginClient(http: http, owner: owner, currentOwner: { owner })
+        let result = try await client.perform(.usageList, payload: ["agentId": .string("default"), "refresh": .boolean(false)])
+        #expect(result["providers"] == .array([]))
+        #expect(http.calls.last?.guardValue?.etag == etag, "If-Match carries the plugin's own tag, without the coding")
+    }
+
+    @Test func onlyAContentCodingComesOffATag() {
+        let tag = String(etag.dropLast())
+        #expect(DirectHermesNativeRequestGuard.contextTag(tag + "-gzip\"") == etag)
+        #expect(DirectHermesNativeRequestGuard.contextTag("W/" + tag + "-gzip\"") == etag)
+        for odd in [tag + "-other\"", tag + "-gzip-gzip\"", tag + "gzip\"", tag + "-gzip"] {
+            #expect(DirectHermesNativeRequestGuard.contextTag(odd) == nil, "\(odd)")
+        }
+    }
+
     @Test func verifiedContextBindsPrincipalAndDiscardsUnrecognizedFields() async throws {
         let owner = try owner()
         let http = HTTP()

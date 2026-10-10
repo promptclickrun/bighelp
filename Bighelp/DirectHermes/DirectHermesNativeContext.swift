@@ -11,12 +11,16 @@ struct DirectHermesNativeRequestGuard: Equatable, Sendable {
         self.requestID = requestID
     }
 
-    /// The plugin context a reply's ETag names. A proxy that compresses the
-    /// reply marks it weak (`W/`; a Cloudflare Tunnel does for every iPhone, which always
-    /// accepts compression); the tag inside is the same context.
+    /// The plugin context a reply's ETag names. A proxy that compresses the reply
+    /// changes the tag: a Cloudflare Tunnel marks it weak (`W/`, for every iPhone, which
+    /// always accepts compression) and Caddy's `encode` adds the coding inside the quotes
+    /// (`"sha256:…-gzip"`). The tag under either is the same context.
     static func contextTag(_ header: String?) -> String? {
         guard var value = header else { return nil }
         if value.hasPrefix("W/") { value.removeFirst(2) }
+        if let coding = ["gzip", "zstd", "br", "deflate"].first(where: { value.hasSuffix("-\($0)\"") }) {
+            value = String(value.dropLast(coding.utf8.count + 2)) + "\""
+        }
         return validETag(value) ? value : nil
     }
 

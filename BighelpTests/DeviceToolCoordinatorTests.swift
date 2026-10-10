@@ -27,12 +27,12 @@ struct DeviceToolCoordinatorTests {
 
     @Test func disablingThenReenablingDoesNotReviveAnOldRead() async {
         let fixture = DeviceCoordinatorFixture()
-        await fixture.permissions.setEnabled(true, for: .health)
+        await fixture.permissions.setEnabled(true, for: .calendar)
         fixture.onExecuteAsync = {
-            fixture.permissions.disable(.health)
-            await fixture.permissions.setEnabled(true, for: .health)
+            fixture.permissions.disable(.calendar)
+            await fixture.permissions.setEnabled(true, for: .calendar)
         }
-        let result = await fixture.coordinator.handle(fixture.request(operation: "health.read"), owner: fixture.scope, isCurrent: { true })
+        let result = await fixture.coordinator.handle(fixture.request(operation: "calendar.list"), owner: fixture.scope, isCurrent: { true })
         #expect(result.code == "permission_disabled")
         #expect(result.payload.isEmpty)
     }
@@ -102,9 +102,9 @@ struct DeviceToolCoordinatorTests {
 
     @Test func grantRevocationWhileReadingSuppressesThePrivateResult() async {
         let fixture = DeviceCoordinatorFixture()
-        await fixture.permissions.setEnabled(true, for: .health)
-        fixture.onExecute = { fixture.permissions.disable(.health) }
-        let result = await fixture.coordinator.handle(fixture.request(operation: "health.read"), owner: fixture.scope, isCurrent: { true })
+        await fixture.permissions.setEnabled(true, for: .calendar)
+        fixture.onExecute = { fixture.permissions.disable(.calendar) }
+        let result = await fixture.coordinator.handle(fixture.request(operation: "calendar.list"), owner: fixture.scope, isCurrent: { true })
         #expect(result.code == "permission_disabled")
         #expect(result.payload.isEmpty)
     }

@@ -12,17 +12,6 @@ struct AppleDeviceToolServiceTests {
         #expect(result["items"] == .array([]))
         #expect(result["truncated"] == .boolean(false))
     }
-    @Test func commonHealthCatalogIsFiniteAndIncludesEachSupportedDomain() {
-        let catalog = Set(AppleDeviceToolService.commonHealthCatalog)
-
-        #expect(catalog.count == 22)
-        #expect(catalog.contains("step_count"))
-        #expect(catalog.contains("sleep_analysis"))
-        #expect(catalog.contains("heart_rate"))
-        #expect(catalog.contains("body_mass"))
-        #expect(catalog.contains("workout"))
-    }
-
     @Test func statusAndRequestDelegateToTheNativeBoundary() async {
         let boundary = RecordingAppleDeviceToolBoundary()
         boundary.statuses[.calendar] = .available
@@ -47,14 +36,14 @@ struct AppleDeviceToolServiceTests {
         }
     }
 
-    @Test func healthReadRequiresExplicitISODateRangeAndTimeZone() async {
+    @Test func readsRequireExplicitISODateRangeAndTimeZone() async {
         let service = AppleDeviceToolService(boundary: RecordingAppleDeviceToolBoundary())
         var arguments = Self.rangeArguments
         arguments.removeValue(forKey: "timeZone")
 
         await #expect(throws: AppleDeviceToolError.invalidArguments) {
             try await service.execute(
-                operation: "health.read",
+                operation: "calendar.list",
                 arguments: arguments,
                 authorize: { }
             )
@@ -172,28 +161,6 @@ struct AppleDeviceToolServiceTests {
         }
     }
 
-    @Test func healthReadReportsRawQueryCoverageAndLimitEvidence() async throws {
-        let boundary = RecordingAppleDeviceToolBoundary()
-        boundary.response = ["items": .array([]), "truncated": .boolean(false)]
-        let service = AppleDeviceToolService(boundary: boundary)
-
-        let result = try await service.execute(
-            operation: "health.read",
-            arguments: Self.rangeArguments,
-            authorize: { }
-        )
-
-        #expect(result["coverage"] == .object([
-            "start": .string("2026-09-01T00:00:00Z"),
-            "end": .string("2026-09-02T00:00:00Z"),
-            "timeZone": .string("America/Chicago"),
-            "limit": .integer(200),
-            "returnedCount": .integer(0),
-            "truncated": .boolean(false),
-            "aggregation": .string("raw_samples"),
-        ]))
-    }
-
     @Test func calendarRecurringMutationRejectsWholeSeriesSpan() async {
         let service = AppleDeviceToolService(boundary: RecordingAppleDeviceToolBoundary())
         let arguments: [String: BighelpJSONValue] = [
@@ -249,7 +216,6 @@ struct AppleDeviceToolServiceTests {
     }
 
     @Test(arguments: [
-        "health.read",
         "calendar.list",
         "calendar.create",
         "calendar.update",
@@ -325,7 +291,7 @@ struct AppleDeviceToolServiceTests {
 
         await #expect(throws: AppleDeviceToolError.authorizationRequired) {
             try await service.execute(
-                operation: "health.read",
+                operation: "calendar.list",
                 arguments: Self.rangeArguments,
                 authorize: { throw TestAuthorizationFailure.denied }
             )
@@ -374,7 +340,7 @@ struct AppleDeviceToolServiceTests {
 
     private static func arguments(for operation: String) -> [String: BighelpJSONValue] {
         switch operation {
-        case "health.read", "calendar.list", "reminders.list":
+        case "calendar.list", "reminders.list":
             rangeArguments
         case "calendar.create":
             [

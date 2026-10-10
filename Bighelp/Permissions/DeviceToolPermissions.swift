@@ -3,7 +3,7 @@ import Observation
 import CryptoKit
 
 enum DeviceToolCapability: String, CaseIterable, Codable, Identifiable, Sendable {
-    case health, calendar, reminders, location
+    case calendar, reminders, location
     var id: String { rawValue }
 
     /// The plugin feature a host must list before the phone offers this tool.
@@ -25,7 +25,7 @@ struct DeviceToolScope: Codable, Hashable, Sendable {
 }
 
 enum DeviceToolSystemAccess: Equatable, Sendable {
-    case notRequested, available, managedByHealth, denied, unavailable
+    case notRequested, available, denied, unavailable
 }
 
 @MainActor @Observable
@@ -95,7 +95,7 @@ final class DeviceToolPermissions {
         let value = await requestAccess(kind)
         guard self.scope == scope, revision == owner else { return }
         statuses[kind] = value
-        guard value == .available || (kind == .health && value == .managedByHealth) else { return }
+        guard value == .available else { return }
         self.enabled.insert(kind)
         revision &+= 1
         persist()

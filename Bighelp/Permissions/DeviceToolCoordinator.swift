@@ -142,7 +142,7 @@ final class DeviceToolCoordinator {
             guard (try Self.encoder.encode(payload)).count <= 128_000 else {
                 throw Failure(code: "result_limit_exceeded")
             }
-            // Durable outcomes never include event contents or health/read data.
+            // Durable outcomes never include event contents or read data.
             if mutation, !Set(payload.keys).isSubset(of: ["id", "revision", "deleted"]) {
                 throw Failure(code: "invalid_result")
             }
@@ -175,12 +175,11 @@ final class DeviceToolCoordinator {
         !value.isEmpty && value.utf8.count <= 512 && !value.unicodeScalars.contains { CharacterSet.controlCharacters.contains($0) }
     }
 
-    /// Reads are never journaled: their results (health, events, where someone is) stay off disk.
-    private static let readOperations: Set<String> = ["health.read", "calendar.list", "reminders.list", "location.current"]
+    /// Reads are never journaled: their results (events, where someone is) stay off disk.
+    private static let readOperations: Set<String> = ["calendar.list", "reminders.list", "location.current"]
 
     private static func capability(for operation: String) -> DeviceToolCapability? {
         switch operation {
-        case "health.read": .health
         case "calendar.list", "calendar.create", "calendar.update", "calendar.delete": .calendar
         case "reminders.list", "reminders.create", "reminders.update", "reminders.delete": .reminders
         case "location.current": .location

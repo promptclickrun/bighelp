@@ -76,7 +76,7 @@ final class DeviceLocationTool {
         switch await status() {
         case .available: break
         case .unavailable: throw AppleDeviceToolError.unavailable
-        case .notRequested, .denied, .managedByHealth: throw AppleDeviceToolError.authorizationRequired
+        case .notRequested, .denied: throw AppleDeviceToolError.authorizationRequired
         }
         // A question from iOS only while this chat still owns the call and the app is open.
         try authorize()

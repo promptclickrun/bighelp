@@ -870,7 +870,6 @@ struct BighelpPluginCapabilitiesSection: View {
                     systemImage: "bell.and.waves.left.and.right",
                     capability: .cloudNotifications
                 )
-                deviceCapabilityRow(.health, title: "Apple Health", systemImage: "heart")
                 deviceCapabilityRow(.calendar, title: "Calendar", systemImage: "calendar")
                 deviceCapabilityRow(.reminders, title: "Reminders", systemImage: "checklist")
                 deviceCapabilityRow(.location, title: "Location", systemImage: "location")
@@ -1000,8 +999,6 @@ struct BighelpPluginCapabilitiesSection: View {
             "bighelp’s host grant is on; iOS access has not been requested in this session."
         case .available:
             "The host grant and iOS access are available on this iPhone."
-        case .managedByHealth:
-            "The host grant is on. Apple Health controls which data is shared and does not reveal read authorization status."
         case .denied:
             "The host grant is on, but iOS access is denied."
         case .unavailable:
@@ -1013,7 +1010,6 @@ struct BighelpPluginCapabilitiesSection: View {
         switch permissionCenter.deviceTools.status(for: capability) {
         case .notRequested: "iOS not requested"
         case .available: "iOS available"
-        case .managedByHealth: "managed by Health"
         case .denied: "iOS denied"
         case .unavailable: "iOS unavailable"
         }
@@ -1023,7 +1019,6 @@ struct BighelpPluginCapabilitiesSection: View {
         switch permissionCenter.deviceTools.status(for: capability) {
         case .notRequested: "This iPhone has not requested that protected-data permission."
         case .available: "This iPhone reports the protected-data capability as available."
-        case .managedByHealth: "Apple Health manages per-data-type authorization and does not expose read authorization status."
         case .denied: "iOS denies this protected-data access; change it in the relevant system settings if desired."
         case .unavailable: "This iPhone reports the protected-data capability as unavailable."
         }

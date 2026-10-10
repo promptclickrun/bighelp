@@ -19,11 +19,15 @@ in `AppleDeviceToolServiceTests` reproduces that crash before the correction;
 keep the post-fetch authorization check. See Apple's
 [asynchronous reminder retrieval](https://developer.apple.com/documentation/eventkit/retrieving-events-and-reminders).
 
-Permissions contains independent Apple Health, Calendar, Reminders and Location controls.
+Permissions contains independent Calendar, Reminders and Location controls. Apple Health
+access was removed in 2.3.0 (105): App Review (guideline 2.5.1) refuses HealthKit in an app
+whose main features don't need health data. The phone never lists or runs `health.read`, so
+the plugin's `iphone_health` tool answers `authorization_required`; a saved Health grant is
+dropped when read.
 Every control starts off. Enabling one requests its native iOS permission from
 that explicit foreground action. Calendar and Reminders authorize direct reads,
 creation, updates and deletion after enablement, with no per-operation approval.
-Health and Location are read-only. OS permission by itself never enables agent access.
+Location is read-only. OS permission by itself never enables agent access.
 
 Grants are scoped to the current phone, phone authorization epoch and selected
 host. Turning a control off invalidates active work immediately. Switching host,
@@ -33,14 +37,12 @@ Re-enabling a grant cannot revive a read started under an older grant revision.
 
 The phone must be open, unlocked and connected. No background execution or wake-up
 guarantee is offered. Unavailable or denied access is a failure, never fabricated
-empty data. Apple deliberately does not disclose Health read authorization;
-an empty Health result may mean no records or denied access. The UI must preserve
-this distinction.
+empty data.
 
 Requested data is sent to the selected Hermes host and its AI provider. It may
 be retained in the ordinary conversation/tool history. It is not used for
 advertising or analytics. bighelp's mutation journal stores only request hashes,
-expiry and identity/reconciliation metadata, never Health samples, event text,
+expiry and identity/reconciliation metadata, never event text,
 reminder text or request arguments. The journal is protected, atomically written,
 excluded from backups and bounded to 512 records / 2 MB. No raw Apple data should
 be added to diagnostics.
@@ -53,11 +55,11 @@ Native harness is not required and is not treated as operational.
 | Component | Responsibility |
 | --- | --- |
 | Hermes `ToolExecutionContext` extension | Carries immutable authenticated ingress ownership to official plugin handlers and hooks, with official session/turn/tool-call IDs. |
-| bighelp plugin 2.11.2 | Registers `iphone_health`, `iphone_calendar`, `iphone_reminders`; uses the gateway connection loop to target the verified phone and correlate canonical Hermes turn IDs. |
+| bighelp plugin 2.11.2 | Registers `iphone_calendar`, `iphone_reminders` (and `iphone_health`, which the app no longer offers); uses the gateway connection loop to target the verified phone and correlate canonical Hermes turn IDs. |
 | Link relay with `directed-frames-v1` | Negotiates exact-recipient delivery and queues only for that active paired device. Legacy sockets never receive a broadcast fallback. |
 | iOS `DeviceToolPermissions` | Persists opt-in grants and fences asynchronous work by scope/revision. |
 | iOS `DeviceToolCoordinator` | Validates envelopes, deadlines, ownership and grants; bounds concurrency and journals mutation outcomes. |
-| iOS `AppleDeviceToolService` | Executes the finite HealthKit/EventKit operations with authorization checks around native boundaries. |
+| iOS `AppleDeviceToolService` | Executes the finite EventKit and location operations with authorization checks around native boundaries. |
 | iOS live socket | Receipts authenticated requests before native execution and sends directed correlated results without blocking chat streaming. |
 
 The generic Hermes source extension is documented in
@@ -108,20 +110,9 @@ are returned only to their active caller, not cached for later retries.
 
 | Tool | Operations and constraints |
 | --- | --- |
-| `iphone_health` | Read bounded raw samples by type, explicit ISO-8601 start/end and IANA time zone. Maximum 31 days and 200 total records. |
 | `iphone_calendar` | List events in a bounded date range; create; update/delete an exact ID with expected revision. |
 | `iphone_reminders` | List with optional list IDs, completion and undated filters; create; update/delete an exact ID with expected revision. An optional date filter requires start, end and time zone together. |
 | `iphone_location` | `current` only, with no other arguments: where the phone is right now. Needs plugin feature `native-device-location-v1`. |
-
-Health covers steps, walking/running distance, active/basal energy, flights,
-exercise/stand time, sleep, heart rate, resting/walking heart rate, HRV, oxygen
-saturation, respiratory rate, blood pressure, height, mass, BMI, lean mass, body
-fat and workouts. The schema is the authoritative finite catalog.
-
-Health results include query coverage (`start`, `end`, `timeZone`, `limit`,
-`returnedCount`, `truncated`, `aggregation: raw_samples`). They are not
-HealthKit statistical aggregates. Never describe a truncated raw query or empty
-result as a complete daily/weekly total or zero health activity.
 
 Calendar creation accepts title/start/end/time zone and optional calendar,
 location, notes and URL. Recurring event results carry `occurrenceStart`;
@@ -180,11 +171,8 @@ socket receive loop while an Apple permission prompt/query is pending.
 
 ## Release metadata
 
-Keep both HealthKit usage-description keys in the app Info.plist because the
-shared authorization API is linked even for reads. The update description must
-truthfully state that bighelp does not change Health data. Both authorization
-calls pass an empty toShare set; health.write is not an allowed operation.
-Do not mistake an Info.plist description for permission to add Health writes.
+The app links no HealthKit: no HealthKit entitlement, no `NSHealth…` usage descriptions and
+no HealthKit calls. App Review rejects any of them in an app without a main health feature.
 
 ## Regression and acceptance requirements
 
@@ -202,7 +190,7 @@ Hermes tests cover runtime-only context propagation, queued owner separation,
 delegation isolation and official tool-call identifiers. Relay tests verify
 single-device queues and negative routing without legacy fallback.
 
-The registered Health handler must also be tested from a separate worker loop
+The registered Calendar handler must also be tested from a separate worker loop
 with the real encrypted Link client and a contended gateway send lock. Verify
 one directed request, gateway-owned result futures, permission disable and
 disconnect during a pending call, and a stopped gateway loop. Same-loop fake
@@ -213,12 +201,10 @@ Preserve the full visible input focus target and microphone/Send alignment in
 `ComposerInteractionUITests` and the chat interaction contract.
 
 Physical-device acceptance requires real, explicitly enabled OS permissions:
-read a known Health sample; list and create/update/delete disposable Calendar
+list and create/update/delete disposable Calendar
 and Reminders records; verify exact revision conflicts; turn each permission
 off during a pending read; switch host; lock/background; reconnect. Simulator
 and injected-boundary tests do not establish those real-data outcomes.
 
 Apple references:
-[HealthKit privacy](https://developer.apple.com/documentation/healthkit/protecting-user-privacy),
-[Health authorization](https://developer.apple.com/documentation/healthkit/authorizing-access-to-health-data),
 [EventKit calendar access](https://developer.apple.com/documentation/eventkit/accessing-calendar-using-eventkit-and-eventkitui).

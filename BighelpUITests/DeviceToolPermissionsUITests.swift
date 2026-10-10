@@ -11,7 +11,7 @@ final class DeviceToolPermissionsUITests: BighelpUITestCase {
         openSettings(in: app)
         settingsRow("settings.menu.permissions", in: app).tap()
 
-        for capability in ["health", "calendar", "reminders", "location"] {
+        for capability in ["calendar", "reminders", "location"] {
             let toggle = deviceToolSwitch(capability, in: app)
             XCTAssertTrue(toggle.waitForExistence(timeout: 5))
             XCTAssertEqual(toggle.value as? String, "0")

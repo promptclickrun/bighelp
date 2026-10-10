@@ -19,7 +19,6 @@ struct DeviceLocationToolTests {
         #expect(DeviceToolCapability.allCases.contains(.location))
         #expect(DeviceToolCapability.location.rawValue == "location")
         #expect(DeviceToolCapability.location.pluginFeature == "native-device-location-v1")
-        #expect(DeviceToolCapability.health.pluginFeature == nil)
         #expect(DeviceToolCapability.calendar.pluginFeature == nil)
         #expect(DeviceToolCapability.reminders.pluginFeature == nil)
     }

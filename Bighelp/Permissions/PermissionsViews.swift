@@ -75,7 +75,6 @@ private struct DeviceToolPermissionRow: View {
 
     private var title: String {
         switch kind {
-        case .health: "Apple Health"
         case .calendar: "Calendar"
         case .reminders: "Reminders"
         case .location: "Location"
@@ -84,7 +83,6 @@ private struct DeviceToolPermissionRow: View {
 
     private var detail: String {
         switch kind {
-        case .health: "Answer health and fitness questions using the Health data you choose to share."
         case .calendar: "Read, create, update, and delete events directly after you enable access."
         case .reminders: "Read, create, update, and delete reminders directly after you enable access."
         case .location: "Share where you are when your agent asks, for things like finding places near you."
@@ -117,9 +115,6 @@ private struct DeviceToolPermissionRow: View {
                     if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
                 }
                 .accessibilityIdentifier("permissions.device-tools.\(kind.rawValue).settings")
-            } else if kind == .health, permissions.isEnabled(kind) {
-                Text("Health controls which data is shared. An empty result can mean no data or access was not granted.")
-                    .bighelpFont(.metadata).foregroundStyle(.secondary)
             } else if kind == .location, permissions.isEnabled(kind) {
                 Text("Only while bighelp is open. \(BighelpPlatform.isMac ? "macOS" : "iOS") asks before sharing your exact spot; if you keep it approximate, your agent gets a rough area.")
                     .bighelpFont(.metadata).foregroundStyle(.secondary)

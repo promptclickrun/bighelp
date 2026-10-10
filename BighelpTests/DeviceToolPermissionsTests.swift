@@ -22,7 +22,7 @@ struct DeviceToolPermissionsTests {
         await store.setEnabled(true, for: .calendar)
         #expect(store.isEnabled(.calendar))
         #expect(!store.isEnabled(.reminders))
-        #expect(!store.isEnabled(.health))
+        #expect(!store.isEnabled(.location))
         #expect(fixture.requests == [.calendar])
         let reopened = fixture.makeStore()
         reopened.bind(scope)
@@ -39,16 +39,6 @@ struct DeviceToolPermissionsTests {
         await store.setEnabled(true, for: .reminders)
         #expect(!store.isEnabled(.reminders))
         #expect(store.status(for: .reminders) == .denied)
-    }
-
-    @Test func healthSelectionCompletionDoesNotClaimAnObservableReadGrant() async {
-        let fixture = DevicePermissionFixture()
-        fixture.result = .managedByHealth
-        let store = fixture.makeStore()
-        store.bind(scope)
-        await store.setEnabled(true, for: .health)
-        #expect(store.isEnabled(.health))
-        #expect(store.status(for: .health) == .managedByHealth)
     }
 
     @Test func disablingWhilePromptIsPendingCannotBeUndoneByItsCompletion() async {
@@ -101,24 +91,24 @@ struct DeviceToolPermissionsTests {
         await store.setEnabled(true, for: .calendar)
         store.bind(scope)
         fixture.foreground = false
-        await store.setEnabled(true, for: .health)
+        await store.setEnabled(true, for: .location)
         #expect(fixture.requests.isEmpty)
-        #expect(!store.isEnabled(.health))
+        #expect(!store.isEnabled(.location))
     }
 
-    @Test func unrelatedDeniedPermissionsDoNotCancelTheChosenHealthPrompt() async {
+    @Test func unrelatedDeniedPermissionsDoNotCancelTheChosenPrompt() async {
         let fixture = DevicePermissionFixture()
         let pending = PendingDevicePermission()
         fixture.request = { await pending.value() }
         let store = fixture.makeStore()
         store.bind(scope)
-        let enabling = Task { await store.setEnabled(true, for: .health) }
+        let enabling = Task { await store.setEnabled(true, for: .location) }
         while !pending.isWaiting { await Task.yield() }
         fixture.result = .denied
         await store.refresh()
-        pending.resolve(.managedByHealth)
+        pending.resolve(.available)
         await enabling.value
-        #expect(store.isEnabled(.health))
+        #expect(store.isEnabled(.location))
         #expect(!store.isEnabled(.calendar))
         #expect(!store.isEnabled(.reminders))
     }

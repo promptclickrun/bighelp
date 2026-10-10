@@ -6,8 +6,6 @@
     <array>
         <string>group.app.loopdy.mobile.buzzkit</string>
     </array>
-    <key>com.apple.developer.healthkit</key>
-    <true/>
     <key>aps-environment</key>
     <string>$(BIGHELP_APS_ENVIRONMENT)</string>
 	<key>com.apple.developer.carplay-voice-based-conversation</key>

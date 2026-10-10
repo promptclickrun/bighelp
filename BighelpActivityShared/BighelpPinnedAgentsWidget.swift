@@ -1,6 +1,7 @@
 // Pinned agents on the Home Screen, like a grid of contacts: each face opens a
 // chat with that agent. Current Gateway shows the computer in use; Multi
-// Gateway shows every computer's. The app writes the list and the pictures.
+// Gateway shows every computer's; One Gateway the one chosen. The app writes
+// the list and the pictures.
 import AppIntents
 import SwiftUI
 import UIKit
@@ -50,7 +51,7 @@ extension EnvironmentValues {
 
 /// Which pinned agents the widget shows. The names are the person's own words.
 enum PinnedAgentsWidgetScope: String, AppEnum {
-    case current, multi
+    case current, multi, one
 
     static var typeDisplayRepresentation: TypeDisplayRepresentation { TypeDisplayRepresentation(name: "Agents") }
 
@@ -58,6 +59,7 @@ enum PinnedAgentsWidgetScope: String, AppEnum {
         [
             .current: DisplayRepresentation(title: "Current Gateway", subtitle: "Pinned agents on the computer you're using"),
             .multi: DisplayRepresentation(title: "Multi Gateway", subtitle: "Pinned agents on all your computers"),
+            .one: DisplayRepresentation(title: "One Gateway", subtitle: "Pinned agents on the gateway you choose"),
         ]
     }
 }
@@ -68,17 +70,55 @@ struct PinnedAgentsWidgetIntent: WidgetConfigurationIntent {
 
     @Parameter(title: "Show", default: .current)
     var scope: PinnedAgentsWidgetScope
+
+    @Parameter(title: "Gateway")
+    var gateway: BighelpWidgetGateway?
+
+    static var parameterSummary: some ParameterSummary {
+        When(\.$scope, .equalTo, .one) {
+            Summary {
+                \.$scope
+                \.$gateway
+            }
+        } otherwise: {
+            Summary {
+                \.$scope
+            }
+        }
+    }
 }
 
 extension BighelpWidgetSnapshot {
     func pinnedAgents(_ scope: PinnedAgentsWidgetScope) -> [PinnedAgent] {
         switch scope {
-        case .current: pinnedAgents ?? []
+        case .current, .one: pinnedAgents ?? []
         case .multi: allPinnedAgents ?? []
         }
     }
 
+    /// One gateway's pins, as `pinnedAgents`: from All agents' copy, else what that
+    /// gateway's widgets last showed. The gateway in use (nil too) shows its live pins.
+    static func pinned(onGateway hostID: String?) -> BighelpWidgetSnapshot {
+        var snapshot = load()
+        guard let hostID, hostID != snapshot.hostID else { return snapshot }
+        let fromAll = (snapshot.allPinnedAgents ?? []).filter { $0.hostID == hostID }
+        snapshot.pinnedAgents = fromAll.isEmpty
+            ? (load(gateway: hostID).pinnedAgents ?? []).map { pin in
+                var pin = pin
+                pin.hostID = hostID
+                return pin
+            }
+            : fromAll
+        return snapshot
+    }
+
     static let agentsURL = URL(string: "loopdy://agents")!
+
+    /// One Gateway's large title names the gateway.
+    var pinnedTitle: String {
+        guard let name = pinnedAgents?.first?.hostName else { return "Pinned agents" }
+        return "Pinned agents · \(name)"
+    }
 
     static var previewPinned: BighelpWidgetSnapshot {
         var snapshot = preview
@@ -96,10 +136,10 @@ extension BighelpWidgetSnapshot {
 }
 
 extension BighelpWidgetSnapshot.PinnedAgent {
-    /// Current Gateway opens the agent on the computer in use; Multi Gateway
-    /// names its computer, so bighelp switches there first.
+    /// Current Gateway opens the agent on the computer in use; Multi and One
+    /// Gateway name its computer, so bighelp switches there first.
     func link(_ scope: PinnedAgentsWidgetScope) -> URL {
-        BighelpWidgetSnapshot.agentChatURL(agentID: agentID, hostID: scope == .multi ? hostID : nil)
+        BighelpWidgetSnapshot.agentChatURL(agentID: agentID, hostID: scope == .current ? nil : hostID)
     }
 }
 
@@ -117,15 +157,19 @@ struct PinnedAgentsWidgetProvider: AppIntentTimelineProvider {
     }
 
     func snapshot(for configuration: PinnedAgentsWidgetIntent, in context: Context) async -> PinnedAgentsWidgetEntry {
-        let snapshot = BighelpWidgetSnapshot.load()
+        let snapshot = load(configuration)
         let shown = context.isPreview && snapshot.pinnedAgents(configuration.scope).isEmpty ? .previewPinned : snapshot
         return PinnedAgentsWidgetEntry(date: .now, snapshot: shown, scope: configuration.scope)
     }
 
     func timeline(for configuration: PinnedAgentsWidgetIntent, in context: Context) async -> Timeline<PinnedAgentsWidgetEntry> {
         // The app reloads this whenever pins change; this is only a safety net.
-        Timeline(entries: [PinnedAgentsWidgetEntry(date: .now, snapshot: .load(), scope: configuration.scope)],
+        Timeline(entries: [PinnedAgentsWidgetEntry(date: .now, snapshot: load(configuration), scope: configuration.scope)],
                  policy: .after(.now.addingTimeInterval(60 * 60)))
+    }
+
+    private func load(_ configuration: PinnedAgentsWidgetIntent) -> BighelpWidgetSnapshot {
+        configuration.scope == .one ? .pinned(onGateway: configuration.gateway?.hostID) : .load()
     }
 }
 
@@ -179,7 +223,8 @@ struct BighelpPinnedAgentsWidgetView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             if family == .systemLarge {
-                BighelpWidgetSectionTitle(title: scope == .multi ? "Pinned agents · All computers" : "Pinned agents",
+                BighelpWidgetSectionTitle(title: scope == .multi ? "Pinned agents · All computers"
+                                          : scope == .one ? snapshot.pinnedTitle : "Pinned agents",
                                           symbol: "pin.fill")
             }
             if agents.isEmpty {
@@ -189,7 +234,9 @@ struct BighelpPinnedAgentsWidgetView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .widgetURL(layout.shown == 1 ? agents[0].link(scope) : BighelpWidgetSnapshot.agentsURL)
+        .widgetURL(layout.shown == 1 ? agents[0].link(scope)
+                   : BighelpWidgetSnapshot.link(BighelpWidgetSnapshot.agentsURL,
+                                                onGateway: scope == .one ? agents.first?.hostID : nil))
     }
 
     private var grid: some View {

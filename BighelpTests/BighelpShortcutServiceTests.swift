@@ -295,14 +295,13 @@ struct BighelpShortcutServiceTests {
         #expect(fallbackPreparationCalls == 0)
     }
 
-    @Test(arguments: ["agents", "models", "send", "voice"])
+    @Test(arguments: ["agents", "models", "send"])
     func shortcutWaitsForConnectionBeforeUsingHostServices(operation: String) async throws {
         let harness = try await ShortcutServiceHarness(prepareConnection: { throw URLError(.notConnectedToInternet) })
         await #expect(throws: URLError.self) {
             switch operation {
             case "agents": _ = try await harness.service.availableAgents()
             case "models": _ = try await harness.service.availableModels(agentID: nil)
-            case "voice": _ = try await harness.service.startVoiceChat(agentID: nil)
             default:
                 _ = try await harness.service.send(.init(message: "Hello", agentID: nil, model: nil,
                     reasoning: nil, attachments: [], waitForResponse: false))
@@ -404,18 +403,21 @@ struct BighelpShortcutServiceTests {
         ])
     }
 
-    @Test func voiceShortcutOpensANewSessionAndRequestsVoiceModeForIt() async throws {
-        let harness = try await ShortcutServiceHarness()
+    /// Start voice chat never waits on the host: it shows the voice stage and hands
+    /// bighelp a link to the agent's Bot Chat, even while the host doesn't answer.
+    @Test func voiceShortcutHandsOffTheAgentsBotChatAtOnce() async throws {
+        let harness = try await ShortcutServiceHarness(prepareConnection: { throw URLError(.notConnectedToInternet) })
+        var links: [URL] = []
+        harness.service.openLink = { links.append($0) }
+        defer { VoiceLaunchState.shared.finish() }
 
-        let result = try await harness.service.startVoiceChat(agentID: "finance")
+        try harness.service.startVoiceChat(gatewayID: nil, agent: .init(hostID: nil, agentID: "finance"))
 
-        #expect(result == .init(sessionID: "session_shortcut_0001", agentName: "Finley"))
-        #expect(harness.state.path == [
-            .chat(conversationID: "session_shortcut_0001"),
-        ])
-        #expect(harness.state.pendingVoiceConversationID == "session_shortcut_0001")
-        #expect(harness.state.consumeVoiceRequest(for: "another_session_0001") == false)
-        #expect(harness.state.consumeVoiceRequest(for: "session_shortcut_0001"))
+        #expect(links == [URL(string: "loopdy://voice?agent=finance")!])
+        #expect(BighelpIncomingURLRoute.parse(links[0]) == .voice(agentID: "finance", hostID: nil))
+        #expect(VoiceLaunchState.shared.isStarting)
+        #expect(VoiceLaunchState.shared.agent?.name == "Finley")
+        #expect(harness.catalog.records.isEmpty, "The app opens the Bot Chat, not a new chat")
         #expect(harness.state.pendingVoiceConversationID == nil)
     }
 }

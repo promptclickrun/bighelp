@@ -106,6 +106,9 @@ struct BighelpWidgetSnapshot: Codable, Equatable, Sendable {
     var pinnedAgents: [PinnedAgent]? = nil
     /// Pinned agents of every computer, in the order All agents shows them.
     var allPinnedAgents: [PinnedAgent]? = nil
+    /// The gateway (computer) this is from: its ID in bighelp (a UUID). Links name
+    /// it, so they open there.
+    var hostID: String? = nil
 
     static let empty = BighelpWidgetSnapshot(defaultAgentID: nil, defaultAgentName: nil,
                                             sessions: [], tasks: [], generatedAt: .distantPast)
@@ -120,22 +123,45 @@ struct BighelpWidgetSnapshot: Codable, Equatable, Sendable {
     /// The most pinned agents the snapshot carries per list (a large widget shows 12).
     static let maximumPinnedAgents = 24
 
-    static var fileURL: URL? {
-        FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup)?
-            .appendingPathComponent(fileName, isDirectory: false)
+    static var fileURL: URL? { fileURL(gateway: nil) }
+
+    /// The gateway in use's file, or (with a gateway's ID) the copy kept for widgets
+    /// set to that gateway: its data from the last time it was in use.
+    static func fileURL(gateway: String?) -> URL? {
+        let name: String
+        if let gateway {
+            guard let id = UUID(uuidString: gateway) else { return nil }
+            name = gatewayFilePrefix + id.uuidString + ".json"
+        } else {
+            name = fileName
+        }
+        return FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup)?
+            .appendingPathComponent(name, isDirectory: false)
     }
 
-    static func load() -> BighelpWidgetSnapshot {
-        guard let url = fileURL, let data = try? Data(contentsOf: url),
+    static let gatewayFilePrefix = "loopdy-widget-snapshot-v1-"
+
+    /// The gateway in use's data, or (with a gateway's ID) that gateway's. The one in
+    /// use reads its live file, so a widget set to it is as fresh as one that follows.
+    static func load(gateway: String? = nil) -> BighelpWidgetSnapshot {
+        let current = read(fileURL)
+        guard let gateway, current.hostID != gateway else { return current }
+        return read(fileURL(gateway: gateway))
+    }
+
+    private static func read(_ url: URL?) -> BighelpWidgetSnapshot {
+        guard let url, let data = try? Data(contentsOf: url),
               data.count <= 262_144,
               let value = try? JSONDecoder.bighelpWidget.decode(Self.self, from: data) else { return .empty }
         return value
     }
 
+    /// Writes the gateway in use's file, and its own copy for widgets set to it.
     func save() throws {
-        guard let url = Self.fileURL else { return }
         let data = try JSONEncoder.bighelpWidget.encode(self)
-        try data.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+        let options: Data.WritingOptions = [.atomic, .completeFileProtectionUntilFirstUserAuthentication]
+        if let url = Self.fileURL { try data.write(to: url, options: options) }
+        if let hostID, let url = Self.fileURL(gateway: hostID) { try data.write(to: url, options: options) }
     }
 
     var runningSessions: [Session] { sessions.filter(\.isRunning) }
@@ -175,11 +201,30 @@ struct BighelpWidgetSnapshot: Codable, Equatable, Sendable {
         return components.url ?? URL(string: "loopdy://home")!
     }
 
-    static func newChatURL(agentID: String?) -> URL {
+    static func newChatURL(agentID: String?, hostID: String? = nil) -> URL {
         var components = URLComponents()
         components.scheme = "loopdy"; components.host = "new-chat"
         if let agentID { components.queryItems = [URLQueryItem(name: "agent", value: agentID)] }
-        return components.url ?? URL(string: "loopdy://new-chat")!
+        return link(components.url ?? URL(string: "loopdy://new-chat")!, onGateway: hostID)
+    }
+
+    /// A link that opens on a gateway: bighelp switches to it first. Nil keeps the one in use.
+    static func link(_ url: URL, onGateway hostID: String?) -> URL {
+        guard let hostID, UUID(uuidString: hostID) != nil,
+              var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return url }
+        components.queryItems = (components.queryItems ?? []).filter { $0.name != "host" }
+            + [URLQueryItem(name: "host", value: hostID)]
+        return components.url ?? url
+    }
+
+    // The links a widget draws open on the gateway its data is from.
+    func chatURL(_ sessionID: String) -> URL { Self.link(Self.chatURL(sessionID), onGateway: hostID) }
+    func newChatURL(agentID: String?) -> URL { Self.newChatURL(agentID: agentID, hostID: hostID) }
+    func taskURL(_ taskID: String) -> URL { Self.link(Self.taskURL(taskID), onGateway: hostID) }
+    var tasksURL: URL { Self.link(Self.tasksURL, onGateway: hostID) }
+    var sessionsURL: URL { Self.link(Self.sessionsURL, onGateway: hostID) }
+    func agentURL(_ tab: String = "chat", agentID: String? = nil) -> URL {
+        Self.link(Self.agentURL(tab, agentID: agentID), onGateway: hostID)
     }
 
     /// A chat with one agent: its latest, or a new one. With a computer, bighelp

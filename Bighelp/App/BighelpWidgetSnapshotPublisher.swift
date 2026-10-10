@@ -11,6 +11,8 @@ final class BighelpWidgetSnapshotPublisher {
     private weak var scheduledTasks: ScheduledTasksStore?
     private weak var agents: AgentDirectoryStore?
     private let extras: BighelpWidgetExtras
+    /// The gateway this workspace is on; widgets set to it keep its data.
+    private let hostID: String?
     private var pending: Task<Void, Never>?
     private var lastPublished: BighelpWidgetSnapshot?
     private var retired = false
@@ -18,17 +20,18 @@ final class BighelpWidgetSnapshotPublisher {
     private let write: (BighelpWidgetSnapshot) -> Void
 
     init(sessions: SessionCatalogStore, scheduledTasks: ScheduledTasksStore?, agents: AgentDirectoryStore,
-         extras: BighelpWidgetExtras = .shared, interval: Duration = .seconds(2),
+         hostID: String? = nil, extras: BighelpWidgetExtras = .shared, interval: Duration = .seconds(2),
          write: @escaping (BighelpWidgetSnapshot) -> Void = BighelpWidgetSnapshotPublisher.persist) {
         self.sessions = sessions; self.scheduledTasks = scheduledTasks; self.agents = agents; self.extras = extras
-        self.interval = interval; self.write = write
+        self.hostID = hostID; self.interval = interval; self.write = write
         observe()
     }
 
     func retire() {
         retired = true
         pending?.cancel(); pending = nil
-        // A signed-out or switched host must not leave its chats on the Home Screen.
+        // A signed-out or switched host must not leave its chats on widgets that follow
+        // the gateway in use. Widgets set to it keep its own copy until it's removed.
         write(.empty)
     }
 
@@ -100,7 +103,8 @@ final class BighelpWidgetSnapshotPublisher {
                                     lightPalette: extras.lightPalette, darkPalette: extras.darkPalette,
                                     // The same check for pins: a switched computer's never show as this one's.
                                     pinnedAgents: Array(extras.pinnedAgents.filter { names[$0.agentID] != nil }.prefix(limit)),
-                                    allPinnedAgents: Array(extras.allPinnedAgents.prefix(limit)))
+                                    allPinnedAgents: Array(extras.allPinnedAgents.prefix(limit)),
+                                    hostID: hostID)
     }
 
     private static func status(for record: SessionRecord) -> String {

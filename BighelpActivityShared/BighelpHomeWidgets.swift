@@ -10,25 +10,6 @@ struct BighelpWidgetEntry: TimelineEntry {
     let snapshot: BighelpWidgetSnapshot
 }
 
-struct BighelpWidgetProvider: TimelineProvider {
-    func placeholder(in context: Context) -> BighelpWidgetEntry {
-        BighelpWidgetEntry(date: .now, snapshot: .preview)
-    }
-
-    func getSnapshot(in context: Context, completion: @escaping (BighelpWidgetEntry) -> Void) {
-        let snapshot = BighelpWidgetSnapshot.load()
-        completion(BighelpWidgetEntry(date: .now,
-            snapshot: context.isPreview && snapshot.sessions.isEmpty ? .preview : snapshot))
-    }
-
-    func getTimeline(in context: Context, completion: @escaping (Timeline<BighelpWidgetEntry>) -> Void) {
-        let snapshot = BighelpWidgetSnapshot.load()
-        // The app reloads timelines on every change; this is only a safety net.
-        let refresh = Date.now.addingTimeInterval(snapshot.runningSessions.isEmpty ? 30 * 60 : 5 * 60)
-        completion(Timeline(entries: [BighelpWidgetEntry(date: .now, snapshot: snapshot)], policy: .after(refresh)))
-    }
-}
-
 extension BighelpWidgetSnapshot {
     static let preview = BighelpWidgetSnapshot(
         defaultAgentID: "default", defaultAgentName: "Juno",
@@ -166,7 +147,7 @@ struct BighelpActiveSessionsView: View {
                 }
             }
             .accessibilityLabel("\(running.count) active bighelp chats")
-            .widgetURL(BighelpWidgetSnapshot.sessionsURL)
+            .widgetURL(snapshot.sessionsURL)
         case .accessoryRectangular:
             VStack(alignment: .leading, spacing: 2) {
                 Text(running.isEmpty ? "No active chats" : "\(running.count) active")
@@ -177,7 +158,7 @@ struct BighelpActiveSessionsView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .widgetURL(running.first.map { BighelpWidgetSnapshot.chatURL($0.id) } ?? BighelpWidgetSnapshot.sessionsURL)
+            .widgetURL(running.first.map { snapshot.chatURL($0.id) } ?? snapshot.sessionsURL)
         #endif
         default:
             VStack(alignment: .leading, spacing: 8) {
@@ -186,14 +167,14 @@ struct BighelpActiveSessionsView: View {
                     EmptyState(symbol: "checkmark.circle", text: "All caught up")
                 } else {
                     ForEach(running.prefix(family == .systemMedium ? 3 : 2)) { session in
-                        Link(destination: BighelpWidgetSnapshot.chatURL(session.id)) {
+                        Link(destination: snapshot.chatURL(session.id)) {
                             WidgetSessionRow(session: session)
                         }
                     }
                     Spacer(minLength: 0)
                 }
             }
-            .widgetURL(BighelpWidgetSnapshot.sessionsURL)
+            .widgetURL(snapshot.sessionsURL)
         }
     }
 }
@@ -201,7 +182,8 @@ struct BighelpActiveSessionsView: View {
 struct BighelpActiveSessionsWidget: Widget {
     var body: some WidgetConfiguration {
         // Widget kinds keep their original names so widgets already on home screens stay.
-        StaticConfiguration(kind: "LoopdyActiveSessionsWidget", provider: BighelpWidgetProvider()) { entry in
+        AppIntentConfiguration(kind: "LoopdyActiveSessionsWidget", intent: GatewayWidgetIntent.self,
+                               provider: GatewayWidgetProvider()) { entry in
             BighelpWidgetScaffold(snapshot: entry.snapshot) {
                 BighelpActiveSessionsView(snapshot: entry.snapshot)
             }
@@ -240,7 +222,7 @@ struct BighelpScheduledTasksView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .widgetURL(tasks.first.map { BighelpWidgetSnapshot.taskURL($0.id) } ?? BighelpWidgetSnapshot.tasksURL)
+            .widgetURL(tasks.first.map { snapshot.taskURL($0.id) } ?? snapshot.tasksURL)
         #endif
         default:
             VStack(alignment: .leading, spacing: 8) {
@@ -249,7 +231,7 @@ struct BighelpScheduledTasksView: View {
                     EmptyState(symbol: "calendar.badge.clock", text: "No active tasks")
                 } else {
                     ForEach(Array(tasks.prefix(family == .systemSmall ? 2 : 3).enumerated()), id: \.element.id) { index, task in
-                        Link(destination: BighelpWidgetSnapshot.taskURL(task.id)) {
+                        Link(destination: snapshot.taskURL(task.id)) {
                             HStack(spacing: 8) {
                                 // The next task leads, in the bubble color.
                                 RoundedRectangle(cornerRadius: 2)
@@ -273,14 +255,15 @@ struct BighelpScheduledTasksView: View {
                     Spacer(minLength: 0)
                 }
             }
-            .widgetURL(BighelpWidgetSnapshot.tasksURL)
+            .widgetURL(snapshot.tasksURL)
         }
     }
 }
 
 struct BighelpScheduledTasksWidget: Widget {
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "LoopdyScheduledTasksWidget", provider: BighelpWidgetProvider()) { entry in
+        AppIntentConfiguration(kind: "LoopdyScheduledTasksWidget", intent: GatewayWidgetIntent.self,
+                               provider: GatewayWidgetProvider()) { entry in
             BighelpWidgetScaffold(snapshot: entry.snapshot) {
                 BighelpScheduledTasksView(snapshot: entry.snapshot)
             }
@@ -306,10 +289,18 @@ struct BighelpNewChatView: View {
     @Environment(\.widgetFamily) private var family
     @Environment(\.bighelpWidgetColors) private var colors
     let snapshot: BighelpWidgetSnapshot
+    /// The agent the widget is set to; nil is the gateway's default agent.
+    var agentID: String? = nil
+
+    /// The chosen agent while it's on the gateway, else the default one.
+    private var agent: (id: String?, name: String) {
+        if let agentID, let agent = snapshot.agents?.first(where: { $0.id == agentID }) { return (agent.id, agent.name) }
+        return (snapshot.defaultAgentID, snapshot.agentDisplayName)
+    }
 
     var body: some View {
-        let name = snapshot.agentDisplayName
-        let url = BighelpWidgetSnapshot.newChatURL(agentID: snapshot.defaultAgentID)
+        let name = agent.name
+        let url = snapshot.newChatURL(agentID: agent.id)
         Group {
             switch family {
             #if os(iOS)
@@ -322,7 +313,7 @@ struct BighelpNewChatView: View {
             #endif
             default:
                 VStack(alignment: .leading, spacing: 0) {
-                    BighelpWidgetAvatar(agentID: snapshot.defaultAgentID, name: name, diameter: 56)
+                    BighelpWidgetAvatar(agentID: agent.id, name: name, diameter: 56)
                     Spacer(minLength: 0)
                     Text("New chat").font(.headline)
                     Text("with \(name)").font(.caption).foregroundStyle(colors.secondary).lineLimit(1)
@@ -344,13 +335,14 @@ struct BighelpNewChatView: View {
 
 struct BighelpNewChatWidget: Widget {
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "LoopdyNewChatWidget", provider: BighelpWidgetProvider()) { entry in
+        AppIntentConfiguration(kind: "LoopdyNewChatWidget", intent: NewChatWidgetIntent.self,
+                               provider: NewChatWidgetProvider()) { entry in
             BighelpWidgetScaffold(snapshot: entry.snapshot) {
-                BighelpNewChatView(snapshot: entry.snapshot)
+                BighelpNewChatView(snapshot: entry.snapshot, agentID: entry.agentID)
             }
         }
         .configurationDisplayName("New Chat")
-        .description("Start a new chat with your default agent in one tap.")
+        .description("Start a new chat in one tap, with your default agent or one you choose.")
         .supportedFamilies(Self.families)
         .bighelpWidgetPlacement()
     }
@@ -381,7 +373,7 @@ struct BighelpActivityFeedView: View {
             HStack(spacing: 8) {
                 WidgetHeader(title: "Recent chats", symbol: "bubble.left.and.bubble.right.fill",
                              count: snapshot.runningSessions.count)
-                Link(destination: BighelpWidgetSnapshot.newChatURL(agentID: snapshot.defaultAgentID)) {
+                Link(destination: snapshot.newChatURL(agentID: snapshot.defaultAgentID)) {
                     Image(systemName: "square.and.pencil")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(colors.accentForeground)
@@ -395,7 +387,7 @@ struct BighelpActivityFeedView: View {
             } else {
                 let large = family == .systemLarge || family == .systemExtraLarge
                 ForEach(sessions.prefix(family == .systemExtraLarge ? 8 : large ? 5 : 2)) { session in
-                    Link(destination: BighelpWidgetSnapshot.chatURL(session.id)) {
+                    Link(destination: snapshot.chatURL(session.id)) {
                         WidgetSessionRow(session: session, avatar: 30, detailLines: large ? 2 : 1)
                     }
                 }
@@ -407,10 +399,11 @@ struct BighelpActivityFeedView: View {
 
 struct BighelpActivityFeedWidget: Widget {
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "LoopdyActivityFeedWidget", provider: BighelpWidgetProvider()) { entry in
+        AppIntentConfiguration(kind: "LoopdyActivityFeedWidget", intent: GatewayWidgetIntent.self,
+                               provider: GatewayWidgetProvider()) { entry in
             BighelpWidgetScaffold(snapshot: entry.snapshot) {
                 BighelpActivityFeedView(snapshot: entry.snapshot)
-                    .widgetURL(BighelpWidgetSnapshot.sessionsURL)
+                    .widgetURL(entry.snapshot.sessionsURL)
             }
         }
         .configurationDisplayName("Recent Chats")

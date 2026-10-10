@@ -181,14 +181,6 @@ extension BighelpShortcutService {
         return BighelpShortcutAgent(id: profile.id, name: profile.name, role: profile.role, isDefault: profile.isDefault)
     }
 
-    func openAgentHome(agentID: String) {
-        openLink(BighelpShortcutLinks.agentHome(agentID))
-    }
-
-    func open(_ destination: BighelpShortcutDestination) {
-        openLink(destination.url)
-    }
-
     // MARK: Chats
 
     /// The agent's most recent chat, or a new one when it has none.
@@ -210,6 +202,32 @@ extension BighelpShortcutService {
     func availableGroupChats() async throws -> [BighelpShortcutGroupChat] {
         let workspace = try await liveWorkspace()
         return await groupChats(in: workspace)
+    }
+
+    /// The group chats a Shortcut offers: on its gateway, else on the one in use.
+    func availableGroupChats(on gatewayID: UUID?) async throws -> [BighelpShortcutGroupChat] {
+        guard let gateway = try gateway(gatewayID), !gateway.isInUse else { return try await availableGroupChats() }
+        return Self.groupChats(in: try await gatewayDirectory.snapshot(of: gateway.id))
+    }
+
+    /// Group chats saved in Shortcuts. Those on the gateway in use come from it;
+    /// one on another gateway keeps its ID (and its name, when this device knows
+    /// it), and running the Shortcut checks it there.
+    func savedGroupChats(_ ids: [String], on gatewayID: UUID?) async -> [BighelpShortcutGroupChat] {
+        let inUse = (try? gateway(gatewayID))?.isInUse ?? true
+        let known = inUse ? ((try? await availableGroupChats()) ?? [])
+            : gatewayDirectory.gateways.compactMap { gatewayDirectory.savedSnapshot(of: $0.id) }.flatMap(Self.groupChats)
+        return ids.map { id in
+            known.first { $0.id == id } ?? BighelpShortcutGroupChat(id: id, name: "Group chat", memberNames: [],
+                                                                     hostedRoomID: nil)
+        }
+    }
+
+    private static func groupChats(in snapshot: FleetSnapshot) -> [BighelpShortcutGroupChat] {
+        (snapshot.groups ?? []).sorted { $0.updatedAt > $1.updatedAt }.prefix(listLimit).map {
+            BighelpShortcutGroupChat(id: HostedRoomSessionProjection.listID(roomID: $0.roomID), name: $0.name,
+                                     memberNames: $0.memberNames, hostedRoomID: $0.roomID)
+        }
     }
 
     func openGroupChat(id: String) async throws -> BighelpShortcutGroupChat {
@@ -290,6 +308,33 @@ extension BighelpShortcutService {
         let workspace = try await liveWorkspace()
         let store = try await loadedScheduledTasks(in: workspace)
         return store.tasks.prefix(Self.listLimit).map { scheduledTask($0, in: workspace) }
+    }
+
+    /// The scheduled tasks a Shortcut offers: on its gateway, else on the one in use.
+    func availableScheduledTasks(on gatewayID: UUID?) async throws -> [BighelpShortcutScheduledTask] {
+        guard let gateway = try gateway(gatewayID), !gateway.isInUse else { return try await availableScheduledTasks() }
+        return Self.scheduledTasks(in: try await gatewayDirectory.snapshot(of: gateway.id))
+    }
+
+    /// Scheduled tasks saved in Shortcuts, the way `savedGroupChats` finds group chats.
+    func savedScheduledTasks(_ ids: [String], on gatewayID: UUID?) async -> [BighelpShortcutScheduledTask] {
+        let inUse = (try? gateway(gatewayID))?.isInUse ?? true
+        let known = inUse ? ((try? await availableScheduledTasks()) ?? [])
+            : gatewayDirectory.gateways.compactMap { gatewayDirectory.savedSnapshot(of: $0.id) }.flatMap(Self.scheduledTasks)
+        return ids.map { id in
+            known.first { $0.id == id } ?? BighelpShortcutScheduledTask(
+                id: id, jobID: "", agentID: "", name: "Scheduled task", agentName: "", schedule: "", isPaused: false)
+        }
+    }
+
+    private static func scheduledTasks(in snapshot: FleetSnapshot) -> [BighelpShortcutScheduledTask] {
+        let names = Dictionary(snapshot.agents.map { ($0.profileID, $0.name) }, uniquingKeysWith: { first, _ in first })
+        return snapshot.tasks.prefix(listLimit).map {
+            BighelpShortcutScheduledTask(
+                id: BighelpShortcutScheduledTask.entityID(agentID: $0.profileID, jobID: $0.jobID), jobID: $0.jobID,
+                agentID: $0.profileID, name: $0.name, agentName: names[$0.profileID] ?? $0.profileID,
+                schedule: $0.schedule, isPaused: $0.status == .paused)
+        }
     }
 
     /// Runs a scheduled task now, the same as Run now on its page.
@@ -384,6 +429,20 @@ extension BighelpShortcutService {
     }
 
     // MARK: Host status
+
+    /// The status of the Shortcut's gateway. One not in use is only reached, not
+    /// switched to: checking on it must not move bighelp there.
+    func hostStatus(gatewayID: UUID?) async -> String {
+        let gateway: BighelpShortcutGateway?
+        do { gateway = try self.gateway(gatewayID) } catch { return "That gateway isn't in bighelp anymore." }
+        guard let gateway, !gateway.isInUse else { return await hostStatus() }
+        let name = String(gateway.name.prefix(80))
+        guard let agents = try? await gatewayDirectory.agents(on: gateway.id, reachOnly: true) else {
+            return "bighelp can't reach \(name) right now."
+        }
+        return ["Connected to \(name).", agents.count == 1 ? "1 agent." : "\(agents.count) agents."]
+            .joined(separator: "\n")
+    }
 
     /// A few plain lines about the computer. Never keys, tokens or paths.
     func hostStatus() async -> String {

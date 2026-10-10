@@ -5,6 +5,57 @@ import UniformTypeIdentifiers
 // The intent, entity and enum type names below keep their original "Loopdy" names:
 // Shortcuts people have already built refer to them by these names.
 
+/// A gateway: a computer running Hermes. A Shortcut set to one runs there,
+/// whichever one bighelp is using.
+struct BighelpShortcutGatewayEntity: AppEntity {
+    static let typeDisplayRepresentation = TypeDisplayRepresentation(
+        name: "Gateway",
+        numericFormat: "\(placeholder: .int) gateways"
+    )
+    static let defaultQuery = BighelpShortcutGatewayQuery()
+
+    let id: String
+    let name: String
+
+    init(_ gateway: BighelpShortcutGateway) {
+        id = gateway.id.uuidString
+        name = gateway.name
+    }
+
+    init(id: String, name: String) {
+        self.id = id
+        self.name = name
+    }
+
+    var hostID: UUID? { UUID(uuidString: id) }
+
+    var displayRepresentation: DisplayRepresentation {
+        DisplayRepresentation(title: "\(name)", image: .init(systemName: "desktopcomputer"))
+    }
+}
+
+struct BighelpShortcutGatewayQuery: EntityQuery {
+    @Dependency private var service: BighelpShortcutService
+
+    func entities(for identifiers: [String]) async throws -> [BighelpShortcutGatewayEntity] {
+        let gateways = await service.availableGateways()
+        // A gateway taken out of bighelp keeps its place, so running the Shortcut can say so.
+        return identifiers.map { id in
+            gateways.first { $0.id.uuidString == id }.map(BighelpShortcutGatewayEntity.init)
+                ?? BighelpShortcutGatewayEntity(id: id, name: "Removed gateway")
+        }
+    }
+
+    func suggestedEntities() async throws -> [BighelpShortcutGatewayEntity] {
+        await service.availableGateways().map(BighelpShortcutGatewayEntity.init)
+    }
+
+    /// A new Shortcut starts on the gateway in use, and stays there when another one is used later.
+    func defaultResult() async -> BighelpShortcutGatewayEntity? {
+        await service.availableGateways().first(where: \.isInUse).map(BighelpShortcutGatewayEntity.init)
+    }
+}
+
 struct LoopdyShortcutAgentEntity: AppEntity {
     static let typeDisplayRepresentation = TypeDisplayRepresentation(
         name: "bighelp agent",
@@ -12,43 +63,67 @@ struct LoopdyShortcutAgentEntity: AppEntity {
     )
     static let defaultQuery = BighelpShortcutAgentQuery()
 
+    /// The agent and its gateway (`BighelpShortcutAgentReference`).
     let id: String
     let name: String
     let role: String
     let isDefault: Bool
+    let hostID: UUID?
+    let hostName: String?
 
     init(_ agent: BighelpShortcutAgent) {
-        id = agent.id
+        id = BighelpShortcutAgentReference(hostID: agent.hostID, agentID: agent.id).entityID
         name = agent.name
         role = agent.role
         isDefault = agent.isDefault
+        hostID = agent.hostID
+        hostName = agent.hostName
+    }
+
+    var reference: BighelpShortcutAgentReference {
+        BighelpShortcutAgentReference(entityID: id) ?? BighelpShortcutAgentReference(hostID: hostID, agentID: id)
     }
 
     var domain: BighelpShortcutAgent {
-        BighelpShortcutAgent(id: id, name: name, role: role, isDefault: isDefault)
+        BighelpShortcutAgent(id: reference.agentID, name: name, role: role, isDefault: isDefault,
+                             hostID: hostID, hostName: hostName)
     }
 
     var displayRepresentation: DisplayRepresentation {
-        DisplayRepresentation(
+        let details = [isDefault ? "Default agent" : nil, role.isEmpty ? nil : role, hostName.map { "on \($0)" }]
+            .compactMap { $0 }
+        return DisplayRepresentation(
             title: "\(name)",
-            subtitle: "\(isDefault ? "Default agent · \(role)" : role)",
+            subtitle: "\(details.joined(separator: " · "))",
             image: .init(systemName: isDefault ? "person.crop.circle.badge.checkmark" : "person.crop.circle")
         )
     }
 }
 
+/// The agents on the gateway the action is set to, else on the one in use.
 struct BighelpShortcutAgentQuery: EntityQuery {
+    @IntentParameterDependency<SendLoopdyChatIntent>(\.$gateway) private var ask
+    @IntentParameterDependency<StartLoopdyVoiceChatIntent>(\.$gateway) private var voice
+    @IntentParameterDependency<BighelpNewChatIntent>(\.$gateway) private var newChat
+    @IntentParameterDependency<BighelpContinueChatIntent>(\.$gateway) private var continueChat
+    @IntentParameterDependency<BighelpOpenAgentIntent>(\.$gateway) private var openAgent
+    @IntentParameterDependency<BighelpSwitchAgentIntent>(\.$gateway) private var switchAgent
+    @IntentParameterDependency<BighelpBoardItemsIntent>(\.$gateway) private var board
+    @IntentParameterDependency<BighelpAddKanbanTaskIntent>(\.$gateway) private var kanban
     @Dependency private var service: BighelpShortcutService
 
+    private var gateway: BighelpShortcutGatewayEntity? {
+        ask?.gateway ?? voice?.gateway ?? newChat?.gateway ?? continueChat?.gateway ?? openAgent?.gateway
+            ?? switchAgent?.gateway ?? board?.gateway ?? kanban?.gateway
+    }
+
+    /// From what this device last saw, never the network: a Shortcut starts at once.
     func entities(for identifiers: [String]) async throws -> [LoopdyShortcutAgentEntity] {
-        let identifiers = Set(identifiers)
-        return try await service.availableAgents()
-            .filter { identifiers.contains($0.id) }
-            .map(LoopdyShortcutAgentEntity.init)
+        await service.savedAgents(identifiers).map(LoopdyShortcutAgentEntity.init)
     }
 
     func suggestedEntities() async throws -> [LoopdyShortcutAgentEntity] {
-        try await service.availableAgents().map(LoopdyShortcutAgentEntity.init)
+        try await service.availableAgents(on: gateway?.hostID).map(LoopdyShortcutAgentEntity.init)
     }
 }
 
@@ -109,7 +184,7 @@ struct BighelpShortcutModelQuery: EntityQuery {
     }
 
     private func models() async throws -> [BighelpShortcutModel] {
-        try await service.availableModels(agentID: intent?.agent.id)
+        try await service.availableModels(for: intent?.agent.reference)
     }
 }
 
@@ -169,7 +244,7 @@ enum BighelpShortcutAttachmentBuilder {
 struct SendLoopdyChatIntent: AppIntent {
     static let title: LocalizedStringResource = "Ask an agent"
     static let description = IntentDescription(
-        "Starts a new chat with your agent, with any pictures or files you add. Wait for response returns the answer to Shortcuts without opening bighelp. Turn it off to send and continue right away.",
+        "Starts a new chat with your agent on the gateway you choose, with any pictures or files you add. Wait for response returns the answer to Shortcuts without opening bighelp. Turn it off to send and continue right away.",
         categoryName: "Chat"
     )
     static let openAppWhenRun = false
@@ -182,6 +257,9 @@ struct SendLoopdyChatIntent: AppIntent {
         requestValueDialog: "What would you like to ask your agent?"
     )
     var message: String
+
+    @Parameter(title: "Gateway")
+    var gateway: BighelpShortcutGatewayEntity?
 
     @Parameter(title: "Agent")
     var agent: LoopdyShortcutAgentEntity?
@@ -216,10 +294,11 @@ struct SendLoopdyChatIntent: AppIntent {
             images: images ?? [],
             files: files ?? []
         )
+        try await service.useGateway(gateway?.hostID, for: agent?.reference)
         let result = try await service.send(
             BighelpShortcutChatRequest(
                 message: message,
-                agentID: agent?.id,
+                agentID: agent?.reference.agentID,
                 model: model?.domain,
                 reasoning: reasoning.domain,
                 attachments: attachments,
@@ -245,23 +324,31 @@ extension SendLoopdyChatIntent: ForegroundContinuableIntent {}
 struct StartLoopdyVoiceChatIntent: AppIntent {
     static let title: LocalizedStringResource = "Start voice chat"
     static let description = IntentDescription(
-        "Opens a new chat with your agent and starts talking right away.",
+        "Opens your agent's Bot Chat on the gateway you choose and starts talking right away.",
         categoryName: "Chat"
     )
     static let openAppWhenRun = true
+
+    /// Opens bighelp at once, without asking to continue in the app first.
+    @available(iOS 26.0, *)
+    static var supportedModes: IntentModes { .foreground(.immediate) }
+
+    @Parameter(title: "Gateway")
+    var gateway: BighelpShortcutGatewayEntity?
 
     @Parameter(title: "Agent")
     var agent: LoopdyShortcutAgentEntity?
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Start a voice chat with \(\.$agent)")
+        Summary("Start a voice chat with \(\.$agent) on \(\.$gateway)")
     }
 
     @Dependency private var service: BighelpShortcutService
 
-    func perform() async throws -> some IntentResult & ProvidesDialog {
-        let result = try await service.startVoiceChat(agentID: agent?.id)
-        return .result(dialog: "Starting a voice chat with \(result.agentName).")
+    /// Hands off at once: bighelp shows the voice stage and opens the chat itself.
+    func perform() async throws -> some IntentResult {
+        try await service.startVoiceChat(gatewayID: gateway?.hostID, agent: agent?.reference)
+        return .result()
     }
 }
 

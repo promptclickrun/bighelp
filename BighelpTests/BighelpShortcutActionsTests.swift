@@ -164,7 +164,7 @@ struct BighelpShortcutActionsTests {
 
     @Test func openAgentOpensThatAgentsHome() async throws {
         let (harness, _, links) = try await harness()
-        harness.service.openAgentHome(agentID: "finance")
+        try harness.service.openAgentHome(gatewayID: nil, agent: .init(hostID: nil, agentID: "finance"))
         #expect(links.urls == [URL(string: "loopdy://agent/chat?agent=finance")!])
         #expect(BighelpIncomingURLRoute.parse(links.urls[0]) == .agent(tab: "chat", agentID: "finance"))
     }

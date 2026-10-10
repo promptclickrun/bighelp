@@ -4,7 +4,8 @@ import Foundation
 // Shortcuts actions beyond sending a chat. Every one reaches the computer
 // through BighelpShortcutService, which waits for a host that answers and
 // reconnects once. Actions that open bighelp hand it a link; the rest run
-// without opening the app.
+// without opening the app. Each can be set to a gateway: it runs there, and
+// bighelp switches to that gateway first when it isn't the one in use.
 
 // MARK: - Choices
 
@@ -66,18 +67,18 @@ struct BighelpShortcutScheduledTaskEntity: AppEntity {
     }
 }
 
+/// The scheduled tasks on the action's gateway.
 struct BighelpShortcutScheduledTaskQuery: EntityQuery {
+    @IntentParameterDependency<BighelpRunScheduledTaskIntent>(\.$gateway) private var intent
     @Dependency private var service: BighelpShortcutService
 
     func entities(for identifiers: [String]) async throws -> [BighelpShortcutScheduledTaskEntity] {
-        let identifiers = Set(identifiers)
-        return try await service.availableScheduledTasks()
-            .filter { identifiers.contains($0.id) }
+        await service.savedScheduledTasks(identifiers, on: intent?.gateway.hostID)
             .map(BighelpShortcutScheduledTaskEntity.init)
     }
 
     func suggestedEntities() async throws -> [BighelpShortcutScheduledTaskEntity] {
-        try await service.availableScheduledTasks().map(BighelpShortcutScheduledTaskEntity.init)
+        try await service.availableScheduledTasks(on: intent?.gateway.hostID).map(BighelpShortcutScheduledTaskEntity.init)
     }
 }
 
@@ -107,18 +108,17 @@ struct BighelpShortcutGroupChatEntity: AppEntity {
     }
 }
 
+/// The group chats on the action's gateway.
 struct BighelpShortcutGroupChatQuery: EntityQuery {
+    @IntentParameterDependency<BighelpOpenGroupChatIntent>(\.$gateway) private var intent
     @Dependency private var service: BighelpShortcutService
 
     func entities(for identifiers: [String]) async throws -> [BighelpShortcutGroupChatEntity] {
-        let identifiers = Set(identifiers)
-        return try await service.availableGroupChats()
-            .filter { identifiers.contains($0.id) }
-            .map(BighelpShortcutGroupChatEntity.init)
+        await service.savedGroupChats(identifiers, on: intent?.gateway.hostID).map(BighelpShortcutGroupChatEntity.init)
     }
 
     func suggestedEntities() async throws -> [BighelpShortcutGroupChatEntity] {
-        try await service.availableGroupChats().map(BighelpShortcutGroupChatEntity.init)
+        try await service.availableGroupChats(on: intent?.gateway.hostID).map(BighelpShortcutGroupChatEntity.init)
     }
 }
 
@@ -211,23 +211,31 @@ struct BighelpOpenWorkflowIntent: AppIntent {
 struct BighelpNewChatIntent: AppIntent {
     static let title: LocalizedStringResource = "New chat"
     static let description = IntentDescription(
-        "Opens bighelp on a new chat with the agent you choose.",
+        "Opens bighelp on a new chat with the agent you choose, on the gateway you choose.",
         categoryName: "Chat"
     )
     static let openAppWhenRun = true
+
+    /// Opens bighelp at once, without asking to continue in the app first.
+    @available(iOS 26.0, *)
+    static var supportedModes: IntentModes { .foreground(.immediate) }
+
+    @Parameter(title: "Gateway")
+    var gateway: BighelpShortcutGatewayEntity?
 
     @Parameter(title: "Agent")
     var agent: LoopdyShortcutAgentEntity?
 
     static var parameterSummary: some ParameterSummary {
-        Summary("New chat with \(\.$agent)")
+        Summary("New chat with \(\.$agent) on \(\.$gateway)")
     }
 
     @Dependency private var service: BighelpShortcutService
 
-    func perform() async throws -> some IntentResult & ProvidesDialog {
-        let result = try await service.openNewChat(agentID: agent?.id)
-        return .result(dialog: "Started a new chat with \(result.agentName).")
+    /// Hands off at once: bighelp connects and opens the chat itself.
+    func perform() async throws -> some IntentResult {
+        try await service.startNewChat(gatewayID: gateway?.hostID, agent: agent?.reference)
+        return .result()
     }
 }
 
@@ -239,21 +247,26 @@ struct BighelpContinueChatIntent: AppIntent {
     )
     static let openAppWhenRun = true
 
+    /// Opens bighelp at once, without asking to continue in the app first.
+    @available(iOS 26.0, *)
+    static var supportedModes: IntentModes { .foreground(.immediate) }
+
+    @Parameter(title: "Gateway")
+    var gateway: BighelpShortcutGatewayEntity?
+
     @Parameter(title: "Agent")
     var agent: LoopdyShortcutAgentEntity?
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Continue last chat with \(\.$agent)")
+        Summary("Continue last chat with \(\.$agent) on \(\.$gateway)")
     }
 
     @Dependency private var service: BighelpShortcutService
 
-    func perform() async throws -> some IntentResult & ProvidesDialog {
-        let result = try await service.continueLastChat(agentID: agent?.id)
-        let dialog: IntentDialog = result.isNew
-            ? "You had no chats with \(result.agentName) yet, so bighelp started one."
-            : "Opening your last chat with \(result.agentName)."
-        return .result(dialog: dialog)
+    func perform() async throws -> some IntentResult {
+        try await service.useGateway(gateway?.hostID, for: agent?.reference)
+        _ = try await service.continueLastChat(agentID: agent?.reference.agentID)
+        return .result()
     }
 }
 
@@ -265,16 +278,24 @@ struct BighelpOpenGroupChatIntent: AppIntent {
     )
     static let openAppWhenRun = true
 
+    /// Opens bighelp at once, without asking to continue in the app first.
+    @available(iOS 26.0, *)
+    static var supportedModes: IntentModes { .foreground(.immediate) }
+
+    @Parameter(title: "Gateway")
+    var gateway: BighelpShortcutGatewayEntity?
+
     @Parameter(title: "Group chat")
     var group: BighelpShortcutGroupChatEntity
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Open \(\.$group)")
+        Summary("Open \(\.$group) on \(\.$gateway)")
     }
 
     @Dependency private var service: BighelpShortcutService
 
     func perform() async throws -> some IntentResult {
+        try await service.useGateway(gateway?.hostID)
         _ = try await service.openGroupChat(id: group.id)
         return .result()
     }
@@ -293,16 +314,20 @@ struct BighelpRunScheduledTaskIntent: AppIntent {
     @available(iOS 26.0, *)
     static var supportedModes: IntentModes { [.background] }
 
+    @Parameter(title: "Gateway")
+    var gateway: BighelpShortcutGatewayEntity?
+
     @Parameter(title: "Scheduled task")
     var task: BighelpShortcutScheduledTaskEntity
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Run \(\.$task) now")
+        Summary("Run \(\.$task) on \(\.$gateway) now")
     }
 
     @Dependency private var service: BighelpShortcutService
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
+        try await service.useGateway(gateway?.hostID)
         let ran = try await service.runScheduledTask(id: task.id)
         return .result(dialog: "Started \(ran.name) for \(ran.agentName).")
     }
@@ -325,11 +350,14 @@ struct BighelpAddKanbanTaskIntent: AppIntent {
     @Parameter(title: "Notes", inputOptions: .init(multiline: true))
     var notes: String?
 
+    @Parameter(title: "Gateway")
+    var gateway: BighelpShortcutGatewayEntity?
+
     @Parameter(title: "Agent")
     var agent: LoopdyShortcutAgentEntity?
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Add \(\.$title) to Kanban") {
+        Summary("Add \(\.$title) to Kanban on \(\.$gateway)") {
             \.$notes
             \.$agent
         }
@@ -338,7 +366,9 @@ struct BighelpAddKanbanTaskIntent: AppIntent {
     @Dependency private var service: BighelpShortcutService
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        let added = try await service.addKanbanTask(title: title, notes: notes ?? "", assigneeID: agent?.id)
+        try await service.useGateway(gateway?.hostID, for: agent?.reference)
+        let added = try await service.addKanbanTask(title: title, notes: notes ?? "",
+                                                    assigneeID: agent?.reference.agentID)
         return .result(dialog: "Added \(added.title) to Later on \(added.boardName).")
     }
 }
@@ -346,7 +376,7 @@ struct BighelpAddKanbanTaskIntent: AppIntent {
 struct BighelpHostStatusIntent: AppIntent {
     static let title: LocalizedStringResource = "Get computer status"
     static let description = IntentDescription(
-        "Says whether bighelp can reach your computer, how many agents it has and how many chats are working.",
+        "Says whether bighelp can reach your gateway, how many agents it has and how many chats are working. Checking a gateway doesn't switch bighelp to it.",
         categoryName: "Automation"
     )
     static let openAppWhenRun = false
@@ -354,10 +384,17 @@ struct BighelpHostStatusIntent: AppIntent {
     @available(iOS 26.0, *)
     static var supportedModes: IntentModes { [.background] }
 
+    @Parameter(title: "Gateway")
+    var gateway: BighelpShortcutGatewayEntity?
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("Get the status of \(\.$gateway)")
+    }
+
     @Dependency private var service: BighelpShortcutService
 
     func perform() async throws -> some IntentResult & ReturnsValue<String> & ProvidesDialog {
-        let status = await service.hostStatus()
+        let status = await service.hostStatus(gatewayID: gateway?.hostID)
         return .result(value: status, dialog: "\(status)")
     }
 }
@@ -376,17 +413,21 @@ struct BighelpBoardItemsIntent: AppIntent {
     @Parameter(title: "Section", default: .feed)
     var section: BighelpShortcutBoardSection
 
+    @Parameter(title: "Gateway")
+    var gateway: BighelpShortcutGatewayEntity?
+
     @Parameter(title: "Agent")
     var agent: LoopdyShortcutAgentEntity?
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Get \(\.$section) from \(\.$agent)")
+        Summary("Get \(\.$section) from \(\.$agent) on \(\.$gateway)")
     }
 
     @Dependency private var service: BighelpShortcutService
 
     func perform() async throws -> some IntentResult & ReturnsValue<String> & ProvidesDialog {
-        let result = try await service.boardItems(section, agentID: agent?.id)
+        try await service.useGateway(gateway?.hostID, for: agent?.reference)
+        let result = try await service.boardItems(section, agentID: agent?.reference.agentID)
         return .result(value: result.text, dialog: "\(result.text)")
     }
 }
@@ -401,17 +442,24 @@ struct BighelpOpenSectionIntent: AppIntent {
     )
     static let openAppWhenRun = true
 
+    /// Opens bighelp at once, without asking to continue in the app first.
+    @available(iOS 26.0, *)
+    static var supportedModes: IntentModes { .foreground(.immediate) }
+
     @Parameter(title: "Place", default: .chats)
     var section: BighelpShortcutDestination
 
+    @Parameter(title: "Gateway")
+    var gateway: BighelpShortcutGatewayEntity?
+
     static var parameterSummary: some ParameterSummary {
-        Summary("Open \(\.$section) in bighelp")
+        Summary("Open \(\.$section) on \(\.$gateway) in bighelp")
     }
 
     @Dependency private var service: BighelpShortcutService
 
     func perform() async throws -> some IntentResult {
-        await service.open(section)
+        try await service.open(section, gatewayID: gateway?.hostID)
         return .result()
     }
 }
@@ -429,17 +477,21 @@ struct BighelpSwitchAgentIntent: AppIntent {
     @available(iOS 26.0, *)
     static var supportedModes: IntentModes { [.background] }
 
+    @Parameter(title: "Gateway")
+    var gateway: BighelpShortcutGatewayEntity?
+
     @Parameter(title: "Agent")
     var agent: LoopdyShortcutAgentEntity
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Switch to \(\.$agent)")
+        Summary("Switch to \(\.$agent) on \(\.$gateway)")
     }
 
     @Dependency private var service: BighelpShortcutService
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        let switched = try await service.switchAgent(to: agent.id)
+        try await service.useGateway(gateway?.hostID, for: agent.reference)
+        let switched = try await service.switchAgent(to: agent.reference.agentID)
         return .result(dialog: "bighelp now opens on \(switched.name).")
     }
 }
@@ -452,17 +504,24 @@ struct BighelpOpenAgentIntent: AppIntent {
     )
     static let openAppWhenRun = true
 
+    /// Opens bighelp at once, without asking to continue in the app first.
+    @available(iOS 26.0, *)
+    static var supportedModes: IntentModes { .foreground(.immediate) }
+
+    @Parameter(title: "Gateway")
+    var gateway: BighelpShortcutGatewayEntity?
+
     @Parameter(title: "Agent")
     var agent: LoopdyShortcutAgentEntity
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Open \(\.$agent)")
+        Summary("Open \(\.$agent) on \(\.$gateway)")
     }
 
     @Dependency private var service: BighelpShortcutService
 
     func perform() async throws -> some IntentResult {
-        await service.openAgentHome(agentID: agent.id)
+        try await service.openAgentHome(gatewayID: gateway?.hostID, agent: agent.reference)
         return .result()
     }
 }

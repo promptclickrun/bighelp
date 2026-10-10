@@ -1,7 +1,7 @@
 import XCTest
 
 /// The App Review host: bighelp connects with its address alone (no username,
-/// password or token), and the plugin's screens load. Run it before each App
+/// password or token), the agent replies, and the plugin's screens load. Run it before each App
 /// Store submission. Set BIGHELP_REVIEW_HOST (TEST_RUNNER_…) to the address;
 /// skipped without it. Uninstall bighelp from the simulator first, so it starts
 /// at the welcome. Set BIGHELP_REVIEW_EVIDENCE to save screenshots.
@@ -15,8 +15,18 @@ final class AppReviewHostUITests: BighelpUITestCase {
         app.launchArguments = ["-loopdy.home.opens-chat", "YES"]
         app.launch()
         try onboardOpenHost(app, address: address)
-        XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 30), "The agent's chat opens")
+        let composer = app.textViews["chat.composer.text"]
+        XCTAssertTrue(composer.waitForExistence(timeout: 30), "The agent's chat opens")
         save("1-chat", app)
+
+        // A message gets a real reply from the host's model.
+        composer.tap()
+        composer.typeText("Say hello in five words.")
+        app.buttons["chat.send"].tap()
+        let reply = app.textViews.matching(NSPredicate(format: "identifier == %@ AND NOT (value CONTAINS %@)",
+                                                       "chat.message.inline-selection", "Say hello")).firstMatch
+        XCTAssertTrue(reply.waitForExistence(timeout: 90), "The agent replies")
+        save("1-reply", app)
 
         for name in ["feed", "workflows"] {
             if name == "feed" { openRootTab("tab.feed", in: app) } else { app.open(URL(string: "loopdy://workflows")!) }

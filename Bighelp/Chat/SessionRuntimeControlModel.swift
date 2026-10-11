@@ -106,6 +106,16 @@ final class SessionRuntimeControlModel {
         !pinnedModelChoices.isEmpty
     }
 
+    /// The models this person picked last, newest first, for the picker's Recent filter.
+    var recentModelChoices: [RecentModelChoice] {
+        modelHistory.recentChoices(
+            providers: modelProviders,
+            currentProviderID: currentProvider,
+            currentModelID: currentModel,
+            limit: 8
+        )
+    }
+
     func isModelPinned(providerID: String, modelID: String) -> Bool {
         modelHistory.isPinned(providerID: providerID, modelID: modelID)
     }

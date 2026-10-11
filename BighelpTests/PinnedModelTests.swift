@@ -30,6 +30,18 @@ struct PinnedModelTests {
         }
     }
 
+    @Test func recentFilterListsOnlyPickedModelsNewestFirst() {
+        withDefaults { defaults in
+            let store = RecentModelHistoryStore(defaults: defaults)
+            store.record(providerID: "a", modelID: "older")
+            store.record(providerID: "a", modelID: "gone")
+            store.record(providerID: "b", modelID: "newest")
+            let catalog = [provider("a", models: ["first", "older"]), provider("b", models: ["newest"])]
+            let recent = store.recentChoices(providers: catalog, currentProviderID: "a", currentModelID: "first")
+            #expect(recent.map(\.modelID) == ["newest", "older"])
+        }
+    }
+
     @Test func pinsStayWithinLiveScopeAndNilDoesNotWrite() {
         withDefaults { defaults in
             var scope: String? = "device-a:host-a"

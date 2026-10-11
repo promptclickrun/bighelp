@@ -67,7 +67,7 @@ struct DesignSystemTests {
                 < ChatSessionControlsPresentation.preferredHeight(isVerticallyCompact: false)
         )
         #expect(ChatSessionControlsPresentation.preferredHeight(isVerticallyCompact: true) == 320)
-        #expect(ChatSessionControlsPresentation.preferredHeight(isVerticallyCompact: false) == 560)
+        #expect(ChatSessionControlsPresentation.preferredHeight(isVerticallyCompact: false) == 640)
     }
 
     @Test func agentAttachmentActionsExposeExactlyOneSaveForAValidatedDestination() {
@@ -213,13 +213,6 @@ struct DesignSystemTests {
     }
 
     @Test func compactChatHeaderCentersThePickerAndSeparatesTrailingActions() {
-        #expect(ChatSessionControlsPresentation.choiceAlignment == .center)
-        #expect(ChatSessionControlsPresentation.choicesFillAvailableWidth)
-        #expect(ChatSessionControlsPresentation.quickChoiceCentersTextIndependentlyOfAccessories)
-        #expect(ChatSessionControlsPresentation.quickChoiceAccessoryWidth == 40)
-        #expect(ChatSessionControlsPresentation.compactChipCentersModelIndependentlyOfProviderMark)
-        #expect(!ChatSessionControlsPresentation.showsCompactChipDisclosureIndicator)
-        #expect(ChatSessionControlsPresentation.compactChipAccessoryWidth == 24)
         #expect(BighelpPickerSheetLayout.centersProviderHeaders)
         #expect(BighelpPickerSheetLayout.centersModelRows)
         #expect(BighelpPickerSheetLayout.centersReasoningRows)

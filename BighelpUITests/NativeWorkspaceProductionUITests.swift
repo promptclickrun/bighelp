@@ -640,9 +640,9 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: controls)
         XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 20), .completed)
         controls.tap()
-        let search = app.searchFields["model-picker.search"]
-        XCTAssertTrue(search.waitForExistence(timeout: 20)); search.tap(); search.typeText("gpt-5.5")
-        let model = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@ AND NOT identifier BEGINSWITH %@", "model-picker.", ".gpt-5.5", "model-picker.pin.")).firstMatch
+        let search = app.descendants(matching: .any)["chat.models.search"].firstMatch
+        XCTAssertTrue(search.waitForExistence(timeout: 20)); search.tap(); app.typeText("gpt-5.5")
+        let model = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@", "chat.models.row.", ":gpt-5.5")).firstMatch
         XCTAssertTrue(model.waitForExistence(timeout: 25))
         if ProcessInfo.processInfo.environment["BIGHELP_REAL_MODEL_BACKGROUND"] == "1" {
             XCUIDevice.shared.press(.home); app.activate()
@@ -657,9 +657,9 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
                            "Same-host reconnect must restore model controls without reopening the sheet.")
         }
         model.tap()
-        let apply = app.buttons["model-picker.apply"]
+        let apply = app.buttons["chat.session-controls.apply"]
         XCTAssertTrue(apply.waitForExistence(timeout: 10)); apply.tap()
-        let applied = app.buttons["model-picker.dismiss"].waitForNonExistence(timeout: 30)
+        let applied = apply.waitForNonExistence(timeout: 30)
         try? app.debugDescription.write(to: URL(fileURLWithPath: directory).appendingPathComponent("real-model-picker-tree.txt"), atomically: true, encoding: .utf8)
         capture("real-model-picker-after-apply", app)
         XCTAssertTrue(applied, "Real session model selection must apply and close without an expired picker error.")

@@ -86,6 +86,23 @@ final class RecentModelHistoryStore {
         return true
     }
 
+    /// Only the models picked before on this computer, newest first; nothing fills the gaps.
+    func recentChoices(
+        providers: [BighelpLinkModelProvider],
+        currentProviderID: String?,
+        currentModelID: String?,
+        limit: Int = 12
+    ) -> [RecentModelChoice] {
+        guard limit > 0, let scope = currentScopeID else { return [] }
+        return resolvedChoices(
+            for: entriesByScope[scope] ?? [],
+            providers: providers,
+            currentProviderID: currentProviderID,
+            currentModelID: currentModelID,
+            limit: limit
+        )
+    }
+
     func pinnedChoices(
         providers: [BighelpLinkModelProvider],
         currentProviderID: String?,

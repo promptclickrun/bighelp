@@ -125,26 +125,13 @@ struct ChatActionMenuSheet: View {
         }
         .bighelpSheet(isPresented: $isModelPickerPresented) {
             if let controls = runtimeControls {
-                BighelpModelPickerSheet(
-                    title: "Choose model",
-                    scopeLabel: "This chat only",
-                    providers: controls.modelProviders,
-                    currentProviderID: controls.currentProvider,
-                    currentModelID: controls.currentModel,
-                    isLoading: controls.isLoadingModel,
-                    isApplying: controls.isApplyingSelection,
-                    errorMessage: controls.errorMessage,
-                    onClearError: controls.clearError,
-                    onRetry: {
-                        Task { await controls.loadPickersIfNeeded() }
-                    },
-                    onSelect: { _, _ in },
-                    reasoningOptions: controls.reasoningOptions,
-                    currentReasoningValue: controls.currentReasoningValue,
-                    onApply: { draft in applySelection(controls, draft: draft) }
-                )
+                ChatSessionControlsPopover(controls: controls, usesWideLayout: false) {
+                    isModelPickerPresented = false
+                    page = .main
+                }
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
+                .bighelpSheetSize(.standard)
             }
         }
     }
@@ -467,22 +454,6 @@ struct ChatActionMenuSheet: View {
             page = submenu
         } else {
             onSelect(action)
-        }
-    }
-
-    private func applySelection(
-        _ controls: SessionRuntimeControlModel,
-        draft: SessionRuntimeSelectionDraft
-    ) {
-        Task {
-            await controls.apply(draft)
-            guard controls.errorMessage == nil else { return }
-            await controls.loadModelPicker()
-            guard controls.errorMessage == nil else { return }
-            await controls.loadReasoningPicker()
-            guard controls.errorMessage == nil else { return }
-            isModelPickerPresented = false
-            page = .main
         }
     }
 

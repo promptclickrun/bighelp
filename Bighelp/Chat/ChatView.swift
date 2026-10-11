@@ -161,7 +161,6 @@ struct ChatView: View {
     /// window, chat Info, the agent's profile).
     private enum SessionControlsOrigin { case options, composer }
     @State private var sessionControlsOrigin = SessionControlsOrigin.options
-    @State private var sessionControlsPath: [ChatSessionControlsPage] = []
     @State private var optionsButtonBottom: CGFloat = 0
     @State private var canvasWidth: CGFloat = 0
     #endif
@@ -170,7 +169,6 @@ struct ChatView: View {
     @State private var sessionTitleDraft = ""
     @State private var sessionTitleErrorMessage = ""
     @State private var isRenamingSessionTitle = false
-    @State private var isAllModelsPresented = false
     @State var timelineController = ChatTimelineController()
     @State var fittingRailScrollRequest = ChatRailScrollRequest()
     @State private var companionCompletionTracker = CompanionCompletionTracker()
@@ -268,8 +266,8 @@ struct ChatView: View {
     var body: some View {
         let _ = model.botModeRoomStore?.rooms
         // Track the connection capability stamp in the presenting view, not
-        // only inside the retained sheet closure, so reconnect updates it.
-        let runtimeSupport = model.runtimeControls?.selectionSupport
+        // only inside the retained pop-up, so a reconnect updates it.
+        let _ = model.runtimeControls?.selectionSupport
         return chatCanvas
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background {
@@ -278,13 +276,6 @@ struct ChatView: View {
                 SessionAppearanceBackgroundView(snapshot: sessionAppearance)
             }
             .ignoresSafeArea()
-        }
-        .bighelpSheet(isPresented: $isAllModelsPresented) {
-            if let controls = model.runtimeControls {
-                allModelsPicker(controls, support: runtimeSupport)
-                    .presentationDetents([.large])
-                    .presentationDragIndicator(.visible)
-            }
         }
         .bighelpSheet(item: $agentEditorRoute) { route in
             AgentEditorView(
@@ -305,19 +296,16 @@ struct ChatView: View {
             ChatPDFPagesDraftRegistry.mount(model)
             model.nativeSessionResumeProgress.mount()
         }
+        // The message box's model chip: every model is on the one Model & reasoning screen.
         .onChange(of: allModelsRequest) { _, request in
             guard request > 0, let controls = model.runtimeControls else { return }
             guard !ChatRuntimeSelectionLockout.isLocked(isTurnActive: controls.isTurnActive) else {
                 return
             }
             #if targetEnvironment(macCatalyst)
-            sessionControlsPath = [.allModels]
-            openSessionControls(controls)
-            #else
-            isSessionControlsPresented = false
-            isAllModelsPresented = true
-            Task { @MainActor in await controls.loadPickersIfNeeded() }
+            sessionControlsOrigin = .composer
             #endif
+            openSessionControls(controls)
         }
         .onChange(of: model.sessionControlsRequest) { _, _ in
             guard let controls = model.runtimeControls,
@@ -747,7 +735,6 @@ struct ChatView: View {
             #if targetEnvironment(macCatalyst)
             .onChange(of: isSessionControlsPresented) { _, presented in
                 guard !presented else { return }
-                sessionControlsPath = []
                 sessionControlsOrigin = .options
             }
             #else
@@ -756,7 +743,6 @@ struct ChatView: View {
                     ChatSessionControlsPopover(
                         controls: controls,
                         usesWideLayout: horizontalSizeClass == .regular,
-                        onSeeAllModels: showAllModels,
                         onApplied: { isSessionControlsPresented = false }
                     )
                     .presentationCompactAdaptation(.popover)
@@ -768,7 +754,6 @@ struct ChatView: View {
             .onChange(of: model.runtimeControls?.isTurnActive) { _, active in
                 if active == true {
                     isSessionControlsPresented = false
-                    isAllModelsPresented = false
                 }
             }
             .accessibilityHidden(true)
@@ -783,21 +768,15 @@ struct ChatView: View {
         )
     }
 
-    /// One pop-up for the Mac: quick choices and reasoning, with every model
-    /// pushed inside it instead of closing it for a sheet.
+    /// The Mac's Model & reasoning pop-up, hung from the ⋯ button or the message box.
     @ViewBuilder
     private var macSessionControls: some View {
         if let controls = model.runtimeControls {
             ChatSessionControlsMacPopover(
                 controls: controls,
-                path: $sessionControlsPath,
                 size: sessionControlsSize,
                 onApplied: { isSessionControlsPresented = false }
-            ) {
-                allModelsPicker(controls, support: controls.selectionSupport, isEmbedded: true) {
-                    isSessionControlsPresented = false
-                }
-            }
+            )
             .presentationCompactAdaptation(.popover)
             .bighelpPopoverDismissal(isPresented: $isSessionControlsPresented)
         }
@@ -1296,21 +1275,6 @@ struct ChatView: View {
         )]
     }
 
-    /// iPhone and iPad: close the pop-up and open every model in a sheet. (The
-    /// Mac pushes them inside the pop-up; see `ChatSessionControlsMacPopover`.)
-    private func showAllModels() {
-        guard !model.isAwaitingAuthoritativeSessionAllocation else { return }
-        let closingPopover = isSessionControlsPresented
-        isSessionControlsPresented = false
-        guard let controls = model.runtimeControls else { return }
-        Task { @MainActor in
-            // UIKit drops a sheet presented while the popover is still closing.
-            if closingPopover { try? await Task.sleep(for: .milliseconds(450)) }
-            isAllModelsPresented = true
-            await controls.loadPickersIfNeeded()
-        }
-    }
-
     private func openSessionControls(_ controls: SessionRuntimeControlModel) {
         guard !model.isAwaitingAuthoritativeSessionAllocation else { return }
         // The popover hangs below the header; the keyboard would cover its lower half.
@@ -1362,77 +1326,6 @@ struct ChatView: View {
         composerFocusTask = nil
         isDraftFocused = false
         BighelpKeyboard.dismiss()
-    }
-
-    /// Every model, with reasoning: the iPhone and iPad sheet, or the page the
-    /// Mac pushes inside its Model & reasoning pop-up.
-    private func allModelsPicker(
-        _ controls: SessionRuntimeControlModel,
-        support: SessionRuntimeControlSupport?,
-        isEmbedded: Bool = false,
-        onClose: (() -> Void)? = nil
-    ) -> BighelpModelPickerSheet {
-        BighelpModelPickerSheet(
-            title: "Choose model",
-            scopeLabel: "This chat only",
-            providers: controls.modelProviders,
-            currentProviderID: controls.currentProvider,
-            currentModelID: controls.currentModel,
-            isLoading: controls.isLoadingModel,
-            isApplying: controls.isApplyingSelection,
-            errorMessage: controls.errorMessage,
-            onClearError: controls.clearError,
-            onRetry: {
-                Task { await controls.loadPickersIfNeeded() }
-            },
-            onSelect: { _, _ in },
-            isModelPinned: controls.isModelPinned,
-            onToggleModelPin: { providerID, modelID in
-                controls.toggleModelPin(providerID: providerID, modelID: modelID)
-            },
-            reasoningOptions: controls.reasoningOptions,
-            currentReasoningValue: controls.currentReasoningValue,
-            statusMessage: controls.statusMessage,
-            modelUnavailableReason: support?.modelUnavailableReason,
-            reasoningUnavailableReason: support?.reasoningUnavailableReason,
-            modelConfirmation: controls.pendingModelConfirmation,
-            onConfirmModel: confirmSessionModel,
-            onCancelModelConfirmation: { controls.cancelModelConfirmation(expected: $0) },
-            isEmbedded: isEmbedded,
-            onClose: onClose,
-            onApply: applySelection
-        )
-    }
-
-    private func applySelection(_ draft: SessionRuntimeSelectionDraft) {
-        guard let controls = model.runtimeControls else { return }
-        Task {
-            await controls.apply(draft)
-            guard controls.errorMessage == nil, !controls.hasPendingSelection else { return }
-            await controls.loadModelPicker()
-            guard controls.errorMessage == nil else { return }
-            await controls.loadReasoningPicker()
-            guard controls.errorMessage == nil else { return }
-            closeAllModels()
-        }
-    }
-
-    private func confirmSessionModel(_ confirmation: SessionRuntimeModelConfirmation) {
-        guard let controls = model.runtimeControls else { return }
-        Task {
-            guard await controls.confirmModelSelection(confirmation) else { return }
-            await controls.loadPickersIfNeeded()
-            guard controls.errorMessage == nil else { return }
-            closeAllModels()
-        }
-    }
-
-    private func closeAllModels() {
-        isAllModelsPresented = false
-        #if targetEnvironment(macCatalyst)
-        // Every model is a page inside the pop-up there.
-        isSessionControlsPresented = false
-        #endif
     }
 
     @BighelpThemeReader var theme: BighelpTheme

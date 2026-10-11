@@ -3,25 +3,28 @@ import XCTest
 /// The demo host refuses a model change until its exact warning is approved.
 final class ModelConfirmationUITests: BighelpUITestCase {
     @MainActor
-    func testQuickPickerRequiresApproval() {
-        checkApproval(fullPicker: false, appearance: "light")
+    func testPickingFromAProviderRequiresApproval() {
+        checkApproval(bySearch: false, appearance: "light")
     }
 
     @MainActor
-    func testFullPickerRequiresApproval() {
-        checkApproval(fullPicker: true, appearance: "dark")
+    func testPickingBySearchRequiresApproval() {
+        checkApproval(bySearch: true, appearance: "dark")
     }
 
     @MainActor
-    private func checkApproval(fullPicker: Bool, appearance: String) {
+    private func checkApproval(bySearch: Bool, appearance: String) {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-start-chat", "-preview-ui-v3",
                                "-test-model-confirmation", "-loopdy.demo.appearance", appearance]
         app.launch()
-        openPicker(in: app, full: fullPicker)
-        selectModel(in: app, full: fullPicker)
+        openPicker(in: app)
+        evidence("model-picker-\(appearance)")
+        selectModel(in: app, bySearch: bySearch)
         let approve = app.buttons["model-confirmation.approve"].firstMatch
-        guard approve.waitForExistence(timeout: 8) else {
+        let approvalShown = approve.waitForExistence(timeout: 8)
+        evidence("after-apply-\(appearance)")
+        guard approvalShown else {
             XCTFail("The host's pending model warning must offer Approve and Cancel")
             return
         }
@@ -29,61 +32,58 @@ final class ModelConfirmationUITests: BighelpUITestCase {
         evidence("model-approval-\(appearance)")
         app.buttons["model-confirmation.cancel"].tap()
         XCTAssertTrue(approve.waitForNonExistence(timeout: 5))
-        if !fullPicker {
-            XCTAssertTrue(app.buttons["chat.quick-model.openai:gpt-5.6"].exists,
-                          "Cancelling must leave the quick choices usable, not stuck loading")
-        }
-        closePicker(in: app, full: fullPicker)
+        XCTAssertTrue(app.buttons["chat.models.row.openai:gpt-5.6"].exists,
+                      "Cancelling must leave the list usable, not stuck loading")
+        app.buttons["Cancel"].firstMatch.tap()
 
         // Cancelling must not change the saved model, even after reopening.
-        openPicker(in: app, full: false)
-        XCTAssertTrue(app.buttons["chat.quick-model.nous:Hermes-4-405B"].isSelected)
-        if fullPicker { app.buttons["chat.models.see-all"].tap() }
-        selectModel(in: app, full: fullPicker)
+        openPicker(in: app)
+        XCTAssertTrue(selected(in: app).label.contains("Hermes"), selected(in: app).label)
+        selectModel(in: app, bySearch: bySearch)
         XCTAssertTrue(approve.waitForExistence(timeout: 8))
         approve.tap()
-        let apply = app.buttons[fullPicker ? "model-picker.apply" : "chat.session-controls.apply"]
-        XCTAssertTrue(apply.waitForNonExistence(timeout: 10), "Only an accepted approval closes the picker")
-        openPicker(in: app, full: false)
-        XCTAssertTrue(app.buttons["chat.quick-model.openai:gpt-5.6"].isSelected)
+        XCTAssertTrue(app.buttons["chat.session-controls.apply"].waitForNonExistence(timeout: 10),
+                      "Only an accepted approval closes the picker")
+        openPicker(in: app)
+        XCTAssertTrue(selected(in: app).label.localizedCaseInsensitiveContains("GPT-5.6"), selected(in: app).label)
         app.terminate()
     }
 
+    /// The model the chat will use, on top of the sheet.
     @MainActor
-    private func openPicker(in app: XCUIApplication, full: Bool) {
-        _ = chatMenuItem("chat.session-controls", in: app, timeout: 2)
-        // Native menu rows can expose their title instead of their SwiftUI identifier.
-        let controls = app.buttons.matching(NSPredicate(
-            format: "identifier == %@ OR label BEGINSWITH %@", "chat.session-controls", "Model & reasoning"
-        )).firstMatch
-        if !controls.waitForExistence(timeout: 2) {
-            // The first tap can arrive while the native submenu is still laying out.
-            let group = app.buttons["chat.options.model-speed"].firstMatch
-            XCTAssertTrue(group.waitForExistence(timeout: 5))
-            group.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        }
-        XCTAssertTrue(controls.waitForExistence(timeout: 8))
-        controls.tap()
-        XCTAssertTrue(app.buttons["chat.models.see-all"].waitForExistence(timeout: 8))
-        if full { app.buttons["chat.models.see-all"].tap() }
+    private func selected(in app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any)["chat.models.selected"].firstMatch
     }
 
     @MainActor
-    private func selectModel(in app: XCUIApplication, full: Bool) {
-        if full {
-            let provider = app.buttons["model-picker.provider.openai"]
+    private func openPicker(in app: XCUIApplication) {
+        openModelAndReasoning(in: app)
+        XCTAssertTrue(selected(in: app).waitForExistence(timeout: 8))
+    }
+
+    /// One screen: a provider's filter, or search, then the model, then Apply.
+    @MainActor
+    private func selectModel(in app: XCUIApplication, bySearch: Bool) {
+        if bySearch {
+            let search = app.descendants(matching: .any)["chat.models.search"].firstMatch
+            XCTAssertTrue(search.waitForExistence(timeout: 8))
+            search.tap()
+            app.typeText("gpt-5.6")
+        } else {
+            let provider = app.buttons["chat.models.filter.provider.openai"]
             XCTAssertTrue(provider.waitForExistence(timeout: 8))
             provider.tap()
         }
-        let model = app.buttons[full ? "model-picker.openai.gpt-5.6" : "chat.quick-model.openai:gpt-5.6"]
+        let model = app.buttons["chat.models.row.openai:gpt-5.6"]
         XCTAssertTrue(model.waitForExistence(timeout: 8))
         model.tap()
-        app.buttons[full ? "model-picker.apply" : "chat.session-controls.apply"].tap()
-    }
-
-    @MainActor
-    private func closePicker(in app: XCUIApplication, full: Bool) {
-        app.buttons[full ? "model-picker.dismiss" : "Cancel"].firstMatch.tap()
+        if bySearch {
+            XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), "Picking a model closes the keyboard")
+        }
+        let apply = app.buttons["chat.session-controls.apply"]
+        let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isEnabled == true"), object: apply)
+        XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 5), .completed, "A new model waits for Apply")
+        apply.tap()
     }
 
     @MainActor

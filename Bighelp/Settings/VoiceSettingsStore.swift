@@ -251,6 +251,15 @@ final class VoiceSettingsStore {
             return "Update the bighelp plugin on this host to play samples."
         }
         let title = selectedProvider?.title ?? "This provider"
+        switch error {
+        case DirectHermesVoiceError.hostRestartRequired:
+            return "\(title) is installed on your computer now. Restart Hermes there, then play the sample again."
+        case DirectHermesVoiceError.voicePackageMissing(let extra?):
+            return "Hermes couldn't install \(title) on your computer. Run hermes pm install --extra \(extra) there, then restart Hermes."
+        case DirectHermesVoiceError.voicePackageMissing:
+            return "Hermes couldn't install \(title) on your computer. Run hermes setup tts there."
+        default: break
+        }
         switch selectedProvider?.kind {
         case .onYourComputer:
             return "Couldn't play a sample. Make sure \(title) is installed on your computer: run hermes setup tts there."

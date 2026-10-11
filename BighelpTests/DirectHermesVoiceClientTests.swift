@@ -136,13 +136,54 @@ struct DirectHermesVoiceClientTests {
 
         try await output.speak("Read the answer", rate: 1.25)
 
-        #expect(transport.voiceCalls == [
-            .init(operation: .voiceSpeak, payload: [
-                "profile": .string("finance"),
-                "text": .string("Read the answer"),
-            ], owner: owner)
-        ])
+        // Warmed first, as Hermes desktop does: that's where Hermes installs a cloud voice's package.
+        #expect(transport.voiceCalls.map(\.operation) == [.voiceWarm, .voiceWarm, .voiceSpeak])
+        #expect(transport.voiceCalls.map { $0.payload["active"] } == [.boolean(true), .boolean(false), nil])
+        #expect(transport.voiceCalls[0].payload["lease"] == transport.voiceCalls[1].payload["lease"])
+        #expect(transport.voiceCalls.last == .init(operation: .voiceSpeak, payload: [
+            "profile": .string("finance"),
+            "text": .string("Read the answer"),
+        ], owner: owner))
         #expect(playback.requests == [.init(audio: Data([1, 2, 3]), mimeType: "audio/mpeg")])
+    }
+
+    /// Hermes' lease reply when it installed ElevenLabs but the running process
+    /// can't load it, and when the install itself failed.
+    @Test(arguments: [
+        ("venv: tts-premium installed; restart Hermes to activate it (dependency generation 7b91 was published "
+            + "after this process loaded 2fdc) — retry, or run `hermes pm doctor`",
+         DirectHermesVoiceError.hostRestartRequired),
+        ("venv: sync failed — retry, or run `hermes pm doctor`",
+         DirectHermesVoiceError.voicePackageMissing(extra: "tts-premium")),
+    ])
+    func aVoiceHermesCouldNotLoadSaysWhyInsteadOfBlamingTheKey(
+        reason: String, expected: DirectHermesVoiceError
+    ) async throws {
+        let owner = try Self.owner()
+        let transport = DirectHermesVoiceTransportFixture(owner: owner)
+        transport.results[WorkspaceOperation.voiceWarm.rawValue] = [
+            "ok": .boolean(true), "active": .boolean(true), "provider": .string("elevenlabs"),
+            "warmed": .boolean(false), "action": .string("error"), "error": .string(reason),
+        ]
+        // Hermes' speak route answers 400 "package not installed", which reaches the app as this.
+        transport.failures[WorkspaceOperation.voiceSpeak.rawValue] = WorkspaceClientError.invalidResponse
+        let output = DirectHermesVoiceSpeechOutput(workspace: transport, owner: owner, profileID: "finance",
+                                                   playback: VoiceAudioPlaybackFixture(), currentOwner: { owner })
+
+        await #expect(throws: expected) { try await output.speak("Hi", rate: 1) }
+    }
+
+    @Test func aVoiceThatWarmedButStillFailsKeepsHermesError() async throws {
+        let owner = try Self.owner()
+        let transport = DirectHermesVoiceTransportFixture(owner: owner)
+        transport.results[WorkspaceOperation.voiceWarm.rawValue] = [
+            "ok": .boolean(true), "provider": .string("elevenlabs"), "warmed": .boolean(true), "action": .string("cached"),
+        ]
+        transport.failures[WorkspaceOperation.voiceSpeak.rawValue] = WorkspaceClientError.invalidResponse
+        let output = DirectHermesVoiceSpeechOutput(workspace: transport, owner: owner, profileID: "finance",
+                                                   playback: VoiceAudioPlaybackFixture(), currentOwner: { owner })
+
+        await #expect(throws: WorkspaceClientError.invalidResponse) { try await output.speak("Hi", rate: 1) }
     }
 
     @Test func directSpeechRejectsMalformedAudioWithoutPlayback() async throws {
@@ -448,6 +489,7 @@ private final class DirectHermesVoiceTransportFixture: WorkspaceOperationPerform
     let capabilities: WorkspaceCapabilities
     var results: [String: [String: BighelpJSONValue]] = [:]
     var sequences: [String: [[String: BighelpJSONValue]]] = [:]
+    var failures: [String: any Error] = [:]
     var onVoiceCall: (() -> Void)?
     private(set) var voiceCalls: [Call] = []
 
@@ -461,11 +503,13 @@ private final class DirectHermesVoiceTransportFixture: WorkspaceOperationPerform
         payload: [String: BighelpJSONValue],
         owner: WorkspaceOwner
     ) async throws -> [String: BighelpJSONValue] {
-        guard [.workspaceConfigGet, .workspaceConfigSet, .keysList, .keysSet, .voiceSpeak].contains(operation) else {
+        guard [.workspaceConfigGet, .workspaceConfigSet, .keysList, .keysSet, .voiceSpeak, .voiceWarm]
+            .contains(operation) else {
             throw WorkspaceClientError.unavailable(.unsupportedOperation)
         }
         voiceCalls.append(.init(operation: operation, payload: payload, owner: owner))
         onVoiceCall?()
+        if let failure = failures[operation.rawValue] { throw failure }
         if var sequence = sequences[operation.rawValue], !sequence.isEmpty {
             let value = sequence.removeFirst()
             sequences[operation.rawValue] = sequence

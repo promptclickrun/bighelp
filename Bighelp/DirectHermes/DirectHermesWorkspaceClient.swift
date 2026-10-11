@@ -392,6 +392,14 @@ final class DirectHermesWorkspaceClient: WorkspaceOperationPerforming {
             try fields(payload, allowed: ["profile", "text"], required: ["profile", "text"])
             return .http(.init(path: "/api/audio/speak", method: .post,
                               query: try queryItems(["profile": payload["profile"]!]), body: ["text": payload["text"]!]))
+        case .voiceWarm:
+            try fields(payload, allowed: ["profile", "lease", "active"], required: ["profile", "lease", "active"])
+            var request = DirectHermesHTTPRequest(path: "/api/audio/tts-lease", method: .post,
+                                                  query: try queryItems(["profile": payload["profile"]!]),
+                                                  body: ["lease": payload["lease"]!, "active": payload["active"]!])
+            // A first warm-up can install the voice's package; Hermes desktop waits three minutes.
+            request.timeout = 180
+            return .http(request)
         case .pluginsList:
             try fields(payload, allowed: ["profile", "action"])
             guard payload["action"] == nil || payload["action"] == .string("list") else {

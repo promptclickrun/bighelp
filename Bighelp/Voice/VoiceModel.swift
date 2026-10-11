@@ -632,7 +632,12 @@ final class VoiceModel {
             stopMonitoring()
             currentSpokenReply = nil
             liveAgentTranscript = nil
-            turnErrorMessage = "Voice response could not be completed. Try speaking again."
+            // A voice Hermes still has to install, or restart to use, says so.
+            if let voiceError = error as? DirectHermesVoiceError, voiceError != .invalidAudioResponse {
+                turnErrorMessage = voiceError.errorDescription
+            } else {
+                turnErrorMessage = "Voice response could not be completed. Try speaking again."
+            }
             status = .listening
         }
     }

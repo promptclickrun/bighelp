@@ -81,6 +81,8 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     case subagentInterrupt = "subagent.interrupt"
     case subagentSteer = "subagent.steer"
     case voiceSpeak = "voice.speak"
+    /// Hermes' TTS warm-up (`/api/audio/tts-lease`), which installs a cloud voice's package on first use.
+    case voiceWarm = "voice.warm"
     case groupsCapabilities = "groups.capabilities"
     case groupsList = "groups.list"
     case groupsCreate = "groups.create"

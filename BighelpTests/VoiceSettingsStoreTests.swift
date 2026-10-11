@@ -176,6 +176,20 @@ struct VoiceSettingsStoreTests {
         #expect(store.sampleError?.contains("hermes setup tts") == true)
     }
 
+    @Test func aSampleHermesMustRestartForSaysSo() async {
+        let client = VoiceSettingsProbe()
+        client.configuration = VoiceSettingsConfiguration(revision: "revision-1", providerID: "elevenlabs", providers: [
+            .init(spec: VoiceProviderSpec.builtIn("elevenlabs")!, voiceID: "voice-1",
+                  apiKeyConfigured: true, model: "", serverURL: ""),
+        ])
+        client.sampleError = DirectHermesVoiceError.hostRestartRequired
+        let store = VoiceSettingsStore(agentID: "finance", client: client)
+        await store.load()
+        await store.playSample()
+        #expect(store.sampleError?.contains("Restart Hermes") == true)
+        #expect(store.sampleError?.contains("API key") == false)
+    }
+
     @Test func serverAddressMustBeAWebAddress() async {
         let client = VoiceSettingsProbe()
         client.configuration = VoiceSettingsConfiguration(revision: "revision-1", providerID: "openai", providers: [

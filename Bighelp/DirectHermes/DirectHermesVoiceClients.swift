@@ -344,8 +344,22 @@ private extension JSONEncoder {
     }
 }
 
-enum DirectHermesVoiceError: Error, Equatable, Sendable {
+enum DirectHermesVoiceError: Error, Equatable, LocalizedError, Sendable {
     case invalidAudioResponse
+    /// Hermes installed what the voice needs but runs without it until it restarts.
+    case hostRestartRequired
+    /// Hermes couldn't install what the voice needs. `extra` is its `hermes pm` add-on, when known.
+    case voicePackageMissing(extra: String?)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidAudioResponse: "Hermes sent audio this device can't play."
+        case .hostRestartRequired: "This voice is installed on your computer now. Restart Hermes there to use it."
+        case .voicePackageMissing(let extra):
+            extra.map { "Hermes couldn't install this voice on your computer. Run hermes pm install --extra \($0) there, then restart Hermes." }
+                ?? "Hermes couldn't install this voice on your computer."
+        }
+    }
 }
 
 @MainActor
@@ -354,6 +368,7 @@ final class DirectHermesVoiceSpeechOutput: VoiceSpeechOutput {
     private let profileID: String
     private let playback: any VoiceAudioPlayback
     private var generation: UInt64 = 0
+    private var warmUp: WarmUp?
 
     init(
         workspace: any WorkspaceOperationPerforming,
@@ -395,10 +410,16 @@ final class DirectHermesVoiceSpeechOutput: VoiceSpeechOutput {
         guard !normalized.isEmpty else { throw VoiceSessionError.emptyResponse }
         let profile = try DirectHermesCoreRequestScope.profile(profileID)
         try scope.require(.voiceOutput, profile: profile)
-        let value = try await scope.perform(.voiceSpeak, [
-            "profile": .string(profile),
-            "text": .string(String(normalized.prefix(20_000))),
-        ])
+        let warmUp = try await warm(profile)
+        let value: [String: BighelpJSONValue]
+        do {
+            value = try await scope.perform(.voiceSpeak, [
+                "profile": .string(profile),
+                "text": .string(String(normalized.prefix(20_000))),
+            ])
+        } catch let error as WorkspaceClientError where error != .ownerChanged {
+            throw warmUp.failure ?? error
+        }
         try Task.checkCancellation()
         let audio = try Self.audio(value)
         return TeamCallAudio(data: audio.data, mimeType: audio.mimeType)
@@ -407,6 +428,48 @@ final class DirectHermesVoiceSpeechOutput: VoiceSpeechOutput {
     func stop() {
         generation &+= 1
         playback.stop()
+    }
+
+    /// What Hermes said when it warmed this voice.
+    private struct WarmUp {
+        /// Why speaking may fail: the voice's package is missing, or needs a restart.
+        let failure: DirectHermesVoiceError?
+    }
+
+    /// Hermes installs a cloud voice's package (ElevenLabs, Edge, Mistral) the
+    /// first time it's used. Warming it first, as Hermes desktop does when voice
+    /// turns on, gives that install three minutes instead of speech's 20 seconds,
+    /// and says why when Hermes can't install it or must restart to load it (speech
+    /// only says "not installed"). Once per output, released right away: a local
+    /// voice stays loaded for Hermes' keep-warm time. An older Hermes just speaks.
+    private func warm(_ profile: String) async throws -> WarmUp {
+        if let warmUp { return warmUp }
+        let lease = "bighelp:voice:\(UUID().uuidString.lowercased())"
+        let receipt: [String: BighelpJSONValue]
+        do {
+            receipt = try await scope.perform(.voiceWarm, [
+                "profile": .string(profile), "lease": .string(lease), "active": .boolean(true),
+            ])
+        } catch WorkspaceClientError.ownerChanged {
+            throw WorkspaceClientError.ownerChanged
+        } catch {
+            receipt = [:]
+        }
+        _ = try? await scope.perform(.voiceWarm, [
+            "profile": .string(profile), "lease": .string(lease), "active": .boolean(false),
+        ])
+        let result = WarmUp(failure: Self.warmUpFailure(receipt))
+        warmUp = result
+        return result
+    }
+
+    private static func warmUpFailure(_ receipt: [String: BighelpJSONValue]) -> DirectHermesVoiceError? {
+        guard receipt["action"]?.string == "error" else { return nil }
+        let reason = String(receipt["error"]?.string?.prefix(2_048) ?? "")
+        if reason.localizedCaseInsensitiveContains("restart Hermes") { return .hostRestartRequired }
+        // Hermes' add-on for each voice whose package installs on first use.
+        let extras = ["elevenlabs": "tts-premium", "edge": "edge-tts", "mistral": "mistral"]
+        return .voicePackageMissing(extra: receipt["provider"]?.string.flatMap { extras[$0] })
     }
 
     private static func audio(_ value: [String: BighelpJSONValue]) throws -> (data: Data, mimeType: String) {

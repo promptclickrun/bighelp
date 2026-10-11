@@ -10,11 +10,13 @@ final class ChatContextWindowUITests: BighelpUITestCase {
             let app = launch(appearance: appearance)
             XCTAssertFalse(app.buttons["chat.session-context"].exists, "No context button above the message box")
 
-            let item = chatMenuItem("chat.context-window", in: app)
-            XCTAssertTrue(item.waitForExistence(timeout: 5), "⋯ has Context window")
-            let order = ["chat.provider-usage", "chat.context-window"].map {
-                app.buttons[$0].firstMatch
+            _ = chatMenuItem("chat.context-window", in: app)
+            if !menuButton("chat.context-window", "Context window", in: app).waitForExistence(timeout: 2) {
+                menuButton("chat.options.usage", "Usage", in: app).tap()
             }
+            let item = menuButton("chat.context-window", "Context window", in: app)
+            XCTAssertTrue(item.waitForExistence(timeout: 5), "⋯ has Context window")
+            let order = [menuButton("chat.provider-usage", "Usage", in: app, exact: true), item]
             for element in order { XCTAssertTrue(element.exists, element.identifier) }
             for (upper, lower) in zip(order, order.dropFirst()) {
                 XCTAssertLessThan(upper.frame.midY, lower.frame.midY,
@@ -46,6 +48,15 @@ final class ChatContextWindowUITests: BighelpUITestCase {
         let model = chatMenuItem("chat.session-controls", in: app)
         XCTAssertTrue(model.waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["chat.context-window"].exists)
+    }
+
+    /// Native menu rows can expose their title instead of their identifier.
+    @MainActor
+    private func menuButton(_ identifier: String, _ title: String, in app: XCUIApplication,
+                            exact: Bool = false) -> XCUIElement {
+        app.buttons.matching(NSPredicate(format: exact ? "identifier == %@ OR label == %@"
+                                                       : "identifier == %@ OR label BEGINSWITH %@",
+                                         identifier, title)).firstMatch
     }
 
     @MainActor

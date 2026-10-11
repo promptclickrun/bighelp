@@ -952,7 +952,7 @@ struct ChatView: View {
             }
             thisChatMenu
             if dynamicTypeSize.isAccessibilitySize {
-                if projectChangesSummary != nil || contextWindowSnapshot != nil || providerUsage?.isAvailable == true || nerdModeEnabled {
+                if projectChangesSummary != nil || offersContextWindow || providerUsage?.isAvailable == true || nerdModeEnabled {
                     Menu {
                         fileChangesMenuItem
                         usageMenu
@@ -1095,7 +1095,7 @@ struct ChatView: View {
 
     @ViewBuilder
     private var usageMenu: some View {
-        if contextWindowSnapshot != nil || providerUsage?.isAvailable == true {
+        if offersContextWindow || providerUsage?.isAvailable == true {
             Menu {
                 providerUsageMenuItem
                 contextWindowMenuItem
@@ -1182,11 +1182,13 @@ struct ChatView: View {
 
     @ViewBuilder
     private var contextWindowMenuItem: some View {
-        if let context = contextWindowSnapshot {
+        if offersContextWindow {
             Button(action: openContextWindow) {
                 Text("Context window")
                 if !dynamicTypeSize.isAccessibilitySize {
-                    Text("\(SessionContextRingPresentation.remainingLabel(usedPercent: context.contextPercent)) left")
+                    Text(contextWindowSnapshot.map {
+                        "\(SessionContextRingPresentation.remainingLabel(usedPercent: $0.contextPercent)) left"
+                    } ?? "Not reported yet")
                 }
                 Image(systemName: "gauge.with.dots.needle.33percent")
             }
@@ -1209,10 +1211,18 @@ struct ChatView: View {
         nerdModeEnabled ? model.sessionContext : nil
     }
 
+    /// Hermes reports a chat's context size only once the agent has answered in its
+    /// current session (a new chat, or any chat after Hermes restarts, has none yet),
+    /// so a Hermes chat always offers Context window in Nerd Mode, saying when it's
+    /// still to come, rather than the item and Usage disappearing.
+    private var offersContextWindow: Bool {
+        nerdModeEnabled && (model.sessionContext != nil || directHermesClient != nil)
+    }
+
     /// The pop-up hangs from the ⋯ button. The menu has already closed when its
     /// item runs, so nothing else is presenting.
     private func openContextWindow() {
-        guard contextWindowSnapshot != nil else { return }
+        guard offersContextWindow else { return }
         dismissKeyboard()
         isContextWindowPresented = true
     }
@@ -1239,6 +1249,21 @@ struct ChatView: View {
             .presentationCompactAdaptation(.popover)
             .bighelpPopoverDismissal(isPresented: $isContextWindowPresented)
             .onDisappear(perform: contextWindowDidClose)
+        } else {
+            VStack(alignment: .leading, spacing: BighelpTokens.space8) {
+                Text("Context window").bighelpFont(.label, weight: .semibold)
+                Text("Hermes reports this chat's context size after the agent's next reply.")
+                    .bighelpFont(.metadata)
+                    .foregroundStyle(theme.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(BighelpTokens.space20)
+            .frame(minWidth: 260, alignment: .leading)
+            .background(theme.canvas)
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("chat.session-context.pending")
+            .presentationCompactAdaptation(.popover)
+            .bighelpPopoverDismissal(isPresented: $isContextWindowPresented)
         }
     }
 

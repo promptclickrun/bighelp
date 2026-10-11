@@ -95,7 +95,11 @@ extension DirectHermesConversationClient {
                         } else {
                             params[command ? "command" : "text"] = .string(message)
                         }
-                        if voiceReply { params["surface"] = .string("voice-live") }
+                        if voiceReply {
+                            params["surface"] = .string("voice-live")
+                            // Hermes runs a spoken turn on Settings' Voice Chat model (auxiliary.voice_chat).
+                            if !command { params["voice_turn"] = .boolean(true) }
+                        }
                         // If another surface wins the idle race, queue rather
                         // than applying the host's default interrupt/redirect.
                         if !command { params["queued"] = .boolean(true) }

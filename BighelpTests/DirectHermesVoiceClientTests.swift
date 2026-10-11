@@ -286,6 +286,7 @@ struct DirectHermesVoiceClientTests {
         let request = try #require(rpc.requests.first)
         #expect(request.method == "prompt.submit")
         #expect(request.params["surface"] == .string("voice-live"))
+        #expect(request.params["voice_turn"] == .boolean(true), "Hermes runs it on the Voice Chat model")
         #expect(request.params["queued"] == .boolean(true))
 
         conversation.receive(.init(type: "message.start", sessionID: "voice-runtime", payload: [:], sequence: 1))

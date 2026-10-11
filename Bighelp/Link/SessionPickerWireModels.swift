@@ -173,27 +173,32 @@ struct BighelpLinkModelPicker: Decodable, Equatable, Sendable {
         currentModel: String, currentProvider: String,
         providers: [BighelpLinkModelProvider], sentAt: Int
     ) throws {
-        guard BighelpLinkPickerValidation.opaque(pickerID, minimum: 16, maximum: 128),
-              BighelpLinkPickerValidation.modelIdentifier(currentModel, maximum: 256) != nil,
-              // Empty when Hermes didn't say (a chat whose agent hasn't started).
-              currentProvider.isEmpty || BighelpLinkPickerValidation.identifier(currentProvider, maximum: 128) != nil,
-              providers.count <= 128,
-              Set(providers.map(\.id)).count == providers.count,
-              providers.reduce(0, { $0 + $1.models.count }) <= 20_000,
-              providers.allSatisfy({
-                  BighelpLinkPickerValidation.identifier($0.id, maximum: 128) != nil
-                      && BighelpLinkPickerValidation.label($0.name, maximum: 800) != nil
-                      && $0.models.count <= 10_000
-                      && Set($0.models).count == $0.models.count
-                      && $0.models.allSatisfy { BighelpLinkPickerValidation.modelIdentifier($0, maximum: 256) != nil }
-              }),
-              sentAt > 0 else { throw BighelpLinkWireError.invalidValue }
+        guard BighelpLinkPickerValidation.opaque(pickerID, minimum: 16, maximum: 128), sentAt > 0 else {
+            throw BighelpLinkWireError.invalidValue
+        }
         self.pickerID = pickerID
         self.sessionID = nativeCoordinate.workspace.sessionID
         self.nativeCoordinate = nativeCoordinate
-        self.currentModel = currentModel
-        self.currentProvider = currentProvider
-        self.providers = providers
+        // A model or provider Hermes names that the app couldn't send back reads as unknown
+        // (empty), as it does for a chat whose agent hasn't started.
+        self.currentModel = BighelpLinkPickerValidation.modelIdentifier(currentModel, maximum: 256) == nil ? "" : currentModel
+        self.currentProvider = BighelpLinkPickerValidation.identifier(currentProvider, maximum: 128) == nil ? "" : currentProvider
+        // The picker always lists what it can: a repeated or unusable provider or model
+        // costs only itself (`DirectHermesAgentRuntimeDefaultsClient.decodeModelProviders`).
+        var providerIDs = Set<String>()
+        self.providers = providers.compactMap { provider in
+            guard BighelpLinkPickerValidation.identifier(provider.id, maximum: 128) != nil,
+                  providerIDs.insert(provider.id).inserted else { return nil }
+            var modelIDs = Set<String>()
+            let models = provider.models.filter {
+                BighelpLinkPickerValidation.modelIdentifier($0, maximum: 256) != nil && modelIDs.insert($0).inserted
+            }
+            return BighelpLinkModelProvider(
+                id: provider.id, name: BighelpLinkPickerValidation.label(provider.name, maximum: 800) ?? provider.id,
+                isCurrent: provider.isCurrent, isCustom: provider.isCustom, models: models,
+                fastModeModels: provider.fastModeModels
+            )
+        }
         self.sentAt = sentAt
     }
 

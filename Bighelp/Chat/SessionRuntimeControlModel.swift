@@ -354,7 +354,8 @@ final class SessionRuntimeControlModel {
             modelObservedAt = readStartedAt
             allowsAgentDefaults = false
             currentProvider = picker.currentProvider.isEmpty ? nil : picker.currentProvider
-            currentModel = picker.currentModel
+            // Unknown (no live session behind the chat yet) keeps the model known before.
+            if !picker.currentModel.isEmpty { currentModel = picker.currentModel }
             if readStartedAt >= deferredObservedAt {
                 deferredSelection = nil
                 statusMessage = nil

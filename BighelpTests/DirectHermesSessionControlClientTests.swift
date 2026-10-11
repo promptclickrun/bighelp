@@ -114,12 +114,25 @@ struct DirectHermesSessionControlClientTests {
             owner: fixture.originalOwner, profileID: "studio", sessionID: otherID,
             storedSessionID: "stored-chat", runtimeSessionID: "runtime-chat"
         )
+        // Another chat's session is never used in this one's place: the picker lists the
+        // agent's own catalog, and a choice waits for this chat's own live session.
+        try await Self.listsTheCatalogButNeverChangesAnything(fixture)
+    }
+
+    /// What a chat with no verified live session of its own gets: the agent's catalog to
+    /// choose from, read for its profile alone, and nothing changed on any session or the
+    /// agent's defaults until the chat has its own.
+    private static func listsTheCatalogButNeverChangesAnything(_ fixture: SessionControlWorkspace) async throws {
         let client = fixture.client()
-        #expect(client.selectionSupport(sessionID: fixture.appID, agentID: "studio").modelUnavailableReason != nil)
-        await #expect(throws: WorkspaceClientError.unavailable(.unsupportedOperation)) {
-            _ = try await client.openPicker(fixture.open(.model))
-        }
-        #expect(fixture.calls.isEmpty)
+        let picker = try #require(try await client.openPicker(fixture.open(.model)).model)
+        #expect(picker.providers.map(\.id) == ["native-provider"])
+        #expect(picker.providers.first?.models == ["old-model", "new-model"])
+        let selection = try BighelpLinkPickerSelection(
+            pickerID: picker.pickerID, sessionID: fixture.appID, kind: .model,
+            provider: "native-provider", model: "new-model", value: nil, sentAt: 1_800_000_000,
+            nativeCoordinate: picker.nativeCoordinate)
+        await #expect(throws: (any Error).self) { _ = try await client.selectPicker(selection) }
+        #expect(!fixture.calls.contains { [.configSet, .sessionCreate].contains($0.operation) })
     }
 
     @Test func nativePickerProjectionDoesNotWidenLinkWireContracts() async throws {
@@ -168,32 +181,58 @@ struct DirectHermesSessionControlClientTests {
         }
     }
 
-    @Test func absentLiveMappingNeverCreatesOrFallsBackToProfileDefaults() async throws {
+    /// A chat not attached to a live session yet (still starting, or reattaching) still
+    /// lists the agent's models; it never creates a session or changes the defaults.
+    @Test func absentLiveMappingListsTheCatalogButNeverCreatesOrChangesDefaults() async throws {
         let fixture = try SessionControlWorkspace()
         fixture.coordinate = nil
-        await #expect(throws: WorkspaceClientError.unavailable(.unsupportedOperation)) {
-            _ = try await fixture.client().openPicker(fixture.open(.model))
-        }
-        #expect(fixture.calls.isEmpty)
+        try await Self.listsTheCatalogButNeverChangesAnything(fixture)
+        #expect(fixture.calls.allSatisfy { $0.operation == .modelOptions && $0.payload["session_id"] == nil })
     }
 
     @Test func mismatchedProfileOrDurableReceiptIsRejected() async throws {
         for field in ["profile_name", "stored_session_id"] {
             let fixture = try SessionControlWorkspace()
             fixture.invalidInfoField = field
-            await #expect(throws: WorkspaceClientError.unavailable(.unsupportedOperation)) {
-                _ = try await fixture.client().openPicker(fixture.open(.model))
-            }
-            #expect(!fixture.calls.contains { $0.operation == .configSet })
+            try await Self.listsTheCatalogButNeverChangesAnything(fixture)
         }
     }
 
+    /// A started chat that doesn't report its reasoning still lists the levels, on Auto;
+    /// choosing one needs the report, so nothing is changed.
     @Test func aStartedChatMustReportItsReasoning() async throws {
         let fixture = try SessionControlWorkspace()
         fixture.reasoning = nil
-        await #expect(throws: WorkspaceClientError.unavailable(.unsupportedOperation)) {
-            _ = try await fixture.client().openPicker(fixture.open(.reasoning))
-        }
+        let client = fixture.client()
+        let picker = try #require(try await client.openPicker(fixture.open(.reasoning)).choice)
+        #expect(picker.choices.first(where: \.isCurrent)?.value == "reset")
+        let selection = try BighelpLinkPickerSelection(
+            pickerID: picker.pickerID, sessionID: fixture.appID, kind: .reasoning,
+            provider: nil, model: nil, value: "high", sentAt: 1_800_000_000, nativeCoordinate: picker.nativeCoordinate)
+        await #expect(throws: (any Error).self) { _ = try await client.selectPicker(selection) }
+        #expect(!fixture.calls.contains { $0.operation == .configSet })
+    }
+
+    /// A provider's catalog with a repeated model (one Azure AI Foundry provider lists 482,
+    /// 17 of them twice), a model the app couldn't send back, a malformed provider row or a
+    /// repeated provider costs only that entry, never the picker.
+    @Test func aRepeatedOrUnusableCatalogEntryCostsOnlyItself() throws {
+        let providers = try DirectHermesAgentRuntimeDefaultsClient.decodeModelProviders([
+            "providers": .array([
+                .object(["slug": .string("azure-foundry"), "name": .string("Azure AI Foundry"),
+                         "is_current": .boolean(true), "is_user_defined": .boolean(false),
+                         "models": .array(["gpt-5.5", "text-embedding-ada-002", "Phi-3.5-mini-instruct",
+                                           "text-embedding-ada-002", " padded", "bell\u{0007}", "Phi-3.5-mini-instruct"]
+                            .map(BighelpJSONValue.string))]),
+                .object(["name": .string("No slug")]),
+                .object(["slug": .string("azure-foundry"), "models": .array([.string("other")])]),
+                .object(["slug": .string("openrouter"), "models": .array([.string("anthropic/claude-sonnet-5.5")])]),
+            ])
+        ])
+        #expect(providers.map(\.id) == ["azure-foundry", "openrouter"])
+        #expect(providers[0].models == ["gpt-5.5", "text-embedding-ada-002", "Phi-3.5-mini-instruct"])
+        #expect(providers[0].isCurrent)
+        #expect(providers[1].name == "openrouter" && !providers[1].isCurrent)
     }
 
     /// A new agent cloned onto a provider whose login didn't carry over (a plugin
@@ -875,7 +914,9 @@ private final class SessionControlWorkspace: WorkspaceOperationPerforming {
                  owner: WorkspaceOwner) async throws -> [String: BighelpJSONValue] {
         guard self.owner == owner else { throw WorkspaceClientError.ownerChanged }
         calls.append(Call(operation: operation, payload: payload))
-        guard payload["session_id"] == .string("runtime-chat") else { throw WorkspaceClientError.invalidRequest }
+        // The agent's own catalog is read for its profile alone, as Hermes allows.
+        guard payload["session_id"] == .string("runtime-chat")
+            || (operation == .modelOptions && payload["session_id"] == nil) else { throw WorkspaceClientError.invalidRequest }
         switch operation {
         case .sessionActivate:
             if yieldOnActivation { await Task.yield() }

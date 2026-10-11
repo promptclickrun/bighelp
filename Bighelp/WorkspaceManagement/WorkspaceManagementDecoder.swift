@@ -60,25 +60,31 @@ enum WorkspaceManagementDecoder {
         )
     }
 
+    /// Hermes' model catalog, read like the chat picker's
+    /// (`DirectHermesAgentRuntimeDefaultsClient.decodeModelProviders`): a malformed
+    /// provider, an unusable model or a repeat costs only itself, never the list.
     static func models(_ payload: Object) throws -> WorkspaceModelCatalog {
-        let providers: [WorkspaceModelCatalog.Provider] = try rows(payload["providers"], maximum: 100).map {
-            let row = try object($0)
-            let models = try rows(row["models"], maximum: 5_000).map { try text($0, maximum: 256) }
-            guard Set(models).count == models.count else { throw WorkspaceManagementError.invalidResponse }
-            if let authenticated = row["authenticated"], authenticated.boolean == nil {
-                throw WorkspaceManagementError.invalidResponse
+        guard let rows = payload["providers"]?.array else { throw WorkspaceManagementError.invalidResponse }
+        var providerIDs = Set<String>()
+        let providers: [WorkspaceModelCatalog.Provider] = rows.compactMap { value in
+            guard let row = value.object, let id = try? text(row["slug"], maximum: 256),
+                  providerIDs.insert(id).inserted else { return nil }
+            var modelIDs = Set<String>()
+            let models = (row["models"]?.array ?? []).compactMap { model -> String? in
+                guard let model = try? text(model, maximum: 256), modelIDs.insert(model).inserted else { return nil }
+                return model
             }
-            return try .init(
-                id: text(row["slug"], maximum: 256),
-                name: text(row["name"], maximum: 200),
+            return .init(
+                id: id,
+                name: (try? text(row["name"], maximum: 200)) ?? id,
                 models: models,
                 isAuthenticated: row["authenticated"]?.boolean
             )
         }
-        return try .init(
-            providers: unique(providers),
-            currentProvider: text(payload["provider"], maximum: 256, empty: true),
-            currentModel: text(payload["model"], maximum: 256, empty: true)
+        return .init(
+            providers: providers,
+            currentProvider: (try? text(payload["provider"], maximum: 256, empty: true)) ?? "",
+            currentModel: (try? text(payload["model"], maximum: 256, empty: true)) ?? ""
         )
     }
 

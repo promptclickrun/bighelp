@@ -85,7 +85,10 @@ final class DirectHermesSessionControlClient: SessionRuntimeControlConfirming, S
         let modelReason: String?
         if currentOwner() != owner || workspace.owner != owner {
             modelReason = "The host connection changed. Reopen this chat's controls."
-        } else if (try? coordinate(sessionID: sessionID, agentID: agentID)) != nil {
+        } else if (try? DirectHermesSessionIdentity.decode(sessionID, owner: owner))
+                    .map({ DirectHermesSessionValidation.same($0.profileID, agentID) }) == true {
+            // This agent's chat, live or not yet (still starting, or reattaching): its lists
+            // show and a choice is made on its own live session when applied (`livePicker`).
             modelReason = AgentActionsPresentation.unavailableMessage(
                 workspace.capabilities.availability(for: .sessionModelEdit, owner: owner, profileID: agentID)
             )
@@ -134,7 +137,8 @@ final class DirectHermesSessionControlClient: SessionRuntimeControlConfirming, S
               request.sentAt > 0 else {
             throw WorkspaceClientError.invalidRequest
         }
-        let coordinate = try coordinate(sessionID: request.sessionID, agentID: request.agentID)
+        // The lists never wait on the chat's live session; a choice does (`liveCoordinate`).
+        let coordinate = try listingCoordinate(sessionID: request.sessionID, agentID: request.agentID)
         let nativeCoordinate = try NativeSessionRuntimePickerCoordinate(coordinate)
         prune()
         let key = Key(sessionID: request.sessionID, kind: request.kind)
@@ -155,14 +159,37 @@ final class DirectHermesSessionControlClient: SessionRuntimeControlConfirming, S
         let providers: [BighelpLinkModelProvider]
         switch request.kind {
         case .model:
-            let state = try await modelState(sessionID: request.sessionID, coordinate: coordinate)
+            let state: ModelState
+            if coordinate.runtimeSessionID != nil {
+                do {
+                    state = try await modelState(sessionID: request.sessionID, coordinate: coordinate)
+                } catch let error where Self.endsPicker(error) {
+                    throw error
+                } catch {
+                    state = try await catalogState(coordinate)
+                }
+            } else {
+                state = try await catalogState(coordinate)
+            }
             providers = state.providers
             response = .model(try BighelpLinkModelPicker(
                 pickerID: id, nativeCoordinate: nativeCoordinate, currentModel: state.model,
                 currentProvider: state.provider, providers: state.providers, sentAt: timestamp
             ))
         case .reasoning:
-            let proof = try await proof(sessionID: request.sessionID, coordinate: coordinate)
+            // With no live session to ask, the levels still show, on Auto.
+            let proof: Proof
+            if coordinate.runtimeSessionID != nil {
+                do {
+                    proof = try await self.proof(sessionID: request.sessionID, coordinate: coordinate)
+                } catch let error where Self.endsPicker(error) {
+                    throw error
+                } catch {
+                    proof = Proof(reasoning: "", model: "", provider: "", fastMode: nil, isRunning: false)
+                }
+            } else {
+                proof = Proof(reasoning: "", model: "", provider: "", fastMode: nil, isRunning: false)
+            }
             providers = []
             var choices = try Self.reasoningValues.map { value in
                 try BighelpLinkChoice(value: value, label: AgentReasoningOption.option(for: value).title,
@@ -177,7 +204,7 @@ final class DirectHermesSessionControlClient: SessionRuntimeControlConfirming, S
                 sentAt: timestamp
             ))
         }
-        try requireCurrent(sessionID: request.sessionID, coordinate: coordinate)
+        try requireListingCurrent(sessionID: request.sessionID, coordinate: coordinate)
         guard generations[key] == generation else { throw CancellationError() }
         pickers[id] = Picker(
             id: id, key: key, generation: generation, coordinate: coordinate,
@@ -189,11 +216,12 @@ final class DirectHermesSessionControlClient: SessionRuntimeControlConfirming, S
 
     func selectPicker(_ selection: BighelpLinkPickerSelection) async throws -> BighelpLinkPickerResult {
         prune()
-        guard let picker = pickers[selection.pickerID],
-              picker.key.sessionID == selection.sessionID, picker.key.kind == selection.kind,
-              generations[picker.key] == picker.generation else {
+        guard let opened = pickers[selection.pickerID],
+              opened.key.sessionID == selection.sessionID, opened.key.kind == selection.kind,
+              generations[opened.key] == opened.generation else {
             return try result(selection, status: .expired, message: "Reopen this chat's model picker.")
         }
+        let picker = try livePicker(opened)
         try requireCurrent(sessionID: selection.sessionID, coordinate: picker.coordinate)
         if selection.kind == .reasoning {
             return try await applyReasoning(selection, picker: picker)
@@ -513,6 +541,67 @@ final class DirectHermesSessionControlClient: SessionRuntimeControlConfirming, S
         return coordinate
     }
 
+    /// The chat's coordinate for listing models and levels: its live session when it has
+    /// one, or just its identity before it does (not reattached yet, or still starting).
+    private func listingCoordinate(sessionID: String, agentID: String) throws -> WorkspaceSessionCoordinate {
+        if let live = try? coordinate(sessionID: sessionID, agentID: agentID) { return live }
+        let identity = try DirectHermesSessionIdentity.decode(sessionID, owner: owner)
+        guard DirectHermesSessionValidation.same(identity.profileID, agentID) else { throw WorkspaceClientError.invalidRequest }
+        // Only this chat's own mapping: never another chat's session in its place.
+        if let known = resolveSession(sessionID), known.owner == owner,
+           DirectHermesSessionValidation.same(known.sessionID, sessionID),
+           DirectHermesSessionValidation.same(known.profileID, agentID) {
+            return known
+        }
+        return try WorkspaceSessionCoordinate(owner: owner, profileID: identity.profileID, sessionID: sessionID,
+                                              storedSessionID: nil, runtimeSessionID: nil)
+    }
+
+    private func requireListingCurrent(sessionID: String, coordinate: WorkspaceSessionCoordinate) throws {
+        guard coordinate.runtimeSessionID != nil else {
+            try Task.checkCancellation()
+            guard currentOwner() == owner, workspace.owner == owner else { throw WorkspaceClientError.ownerChanged }
+            return
+        }
+        try requireCurrent(sessionID: sessionID, coordinate: coordinate)
+    }
+
+    /// A picker opened before the chat had a live session chooses on the one it has now.
+    private func livePicker(_ picker: Picker) throws -> Picker {
+        guard picker.coordinate.runtimeSessionID == nil else { return picker }
+        guard let live = try? coordinate(sessionID: picker.key.sessionID, agentID: picker.coordinate.profileID) else {
+            throw WorkspaceClientError.unavailable(.notConnected)
+        }
+        return Picker(id: picker.id, key: picker.key, generation: picker.generation, coordinate: live,
+                      providers: picker.providers, expiresAt: picker.expiresAt)
+    }
+
+    /// Cancellation or a changed owner ends a picker; anything else falls back to the catalog.
+    private static func endsPicker(_ error: any Error) -> Bool {
+        error is CancellationError || (error as? WorkspaceClientError) == .ownerChanged
+    }
+
+    /// The agent's own catalog (`model.options` for its profile), for a chat with no live
+    /// session or one whose check failed: the list always shows, the current model from
+    /// what Hermes says for the profile.
+    private func catalogState(_ coordinate: WorkspaceSessionCoordinate) async throws -> ModelState {
+        try Task.checkCancellation()
+        guard currentOwner() == owner, workspace.owner == owner else { throw WorkspaceClientError.ownerChanged }
+        let availability = workspace.capabilities.availability(for: .modelsRead, owner: owner, profileID: coordinate.profileID)
+        guard availability.isAvailable else {
+            if case .unavailable(let reason) = availability { throw WorkspaceClientError.unavailable(reason) }
+            throw WorkspaceClientError.unavailable(.unsupportedOperation)
+        }
+        let response = try await workspace.perform(.modelOptions, payload: ["profile": .string(coordinate.profileID)],
+                                                   owner: owner)
+        guard currentOwner() == owner, workspace.owner == owner else { throw WorkspaceClientError.ownerChanged }
+        let providers = try DirectHermesAgentRuntimeDefaultsClient.decodeModelProviders(response)
+        let model = response["model"]?.string ?? ""
+        let provider = response["provider"]?.string ?? providers.first(where: \.isCurrent)?.id ?? ""
+        return ModelState(provider: provider, runtimeProvider: provider, model: model, providers: providers,
+                          fastMode: nil, isRunning: false)
+    }
+
     private func requireCurrent(sessionID: String, coordinate: WorkspaceSessionCoordinate) throws {
         try Task.checkCancellation()
         guard currentOwner() == owner, workspace.owner == owner,
@@ -534,7 +623,7 @@ final class DirectHermesSessionControlClient: SessionRuntimeControlConfirming, S
     private func result(_ selection: BighelpLinkPickerSelection, status: BighelpLinkPickerResult.Status,
                         message: String) throws -> BighelpLinkPickerResult {
         let identity = try DirectHermesSessionIdentity.decode(selection.sessionID, owner: owner)
-        let coordinate = try coordinate(sessionID: selection.sessionID, agentID: identity.profileID)
+        let coordinate = try listingCoordinate(sessionID: selection.sessionID, agentID: identity.profileID)
         return try BighelpLinkPickerResult(
             pickerID: selection.pickerID, nativeCoordinate: NativeSessionRuntimePickerCoordinate(coordinate),
             kind: selection.kind, status: status, message: message, sentAt: Int(now().timeIntervalSince1970)

@@ -41,48 +41,35 @@ final class DirectHermesAgentRuntimeDefaultsClient: AgentRuntimeDefaultsConfirmi
         return providers
     }
 
+    /// Hermes' model catalog (`model.options`), read so the picker always has it: a provider
+    /// or model the app can't use (a malformed row, a name it couldn't send back, a repeat)
+    /// costs only itself, never the list. Real catalogs are big and untidy: one Azure AI
+    /// Foundry provider lists 482 models, 17 of them twice. The reply's size limit bounds it.
     static func decodeModelProviders(_ response: [String: BighelpJSONValue]) throws -> [BighelpLinkModelProvider] {
-        guard let values = response["providers"]?.array, values.count <= 128 else {
-            throw WorkspaceClientError.invalidResponse
-        }
+        guard let values = response["providers"]?.array else { throw WorkspaceClientError.invalidResponse }
         var providers: [BighelpLinkModelProvider] = []
-        var totalModels = 0
+        var providerIDs = Set<String>()
         for value in values {
-            guard let row = value.object, let id = row["slug"]?.string, let name = row["name"]?.string,
-                  let isCurrent = row["is_current"]?.boolean, let isCustom = row["is_user_defined"]?.boolean,
-                  let rawModels = row["models"]?.array, rawModels.count <= 10_000 else {
-                throw WorkspaceClientError.invalidResponse
-            }
-            try WorkspaceAuthority.validateIdentifier(id, maximumBytes: 128)
-            _ = try DirectHermesAgentProfileService.text(name, maximumBytes: 800)
-            let models = try rawModels.map { value -> String in
-                guard let model = value.string else { throw WorkspaceClientError.invalidResponse }
-                try WorkspaceAuthority.validateIdentifier(model, maximumBytes: 256)
+            guard let row = value.object, let id = row["slug"]?.string,
+                  (try? WorkspaceAuthority.validateIdentifier(id, maximumBytes: 128)) != nil,
+                  providerIDs.insert(id).inserted else { continue }
+            let name = row["name"]?.string.flatMap { try? DirectHermesAgentProfileService.text($0, maximumBytes: 800) }
+            var modelIDs = Set<String>()
+            let models = (row["models"]?.array ?? []).compactMap { value -> String? in
+                guard let model = value.string, (try? WorkspaceAuthority.validateIdentifier(model, maximumBytes: 256)) != nil,
+                      modelIDs.insert(model).inserted else { return nil }
                 return model
             }
-            guard Set(models).count == models.count else { throw WorkspaceClientError.invalidResponse }
-            let unavailable: Set<String>
-            if let raw = row["unavailable_models"] {
-                guard let values = raw.array, values.count <= 10_000 else { throw WorkspaceClientError.invalidResponse }
-                unavailable = Set(try values.map {
-                    guard let id = $0.string else { throw WorkspaceClientError.invalidResponse }
-                    try WorkspaceAuthority.validateIdentifier(id, maximumBytes: 256)
-                    return id
-                })
-            } else {
-                unavailable = []
-            }
-            totalModels += models.count
-            guard totalModels <= 20_000 else { throw WorkspaceClientError.capacityExceeded }
+            let unavailable = Set((row["unavailable_models"]?.array ?? []).compactMap(\.string))
             providers.append(BighelpLinkModelProvider(
-                id: id, name: name, isCurrent: isCurrent, isCustom: isCustom,
+                id: id, name: name.flatMap { $0.isEmpty ? nil : $0 } ?? id,
+                isCurrent: row["is_current"]?.boolean ?? false, isCustom: row["is_user_defined"]?.boolean ?? false,
                 models: models.filter { !unavailable.contains($0) },
                 fastModeModels: row["capabilities"]?.object.map { capabilities in
                     Set(models.filter { capabilities[$0]?.object?["fast"]?.boolean == true })
                 }
             ))
         }
-        guard Set(providers.map(\.id)).count == providers.count else { throw WorkspaceClientError.invalidResponse }
         return providers
     }
 

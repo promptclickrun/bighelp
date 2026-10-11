@@ -1,13 +1,13 @@
 import Foundation
 
-/// Local picker identity, never a Link wire coordinate.
+/// Local picker identity, never a Link wire coordinate. The chat may not have a live
+/// session yet: its pickers still list, and a choice waits for one.
 struct NativeSessionRuntimePickerCoordinate: Equatable, Sendable {
     let workspace: WorkspaceSessionCoordinate
 
     init(_ coordinate: WorkspaceSessionCoordinate) throws {
         let identity = try DirectHermesSessionIdentity.decode(coordinate.sessionID, owner: coordinate.owner)
-        guard DirectHermesSessionValidation.same(identity.profileID, coordinate.profileID),
-              coordinate.runtimeSessionID != nil, coordinate.storedSessionID != nil else {
+        guard DirectHermesSessionValidation.same(identity.profileID, coordinate.profileID) else {
             throw WorkspaceClientError.invalidRequest
         }
         workspace = coordinate

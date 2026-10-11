@@ -51,6 +51,14 @@ struct FleetStoreTests {
             if let placementFailure { throw placementFailure }
             placements[profileID] = placement
         }
+
+        private(set) var chatChanges: [FleetChatChange] = []
+        var chatFailure: (any Error)?
+
+        func updateChat(_ change: FleetChatChange, chat: FleetChat) async throws {
+            if let chatFailure { throw chatFailure }
+            chatChanges.append(change)
+        }
     }
 
     private func directory() -> URL {
@@ -109,6 +117,28 @@ struct FleetStoreTests {
         try await fleet.setHidden(try #require(fleet.agent(hostID: studio, profileID: "rio")), false)
         #expect(reader.placements["rio"]?.isHidden == false)
         #expect(fleet.hiddenAgentCount == 0)
+    }
+
+    /// A long press in All sessions renames or archives a chat on its own computer; the
+    /// list changes at once, and goes back when the computer refuses.
+    @Test func chatsOnAnotherComputerRenameAndArchiveThere() async throws {
+        let reader = reader()
+        let chat = FleetChat(hostID: studio, profileID: "rio", storedSessionID: "s1", title: "Plans",
+                             preview: "", updatedAt: Date(), isActive: false)
+        reader.snapshots[studio] = FleetSnapshot(chats: [chat], refreshedAt: Date())
+        let fleet = FleetStore(reader: reader, directory: directory(), saveDelay: .zero)
+        fleet.refresh()
+        await fleet.waitForReads()
+
+        try await fleet.updateChat(chat, .rename("Trip"))
+        #expect(fleet.chats(on: studio).map(\.title) == ["Trip"])
+        reader.chatFailure = WorkspaceClientError.transportUnavailable
+        await #expect(throws: WorkspaceClientError.self) { try await fleet.updateChat(chat, .archive) }
+        #expect(fleet.chats(on: studio).map(\.title) == ["Trip"])
+        reader.chatFailure = nil
+        try await fleet.updateChat(chat, .archive)
+        #expect(fleet.chats(on: studio).isEmpty)
+        #expect(reader.chatChanges == [.rename("Trip"), .archive])
     }
 
     /// A host that can't save puts the agent back and says to update Hermes.

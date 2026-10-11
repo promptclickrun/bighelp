@@ -20,6 +20,8 @@ protocol FleetHostReading: AnyObject {
     func setPinned(_ pinned: Bool, hostID: UUID, profileID: String) -> Bool
     /// Saves an agent's section or hidden state on a host that isn't selected.
     func setPlacement(_ placement: AgentListPlacement, hostID: UUID, profileID: String) async throws
+    /// Renames or archives a chat on a host that isn't selected.
+    func updateChat(_ change: FleetChatChange, chat: FleetChat) async throws
     /// Reaches every host for Fleet settings. None hides it.
     func maintenance() -> (any FleetMaintenanceConnecting)?
     /// A host that isn't the selected one: its agents' usage and its plans and limits.
@@ -30,6 +32,9 @@ extension FleetHostReading {
     func maintenance() -> (any FleetMaintenanceConnecting)? { nil }
     func keepConnected(_ hostID: UUID) async {}
     func setPlacement(_ placement: AgentListPlacement, hostID: UUID, profileID: String) async throws {
+        throw WorkspaceClientError.unavailable(.unsupportedHost)
+    }
+    func updateChat(_ change: FleetChatChange, chat: FleetChat) async throws {
         throw WorkspaceClientError.unavailable(.unsupportedHost)
     }
 }
@@ -392,6 +397,27 @@ final class FleetStore {
     }
 
     /// Changes one host's snapshot from here (a placement), saved soon.
+    /// Renames or archives a chat on a host that isn't selected: the list shows it at
+    /// once and goes back if the host refuses. The selected host's chats change
+    /// through its own sessions instead.
+    func updateChat(_ chat: FleetChat, _ change: FleetChatChange) async throws {
+        guard let previous = snapshots[chat.hostID] else { return }
+        var changed = previous
+        switch change {
+        case .rename(let title):
+            if let index = changed.chats.firstIndex(where: { $0.id == chat.id }) { changed.chats[index].title = title }
+        case .archive:
+            changed.chats.removeAll { $0.id == chat.id }
+        }
+        replaceSnapshot(changed, hostID: chat.hostID)
+        do {
+            try await reader.updateChat(change, chat: chat)
+        } catch {
+            replaceSnapshot(previous, hostID: chat.hostID)
+            throw error
+        }
+    }
+
     func replaceSnapshot(_ snapshot: FleetSnapshot, hostID: UUID) {
         snapshots[hostID] = snapshot
         scheduleSave(hostID)

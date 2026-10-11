@@ -92,6 +92,12 @@ struct FleetChat: Codable, Equatable, Sendable, Identifiable {
     var id: String { FleetID.make(hostID, storedSessionID) }
 }
 
+/// A chat's long-press actions in All sessions.
+enum FleetChatChange: Equatable, Sendable {
+    case rename(String)
+    case archive
+}
+
 /// All sessions' filters while every computer shows. A computer is picked with its chip.
 struct FleetChatsFilter: Equatable {
     /// One agent, by its `FleetAgent.id` (its computer and profile).

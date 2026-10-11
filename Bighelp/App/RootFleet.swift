@@ -157,8 +157,17 @@ extension RootShellView {
 
     // MARK: Opening across hosts
 
+    /// An agent tapped on the all-hosts Agents list, on its own computer: what
+    /// Settings › Chat › Bot chat experience asks for, as `openAgentChat` does.
     func openFleetAgent(_ agent: FleetAgent) {
-        openFleet(.agent(profileID: agent.profileID), on: agent.hostID)
+        switch settings.botChatExperience {
+        case .botChat:
+            openFleet(.agent(profileID: agent.profileID), on: agent.hostID)
+        case .lastChat:
+            if let chat = fleet?.latestChat(for: agent) { openFleetChat(chat) } else { startFleetChat(with: agent) }
+        case .newChat:
+            startFleetChat(with: agent)
+        }
     }
 
     /// An agent from a widget, Shortcut or link: its Bot Chat, or with `startsVoice`
@@ -239,7 +248,39 @@ extension RootShellView {
     func fleetChats(_ fleet: FleetStore) -> FleetChatsView {
         FleetChatsView(fleet: fleet, hostFilter: fleetFocusBinding, filter: $fleetChatsFilter,
                        onOpen: { openFleetChat($0) }, hostSessions: { fleetHostSessions($0) },
-                       otherApps: otherAppChats, onOpenOtherApp: { openFleetOtherAppChat($0) })
+                       otherApps: otherAppChats, onOpenOtherApp: { openFleetOtherAppChat($0) },
+                       onChange: { changeFleetChat($0, $1) })
+    }
+
+    /// A chat's Rename or Archive from All sessions. On the selected computer it goes
+    /// through its sessions, as on its own Sessions screen; on another, straight to it.
+    func changeFleetChat(_ chat: FleetChat, _ change: FleetChatChange) {
+        guard let fleet else { return }
+        Task { @MainActor in
+            do {
+                guard chat.hostID == fleet.selectedHostID else {
+                    try await fleet.updateChat(chat, change)
+                    return
+                }
+                let record: SessionRecord
+                if let id = chat.appSessionID, let saved = sessionCatalog.session(id: id) {
+                    record = saved
+                } else {
+                    record = try await sessionCatalog.resolveStoredSession(profileID: chat.profileID,
+                                                                           storedSessionID: chat.storedSessionID)
+                }
+                switch change {
+                case .rename(let title): try await sessionCatalog.renameSession(id: record.id, title: title)
+                case .archive: try await sessionCatalog.archiveSession(id: record.id)
+                }
+            } catch is CancellationError {
+            } catch {
+                actionErrorMessage = switch change {
+                case .rename: "bighelp couldn't rename this chat. Try again."
+                case .archive: "bighelp couldn't archive this chat. Try again."
+                }
+            }
+        }
     }
 
     /// A chat still in Codex or Claude Code: its computer's own Sessions screen

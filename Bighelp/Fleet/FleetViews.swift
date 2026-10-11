@@ -531,7 +531,11 @@ struct FleetChatsView: View {
     var otherApps: (source: any OtherAppChatsSource, id: String)? = nil
     /// Opens a chat still in Codex or Claude Code: on its computer's own Sessions screen.
     var onOpenOtherApp: ((FleetOtherAppChat) -> Void)? = nil
+    /// A chat's long-press Rename and Archive, on whichever computer it's on.
+    var onChange: ((FleetChat, FleetChatChange) -> Void)? = nil
     @State private var search = ""
+    @State private var renaming: FleetChat?
+    @State private var renameDraft = ""
     @State private var liveOtherApps: OtherAppChatsStore?
     @State private var liveOtherAppsID: String?
 
@@ -570,6 +574,7 @@ struct FleetChatsView: View {
             ForEach(chats) { chat in
                 Button { onOpen(chat) } label: { FleetChatRow(chat: chat, fleet: fleet) }
                     .buttonStyle(.plain)
+                    .contextMenu { chatActions(chat) }
                     .listRowBackground(Color.clear)
                     .accessibilityIdentifier("fleet.chat.\(chat.title)")
             }
@@ -622,11 +627,36 @@ struct FleetChatsView: View {
         }
         .task { fleet.refresh() }
         .task(id: LiveOtherAppsKey(id: otherApps?.id, app: filter.app)) { await loadLiveOtherApps() }
+        .alert("Rename chat", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } }),
+               presenting: renaming) { chat in
+            TextField("Session name", text: $renameDraft)
+                .accessibilityIdentifier("fleet.chat.rename-field")
+            Button("Cancel", role: .cancel) {}
+            Button("Save") { onChange?(chat, .rename(renameDraft)) }
+                .accessibilityIdentifier("fleet.chat.rename-save")
+        } message: { chat in
+            Text(chat.title == "Bot Chat"
+                 ? "Renamed, this becomes a regular chat, and tapping the agent starts a new Bot Chat."
+                 : "Enter a name up to \(SessionTitleRules.maximumLength) characters.")
+        }
         .navigationTitle("All sessions")
         .accessibilityIdentifier("fleet.chats")
     }
 
     private var visibleChats: [FleetChat] { fleet.chats(on: hostFilter, matching: search, filter: filter) }
+
+    @ViewBuilder
+    private func chatActions(_ chat: FleetChat) -> some View {
+        if let onChange {
+            Button("Rename", systemImage: "pencil") {
+                renameDraft = chat.title
+                renaming = chat
+            }
+            .accessibilityIdentifier("fleet.chat.rename")
+            Button("Archive", systemImage: "archivebox") { onChange(chat, .archive) }
+                .accessibilityIdentifier("fleet.chat.archive")
+        }
+    }
 
     /// Chats still in Codex or Claude Code: the working computer's live, the others' as last read.
     private var visibleOtherAppChats: [FleetOtherAppChat] {

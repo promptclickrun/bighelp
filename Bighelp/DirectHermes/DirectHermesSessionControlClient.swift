@@ -449,6 +449,11 @@ final class DirectHermesSessionControlClient: SessionRuntimeControlConfirming, S
             throw WorkspaceClientError.unavailable(.unsupportedOperation)
         }
         // Activation attaches/touches an existing runtime; it never creates or builds one.
+        // A chat whose agent isn't built yet (Hermes `lazy`: not started, or its provider has
+        // no login) reports its model but may leave out the provider and reasoning. Its
+        // model can still be switched for this chat alone, which is how a person gets out
+        // of a provider that can't start; so it counts, with the provider unknown and
+        // reasoning on Auto. A built chat must report all three.
         let response = try await perform(.sessionActivate, payload: [
             "session_id": .string(runtimeID), "omit_messages": .boolean(true)
         ], sessionID: sessionID, coordinate: coordinate, capability: .sessionsRead)
@@ -458,15 +463,18 @@ final class DirectHermesSessionControlClient: SessionRuntimeControlConfirming, S
               response["messages"]?.array?.isEmpty == true,
               response["running"]?.boolean != nil,
               let info = response["info"]?.object,
-              (info["lazy"] == nil || info["lazy"] == .boolean(false)),
               info["stored_session_id"]?.string == storedID,
               info["profile_name"]?.string == coordinate.profileID,
-              let model = info["model"]?.string, let provider = info["provider"]?.string,
-              let reasoning = info["reasoning_effort"]?.string else {
+              let model = info["model"]?.string else {
+            throw WorkspaceClientError.unavailable(.unsupportedOperation)
+        }
+        let isBuilt = info["lazy"] == nil || info["lazy"] == .boolean(false)
+        guard let provider = info["provider"]?.string ?? (isBuilt ? nil : ""),
+              let reasoning = info["reasoning_effort"]?.string ?? (isBuilt ? nil : "") else {
             throw WorkspaceClientError.unavailable(.unsupportedOperation)
         }
         try WorkspaceAuthority.validateIdentifier(model, maximumBytes: 256)
-        try WorkspaceAuthority.validateIdentifier(provider, maximumBytes: 128)
+        if !provider.isEmpty { try WorkspaceAuthority.validateIdentifier(provider, maximumBytes: 128) }
         guard reasoning.isEmpty || ["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"].contains(reasoning) else {
             throw WorkspaceClientError.invalidResponse
         }

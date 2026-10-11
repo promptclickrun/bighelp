@@ -175,7 +175,8 @@ struct BighelpLinkModelPicker: Decodable, Equatable, Sendable {
     ) throws {
         guard BighelpLinkPickerValidation.opaque(pickerID, minimum: 16, maximum: 128),
               BighelpLinkPickerValidation.modelIdentifier(currentModel, maximum: 256) != nil,
-              BighelpLinkPickerValidation.identifier(currentProvider, maximum: 128) != nil,
+              // Empty when Hermes didn't say (a chat whose agent hasn't started).
+              currentProvider.isEmpty || BighelpLinkPickerValidation.identifier(currentProvider, maximum: 128) != nil,
               providers.count <= 128,
               Set(providers.map(\.id)).count == providers.count,
               providers.reduce(0, { $0 + $1.models.count }) <= 20_000,

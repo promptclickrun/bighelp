@@ -343,7 +343,7 @@ final class SessionRuntimeControlModel {
             guard readStartedAt >= modelObservedAt else { return }
             modelObservedAt = readStartedAt
             allowsAgentDefaults = false
-            currentProvider = picker.currentProvider
+            currentProvider = picker.currentProvider.isEmpty ? nil : picker.currentProvider
             currentModel = picker.currentModel
             if readStartedAt >= deferredObservedAt {
                 deferredSelection = nil

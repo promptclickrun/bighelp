@@ -188,15 +188,55 @@ struct DirectHermesSessionControlClientTests {
         }
     }
 
-    @Test func lazyOrMissingReasoningCannotMasqueradeAsAnActualSession() async throws {
-        for lazy in [true, false] {
-            let fixture = try SessionControlWorkspace()
-            fixture.lazy = lazy
-            fixture.reasoning = nil
-            await #expect(throws: WorkspaceClientError.unavailable(.unsupportedOperation)) {
-                _ = try await fixture.client().openPicker(fixture.open(.reasoning))
-            }
+    @Test func aStartedChatMustReportItsReasoning() async throws {
+        let fixture = try SessionControlWorkspace()
+        fixture.reasoning = nil
+        await #expect(throws: WorkspaceClientError.unavailable(.unsupportedOperation)) {
+            _ = try await fixture.client().openPicker(fixture.open(.reasoning))
         }
+    }
+
+    /// A new agent cloned onto a provider whose login didn't carry over (a plugin
+    /// provider) can't start, so Hermes reports its chat as not built yet: `lazy`,
+    /// with no provider or reasoning. Picking a configured model is how the person
+    /// gets out of that, so the picker must open, and Hermes's session-only switch
+    /// starts the agent on the new model (seen on a real host).
+    @Test func aChatWhoseAgentCouldNotStartCanStillSwitchModel() async throws {
+        let fixture = try SessionControlWorkspace()
+        fixture.unstarted = true
+        fixture.model = "plugin-model"
+        fixture.catalogMarksCurrent = false
+        let client = fixture.client()
+
+        let picker = try #require(try await client.openPicker(fixture.open(.model)).model)
+        #expect(picker.currentModel == "plugin-model")
+        #expect(picker.currentProvider.isEmpty, "Hermes didn't say which provider; the app doesn't guess")
+        #expect(picker.providers.map(\.id) == ["native-provider"])
+
+        let selection = try BighelpLinkPickerSelection(
+            pickerID: picker.pickerID, sessionID: fixture.appID, kind: .model,
+            provider: "native-provider", model: "new-model", value: nil, sentAt: 1_800_000_000,
+            nativeCoordinate: picker.nativeCoordinate
+        )
+        #expect(try await client.selectPicker(selection).status == .completed)
+        #expect(!fixture.unstarted)
+        #expect(fixture.calls.contains { $0.operation == .configSet && $0.payload["key"] == .string("model") })
+    }
+
+    @Test func reasoningOnAChatWhoseAgentCouldNotStartIsAutoAndStaysOnThatChat() async throws {
+        let fixture = try SessionControlWorkspace()
+        fixture.unstarted = true
+        let client = fixture.client()
+        let picker = try #require(try await client.openPicker(fixture.open(.reasoning)).choice)
+        #expect(picker.choices.first?.value == "reset")
+        #expect(picker.choices.first?.isCurrent == true)
+        let selection = try BighelpLinkPickerSelection(
+            pickerID: picker.pickerID, sessionID: fixture.appID, kind: .reasoning,
+            provider: nil, model: nil, value: "high", sentAt: 1_800_000_000, nativeCoordinate: picker.nativeCoordinate
+        )
+        #expect(try await client.selectPicker(selection).status == .completed)
+        let write = try #require(fixture.calls.first { $0.operation == .configSet })
+        #expect(write.payload["scope"] == .string("session"))
     }
 
     @Test func explicitReasoningLevelsAreEditableAndAutomaticIsOnlyAReadRepresentation() async throws {
@@ -773,7 +813,9 @@ private final class SessionControlWorkspace: WorkspaceOperationPerforming {
     var running = false
     var models = ["old-model", "new-model"]
     var reasoning: String? = "medium"
-    var lazy = false
+    /// Hermes couldn't start the agent (its provider has no login): the chat reports
+    /// `lazy` with no provider or reasoning until a model switch starts it.
+    var unstarted = false
     var invalidInfoField: String?
     var pendingInfoModel: String?
     var applyModel = true
@@ -844,7 +886,11 @@ private final class SessionControlWorkspace: WorkspaceOperationPerforming {
             ]
             if let reasoning { info["reasoning_effort"] = .string(reasoning) }
             if let fastValue { info["service_tier"] = .string(fastValue) }
-            if lazy { info["lazy"] = .boolean(true) }
+            if unstarted {
+                info["lazy"] = .boolean(true)
+                info["provider"] = nil
+                info["reasoning_effort"] = nil
+            }
             if let invalidInfoField { info[invalidInfoField] = .string("wrong") }
             return [
                 "session_id": .string("runtime-chat"), "session_key": .string("stored-chat"),
@@ -892,6 +938,7 @@ private final class SessionControlWorkspace: WorkspaceOperationPerforming {
             if rejectModelAsMissing { throw WorkspaceClientError.rejected(code: "4001") }
             let warning = needsConfirmation && payload["confirm_expensive_model"] != .boolean(true)
             if applyModel && !deferModel && !warning {
+                if unstarted { unstarted = false; reasoning = "" }
                 model = "new-model"
                 if resetReasoningOnModelChange { reasoning = "medium" }
             }

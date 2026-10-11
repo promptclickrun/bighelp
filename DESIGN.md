@@ -309,6 +309,11 @@ the context pop-up, each with Change into Model & reasoning. Showing them reads 
 is replying. Deleting an agent stops its reply and clears its unsent drafts on this device instead of refusing; only a
 group chat that includes it holds the delete back, by name.
 
+Model & reasoning (`ChatSessionControlsPopover`) never makes people scroll for reasoning. The chosen model and the
+reasoning slider (`BighelpReasoningSlider`: one notch per level, the fill covers the notches up to the choice) stay
+at the top. Search and the filter chips (Pinned, Recent, then each provider) sit under them, and only the short list
+of models scrolls. Picking a model or level changes nothing until Apply.
+
 Long instructions (an agent's SOUL, a personality) have an expand icon that opens them full screen
 (`FocusedTextEditorButton` + `focusedTextEditor`). Edits go straight into the form; Done keeps them and Save saves the
 form. Present that editor from the form's root: a full-screen cover hung on a list section header never got the

@@ -330,6 +330,19 @@ struct SettingsStoreTests {
         #expect(!SettingsStore(defaults: defaults).organizeChatsByProjects)
     }
 
+    /// Tapping an agent opens its Bot Chat until someone picks another way; the pick stays.
+    @Test func botChatExperienceDefaultsToTheBotChatAndKeepsAChoice() {
+        let suiteName = #function
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        #expect(SettingsStore(defaults: defaults).botChatExperience == .botChat)
+        SettingsStore(defaults: defaults).botChatExperience = .lastChat
+        #expect(SettingsStore(defaults: defaults).botChatExperience == .lastChat)
+        #expect(BotChatExperience.allCases == [.botChat, .lastChat, .newChat])
+    }
+
     @Test func midSessionChatBehaviorDefaultsToSteerAndOffersEveryHermesMode() {
         let suiteName = #function
         let defaults = UserDefaults(suiteName: suiteName)!

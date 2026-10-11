@@ -313,11 +313,21 @@ extension RootShellView {
         startNewChat(explicitAgentID: agentID)
     }
 
-    /// Message resumes the agent's Bot Chat. Only explicit New chat allocates
-    /// an ordinary conversation; the all-hosts view keeps its Back navigation.
+    /// An agent tapped on Agents opens what Settings › Chat › Bot chat experience
+    /// asks for: its Bot Chat, its latest chat, or a new one. The all-hosts view
+    /// keeps its Back navigation (`openFleetAgent` is its version).
     func openAgentChat(_ agentID: String) {
         agents.select(agentID)
-        openCanonicalAgentChat(agentID, fromList: fleetModeOn)
+        switch settings.botChatExperience {
+        case .botChat:
+            openCanonicalAgentChat(agentID, fromList: fleetModeOn)
+        case .lastChat:
+            openLatestAgentChat(agentID, fromList: fleetModeOn, startsVoice: false)
+        case .newChat:
+            if appState.selectedTab != .sessions { appState.select(.sessions) }
+            appState.chatOpenedFromList = fleetModeOn
+            startNewChat(explicitAgentID: agentID)
+        }
     }
 
     func inviteToGroup(seed: String?) {

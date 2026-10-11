@@ -183,6 +183,10 @@ final class SettingsStore {
         didSet { defaults.set(midSessionChatBehavior.rawValue, forKey: Keys.midSessionChatBehavior) }
     }
 
+    var botChatExperience: BotChatExperience {
+        didSet { defaults.set(botChatExperience.rawValue, forKey: Keys.botChatExperience) }
+    }
+
     var foldCompletedTurns: Bool {
         didSet { defaults.set(foldCompletedTurns, forKey: Keys.foldCompletedTurns) }
     }
@@ -353,6 +357,9 @@ final class SettingsStore {
         midSessionChatBehavior = MidSessionChatBehavior(
             rawValue: defaults.string(forKey: Keys.midSessionChatBehavior) ?? ""
         ) ?? .steer
+        botChatExperience = BotChatExperience(
+            rawValue: defaults.string(forKey: Keys.botChatExperience) ?? ""
+        ) ?? .botChat
         foldCompletedTurns = defaults.bool(forKey: Keys.foldCompletedTurns, default: true)
         reactionsReachAgent = defaults.bool(forKey: Keys.reactionsReachAgent, default: true)
         lightBackground = defaults.string(forKey: Keys.lightBackground).flatMap(BighelpLightBackground.init(rawValue:)) ?? .cream
@@ -664,6 +671,7 @@ private extension SettingsStore {
         static let rightEdgeSwipeAction = "loopdy.workspace.rightEdgeSwipeAction"
         static let preferredBrowser = "loopdy.chat.preferredBrowser"
         static let midSessionChatBehavior = "loopdy.chat.midSessionBehavior"
+        static let botChatExperience = "bighelp.chat.bot-chat-experience"
         static let foldCompletedTurns = "loopdy.chat.foldCompletedTurns"
         static let reactionsReachAgent = "loopdy.chat.reactionsReachAgent"
         static let agentIsland = "loopdy.chat.agentIsland"

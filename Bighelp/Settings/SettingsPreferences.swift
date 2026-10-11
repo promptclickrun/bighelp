@@ -212,6 +212,33 @@ enum MidSessionChatBehavior: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// What tapping an agent on Agents opens, with one gateway or several
+/// (Settings › Chat › Bot chat experience).
+enum BotChatExperience: String, CaseIterable, Identifiable, Sendable {
+    /// The agent's one ongoing Bot Chat; its latest chat or a new one when the host has none to give.
+    case botChat
+    case lastChat
+    case newChat
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .botChat: "Persistent Bot Chat"
+        case .lastChat: "Open last chat"
+        case .newChat: "Open new chat"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .botChat: "Tapping an agent opens its one ongoing Bot Chat."
+        case .lastChat: "Tapping an agent opens your most recent chat with it."
+        case .newChat: "Tapping an agent starts a new chat with it."
+        }
+    }
+}
+
 enum WorkspaceSwipeAction: String, CaseIterable, Identifiable, Sendable {
     case quickWorkspace
     case newChat

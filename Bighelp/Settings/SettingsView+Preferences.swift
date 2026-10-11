@@ -223,6 +223,15 @@ extension SettingsView {
 
     private var chatBasics: some View {
         Section {
+            Picker(selection: $settings.botChatExperience) {
+                ForEach(BotChatExperience.allCases) { choice in
+                    Text(choice.title).tag(choice)
+                }
+            } label: {
+                settingLabel("Bot chat experience", detail: settings.botChatExperience.detail)
+            }
+            .accessibilityIdentifier("settings.chat.bot-chat-experience")
+
             #if !targetEnvironment(macCatalyst) // A Mac has no haptics.
             Toggle(isOn: $settings.responseHapticsEnabled) {
                 settingLabel(

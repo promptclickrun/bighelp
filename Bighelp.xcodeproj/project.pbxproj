@@ -1152,6 +1152,7 @@
 		CD07266FF82B22AF214298E8 /* BighelpLocalCacheRefreshCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 393615CD28B3A6AD2B32DD80 /* BighelpLocalCacheRefreshCoordinator.swift */; };
 		CD3D97535846F18BD82E4055 /* HermesUsage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CF2F4BBA17591B56074734A /* HermesUsage.swift */; };
 		CD53051F93E86414FE833F0F /* SubagentCanvasUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B786BE6FB911654CE87D487D /* SubagentCanvasUITests.swift */; };
+		CD77D3FC449640CE3AD267A9 /* HostListSizeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4633A8076FD7DC2B28F17301 /* HostListSizeTests.swift */; };
 		CD9537C11B8F4B07382AAA22 /* GeneratedMediaAcceptanceFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98A0392DC8985D4CD3EA1FBD /* GeneratedMediaAcceptanceFixture.swift */; };
 		CD99674CAE877E58275EBB42 /* ChatImageStackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0BD4E22E511ADD515F2DC3E /* ChatImageStackTests.swift */; };
 		CDBAEF0147205371BC9A96DC /* DirectHermesSessionMaintenanceClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EA10CCE814770EDA69B910D /* DirectHermesSessionMaintenanceClient.swift */; };
@@ -1928,6 +1929,7 @@
 		45769F0DA6DB3DBA1A9175F0 /* BighelpLinkProjectGitClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpLinkProjectGitClient.swift; sourceTree = "<group>"; };
 		458AECEE1D05EA55E6476DDE /* GeneratedMediaProjectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneratedMediaProjectionTests.swift; sourceTree = "<group>"; };
 		4608F7B111BF38A1875E82D7 /* BighelpWatchUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BighelpWatchUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		4633A8076FD7DC2B28F17301 /* HostListSizeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostListSizeTests.swift; sourceTree = "<group>"; };
 		46CB5F2C485C852B14B781AF /* SpatialAvatarSculpt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpatialAvatarSculpt.swift; sourceTree = "<group>"; };
 		46D19587978755B4DC4B7D9E /* DeviceToolPermissionsUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceToolPermissionsUITests.swift; sourceTree = "<group>"; };
 		46E55627383BAC697F21560D /* static-metrics.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "static-metrics.json"; sourceTree = "<group>"; };
@@ -4026,6 +4028,7 @@
 				1C1110763B724D51E070E0B1 /* HermesUserMessageDisplayTests.swift */,
 				CFF0176BACFC11059D4F8A6F /* HostActivityRenderTests.swift */,
 				71AB75411B7397CFAC2B5AE0 /* HostConnectionStatusTests.swift */,
+				4633A8076FD7DC2B28F17301 /* HostListSizeTests.swift */,
 				4B79E147B2F0C41D20965E73 /* HostManagementTests.swift */,
 				3A647DF649F6F486557B0D97 /* HostOperationsPayloadTests.swift */,
 				82405E8F501B1074ADC79AD8 /* HostPluginUpdateTests.swift */,
@@ -6725,6 +6728,7 @@
 				AA4BE7095FA7772DE048864D /* HermesUserMessageDisplayTests.swift in Sources */,
 				3E57E5E4628907AED11947A9 /* HostActivityRenderTests.swift in Sources */,
 				9845E8B8092D3DB7AF828839 /* HostConnectionStatusTests.swift in Sources */,
+				CD77D3FC449640CE3AD267A9 /* HostListSizeTests.swift in Sources */,
 				489352B8790D5EFB6EB1B943 /* HostManagementTests.swift in Sources */,
 				C178567129F50942DB48F7FA /* HostOperationsPayloadTests.swift in Sources */,
 				1E644E00A1500C716D318A75 /* HostPluginUpdateTests.swift in Sources */,

@@ -24,9 +24,9 @@ final class DirectHermesPluginLifecycleClient: PluginLifecycleManagementClient {
         async let catalogValue = request(.catalog)
         let hub = try await hubValue
         let catalog = try await catalogValue
-        let installed = try CapabilitiesPayload.array(hub["plugins"], maximum: 512).map(decodeInstalled)
-        let entries = try CapabilitiesPayload.array(catalog["entries"], maximum: 512).map(decodeCatalog)
-        let removed = try CapabilitiesPayload.array(catalog["removed"], maximum: 512).map { value -> String in
+        let installed = try CapabilitiesPayload.array(hub["plugins"]).map(decodeInstalled)
+        let entries = try CapabilitiesPayload.array(catalog["entries"]).map(decodeCatalog)
+        let removed = try CapabilitiesPayload.array(catalog["removed"]).map { value -> String in
             let row = try CapabilitiesPayload.object(value)
             let name = try CapabilitiesPayload.text(row["name"], maximumBytes: 160)
             let reason = try CapabilitiesPayload.text(row["reason"], maximumBytes: 2_048, required: false)
@@ -220,12 +220,12 @@ final class DirectHermesPluginLifecycleClient: PluginLifecycleManagementClient {
             tier: try CapabilitiesPayload.text(row["tier"], maximumBytes: 64),
             requiredHermesVersion: try CapabilitiesPayload.text(row["requires_hermes"], maximumBytes: 128, required: false),
             documentationURL: documentationURL,
-            platforms: try CapabilitiesPayload.strings(row["platforms"], maximum: 32),
+            platforms: try CapabilitiesPayload.strings(row["platforms"]),
             capabilities: PluginCapabilitySummary(
-                tools: try CapabilitiesPayload.strings(capabilities["provides_tools"], maximum: 512),
-                hooks: try CapabilitiesPayload.strings(capabilities["provides_hooks"], maximum: 512),
-                middleware: try CapabilitiesPayload.strings(capabilities["provides_middleware"], maximum: 512),
-                requiredEnvironment: try CapabilitiesPayload.strings(capabilities["requires_env"], maximum: 128)
+                tools: try CapabilitiesPayload.strings(capabilities["provides_tools"]),
+                hooks: try CapabilitiesPayload.strings(capabilities["provides_hooks"]),
+                middleware: try CapabilitiesPayload.strings(capabilities["provides_middleware"]),
+                requiredEnvironment: try CapabilitiesPayload.strings(capabilities["requires_env"])
             ),
             isInstalled: try CapabilitiesPayload.boolean(row["installed"]),
             installedSHA: try CapabilitiesPayload.optionalText(row["installed_sha"], maximumBytes: 40),

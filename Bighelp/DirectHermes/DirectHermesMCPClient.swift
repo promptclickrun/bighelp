@@ -70,7 +70,7 @@ final class DirectHermesMCPClient: MCPManagementClient, MCPRuntimeManagementClie
         let catalog = try await catalogValue
         let serverRows = try CapabilitiesPayload.array(servers["servers"]).map(decodeServer)
         let catalogRows = try CapabilitiesPayload.array(catalog["entries"]).map(decodeCatalogEntry)
-        let diagnostics = try CapabilitiesPayload.array(catalog["diagnostics"], maximum: 64).map { value in
+        let diagnostics = try CapabilitiesPayload.array(catalog["diagnostics"]).map { value in
             let row = try CapabilitiesPayload.object(value)
             let name = try CapabilitiesPayload.text(row["name"], maximumBytes: 160)
             let kind = try CapabilitiesPayload.text(row["kind"], maximumBytes: 80)
@@ -203,7 +203,6 @@ final class DirectHermesMCPClient: MCPManagementClient, MCPRuntimeManagementClie
 
     func cachedRuntimeStatus(configuredServers: [MCPServer]) async throws -> MCPRuntimeSnapshot {
         let profile = try checkedProfile()
-        guard configuredServers.count <= 512 else { throw CapabilitiesManagementError.capacityExceeded }
         var expectedTransports: [String: String] = [:]
         for server in configuredServers {
             let name = try CapabilitiesPayload.identifier(server.name)
@@ -213,7 +212,7 @@ final class DirectHermesMCPClient: MCPManagementClient, MCPRuntimeManagementClie
         }
         let payload = try await requestRPC("mcp.servers.status", params: ["profile": .string(profile)])
         let checkedAt = try CapabilitiesPayload.integer(payload["checked_at"], range: 1...Int.max)
-        let rows = try CapabilitiesPayload.array(payload["servers"], maximum: 512)
+        let rows = try CapabilitiesPayload.array(payload["servers"])
         var seen = Set<String>()
         let statuses = try rows.map { value in
             let row = try CapabilitiesPayload.object(value)
@@ -278,7 +277,7 @@ final class DirectHermesMCPClient: MCPManagementClient, MCPRuntimeManagementClie
               try CapabilitiesPayload.text(acknowledgedServer["transport"], maximumBytes: 32) == before.transport else {
             throw CapabilitiesManagementError.invalidResponse
         }
-        let acknowledgedEnvironment = try CapabilitiesPayload.strings(acknowledgedServer["env"], maximum: 64)
+        let acknowledgedEnvironment = try CapabilitiesPayload.strings(acknowledgedServer["env"])
         let acknowledgedAuth = try CapabilitiesPayload.optionalText(acknowledgedServer["auth"], maximumBytes: 32)
         guard (before.transport == "http" && acknowledgedAuth == "header")
                 || (before.transport == "stdio" && acknowledgedEnvironment.contains(returnedEnvironment)) else {
@@ -459,15 +458,12 @@ final class DirectHermesMCPClient: MCPManagementClient, MCPRuntimeManagementClie
         let headersObject: [String: BighelpJSONValue]
         if let headers = row["headers"] { headersObject = try CapabilitiesPayload.object(headers) }
         else { headersObject = [:] }
-        guard environmentObject.count <= 64, headersObject.count <= 64 else {
-            throw CapabilitiesManagementError.capacityExceeded
-        }
         return MCPServer(
             name: try CapabilitiesPayload.text(row["name"], maximumBytes: 160),
             transport: try CapabilitiesPayload.text(row["transport"], maximumBytes: 32),
             url: try CapabilitiesPayload.optionalText(row["url"], maximumBytes: 4_096),
             command: try CapabilitiesPayload.optionalText(row["command"], maximumBytes: 2_048),
-            arguments: try CapabilitiesPayload.strings(row["args"], maximum: 128),
+            arguments: try CapabilitiesPayload.strings(row["args"]),
             auth: try CapabilitiesPayload.optionalText(row["auth"], maximumBytes: 32),
             isEnabled: try CapabilitiesPayload.boolean(row["enabled"]),
             environmentKeys: environmentObject.keys.sorted(),
@@ -477,7 +473,7 @@ final class DirectHermesMCPClient: MCPManagementClient, MCPRuntimeManagementClie
 
     private func decodeCatalogEntry(_ value: BighelpJSONValue) throws -> MCPCatalogEntry {
         let row = try CapabilitiesPayload.object(value)
-        let requirements = try CapabilitiesPayload.array(row["required_env"], maximum: 64).map { value in
+        let requirements = try CapabilitiesPayload.array(row["required_env"]).map { value in
             let field = try CapabilitiesPayload.object(value)
             return MCPEnvironmentRequirement(
                 name: try CapabilitiesPayload.text(field["name"], maximumBytes: 128),
@@ -493,11 +489,11 @@ final class DirectHermesMCPClient: MCPManagementClient, MCPRuntimeManagementClie
             authType: try CapabilitiesPayload.text(row["auth_type"], maximumBytes: 32),
             requiredEnvironment: requirements,
             command: try CapabilitiesPayload.optionalText(row["command"], maximumBytes: 2_048),
-            arguments: try CapabilitiesPayload.strings(row["args"], maximum: 128),
+            arguments: try CapabilitiesPayload.strings(row["args"]),
             url: try CapabilitiesPayload.optionalText(row["url"], maximumBytes: 4_096),
             installURL: try CapabilitiesPayload.optionalText(row["install_url"], maximumBytes: 4_096),
             installReference: try CapabilitiesPayload.optionalText(row["install_ref"], maximumBytes: 256),
-            bootstrap: try CapabilitiesPayload.strings(row["bootstrap"], maximum: 128),
+            bootstrap: try CapabilitiesPayload.strings(row["bootstrap"]),
             postInstall: try CapabilitiesPayload.text(row["post_install"], maximumBytes: 8_192, required: false),
             needsInstall: try CapabilitiesPayload.boolean(row["needs_install"]),
             isInstalled: try CapabilitiesPayload.boolean(row["installed"]),

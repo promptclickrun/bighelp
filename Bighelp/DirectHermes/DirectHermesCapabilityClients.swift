@@ -184,7 +184,7 @@ final class DirectHermesSkillsAndToolsClient: HermesSkillsAndToolsCatalogClient 
     }
 
     private static func decodeSkills(_ payload: [String: BighelpJSONValue]) throws -> [HermesSkillSummary] {
-        let rows = try array(payload["skills"], maximum: 512)
+        let rows = try array(payload["skills"])
         var ids = Set<String>()
         return try rows.map { value in
             guard let row = value.object,
@@ -203,7 +203,7 @@ final class DirectHermesSkillsAndToolsClient: HermesSkillsAndToolsCatalogClient 
     }
 
     private static func decodePlugins(_ payload: [String: BighelpJSONValue]) throws -> [HermesPluginSummary] {
-        let rows = try array(payload["plugins"], maximum: 256)
+        let rows = try array(payload["plugins"])
         var ids = Set<String>()
         return try rows.map { value in
             guard let row = value.object,
@@ -218,10 +218,9 @@ final class DirectHermesSkillsAndToolsClient: HermesSkillsAndToolsCatalogClient 
             let isEnabled = row["enabled"]?.boolean ?? (row["status"]?.string?.lowercased() == "enabled")
             let capabilityCount: Int
             if let count = row["capabilityCount"]?.integer {
-                guard (0...100_000).contains(count) else { throw WorkspaceClientError.invalidResponse }
+                guard count >= 0 else { throw WorkspaceClientError.invalidResponse }
                 capabilityCount = count
             } else if let provides = row["provides"]?.array {
-                guard provides.count <= 100_000 else { throw WorkspaceClientError.capacityExceeded }
                 capabilityCount = provides.count
             } else {
                 capabilityCount = 0
@@ -234,7 +233,7 @@ final class DirectHermesSkillsAndToolsClient: HermesSkillsAndToolsCatalogClient 
     }
 
     private static func decodeMCPServers(_ payload: [String: BighelpJSONValue]) throws -> [HermesMCPServerSummary] {
-        let rows = try array(payload["servers"], maximum: 256)
+        let rows = try array(payload["servers"])
         var ids = Set<String>()
         return try rows.map { value in
             guard let row = value.object, let rawName = row["name"]?.string,
@@ -244,7 +243,6 @@ final class DirectHermesSkillsAndToolsClient: HermesSkillsAndToolsCatalogClient 
             let enabled = row["enabled"]?.boolean ?? false
             let toolCount: Int?
             if let tools = row["tools"]?.array {
-                guard tools.count <= 100_000 else { throw WorkspaceClientError.capacityExceeded }
                 toolCount = tools.count
             } else if row["tools"] == nil || row["tools"] == .null || row["tools"]?.object != nil {
                 // Hermes returns the persisted include/exclude filter object here. It is
@@ -261,7 +259,7 @@ final class DirectHermesSkillsAndToolsClient: HermesSkillsAndToolsCatalogClient 
     }
 
     private static func decodeToolsets(_ payload: [String: BighelpJSONValue]) throws -> [HermesToolsetSummary] {
-        let rows = try array(payload["toolsets"], maximum: 256)
+        let rows = try array(payload["toolsets"])
         var ids = Set<String>()
         return try rows.map { value in
             guard let row = value.object,
@@ -276,9 +274,8 @@ final class DirectHermesSkillsAndToolsClient: HermesSkillsAndToolsCatalogClient 
             let platform = try text(rawPlatform, maximumBytes: 80)
             let count: Int
             if let tools = row["tools"]?.array {
-                guard tools.count <= 100_000 else { throw WorkspaceClientError.capacityExceeded }
                 count = tools.count
-            } else if let legacy = row["toolCount"]?.integer, (0...100_000).contains(legacy) {
+            } else if let legacy = row["toolCount"]?.integer, legacy >= 0 {
                 count = legacy
             } else {
                 throw WorkspaceClientError.invalidResponse
@@ -312,9 +309,8 @@ final class DirectHermesSkillsAndToolsClient: HermesSkillsAndToolsCatalogClient 
         }
     }
 
-    private static func array(_ value: BighelpJSONValue?, maximum: Int) throws -> [BighelpJSONValue] {
+    private static func array(_ value: BighelpJSONValue?) throws -> [BighelpJSONValue] {
         guard let rows = value?.array else { throw WorkspaceClientError.invalidResponse }
-        guard rows.count <= maximum else { throw WorkspaceClientError.capacityExceeded }
         return rows
     }
 
@@ -505,7 +501,6 @@ final class DirectHermesPersonalityClient: PersonalityClient {
                 for (name, value) in try object(custom) { merged[name] = value }
             }
         }
-        guard merged.count <= 256 else { throw WorkspaceClientError.capacityExceeded }
         var definitions: [PersonalityDefinition] = []
         for (rawName, value) in merged.sorted(by: { $0.key < $1.key }) {
             let name = try personalityName(rawName)
@@ -532,7 +527,6 @@ final class DirectHermesPersonalityClient: PersonalityClient {
             return (try text(prompt, maximumBytes: 20_000, allowsEmpty: false), "", "", "")
         }
         if let values = value.array {
-            guard values.count <= 256 else { throw WorkspaceClientError.capacityExceeded }
             let prompt = try values.map { item -> String in
                 guard let value = item.string else { throw WorkspaceClientError.invalidResponse }
                 return value

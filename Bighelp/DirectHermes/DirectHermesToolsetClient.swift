@@ -30,7 +30,7 @@ final class DirectHermesToolsetClient: ToolsetManagementClient {
     func load() async throws -> ToolsetSnapshot {
         let profile = try checkedProfile()
         let value = try await requestValue(.list(profile: profile))
-        return ToolsetSnapshot(toolsets: try CapabilitiesPayload.array(value, maximum: 512).map(decodeSummary))
+        return ToolsetSnapshot(toolsets: try CapabilitiesPayload.array(value).map(decodeSummary))
     }
 
     func detail(name: String, modelProvider: String? = nil) async throws -> ToolsetDetail {
@@ -39,7 +39,7 @@ final class DirectHermesToolsetClient: ToolsetManagementClient {
         async let listValue = requestValue(.list(profile: profile))
         async let configValue = requestObject(.config(name: name, profile: profile))
         async let modelsValue = requestObject(.models(name: name, provider: modelProvider, profile: profile))
-        let summaries = try CapabilitiesPayload.array(try await listValue, maximum: 512).map(decodeSummary)
+        let summaries = try CapabilitiesPayload.array(try await listValue).map(decodeSummary)
         guard let summary = summaries.first(where: { $0.name == name }) else {
             throw CapabilitiesManagementError.readbackFailed
         }
@@ -244,14 +244,14 @@ final class DirectHermesToolsetClient: ToolsetManagementClient {
             platformLabel: try CapabilitiesPayload.text(row["platform_label"], maximumBytes: 160),
             isEnabled: try CapabilitiesPayload.boolean(row["enabled"]),
             isConfigured: try CapabilitiesPayload.boolean(row["configured"]),
-            tools: try CapabilitiesPayload.strings(row["tools"], maximum: 2_048)
+            tools: try CapabilitiesPayload.strings(row["tools"])
         )
     }
 
     private func decodeConfiguration(_ payload: [String: BighelpJSONValue]) throws -> ToolsetConfiguration {
-        let providers = try CapabilitiesPayload.array(payload["providers"], maximum: 128).map { value in
+        let providers = try CapabilitiesPayload.array(payload["providers"]).map { value in
             let row = try CapabilitiesPayload.object(value)
-            let environment = try CapabilitiesPayload.array(row["env_vars"], maximum: 64).map { value in
+            let environment = try CapabilitiesPayload.array(row["env_vars"]).map { value in
                 let field = try CapabilitiesPayload.object(value)
                 let rawURL = try CapabilitiesPayload.optionalText(field["url"], maximumBytes: 4_096)
                 let helpURL: URL?
@@ -271,7 +271,7 @@ final class DirectHermesToolsetClient: ToolsetManagementClient {
             }
             let capabilities: [String]
             if row["capabilities"] == nil { capabilities = [] }
-            else { capabilities = try CapabilitiesPayload.strings(row["capabilities"], maximum: 16) }
+            else { capabilities = try CapabilitiesPayload.strings(row["capabilities"]) }
             return ToolsetProvider(
                 name: try CapabilitiesPayload.text(row["name"], maximumBytes: 160),
                 badge: try CapabilitiesPayload.text(row["badge"], maximumBytes: 128, required: false),
@@ -296,7 +296,7 @@ final class DirectHermesToolsetClient: ToolsetManagementClient {
     }
 
     private func decodeModels(_ payload: [String: BighelpJSONValue]) throws -> ToolsetModelCatalog {
-        let rows = try CapabilitiesPayload.array(payload["models"], maximum: 512)
+        let rows = try CapabilitiesPayload.array(payload["models"])
         return ToolsetModelCatalog(
             name: try CapabilitiesPayload.text(payload["name"], maximumBytes: 160),
             hasModels: try CapabilitiesPayload.boolean(payload["has_models"]),

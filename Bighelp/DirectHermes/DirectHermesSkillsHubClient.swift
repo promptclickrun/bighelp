@@ -39,16 +39,16 @@ final class DirectHermesSkillsHubClient: SkillsHubManagementClient {
         try requireOwner()
 
         let installed = try decodeInstalled(sources["installed"])
-        let activeSkills = try CapabilitiesPayload.array(installedPayload, maximum: 2_048).map(decodeInstalledSkill)
+        let activeSkills = try CapabilitiesPayload.array(installedPayload).map(decodeInstalledSkill)
         for skill in activeSkills { knownSkills[skill.name] = skill }
         let activeNames = Set(activeSkills.map(\.name))
         let retainedDisabled = knownSkills.values.filter { !$0.isEnabled && !activeNames.contains($0.name) }
         let installedSkills = (activeSkills + retainedDisabled).sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
-        let sourceRows = try CapabilitiesPayload.array(sources["sources"], maximum: 32).map(decodeSource)
-        let featured = try CapabilitiesPayload.array(sources["featured"], maximum: 24).map {
+        let sourceRows = try CapabilitiesPayload.array(sources["sources"]).map(decodeSource)
+        let featured = try CapabilitiesPayload.array(sources["featured"]).map {
             try decodeItem($0, installed: installed)
         }
-        let officialRows = try CapabilitiesPayload.array(official["skills"], maximum: 512).map {
+        let officialRows = try CapabilitiesPayload.array(official["skills"]).map {
             try decodeItem($0, installed: installed)
         }
         return SkillHubSnapshot(
@@ -68,11 +68,10 @@ final class DirectHermesSkillsHubClient: SkillsHubManagementClient {
         let source = try source.validatedHubText(maximumBytes: 80)
         let payload = try await request(.search(query: query, source: source.isEmpty ? "all" : source, profile: profile))
         let installed = try decodeInstalled(payload["installed"])
-        let items = try CapabilitiesPayload.array(payload["results"], maximum: 50).map {
+        let items = try CapabilitiesPayload.array(payload["results"]).map {
             try decodeItem($0, installed: installed)
         }
         let countsObject = try CapabilitiesPayload.object(payload["source_counts"])
-        guard countsObject.count <= 32 else { throw CapabilitiesManagementError.capacityExceeded }
         var counts: [String: Int] = [:]
         for (key, value) in countsObject {
             counts[try key.validatedHubText(maximumBytes: 80)] = try CapabilitiesPayload.integer(value)
@@ -80,7 +79,7 @@ final class DirectHermesSkillsHubClient: SkillsHubManagementClient {
         return SkillHubSearchResult(
             items: items,
             sourceCounts: counts,
-            timedOutSources: try CapabilitiesPayload.strings(payload["timed_out"], maximum: 32)
+            timedOutSources: try CapabilitiesPayload.strings(payload["timed_out"])
         )
     }
 
@@ -92,7 +91,7 @@ final class DirectHermesSkillsHubClient: SkillsHubManagementClient {
         let markdown = try CapabilitiesPayload.text(
             payload["skill_md"], maximumBytes: CapabilitiesPayload.maximumDocumentBytes, required: false
         )
-        let files = try CapabilitiesPayload.strings(payload["files"], maximum: 1_024)
+        let files = try CapabilitiesPayload.strings(payload["files"])
         return SkillHubPreview(item: item, skillMarkdown: markdown, files: files)
     }
 
@@ -103,7 +102,7 @@ final class DirectHermesSkillsHubClient: SkillsHubManagementClient {
               let policy = SkillHubScan.Policy(rawValue: try CapabilitiesPayload.text(payload["policy"], maximumBytes: 16)) else {
             throw CapabilitiesManagementError.invalidResponse
         }
-        let findings = try CapabilitiesPayload.array(payload["findings"], maximum: 512).map { value in
+        let findings = try CapabilitiesPayload.array(payload["findings"]).map { value in
             let row = try CapabilitiesPayload.object(value)
             let line: Int?
             if row["line"] == nil || row["line"] == .null { line = nil }
@@ -117,7 +116,6 @@ final class DirectHermesSkillsHubClient: SkillsHubManagementClient {
             )
         }
         let countsObject = try CapabilitiesPayload.object(payload["severity_counts"])
-        guard countsObject.count <= 8 else { throw CapabilitiesManagementError.capacityExceeded }
         var counts: [String: Int] = [:]
         for (key, value) in countsObject {
             counts[try key.validatedHubText(maximumBytes: 32)] = try CapabilitiesPayload.integer(value)
@@ -140,7 +138,7 @@ final class DirectHermesSkillsHubClient: SkillsHubManagementClient {
         let profile = try checkedProfile()
         let name = try CapabilitiesPayload.identifier(skillName, maximumBytes: 128)
         let activeBefore = try CapabilitiesPayload.array(
-            try await requestValue(.installed(profile: profile)), maximum: 2_048
+            try await requestValue(.installed(profile: profile))
         ).map(decodeInstalledSkill)
         guard let existing = activeBefore.first(where: { $0.name == name }) ?? knownSkills[name] else {
             throw CapabilitiesManagementError.invalidRequest
@@ -151,7 +149,7 @@ final class DirectHermesSkillsHubClient: SkillsHubManagementClient {
             throw CapabilitiesManagementError.invalidResponse
         }
         let readback = try CapabilitiesPayload.array(
-            try await requestValue(.installed(profile: profile)), maximum: 2_048
+            try await requestValue(.installed(profile: profile))
         ).map(decodeInstalledSkill)
         if enabled {
             guard let skill = readback.first(where: { $0.name == name }), skill.isEnabled else {
@@ -297,11 +295,9 @@ final class DirectHermesSkillsHubClient: SkillsHubManagementClient {
     private func decodeInstalled(_ value: BighelpJSONValue?) throws -> Set<String> {
         guard let value else { throw CapabilitiesManagementError.invalidResponse }
         if let object = value.object {
-            guard object.count <= 2_048 else { throw CapabilitiesManagementError.capacityExceeded }
             return Set(try object.keys.map { try $0.validatedHubText(maximumBytes: 2_048) })
         }
         if let array = value.array {
-            guard array.count <= 2_048 else { throw CapabilitiesManagementError.capacityExceeded }
             return Set(try array.map { try CapabilitiesPayload.text($0, maximumBytes: 2_048) })
         }
         throw CapabilitiesManagementError.invalidResponse
@@ -332,7 +328,7 @@ final class DirectHermesSkillsHubClient: SkillsHubManagementClient {
             source: try CapabilitiesPayload.text(row["source"], maximumBytes: 2_048, required: false),
             trustLevel: try CapabilitiesPayload.text(row["trust_level"], maximumBytes: 64),
             repository: try CapabilitiesPayload.optionalText(row["repo"], maximumBytes: 2_048),
-            tags: try CapabilitiesPayload.strings(row["tags"], maximum: 64),
+            tags: try CapabilitiesPayload.strings(row["tags"]),
             category: try CapabilitiesPayload.optionalText(row["category"], maximumBytes: 128),
             isInstalled: installedFlag
         )

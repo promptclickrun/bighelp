@@ -273,8 +273,6 @@ struct MCPProbeResult: Equatable, Sendable {
     /// keeps the ones its include list names. The screen lists the first few.
     static let displayedToolLimit = 200
     static let summaryCharacterLimit = 400
-    /// Sanity bound on a host's answer, far above any real server.
-    static let maximumToolCount = 50_000
 
     let succeeded: Bool
     let error: String?
@@ -288,7 +286,7 @@ struct MCPProbeResult: Equatable, Sendable {
     /// Reads a host's tool rows leniently: all of them are counted, the first
     /// few are kept, and long descriptions are shortened rather than refused.
     static func displayedTools(_ value: BighelpJSONValue?) throws -> (tools: [MCPProbeTool], count: Int) {
-        let rows = try CapabilitiesPayload.array(value, maximum: maximumToolCount)
+        let rows = try CapabilitiesPayload.array(value)
         let tools = try rows.prefix(displayedToolLimit).map { value in
             let row = try CapabilitiesPayload.object(value)
             let schemaCharacters = row["schema_chars"]?.integer
@@ -507,7 +505,6 @@ struct CapabilitiesManagementDependencies {
 
 /// Shared validation/projection helpers for the fixed Direct clients.
 enum CapabilitiesPayload {
-    static let maximumRows = 256
     static let maximumTextBytes = 32_768
     static let maximumDocumentBytes = 256_000
 
@@ -516,9 +513,10 @@ enum CapabilitiesPayload {
         return object
     }
 
-    static func array(_ value: BighelpJSONValue?, maximum: Int = maximumRows) throws -> [BighelpJSONValue] {
+    /// A host list, any length: the connection's reply-size limit bounds it, and
+    /// screens draw lazily.
+    static func array(_ value: BighelpJSONValue?) throws -> [BighelpJSONValue] {
         guard let rows = value?.array else { throw CapabilitiesManagementError.invalidResponse }
-        guard rows.count <= maximum else { throw CapabilitiesManagementError.capacityExceeded }
         return rows
     }
 
@@ -538,8 +536,8 @@ enum CapabilitiesPayload {
         return try text(value, maximumBytes: maximumBytes, required: false)
     }
 
-    static func strings(_ value: BighelpJSONValue?, maximum: Int = maximumRows) throws -> [String] {
-        try array(value, maximum: maximum).map { try text($0, maximumBytes: 4_096) }
+    static func strings(_ value: BighelpJSONValue?) throws -> [String] {
+        try array(value).map { try text($0, maximumBytes: 4_096) }
     }
 
     static func boolean(_ value: BighelpJSONValue?) throws -> Bool {

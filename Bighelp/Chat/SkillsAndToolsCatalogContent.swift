@@ -275,7 +275,7 @@ struct SkillsAndToolsCatalogContent: View {
         rows: [CapabilityRow],
         onSelect: ((String) -> Void)? = nil
     ) -> some View {
-        VStack(alignment: .leading, spacing: BighelpTokens.space8) {
+        LazyVStack(alignment: .leading, spacing: BighelpTokens.space8) {
             Text(title.uppercased())
                 .bighelpFont(.metadata, weight: .semibold)
                 .foregroundStyle(theme.secondaryText)

@@ -20,6 +20,8 @@ protocol HostNotificationSetupServing {
                 isCurrent: @escaping @MainActor () -> Bool) async throws -> HostNotificationSetupResult
     /// Removes only this device's recipient trust/grant metadata, not host data.
     func removeLocalEnrollment(host: BighelpConfiguredHost) throws
+    /// Clears one computer's notification setup on every side, however far it got.
+    func resetHost(_ host: BighelpConfiguredHost) async
     /// Tells every computer with notifications on whether this phone wants Peer chats alerts.
     func applyAlertPreferences() async
     /// Gives this device's Quiet Hours to every computer with notifications on.
@@ -27,6 +29,7 @@ protocol HostNotificationSetupServing {
 }
 
 extension HostNotificationSetupServing {
+    func resetHost(_ host: BighelpConfiguredHost) async {}
     func applyAlertPreferences() async {}
     func applyQuietHours() async -> BighelpQuietHoursSyncResult { BighelpQuietHoursSyncResult() }
 }
@@ -102,7 +105,7 @@ enum HostNotificationState: String, Codable, Sendable {
         case .managementRejected: "This computer rejected installation. Check Hermes for details."
         case .unsupported: "This Hermes version doesn't support in-app installation."
         case .replacementRequired: "Update the existing bighelp plugin on this computer."
-        case .outcomeUnknown: "Couldn't confirm setup. Check again before reinstalling."
+        case .outcomeUnknown: "Couldn't confirm setup. Check again, or use Set Up Again to start over."
         case .notConnected: "Can't reach this computer. Reconnect and check setup again."
         case .releaseUnavailable: "Couldn't reach GitHub for the newest bighelp plugin. Check the internet connection and try again."
         case .signInChanged: "This computer's sign-in changed. Sign in to this computer again, then check setup."
@@ -333,6 +336,19 @@ final class HostNotificationSetupModel {
             break
         }
         // Persisted install/toggle intent remains for readback. Never replay it.
+    }
+
+    /// Set Up Again: clears this computer's notification setup on every side (the
+    /// computer, the notification service and this device), however far an earlier
+    /// setup got, then sets it up fresh. For a setup that's stuck or half there.
+    func setUpAgain() async {
+        guard enrollNotifications, !isWorking, let host = registry.hosts.first(where: { $0.id == hostID }),
+              let setup = registry.notificationSetup else { return }
+        isWorking = true
+        state = .checking
+        await setup.resetHost(host)
+        isWorking = false
+        await enable()
     }
 
     /// User consent authorizes one pinned install/enable in backend current scope,

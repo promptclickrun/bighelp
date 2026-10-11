@@ -230,6 +230,16 @@ final class BighelpManagedNotificationLedger {
         }
         try persist(next)
     }
+    /// A computer's records with nothing left to revoke, dropped so its next setup
+    /// starts clean (a saved grant for an earlier host key would refuse it).
+    func forget(host: BighelpConfiguredHost) throws {
+        var next = snapshot
+        next.enrollments = next.enrollments.filter { _, record in
+            !(record.accountScope == host.notificationScope && record.hostConnectionID == host.hostConnectionID
+                && !record.revokePending)
+        }
+        if next.enrollments.count != snapshot.enrollments.count { try persist(next) }
+    }
     func forgetRetiredActivity(_ id: String) throws {
         guard snapshot.activities[id]?.retired == true else { throw DirectHermesError.secureStorageChanged }
         var next = snapshot; next.activities[id] = nil; try persist(next)

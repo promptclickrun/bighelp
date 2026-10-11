@@ -40,6 +40,37 @@ import UserNotifications
         #expect(reloaded.enrollments.isEmpty, "Nothing comes back after relaunch")
     }
 
+    /// A setup stuck on a saved grant for the computer's earlier notification key (it read
+    /// as a changed sign-in, and checking again never cleared it) sets up fresh after Set
+    /// Up Again, which clears that computer on every side and leaves the rest alone.
+    @Test func setUpAgainClearsAStuckComputerOnEverySide() async throws {
+        let fixture = try Fixture(notificationDeviceID: UUID().uuidString.lowercased())
+        defer { fixture.cleanup() }
+        _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+        let grant = try #require(fixture.account.grant)
+        var record = try #require(fixture.ledger.enrollments.first)
+        record.grant = BighelpManagedGrant(grantId: grant.grantId, instanceId: grant.instanceId, hostKeyId: "earlier-key",
+            hostPublicKey: grant.hostPublicKey, authorizationEpoch: grant.authorizationEpoch, profile: grant.profile,
+            eventTypes: grant.eventTypes, createdAt: grant.createdAt, expiresAt: grant.expiresAt, revision: grant.revision,
+            provider: grant.provider, subscriberScope: grant.subscriberScope, state: grant.state)
+        try fixture.ledger.save(record)
+        await #expect(throws: DirectHermesError.identityChanged) {
+            _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+        }
+
+        await fixture.service.resetHost(fixture.host)
+
+        #expect(fixture.hostAPI.removedGrants == [grant.grantId], "The computer deletes its copy")
+        #expect(fixture.account.grant?.state == "revoked", "The notification service revokes the grant")
+        #expect(fixture.ledger.enrollments.isEmpty, "This device forgets it")
+        #expect(fixture.host.notificationState == .notConfigured)
+        #expect(fixture.host.notificationBinding == nil)
+        #expect(fixture.identityVault.value != .none, "The device keeps its identity for other computers")
+
+        _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+        #expect(fixture.account.grant?.state == "active")
+    }
+
     @Test func turnOffFinishesWithAnOfflineHostAndRemovesItsCopyLater() async throws {
         let fixture = try Fixture(notificationDeviceID: UUID().uuidString.lowercased())
         defer { fixture.cleanup() }

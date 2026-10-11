@@ -724,6 +724,49 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
             activityRuntime?.retire(host: host)
         }
     }
+    // MARK: Setting up a computer again
+
+    /// A computer's Set Up Again: its notification setup cleared on every side, however
+    /// far an earlier one got, so the next starts clean. The computer deletes this
+    /// device's enrollments, the notification service revokes their grants (and any it
+    /// holds for this computer that this device lost track of), and this device forgets
+    /// them. What's out of reach is retried later and never blocks the new setup.
+    func resetHost(_ host: BighelpConfiguredHost) async {
+        let grants = Set(ledger.enrollments.filter {
+            $0.accountScope == host.notificationScope && $0.hostConnectionID == host.hostConnectionID
+        }.compactMap { $0.grant?.grantId })
+        if !grants.isEmpty {
+            var cleanups = pendingHostCleanups
+            cleanups[host.id.uuidString, default: []].formUnion(grants)
+            pendingHostCleanups = cleanups
+            _ = await retryPendingHostCleanups()
+        }
+        try? removeLocalEnrollment(host: host)
+        try? await reconcilePendingRevocations()
+        await revokeUntrackedGrants(for: host)
+        try? ledger.forget(host: host)
+        retiredHosts.remove(host.notificationScope + ":" + host.hostConnectionID)
+        guard var current = registry.hosts.first(where: { $0.id == host.id }) else { return }
+        current.notificationState = .notConfigured
+        current.notificationBinding = nil
+        // An install or toggle never confirmed would hold setup at "Couldn't confirm".
+        if current.pluginIntent?.phase != .verified { current.pluginIntent = nil }
+        try? registry.update(current)
+    }
+
+    /// Grants the notification service holds for this computer with no record here,
+    /// from a setup cut off before it saved one.
+    private func revokeUntrackedGrants(for host: BighelpConfiguredHost) async {
+        guard let credentials = try? identity.current(), let listed = try? await list(credentials) else { return }
+        for grant in listed where grant.instanceId == host.hostConnectionID.lowercased()
+            && grant.authorizationEpoch == credentials.authorizationEpoch && grant.state != "revoked" {
+            guard let body = try? ManagedNotificationValidation.data(BighelpJSONValue.object([
+                "version": .integer(2), "expectedRevision": .integer(grant.revision)])) else { continue }
+            _ = try? await api.managedNotificationRequest(path: Self.root + "/" + grant.grantId, method: "DELETE",
+                                                          body: body, credentials: credentials)
+        }
+    }
+
     // MARK: Turn off notifications
 
     /// Anything left to turn off: an identity, grants, a host marked enabled,

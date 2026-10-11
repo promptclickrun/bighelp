@@ -174,6 +174,10 @@ final class BighelpManagedNotificationComposition: HostNotificationSetupServing 
         guard isCurrent(owner) else { throw DirectHermesError.secureStorageChanged }
     }
 
+    func resetHost(_ host: BighelpConfiguredHost) async {
+        await integration?.service.resetHost(host)
+    }
+
     func applyAlertPreferences() async {
         await integration?.service.applyAlertPreferences()
     }

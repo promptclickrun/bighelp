@@ -869,9 +869,27 @@ struct HostNotificationSetupSection: View {
                 Button(notificationReviewTitle) { showsReview = true }
                     .accessibilityIdentifier("host-setup.enable-notifications")
             }
+            if offersSetUpAgain {
+                Button("Set Up Again") {
+                    Task {
+                        await model.setUpAgain()
+                        await onCompletion()
+                    }
+                }
+                .accessibilityIdentifier("host-setup.notifications-set-up-again")
+            }
         } header: {
             Text("Notifications")
+        } footer: {
+            if offersSetUpAgain {
+                Text("Set Up Again clears this computer's notification setup, on the computer and on this device, and sets it up fresh.")
+            }
         }
+    }
+
+    /// Any setup that got somewhere, stuck or working, can start over from scratch.
+    private var offersSetUpAgain: Bool {
+        model.enrollNotifications && !model.isWorking && model.state != .notConfigured
     }
 
     private var notificationReviewTitle: String {

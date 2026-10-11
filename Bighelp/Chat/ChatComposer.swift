@@ -39,10 +39,10 @@ struct ChatComposer: View {
 
     var body: some View {
         VStack(spacing: BighelpTokens.space4) {
-            if let context = model.sessionContext, context.isCompacting {
-                SessionCompactionCard(context: context)
+            if let compaction = model.compaction {
+                ChatCompactionRail(compaction: compaction)
                     .padding(.horizontal, BighelpTokens.space4)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .transition(reduceMotion ? .opacity : .scale(scale: 0.85).combined(with: .opacity))
             }
 
             if referenceHub.isPresented, presentedSheet == nil {
@@ -112,6 +112,7 @@ struct ChatComposer: View {
         .animation(reduceMotion ? nil : .easeInOut(duration: BighelpTokens.stateDuration), value: model.nativeSubagents)
         .animation(reduceMotion ? nil : .easeInOut(duration: BighelpTokens.stateDuration), value: model.goalRailState)
         .animation(reduceMotion ? nil : .easeInOut(duration: BighelpTokens.stateDuration), value: model.sessionContext)
+        .animation(reduceMotion ? nil : .snappy(duration: BighelpTokens.stateDuration), value: model.compaction)
         .animation(reduceMotion ? nil : .easeInOut(duration: BighelpTokens.stateDuration), value: model.replyDraft)
         .onChange(of: model.taskDrawer) { _, tasks in
             if tasks == nil, presentedStatus == .tasks {
@@ -652,39 +653,6 @@ struct ChatComposer: View {
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
-}
-
-private struct SessionCompactionCard: View {
-    let context: SessionContextSnapshot
-
-    var body: some View {
-        HStack(spacing: BighelpTokens.space8) {
-            BighelpThinkingOrb(scenario: .shaping, scale: .inline)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 1) {
-                Text("Compacting context")
-                    .bighelpFont(.label)
-                    .foregroundStyle(theme.primaryText)
-                Text(SessionContextPresentation.summary(for: context))
-                    .bighelpFont(.metadata)
-                    .foregroundStyle(theme.secondaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-            }
-        }
-        .padding(.horizontal, BighelpTokens.space16)
-        .padding(.vertical, BighelpTokens.space8)
-        .frame(maxWidth: horizontalSizeClass == .regular ? 420 : .infinity, alignment: .center)
-        .bighelpSurface(.capsuleControl)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Compacting chat context")
-        .accessibilityValue(SessionContextPresentation.summary(for: context))
-        .accessibilityIdentifier("chat.session-context-compacting")
-    }
-
-    @BighelpThemeReader private var theme: BighelpTheme
-
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 }
 
 private enum ChatComposerSheet: String, Identifiable {

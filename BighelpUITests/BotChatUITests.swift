@@ -46,6 +46,26 @@ final class BotChatUITests: BighelpUITestCase {
         }
     }
 
+    /// Compacting shows a chip above the message box, then Done with what it saved.
+    @MainActor
+    func testCompactionRailShowsThenFinishes() {
+        for appearance in ["light", "dark"] {
+            let app = makeApp()
+            app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-start-chat",
+                                   "-test-compaction-rail", "-loopdy.demo.appearance", appearance]
+            app.launch()
+            let running = app.descendants(matching: .any).matching(NSPredicate(
+                format: "identifier == %@ AND label CONTAINS %@", "chat.compaction.running", "Compacting 48 messages")).firstMatch
+            XCTAssertTrue(running.waitForExistence(timeout: 15), "Compacting shows above the message box")
+            save("compaction-running-\(appearance)", app)
+            let done = app.descendants(matching: .any)["chat.compaction.done"].firstMatch
+            XCTAssertTrue(done.waitForExistence(timeout: 12), "Then Done")
+            save("compaction-done-\(appearance)", app)
+            XCTAssertTrue(done.waitForNonExistence(timeout: 6), "Then it goes")
+            app.terminate()
+        }
+    }
+
     /// With several gateways, All sessions' rows have the long-press menu too.
     @MainActor
     func testAllSessionsRowsHaveALongPressMenu() {

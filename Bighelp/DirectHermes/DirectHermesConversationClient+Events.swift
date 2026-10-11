@@ -96,6 +96,7 @@ extension DirectHermesConversationClient {
             title = value
             model?.applyRenamedSessionTitle(value)
         }
+        if !isReplayingActivity { trackCompaction(event, status: change.statusUpdate) }
         if let update = change.statusUpdate { status = update.text.isEmpty ? "Working" : update.text }
         if let notice = change.notice, !notice.message.isEmpty { status = notice.message }
         if change.reviewSummary != nil { status = "Background review ready" }

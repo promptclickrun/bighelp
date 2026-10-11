@@ -289,7 +289,7 @@ Settings › Chat. Everyday controls must never live only behind it.
 
 The chat's ⋯ menu has at most five rows: File changes when available, Model & speed, This chat, Usage and
 Nerd Mode's Advanced. Model & speed contains Model & reasoning and Fast Mode. This chat contains Rename chat,
-Chat files, Chat appearance and Edit this agent. Usage contains provider usage and Nerd Mode's Context window.
+Compact, New Bot Chat (in an agent's Bot Chat), Chat files, Chat appearance and Edit this agent. Usage contains provider usage and Nerd Mode's Context window.
 Existing technical controls stay in Advanced. Keep every level short enough to navigate without scrolling.
 At accessibility text sizes, keep the full font size: the top level is Model & speed, This chat and More.
 More holds File changes, Usage and Advanced; This chat groups Rename and Appearance under Settings, and
@@ -308,6 +308,10 @@ A chat's model and reasoning (`ChatModelSummaryRow`) show in the avatar's profil
 the context pop-up, each with Change into Model & reasoning. Showing them reads the reasoning once, never while the agent
 is replying. Deleting an agent stops its reply and clears its unsent drafts on this device instead of refusing; only a
 group chat that includes it holds the delete back, by name.
+
+Compacting (This chat › Compact, or Hermes on its own when the context fills) shows `ChatCompactionRail` above the
+message box: a chip whose four-step bar moves once a second (still with Reduce Motion), then Compacted with the tokens
+before and after for two seconds before it shrinks away. Hermes' own status starts and ends it.
 
 Model & reasoning (`ChatSessionControlsPopover`) never makes people scroll for reasoning. The chosen model and the
 reasoning slider (`BighelpReasoningSlider`: one notch per level, the fill covers the notches up to the choice) stay

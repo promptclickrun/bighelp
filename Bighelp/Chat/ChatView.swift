@@ -184,6 +184,7 @@ struct ChatView: View {
     @State private var refreshGeneration: UUID?
     @State private var refreshTask: Task<Void, Never>?
     @State private var refreshError: String?
+    @State private var compactError: String?
     @State var headerHeight: CGFloat = 0
     /// Full screen height, for the Auto avatar size.
     @State private var screenHeight: CGFloat = 0
@@ -294,6 +295,15 @@ struct ChatView: View {
         .environment(\.bighelpUIV3Enabled, true)
         .environment(\.bighelpUIV2Enabled, true)
         .environment(\.chatActivityDisclosureStore, model.activityDisclosures)
+        #if DEBUG && targetEnvironment(simulator)
+        .task {
+            // The compaction rail on the demo data (BotChatUITests): compacting, then Done.
+            guard ProcessInfo.processInfo.arguments.contains("-test-compaction-rail") else { return }
+            model.beginCompaction(status: "⠋ compressing 48 messages (~41,200 tok)…")
+            try? await Task.sleep(for: .seconds(8))
+            model.finishCompaction(tokensBefore: 41_200, tokensAfter: 6_100)
+        }
+        #endif
         .onAppear {
             isChatVisible = true
             BighelpVisibleChats.shared.appeared(model)
@@ -385,6 +395,9 @@ struct ChatView: View {
             companionReaction = companionSignal.baselineReaction
             companionCompletionTracker = CompanionCompletionTracker()
         }
+        .alert("Couldn't compact", isPresented: Binding(get: { compactError != nil }, set: { if !$0 { compactError = nil } })) {
+            Button("OK") { compactError = nil }
+        } message: { Text(compactError ?? "") }
         .alert("Refresh failed", isPresented: Binding(get: { refreshError != nil }, set: { if !$0 { refreshError = nil } })) {
             Button("OK") { refreshError = nil }
         } message: { Text(refreshError ?? "") }
@@ -1011,6 +1024,14 @@ struct ChatView: View {
             } else {
                 renameChatMenuItem
             }
+            if let directHermesClient {
+                Button("Compact", systemImage: "arrow.down.right.and.arrow.up.left") {
+                    dismissKeyboard()
+                    compactChat(directHermesClient)
+                }
+                .disabled(model.isSending || model.compaction != nil)
+                .accessibilityIdentifier("chat.compact")
+            }
             if let onNewBotChat {
                 Button("New Bot Chat", systemImage: "arrow.trianglehead.counterclockwise") {
                     dismissKeyboard()
@@ -1037,6 +1058,19 @@ struct ChatView: View {
             Label("This chat", systemImage: "bubble.left")
         }
         .accessibilityIdentifier("chat.options.this-chat")
+    }
+
+    /// This chat › Compact: Hermes folds earlier messages into a summary; the rail above
+    /// the message box shows it working, then what it saved.
+    private func compactChat(_ client: DirectHermesConversationClient) {
+        Task {
+            do {
+                try await client.compact(conversationID: model.conversationID)
+            } catch is CancellationError {
+            } catch {
+                compactError = "Hermes couldn't compact this chat. Try again when the agent isn't replying."
+            }
+        }
     }
 
     @ViewBuilder

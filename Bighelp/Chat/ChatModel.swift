@@ -176,6 +176,8 @@ final class ChatModel {
     var transcriptActivityPositionByEventID: [String: Int] = [:]
     var taskDrawer: ChatTaskDrawerState?
     var sessionContext: SessionContextSnapshot?
+    /// Hermes compacting this chat, then Done for a moment (`ChatCompactionRail`).
+    var compaction: ChatCompaction?
     var sessionGoal: SessionGoalSnapshot?
     var sessionTitle: String
     var sessionWorkspaceID: String? { sourceSession?.workspaceID }

@@ -509,11 +509,40 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
             canonicalIDs[key] = canonical
             return .resolved(try await openRegistry(canonical, profile: profile))
         }
-        if let resolved = try await resumeCanonicalByTitle(profile: profile) { return .resolved(resolved) }
+        // Hermes' exact-title lookup skips a Bot Chat someone retired (archived) and
+        // restores one archived by accident, so none means the agent has none: the
+        // caller makes one. (Resuming "Bot Chat" by title here reopened retired ones.)
         if let known = canonicalIDs[key] {
-            throw DirectHermesSessionError.canonicalMissing(profileID: profile.id, knownID: known.id)
+            // One that's merely missing from the lookup is never replaced.
+            guard (try? await isRetiredBotChat(known.id, profileID: profile.id)) == true else {
+                throw DirectHermesSessionError.canonicalMissing(profileID: profile.id, knownID: known.id)
+            }
+            forgetBotChat(profileKey: key)
         }
         return .notCreated(profileID: profile.id)
+    }
+
+    /// A Bot Chat this connection knew that has since been archived or renamed,
+    /// here or anywhere else: retired, so the agent gets a new one.
+    private func isRetiredBotChat(_ id: String, profileID: String) async throws -> Bool {
+        let row = try await detail(profileID: profileID, storedID: id)
+        return row["archived"]?.boolean == true || row["title"]?.string != "Bot Chat"
+    }
+
+    private func forgetBotChat(profileKey key: String) {
+        canonicalIDs[key] = nil
+        canonicalTitleTaken.remove(key)
+    }
+
+    /// Hermes refuses to rename a hidden chat titled "Bot Chat": hidden is what makes it
+    /// the agent's Bot Chat. Shown in the list, it's a regular chat to rename, and the
+    /// agent's next Bot Chat is a new one.
+    private func releaseBotChat(_ registryID: String, profileID: String) async throws {
+        let response = try await perform(.sessionUpdate, [
+            "session_id": .string(registryID), "profile": .string(profileID), "hidden": .boolean(false),
+        ])
+        guard response["ok"]?.boolean == true else { throw WorkspaceClientError.invalidResponse }
+        forgetBotChat(profileKey: DirectHermesSessionIdentity.key(profileID))
     }
 
     /// Read coverage only from this owner's matching retained history window.
@@ -653,7 +682,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         }
         var state: DirectHermesSessionCreationState
         var binding: Binding
-        if let pending = creations[key], !(pending.purpose == .ordinary && pending.phase == .complete) {
+        if let pending = creations[key], pending.phase != .complete, pending.phase != .canonicalResolved {
             guard pending.purpose == .firstCanonical, pending.phase == .created,
                   let stored = pending.storedSessionID else {
                 throw DirectHermesSessionError.creationUnconfirmed(profileID: profileID)
@@ -1111,7 +1140,10 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         guard !binding.isLiveDiscoveryOnly else {
             throw DirectHermesSessionError.sessionNotPersisted
         }
-        guard binding.canonicalRegistryID == nil else { throw WorkspaceClientError.unavailable(.policyRestricted) }
+        if let canonical = binding.canonicalRegistryID {
+            try await releaseBotChat(canonical, profileID: binding.coordinate.profileID)
+            binding.canonicalRegistryID = nil
+        }
         let targetID: String
         if let live = binding.coordinate.runtimeSessionID {
             let response = try await perform(.sessionTitle, ["session_id": .string(live), "title": .string(title)])
@@ -1123,7 +1155,9 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
             targetID = try DirectHermesSessionValidation.string(binding.coordinate.storedSessionID.map(BighelpJSONValue.string))
         } else {
             let catalog = try await refreshedCatalogCoordinate(for: binding)
-            guard catalog.canonicalRegistryID == nil else { throw WorkspaceClientError.unavailable(.policyRestricted) }
+            if let canonical = catalog.canonicalRegistryID {
+                try await releaseBotChat(canonical, profileID: binding.coordinate.profileID)
+            }
             targetID = catalog.rowID
             binding.catalog = catalog
             let response = try await perform(.sessionUpdate, [
@@ -1146,7 +1180,12 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
     }
 
     func archive(_ record: SessionRecord) async throws {
-        try await setFlags(record, flags: .init(archived: true))
+        let target = try candidate(for: record)
+        let botChat = target.canonicalRegistryID != nil
+        // Archived and hidden, a Bot Chat is retired as Hermes Desktop retires one:
+        // the agent's next Bot Chat is new, and takes over its title.
+        try await setFlags(record, flags: .init(archived: true, hidden: botChat ? true : nil))
+        if botChat { forgetBotChat(profileKey: DirectHermesSessionIdentity.key(target.coordinate.profileID)) }
         if let binding = bindings[record.id] {
             // Bounded: the oldest archives have long since been closed by Hermes.
             if archivedKeys.count > 1_024 { archivedKeys.removeAll() }
@@ -1287,10 +1326,9 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         return try registryValue(value)
     }
 
-    /// Hermes finds an agent's Bot Chat by name on resume, as `hermes -c "Bot Chat"` and its
-    /// message routes do, wherever the chat started and even when archived. The list
-    /// lookup skips archived chats, so a Bot Chat archived elsewhere never opened here.
-    /// Nil when the agent has none (4007).
+    /// The chat holding the title "Bot Chat" when Hermes refused it to a new one (4022):
+    /// Hermes finds it by name on resume, as `hermes -c "Bot Chat"` does, even one its
+    /// list doesn't show. Nil when the agent has none (4007).
     private func resumeCanonicalByTitle(profile: Profile) async throws -> DirectHermesResolvedSession? {
         let receipt: (response: [String: BighelpJSONValue], epoch: String?)
         do {

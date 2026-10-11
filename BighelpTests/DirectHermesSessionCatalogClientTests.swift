@@ -769,28 +769,26 @@ struct DirectHermesSessionCatalogClientTests {
         #expect(!workspace.calls.contains { $0.operation == .sessionCreate })
     }
 
-    /// The list lookup skips an archived Bot Chat; Hermes still resumes it by name.
-    @Test func archivedBotChatOpensByNameInsteadOfANewOne() async throws {
+    /// Hermes' lookup skips a Bot Chat someone archived: it's retired, and the agent gets
+    /// a new one, as in Hermes Desktop. Resuming "Bot Chat" by name reopened it.
+    @Test func archivedBotChatIsRetiredNotReopenedByName() async throws {
         let workspace = try SessionWorkspaceStub()
         workspace.handler = { operation, payload in
             switch operation {
             case .profilesList: return Self.profiles()
             case .nativeSessionList: return ["sessions": .array([])]
-            case .sessionResume:
-                #expect(payload["session_id"] == .string("Bot Chat"))
-                return Self.attached(stored: "archived")
+            case .sessionDetail:
+                return ["id": payload["session_id"]!, "profile": .string("alpha"),
+                        "title": .string("Bot Chat"), "archived": .boolean(true)]
             default: throw WorkspaceClientError.invalidRequest
             }
         }
         let client = Self.client(workspace)
-        guard case .resolved(let resolved) = try await client.resolveCanonicalChat(profileID: "alpha") else {
-            Issue.record("Expected the archived Bot Chat")
-            return
-        }
-        #expect(resolved.coordinate.storedSessionID == "archived")
-        #expect(try DirectHermesSessionIdentity.decode(resolved.record.id, owner: workspace.owner!).anchorID == "archived")
-        #expect(workspace.calls.filter { $0.operation == .sessionResume }.count == 1)
-        #expect(!workspace.calls.contains { $0.operation == .sessionCreate })
+        #expect(try await client.resolveCanonicalChat(profileID: "alpha") == .notCreated(profileID: "alpha"))
+        // One this connection knew, archived since (here or in Hermes Desktop), too.
+        #expect(try await client.resolveCanonicalChat(profileID: "alpha", previouslyKnownID: "known")
+            == .notCreated(profileID: "alpha"))
+        #expect(!workspace.calls.contains { $0.operation == .sessionResume })
     }
 
     @Test func lazyActivationWithoutProfileEchoRequiresExactKnownNativePair() async throws {
@@ -1193,7 +1191,7 @@ struct DirectHermesSessionCatalogClientTests {
         #expect(deleted.mayRetainOtherHistory)
     }
 
-    @Test func canonicalPinUsesRegistryIdentityAndRenameIsNotAgentDisplayRename() async throws {
+    @Test func canonicalPinUsesRegistryIdentity() async throws {
         let workspace = try SessionWorkspaceStub()
         workspace.handler = { operation, payload in
             switch operation {
@@ -1213,10 +1211,50 @@ struct DirectHermesSessionCatalogClientTests {
             return
         }
         try await client.setPinned(resolved.record, pinned: true)
-        await #expect(throws: WorkspaceClientError.unavailable(.policyRestricted)) {
-            try await client.rename(resolved.record, title: "Not an agent display rename")
+    }
+
+    /// Hermes won't rename a hidden "Bot Chat": hidden is what makes it the agent's Bot
+    /// Chat. Shown first, it's a regular chat to rename. Archived, it's hidden too, which
+    /// retires it as Hermes Desktop does. Either way the agent's next Bot Chat is new.
+    @Test func renamingOrArchivingABotChatRetiresIt() async throws {
+        @MainActor final class Updates { var payloads: [[String: BighelpJSONValue]] = [] }
+        let updates = Updates()
+        let workspace = try SessionWorkspaceStub()
+        workspace.handler = { operation, payload in
+            switch operation {
+            case .profilesList: return Self.profiles(canonical: "canonical-root", resolved: "tip")
+            case .sessionResume, .sessionActivate: return Self.attached(stored: "tip")
+            case .sessionTitle: return ["pending": .boolean(false), "title": payload["title"]!]
+            case .sessionUpdate:
+                updates.payloads.append(payload)
+                return payload.merging(["ok": .boolean(true)]) { $1 }
+            case .sessionDetail:
+                return ["id": payload["session_id"]!, "profile": .string("alpha"), "title": .string("Trip"),
+                        "archived": .boolean(true), "hidden": .boolean(true)]
+            default:
+                Issue.record("Unexpected \(operation)")
+                throw WorkspaceClientError.invalidRequest
+            }
         }
-        #expect(!workspace.calls.contains { $0.operation == .sessionTitle })
+        let renaming = Self.client(workspace)
+        guard case .resolved(let botChat) = try await renaming.resolveCanonicalChat(profileID: "alpha") else {
+            Issue.record("Expected the Bot Chat")
+            return
+        }
+        try await renaming.rename(botChat.record, title: "Trip")
+        #expect(updates.payloads.first == ["session_id": .string("canonical-root"), "profile": .string("alpha"),
+                                           "hidden": .boolean(false)])
+        #expect(workspace.calls.contains { $0.operation == .sessionTitle && $0.payload["title"] == .string("Trip") })
+
+        let archiving = Self.client(workspace)
+        guard case .resolved(let another) = try await archiving.resolveCanonicalChat(profileID: "alpha") else {
+            Issue.record("Expected the Bot Chat")
+            return
+        }
+        updates.payloads = []
+        try await archiving.archive(another.record)
+        #expect(updates.payloads == [["session_id": .string("canonical-root"), "profile": .string("alpha"),
+                                      "archived": .boolean(true), "hidden": .boolean(true)]])
     }
 
     /// Without a source Hermes labels the chat "tui" and tells the agent it's in a terminal: no files,

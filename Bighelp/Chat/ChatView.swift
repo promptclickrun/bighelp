@@ -143,6 +143,8 @@ struct ChatView: View {
     let onChatAppearanceTap: (() -> Void)?
     let onSessionToolsTap: (() -> Void)?
     let onNewChatTap: () -> Void
+    /// Set when this chat is its agent's Bot Chat: starts a new one (This chat › New Bot Chat).
+    let onNewBotChat: (() -> Void)?
     let onLoadPreviousMessages: () -> Void
     let onForkMessage: ((String) -> Void)?
     let referenceHub: ReferenceHubStore?
@@ -214,6 +216,7 @@ struct ChatView: View {
         onChatAppearanceTap: (() -> Void)? = nil,
         onSessionToolsTap: (() -> Void)? = nil,
         onNewChatTap: @escaping () -> Void = {},
+        onNewBotChat: (() -> Void)? = nil,
         onLoadPreviousMessages: @escaping () -> Void = {},
         onForkMessage: ((String) -> Void)? = nil,
         referenceHub: ReferenceHubStore? = nil,
@@ -254,6 +257,7 @@ struct ChatView: View {
         self.onChatAppearanceTap = onChatAppearanceTap
         self.onSessionToolsTap = onSessionToolsTap
         self.onNewChatTap = onNewChatTap
+        self.onNewBotChat = onNewBotChat
         self.onLoadPreviousMessages = onLoadPreviousMessages
         self.onForkMessage = onForkMessage
         self.referenceHub = referenceHub
@@ -407,7 +411,9 @@ struct ChatView: View {
         } message: { dialog in
             switch dialog {
             case .rename:
-                Text("Enter a name up to \(SessionTitleRules.maximumLength) characters.")
+                Text(onNewBotChat == nil
+                     ? "Enter a name up to \(SessionTitleRules.maximumLength) characters."
+                     : "Renamed, this becomes a regular chat, and tapping the agent starts a new Bot Chat.")
             case .error:
                 Text(sessionTitleErrorMessage)
             }
@@ -1004,6 +1010,13 @@ struct ChatView: View {
                 .accessibilityIdentifier("chat.options.settings")
             } else {
                 renameChatMenuItem
+            }
+            if let onNewBotChat {
+                Button("New Bot Chat", systemImage: "arrow.trianglehead.counterclockwise") {
+                    dismissKeyboard()
+                    onNewBotChat()
+                }
+                .accessibilityIdentifier("chat.new-bot-chat")
             }
             if let onChatFilesTap {
                 Button(dynamicTypeSize.isAccessibilitySize ? "Files" : "Chat files", systemImage: "folder") {

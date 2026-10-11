@@ -611,6 +611,20 @@ extension SessionCatalogClient {
 }
 
 extension SessionRecord {
+    /// An agent's Bot Chat: Hermes names it by this exact title, one per agent.
+    var isBotChat: Bool { kind == .direct && agentIDs.count == 1 && title == "Bot Chat" }
+
+    /// What a Bot Chat is called once New Bot Chat sets it aside as a regular chat.
+    static func retiredBotChatTitle(at date: Date) -> String {
+        "Bot Chat · " + date.formatted(date: .abbreviated, time: .shortened)
+    }
+}
+
+extension SessionSummary {
+    var isBotChat: Bool { kind == .direct && agentIDs.count == 1 && title == "Bot Chat" }
+}
+
+extension SessionRecord {
     /// The saved one-agent chat a notification names by `ManagedNotificationValidation.sessionReference`.
     static func matching(reference: String, profileID: String, in records: [SessionRecord]) -> SessionRecord? {
         let matches = records.filter { record in

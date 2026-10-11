@@ -213,8 +213,10 @@ struct SessionsView: View {
             }
         } message: { dialog in
             switch dialog {
-            case .rename:
-                Text("Enter a name up to \(SessionTitleRules.maximumLength) characters.")
+            case .rename(let session):
+                Text(session.isBotChat
+                     ? "Renamed, this becomes a regular chat, and tapping the agent starts a new Bot Chat."
+                     : "Enter a name up to \(SessionTitleRules.maximumLength) characters.")
             case .delete(let session):
                 Text("Delete “\(session.title)” permanently? This cannot be undone.")
             case .error(let message):

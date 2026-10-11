@@ -60,6 +60,7 @@ struct ChatDestinationView: View {
     let headerActions: ChatHeaderActions
     let onNewChat: () -> Void
     let onStartSession: () -> Void
+    let onNewBotChat: (() -> Void)?
     /// An edge swipe's place (Settings › Chat › Swipe from the edges), the same as from any other screen.
     let onEdgeAction: (WorkspaceSwipeAction) -> Void
     let onOpenAgentSessions: (String) -> Void
@@ -129,6 +130,7 @@ struct ChatDestinationView: View {
         responseHapticsCoveredByRoot: Bool,
         onNewChat: @escaping () -> Void,
         onStartSession: @escaping () -> Void,
+        onNewBotChat: (() -> Void)? = nil,
         onEdgeAction: @escaping (WorkspaceSwipeAction) -> Void,
         onOpenAgentSessions: @escaping (String) -> Void,
         onOpenApproval: @escaping (ApprovalRequest) -> Void,
@@ -156,6 +158,7 @@ struct ChatDestinationView: View {
         self.headerActions = ChatHeaderActions(newChat: onNewChat)
         self.onNewChat = onNewChat
         self.onStartSession = onStartSession
+        self.onNewBotChat = onNewBotChat
         self.onEdgeAction = onEdgeAction
         self.onOpenAgentSessions = onOpenAgentSessions
         self.onOpenApproval = onOpenApproval
@@ -318,6 +321,7 @@ struct ChatDestinationView: View {
             onChatAppearanceTap: sessionAppearance == nil ? nil : { isChatAppearancePresented = true },
             onSessionToolsTap: nativeSessionControls == nil ? nil : { isNativeSessionControlsPresented = true },
             onNewChatTap: onNewChat,
+            onNewBotChat: onNewBotChat,
             onLoadPreviousMessages: loadPreviousMessages,
             onForkMessage: onForkMessage,
             referenceHub: referenceHub,

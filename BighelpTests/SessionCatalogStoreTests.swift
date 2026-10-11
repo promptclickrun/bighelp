@@ -1998,6 +1998,17 @@ struct SessionCatalogStoreTests {
         #expect(catalog.session(id: original.id)?.isPinned == false)
     }
 
+    /// Hermes saves titles with every run of spaces as one plain space and without
+    /// invisible marks; the app sends them that way so its check after saving matches.
+    /// iOS writes "10:09 PM" with a narrow no-break space (New Bot Chat's dated name).
+    @Test func titlesAreCleanedAsHermesSavesThem() throws {
+        #expect(try SessionTitleRules.validated("Bot Chat · Oct 11, 2026 at 10:09\u{202F}PM")
+            == "Bot Chat · Oct 11, 2026 at 10:09 PM")
+        #expect(try SessionTitleRules.validated("  Trip\u{00A0}\u{00A0}plans\u{200B}\n ") == "Trip plans")
+        #expect(try SessionTitleRules.validated(SessionRecord.retiredBotChatTitle(at: .now))
+            .unicodeScalars.allSatisfy { !$0.properties.isWhitespace || $0 == " " })
+    }
+
     @Test func invalidSessionTitlesAreRejectedBeforeRemoteMutation() async {
         let original = Self.record(id: "invalid-title-session", title: "Original")
         let client = MutationRecordingSessionCatalogClient(records: [original])

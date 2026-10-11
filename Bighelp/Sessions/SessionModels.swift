@@ -14,8 +14,16 @@ enum SessionCatalogError: Error, Equatable, Sendable {
 enum SessionTitleRules {
     static let maximumLength = 100
 
+    /// Cleaned as Hermes cleans a title before saving it (`SessionDB.sanitize_title`):
+    /// control, zero-width and direction marks out, every run of spaces one plain space.
+    /// The app checks that Hermes kept the exact title it sent, and iOS writes "10:09 PM"
+    /// with a narrow no-break space that Hermes saves as a plain one.
     static func validated(_ value: String) throws -> String {
-        let title = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        let visible = String(String.UnicodeScalarView(value.unicodeScalars.filter { scalar in
+            scalar.properties.isWhitespace
+                || !(CharacterSet.controlCharacters.contains(scalar) || scalar.properties.generalCategory == .format)
+        }))
+        let title = visible.split(whereSeparator: \.isWhitespace).joined(separator: " ")
         guard !title.isEmpty, title.count <= maximumLength else {
             throw SessionCatalogError.invalidTitle
         }

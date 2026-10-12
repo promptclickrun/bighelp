@@ -239,7 +239,7 @@ extension DirectHermesConversationClient {
         status = "Stop requested"
     }
 
-    /// This chat › Compact: Hermes folds the chat's earlier messages into a summary
+    /// Advanced › Compact: Hermes folds the chat's earlier messages into a summary
     /// (`session.compress`), the same chat with a lighter context. The rail shows at once
     /// and follows Hermes' own status; the receipt adds the exact before and after. A
     /// compaction outlasting the request carries on, and its status still ends the rail.

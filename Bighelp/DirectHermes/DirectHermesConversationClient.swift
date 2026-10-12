@@ -4,7 +4,7 @@ import Observation
 @MainActor
 @Observable
 /// Owns observable state and transport lifetime. Responsibility extensions operate on this same actor and journal.
-final class DirectHermesConversationClient: StreamingConversationClient, StoppableConversationClient,
+final class DirectHermesConversationClient: StreamingConversationClient, StoppableConversationClient, CompactingConversationClient,
     MidSessionConversationClient, AttachmentConversationClient {
     typealias SessionContextObserver = @MainActor (SessionContextSnapshot) -> Void
     typealias NativeSubagentObserver = @MainActor ([NativeSubagentRailItem]) -> Void

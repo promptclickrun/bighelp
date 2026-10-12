@@ -688,6 +688,7 @@
 		78E349D99DD30D98CAABB4BE /* RootWidgetFeeds.swift in Sources */ = {isa = PBXBuildFile; fileRef = 997011A9007216A348E31523 /* RootWidgetFeeds.swift */; };
 		78ED012B91C715FBA95C572B /* AchievementsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FD5FD6075748203E10CC6B7 /* AchievementsStore.swift */; };
 		78F261CED7ADF7F48AC05E4B /* DirectHermesHostOperationsClient+Gateway.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F2B24C355E463BD808454C4 /* DirectHermesHostOperationsClient+Gateway.swift */; };
+		792A0C957D29920889390BB1 /* CompactHostUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C90E1BD41FB2AE269C8B206C /* CompactHostUITests.swift */; };
 		793C12B5D68543611F2B5B4A /* CapabilitiesManagementModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DB1B9E73CD85A90EC183093 /* CapabilitiesManagementModels.swift */; };
 		797D40BB4F863210BD9FF3E9 /* BighelpLoaderMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63BD3CBB6E48D1AB957D471B /* BighelpLoaderMotion.swift */; };
 		797DEBAA188DE7C5206C28E8 /* RootDestinations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41F9EB6894454B1B3580988F /* RootDestinations.swift */; };
@@ -2658,6 +2659,7 @@
 		C7AFBAD05FFB3A2C204E28E5 /* ReferenceCanonicalState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReferenceCanonicalState.swift; sourceTree = "<group>"; };
 		C7F0E6A28B2BDF60EFA57809 /* BighelpLandingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpLandingTests.swift; sourceTree = "<group>"; };
 		C820C988D3FE3D2A125EA670 /* AgentDuplicateModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentDuplicateModelTests.swift; sourceTree = "<group>"; };
+		C90E1BD41FB2AE269C8B206C /* CompactHostUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompactHostUITests.swift; sourceTree = "<group>"; };
 		C91ACCA1752AA281B61BD798 /* KanbanModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanbanModels.swift; sourceTree = "<group>"; };
 		C92202D7CED62BC075E6080B /* ChatCompletedTurnPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatCompletedTurnPresentation.swift; sourceTree = "<group>"; };
 		C9AD31BCCC13F04E674F550C /* HermesLogsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesLogsStore.swift; sourceTree = "<group>"; };
@@ -4279,6 +4281,7 @@
 				32A8093F2FE15DF1627DCB77 /* ChatStreamingAnchorUITests.swift */,
 				9DFD40C7EF8353F3B2682B44 /* ChatToolFoldersUITests.swift */,
 				8020C3914A0DDC5D274AB35B /* CompactChatMenuUITests.swift */,
+				C90E1BD41FB2AE269C8B206C /* CompactHostUITests.swift */,
 				530632539B8C069371C9BC57 /* ComposerGlassUITests.swift */,
 				D12AC6E66E242B6AA18EECAF /* ComposerInteractionUITests.swift */,
 				3CDABE72B40973455A986015 /* CredentialVaultUITests.swift */,
@@ -6913,6 +6916,7 @@
 				313E0D3151A48CE98320724D /* ChatStreamingAnchorUITests.swift in Sources */,
 				83290EF0564275CC106CA573 /* ChatToolFoldersUITests.swift in Sources */,
 				381C5D187D4D55D30DE40DB6 /* CompactChatMenuUITests.swift in Sources */,
+				792A0C957D29920889390BB1 /* CompactHostUITests.swift in Sources */,
 				D6953205AD992A7915070EF8 /* ComposerGlassUITests.swift in Sources */,
 				C1FB39C6F4D951394EC6A67A /* ComposerInteractionUITests.swift in Sources */,
 				FDF931038113A673577D553B /* CredentialVaultUITests.swift in Sources */,

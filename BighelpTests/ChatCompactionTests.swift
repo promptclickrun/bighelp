@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import Bighelp
 
-/// This chat › Compact and Hermes' own compaction show the rail above the message box:
+/// Advanced › Compact and Hermes' own compaction show the rail above the message box:
 /// compacting while Hermes says so, then Done with what it saved.
 @MainActor
 struct ChatCompactionTests {

@@ -46,14 +46,19 @@ final class BotChatUITests: BighelpUITestCase {
         }
     }
 
-    /// Compacting shows a chip above the message box, then Done with what it saved.
+    /// ⋯ › Advanced › Compact shows a chip above the message box, then Done with what it saved.
     @MainActor
-    func testCompactionRailShowsThenFinishes() {
+    func testCompactShowsTheRailThenFinishes() {
         for appearance in ["light", "dark"] {
             let app = makeApp()
             app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-start-chat",
-                                   "-test-compaction-rail", "-loopdy.demo.appearance", appearance]
+                                   "-loopdy.demo.appearance", appearance]
             app.launch()
+            XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 15))
+            let compact = chatCompactItem(in: app)
+            XCTAssertTrue(compact.waitForExistence(timeout: 5), "Advanced has Compact")
+            save("compact-menu-\(appearance)", app)
+            compact.tap()
             let running = app.descendants(matching: .any).matching(NSPredicate(
                 format: "identifier == %@ AND label CONTAINS %@", "chat.compaction.running", "Compacting 48 messages")).firstMatch
             XCTAssertTrue(running.waitForExistence(timeout: 15), "Compacting shows above the message box")

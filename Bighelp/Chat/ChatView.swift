@@ -141,7 +141,6 @@ struct ChatView: View {
     /// Nil leaves the item out.
     let onChatFilesTap: (() -> Void)?
     let onChatAppearanceTap: (() -> Void)?
-    let onSessionToolsTap: (() -> Void)?
     let onNewChatTap: () -> Void
     /// Set when this chat is its agent's Bot Chat: starts a new one (This chat › New Bot Chat).
     let onNewBotChat: (() -> Void)?
@@ -219,7 +218,6 @@ struct ChatView: View {
         onPeopleTap: @escaping () -> Void = {},
         onChatFilesTap: (() -> Void)? = nil,
         onChatAppearanceTap: (() -> Void)? = nil,
-        onSessionToolsTap: (() -> Void)? = nil,
         onNewChatTap: @escaping () -> Void = {},
         onNewBotChat: (() -> Void)? = nil,
         onContinueInBranch: ((ChatBranchContinuation) -> Void)? = nil,
@@ -262,7 +260,6 @@ struct ChatView: View {
         self.onPeopleTap = onPeopleTap
         self.onChatFilesTap = onChatFilesTap
         self.onChatAppearanceTap = onChatAppearanceTap
-        self.onSessionToolsTap = onSessionToolsTap
         self.onNewChatTap = onNewChatTap
         self.onNewBotChat = onNewBotChat
         self.onContinueInBranch = onContinueInBranch
@@ -303,15 +300,6 @@ struct ChatView: View {
         .environment(\.bighelpUIV3Enabled, true)
         .environment(\.bighelpUIV2Enabled, true)
         .environment(\.chatActivityDisclosureStore, model.activityDisclosures)
-        #if DEBUG && targetEnvironment(simulator)
-        .task {
-            // The compaction rail on the demo data (BotChatUITests): compacting, then Done.
-            guard ProcessInfo.processInfo.arguments.contains("-test-compaction-rail") else { return }
-            model.beginCompaction(status: "⠋ compressing 48 messages (~41,200 tok)…")
-            try? await Task.sleep(for: .seconds(8))
-            model.finishCompaction(tokensBefore: 41_200, tokensAfter: 6_100)
-        }
-        #endif
         .onAppear {
             isChatVisible = true
             BighelpVisibleChats.shared.appeared(model)
@@ -1036,14 +1024,6 @@ struct ChatView: View {
             } else {
                 renameChatMenuItem
             }
-            if let directHermesClient {
-                Button("Compact", systemImage: "arrow.down.right.and.arrow.up.left") {
-                    dismissKeyboard()
-                    compactChat(directHermesClient)
-                }
-                .disabled(model.isSending || model.compaction != nil)
-                .accessibilityIdentifier("chat.compact")
-            }
             if let onNewBotChat {
                 Button("New Bot Chat", systemImage: "arrow.trianglehead.counterclockwise") {
                     dismissKeyboard()
@@ -1086,9 +1066,9 @@ struct ChatView: View {
         }
     }
 
-    /// This chat › Compact: Hermes folds earlier messages into a summary; the rail above
+    /// Advanced › Compact: Hermes folds earlier messages into a summary; the rail above
     /// the message box shows it working, then what it saved.
-    private func compactChat(_ client: DirectHermesConversationClient) {
+    private func compactChat(_ client: any CompactingConversationClient) {
         Task {
             do {
                 try await client.compact(conversationID: model.conversationID)
@@ -1136,13 +1116,13 @@ struct ChatView: View {
     private var advancedMenu: some View {
         if nerdModeEnabled {
             Menu {
-                if let onSessionToolsTap {
-                    Button(dynamicTypeSize.isAccessibilitySize ? "Tools" : "Session tools", systemImage: "wrench.and.screwdriver") {
+                if let compacting = model.client as? any CompactingConversationClient {
+                    Button("Compact", systemImage: "arrow.down.right.and.arrow.up.left") {
                         dismissKeyboard()
-                        onSessionToolsTap()
+                        compactChat(compacting)
                     }
-                    .accessibilityLabel("Session tools")
-                    .accessibilityIdentifier("chat.session-tools")
+                    .disabled(model.isSending || model.compaction != nil)
+                    .accessibilityIdentifier("chat.compact")
                 }
                 if dynamicTypeSize.isAccessibilitySize {
                     Menu {

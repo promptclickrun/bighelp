@@ -8,7 +8,9 @@ enum ConversationFixtureError: Error {
 }
 
 @MainActor
-class ConversationFixtureClient: AttachmentConversationClient {
+class ConversationFixtureClient: AttachmentConversationClient, CompactingConversationClient {
+    /// The demo chat this client answers, set by `ChatModel`.
+    weak var model: ChatModel?
     private(set) var receivedAttachments: [ChatAttachment] = []
     private var responseSequence = 1
     private let shouldFail: Bool
@@ -61,6 +63,14 @@ class ConversationFixtureClient: AttachmentConversationClient {
         return ConversationResponse(items: [
             assistantItem(conversationID: conversationID, content: content)
         ])
+    }
+
+    /// Demo Compact: Hermes' status on the rail for a moment, then what it saved.
+    func compact(conversationID: String) async throws {
+        guard !shouldFail, let model else { throw ConversationFixtureError.unavailable }
+        model.beginCompaction(status: "⠋ compressing 48 messages (~41,200 tok)…")
+        try await Task.sleep(for: .seconds(3))
+        model.finishCompaction(tokensBefore: 41_200, tokensAfter: 6_100)
     }
 
     private func assistantItem(

@@ -325,7 +325,6 @@ struct ChatDestinationView: View {
             onPeopleTap: { isPeopleAndChatPresented = true },
             onChatFilesTap: { isSessionFilesPresented = true },
             onChatAppearanceTap: sessionAppearance == nil ? nil : { isChatAppearancePresented = true },
-            onSessionToolsTap: nativeSessionControls == nil ? nil : { isNativeSessionControlsPresented = true },
             onNewChatTap: onNewChat,
             onNewBotChat: onNewBotChat,
             onContinueInBranch: onContinueInBranch,

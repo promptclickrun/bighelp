@@ -84,6 +84,13 @@ class BighelpUITestCase: XCTestCase {
         return true
     }
 
+    /// ⋯ › Advanced › Compact. A menu item can report its title instead of its identifier.
+    @MainActor
+    func chatCompactItem(in app: XCUIApplication) -> XCUIElement {
+        _ = chatMenuItem("chat.compact", in: app)
+        return app.buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@", "chat.compact", "Compact")).firstMatch
+    }
+
     /// Opens the chat's ⋯ menu when it's closed and returns one of its items.
     @MainActor
     func chatMenuItem(_ identifier: String, in app: XCUIApplication, timeout: TimeInterval = 5) -> XCUIElement {
@@ -96,7 +103,7 @@ class BighelpUITestCase: XCTestCase {
         case "chat.rename", "chat.appearance": groups = ["chat.options.this-chat", "chat.options.settings"]
         case "chat.files", "chat.edit-current-agent", "chat.options.settings": groups = ["chat.options.this-chat"]
         case "chat.options.usage", "chat.options.advanced", "chat.file-changes": groups = ["chat.options.more"]
-        case "chat.session-tools", "chat.force-refresh", "chat.options.display": groups = ["chat.options.more", "chat.options.advanced"]
+        case "chat.compact", "chat.force-refresh", "chat.options.display": groups = ["chat.options.more", "chat.options.advanced"]
         case "chat.visibility.reasoning", "chat.visibility.tool-calls": groups = ["chat.options.more", "chat.options.advanced", "chat.options.display"]
         default: groups = []
         }

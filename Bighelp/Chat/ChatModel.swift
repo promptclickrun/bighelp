@@ -373,9 +373,7 @@ final class ChatModel {
         rebuildItemIndexes()
         rebuildTranscript()
         observeBotModeRoomIfNeeded()
-        #if DEBUG
-        (client as? CanvasStreamingFixtureClient)?.model = self
-        #endif
+        (client as? ConversationFixtureClient)?.model = self
         scheduleGeneratedMediaResolutions()
         scheduleNativeGoalControlRefresh()
     }

@@ -50,8 +50,8 @@ final class CompactChatMenuUITests: BighelpUITestCase {
             let reopened = chatMenuItem("chat.fast-mode", in: app)
             XCTAssertTrue(reopened.waitForExistence(timeout: 5))
             XCTAssertTrue(reopened.label.contains("On"), "The saved chat value is visible")
-            // Demo chats have no native session, so Session tools and Force
-            // refresh are absent. More and This chat still exercise full rows.
+            // Demo chats have no native session, so Force refresh is absent.
+            // More and This chat still exercise full rows.
             let submenus = large ? [
                 ["chat.options.settings", "chat.files", "chat.edit-current-agent"],
                 ["chat.rename", "chat.appearance"],

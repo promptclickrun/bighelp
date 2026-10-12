@@ -309,7 +309,7 @@ the context pop-up, each with Change into Model & reasoning. Showing them reads 
 is replying. Deleting an agent stops its reply and clears its unsent drafts on this device instead of refusing; only a
 group chat that includes it holds the delete back, by name.
 
-Compacting (This chat › Compact, or Hermes on its own when the context fills) shows `ChatCompactionRail` above the
+Compacting (⋯ › Advanced › Compact, or Hermes on its own when the context fills) shows `ChatCompactionRail` above the
 message box: a chip whose four-step bar moves once a second (still with Reduce Motion), then Compacted with the tokens
 before and after for two seconds before it shrinks away. Hermes' own status starts and ends it.
 

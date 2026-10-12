@@ -105,6 +105,13 @@ protocol StoppableConversationClient: ConversationClient {
     func stop(conversationID: String) async throws
 }
 
+/// Advanced › Compact: the host folds a chat's earlier messages into a summary, the same chat
+/// with a lighter memory. The client shows the work on its chat's `compaction` rail.
+@MainActor
+protocol CompactingConversationClient: ConversationClient {
+    func compact(conversationID: String) async throws
+}
+
 @MainActor
 protocol InactiveSessionReconciliationConversationClient: ConversationClient {
     /// Retires only the local waiter for a turn Hermes already reports as

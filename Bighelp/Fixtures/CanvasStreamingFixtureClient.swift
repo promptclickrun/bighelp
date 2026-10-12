@@ -7,7 +7,6 @@ import CoreFoundation
 @MainActor
 final class CanvasStreamingFixtureClient: ConversationFixtureClient, StreamingConversationClient, MidSessionConversationClient {
     let senderID: String
-    weak var model: ChatModel?
     weak var featureStore: ShellFeatureStore?
     weak var catalog: SessionCatalogStore?
     private let toolStress = ProcessInfo.processInfo.arguments.contains("-test-tool-stream")

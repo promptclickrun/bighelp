@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Hermes compacting a chat's context: its earlier messages folded into a summary, the
-/// same chat with a lighter memory. Asked for with This chat › Compact, or done by Hermes
+/// same chat with a lighter memory. Asked for with Advanced › Compact, or done by Hermes
 /// on its own when the context fills during a turn. Drives `ChatCompactionRail`.
 struct ChatCompaction: Equatable {
     enum Phase: Equatable { case compacting, done }

@@ -715,7 +715,7 @@ final class ShellFeatureStore {
             let model = flight.model
             if !model.hasPendingIndependentMessageSubmission {
                 catalog.updateChatSnapshot(draft: model.persistedDraft, items: model.items,
-                    activityEvents: model.activityLedger.allEvents, activityVisibility: model.activityVisibility, for: id)
+                    activityEvents: model.activityLedger.allEvents, activityVisibility: model.chosenActivityVisibility, for: id)
             }
             // The model's normal checkpoint excludes provisional independent
             // rows. Do not bypass that rule while such a submission is pending.
@@ -1243,7 +1243,8 @@ final class ShellFeatureStore {
             initialItems: initialItems,
             initialDraft: session.draft,
             initialActivityEvents: session.activityEvents,
-            initialActivityVisibility: session.activityVisibility,
+            initialActivityVisibility: catalog.activityVisibility(for: session),
+            chosenActivityVisibility: session.activityVisibility,
             initialGoalSnapshot: session.sessionGoal,
             initialTodoSnapshot: session.sessionTodos,
             midSessionBehavior: midSessionBehavior,

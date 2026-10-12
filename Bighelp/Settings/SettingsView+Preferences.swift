@@ -298,7 +298,7 @@ extension SettingsView {
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    /// How much of an agent's work new chats show. Technical, so it appears
+    /// How much of an agent's work chats show. Technical, so it appears
     /// with Nerd Mode's Advanced section rather than the basics.
     var chatDetailDefaults: some View {
         Section {
@@ -313,7 +313,7 @@ extension SettingsView {
             Toggle(isOn: $settings.showReasoningByDefault) {
                 settingLabel(
                     "Show reasoning",
-                    detail: "Thinking and notes between steps, in new chats."
+                    detail: "Thinking and notes between steps."
                 )
             }
             .accessibilityIdentifier("settings.chat.show-reasoning")
@@ -321,14 +321,14 @@ extension SettingsView {
             Toggle(isOn: $settings.showToolCallsByDefault) {
                 settingLabel(
                     "Show tool calls",
-                    detail: "Show the work trail in new chats."
+                    detail: "Show the work trail."
                 )
             }
             .accessibilityIdentifier("settings.chat.show-tool-calls")
         } header: {
             Text("Chat details")
         } footer: {
-            Text("For new chats. Each chat can change its own in its ••• menu.")
+            Text("Every chat shows these unless you change it in that chat's ••• menu.")
                 .bighelpFont(.metadata)
         }
         .listRowBackground(theme.surface)

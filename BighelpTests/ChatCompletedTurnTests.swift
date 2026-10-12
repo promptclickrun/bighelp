@@ -421,7 +421,7 @@ struct ChatCompletedTurnTests {
         let restored = try JSONDecoder().decode(SessionRecord.self, from: before)
         func project(_ session: SessionRecord) -> [ChatTranscriptEntry] {
             ChatTranscriptProjection.entries(items: session.items, activityEvents: session.activityEvents,
-                                             visibility: session.activityVisibility, isBotMode: false)
+                                             visibility: session.activityVisibility ?? .default, isBotMode: false)
         }
         let entries = project(record)
         let original = ChatCompletedTurnProjection.rows(from: entries, isSending: false, enabled: true)

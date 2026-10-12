@@ -207,7 +207,9 @@ struct SessionRecord: Identifiable, Codable, Equatable, Sendable {
     /// agent. Bot Mode's canonical shared log lives in `items` after conversion.
     var botModePrivateHistory: [TimelineItem]
     var activityEvents: [ChatActivityEvent]
-    var activityVisibility: ChatActivityVisibility
+    /// What this chat's ⋯ menu chose to show. Nil follows Settings › Chat details, so a chat
+    /// bighelp first sees on the host shows what Settings says, like one it starts itself.
+    var activityVisibility: ChatActivityVisibility?
     /// True while Hermes reports this durable session as live, even before
     /// the first user message has been committed.
     var isActive: Bool
@@ -257,7 +259,9 @@ struct SessionRecord: Identifiable, Codable, Equatable, Sendable {
         case botModeRoomID
         case botModePrivateHistory
         case activityEvents
-        case activityVisibility
+        // A new key: chats saved before it kept the built-in "off" for reasoning even when
+        // Settings said show it, so their old value is dropped once and they follow Settings.
+        case activityVisibility = "chosenActivityVisibility"
         case isActive
         case isPinned
         case createdAt
@@ -289,7 +293,7 @@ struct SessionRecord: Identifiable, Codable, Equatable, Sendable {
         botModeRoomID: String? = nil,
         botModePrivateHistory: [TimelineItem] = [],
         activityEvents: [ChatActivityEvent] = [],
-        activityVisibility: ChatActivityVisibility = .default,
+        activityVisibility: ChatActivityVisibility? = nil,
         isActive: Bool = false,
         isPinned: Bool = false,
         createdAt: Date = .now,
@@ -418,7 +422,7 @@ struct SessionRecord: Identifiable, Codable, Equatable, Sendable {
         activityVisibility = try container.decodeIfPresent(
             ChatActivityVisibility.self,
             forKey: .activityVisibility
-        ) ?? .default
+        )
         isActive = try container.decodeIfPresent(Bool.self, forKey: .isActive) ?? false
         isPinned = try container.decodeIfPresent(Bool.self, forKey: .isPinned) ?? false
         createdAt = try container.decode(Date.self, forKey: .createdAt)
@@ -457,7 +461,7 @@ struct SessionRecord: Identifiable, Codable, Equatable, Sendable {
         try container.encodeIfPresent(botModeRoomID, forKey: .botModeRoomID)
         try container.encode(botModePrivateHistory, forKey: .botModePrivateHistory)
         try container.encode(activityEvents, forKey: .activityEvents)
-        try container.encode(activityVisibility, forKey: .activityVisibility)
+        try container.encodeIfPresent(activityVisibility, forKey: .activityVisibility)
         try container.encode(isActive, forKey: .isActive)
         try container.encode(isPinned, forKey: .isPinned)
         try container.encode(createdAt, forKey: .createdAt)

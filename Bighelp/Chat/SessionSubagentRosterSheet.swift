@@ -325,7 +325,7 @@ private struct SessionSubagentDetailView: View {
         ChatTranscriptProjection.entries(
             items: record.items,
             activityEvents: record.activityEvents,
-            visibility: record.activityVisibility,
+            visibility: sessionCatalog?.activityVisibility(for: record) ?? .default,
             isBotMode: record.kind == .botMode,
             isScheduled: record.isCronSession
         )

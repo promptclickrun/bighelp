@@ -254,7 +254,7 @@ extension ChatModel {
         }
         onSessionChange(persistedDraft, items.filter {
             !pendingIndependentMessageIDs.contains($0.id)
-        }, activityLedger, activityVisibility)
+        }, activityLedger, chosenActivityVisibility)
         try onReferenceStateChange(persistedDraft, referenceState)
         lastReferenceCheckpoint = (Data(persistedDraft.utf8), referenceState)
         hasDirtyPersistence = false
@@ -375,7 +375,7 @@ extension ChatModel {
             ? items
             : items.filter { !pendingIndependentMessageIDs.contains($0.id) }
         let savedDraft = persistedDraft
-        onSessionChange?(savedDraft, acceptedItems, activityLedger, activityVisibility)
+        onSessionChange?(savedDraft, acceptedItems, activityLedger, chosenActivityVisibility)
         if referencePersistenceNeeded, let onReferenceStateChange, !referenceOwnerRetired {
             let draftBytes = Data(savedDraft.utf8)
             let state = referenceState

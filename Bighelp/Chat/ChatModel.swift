@@ -192,6 +192,10 @@ final class ChatModel {
     var nativeSubagents: [NativeSubagentRailItem] = []
     /// What each helper did, kept after it finishes so its canvas can show the end.
     var subagentCanvases = SubagentCanvasLedger()
+    /// The chat's own ⋯ choice (`setReasoningVisible`, `setToolCallsVisible`); nil while it
+    /// follows Settings › Chat details.
+    var chosenActivityVisibility: ChatActivityVisibility?
+    /// What the chat shows: its own ⋯ choice, or Settings › Chat details when it has none.
     var activityVisibility: ChatActivityVisibility {
         didSet {
             rebuildTranscript()
@@ -217,7 +221,8 @@ final class ChatModel {
     var botModeRoomID: String?
     private let userIdentity: UserIdentity
     private let userIdentityStore: UserIdentityStore?
-    let onSessionChange: ((String, [TimelineItem], ChatActivityLedger, ChatActivityVisibility) -> Void)?
+    /// Saves the chat; its visibility is the chat's own ⋯ choice, nil while it follows Settings.
+    let onSessionChange: ((String, [TimelineItem], ChatActivityLedger, ChatActivityVisibility?) -> Void)?
     let onGoalSnapshotChange: ((SessionGoalSnapshot) -> Void)?
     let onTodoSnapshotChange: ((SessionTodoSnapshot) -> Void)?
     let persistenceCheckpointDelay: Duration
@@ -256,6 +261,7 @@ final class ChatModel {
         initialDraft: String = "",
         initialActivityEvents: [ChatActivityEvent] = [],
         initialActivityVisibility: ChatActivityVisibility = .default,
+        chosenActivityVisibility: ChatActivityVisibility? = nil,
         initialGoalSnapshot: SessionGoalSnapshot? = nil,
         initialTodoSnapshot: SessionTodoSnapshot? = nil,
         persistenceCheckpointDelay: Duration = .seconds(2),
@@ -268,7 +274,7 @@ final class ChatModel {
         slashCommandCatalog: SlashCommandCatalogModel? = nil,
         generatedMediaResolver: (any GeneratedMediaResolving)? = nil,
         botModeRoomID: String? = nil,
-        onSessionChange: ((String, [TimelineItem], ChatActivityLedger, ChatActivityVisibility) -> Void)? = nil,
+        onSessionChange: ((String, [TimelineItem], ChatActivityLedger, ChatActivityVisibility?) -> Void)? = nil,
         onGoalSnapshotChange: ((SessionGoalSnapshot) -> Void)? = nil,
         onTodoSnapshotChange: ((SessionTodoSnapshot) -> Void)? = nil,
         onTurnStopped: (() -> Void)? = nil,
@@ -344,7 +350,8 @@ final class ChatModel {
         }
         nextTranscriptOrder = orderedContent.nextOrder
         botModeRoomStore?.ensurePresentationOrder(atLeast: orderedContent.nextOrder)
-        activityVisibility = initialActivityVisibility
+        self.chosenActivityVisibility = chosenActivityVisibility
+        activityVisibility = chosenActivityVisibility ?? initialActivityVisibility
         // A saved reply rides before an ordinary draft; reference drafts keep their exact bytes.
         let savedReply = sourceSession?.referenceState == nil ? ChatReplyQuote.split(initialDraft) : nil
         let initialDraft = savedReply?.body ?? initialDraft

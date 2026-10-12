@@ -18,7 +18,7 @@ struct SessionReopenReplayTests {
         let catalog = SessionCatalogStore(client: client, records: [initial])
         let model = ChatModel(conversationID: initial.id, client: NativeWorkspaceUnavailableClient(),
             agentID: "default", initialItems: initial.items, initialDraft: "Unsent replay draft",
-            initialActivityEvents: initial.activityEvents, initialActivityVisibility: initial.activityVisibility, sourceSession: initial)
+            initialActivityEvents: initial.activityEvents, chosenActivityVisibility: initial.activityVisibility, sourceSession: initial)
         let host = UIHostingController(rootView: ChatView(model: model, foldCompletedTurns: true)
             .environment(\.bighelpUIV3Enabled, true))
         let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
@@ -87,7 +87,7 @@ struct SessionReopenReplayTests {
         let catalog = SessionCatalogStore(client: client, records: [initial])
         let model = ChatModel(conversationID: initial.id, client: NativeWorkspaceUnavailableClient(),
             agentID: "default", initialItems: initial.items, initialActivityEvents: initial.activityEvents,
-            initialActivityVisibility: initial.activityVisibility, sourceSession: initial)
+            chosenActivityVisibility: initial.activityVisibility, sourceSession: initial)
         print("DEVICE_REPLAY items=\(initial.items.count) activities=\(initial.activityEvents.count)")
         for size in [decoded.count, min(320, decoded.count), decoded.count] {
             let window = Array(decoded.suffix(size))

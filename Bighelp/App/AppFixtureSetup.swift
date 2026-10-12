@@ -49,7 +49,7 @@ enum AppFixtureSetup {
            let index = initialSessions.firstIndex(where: { $0.id == "demo-finance" }) {
             initialSessions[index] = ConversationFixtures.thinkingStylePreview
             if arguments.contains("-test-hide-tool-calls") {
-                initialSessions[index].activityVisibility.showToolCalls = false
+                initialSessions[index].activityVisibility?.showToolCalls = false
             }
         }
         if usesFixtures, arguments.contains("-test-loader-chat"),
@@ -118,7 +118,8 @@ enum AppFixtureSetup {
                 occurredAt: 6
             ))
             initialSessions[index].isActive = !completed
-            initialSessions[index].activityVisibility.showReasoning = true
+            initialSessions[index].activityVisibility = .init(
+                showReasoning: true, showToolCalls: initialSessions[index].activityVisibility?.showToolCalls ?? true)
         }
         if usesFixtures, arguments.contains("-test-live-reasoning-card"),
            let index = initialSessions.firstIndex(where: { $0.id == "demo-finance" }) {

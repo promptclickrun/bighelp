@@ -414,7 +414,9 @@ struct SettingsStoreTests {
         ) == nil)
     }
 
-    @Test func chatActivityVisibilityDefaultsPersistAndNewSessionsInheritThem() async throws {
+    /// Show reasoning was off in chats bighelp found on the host (another device, Hermes
+    /// Desktop, a Bot Chat, a re-downloaded chat) although Settings said show it.
+    @Test func everyChatFollowsSettingsUntilItsOwnMenuChanges() async throws {
         let suiteName = #function
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
@@ -423,19 +425,31 @@ struct SettingsStoreTests {
         let settings = SettingsStore(defaults: defaults)
         settings.showReasoningByDefault = true
         settings.showToolCallsByDefault = false
-        let client = DemoSessionCatalogClient(records: [])
+        let fromHost = SessionRecord(id: "session_from_host_0001", kind: .direct, agentIDs: ["default"], title: "Desktop")
         let catalog = SessionCatalogStore(
-            client: client,
+            client: DemoSessionCatalogClient(records: [fromHost]),
             defaultActivityVisibility: { settings.chatActivityVisibility }
         )
-
+        try await catalog.load()
         let created = try await catalog.createDirect(agentID: "default")
+        let shown = ChatActivityVisibility(showReasoning: true, showToolCalls: false)
+        for id in [fromHost.id, created.id] {
+            #expect(catalog.activityVisibility(for: try #require(catalog.session(id: id))) == shown, "\(id)")
+        }
 
-        #expect(created.activityVisibility == .init(
-            showReasoning: true,
-            showToolCalls: false
-        ))
-        #expect(catalog.session(id: created.id)?.activityVisibility == created.activityVisibility)
+        // A chat's own ⋯ choice stays, whatever Settings says later.
+        let model = ChatModel(conversationID: created.id, client: ConversationFixtureClient(),
+                              initialActivityVisibility: shown,
+                              onSessionChange: { draft, items, ledger, visibility in
+                                  catalog.updateChatSnapshot(draft: draft, items: items, activityEvents: ledger.allEvents,
+                                                             activityVisibility: visibility, for: created.id)
+                              })
+        model.setReasoningVisible(false)
+        model.flushPersistence()
+        settings.showReasoningByDefault = true
+        let own = try #require(catalog.session(id: created.id))
+        #expect(catalog.activityVisibility(for: own).showReasoning == false)
+        #expect(catalog.activityVisibility(for: try #require(catalog.session(id: fromHost.id))).showReasoning)
     }
 
     @Test func settingsMenuUsesFocusedSubsectionsInsteadOfOneLongForm() {

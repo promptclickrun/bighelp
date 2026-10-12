@@ -299,14 +299,24 @@ extension ChatModel {
         return result
     }
 
+    /// The chat's ⋯ menu: from now on this chat keeps its own choice, whatever Settings says.
     func setReasoningVisible(_ isVisible: Bool) {
         guard activityVisibility.showReasoning != isVisible else { return }
-        activityVisibility.showReasoning = isVisible
+        var chosen = activityVisibility
+        chosen.showReasoning = isVisible
+        choose(chosen)
     }
 
     func setToolCallsVisible(_ isVisible: Bool) {
         guard activityVisibility.showToolCalls != isVisible else { return }
-        activityVisibility.showToolCalls = isVisible
+        var chosen = activityVisibility
+        chosen.showToolCalls = isVisible
+        choose(chosen)
+    }
+
+    private func choose(_ visibility: ChatActivityVisibility) {
+        chosenActivityVisibility = visibility
+        activityVisibility = visibility  // saves the chat, with its choice
     }
 
     /// Only authenticated live assistant delivery opts in. History, fixtures,

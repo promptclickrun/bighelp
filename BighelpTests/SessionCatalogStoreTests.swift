@@ -890,7 +890,7 @@ struct SessionCatalogStoreTests {
         )
         let item = Self.message("new-turn", role: .human, text: "Hello")
 
-        catalog.updateChatSnapshot(draft: "Next", items: [item], for: record.id)
+        catalog.updateChatSnapshot(draft: "Next", items: [item], activityVisibility: nil, for: record.id)
 
         #expect(catalog.session(id: record.id)?.draft == "Next")
         #expect(catalog.session(id: record.id)?.items == [item])
@@ -1736,7 +1736,7 @@ struct SessionCatalogStoreTests {
         #expect(record.updatedAt == record.createdAt)
         #expect(!record.hasAcceptedMessage)
         #expect(record.activityEvents.isEmpty)
-        #expect(record.activityVisibility == .default)
+        #expect(record.activityVisibility == nil, "It follows Settings")
         #expect(!record.isActive)
         #expect(record.workspaceID == nil)
         #expect(record.workspaceName == nil)

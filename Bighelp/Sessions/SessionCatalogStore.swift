@@ -290,7 +290,6 @@ final class SessionCatalogStore {
         let generation = accountGeneration
         var record = try await client.create(kind: .direct, agentIDs: [agentID])
         guard generation == accountGeneration else { throw CancellationError() }
-        record.activityVisibility = defaultActivityVisibility()
         upsert(record)
         persistChangesIfNeeded()
         return record
@@ -307,7 +306,6 @@ final class SessionCatalogStore {
             agentIDs: [agentID],
             title: "New chat"
         )
-        record.activityVisibility = defaultActivityVisibility()
         upsert(record)
         persistChangesIfNeeded()
         return record
@@ -818,11 +816,16 @@ final class SessionCatalogStore {
         persistChangesIfNeeded()
     }
 
+    /// What a chat shows: its own ⋯ choice, or Settings › Chat details.
+    func activityVisibility(for record: SessionRecord) -> ChatActivityVisibility {
+        record.activityVisibility ?? defaultActivityVisibility()
+    }
+
     func updateChatSnapshot(
         draft: String,
         items: [TimelineItem],
         activityEvents: [ChatActivityEvent] = [],
-        activityVisibility: ChatActivityVisibility = .default,
+        activityVisibility: ChatActivityVisibility?,
         persist: Bool = true,
         for sessionID: String
     ) {
@@ -955,7 +958,7 @@ final class SessionCatalogStore {
 
     func replaceActivity(
         _ events: [ChatActivityEvent],
-        visibility: ChatActivityVisibility,
+        visibility: ChatActivityVisibility?,
         for sessionID: String
     ) {
         guard contentSession(id: sessionID) != nil else { return }

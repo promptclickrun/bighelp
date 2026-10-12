@@ -419,7 +419,7 @@ enum WikiError: Error, LocalizedError, Equatable {
             case .conflict: return .remote("REVISION_STALE")
             case .outcomeUnknown: return .remote("OPERATION_UNCONFIRMED")
             case .capacityExceeded: return .oversized
-            case .rejected(let code): return .remote(code ?? "UNAVAILABLE")
+            case .rejected(let code, _): return .remote(code ?? "UNAVAILABLE")
             case .unavailable, .transportUnavailable: return .unavailable
             }
         }

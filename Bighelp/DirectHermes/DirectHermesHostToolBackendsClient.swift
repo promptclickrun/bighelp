@@ -291,7 +291,7 @@ final class DirectHermesHostToolBackendsClient: HermesHostToolBackendsManaging {
             switch error {
             case DirectHermesError.unsupportedAuthentication:
                 return capabilityProbe ? HermesHostToolBackendsError.unavailable : HermesHostToolBackendsError.invalidRequest
-            case DirectHermesError.rpcRejected(let code) where capabilityProbe && (code == -32601 || code == 404):
+            case DirectHermesError.rpcRejected(let code, _) where capabilityProbe && (code == -32601 || code == 404):
                 return HermesHostToolBackendsError.unavailable
             case DirectHermesError.messageTooLarge:
                 return HermesHostToolBackendsError.responseTooLarge

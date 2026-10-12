@@ -407,7 +407,8 @@ extension RootShellView {
                         openSession(record.summary)
                     } catch is CancellationError {
                     } catch {
-                        actionErrorMessage = "This chat couldn't be opened. Try again from All sessions."
+                        actionErrorMessage = "This chat couldn't be opened. "
+                            + (HermesRefusalMessage.sentence(in: error) ?? "Try again from All sessions.")
                     }
                 }
             }

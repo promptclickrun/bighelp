@@ -130,7 +130,7 @@ final class DirectHermesArtifactClient: WorkspaceOperationPerforming {
             let error = responseError(response)
             // Without the feature the plugin can't find hosted Hermes' workspace
             // folder, so its "set terminal.cwd" reason is the wrong fix.
-            if case .rejected(let code?) = error, Self.hermesHomeRefusals.contains(code),
+            if case .rejected(let code?, _) = error, Self.hermesHomeRefusals.contains(code),
                !context.features.contains(Self.hermesHomeFeature) {
                 throw WorkspaceClientError.rejected(code: WorkspaceClientError.workspacePluginOutdated)
             }

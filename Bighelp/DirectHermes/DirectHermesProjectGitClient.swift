@@ -167,7 +167,7 @@ final class DirectHermesProjectGitClient: ProjectGitClient {
         } catch {
             try check(target)
             observations.removeAll { $0.target == target }
-            if case WorkspaceClientError.rejected(let code) = error {
+            if case WorkspaceClientError.rejected(let code, _) = error {
                 if code == "status_changed" {
                     throw Self.statusChanged
                 }

@@ -114,7 +114,7 @@ extension DirectHermesConversationClient {
                         let result: BighelpJSONValue
                         do {
                             result = try await self.rpc.request(method, params: params)
-                        } catch DirectHermesError.rpcRejected(code: 4018) where method == "slash.exec" {
+                        } catch DirectHermesError.rpcRejected(code: 4018, _) where method == "slash.exec" {
                             // Typed text (a Shortcut, or a command typed without the menu) has
                             // no catalog selection. Hermes refuses skills here, before running
                             // anything, and names command.dispatch; its own clients retry there.
@@ -411,7 +411,7 @@ extension DirectHermesConversationClient {
 
     static func definitePromptRefusalCode(_ error: Error) -> Int? {
         if (error as? DirectHermesError) == .activeSessionLimit { return 4090 }
-        guard case .rpcRejected(let code) = error as? DirectHermesError,
+        guard case .rpcRejected(let code, _) = error as? DirectHermesError,
               [4001, 4007, 4090].contains(code) else { return nil }
         return code
     }
@@ -491,7 +491,7 @@ extension DirectHermesConversationClient {
     private static func isProvenInputRejection(_ error: Error, method: String = "prompt.submit") -> Bool {
         if let workspace = error as? DirectHermesWorkspaceError, case .midSessionRejected = workspace { return true }
         if method == "prompt.submit", (error as? DirectHermesError) == .activeSessionLimit { return true }
-        guard let direct = error as? DirectHermesError, case .rpcRejected(let code) = direct else { return false }
+        guard let direct = error as? DirectHermesError, case .rpcRejected(let code, _) = direct else { return false }
         // These stock validation/ownership rejections precede prompt admission.
         // An arbitrary server error from a mutating command is not such proof.
         return [4001, 4002, 4004, 4009, 4010, 4030, 4130].contains(code)

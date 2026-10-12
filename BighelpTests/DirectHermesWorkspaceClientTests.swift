@@ -20,6 +20,29 @@ struct DirectHermesWorkspaceClientTests {
         }
     }
 
+    /// A host with a full disk refused every chat with "Hermes rejected this operation."
+    /// Hermes' own words reach the alert now, on one short line.
+    @Test func aRefusalShowsHermesOwnWords() async throws {
+        let authority = try WorkspaceAuthority.fixture(id: "refusal-words")
+        let owner = WorkspaceOwner(authority: authority, authenticationGeneration: UUID(), connectionGeneration: UUID())
+        let transport = WorkspaceTransportStub()
+        transport.failure = .rpcRejected(code: 5000,
+            message: HermesRefusalMessage("resume failed:\n  database or disk is full\u{202E}"))
+        let client = DirectHermesWorkspaceClient(rpc: transport, http: transport, owner: owner,
+            capabilities: .init(owner: owner), currentOwner: { owner })
+        do {
+            _ = try await client.perform(.projectsList, payload: ["profile": .string("alpha")], owner: owner)
+            Issue.record("The refusal was not thrown")
+        } catch {
+            #expect(error as? WorkspaceClientError == .rejected(code: nil))
+            #expect(error.localizedDescription == "Hermes said: resume failed: database or disk is full")
+        }
+        let long = HermesRefusalMessage(String(repeating: "x", count: 1_000))
+        #expect(long.text?.count == HermesRefusalMessage.maximumCharacters && long.text?.hasSuffix("…") == true)
+        #expect(HermesRefusalMessage(" \n ").sentence == nil)
+        #expect(WorkspaceClientError.rejected(code: nil).localizedDescription == "Hermes rejected this operation.")
+    }
+
     @Test func nativeCreationOptionsRouteWithoutSelectiveFlags() throws {
         for operation in [WorkspaceOperation.profilesCreate, .profilesClone] {
             let payload: [String: BighelpJSONValue] = [

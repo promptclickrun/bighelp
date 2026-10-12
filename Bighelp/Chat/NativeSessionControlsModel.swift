@@ -569,7 +569,7 @@ final class NativeSessionControlsModel {
             verificationStatus = status
             verificationIsUnsupported = false
             finish(request)
-        } catch DirectHermesError.rpcRejected(let code) where code == -32601 {
+        } catch DirectHermesError.rpcRejected(let code, _) where code == -32601 {
             guard accepts(request) else { return }
             verificationStatus = nil
             verificationIsUnsupported = true

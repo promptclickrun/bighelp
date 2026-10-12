@@ -93,7 +93,7 @@ final class DirectHermesProjectClient: HermesWorkspaceCatalogClient {
         guard let id = catalog.activeWorkspaceID else { return nil }
         let project: WorkspaceProject
         do { project = try await get(id: id, profile: profile) }
-        catch WorkspaceClientError.rejected(code: "project_not_found") {
+        catch WorkspaceClientError.rejected(code: "project_not_found", _) {
             try scope.check()
             return nil
         }

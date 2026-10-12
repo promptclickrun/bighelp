@@ -7,7 +7,7 @@ enum WorkspaceClientError: Error, Equatable, LocalizedError, Sendable {
     case invalidRequest
     case invalidResponse
     case transportUnavailable
-    case rejected(code: String?)
+    case rejected(code: String?, message: HermesRefusalMessage = .none)
     case conflict
     case outcomeUnknown
     case capacityExceeded
@@ -20,7 +20,8 @@ enum WorkspaceClientError: Error, Equatable, LocalizedError, Sendable {
         case .invalidRequest: "This host request is invalid."
         case .invalidResponse: "Hermes returned an unsupported or invalid response."
         case .transportUnavailable: "The host is unavailable. Check its connection and try again."
-        case .rejected(let code): Self.workspaceFilesMessage(code) ?? "Hermes rejected this operation."
+        case .rejected(let code, let message):
+            Self.workspaceFilesMessage(code) ?? message.sentence ?? "Hermes rejected this operation."
         case .conflict: "The host state changed. Reload it before applying your changes."
         case .outcomeUnknown: "The host did not confirm this action. Check its current state before trying again."
         case .capacityExceeded: "This operation exceeds the supported size or capacity."

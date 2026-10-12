@@ -98,9 +98,9 @@ enum HermesFolderListing {
 
     static func message(for error: any Error) -> String {
         switch error {
-        case WorkspaceClientError.rejected(code: "ENOENT"): "There's no folder at that path yet."
-        case WorkspaceClientError.rejected(code: "ENOTDIR"): "That path is a file, not a folder."
-        case WorkspaceClientError.rejected(code: "EACCES"): "Hermes isn't allowed to open that folder."
+        case WorkspaceClientError.rejected(code: "ENOENT", _): "There's no folder at that path yet."
+        case WorkspaceClientError.rejected(code: "ENOTDIR", _): "That path is a file, not a folder."
+        case WorkspaceClientError.rejected(code: "EACCES", _): "Hermes isn't allowed to open that folder."
         case WorkspaceClientError.unavailable: "This connection can't browse folders. Type the full path."
         default: "Remote folders could not be listed."
         }

@@ -12,7 +12,7 @@ struct WorkspaceFolderChooser {
 
     /// Problems a chosen folder fixes. Containers, SSH and Windows aren't one of them.
     static func canFix(_ error: any Error) -> Bool {
-        guard case .rejected(let code)? = error as? WorkspaceClientError else { return false }
+        guard case .rejected(let code, _)? = error as? WorkspaceClientError else { return false }
         return ["workspace_not_configured", "workspace_unavailable", "workspace_hermes_folder"].contains(code)
     }
 

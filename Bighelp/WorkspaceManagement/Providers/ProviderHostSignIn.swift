@@ -296,7 +296,7 @@ final class ProviderHostSignInStore {
     private func message(_ error: any Error, providerID: String) -> String {
         let client = provider(providerID)?.client ?? "The sign-in tool"
         switch error as? WorkspaceClientError {
-        case .rejected(let code)?:
+        case .rejected(let code, _)?:
             switch code {
             case "sign_in_tool_missing": return "\(client) isn't installed on \(hostName)."
             case "sign_in_retired": return "This sign-in is no longer offered."

@@ -19,7 +19,7 @@ enum WorkflowsLoadState: Equatable, Sendable {
         switch error {
         case WorkspaceClientError.unavailable(.unsupportedOperation), WorkspaceClientError.unavailable(.pluginRequired):
             return .needsPluginUpdate
-        case WorkspaceClientError.rejected(let code?) where WorkflowsSupport.unavailableCodes.contains(code):
+        case WorkspaceClientError.rejected(let code?, _) where WorkflowsSupport.unavailableCodes.contains(code):
             return .cantRunHere(code)
         default:
             return .unavailable(hasContent ? "Couldn't refresh. Showing the last result." : WorkflowsStore.reason(error))
@@ -173,7 +173,7 @@ final class WorkflowsStore {
             await loadTemplates()
             message = nil
             return true
-        } catch WorkspaceClientError.rejected(let code) where code == "not_allowed" {
+        } catch WorkspaceClientError.rejected(let code, _) where code == "not_allowed" {
             // The host keeps at most 100 of yours.
             message = "You have 100 templates. Delete one, then save this one."
         } catch {
@@ -216,7 +216,7 @@ final class WorkflowsStore {
             "Your computer didn't confirm it. Check the runs before you try again."
         case WorkspaceClientError.capacityExceeded:
             "This workflow is too big to save. Make the instructions shorter."
-        case WorkspaceClientError.rejected(let code?):
+        case WorkspaceClientError.rejected(let code?, _):
             WorkflowWords.problem(code)
         default:
             "Workflows couldn't be loaded from your computer. Try again in a moment."

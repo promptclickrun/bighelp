@@ -646,9 +646,9 @@ final class HostNotificationSetupModel {
         switch error {
         case .notConnected: return .notConnected
         case .identityChanged: return .signInChanged
-        case .rpcRejected(code: -32601): return .unsupported
-        case .rpcRejected(code: 403): return .permissionDenied
-        case .rpcRejected(code: 5026): return .managementRejected
+        case .rpcRejected(code: -32601, _): return .unsupported
+        case .rpcRejected(code: 403, _): return .permissionDenied
+        case .rpcRejected(code: 5026, _): return .managementRejected
         default: return .outcomeUnknown
         }
     }

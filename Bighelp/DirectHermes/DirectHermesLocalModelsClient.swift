@@ -456,7 +456,7 @@ final class DirectHermesLocalModelsClient: HermesLocalModelsManaging {
             switch error {
             case DirectHermesError.unsupportedAuthentication:
                 return capabilityProbe ? HermesLocalModelsError.unavailable : HermesLocalModelsError.invalidRequest
-            case DirectHermesError.rpcRejected(let code) where capabilityProbe && (code == -32601 || code == 404):
+            case DirectHermesError.rpcRejected(let code, _) where capabilityProbe && (code == -32601 || code == 404):
                 return HermesLocalModelsError.unavailable
             case DirectHermesError.messageTooLarge:
                 return HermesLocalModelsError.responseTooLarge

@@ -298,7 +298,8 @@ extension RootShellView {
             } catch is CancellationError {
                 return
             } catch {
-                actionErrorMessage = "bighelp couldn't start a new Bot Chat. Check the connection and try again."
+                actionErrorMessage = "bighelp couldn't start a new Bot Chat. "
+                    + (HermesRefusalMessage.sentence(in: error) ?? "Check the connection and try again.")
                 return
             }
             openCanonicalAgentChat(agentID, fromList: fromList)

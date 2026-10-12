@@ -148,10 +148,11 @@ struct DirectHermesProtocolParityTests {
             "error": .object(["code": .integer(4090), "message": .string("Active session limit reached"),
                               "data": .object(["reason": .string("MAX_CONCURRENT_SESSIONS")])]),
         ])
-        guard case .failure(let id, let code, let reason) = try #require(try DirectHermesWire.decode(JSONEncoder().encode(frame)).first) else {
+        guard case .failure(let id, let code, let reason, let message) = try #require(try DirectHermesWire.decode(JSONEncoder().encode(frame)).first) else {
             Issue.record("Refusal was not decoded as a failure")
             return
         }
         #expect(id == "request-1" && code == 4090 && reason == "MAX_CONCURRENT_SESSIONS")
+        #expect(message.text == "Active session limit reached")
     }
 }

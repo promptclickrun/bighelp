@@ -63,8 +63,8 @@ enum DirectHermesAdministrationCodec: DirectHermesPayloadDecoding {
         if direct.outcomeIsUnknown { return WorkspaceClientError.outcomeUnknown }
         switch direct {
         case .invalidCredentials, .authenticationRequired: return WorkspaceClientError.authenticationRequired
-        case .rpcRejected(let code) where code == -32601: return WorkspaceClientError.unavailable(.unsupportedOperation)
-        case .rpcRejected: return WorkspaceClientError.rejected(code: nil)
+        case .rpcRejected(let code, _) where code == -32601: return WorkspaceClientError.unavailable(.unsupportedOperation)
+        case .rpcRejected(_, let message): return WorkspaceClientError.rejected(code: nil, message: message)
         case .invalidResponse: return WorkspaceClientError.invalidResponse
         case .messageTooLarge, .tooManyRequests: return WorkspaceClientError.capacityExceeded
         default: return mutation ? WorkspaceClientError.outcomeUnknown : WorkspaceClientError.transportUnavailable

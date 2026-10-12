@@ -440,7 +440,7 @@ final class CredentialVaultModel: Identifiable {
     private var profile: [String: BighelpJSONValue] { ["profile": .string(agentID)] }
 
     private static func isUnsupported(_ error: any Error) -> Bool {
-        if case DirectHermesError.rpcRejected(code: -32601)? = error as? DirectHermesError { return true }
+        if case DirectHermesError.rpcRejected(code: -32601, _)? = error as? DirectHermesError { return true }
         return false
     }
 }

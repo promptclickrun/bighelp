@@ -237,9 +237,9 @@ final class BighelpLiveAlertListener {
         case WorkspaceClientError.unavailable:
             // An older plugin, or one that can't do this here: pushes as before.
             return .wait(.seconds(300))
-        case WorkspaceClientError.rejected(let code) where code == "live_alerts_not_enrolled":
+        case WorkspaceClientError.rejected(let code, _) where code == "live_alerts_not_enrolled":
             return .wait(.seconds(300))
-        case WorkspaceClientError.rejected(let code) where code == "live_alerts_busy":
+        case WorkspaceClientError.rejected(let code, _) where code == "live_alerts_busy":
             return .wait(.seconds(60))
         case WorkspaceClientError.conflict:
             // The plugin's context changed: the next listen loads it again. Once.

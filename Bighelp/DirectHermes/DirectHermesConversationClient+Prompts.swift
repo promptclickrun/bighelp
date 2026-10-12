@@ -380,7 +380,7 @@ extension DirectHermesConversationClient {
         } catch {
             guard generation == owner else { throw error }
             if let direct = error as? DirectHermesError,
-               case .rpcRejected(let code) = direct, code == 4009 {
+               case .rpcRejected(let code, _) = direct, code == 4009 {
                 removeLegacyPrompt(prompt)
                 throw DirectHermesWorkspaceError.expiredPrompt
             }

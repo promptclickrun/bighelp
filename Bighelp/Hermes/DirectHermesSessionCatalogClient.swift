@@ -715,7 +715,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
                 throw DirectHermesSessionError.creationUnconfirmed(profileID: profileID)
             }
         } catch let error as WorkspaceClientError {
-            if case .rejected(code: "4022") = error {
+            if case .rejected(code: "4022", _) = error {
                 if let winner = try await registry(profileID: profileID) {
                     canonicalIDs[key] = winner
                     let resolved = try await openRegistry(winner, profile: profile)
@@ -1333,7 +1333,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         let receipt: (response: [String: BighelpJSONValue], epoch: String?)
         do {
             receipt = try await resume(profileID: profile.id, storedID: "Bot Chat")
-        } catch WorkspaceClientError.rejected(code: "4007") {
+        } catch WorkspaceClientError.rejected(code: "4007", _) {
             return nil
         }
         let stored = try DirectHermesSessionValidation.string(receipt.response["session_key"] ?? receipt.response["resumed"])
@@ -2094,7 +2094,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         let receipt: (response: [String: BighelpJSONValue], epoch: String?)
         do {
             receipt = try await performReceipt(.sessionCreate, payload)
-        } catch WorkspaceClientError.rejected(code: "invalid_params") where payload["cwd_explicit"] != nil {
+        } catch WorkspaceClientError.rejected(code: "invalid_params", _) where payload["cwd_explicit"] != nil {
             // Released Hermes (0.21.5 and older) refuses fields it doesn't know. It
             // also doesn't put an agent's own folder first, so the plain request is
             // enough there.

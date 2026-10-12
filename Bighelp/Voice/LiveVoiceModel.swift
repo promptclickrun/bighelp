@@ -529,11 +529,11 @@ final class LiveVoiceModel {
             return "Sign in to your computer again, then try live voice."
         case .unavailable?:
             return "Live voice isn't set up on your computer. Use TTS voice mode instead."
-        case .rejected(let code)? where code == "voice_already_active":
+        case .rejected(let code, _)? where code == "voice_already_active":
             return "Another live voice call is still open with your computer. End it, then try again."
-        case .rejected(let code)? where code == "profile_not_found":
+        case .rejected(let code, _)? where code == "profile_not_found":
             return "This agent is no longer on your computer."
-        case .rejected(let code?)? where code.hasPrefix("voice_provider_"):
+        case .rejected(let code?, _)? where code.hasPrefix("voice_provider_"):
             return providerMessage(String(code.dropFirst("voice_provider_".count)))
         case .ownerChanged?:
             return "Your connection to your computer changed. Close voice and open it again."

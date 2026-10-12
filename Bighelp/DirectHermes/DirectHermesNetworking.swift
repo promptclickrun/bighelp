@@ -341,7 +341,7 @@ final class DirectHermesClient: DirectHermesRPC, DirectHermesAuthenticatedHTTP,
             do {
                 _ = try await self.request("client.capabilities", params: ["server_requests": .boolean(true)],
                                            timeoutNanoseconds: 15_000_000_000)
-            } catch DirectHermesError.rpcRejected(_) {
+            } catch DirectHermesError.rpcRejected {
                 return
             } catch {
                 if self.generation == epoch { self.advertisedGeneration = nil }
@@ -657,9 +657,9 @@ final class DirectHermesClient: DirectHermesRPC, DirectHermesAuthenticatedHTTP,
             case .request(let request):
                 acceptServerRequest(request, epoch: epoch)
             case .result(let id, let value): finish(id: id, result: .success(value))
-            case .failure(let id, let code, let reason):
+            case .failure(let id, let code, let reason, let message):
                 let error: DirectHermesError = code == 4090 && reason == "MAX_CONCURRENT_SESSIONS"
-                    ? .activeSessionLimit : .rpcRejected(code: code)
+                    ? .activeSessionLimit : .rpcRejected(code: code, message: message)
                 finish(id: id, result: .failure(error))
             }
         }

@@ -55,7 +55,7 @@ extension DirectHermesHostOperationsClient {
         do {
             value = try await rpc.request("diagnostics.share_nous", params: ["log_lines": .integer(logLines)])
             try requireOwner()
-        } catch DirectHermesError.rpcRejected(let code) where code == -32601 || code == 4010 {
+        } catch DirectHermesError.rpcRejected(let code, _) where code == -32601 || code == 4010 {
             try requireOwner()
             throw HostOperationsError.unavailable("force-redacted Nous diagnostics sharing")
         } catch {

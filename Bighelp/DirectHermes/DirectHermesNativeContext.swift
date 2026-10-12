@@ -461,12 +461,12 @@ final class DirectHermesNativePluginClient {
         case 500...599: return mutation ? .outcomeUnknown : .transportUnavailable
         default: break
         }
-        let document = try? response.object()
-        let code = document?["error"]?.object?["code"]?.string
+        let failure = (try? response.object())?["error"]?.object
+        let code = failure?["code"]?.string
         if let code, !code.isEmpty, code.utf8.count <= 128,
            code.utf8.allSatisfy({ (65...90).contains($0) || (97...122).contains($0)
                || (48...57).contains($0) || [45, 46, 95].contains($0) }) {
-            return .rejected(code: code)
+            return .rejected(code: code, message: HermesRefusalMessage(failure?["message"]?.string))
         }
         return response.http.statusCode == 404 ? .unavailable(.pluginRequired) : .invalidResponse
     }

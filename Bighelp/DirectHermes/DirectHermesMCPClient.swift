@@ -395,7 +395,7 @@ final class DirectHermesMCPClient: MCPManagementClient, MCPRuntimeManagementClie
             return try CapabilitiesPayload.object(value)
         } catch let error as DirectHermesError {
             try requireOwner()
-            if case .rpcRejected(let code) = error {
+            if case .rpcRejected(let code, _) = error {
                 if code == -32601 {
                     throw CapabilitiesManagementError.unsupportedHost("This Hermes host does not expose typed MCP RPC management.")
                 }

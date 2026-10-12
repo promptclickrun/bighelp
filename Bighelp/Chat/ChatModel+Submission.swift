@@ -320,7 +320,8 @@ extension ChatModel {
                 failureMessage = reason
                 retryRequest = .send(message, attachments)
             } else {
-                failureMessage = "Message could not be delivered. Try again."
+                failureMessage = "Message could not be delivered. "
+                    + (HermesRefusalMessage.sentence(in: error) ?? "Try again.")
                 retryRequest = .send(message, attachments)
             }
         }

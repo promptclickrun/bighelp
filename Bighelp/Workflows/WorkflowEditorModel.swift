@@ -306,7 +306,7 @@ final class WorkflowEditorModel {
             }
             message = nil
             return true
-        } catch WorkspaceClientError.rejected(let code) where code == "draft_conflict" {
+        } catch WorkspaceClientError.rejected(let code, _) where code == "draft_conflict" {
             message = "This workflow changed on another device. Here is the newest version; make your change again."
             await load()
         } catch {
@@ -323,7 +323,7 @@ final class WorkflowEditorModel {
             bindings = try await client.bind(workflowID: workflowID, role: role, agentID: agentID)
             message = nil
             if let validation = try? await client.validate(workflowID: workflowID) { self.validation = validation }
-        } catch WorkspaceClientError.rejected(let code) where code == "profile_not_found" {
+        } catch WorkspaceClientError.rejected(let code, _) where code == "profile_not_found" {
             message = "That agent isn't on this computer any more."
         } catch {
             message = WorkflowsStore.reason(error)
@@ -410,11 +410,11 @@ final class WorkflowEditorModel {
             detail?.trigger = saved
             message = nil
             return true
-        } catch WorkspaceClientError.rejected(let code) where code == "schedule_invalid" {
+        } catch WorkspaceClientError.rejected(let code, _) where code == "schedule_invalid" {
             message = "Your computer couldn't use that schedule. Choose another time."
-        } catch WorkspaceClientError.rejected(let code) where code == "not_valid" {
+        } catch WorkspaceClientError.rejected(let code, _) where code == "not_valid" {
             message = "Fix the problems in this workflow, then schedule it."
-        } catch WorkspaceClientError.rejected(let code) where code == "inputs_invalid" {
+        } catch WorkspaceClientError.rejected(let code, _) where code == "inputs_invalid" {
             message = "Fill in what each run needs, then save again."
         } catch WorkspaceClientError.unavailable(.unsupportedOperation) {
             message = "Update the bighelp plugin on your computer to schedule workflows."
@@ -440,10 +440,10 @@ final class WorkflowEditorModel {
             _ = try await publishIfNeeded()
             message = nil
             return true
-        } catch WorkspaceClientError.rejected(let code) where code == "not_valid" {
+        } catch WorkspaceClientError.rejected(let code, _) where code == "not_valid" {
             message = "Your computer found a problem with this workflow. Fix it, then publish again."
             if let validation = try? await client.validate(workflowID: workflowID) { self.validation = validation }
-        } catch WorkspaceClientError.rejected(let code) where code == "inputs_invalid" {
+        } catch WorkspaceClientError.rejected(let code, _) where code == "inputs_invalid" {
             message = "A default value doesn't fit its field. Fix it in Inputs, then publish again."
         } catch {
             message = WorkflowsStore.reason(error)
@@ -477,10 +477,10 @@ final class WorkflowEditorModel {
             pendingRunToken = nil
             message = nil
             return run
-        } catch WorkspaceClientError.rejected(let code) where code == "not_valid" {
+        } catch WorkspaceClientError.rejected(let code, _) where code == "not_valid" {
             message = "Your computer found a problem with this workflow. Fix it, then run it again."
             if let validation = try? await client.validate(workflowID: workflowID) { self.validation = validation }
-        } catch WorkspaceClientError.rejected(let code) where code == "queue_full" {
+        } catch WorkspaceClientError.rejected(let code, _) where code == "queue_full" {
             pendingRunToken = nil
             message = "Too many runs are waiting to start. Try again when some have finished."
         } catch {

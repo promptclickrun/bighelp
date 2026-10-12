@@ -103,7 +103,7 @@ extension ChatModel {
             guard nativeConversationClient === native,
                   native.sessionActionsConnectionGeneration == connectionGeneration else { return }
             if let direct = error as? DirectHermesError,
-               case .rpcRejected(let code) = direct, code == -32601 {
+               case .rpcRejected(let code, _) = direct, code == -32601 {
                 unsupportedNativeReactionGeneration = connectionGeneration
                 nativeMessageReactionErrors[rowID] =
                     NativeMessageReactionAvailability.unsupportedHost.accessibilityDescription

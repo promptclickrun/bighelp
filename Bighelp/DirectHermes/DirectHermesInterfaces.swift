@@ -300,8 +300,46 @@ struct DirectHermesSavedConnection: Codable, Equatable, Sendable {
     }
 }
 
-/// Only fixed, locally authored messages cross the presentation boundary. Never wrap
-/// NSError.localizedDescription, server messages, URLs, cookies, or RPC error.data.
+/// Hermes' own words for why it refused (an RPC or plugin `error.message`), so people see
+/// the real reason, like a full disk. Kept to one short line of plain text and always shown
+/// as Hermes' words. Equality ignores it: two refusals with the same code are the same.
+struct HermesRefusalMessage: Equatable, Sendable {
+    static let none = HermesRefusalMessage(nil)
+    static let maximumCharacters = 280
+
+    let text: String?
+
+    init(_ raw: String?) {
+        // Line breaks, control and invisible format characters (bidi overrides) become spaces.
+        let words = (raw ?? "").split { character in
+            character.isWhitespace || character.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains)
+        }.joined(separator: " ")
+        guard !words.isEmpty else { text = nil; return }
+        text = words.count > Self.maximumCharacters
+            ? String(words.prefix(Self.maximumCharacters - 1)) + "…"
+            : words
+    }
+
+    static func == (_: Self, _: Self) -> Bool { true }
+
+    /// "Hermes said: …", or nil when Hermes gave no words.
+    var sentence: String? { text.map { "Hermes said: \($0)" } }
+
+    /// The sentence for a refusal from either layer, for alerts that otherwise say only
+    /// what failed. Nil for any other failure.
+    static func sentence(in error: any Error) -> String? {
+        switch error {
+        case WorkspaceClientError.rejected(_, let message), DirectHermesError.rpcRejected(_, let message):
+            message.sentence
+        default:
+            nil
+        }
+    }
+}
+
+/// Only fixed, locally authored messages cross the presentation boundary, plus Hermes' own
+/// refusal words through `HermesRefusalMessage`. Never wrap NSError.localizedDescription,
+/// other server text, URLs, cookies, or RPC error.data.
 enum DirectHermesError: Error, LocalizedError, Sendable, Equatable {
     case invalidEndpoint, plaintextNotAllowed, invalidCredentials, authenticationRequired
     case unsupportedAuthentication, ambiguousPasswordProvider, authModeChanged, identityChanged
@@ -314,7 +352,7 @@ enum DirectHermesError: Error, LocalizedError, Sendable, Equatable {
     case disconnected(outcomeUnknown: Bool)
     case timedOut(outcomeUnknown: Bool)
     case cancelled(outcomeUnknown: Bool)
-    case rpcRejected(code: Int)
+    case rpcRejected(code: Int, message: HermesRefusalMessage = .none)
     /// Hermes' cap on open chats (4090, `MAX_CONCURRENT_SESSIONS`). Plain 4090 is a chat
     /// another Hermes process holds (`SESSION_NOT_OWNED`).
     case activeSessionLimit
@@ -360,7 +398,8 @@ enum DirectHermesError: Error, LocalizedError, Sendable, Equatable {
         case .nativeTokenExchangeUncertain: "The host sign-in could not be confirmed. Start a new sign-in; the one-time code will not be reused."
         case .disconnected(let unknown), .timedOut(let unknown), .cancelled(let unknown):
             unknown ? "The connection ended before the host confirmed the action. It may have been accepted. Check the conversation before sending again." : "The host request did not complete. Reconnect or try again."
-        case .rpcRejected(let code): "The host rejected this operation (code \(code))."
+        case .rpcRejected(let code, let message):
+            message.sentence.map { "\($0) (code \(code))" } ?? "The host rejected this operation (code \(code))."
         case .activeSessionLimit:
             "Hermes is at its limit of open chats. Finish a chat in another Hermes window, then try again."
         }
@@ -406,8 +445,9 @@ enum DirectHermesWire {
         case event(DirectHermesEvent)
         case request(DirectHermesServerRequest)
         case result(id: String, value: BighelpJSONValue)
-        /// `reason` is the machine reason Hermes adds in `error.data` (4090: who holds the chat).
-        case failure(id: String, code: Int, reason: String?)
+        /// `reason` is the machine reason Hermes adds in `error.data` (4090: who holds the chat);
+        /// `message` is its `error.message`, for people.
+        case failure(id: String, code: Int, reason: String?, message: HermesRefusalMessage)
     }
 
     static func decode(_ data: Data) throws -> [Message] {
@@ -474,7 +514,8 @@ enum DirectHermesWire {
                 if let error = object["error"]?.object, let code = error["code"]?.integer {
                     guard object["result"] == nil else { throw DirectHermesError.invalidResponse }
                     messages.append(.failure(id: id, code: code,
-                                             reason: error["data"]?.object?["reason"]?.string))
+                                             reason: error["data"]?.object?["reason"]?.string,
+                                             message: HermesRefusalMessage(error["message"]?.string)))
                 } else if let result = object["result"], object["error"] == nil {
                     messages.append(.result(id: id, value: result))
                 } else { throw DirectHermesError.invalidResponse }

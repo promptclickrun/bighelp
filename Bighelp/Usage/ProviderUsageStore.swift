@@ -51,7 +51,7 @@ final class DirectHermesProviderUsageClient: ProviderUsageClient {
         }
         do {
             return try await ask(agentID)
-        } catch WorkspaceClientError.rejected(let code)
+        } catch WorkspaceClientError.rejected(let code, _)
                     where agentID != "default" && (code == "profile_not_found" || code == "invalid_request") {
             // Usage is the host's, the same for every agent; Hermes just doesn't know this one.
             return try await ask("default")

@@ -135,7 +135,7 @@ final class WorkflowRunModel {
         do {
             _ = try await client.control(runID: runID, action: action, expectedVersion: detail.summary.version)
             message = nil
-        } catch WorkspaceClientError.rejected(let code) where code == "run_conflict" || code == "not_allowed" {
+        } catch WorkspaceClientError.rejected(let code, _) where code == "run_conflict" || code == "not_allowed" {
             message = "This run changed on your computer. Here is where it is now."
         } catch {
             message = WorkflowsStore.reason(error)
@@ -184,10 +184,10 @@ final class WorkflowRunModel {
                                                artifactSHA256: sha, notes: notes)
             accepted = run.state != .waitingForYou || run.waiting?.stageKey != signoff.stageKey
             message = accepted ? nil : "Your computer didn't confirm it. It still waits for you."
-        } catch WorkspaceClientError.rejected(let code) where code == "approval_stale" {
+        } catch WorkspaceClientError.rejected(let code, _) where code == "approval_stale" {
             message = WorkflowWords.problem("approval_stale")
             signoffFileSHA = nil
-        } catch WorkspaceClientError.rejected(let code) where code == "not_waiting" {
+        } catch WorkspaceClientError.rejected(let code, _) where code == "not_waiting" {
             message = "This run isn't waiting for you any more."
         } catch {
             message = WorkflowsStore.reason(error)

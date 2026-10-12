@@ -163,6 +163,8 @@ extension RootShellView {
                     startNewChat(explicitAgentID: model.memberIDs.first)
                 },
                 onNewBotChat: botChatRestart(conversationID),
+                onContinueInBranch: { continueInBranch(from: model, $0) },
+                consumesSendOnOpen: { appState.sendsDraftOnOpen.remove($0) != nil },
                 onEdgeAction: { performWorkspaceAction($0) },
                 onOpenAgentSessions: { openAllSessions(filteredTo: $0) },
                 onOpenApproval: {

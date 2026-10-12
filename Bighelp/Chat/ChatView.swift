@@ -145,6 +145,10 @@ struct ChatView: View {
     let onNewChatTap: () -> Void
     /// Set when this chat is its agent's Bot Chat: starts a new one (This chat › New Bot Chat).
     let onNewBotChat: (() -> Void)?
+    /// Hermes refused a message because another Hermes process holds this chat: go on in a branch.
+    let onContinueInBranch: ((ChatBranchContinuation) -> Void)?
+    /// True once for a chat that should send its draft when connected (a branch's message).
+    let consumesSendOnOpen: ((String) -> Bool)?
     let onLoadPreviousMessages: () -> Void
     let onForkMessage: ((String) -> Void)?
     let referenceHub: ReferenceHubStore?
@@ -218,6 +222,8 @@ struct ChatView: View {
         onSessionToolsTap: (() -> Void)? = nil,
         onNewChatTap: @escaping () -> Void = {},
         onNewBotChat: (() -> Void)? = nil,
+        onContinueInBranch: ((ChatBranchContinuation) -> Void)? = nil,
+        consumesSendOnOpen: ((String) -> Bool)? = nil,
         onLoadPreviousMessages: @escaping () -> Void = {},
         onForkMessage: ((String) -> Void)? = nil,
         referenceHub: ReferenceHubStore? = nil,
@@ -259,6 +265,8 @@ struct ChatView: View {
         self.onSessionToolsTap = onSessionToolsTap
         self.onNewChatTap = onNewChatTap
         self.onNewBotChat = onNewBotChat
+        self.onContinueInBranch = onContinueInBranch
+        self.consumesSendOnOpen = consumesSendOnOpen
         self.onLoadPreviousMessages = onLoadPreviousMessages
         self.onForkMessage = onForkMessage
         self.referenceHub = referenceHub
@@ -395,6 +403,10 @@ struct ChatView: View {
             companionReaction = companionSignal.baselineReaction
             companionCompletionTracker = CompanionCompletionTracker()
         }
+        .onChange(of: model.branchContinuation) { _, continuation in
+            if let continuation { onContinueInBranch?(continuation) }
+        }
+        .task(id: model.conversationID) { await sendDraftOnOpenIfAsked() }
         .alert("Couldn't compact", isPresented: Binding(get: { compactError != nil }, set: { if !$0 { compactError = nil } })) {
             Button("OK") { compactError = nil }
         } message: { Text(compactError ?? "") }
@@ -1058,6 +1070,20 @@ struct ChatView: View {
             Label("This chat", systemImage: "bubble.left")
         }
         .accessibilityIdentifier("chat.options.this-chat")
+    }
+
+    /// A branch made for a refused message sends it once the branch is connected; if it
+    /// isn't soon, the message stays in the box for the person to send.
+    private func sendDraftOnOpenIfAsked() async {
+        guard consumesSendOnOpen?(model.conversationID) == true else { return }
+        for _ in 0..<150 {
+            if model.directTransportIsReady, !model.draft.isEmpty {
+                await model.send()
+                return
+            }
+            try? await Task.sleep(for: .milliseconds(100))
+            if Task.isCancelled { return }
+        }
     }
 
     /// This chat › Compact: Hermes folds earlier messages into a summary; the rail above

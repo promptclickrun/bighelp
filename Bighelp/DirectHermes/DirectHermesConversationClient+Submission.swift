@@ -5,6 +5,10 @@ extension DirectHermesConversationClient {
     /// A method-specific stock refusal before prompt admission, not a lost ACK.
     struct RejectedPrompt: Error {
         let code: Int
+        /// 4090 because Hermes is at its cap on open chats, not because another process holds this one.
+        var reachedSessionLimit = false
+        /// The refused submission, kept in the unsent journal.
+        var submissionID: UUID?
     }
 
     func send(message: String, conversationID: String) async throws -> ConversationResponse {
@@ -179,13 +183,14 @@ extension DirectHermesConversationClient {
                         // malformed receipt does not; no fallback transport or resend.
                         let commandRejected = command && !expandedToPrompt
                             && (error as? DirectHermesError) == .rpcRejected(code: 4018)
-                        if !command, case .rpcRejected(let code) = error as? DirectHermesError,
-                           [4001, 4007, 4090].contains(code) {
+                        if !command, let code = Self.definitePromptRefusalCode(error) {
                             do {
                                 try self.retainRejectedSubmission(submission, code: code)
                                 self.needsRecovery = false
                                 self.status = "Hermes refused this message. Its unsent draft is retained."
-                                self.finish(throwing: RejectedPrompt(code: code))
+                                self.finish(throwing: RejectedPrompt(
+                                    code: code, reachedSessionLimit: (error as? DirectHermesError) == .activeSessionLimit,
+                                    submissionID: submission.id))
                                 return
                             } catch {
                                 // Keep the previous durable entry when saving
@@ -405,6 +410,7 @@ extension DirectHermesConversationClient {
     }
 
     static func definitePromptRefusalCode(_ error: Error) -> Int? {
+        if (error as? DirectHermesError) == .activeSessionLimit { return 4090 }
         guard case .rpcRejected(let code) = error as? DirectHermesError,
               [4001, 4007, 4090].contains(code) else { return nil }
         return code
@@ -484,6 +490,7 @@ extension DirectHermesConversationClient {
 
     private static func isProvenInputRejection(_ error: Error, method: String = "prompt.submit") -> Bool {
         if let workspace = error as? DirectHermesWorkspaceError, case .midSessionRejected = workspace { return true }
+        if method == "prompt.submit", (error as? DirectHermesError) == .activeSessionLimit { return true }
         guard let direct = error as? DirectHermesError, case .rpcRejected(let code) = direct else { return false }
         // These stock validation/ownership rejections precede prompt admission.
         // An arbitrary server error from a mutating command is not such proof.

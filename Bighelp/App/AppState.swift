@@ -31,6 +31,9 @@ final class AppState {
     /// (auto-opened, ☰ › New chat, the switcher, an agent tapped on Agents), so
     /// tapping Chat leaves it. Both have ☰, the tab bar and the big-avatar header.
     var chatOpenedFromList = false
+    /// Chats that send their draft once connected: a branch made when Hermes refused a
+    /// message because another Hermes process held the original (`continueInBranch`).
+    var sendsDraftOnOpen: Set<String> = []
 
     /// The drawer reflects the destination on screen, while `selectedTab`
     /// deliberately retains the root to return to when a pushed route closes.

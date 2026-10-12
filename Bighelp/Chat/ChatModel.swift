@@ -121,6 +121,9 @@ final class ChatModel {
     var isStopping = false
     var pendingMidSessionSubmissions: [PendingMidSessionSubmission] = []
     var failureMessage: String?
+    /// A message Hermes refused because another Hermes process holds this chat: it goes on
+    /// in a branch with the same history, where the message is sent (`continueInBranch`).
+    var branchContinuation: ChatBranchContinuation?
     var isHydratingHistory = false
     /// In-flight reloads from Hermes: returning to the chat, Force Refresh or
     /// reconnect recovery. The header reads "Updating…" while any is running.

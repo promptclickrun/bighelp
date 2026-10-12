@@ -1626,6 +1626,37 @@ struct RootShellView: View {
         }
     }
 
+    /// Hermes refused a message because another Hermes process holds this chat (4090), which
+    /// retrying meets again. The chat goes on in a branch with its history (`session.branch`
+    /// through its last message), the branch opens, and the message is sent there.
+    func continueInBranch(from model: ChatModel, _ continuation: ChatBranchContinuation) {
+        let sourceID = model.conversationID
+        guard let last = sessionCatalog.session(id: sourceID)?.items.last(where: {
+            if case .message = $0.content { return true }
+            return false
+        }) else {
+            model.failureMessage = "This chat is open in another Hermes process. Start a new chat to go on. Your text has been kept."
+            return
+        }
+        Task { @MainActor in
+            do {
+                let branch = try await sessionCatalog.forkSession(id: sourceID, throughItemID: last.id)
+                sessionCatalog.updateDraft(continuation.message, for: branch.id)
+                if !continuation.hasAttachments { appState.sendsDraftOnOpen.insert(branch.id) }
+                model.resolveBranchContinuation(continuation)
+                let route = AppRoute.chat(conversationID: branch.id)
+                guard try featureStore.prepareForUserNavigation(route) else {
+                    actionErrorMessage = "This chat went on in a new chat with the same history. Find it in Sessions."
+                    return
+                }
+                appState.activateConversation(id: branch.id, source: .fork)
+            } catch {
+                model.branchContinuation = nil
+                model.failureMessage = "This chat is open in another Hermes process, and bighelp couldn't continue it in a new chat. Start a new chat to go on. Your text has been kept."
+            }
+        }
+    }
+
     func forkSession(sourceID: String, throughItemID: String) {
         Task {
             do {

@@ -315,6 +315,9 @@ enum DirectHermesError: Error, LocalizedError, Sendable, Equatable {
     case timedOut(outcomeUnknown: Bool)
     case cancelled(outcomeUnknown: Bool)
     case rpcRejected(code: Int)
+    /// Hermes' cap on open chats (4090, `MAX_CONCURRENT_SESSIONS`). Plain 4090 is a chat
+    /// another Hermes process holds (`SESSION_NOT_OWNED`).
+    case activeSessionLimit
 
     var outcomeIsUnknown: Bool {
         switch self {
@@ -358,6 +361,8 @@ enum DirectHermesError: Error, LocalizedError, Sendable, Equatable {
         case .disconnected(let unknown), .timedOut(let unknown), .cancelled(let unknown):
             unknown ? "The connection ended before the host confirmed the action. It may have been accepted. Check the conversation before sending again." : "The host request did not complete. Reconnect or try again."
         case .rpcRejected(let code): "The host rejected this operation (code \(code))."
+        case .activeSessionLimit:
+            "Hermes is at its limit of open chats. Finish a chat in another Hermes window, then try again."
         }
     }
 }
@@ -401,7 +406,8 @@ enum DirectHermesWire {
         case event(DirectHermesEvent)
         case request(DirectHermesServerRequest)
         case result(id: String, value: BighelpJSONValue)
-        case failure(id: String, code: Int)
+        /// `reason` is the machine reason Hermes adds in `error.data` (4090: who holds the chat).
+        case failure(id: String, code: Int, reason: String?)
     }
 
     static func decode(_ data: Data) throws -> [Message] {
@@ -467,7 +473,8 @@ enum DirectHermesWire {
                 }
                 if let error = object["error"]?.object, let code = error["code"]?.integer {
                     guard object["result"] == nil else { throw DirectHermesError.invalidResponse }
-                    messages.append(.failure(id: id, code: code))
+                    messages.append(.failure(id: id, code: code,
+                                             reason: error["data"]?.object?["reason"]?.string))
                 } else if let result = object["result"], object["error"] == nil {
                     messages.append(.result(id: id, value: result))
                 } else { throw DirectHermesError.invalidResponse }

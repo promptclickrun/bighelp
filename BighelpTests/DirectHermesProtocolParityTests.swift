@@ -139,4 +139,19 @@ struct DirectHermesProtocolParityTests {
         #expect(request.id == "server-request:original-id")
         #expect(request.method == method)
     }
+
+    /// Hermes says why it refused in `error.data.reason`: 4090 is a chat another Hermes
+    /// process holds (`SESSION_NOT_OWNED`) or its cap on open chats (`MAX_CONCURRENT_SESSIONS`).
+    @Test func refusalsKeepHermesReason() throws {
+        let frame = BighelpJSONValue.object([
+            "jsonrpc": .string("2.0"), "id": .string("request-1"),
+            "error": .object(["code": .integer(4090), "message": .string("Active session limit reached"),
+                              "data": .object(["reason": .string("MAX_CONCURRENT_SESSIONS")])]),
+        ])
+        guard case .failure(let id, let code, let reason) = try #require(try DirectHermesWire.decode(JSONEncoder().encode(frame)).first) else {
+            Issue.record("Refusal was not decoded as a failure")
+            return
+        }
+        #expect(id == "request-1" && code == 4090 && reason == "MAX_CONCURRENT_SESSIONS")
+    }
 }

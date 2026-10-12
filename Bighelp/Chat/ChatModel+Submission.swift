@@ -725,9 +725,18 @@ extension ChatModel {
             removeProjectedMessage(id: humanID)
             nativeConversationClient?.retainVisibleState()
         }
-        failureMessage = refusal.code == 4090
-            ? "Hermes refused this message because another process owns the session or the host's active-session limit was reached. Your text has been kept; it was not sent again."
-            : "This session is no longer attached on Hermes. Reopen it before sending. Your text has been kept; it was not sent again."
+        if refusal.code == 4090, !refusal.reachedSessionLimit {
+            // Another Hermes process holds this chat (a leftover connection, or a job Hermes
+            // runs in it). Retrying meets the same refusal, so it goes on in a branch.
+            branchContinuation = ChatBranchContinuation(
+                message: message, submissionID: refusal.submissionID,
+                hasAttachments: !attachments.isEmpty || !orderedAttachments.isEmpty)
+            failureMessage = "This chat is open in another Hermes process, so bighelp is continuing it in a new chat with the same history. Your text has been kept."
+        } else {
+            failureMessage = refusal.code == 4090
+                ? "Hermes is at its limit of open chats. Finish a chat in another Hermes window, then send again. Your text has been kept; it was not sent again."
+                : "This session is no longer attached on Hermes. Reopen it before sending. Your text has been kept; it was not sent again."
+        }
         retryRequest = nil
         persistSession()
     }
@@ -805,5 +814,28 @@ struct ChatOutgoingMessage {
         orderedAttachments = []
         slashSelection = nil
         isComposerDraft = false
+    }
+}
+
+/// A message Hermes refused (4090) because another Hermes process holds the chat. The chat
+/// goes on in a branch with its history (`RootShellView.continueInBranch`), and the
+/// message is sent there; with attachments it waits in the branch's message box instead.
+struct ChatBranchContinuation: Equatable, Identifiable {
+    let id = UUID()
+    let message: String
+    let submissionID: UUID?
+    let hasAttachments: Bool
+}
+
+extension ChatModel {
+    /// The refused message went on in a branch: it leaves this chat's message box and
+    /// its unsent list.
+    func resolveBranchContinuation(_ continuation: ChatBranchContinuation) {
+        guard branchContinuation?.id == continuation.id else { return }
+        branchContinuation = nil
+        failureMessage = nil
+        if !continuation.hasAttachments, draft == continuation.message { draft = "" }
+        if let id = continuation.submissionID { nativeConversationClient?.markReviewed(id) }
+        persistSession()
     }
 }

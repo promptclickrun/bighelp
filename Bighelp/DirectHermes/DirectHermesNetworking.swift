@@ -657,7 +657,10 @@ final class DirectHermesClient: DirectHermesRPC, DirectHermesAuthenticatedHTTP,
             case .request(let request):
                 acceptServerRequest(request, epoch: epoch)
             case .result(let id, let value): finish(id: id, result: .success(value))
-            case .failure(let id, let code): finish(id: id, result: .failure(.rpcRejected(code: code)))
+            case .failure(let id, let code, let reason):
+                let error: DirectHermesError = code == 4090 && reason == "MAX_CONCURRENT_SESSIONS"
+                    ? .activeSessionLimit : .rpcRejected(code: code)
+                finish(id: id, result: .failure(error))
             }
         }
     }

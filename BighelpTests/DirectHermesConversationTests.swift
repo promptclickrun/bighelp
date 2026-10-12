@@ -2306,6 +2306,37 @@ struct NativeMidSessionTests {
         #expect(model.items.allSatisfy { $0.role != .human }, "A refused message is an editable draft, not accepted history")
     }
 
+    /// Another Hermes process holds the chat (4090 `SESSION_NOT_OWNED`), which retrying meets
+    /// again: the message goes on in a branch with the same history, and leaves this chat
+    /// once sent there. Hermes' cap on open chats is said plainly instead.
+    @Test(arguments: [false, true])
+    func aChatHeldElsewhereGoesOnInABranchButTheOpenChatLimitIsSaid(atLimit: Bool) async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let rpc = DirectTestRPC()
+        let client = try makeClient(rpc, root: root)
+        defer { client.suspend() }
+        let model = ChatModel(conversationID: client.conversationID, client: client, initialItems: [])
+        client.model = model
+        rpc.handler = { method, _ in
+            guard method == "prompt.submit" else { throw DirectHermesError.invalidResponse }
+            throw atLimit ? DirectHermesError.activeSessionLimit : DirectHermesError.rpcRejected(code: 4090)
+        }
+        model.draft = "Hello?"
+
+        await model.send()
+
+        #expect((model.branchContinuation?.message == "Hello?") == !atLimit)
+        #expect(model.failureMessage?.contains("limit of open chats") == atLimit)
+        #expect(!model.canRetry)
+        if let continuation = model.branchContinuation {
+            #expect(continuation.submissionID == client.journal.unresolved.first?.id)
+            model.resolveBranchContinuation(continuation)
+            #expect(model.draft.isEmpty && model.failureMessage == nil)
+            #expect(client.journal.unresolved.isEmpty, "Sent in the branch, so it isn't unsent here")
+        }
+    }
+
     @Test(arguments: [4090, 4007, 4001], ["Review this", ""])
     func refusedAttachmentRestoresOriginalDraftNotUploadedWireText(code: Int, message: String) async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)

@@ -158,6 +158,7 @@ struct SettingsView: View {
         // Every row opens one page, so the first screen stays a short list.
         Form {
             BighelpDeferredSection { localIdentity }
+            BighelpDeferredSection { experienceSection }
             BighelpDeferredSection { assistantBasics }
             BighelpDeferredSection {
                 settingsMenuGroup(sections: [.appearance, .chat, .voice, .notifications])
@@ -175,6 +176,7 @@ struct SettingsView: View {
             }
         }
         .animation(.snappy(duration: BighelpTokens.transitionDuration), value: settings.nerdModeEnabled)
+        .animation(.snappy(duration: BighelpTokens.transitionDuration), value: settings.codeModeEnabled)
         .bighelpFormSurface()
         .listSectionSpacing(20)
         .environment(\.defaultMinListRowHeight, BighelpTokens.hitTarget)

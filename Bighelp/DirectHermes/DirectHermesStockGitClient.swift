@@ -232,6 +232,10 @@ final class DirectHermesStockGitClient: StockGitManaging, ProjectGitClient {
     private let validateTarget: @MainActor (StockGitProjectTarget) -> Bool
     private var snapshots: [String: StockGitSnapshot] = [:]
     private var preparedActions: [UUID: StockGitPreparedAction] = [:]
+    /// Linked worktrees of each registered Project's primary folder, from Hermes's own
+    /// worktree list for that folder. Besides the primary folder, these are the only
+    /// paths a target may name (Bighelp IDE's sessions each work in one).
+    private var projectWorktrees: [String: (primary: StockGitProjectTarget, paths: Set<String>)] = [:]
 
     init(
         rpc: any DirectHermesRPC,
@@ -311,6 +315,9 @@ final class DirectHermesStockGitClient: StockGitManaging, ProjectGitClient {
             facts: facts
         )
         snapshots[targetKey(target)] = value
+        if validateTarget(target) {
+            projectWorktrees[projectKey(target)] = (target, Set(worktrees.filter { !$0.isMain }.map(\.path)))
+        }
         return value
     }
 
@@ -651,8 +658,17 @@ final class DirectHermesStockGitClient: StockGitManaging, ProjectGitClient {
         guard profile == target.profileID, project == target.projectID, cwd == target.cwd, name == target.projectName else {
             throw WorkspaceClientError.invalidRequest
         }
-        guard validateTarget(target) else { throw WorkspaceClientError.ownerChanged }
+        guard validateTarget(target) || isProjectWorktree(target) else { throw WorkspaceClientError.ownerChanged }
         return target
+    }
+
+    /// A linked worktree the Project's primary folder listed in its latest snapshot,
+    /// while that primary folder is still the Project's.
+    private func isProjectWorktree(_ target: StockGitProjectTarget) -> Bool {
+        guard let known = projectWorktrees[projectKey(target)],
+              known.primary.projectName == target.projectName,
+              known.paths.contains(target.cwd) else { return false }
+        return validateTarget(known.primary)
     }
 
     private func check(_ target: StockGitProjectTarget) throws {
@@ -670,8 +686,13 @@ final class DirectHermesStockGitClient: StockGitManaging, ProjectGitClient {
         guard owner.authority.kind == .direct, currentOwner() == owner else {
             snapshots.removeAll()
             preparedActions.removeAll()
+            projectWorktrees.removeAll()
             throw WorkspaceClientError.ownerChanged
         }
+    }
+
+    private func projectKey(_ target: StockGitProjectTarget) -> String {
+        [target.profileID, target.projectID].joined(separator: "\u{0}")
     }
 
     private func targetKey(_ target: StockGitProjectTarget) -> String {
@@ -1032,7 +1053,9 @@ final class DirectHermesStockGitClient: StockGitManaging, ProjectGitClient {
               !value.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains) else {
             throw WorkspaceClientError.invalidRequest
         }
-        let parts = value.split(separator: "/", omittingEmptySubsequences: false)
+        // Git names an untracked folder with one trailing "/" (`.worktrees/`, beside every worktree).
+        let body = value.hasSuffix("/") ? value.dropLast() : Substring(value)
+        let parts = body.split(separator: "/", omittingEmptySubsequences: false)
         guard parts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }) else {
             throw WorkspaceClientError.invalidRequest
         }

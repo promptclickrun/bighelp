@@ -108,6 +108,9 @@ struct RootShellView: View {
     @State var didAutoOpenHomeChat = false
     /// The open Projects screens' chats and project details.
     @State var projectsStore: ProjectsStore?
+    /// Bighelp IDE's home for the selected computer (`cacheScopeID`), kept through reconnects.
+    @State var codeHome: CodeHomeStore?
+    @State var codeSheet: CodeSheet?
     @State var kanbanModel: KanbanBoardModel?
     @State var kanbanAvailability = KanbanAvailability()
     @State var kanbanTaskToOpen: String?
@@ -615,6 +618,8 @@ struct RootShellView: View {
             }
         }
         .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.bottom } action: { rootBottomSafeArea = $0 }
+        // Bighelp Chat or Bighelp IDE: the launch's choice, then ☰'s switch.
+        .onChange(of: settings.experience, initial: true) { applyExperience() }
         .animation(reduceMotion ? nil : .snappy(duration: BighelpTokens.transitionDuration), value: showsBottomNavigation)
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
             isKeyboardVisible = true
@@ -713,6 +718,8 @@ struct RootShellView: View {
     /// Ideas and Goals are clearly its own.
     private var showsTabsOnRoot: Bool {
         let tab = appState.selectedTab
+        // Bighelp IDE's message box sits where the bar would; ☰ goes everywhere else.
+        guard tab != .code else { return false }
         let pinned = tab != .sessions && barTabs.contains(tab)
         return (tab != .agents || pinned) && (!fleetModeOn || tab.isAgentBoard || pinned)
     }
@@ -749,6 +756,8 @@ struct RootShellView: View {
             routeDestination(.workflows)
         case .usage:
             routeDestination(.usage)
+        case .code:
+            codeRootTab
         }
     }
 
@@ -769,6 +778,7 @@ struct RootShellView: View {
         case .kanban: "Kanban"
         case .workflows: "Workflows"
         case .usage: "Usage"
+        case .code: "Code"
         }
     }
 

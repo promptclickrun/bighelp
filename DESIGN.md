@@ -323,6 +323,19 @@ Long instructions (an agent's SOUL, a personality) have an expand icon that open
 form. Present that editor from the form's root: a full-screen cover hung on a list section header never got the
 keyboard.
 
+## Bighelp IDE
+
+An opt-in second home for coding (Settings › Bighelp IDE; Bighelp Chat stays the default). Its home is the
+Launchpad: filter chips (All, Running, Needs you, Ready), one card per session (a still status dot, its name, its
+branch in code type, what it's doing now) and a message box pinned at the bottom in place of the bottom bar. Under
+the box, three chips choose the project, where it runs (New worktree, the default, or Local checkout) and the
+branch; they stay set, so each send starts the next session at once and adds its card. Inside the box, the agent
+and a model chip (model, reasoning, fast mode) set what new sessions run on. A card opens the session's ordinary
+chat, where steer, queue and approvals work as in every chat; it has no bottom bar while Bighelp IDE is the home.
+Touch and hold a card (right-click on the Mac) for Changes: uncommitted files, then the branch's commits, and Ship
+(commit, push, pull request). ☰ keeps one menu: a Bighelp Chat / Bighelp IDE switch on top, then Sessions, Projects, Pull
+requests, Worktrees, Kanban and Settings. Nothing animates on the cards.
+
 ## Mac pointer and keyboard
 
 The Mac app is used with a mouse and keyboard. These helpers (`BighelpPointer.swift`) change only the Mac;

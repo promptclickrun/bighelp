@@ -542,6 +542,15 @@ struct SessionHydrationPage: Equatable, Sendable {
     var presentationOwner: String? = nil
 }
 
+/// What a new session runs on, set when Hermes creates it (`session.create`'s `model`, `provider`,
+/// `reasoning_effort` and `fast`). A part left nil keeps the agent's own setting.
+struct SessionStartRuntime: Equatable, Sendable {
+    var provider: String?
+    var model: String?
+    var reasoningEffort: String?
+    var fast: Bool?
+}
+
 @MainActor
 protocol SessionCatalogClient {
     var canDeleteConversation: Bool { get }
@@ -550,6 +559,9 @@ protocol SessionCatalogClient {
     func refreshMetadata(_ record: SessionRecord) async throws -> SessionRecord?
     func canonicalToolCallIDs(for record: SessionRecord) -> Set<String>
     func create(kind: SessionKind, agentIDs: [String]) async throws -> SessionRecord
+    /// Bighelp IDE: a new direct chat in exactly `folder`, named `title`, on `runtime`'s model choices.
+    func createSession(agentID: String, folder: String, title: String,
+                       runtime: SessionStartRuntime) async throws -> SessionRecord
     func hydrate(_ record: SessionRecord) async throws -> SessionRecord
     func hydrate(
         _ record: SessionRecord,
@@ -581,6 +593,12 @@ extension SessionCatalogClient {
     func canonicalToolCallIDs(for record: SessionRecord) -> Set<String> { [] }
 
     func hydrate(_ record: SessionRecord) async throws -> SessionRecord { record }
+
+    /// Only hosts that can start a chat in a chosen folder (native Hermes, demo) have Bighelp IDE.
+    func createSession(agentID: String, folder: String, title: String,
+                       runtime: SessionStartRuntime) async throws -> SessionRecord {
+        throw WorkspaceClientError.unavailable(.unsupportedOperation)
+    }
 
     func rename(_ record: SessionRecord, title: String) async throws {
         throw SessionCatalogError.invalidSession

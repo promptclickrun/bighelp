@@ -3,6 +3,8 @@ enum AppTab: String, CaseIterable, Identifiable {
     case feed, ideas, goals, apps
     /// Pages ☰ opens, as tabs when the person pins them to the bottom bar.
     case projects, kanban, workflows, usage
+    /// Bighelp IDE's home: coding sessions on the host's projects (Settings › Bighelp IDE).
+    case code
 
     /// The standard bottom bar: the agent's chat, then its Feed, Ideas, Goals and Apps.
     /// Settings › Appearance › App layout changes it (`BighelpAppLayout.barTabs`).
@@ -14,7 +16,7 @@ enum AppTab: String, CaseIterable, Identifiable {
     /// Screens people stay on (Projects, Kanban, Workflows): from ☰ they open as screens of
     /// their own, with ☰ in the corner. Quick ones (Usage, and Feed, Ideas or Goals when the
     /// bottom bar doesn't hold them) slide in over where you are, with Back.
-    var isLongStay: Bool { [.projects, .kanban, .workflows].contains(self) }
+    var isLongStay: Bool { [.projects, .kanban, .workflows, .code].contains(self) }
 
     /// Tabs drawn as the selected agent's board (no navigation bar).
     var isAgentBoard: Bool { [.feed, .ideas, .goals, .apps].contains(self) }
@@ -52,6 +54,8 @@ enum AppRoute: Hashable {
     case allHostsChats
     /// Feed, Ideas, Goals or Files as a quick screen with Back, when the bottom bar doesn't hold it.
     case board(AppTab)
+    /// A Bighelp IDE session's changes, with Ship.
+    case codeChanges(sessionID: String)
 
     /// Screens about every computer, which stay put when the working computer changes.
     var isAllHosts: Bool { self == .allHostsChats }

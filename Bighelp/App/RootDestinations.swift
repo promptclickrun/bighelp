@@ -27,6 +27,8 @@ extension RootShellView {
             workflowsDestination(route)
         case (.usage, _):
             usageDestination
+        case (.codeChanges(let sessionID), _):
+            codeChangesDestination(sessionID: sessionID)
         case (.board(let tab), _):
             agentBoardPage(tab)
         case (.allHostsChats, _):

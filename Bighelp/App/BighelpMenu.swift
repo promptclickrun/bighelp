@@ -78,6 +78,22 @@ struct BighelpMenuDestinations {
     var onBoard: ((AppTab) -> Void)? = nil
     /// Feed, Ideas and Goals with something new, for a dot on their rows.
     var unread: Set<AppTab> = []
+    /// Bighelp IDE's own places, listed instead of the everyday ones while it's the home.
+    var code: Code? = nil
+    /// Settings › Bighelp IDE on: the switch between Bighelp Chat and Bighelp IDE, on top.
+    var experience: ExperienceSwitch? = nil
+
+    struct Code {
+        var onNewSession: () -> Void
+        /// The selected project's pull requests and worktrees; none until there's a project.
+        var onPullRequests: (() -> Void)?
+        var onWorktrees: (() -> Void)?
+    }
+
+    struct ExperienceSwitch {
+        let current: BighelpExperience
+        let select: (BighelpExperience) -> Void
+    }
 }
 
 /// bighelp's one menu (☰). The first screen is short on purpose: New chat (top right),
@@ -100,6 +116,7 @@ struct BighelpMenu<Recent: View>: View {
 
     var body: some View {
         List {
+            if let experience = destinations.experience { experienceSection(experience) }
             mainSection
             recentSection
             moreSection
@@ -117,9 +134,13 @@ struct BighelpMenu<Recent: View>: View {
 
     private var mainSection: some View {
         Section {
-            // In the person's order (Appearance › App layout). With all hosts showing, Agents
-            // is All agents and the one-computer places ask which computer.
-            ForEach(destinations.places) { place in placeRow(place) }
+            if let code = destinations.code {
+                codeRows(code)
+            } else {
+                // In the person's order (Appearance › App layout). With all hosts showing, Agents
+                // is All agents and the one-computer places ask which computer.
+                ForEach(destinations.places) { place in placeRow(place) }
+            }
         } header: {
             HStack(spacing: BighelpTokens.space8) {
                 if !hosts.hosts.isEmpty || hosts.add != nil {
@@ -171,12 +192,47 @@ struct BighelpMenu<Recent: View>: View {
         }
     }
 
+    /// Bighelp Chat or Bighelp IDE: which home the app shows.
+    private func experienceSection(_ experience: BighelpMenuDestinations.ExperienceSwitch) -> some View {
+        Section {
+            Picker("Mode", selection: Binding(get: { experience.current }, set: { value in
+                choose { experience.select(value) }
+            })) {
+                ForEach(BighelpExperience.allCases) { mode in
+                    Text(mode.title).tag(mode)
+                }
+            }
+            .bighelpSegmentedPicker()
+            .labelsHidden()
+            .accessibilityIdentifier("menu.experience")
+        }
+        .listRowBackground(Color.clear)
+        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+    }
+
+    /// Bighelp IDE's places: its home, the project's pull requests and worktrees, then
+    /// Projects, Kanban and Settings.
+    @ViewBuilder
+    private func codeRows(_ code: BighelpMenuDestinations.Code) -> some View {
+        row("Sessions", symbol: "chevron.left.forwardslash.chevron.right", id: "menu.code.sessions", action: code.onNewSession)
+        if let onProjects = destinations.onProjects {
+            row(BighelpPlace.projects.title, symbol: BighelpPlace.projects.symbol, id: "menu.projects", action: onProjects)
+        }
+        if let onPullRequests = code.onPullRequests {
+            row("Pull requests", symbol: "arrow.triangle.pull", id: "menu.code.pull-requests", action: onPullRequests)
+        }
+        if let onWorktrees = code.onWorktrees {
+            row("Worktrees", symbol: "square.stack.3d.up", id: "menu.code.worktrees", action: onWorktrees)
+        }
+        ForEach(destinations.places.filter { [.kanban, .settings].contains($0) }) { place in placeRow(place) }
+    }
+
     /// Compact rows, so the whole first screen fits without scrolling.
     private static var rowInsets: EdgeInsets { EdgeInsets(top: 2, leading: 16, bottom: 2, trailing: 16) }
 
     /// New chat, its own button at the top right. Group chats start from its own picker ("Group chat").
     private var newChatButton: some View {
-        Button { choose(destinations.onNewChat) } label: {
+        Button { choose(destinations.code?.onNewSession ?? destinations.onNewChat) } label: {
             Image(systemName: "square.and.pencil")
                 .font(.bighelp(.body).weight(.semibold))
                 // Dark Mac palettes use pale lavender and need dark icon ink.
@@ -187,8 +243,8 @@ struct BighelpMenu<Recent: View>: View {
         }
         .bighelpPlainButtonStyle(.circle)
         .textCase(nil)
-        .bighelpHelp(destinations.newChatTitle, shortcut: "⌘N")
-        .accessibilityLabel(destinations.newChatTitle)
+        .bighelpHelp(destinations.code == nil ? destinations.newChatTitle : "New session", shortcut: "⌘N")
+        .accessibilityLabel(destinations.code == nil ? destinations.newChatTitle : "New session")
         .accessibilityIdentifier("menu.new-chat")
     }
 

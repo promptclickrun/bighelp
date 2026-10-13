@@ -33,6 +33,18 @@ final class DemoSessionCatalogClient: SessionCatalogClient {
         return record
     }
 
+    func createSession(agentID: String, folder: String, title: String,
+                       runtime: SessionStartRuntime) async throws -> SessionRecord {
+        let record = SessionRecord(
+            id: "session_\(UUID().uuidString.lowercased())",
+            kind: .direct,
+            agentIDs: [agentID],
+            title: title
+        )
+        records.append(record)
+        return record
+    }
+
     func refreshMetadata(_ record: SessionRecord) async throws -> SessionRecord? {
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("-test-held-session-metadata") {
@@ -58,6 +70,10 @@ final class DemoSessionCatalogClient: SessionCatalogClient {
         #endif
         guard canonical.id == "demo-tool-folder-anchor" else {
             guard offset == nil else { throw SessionCatalogError.invalidSession }
+            // A chat started in the demo keeps what was sent in it, as a host saves it.
+            if canonical.items.isEmpty, !record.items.isEmpty {
+                return SessionHydrationPage(record: record, nextOffset: nil)
+            }
             return SessionHydrationPage(record: canonical, nextOffset: nil)
         }
         switch offset {

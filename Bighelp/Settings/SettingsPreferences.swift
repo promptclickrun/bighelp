@@ -239,6 +239,22 @@ enum BotChatExperience: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// Which home bighelp shows: the everyday agent chat, or Bighelp IDE's coding
+/// sessions (Settings › Bighelp IDE; ☰ switches between them).
+enum BighelpExperience: String, CaseIterable, Identifiable, Sendable {
+    case bighelp
+    case code
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .bighelp: "Bighelp Chat"
+        case .code: "Bighelp IDE"
+        }
+    }
+}
+
 enum WorkspaceSwipeAction: String, CaseIterable, Identifiable, Sendable {
     case quickWorkspace
     case newChat

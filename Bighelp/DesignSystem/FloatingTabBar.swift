@@ -454,6 +454,7 @@ private extension AppTab {
         case .kanban: "Kanban"
         case .workflows: "Workflows"
         case .usage: "Usage"
+        case .code: "Code"
         }
     }
 
@@ -485,6 +486,7 @@ private extension AppTab {
         case (.kanban, _): "rectangle.split.3x1"
         case (.workflows, _): "flowchart"
         case (.usage, _): "gauge.with.dots.needle.50percent"
+        case (.code, _): "chevron.left.forwardslash.chevron.right"
         }
     }
 
@@ -505,6 +507,7 @@ private extension AppTab {
         case .kanban: "tab.kanban"
         case .workflows: "tab.workflows"
         case .usage: "tab.usage"
+        case .code: "tab.code"
         }
     }
 }

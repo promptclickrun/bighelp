@@ -1,0 +1,578 @@
+import SwiftUI
+
+/// Bighelp IDE's message box. Under it, three chips choose the project, where the
+/// session works (a new worktree or the local checkout) and its branch; they stay
+/// set after each send, so the next message starts the next session right away.
+struct CodeComposer: View {
+    @Bindable var store: CodeHomeStore
+    let agents: [AgentProfile]
+    let onWorktrees: () -> Void
+    @State private var message = ""
+    @State private var isPickingProject = false
+    @State private var isPickingBranch = false
+    @State private var isPickingRuntime = false
+    @FocusState private var isFocused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: BighelpTokens.space8) {
+            VStack(alignment: .leading, spacing: BighelpTokens.space8) {
+                TextField("Describe a change…", text: $message, axis: .vertical)
+                    .font(.bighelp(.body))
+                    .foregroundStyle(theme.primaryText)
+                    .lineLimit(1...6)
+                    .focused($isFocused)
+                    .bighelpMacFieldArea()
+                    .accessibilityIdentifier("code.composer.field")
+                HStack(spacing: BighelpTokens.space12) {
+                    agentMenu
+                    runtimeChip
+                    Spacer(minLength: 0)
+                    sendButton
+                }
+            }
+            .padding(.horizontal, BighelpTokens.space16)
+            .padding(.top, BighelpTokens.space12)
+            .padding(.bottom, BighelpTokens.space8)
+            .bighelpSurface(.composer)
+            ScrollView(.horizontal) {
+                HStack(spacing: BighelpTokens.space8) {
+                    projectChip
+                    placementMenu
+                    branchChip
+                }
+                .padding(.horizontal, BighelpTokens.space4)
+            }
+            .scrollIndicators(.hidden)
+        }
+        .padding(.horizontal, BighelpTokens.space12)
+        .padding(.bottom, BighelpTokens.space8)
+        .bighelpSheet(isPresented: $isPickingProject) {
+            CodeProjectPicker(store: store)
+                .bighelpSheetSize(.standard)
+        }
+        .bighelpSheet(isPresented: $isPickingBranch) {
+            CodeBranchPicker(store: store, message: message)
+                .bighelpSheetSize(.standard)
+        }
+        .bighelpSheet(isPresented: $isPickingRuntime) {
+            CodeRuntimePicker(store: store)
+                .bighelpSheetSize(.standard)
+        }
+    }
+
+    /// The model, reasoning and fast mode new sessions start with.
+    private var runtimeChip: some View {
+        Button { isPickingRuntime = true } label: {
+            Text(runtimeTitle)
+                .lineLimit(1)
+                .font(.bighelp(.subheadline).weight(.medium))
+                .foregroundStyle(theme.secondaryText)
+                .frame(minHeight: BighelpTokens.scaled(36))
+                .contentShape(.rect)
+        }
+        .bighelpPlainButtonStyle()
+        .accessibilityLabel("Model: \(runtimeTitle)")
+        .accessibilityIdentifier("code.composer.model")
+    }
+
+    private var runtimeTitle: String {
+        let runtime = store.runtime
+        var parts = [runtime.modelID.map { ModelNameCatalogStore.shared.displayName(for: $0) } ?? "Agent's model"]
+        if let reasoning = runtime.reasoning { parts.append(CodeRuntimeChoice.reasoningLabel(reasoning)) }
+        if runtime.fastMode == true { parts.append("Fast") }
+        return parts.joined(separator: " · ")
+    }
+
+    private var canSend: Bool {
+        store.project != nil && !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var sendButton: some View {
+        Button {
+            if store.send(message) { message = "" }
+        } label: {
+            Image(systemName: "arrow.up")
+                .font(.bighelp(.body).weight(.bold))
+                .foregroundStyle(canSend ? theme.actionForeground : theme.secondaryText)
+                .frame(width: BighelpTokens.scaled(36), height: BighelpTokens.scaled(36))
+                .background(canSend ? theme.action : theme.surface, in: .circle)
+                .contentShape(.circle)
+        }
+        .bighelpPlainButtonStyle(.circle)
+        .disabled(!canSend)
+        .keyboardShortcut(.return, modifiers: .command)
+        .bighelpIconLabel("Start session", shortcut: "⌘↩")
+        .accessibilityIdentifier("code.composer.send")
+    }
+
+    private var agentMenu: some View {
+        Menu {
+            ForEach(agents) { agent in
+                Button {
+                    Task { await store.selectAgent(agent.id) }
+                } label: {
+                    if agent.id == store.agentID { Label(agent.name, systemImage: "checkmark") } else { Text(agent.name) }
+                }
+            }
+        } label: {
+            HStack(spacing: BighelpTokens.space4) {
+                Image(systemName: "person.crop.circle")
+                Text(agents.first { $0.id == store.agentID }?.name ?? "Agent").lineLimit(1)
+            }
+            .font(.bighelp(.subheadline).weight(.medium))
+            .foregroundStyle(theme.secondaryText)
+            .frame(minHeight: BighelpTokens.scaled(36))
+            .contentShape(.rect)
+        }
+        .accessibilityLabel("Agent")
+        .accessibilityIdentifier("code.composer.agent")
+    }
+
+    private var projectChip: some View {
+        Button { isPickingProject = true } label: {
+            CodeChipLabel(systemImage: "folder", text: store.project?.name ?? "Choose a project")
+        }
+        .bighelpPlainButtonStyle(.capsule)
+        .accessibilityLabel("Project: \(store.project?.name ?? "none")")
+        .accessibilityIdentifier("code.chip.project")
+    }
+
+    private var placementMenu: some View {
+        Menu {
+            Section("Where should this session run?") {
+                ForEach(CodePlacement.allCases) { placement in
+                    Button {
+                        store.placement = placement
+                        store.branch = nil
+                    } label: {
+                        Label(placement.title, systemImage: store.placement == placement ? "checkmark" : placement.systemImage)
+                        Text(subtitle(for: placement))
+                    }
+                    .accessibilityIdentifier("code.placement.\(placement.rawValue)")
+                }
+            }
+            Button("Manage worktrees", systemImage: "square.stack.3d.up", action: onWorktrees)
+        } label: {
+            CodeChipLabel(systemImage: store.placement.systemImage, text: store.placement.title)
+        }
+        .accessibilityLabel("Where it runs: \(store.placement.title)")
+        .accessibilityIdentifier("code.chip.placement")
+    }
+
+    private func subtitle(for placement: CodePlacement) -> String {
+        let busy = store.sessionsInMainFolder
+        guard placement == .local, busy > 0 else { return placement.detail }
+        return busy == 1 ? "1 session is already working here." : "\(busy) sessions are already working here."
+    }
+
+    private var branchChip: some View {
+        Button { isPickingBranch = true } label: {
+            CodeChipLabel(systemImage: "arrow.triangle.branch", text: store.branchTitle ?? "Branch", monospaced: true)
+        }
+        .bighelpPlainButtonStyle(.capsule)
+        .disabled(store.git == nil)
+        .accessibilityLabel("Branch: \(store.branchTitle ?? "default")")
+        .accessibilityIdentifier("code.chip.branch")
+    }
+
+    @BighelpThemeReader private var theme
+}
+
+struct CodeChipLabel: View {
+    let systemImage: String
+    let text: String
+    var monospaced = false
+
+    var body: some View {
+        HStack(spacing: BighelpTokens.space4) {
+            Image(systemName: systemImage)
+            Text(text)
+                .font(monospaced ? .system(.subheadline, design: .monospaced).weight(.medium)
+                                 : .bighelp(.subheadline).weight(.medium))
+                .lineLimit(1)
+        }
+        .font(.bighelp(.subheadline))
+        .foregroundStyle(theme.primaryText)
+        .padding(.horizontal, BighelpTokens.space12)
+        .frame(minHeight: BighelpTokens.scaled(34))
+        .bighelpSurface(.capsuleControl, isInteractive: true)
+        .contentShape(.capsule)
+    }
+
+    @BighelpThemeReader private var theme
+}
+
+/// The project chip's sheet: Hermes projects, then git folders it found that can become one.
+struct CodeProjectPicker: View {
+    @Bindable var store: CodeHomeStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var search = ""
+    @State private var addingPath: String?
+
+    var body: some View {
+        NavigationStack {
+            List {
+                BighelpSearchField(text: $search, accessibilityIdentifier: "code.projects.search")
+                    .bighelpListSearchRow()
+                Section {
+                    if store.projects.isEmpty {
+                        if store.isLoading {
+                            ProgressView().frame(maxWidth: .infinity)
+                        } else {
+                            Text(store.errorMessage ?? "No projects on this computer yet. Add a folder below.")
+                                .font(.bighelp(.subheadline))
+                                .foregroundStyle(theme.secondaryText)
+                        }
+                    }
+                    ForEach(matching(store.projects)) { project in
+                        Button {
+                            Task { await store.selectProject(project.id) }
+                            dismiss()
+                        } label: {
+                            HStack(spacing: BighelpTokens.space12) {
+                                ProjectTile(id: project.id, icon: project.icon, color: project.color, size: 32)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(project.name).font(.bighelp(.body)).foregroundStyle(theme.primaryText)
+                                    Text(project.folder)
+                                        .font(.system(.caption, design: .monospaced))
+                                        .foregroundStyle(theme.secondaryText)
+                                        .lineLimit(1).truncationMode(.head)
+                                }
+                                Spacer(minLength: 0)
+                                if project.id == store.projectID {
+                                    Image(systemName: "checkmark").foregroundStyle(theme.action)
+                                }
+                            }
+                            .contentShape(.rect)
+                        }
+                        .bighelpPlainButtonStyle()
+                        .accessibilityIdentifier("code.project.\(project.id)")
+                    }
+                }
+                .listRowBackground(theme.surface)
+                if !matching(store.found).isEmpty {
+                    Section("Found on your computer") {
+                        ForEach(matching(store.found)) { folder in
+                            HStack(spacing: BighelpTokens.space12) {
+                                Image(systemName: "folder").frame(width: 32).foregroundStyle(theme.secondaryText)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(folder.name).font(.bighelp(.body)).foregroundStyle(theme.primaryText)
+                                    Text(folder.path)
+                                        .font(.system(.caption, design: .monospaced))
+                                        .foregroundStyle(theme.secondaryText)
+                                        .lineLimit(1).truncationMode(.head)
+                                }
+                                Spacer(minLength: 0)
+                                if addingPath == folder.path {
+                                    ProgressView()
+                                } else {
+                                    Button("Add") {
+                                        addingPath = folder.path
+                                        Task {
+                                            await store.addProject(folder)
+                                            addingPath = nil
+                                            if store.project?.folder == folder.path { dismiss() }
+                                        }
+                                    }
+                                    .font(.bighelp(.subheadline).weight(.semibold))
+                                    .accessibilityIdentifier("code.found.add")
+                                }
+                            }
+                        }
+                    }
+                    .listRowBackground(theme.surface)
+                }
+            }
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(theme.canvas.ignoresSafeArea())
+            .navigationTitle("Project")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+            }
+            .refreshable { await store.load() }
+            .task { if store.projects.isEmpty { await store.load() } }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("code.projects")
+    }
+
+    private func matching(_ projects: [CodeProject]) -> [CodeProject] {
+        let term = search.trimmingCharacters(in: .whitespaces)
+        guard !term.isEmpty else { return projects }
+        return projects.filter { $0.name.localizedCaseInsensitiveContains(term) || $0.folder.localizedCaseInsensitiveContains(term) }
+    }
+
+    private func matching(_ folders: [CodeFoundFolder]) -> [CodeFoundFolder] {
+        let term = search.trimmingCharacters(in: .whitespaces)
+        guard !term.isEmpty else { return folders }
+        return folders.filter { $0.name.localizedCaseInsensitiveContains(term) || $0.path.localizedCaseInsensitiveContains(term) }
+    }
+
+    @BighelpThemeReader private var theme
+}
+
+/// The branch chip's sheet. New worktree: the new branch's name (named from the
+/// message unless changed) and the branch it starts from. Local: the branch to
+/// check out in the project's folder.
+struct CodeBranchPicker: View {
+    @Bindable var store: CodeHomeStore
+    let message: String
+    @Environment(\.dismiss) private var dismiss
+    @State private var search = ""
+    @State private var newBranch = ""
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if store.placement == .newWorktree {
+                    Section {
+                        TextField(suggested, text: $newBranch)
+                            .font(.system(.body, design: .monospaced))
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .accessibilityIdentifier("code.branch.new")
+                    } header: {
+                        Text("New branch")
+                    } footer: {
+                        Text("Named from your message unless you type a name.")
+                    }
+                    .listRowBackground(theme.surface)
+                }
+                BighelpSearchField(text: $search, prompt: "Search branches", accessibilityIdentifier: "code.branch.search")
+                    .bighelpListSearchRow()
+                Section(store.placement == .newWorktree ? "Start from" : "Branch") {
+                    ForEach(matching(localBranches)) { branch in
+                        branchRow(branch)
+                    }
+                }
+                .listRowBackground(theme.surface)
+                if store.placement == .local, !matching(remoteBranches).isEmpty {
+                    Section("On GitHub") {
+                        ForEach(matching(remoteBranches)) { branch in
+                            Text(branch.name)
+                                .font(.system(.body, design: .monospaced))
+                                .foregroundStyle(theme.secondaryText)
+                        }
+                    }
+                    .listRowBackground(theme.surface)
+                }
+            }
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(theme.canvas.ignoresSafeArea())
+            .navigationTitle(store.placement == .newWorktree ? "Start from" : "Branch")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        let name = newBranch.trimmingCharacters(in: .whitespacesAndNewlines)
+                        store.newBranchName = name.isEmpty ? nil : name
+                        dismiss()
+                    }
+                    .accessibilityIdentifier("code.branch.done")
+                }
+            }
+            .onAppear { newBranch = store.newBranchName ?? "" }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("code.branches")
+    }
+
+    private var suggested: String {
+        let taken = Set(store.git?.branches.map(\.name) ?? [])
+        return CodeBranchName.suggested(for: message.isEmpty ? "change" : message, taken: taken)
+    }
+
+    /// Worktrees start from base branches; Local checks out a local branch.
+    private var localBranches: [StockGitBranch] {
+        guard let git = store.git else { return [] }
+        return store.placement == .newWorktree ? git.baseBranches : git.branches.filter { !$0.isRemote }
+    }
+
+    private var remoteBranches: [StockGitBranch] {
+        store.git?.branches.filter(\.isRemote) ?? []
+    }
+
+    private func branchRow(_ branch: StockGitBranch) -> some View {
+        let selected = branch.name == store.branchTitle
+        // A branch checked out in another worktree can't be checked out here too.
+        let busyElsewhere = store.placement == .local && branch.worktreePath != nil
+            && branch.worktreePath != store.project?.folder
+        return Button {
+            store.branch = branch.name
+            dismiss()
+        } label: {
+            HStack(spacing: BighelpTokens.space12) {
+                Image(systemName: "arrow.triangle.branch").foregroundStyle(theme.secondaryText)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(branch.name)
+                        .font(.system(.body, design: .monospaced))
+                        .foregroundStyle(busyElsewhere ? theme.secondaryText : theme.primaryText)
+                    if let note = note(for: branch) {
+                        Text(note).font(.bighelp(.caption)).foregroundStyle(theme.secondaryText)
+                    }
+                }
+                Spacer(minLength: 0)
+                if selected { Image(systemName: "checkmark").foregroundStyle(theme.action) }
+            }
+            .contentShape(.rect)
+        }
+        .bighelpPlainButtonStyle()
+        .disabled(busyElsewhere)
+        .accessibilityIdentifier("code.branch.\(branch.name)")
+    }
+
+    private func note(for branch: StockGitBranch) -> String? {
+        if branch.isDefault { return "Default" }
+        guard let path = branch.worktreePath else { return nil }
+        return path == store.project?.folder ? "Checked out in the local folder" : "In a worktree"
+    }
+
+    private func matching(_ branches: [StockGitBranch]) -> [StockGitBranch] {
+        let term = search.trimmingCharacters(in: .whitespaces)
+        guard !term.isEmpty else { return branches }
+        return branches.filter { $0.name.localizedCaseInsensitiveContains(term) }
+    }
+
+    @BighelpThemeReader private var theme
+}
+
+/// The model chip's sheet: the model (or the agent's own), the reasoning level and
+/// fast mode for new sessions. Each session applies them before its first message.
+struct CodeRuntimePicker: View {
+    @Bindable var store: CodeHomeStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var providers: [BighelpLinkModelProvider] = []
+    @State private var isLoading = true
+    @State private var loadError: String?
+    @State private var search = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Model") {
+                    NavigationLink {
+                        modelList
+                    } label: {
+                        LabeledContent("Model", value: modelTitle)
+                    }
+                    .accessibilityIdentifier("code.runtime.model")
+                }
+                .listRowBackground(theme.surface)
+                Section {
+                    Picker("Reasoning", selection: $store.runtime.reasoning) {
+                        Text("Agent's setting").tag(String?.none)
+                        ForEach(CodeRuntimeChoice.reasoningLevels, id: \.value) { level in
+                            Text(level.label).tag(Optional(level.value))
+                        }
+                    }
+                    .accessibilityIdentifier("code.runtime.reasoning")
+                    Picker("Fast mode", selection: $store.runtime.fastMode) {
+                        Text("Agent's setting").tag(Bool?.none)
+                        Text("On").tag(Optional(true))
+                        Text("Off").tag(Optional(false))
+                    }
+                    .disabled(fastModeUnavailable != nil)
+                    .accessibilityIdentifier("code.runtime.fast")
+                } footer: {
+                    Text(fastModeUnavailable ?? "Each new session checks these with Hermes before your message goes out.")
+                }
+                .listRowBackground(theme.surface)
+            }
+            .scrollContentBackground(.hidden)
+            .background(theme.canvas.ignoresSafeArea())
+            .navigationTitle("Model")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .task { await load() }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("code.runtime")
+    }
+
+    private var modelTitle: String {
+        store.runtime.modelID.map { ModelNameCatalogStore.shared.displayName(for: $0) } ?? "Agent's model"
+    }
+
+    /// Fast mode needs a chosen model that supports it.
+    private var fastModeUnavailable: String? {
+        guard let modelID = store.runtime.modelID else { return "Choose a model to use Fast Mode." }
+        return FastMode.unavailableReason(provider: providers.first { $0.id == store.runtime.providerID },
+                                          model: modelID)
+    }
+
+    private var modelList: some View {
+        List {
+            BighelpSearchField(text: $search, prompt: "Search models", accessibilityIdentifier: "code.runtime.search")
+                .bighelpListSearchRow()
+            Section {
+                modelRow(title: "Agent's model", providerID: nil, modelID: nil)
+            }
+            .listRowBackground(theme.surface)
+            if isLoading {
+                ProgressView().frame(maxWidth: .infinity)
+            } else if let loadError {
+                Text(loadError).font(.bighelp(.subheadline)).foregroundStyle(theme.secondaryText)
+            }
+            ForEach(providers.filter { !matching($0).isEmpty }) { provider in
+                Section(provider.name) {
+                    ForEach(matching(provider), id: \.self) { model in
+                        modelRow(title: ModelNameCatalogStore.shared.displayName(for: model),
+                                 providerID: provider.id, modelID: model)
+                    }
+                }
+                .listRowBackground(theme.surface)
+            }
+        }
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(theme.canvas.ignoresSafeArea())
+        .navigationTitle("Model")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func modelRow(title: String, providerID: String?, modelID: String?) -> some View {
+        Button {
+            store.runtime.providerID = providerID
+            store.runtime.modelID = modelID
+            if fastModeUnavailable != nil { store.runtime.fastMode = nil }
+        } label: {
+            HStack {
+                Text(title).foregroundStyle(theme.primaryText)
+                Spacer(minLength: 0)
+                if store.runtime.providerID == providerID && store.runtime.modelID == modelID {
+                    Image(systemName: "checkmark").foregroundStyle(theme.action)
+                }
+            }
+            .contentShape(.rect)
+        }
+        .bighelpPlainButtonStyle()
+        .accessibilityIdentifier(providerID.map { "code.runtime.model.\($0).\(modelID ?? "")" } ?? "code.runtime.model.agent")
+    }
+
+    private func matching(_ provider: BighelpLinkModelProvider) -> [String] {
+        let term = search.trimmingCharacters(in: .whitespaces)
+        guard !term.isEmpty else { return provider.models }
+        return provider.models.filter {
+            $0.localizedCaseInsensitiveContains(term)
+                || ModelNameCatalogStore.shared.displayName(for: $0).localizedCaseInsensitiveContains(term)
+                || provider.name.localizedCaseInsensitiveContains(term)
+        }
+    }
+
+    private func load() async {
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            providers = try await store.modelProviders()
+            loadError = providers.isEmpty ? "No models found for this agent." : nil
+        } catch is CancellationError {
+        } catch {
+            loadError = "Models couldn't load. \(error.localizedDescription)"
+        }
+    }
+
+    @BighelpThemeReader private var theme
+}

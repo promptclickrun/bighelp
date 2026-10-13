@@ -42,6 +42,9 @@ change in both repos.
     a `BighelpSearchField` as the first row under the title (`bighelpListSearchRow()`), filter chips below
     it; never `.searchable` on a screen with the bar (iOS 26 puts it along the bottom, on the bar).
   - Never show "bighelp account" or "Link" wording. That pairing system is retired.
+  - Bighelp IDE is a second home, not a second app: Settings turns it on and picks the mode a launch opens in
+    (`settings.codeModeEnabled`, `startExperience`); ☰ gets a mode switch on top and Code's places while it's the
+    home (`AppTab.code`, `appState.homeTab`). Bighelp Chat stays the out-of-box home.
 - **Real data only.**
   - Avatars, activity poses and badges must come from what the agent is actually doing.
   - Never fake progress.
@@ -75,6 +78,7 @@ change in both repos.
 | `Bighelp/Settings/` | Settings screens and `SettingsStore` |
 | `Bighelp/Agents/`, `Board/`, `Companion/` | Agents, Feed/Ideas/Goals, the avatar kit renderer |
 | `Bighelp/Kanban/` | Kanban on Hermes' Kanban plugin: board model, lanes, cards, Vision Pro window and pinch-drag |
+| `Bighelp/Code/` | Bighelp IDE (Settings › Bighelp IDE): its home (`CodeHomeView`), the message box's chips (project, new worktree or local, branch), `CodeLauncher`, Changes and Ship |
 | `Bighelp/Usage/` | The Usage page (☰ › Usage): plans and limits (`ProviderUsageStore`), Hermes' own analytics per agent and computer (`UsageStore`, `HostUsageLoader`), charts |
 | `Bighelp/Voice/` | Turn-based and live voice |
 | `Bighelp/Spatial/` | Vision Pro: the agent in the room (`SpatialAvatarModel`, its volume and voice panel, its Settings section) |
@@ -175,6 +179,27 @@ change in both repos.
   metadata, not an allowlist. Check actual host capabilities and route responses instead.
   - Hosts differ, so parse leniently: ignore unknown keys and treat most parts as optional.
   - A missing part should hide one row, not break a screen.
+
+### Bighelp IDE
+
+- Each Send runs `CodeLauncher`: the host's stock git makes the worktree (`/api/git/worktree/add` through
+  `StockGitManaging` prepare/execute) or switches the local branch, then `session.create` starts the session in
+  exactly that folder with a title (`createSession(agentID:folder:title:)`, no fallback folder), then the first
+  message goes out the way Shortcuts sends (`submitWithoutWaiting`). Nothing opens, so sends can go back to back.
+- Git may act in a project's linked worktrees only when the main folder's latest snapshot lists them
+  (`DirectHermesStockGitClient.isProjectWorktree`). No other path is ever a target.
+- Hermes puts worktrees in `<repo>/.worktrees/`, which the main checkout sees as an untracked folder (git names
+  it `.worktrees/`, trailing slash and all). Changes and Ship leave it out, so a commit never takes the worktrees.
+- The model chip (model, reasoning, fast mode) rides in `session.create` (`model`, `provider`, `reasoning_effort`,
+  `fast`), so even the first message runs on it; the app checks the session reports that model. A brand-new
+  session's own controls can't change it yet (Hermes hasn't built the agent before its first turn).
+- Back-to-back sends make their folders and sessions one at a time (`CodeHomeStore.setupTail`): Hermes starts one
+  new chat per agent at a time, and each worktree changes the repository the next send reads. Sending and the
+  agents' work still run side by side.
+- Hermes doesn't remove a worktree when its session ends; ☰ › Worktrees does. Its `create-pr` route takes no
+  title or description (they come from the commits); "Ask the agent to open it" sends the session a message.
+- Cards show only what the live chat or the session list says (`CodeChatStatusReader`): waiting prompts are
+  "Needs you", running work shows its tool. Demo mode uses `DemoCodeProjectSource` and `DemoCodeGit`.
 
 ### SwiftUI traps we've hit
 

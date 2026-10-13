@@ -10,6 +10,7 @@ enum DirectHermesSessionError: Error, Equatable, Sendable {
     case sessionNotPersisted
     case workspaceNotConfirmed
     case nativeRowDeletionOnly
+    case modelNotConfirmed(String)
 }
 
 extension DirectHermesSessionError: LocalizedError {
@@ -30,6 +31,8 @@ extension DirectHermesSessionError: LocalizedError {
             "Your computer answered in a way bighelp didn't expect. Try again."
         case .nativeRowDeletionOnly:
             "This chat can only be deleted here, not changed."
+        case .modelNotConfirmed(let model):
+            "Your computer didn't start the session on \(model). Check this agent's models, then try again."
         }
     }
 }

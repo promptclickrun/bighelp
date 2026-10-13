@@ -240,6 +240,23 @@ final class SettingsStore {
         didSet { defaults.set(allHostsMode, forKey: Keys.allHostsMode) }
     }
 
+    /// Settings › Bighelp IDE: a second home for coding sessions on the host's
+    /// projects. Off by default; Bighelp Chat stays the out-of-box home.
+    var codeModeEnabled: Bool {
+        didSet {
+            defaults.set(codeModeEnabled, forKey: Keys.codeMode)
+            if !codeModeEnabled { experience = .bighelp }
+        }
+    }
+
+    /// Settings › Open in: the home a launch starts on while Bighelp IDE is on.
+    var startExperience: BighelpExperience {
+        didSet { defaults.set(startExperience.rawValue, forKey: Keys.startExperience) }
+    }
+
+    /// The home on screen now. ☰ switches it; each launch starts on `startExperience`.
+    var experience: BighelpExperience
+
     /// Settings › Chat › Open on; nil until picked (the agent's latest chat).
     var landingScreen: BighelpLandingScreen? {
         didSet { defaults.set(landingScreen?.rawValue, forKey: BighelpLanding.screenKey) }
@@ -386,6 +403,11 @@ final class SettingsStore {
         appLayout = BighelpAppLayout(savedObject: defaults.object(forKey: Keys.appLayout))
         nerdModeEnabled = defaults.bool(forKey: Keys.nerdMode, default: false)
         allHostsMode = defaults.bool(forKey: Keys.allHostsMode, default: false)
+        let codeMode = defaults.bool(forKey: Keys.codeMode, default: false)
+        let start = defaults.string(forKey: Keys.startExperience).flatMap(BighelpExperience.init(rawValue:)) ?? .bighelp
+        codeModeEnabled = codeMode
+        startExperience = start
+        experience = codeMode ? start : .bighelp
         let landing = defaults.string(forKey: BighelpLanding.screenKey).flatMap(BighelpLandingScreen.init(rawValue:))
         landingScreen = landing
         let legacyOpensChat = defaults.object(forKey: BighelpLanding.legacyOpensChatKey) == nil
@@ -687,6 +709,8 @@ private extension SettingsStore {
         static let appLayout = "bighelp.app-layout"
         static let nerdMode = "loopdy.settings.nerd-mode"
         static let allHostsMode = "bighelp.hosts.all-hosts"
+        static let codeMode = "bighelp.settings.code-mode"
+        static let startExperience = "bighelp.settings.code-mode.open-in"
         static let sessionSectionPreferences = "loopdy.sessions.section-preferences.v1"
     }
 }

@@ -609,6 +609,21 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
     }
 
     func createOrdinarySession(profileID: String) async throws -> DirectHermesResolvedSession {
+        try await createOrdinarySession(profileID: profileID, folder: nil, title: nil, runtime: .init())
+    }
+
+    /// Bighelp IDE: a new chat in exactly `folder` (a project's worktree or checkout),
+    /// named `title`. Unlike a chat in the selected project, it never falls back to
+    /// another folder: work meant for a worktree must not land somewhere else.
+    func createSession(agentID: String, folder: String, title: String,
+                       runtime: SessionStartRuntime) async throws -> SessionRecord {
+        try DirectHermesSessionValidation.hostPath(folder)
+        let title = try DirectHermesSessionValidation.text(title, maximum: 240, allowsEmpty: false)
+        return try await createOrdinarySession(profileID: agentID, folder: folder, title: title, runtime: runtime).record
+    }
+
+    private func createOrdinarySession(profileID: String, folder: String?, title: String?,
+                                       runtime: SessionStartRuntime) async throws -> DirectHermesResolvedSession {
         try requireOwner()
         try DirectHermesSessionValidation.coordinate(profileID, maximum: 128)
         // The agent picker/catalog already loaded this owner-scoped profile.
@@ -642,11 +657,11 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
             }
             try retain(pending)
         }
-        var state = try await newCreation(profile: profile, purpose: .ordinary)
+        var state = try await newCreation(profile: profile, purpose: .ordinary, folder: folder)
         let binding: Binding
         do {
-            binding = try await dispatchCreate(&state, profile: profile)
-        } catch DirectHermesSessionError.workspaceNotConfirmed where state.requestedCWD != nil {
+            binding = try await dispatchCreate(&state, profile: profile, title: title, startOn: runtime)
+        } catch DirectHermesSessionError.workspaceNotConfirmed where state.requestedCWD != nil && folder == nil {
             // Hermes starts a chat only in a folder that exists, else somewhere
             // else. A project whose folder is gone must not lock its agent out of
             // new chats: start it without the project, in the agent's own folder.
@@ -2082,8 +2097,11 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
     }
 
     private func newCreation(profile: Profile, purpose: DirectHermesSessionCreationState.Purpose,
-                             inProjectFolder: Bool = true) async throws -> DirectHermesSessionCreationState {
-        let cwd = inProjectFolder ? try await selectedFolderPath?(profile.id) : nil
+                             inProjectFolder: Bool = true,
+                             folder: String? = nil) async throws -> DirectHermesSessionCreationState {
+        let cwd: String?
+        if let folder { cwd = folder }
+        else { cwd = inProjectFolder ? try await selectedFolderPath?(profile.id) : nil }
         try requireOwner()
         if let cwd { try DirectHermesSessionValidation.hostPath(cwd) }
         return .init(schemaVersion: 1, intentID: UUID().uuidString, scopeID: owner.cacheScopeID,
@@ -2092,11 +2110,25 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
                      canonicalRegistryID: canonicalIDs[DirectHermesSessionIdentity.key(profile.id)]?.id)
     }
 
-    private func dispatchCreate(_ state: inout DirectHermesSessionCreationState, profile: Profile) async throws -> Binding {
+    private func dispatchCreate(_ state: inout DirectHermesSessionCreationState, profile: Profile,
+                                title: String? = nil, startOn choice: SessionStartRuntime = .init()) async throws -> Binding {
         try persistBeforeDispatch(state)
         var payload: [String: BighelpJSONValue] = [
             "profile": .string(profile.id), "source": .string(DirectHermesReleaseContract.sessionSource),
         ]
+        if let title { payload["title"] = .string(title) }
+        // A per-session pick that beats the agent's defaults for this session only; Hermes
+        // refuses a model that doesn't belong to the provider before anything exists.
+        if let model = choice.model {
+            payload["model"] = .string(try DirectHermesSessionValidation.text(model, maximum: 256, allowsEmpty: false))
+            if let provider = choice.provider {
+                payload["provider"] = .string(try DirectHermesSessionValidation.text(provider, maximum: 128, allowsEmpty: false))
+            }
+        }
+        if let effort = choice.reasoningEffort {
+            payload["reasoning_effort"] = .string(try DirectHermesSessionValidation.text(effort, maximum: 32, allowsEmpty: false))
+        }
+        if let fast = choice.fast { payload["fast"] = .boolean(fast) }
         if state.purpose == .firstCanonical {
             payload["title"] = .string("Bot Chat")
             payload["hidden"] = .boolean(true)
@@ -2128,12 +2160,16 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
               DirectHermesSessionValidation.same(returnedProfile, profile.id) else {
             throw WorkspaceClientError.invalidResponse
         }
+        // A chosen model must be the one the session reports, or the work would run on another.
+        if let model = choice.model, response["info"]?.object?["model"]?.string != model {
+            throw DirectHermesSessionError.modelNotConfirmed(model)
+        }
         state.storedSessionID = stored
         state.runtimeSessionID = runtime
         state.phase = .created
         try retain(state)
         let record = try draftRecord(profile: profile, storedID: stored,
-                                     title: state.purpose == .firstCanonical ? "Bot Chat" : "New chat")
+                                     title: state.purpose == .firstCanonical ? "Bot Chat" : title ?? "New chat")
         let original = try Binding(
             coordinate: WorkspaceSessionCoordinate(owner: owner, profileID: profile.id, sessionID: record.id,
                                                    storedSessionID: stored, runtimeSessionID: runtime),

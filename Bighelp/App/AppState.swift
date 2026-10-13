@@ -17,6 +17,8 @@ struct SuspendedChat: Equatable {
 @Observable
 final class AppState {
     var selectedTab: AppTab = .sessions
+    /// The root a host or account change returns to: Chat, or Code in Bighelp IDE.
+    var homeTab: AppTab = .sessions
     var path: [AppRoute] = []
     private(set) var activeConversationID: String?
     private(set) var pendingVoiceConversationID: String?
@@ -125,7 +127,7 @@ final class AppState {
             if ![.sessions, .scheduledTasks].contains(selectedTab) { selectedTab = .sessions }
             path = Array(path.prefix { $0.isAllHosts })
         } else if !showsOnlyConnections {
-            selectedTab = .sessions
+            selectedTab = homeTab
             path.removeAll()
         }
         activeConversationID = nil
@@ -136,7 +138,7 @@ final class AppState {
     }
 
     func resetForAccountBoundary() {
-        selectedTab = .sessions
+        selectedTab = homeTab
         path.removeAll()
         activeConversationID = nil
         pendingVoiceConversationID = nil

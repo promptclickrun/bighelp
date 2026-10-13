@@ -199,6 +199,13 @@ extension NativeWorkspaceSessionBridge {
         return try await prepare(record, catalog: client, preserveIfOmitted: true)
     }
 
+    func createSession(agentID: String, folder: String, title: String,
+                       runtime: SessionStartRuntime) async throws -> SessionRecord {
+        let client = try box.value()
+        let record = try await client.createSession(agentID: agentID, folder: folder, title: title, runtime: runtime)
+        return try await prepare(record, catalog: client, preserveIfOmitted: true)
+    }
+
     func hydrate(_ record: SessionRecord) async throws -> SessionRecord {
         let owner = try currentOwner()
         let client = try box.value()

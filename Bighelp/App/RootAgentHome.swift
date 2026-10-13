@@ -75,7 +75,8 @@ extension RootShellView {
         AgentHomeChrome(
             isEnabled: true,
             // All hosts too: a chat's agent is on the selected host, so its tabs are that agent's.
-            showsTabBar: true,
+            // Bighelp IDE has no bottom bar: its sessions return to its home through ☰ or Back.
+            showsTabBar: settings.experience != .code,
             onMenu: { isHomeDrawerPresented.toggle() },
             onProfile: { profileAgentID = $0 },
             onSwitchAgent: { isAgentSwitcherPresented = true },
@@ -782,7 +783,7 @@ extension RootShellView {
             chats: Array(sessionCatalog.recentSummaries(includeCronSessions: false).prefix(12)),
             agent: { id in agents.profiles.first { $0.id == id }.map { ($0.name, agents.avatarURL(for: $0)) } },
             hosts: fleetMenuHosts,
-            destinations: fleetModeOn ? fleetMenuDestinations : menuDestinations,
+            destinations: fleetModeOn && settings.experience != .code ? fleetMenuDestinations : menuDestinations,
             onOpen: { summary in afterClosingHomeSheets { openAsHomeChat(summary) } },
             fleetChats: fleetModeOn ? fleet.map { fleet in
                 (fleet, { chat in afterClosingHomeSheets { openFleetChat(chat) } })
@@ -815,7 +816,9 @@ extension RootShellView {
             onSettings: { afterClosingHomeSheets { openSettingsPage() } },
             places: settings.appLayout.menuPlaces,
             onBoard: { tab in afterClosingHomeSheets { openBoard(tab) } },
-            unread: boardUnreadTabs
+            unread: boardUnreadTabs,
+            code: settings.experience == .code ? codeMenu : nil,
+            experience: experienceSwitch
         )
     }
 

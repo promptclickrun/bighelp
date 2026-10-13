@@ -340,7 +340,7 @@ final class ShellFeatureStore {
         case .skillsAndTools,
              .workspaceActivity, .workspaceSettings, .workspaceManagement, .workspaceConnections, .workspaceHub,
              .projects, .project, .kanban, .usage, .allHostsChats, .board,
-             .workflows, .workflow, .workflowRun, .workflowSignoff, .workflowRuns:
+             .workflows, .workflow, .workflowRun, .workflowSignoff, .workflowRuns, .codeChanges:
             nil
         }
     }
@@ -417,7 +417,7 @@ final class ShellFeatureStore {
         case .skillsAndTools,
              .workspaceActivity, .workspaceSettings, .workspaceManagement, .workspaceConnections, .workspaceHub,
              .projects, .project, .kanban, .usage, .allHostsChats, .board,
-             .workflows, .workflow, .workflowRun, .workflowSignoff, .workflowRuns:
+             .workflows, .workflow, .workflowRun, .workflowSignoff, .workflowRuns, .codeChanges:
             return true
         }
     }

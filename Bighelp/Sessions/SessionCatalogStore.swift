@@ -295,6 +295,17 @@ final class SessionCatalogStore {
         return record
     }
 
+    /// Bighelp IDE: a new chat with `agentID` working in exactly `folder`.
+    func createDirect(agentID: String, folder: String, title: String,
+                      runtime: SessionStartRuntime = .init()) async throws -> SessionRecord {
+        let generation = accountGeneration
+        let record = try await client.createSession(agentID: agentID, folder: folder, title: title, runtime: runtime)
+        guard generation == accountGeneration else { throw CancellationError() }
+        upsert(record)
+        persistChangesIfNeeded()
+        return record
+    }
+
     /// Creates an ephemeral local canvas before the authoritative Hermes
     /// session exists. The ID is deliberately local-only and is replaced as
     /// soon as the real session is prepared.

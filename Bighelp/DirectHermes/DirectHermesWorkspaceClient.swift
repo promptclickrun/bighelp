@@ -319,6 +319,15 @@ final class DirectHermesWorkspaceClient: WorkspaceOperationPerforming {
                 }
                 return .rpc(operation.rawValue, payload)
             }
+            // YOLO (Bighelp IDE's mode, the chat's toggle): one session's flag, never the agent's default.
+            if payload["key"] == .string("yolo") {
+                guard operation == .configSet, payload["profile"]?.string != nil,
+                      payload["session_id"]?.string != nil, payload["scope"] == .string("session"),
+                      ["on", "off"].contains(payload["value"]?.string ?? "") else {
+                    throw WorkspaceClientError.invalidRequest
+                }
+                return .rpc(operation.rawValue, payload)
+            }
             guard let key = payload["key"]?.string, ["reasoning", "model"].contains(key),
                   payload["scope"] == nil || payload["scope"] == .string("global")
                     || (payload["scope"] == .string("session") && payload["session_id"]?.string != nil),

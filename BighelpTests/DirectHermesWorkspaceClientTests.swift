@@ -81,6 +81,28 @@ struct DirectHermesWorkspaceClientTests {
         }
     }
 
+    /// Bighelp IDE's YOLO mode turns on Hermes' session flag before the first message. Only
+    /// one session's flag: never the agent's default, never without a profile.
+    @Test func yoloIsOneSessionsFlag() throws {
+        let session: [String: BighelpJSONValue] = [
+            "profile": .string("studio"), "session_id": .string("runtime-chat"),
+            "key": .string("yolo"), "value": .string("on"), "scope": .string("session")
+        ]
+        #expect(try DirectHermesWorkspaceClient.route(.configSet, payload: session) == .rpc("config.set", session))
+        let off = session.merging(["value": .string("off")]) { _, new in new }
+        #expect(try DirectHermesWorkspaceClient.route(.configSet, payload: off) == .rpc("config.set", off))
+        for refused in [
+            session.merging(["scope": .string("global")]) { _, new in new },
+            session.filter { $0.key != "session_id" },
+            session.filter { $0.key != "profile" },
+            session.merging(["value": .string("always")]) { _, new in new },
+        ] {
+            #expect(throws: WorkspaceClientError.invalidRequest) {
+                try DirectHermesWorkspaceClient.route(.configSet, payload: refused)
+            }
+        }
+    }
+
     @Test func firstCanonicalBirthUsesExplicitNativeRegistryAndPersistenceOperations() throws {
         let lookup: [String: BighelpJSONValue] = [
             "profile": .string("studio"), "title": .string("Bot Chat"), "include_hidden": .boolean(true),

@@ -167,6 +167,86 @@ extension RootShellView {
         }
     }
 
+    // MARK: Dev Factory
+
+    /// Opens Dev Factory over the IDE home, with the computer's store made on first use.
+    func openDevFactory() {
+        guard let scope = currentWorkspaceOwner?.cacheScopeID ?? (usesWorkspaceFixtures ? "demo" : nil) else {
+            actionErrorMessage = "Connect to your computer to use Dev Factory."
+            return
+        }
+        if devFactory?.scopeID != scope {
+            guard let client = makeWorkflowsClient() else {
+                actionErrorMessage = "Connect to your computer to use Dev Factory."
+                return
+            }
+            devFactory = DevFactoryStore(scopeID: scope, client: client)
+        }
+        appState.select(.code)
+        appState.open(.devFactory)
+    }
+
+    private func devFactoryContext(_ store: DevFactoryStore) -> DevFactoryContext {
+        DevFactoryContext(
+            store: store, projects: codeHome?.projects ?? [], agents: agents.profiles,
+            defaultAgentID: codeHome?.agentID ?? workspaceAgentID,
+            onOpenGroup: { appState.open(.devFactoryGroup(id: $0)) },
+            onOpenRecipe: { appState.open(.devFactoryRecipe(id: $0)) },
+            onEditRecipe: { id in
+                guard prepareWorkflowsStore() != nil else { return }
+                appState.open(.workflow(id: id, startsRun: false))
+            })
+    }
+
+    @ViewBuilder
+    func devFactoryDestination(_ route: AppRoute) -> some View {
+        if let store = devFactory {
+            let context = devFactoryContext(store)
+            switch route {
+            case .devFactoryRecipe(let id):
+                DevFactoryRecipeView(context: context, recipeID: id)
+            case .devFactoryGroup(let id):
+                DevFactoryRunGroupView(
+                    model: DevFactoryRunGroupModel(groupID: id, store: store),
+                    onOpenRun: { run in
+                        guard prepareWorkflowsStore() != nil else { return }
+                        appState.open(.workflowRun(id: run.id))
+                    },
+                    onLookAtChanges: { appState.open(.devFactoryChanges(runID: $0.id)) })
+            case .devFactoryChanges(let runID):
+                devFactoryChanges(runID: runID, store: store)
+            default:
+                DevFactoryHomeView(context: context)
+            }
+        } else {
+            ContentUnavailableView("Dev Factory isn't open", systemImage: "hammer",
+                description: Text("Open it from the menu in Bighelp IDE."))
+        }
+    }
+
+    /// A run's changes in its worktree, read with the IDE's git: the same Changes screen, without Ship
+    /// (the recipe's own pull request step ships).
+    @ViewBuilder
+    private func devFactoryChanges(runID: String, store: DevFactoryStore) -> some View {
+        let run = store.groups.flatMap(\.runs).first { $0.id == runID }
+        if let code = run?.code, let folder = code.workspace?.path, let home = codeHome,
+           let project = home.projects.first(where: { $0.folder == code.project.path }) {
+            let session = CodeSessionRecord(
+                id: "factory." + runID, agentID: home.agentID, projectID: project.id, projectName: project.name,
+                title: (run?.workflowName ?? "Run") + " · " + code.project.label, folder: folder,
+                branch: code.workspace?.branch, placement: code.workspace?.isWorktree == false ? .local : .newWorktree,
+                startedAt: run?.startedAt ?? .now)
+            CodeChangesView(model: CodeChangesModel(
+                session: session, projectFolder: project.folder, git: home.gitClient,
+                textFiles: hostTextFiles(profileID: home.agentID),
+                sendToSession: { _ in throw WorkspaceClientError.unavailable(.unsupportedOperation) }),
+                canShip: false)
+        } else {
+            ContentUnavailableView("Changes aren't available", systemImage: "plus.forwardslash.minus",
+                description: Text("Add this project in Bighelp IDE to read its changes here."))
+        }
+    }
+
     /// ☰ in Bighelp IDE: New session, Projects, Pull requests and Worktrees, then Kanban and Settings.
     var codeMenu: BighelpMenuDestinations.Code {
         BighelpMenuDestinations.Code(
@@ -176,7 +256,8 @@ extension RootShellView {
             },
             onWorktrees: codeHome?.project == nil ? nil : {
                 afterClosingHomeSheets { appState.select(.code); codeSheet = .worktrees }
-            }
+            },
+            onDevFactory: canOpenWorkflows ? { afterClosingHomeSheets { openDevFactory() } } : nil
         )
     }
 

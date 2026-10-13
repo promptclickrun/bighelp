@@ -1,0 +1,284 @@
+{
+  "route": "workflows/runs/get",
+  "request": {
+    "runId": "run_164e6fc2109deb6c"
+  },
+  "response": {
+    "run": {
+      "allowedActions": [],
+      "endedAt": "2027-01-15T08:00:14Z",
+      "group_id": "grp_ca29965cc4f52207",
+      "id": "run_164e6fc2109deb6c",
+      "inputs": {
+        "task": "Fix it"
+      },
+      "iteration": 1,
+      "number": 1,
+      "outputs": [
+        {
+          "bytes": 19,
+          "iteration": 1,
+          "name": "title",
+          "sha256": "86d7007f96fb73ea10d05b4e215fa155fe7fd0af4fa896f1072ad161e321b91d",
+          "stageKey": "fix",
+          "type": "text",
+          "value": "Make the check pass",
+          "wordCount": 4
+        },
+        {
+          "bytes": 23,
+          "iteration": 1,
+          "name": "summary",
+          "sha256": "d6b6312255307800d559a3aef750086cfc6e92d56328ea21bb2d9f89affdfbef",
+          "stageKey": "fix",
+          "type": "markdown_file",
+          "wordCount": 5
+        },
+        {
+          "bytes": 17,
+          "iteration": 1,
+          "name": "log",
+          "sha256": "ecf661473a4101b595b4b1489423bfc2f04a68c8a9cd0210eae30fa1892d8fc6",
+          "stageKey": "tests",
+          "type": "text"
+        },
+        {
+          "bytes": 20,
+          "iteration": 1,
+          "name": "summary",
+          "sha256": "4242e8c49758c8ffd6d46f5f83d289d0252257b5864ae07b7be29065190587b8",
+          "stageKey": "tests",
+          "type": "text",
+          "value": "Looked at the check.",
+          "wordCount": 4
+        }
+      ],
+      "paused": false,
+      "project": {
+        "key": "app",
+        "label": "App",
+        "path": "/Users/you/code/app"
+      },
+      "pull_request": {
+        "number": 42,
+        "url": "https://github.example/fixture/app/pull/42"
+      },
+      "reason": null,
+      "revision": 1,
+      "sample": false,
+      "stageCount": 4,
+      "stageKey": "open_pr",
+      "stageState": "accepted",
+      "stageTitle": "Open a pull request",
+      "stages": [
+        {
+          "agentId": "writer",
+          "attempts": [
+            {
+              "agentId": "writer",
+              "durationMs": 1000,
+              "endedAt": "2027-01-15T08:00:02Z",
+              "id": "att_2191554a1c702dea",
+              "iteration": 1,
+              "launchedAt": "2027-01-15T08:00:01Z",
+              "number": 1,
+              "outcomeCode": "accepted",
+              "state": "accepted",
+              "tokens": {
+                "in": 1200,
+                "out": 300
+              }
+            }
+          ],
+          "endedAt": "2027-01-15T08:00:02Z",
+          "iteration": 1,
+          "key": "fix",
+          "kind": "agent",
+          "minutes": 30,
+          "role": "coder",
+          "startedAt": "2027-01-15T08:00:01Z",
+          "state": "accepted",
+          "title": "Fix it",
+          "uses": [
+            "inputs.task"
+          ]
+        },
+        {
+          "agentId": null,
+          "attempts": [
+            {
+              "agentId": "",
+              "durationMs": 2000,
+              "endedAt": "2027-01-15T08:00:04Z",
+              "exit_code": 1,
+              "id": "att_bec78ff3757533c0",
+              "iteration": 1,
+              "kind": "command",
+              "launchedAt": "2027-01-15T08:00:02Z",
+              "log": {
+                "bytes": 27,
+                "sha256": "24de7a65ed3770f3b25a7e84504dfeeda5ba57eabb8d5193ff3c224f9773e1b9"
+              },
+              "number": 1,
+              "outcomeCode": "command_failed",
+              "state": "failed",
+              "tokens": {
+                "in": 0,
+                "out": 0
+              },
+              "tries": 0
+            },
+            {
+              "agentId": "writer",
+              "durationMs": 1000,
+              "endedAt": "2027-01-15T08:00:05Z",
+              "id": "att_f1a5473286cf4c54",
+              "iteration": 1,
+              "kind": "fix",
+              "launchedAt": "2027-01-15T08:00:04Z",
+              "number": 2,
+              "outcomeCode": "accepted",
+              "state": "accepted",
+              "tokens": {
+                "in": 1200,
+                "out": 300
+              }
+            },
+            {
+              "agentId": "",
+              "durationMs": 2000,
+              "endedAt": "2027-01-15T08:00:07Z",
+              "exit_code": 1,
+              "id": "att_d9927f27c1170c5e",
+              "iteration": 1,
+              "kind": "command",
+              "launchedAt": "2027-01-15T08:00:05Z",
+              "log": {
+                "bytes": 27,
+                "sha256": "24de7a65ed3770f3b25a7e84504dfeeda5ba57eabb8d5193ff3c224f9773e1b9"
+              },
+              "number": 3,
+              "outcomeCode": "command_failed",
+              "state": "failed",
+              "tokens": {
+                "in": 0,
+                "out": 0
+              },
+              "tries": 1
+            },
+            {
+              "agentId": "",
+              "durationMs": 1000,
+              "endedAt": "2027-01-15T08:00:09Z",
+              "exit_code": 0,
+              "id": "att_95b4f38b38b40b3d",
+              "iteration": 1,
+              "kind": "command",
+              "launchedAt": "2027-01-15T08:00:08Z",
+              "log": {
+                "bytes": 17,
+                "sha256": "ecf661473a4101b595b4b1489423bfc2f04a68c8a9cd0210eae30fa1892d8fc6"
+              },
+              "number": 4,
+              "outcomeCode": "accepted",
+              "state": "accepted",
+              "tokens": {
+                "in": 0,
+                "out": 0
+              },
+              "tries": 0
+            }
+          ],
+          "endedAt": "2027-01-15T08:00:09Z",
+          "iteration": 1,
+          "key": "tests",
+          "kind": "command",
+          "minutes": 20,
+          "role": null,
+          "startedAt": "2027-01-15T08:00:08Z",
+          "state": "accepted",
+          "title": "Run the tests",
+          "uses": []
+        },
+        {
+          "agentId": null,
+          "attempts": [],
+          "changes": {
+            "additions": 1,
+            "base": "main",
+            "branch": "factory/fix-the-check-164e6f",
+            "deletions": 0,
+            "files": 1
+          },
+          "decisions": [
+            {
+              "decidedAt": "2026-10-13T17:23:58Z",
+              "decision": "approve",
+              "iteration": 1,
+              "notes": ""
+            }
+          ],
+          "endedAt": "2026-10-13T17:23:58Z",
+          "iteration": 1,
+          "key": "review",
+          "kind": "signoff",
+          "minutes": null,
+          "role": null,
+          "startedAt": "2027-01-15T08:00:09Z",
+          "state": "accepted",
+          "title": "Review the changes",
+          "uses": []
+        },
+        {
+          "agentId": null,
+          "attempts": [
+            {
+              "agentId": "",
+              "durationMs": 4000,
+              "endedAt": "2027-01-15T08:00:14Z",
+              "id": "att_4386b6d80eb5574e",
+              "iteration": 1,
+              "launchedAt": "2027-01-15T08:00:10Z",
+              "number": 1,
+              "outcomeCode": "accepted",
+              "state": "accepted",
+              "tokens": {
+                "in": 0,
+                "out": 0
+              }
+            }
+          ],
+          "endedAt": "2027-01-15T08:00:14Z",
+          "iteration": 1,
+          "key": "open_pr",
+          "kind": "pull_request",
+          "minutes": null,
+          "role": null,
+          "startedAt": "2027-01-15T08:00:10Z",
+          "state": "accepted",
+          "title": "Open a pull request",
+          "uses": [
+            "fix.title"
+          ]
+        }
+      ],
+      "stagesDone": 4,
+      "startedAt": "2027-01-15T08:00:01Z",
+      "state": "succeeded",
+      "tokens": {
+        "in": 2400,
+        "out": 600
+      },
+      "updatedAt": "2027-01-15T08:00:14Z",
+      "version": 21,
+      "workflowId": "wf_0f0c0a310e2eb91e",
+      "workflowName": "Fix the check",
+      "workspace": {
+        "base": "main",
+        "branch": "factory/fix-the-check-164e6f",
+        "path": "/Users/you/code/app/.worktrees/factory-fix-the-check-164e6f",
+        "placement": "worktree"
+      }
+    }
+  }
+}

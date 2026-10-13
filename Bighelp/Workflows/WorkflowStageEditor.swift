@@ -35,7 +35,7 @@ struct WorkflowStageEditor: View {
                 Section {
                     header
                     // A parallel block's agents each have their own output and limits; a delivery has neither.
-                    if stage.kind != .parallel && stage.kind != .delivery {
+                    if ![.parallel, .delivery, .command, .pullRequest].contains(stage.kind) {
                         Picker("Part", selection: $tab) {
                             ForEach(Tab.allCases) { Text($0.rawValue).tag($0) }
                         }
@@ -251,16 +251,44 @@ struct WorkflowStageEditor: View {
             WorkflowDeliverySection(stage: $stage, choices: deliveryChoices, client: model.client)
         case .signoff:
             Section("Sign-off") {
-                Picker("File you approve", selection: Binding(get: { stage.file ?? "" },
-                                                              set: { stage.file = $0.isEmpty ? nil : $0 })) {
-                    ForEach(earlierOutputs(types: ["markdown_file"]) + [stage.file ?? ""].filter { !$0.isEmpty }
-                        .filter { !earlierOutputs(types: ["markdown_file"]).contains($0) }, id: \.self) {
-                        Text($0).tag($0)
-                    }
+                if model.definition?.isCodeRecipe == true {
+                    Toggle("Sign off on the changes", isOn: $stage.signsChanges)
+                        .accessibilityIdentifier("workflows.stage.signs-changes")
                 }
-                Text("The run waits for you here, with no agent running. Approving never publishes anything.")
+                if stage.signsChanges {
+                    Text("The run waits with a summary of what changed in its project. Approving binds to what you saw: if the folder changes after, you look again.")
+                        .font(.bighelp(.footnote))
+                        .foregroundStyle(theme.secondaryText)
+                } else {
+                    Picker("File you approve", selection: Binding(get: { stage.file ?? "" },
+                                                                  set: { stage.file = $0.isEmpty ? nil : $0 })) {
+                        ForEach(earlierOutputs(types: ["markdown_file"]) + [stage.file ?? ""].filter { !$0.isEmpty }
+                            .filter { !earlierOutputs(types: ["markdown_file"]).contains($0) }, id: \.self) {
+                            Text($0).tag($0)
+                        }
+                    }
+                    Text("The run waits for you here, with no agent running. Approving never publishes anything.")
+                        .font(.bighelp(.footnote))
+                        .foregroundStyle(theme.secondaryText)
+                }
+            }
+        case .command:
+            commandSetup
+        case .pullRequest:
+            Section {
+                Picker("Title from", selection: Binding(get: { stage.titleFrom ?? "" },
+                                                        set: { stage.titleFrom = $0.isEmpty ? nil : $0 })) {
+                    Text("The step's own title").tag("")
+                    ForEach(earlierOutputs(types: ["text", "markdown_file"]), id: \.self) { Text($0).tag($0) }
+                }
+                .accessibilityIdentifier("workflows.stage.title-from")
+                Toggle("Open as a draft", isOn: $stage.draft)
+                    .accessibilityIdentifier("workflows.stage.draft")
+            } header: {
+                Text("Pull request")
+            } footer: {
+                Text("Commits everything in the run's folder, pushes its branch and opens the pull request with the GitHub CLI on \(context.hostName). It comes after your sign-off.")
                     .font(.bighelp(.footnote))
-                    .foregroundStyle(theme.secondaryText)
             }
         case .parallel:
             Section {
@@ -307,6 +335,65 @@ struct WorkflowStageEditor: View {
                 Text("This kind of stage needs a newer bighelp.")
                     .foregroundStyle(theme.secondaryText)
             }
+        }
+    }
+
+    /// A command step: what to run (the same for every project, or one each), how long it
+    /// may take, and whether an agent fixes what fails before it runs again.
+    @ViewBuilder private var commandSetup: some View {
+        let projects = model.definition?.codeProjects ?? []
+        Section {
+            TextField("Command", text: Binding(get: { stage.run["*"] ?? "" }, set: { value in
+                stage.run["*"] = value.isEmpty ? nil : value
+                stage.runIsShared = projects.allSatisfy { stage.run[$0.key] == nil }
+            }), prompt: Text("make test").bighelpFieldHint(theme))
+                .font(.bighelp(.body).monospaced())
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .accessibilityIdentifier("workflows.stage.command")
+            ForEach(projects) { project in
+                LabeledContent(project.label) {
+                    TextField(project.label, text: Binding(get: { stage.run[project.key] ?? "" }, set: { value in
+                        stage.run[project.key] = value.isEmpty ? nil : value
+                        stage.runIsShared = projects.allSatisfy { stage.run[$0.key] == nil }
+                    }), prompt: Text("Same as above").bighelpFieldHint(theme))
+                        .font(.bighelp(.callout).monospaced())
+                        .multilineTextAlignment(.trailing)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                }
+                .accessibilityIdentifier("workflows.stage.command.\(project.key)")
+            }
+            Stepper("Up to \(stage.minutes ?? 20) min", value: Binding(get: { stage.minutes ?? 20 },
+                                                                        set: { stage.minutes = $0 }), in: 1...60)
+        } header: {
+            Text("Command")
+        } footer: {
+            Text("Runs in each project's folder, without a shell. It passes when it exits with 0. Use a script in the project for pipes or several steps.")
+                .font(.bighelp(.footnote))
+        }
+        Section {
+            Toggle("If it fails, an agent fixes it", isOn: Binding(get: { stage.fix != nil }, set: { on in
+                stage.fix = on ? .init(role: model.definition?.roles.first?.key ?? "coder",
+                                       instructions: "The command failed. Fix the code so it passes.") : nil
+            }))
+            .accessibilityIdentifier("workflows.stage.fix")
+            if let fix = stage.fix {
+                Picker("Agent", selection: Binding(get: { fix.role }, set: { stage.fix?.role = $0 })) {
+                    ForEach(model.definition?.roles ?? [], id: \.key) { role in
+                        Text(context.agentName(model.agentID(for: role.key)) ?? role.label).tag(role.key)
+                    }
+                }
+                Stepper("Tries: \(fix.maxTries)", value: Binding(get: { fix.maxTries }, set: { stage.fix?.maxTries = $0 }),
+                        in: 1...3)
+                TextEditor(text: Binding(get: { fix.instructions }, set: { stage.fix?.instructions = $0 }))
+                    .font(.bighelp(.body))
+                    .frame(minHeight: 90)
+                    .accessibilityIdentifier("workflows.stage.fix-instructions")
+            }
+        } footer: {
+            Text("Out of tries, the run waits for you. Try again runs the command again.")
+                .font(.bighelp(.footnote))
         }
     }
 

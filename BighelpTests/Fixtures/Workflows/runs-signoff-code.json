@@ -1,0 +1,45 @@
+{
+  "route": "workflows/runs/signoff",
+  "request": {
+    "runId": "run_164e6fc2109deb6c",
+    "stageKey": "review",
+    "decision": "approve",
+    "artifactSha256": "29a11ee2af98f3720b8c82d0d92a6eb5a8e4807d6be738e0ecf51b67b2a5bb57"
+  },
+  "response": {
+    "run": {
+      "endedAt": null,
+      "group_id": "grp_ca29965cc4f52207",
+      "id": "run_164e6fc2109deb6c",
+      "iteration": 1,
+      "number": 1,
+      "paused": false,
+      "project": {
+        "key": "app",
+        "label": "App",
+        "path": "/Users/you/code/app"
+      },
+      "pull_request": null,
+      "reason": null,
+      "revision": 1,
+      "sample": false,
+      "stageCount": 4,
+      "stageKey": "open_pr",
+      "stageState": "pending",
+      "stageTitle": "Open a pull request",
+      "stagesDone": 3,
+      "startedAt": "2027-01-15T08:00:01Z",
+      "state": "planned",
+      "updatedAt": "2026-10-13T17:23:58Z",
+      "version": 18,
+      "workflowId": "wf_0f0c0a310e2eb91e",
+      "workflowName": "Fix the check",
+      "workspace": {
+        "base": "main",
+        "branch": "factory/fix-the-check-164e6f",
+        "path": "/Users/you/code/app/.worktrees/factory-fix-the-check-164e6f",
+        "placement": "worktree"
+      }
+    }
+  }
+}

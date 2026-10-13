@@ -544,6 +544,9 @@ enum WorkflowStageDefaults {
             // The host needs a stage named here; with none yet, its check says to choose one.
             stage.changesGoTo = agents.dropLast().last?.key ?? agents.last?.key ?? earlier.first?.key ?? stage.key
             stage.changesMaxRevisions = definition.maxRevisions
+        case .signoff where definition.schemaVersion >= 3:
+            // A recipe signs off on the changes in the project, not on a file.
+            stage.signsChanges = true
         case .signoff:
             if let file = outputs.last(where: { $0.output.type == "markdown_file" }) {
                 stage.file = "\(file.stage.key).\(file.output.name)"
@@ -562,6 +565,16 @@ enum WorkflowStageDefaults {
             for index in stage.branches.indices {
                 fill(&stage.branches[index], earlier: earlier, definition: &definition)
                 stage.branches[index].uses = definition.inputs.map { "inputs.\($0.key)" }
+            }
+        case .command:
+            stage.run = ["*": "make test"]
+            stage.runIsShared = true
+            if let role = definition.roles.first?.key {
+                stage.fix = .init(role: role, instructions: "The command failed. Fix the code so it passes.")
+            }
+        case .pullRequest:
+            if let title = outputs.last(where: { $0.output.type == "text" }) {
+                stage.titleFrom = "\(title.stage.key).\(title.output.name)"
             }
         case .unknown:
             break

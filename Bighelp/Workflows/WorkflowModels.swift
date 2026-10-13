@@ -186,10 +186,18 @@ struct WorkflowSummary: Identifiable, Equatable, Sendable {
     var pinned = false
     var archived = false
     var trigger: WorkflowTrigger?
+    /// 3 is a Dev Factory recipe; older hosts don't say (nil).
+    var schemaVersion: Int?
+    /// A recipe's projects (key and label only).
+    var projects: [WorkflowCodeProject] = []
+
+    var isCodeRecipe: Bool { (schemaVersion ?? 1) >= 3 }
 
     init?(json: WorkflowJSON) {
         guard let id = WorkflowDecode.string(json["id"], max: 128), !id.isEmpty else { return nil }
         self.id = id
+        schemaVersion = WorkflowDecode.int(json["schemaVersion"])
+        projects = WorkflowDecode.objects(json["projects"], max: 10).compactMap(WorkflowCodeProject.init(json:))
         name = WorkflowDecode.string(json["name"], max: 200) ?? "Workflow"
         revision = WorkflowDecode.int(json["revision"])
         hasDraft = WorkflowDecode.bool(json["hasDraft"]) ?? false
@@ -450,6 +458,28 @@ struct WorkflowDefinition: Equatable, Sendable {
     private var extra: WorkflowJSON
     private var limitsExtra: WorkflowJSON
 
+    /// Dev Factory (schemaVersion 3): the git projects the recipe works in.
+    var codeProjects: [WorkflowCodeProject] {
+        get { WorkflowDecode.objects(extra["projects"], max: 10).compactMap(WorkflowCodeProject.init(json:)) }
+        set { extra["projects"] = .array(newValue.prefix(10).map(\.json)) }
+    }
+
+    /// Dev Factory: "worktree" (each run gets a new one, the default) or "local", and the branch to start from.
+    var codeWorkspace: (placement: String, base: String?) {
+        get {
+            let object = extra["workspace"]?.object ?? [:]
+            return (WorkflowDecode.string(object["placement"], max: 16) ?? "worktree",
+                    WorkflowDecode.string(object["base"], max: 256))
+        }
+        set {
+            var object: WorkflowJSON = ["placement": .string(newValue.placement)]
+            if let base = newValue.base, !base.isEmpty { object["base"] = .string(base) }
+            extra["workspace"] = .object(object)
+        }
+    }
+
+    var isCodeRecipe: Bool { schemaVersion >= 3 }
+
     /// An empty draft for Create from scratch.
     static func empty(name: String) -> WorkflowDefinition {
         WorkflowDefinition(json: [
@@ -525,7 +555,8 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
     enum Kind: Hashable, Sendable {
         /// `parallel`: a block of agent stages that run at the same time (`native-workflows-parallel-v1`).
         /// `delivery`: sends earlier outputs somewhere with `hermes send` (`native-workflows-delivery-v1`).
-        case agent, check, decision, signoff, parallel, delivery
+        /// `command` and `pullRequest`: Dev Factory's (schemaVersion 3, `native-workflows-code-v1`).
+        case agent, check, decision, signoff, parallel, delivery, command, pullRequest
         case unknown(String)
 
         init(_ raw: String) {
@@ -536,6 +567,8 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
             case "signoff": self = .signoff
             case "parallel": self = .parallel
             case "delivery": self = .delivery
+            case "command": self = .command
+            case "pull_request": self = .pullRequest
             default: self = .unknown(raw)
             }
         }
@@ -548,6 +581,8 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
             case .signoff: "signoff"
             case .parallel: "parallel"
             case .delivery: "delivery"
+            case .command: "command"
+            case .pullRequest: "pull_request"
             case .unknown(let raw): raw
             }
         }
@@ -560,6 +595,8 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
             case .signoff: "Sign-off"
             case .parallel: "Parallel agents"
             case .delivery: "Delivery"
+            case .command: "Check"
+            case .pullRequest: "Pull request"
             case .unknown: "Stage"
             }
         }
@@ -572,6 +609,8 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
             case .signoff: "person.badge.shield.checkmark"
             case .parallel: "rectangle.split.3x1"
             case .delivery: "paperplane"
+            case .command: "testtube.2"
+            case .pullRequest: "arrow.triangle.pull"
             case .unknown: "square.dashed"
             }
         }
@@ -690,6 +729,30 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
         }
     }
 
+    /// A command stage's fix-and-retry: an agent fixes what failed, then the command runs again.
+    struct Fix: Equatable, Sendable {
+        var role: String
+        var instructions: String
+        var maxTries: Int
+
+        init(role: String, instructions: String, maxTries: Int = 2) {
+            self.role = role
+            self.instructions = instructions
+            self.maxTries = maxTries
+        }
+
+        init?(json: BighelpJSONValue?) {
+            guard let object = json?.object, let role = WorkflowDecode.string(object["role"], max: 64) else { return nil }
+            self.role = role
+            instructions = WorkflowDecode.string(object["instructions"], max: 8_000) ?? ""
+            maxTries = WorkflowDecode.int(object["maxTries"]) ?? 2
+        }
+
+        var json: BighelpJSONValue {
+            .object(["role": .string(role), "instructions": .string(instructions), "maxTries": .integer(maxTries)])
+        }
+    }
+
     /// Where a stage that isn't a decision goes (schemaVersion 2's `next`).
     enum Next: Equatable, Sendable {
         /// Absent: the following stage in the list (schemaVersion 1).
@@ -731,6 +794,16 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
     var deliver: [String] = []
     var to: String?
     var message: String?
+    /// Command (Dev Factory): what to run, by project key, or `*` for every project.
+    var run: [String: String] = [:]
+    /// The command as one string for every project (the host's short form).
+    var runIsShared = false
+    var fix: Fix?
+    /// Pull request: the output its title comes from, and whether it opens as a draft.
+    var titleFrom: String?
+    var draft = false
+    /// Sign-off on the run's changes (`changes: true`) instead of a file.
+    var signsChanges = false
     private var extra: WorkflowJSON
     private var changesExtra: WorkflowJSON
 
@@ -769,6 +842,18 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
         to = WorkflowDecode.string(json["to"], max: 256)
         message = WorkflowDecode.string(json["message"], max: Ending.messageLimit * 10)
         file = WorkflowDecode.string(json["file"], max: 128)
+        if let shared = WorkflowDecode.string(json["run"], max: 2_000) {
+            run = ["*": shared]
+            runIsShared = true
+        } else if let byProject = json["run"]?.object {
+            for (key, value) in byProject.prefix(11) {
+                if let command = WorkflowDecode.string(value, max: 2_000) { run[key] = command }
+            }
+        }
+        fix = Fix(json: json["fix"])
+        titleFrom = WorkflowDecode.string(json["titleFrom"], max: 128)
+        draft = WorkflowDecode.bool(json["draft"]) ?? false
+        signsChanges = WorkflowDecode.bool(json["changes"]) ?? false
         switch json["next"] {
         case .null?: next = .end
         case .string(let target)? where target.utf8.count <= 64: next = .stage(target)
@@ -776,7 +861,7 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
         }
         let known: Set<String> = ["key", "kind", "title", "next", "role", "instructions", "tools", "uses", "outputs",
                                   "minutes", "rules", "on", "pass", "changes", "file", "require", "branches",
-                                  "deliver", "to", "message"]
+                                  "deliver", "to", "message", "run", "fix", "titleFrom", "draft"]
         extra = json.filter { !known.contains($0.key) }
     }
 
@@ -800,6 +885,8 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
         case .signoff: title = "Your sign-off"
         case .parallel: title = "Parallel agents"
         case .delivery: title = "Send it"
+        case .command: title = "Run the tests"
+        case .pullRequest: title = "Open a pull request"
         case .unknown: title = "Stage"
         }
         role = nil
@@ -871,7 +958,22 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
                 if !changes.isEmpty { value["changes"] = .object(changes) }
             }
         case .signoff:
-            if let file { value["file"] = .string(file) }
+            if signsChanges {
+                value["changes"] = .boolean(true)
+            } else if let file {
+                value["file"] = .string(file)
+            }
+        case .command:
+            if runIsShared, run.count == 1, let shared = run["*"] {
+                value["run"] = .string(shared)
+            } else {
+                value["run"] = .object(run.mapValues(BighelpJSONValue.string))
+            }
+            if let minutes { value["minutes"] = .integer(minutes) }
+            if let fix { value["fix"] = fix.json }
+        case .pullRequest:
+            if let titleFrom { value["titleFrom"] = .string(titleFrom) }
+            if draft { value["draft"] = .boolean(true) }
         case .parallel:
             value["branches"] = .array(branches.map { .object($0.json) })
         case .delivery:
@@ -911,7 +1013,12 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
                         changesEnd.map { "else ends \($0.outcome.title.lowercased())" }].compactMap { $0 }
             // How it ends first: the row is short, and that's what is new about it.
             return (ends + [reads]).filter { !$0.isEmpty }.joined(separator: " · ")
-        case .signoff: return "approval → you"
+        case .signoff: return signsChanges ? "the changes → you" : "approval → you"
+        case .command:
+            let commands = Set(run.values)
+            let what = commands.count == 1 ? commands.first ?? "" : "\(commands.count) commands"
+            return fix.map { "\(what) · fixes up to \($0.maxTries)" } ?? what
+        case .pullRequest: return draft ? "a draft pull request" : "after your sign-off"
         case .delivery:
             let place = to.map { WorkflowDeliveryPlace.title($0) } ?? "nowhere yet"
             return deliver.count == 1 ? "1 output → \(place)" : "\(deliver.count) outputs → \(place)"
@@ -965,10 +1072,13 @@ struct WorkflowRunSummary: Identifiable, Equatable, Hashable, Sendable {
     var paused = false
     /// Present on hosts that echo it; used to find a run whose start wasn't confirmed.
     var clientRunToken: String?
+    /// A Dev Factory run's project, folder, pull request and reason (schemaVersion 3).
+    var code: WorkflowCodeRun?
 
     init?(json: WorkflowJSON) {
         guard let id = WorkflowDecode.string(json["id"], max: 128), !id.isEmpty else { return nil }
         self.id = id
+        code = WorkflowCodeRun(json: json)
         number = WorkflowDecode.int(json["number"]) ?? 0
         workflowID = WorkflowDecode.string(json["workflowId"], max: 128) ?? ""
         workflowName = WorkflowDecode.string(json["workflowName"], max: 200) ?? "Workflow"
@@ -1405,6 +1515,8 @@ struct WorkflowRunDetail: Equatable, Sendable {
     var stages: [WorkflowRunStage]
     var outputs: [WorkflowOutput]
     var signoff: WorkflowSignoff?
+    /// Dev Factory: a sign-off on the run's changes instead of a file.
+    var changesSignoff: WorkflowChangesSignoff?
     var tokens: WorkflowTokens?
     var allowedActions: Set<String>
 
@@ -1417,6 +1529,7 @@ struct WorkflowRunDetail: Equatable, Sendable {
         stages = WorkflowDecode.objects(run["stages"], max: 40).compactMap(WorkflowRunStage.init(json:))
         outputs = WorkflowDecode.objects(run["outputs"], max: 200).compactMap(WorkflowOutput.init(json:))
         signoff = run["signoff"]?.object.flatMap(WorkflowSignoff.init(json:))
+        changesSignoff = run["signoff"]?.object.flatMap(WorkflowChangesSignoff.init(json:))
         tokens = WorkflowTokens.counted(run["tokens"])
         allowedActions = Set(WorkflowDecode.strings(run["allowedActions"], max: 10))
     }
@@ -1708,7 +1821,8 @@ extension WorkflowStage {
         case .decision: sources
         case .signoff: file.map { [$0] } ?? []
         case .delivery: deliver
-        case .parallel, .unknown: []
+        case .pullRequest: titleFrom.map { [$0] } ?? []
+        case .parallel, .command, .unknown: []
         }
         var seen = Set<String>()
         return all.filter { seen.insert($0).inserted }

@@ -108,8 +108,13 @@ final class WorkflowsStore {
             let recentValue = try await client.runs(workflowID: nil, filter: .all, before: nil, limit: 20)
             guard !Task.isCancelled else { return }
             self.status = statusValue
-            self.list = listValue
-            recentRuns = recentValue.runs
+            // Dev Factory's recipes and runs live in Bighelp IDE (☰ › Dev Factory), not here.
+            var shown = listValue
+            shown.workflows.removeAll(where: \.isCodeRecipe)
+            shown.waiting.removeAll { $0.code != nil }
+            shown.active.removeAll { $0.code != nil }
+            self.list = shown
+            recentRuns = recentValue.runs.filter { $0.code == nil }
             state = statusValue.runnerAvailable ? .loaded : .needsHermesUpdate
         } catch is CancellationError {
             return

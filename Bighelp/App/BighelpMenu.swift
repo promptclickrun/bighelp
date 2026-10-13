@@ -88,6 +88,8 @@ struct BighelpMenuDestinations {
         /// The selected project's pull requests and worktrees; none until there's a project.
         var onPullRequests: (() -> Void)?
         var onWorktrees: (() -> Void)?
+        /// Coding recipes across projects; on computers with Workflows.
+        var onDevFactory: (() -> Void)?
     }
 
     struct ExperienceSwitch {
@@ -223,6 +225,9 @@ struct BighelpMenu<Recent: View>: View {
         }
         if let onWorktrees = code.onWorktrees {
             row("Worktrees", symbol: "square.stack.3d.up", id: "menu.code.worktrees", action: onWorktrees)
+        }
+        if let onDevFactory = code.onDevFactory {
+            row("Dev Factory", symbol: "hammer", id: "menu.code.dev-factory", action: onDevFactory)
         }
         ForEach(destinations.places.filter { [.kanban, .settings].contains($0) }) { place in placeRow(place) }
     }

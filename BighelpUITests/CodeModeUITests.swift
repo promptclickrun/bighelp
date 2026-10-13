@@ -243,6 +243,63 @@ final class CodeModeUITests: BighelpUITestCase {
         save("17-sent", app)
     }
 
+    /// Dev Factory on the demo data: ☰ opens it; the sample start shows one card per
+    /// project, and you approve one project's changes there; a template makes a new recipe,
+    /// and Run starts it on the projects you pick.
+    @MainActor
+    func testDevFactoryRecipesRunsAndSignOff() throws {
+        let app = makeApp()
+        let appearance = ProcessInfo.processInfo.environment["BIGHELP_CODE_MODE_APPEARANCE"] ?? "dark"
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays",
+                               "-bighelp.settings.code-mode", "YES", "-bighelp.settings.code-mode.open-in", "code",
+                               "-loopdy.demo.appearance", appearance]
+        app.launch()
+        XCTAssertTrue(element("code.screen", in: app).waitForExistence(timeout: 10))
+
+        app.buttons["home.drawer.open"].tap()
+        let menuRow = app.buttons["menu.code.dev-factory"]
+        XCTAssertTrue(menuRow.waitForExistence(timeout: 5), "☰ in Bighelp IDE lists Dev Factory.")
+        menuRow.tap()
+        XCTAssertTrue(element("devfactory.home", in: app).waitForExistence(timeout: 8))
+        let group = app.buttons["devfactory.group-row"].firstMatch
+        XCTAssertTrue(group.waitForExistence(timeout: 8), "The sample start runs now.")
+        save("18-factory-home", app)
+
+        group.tap()
+        XCTAssertTrue(element("devfactory.group", in: app).waitForExistence(timeout: 5))
+        XCTAssertTrue(element("devfactory.run.bighelp-plugin", in: app).waitForExistence(timeout: 8))
+        let approve = app.buttons["devfactory.approve"].firstMatch
+        XCTAssertTrue(approve.waitForExistence(timeout: 8), "A run waiting on its changes offers Approve.")
+        XCTAssertTrue(app.buttons["devfactory.retry"].firstMatch.exists, "Failing tests offer Try again.")
+        save("19-factory-run", app)
+        approve.tap()
+        XCTAssertTrue(approve.waitForNonExistence(timeout: 10), "Approving moves the run on.")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+
+        let template = app.buttons["devfactory.template.fix-test-pr"]
+        XCTAssertTrue(template.waitForExistence(timeout: 5))
+        template.tap()
+        let project = app.switches["devfactory.new.project.bighelp"]
+        XCTAssertTrue(project.waitForExistence(timeout: 5))
+        // A form row's switch flips where it draws, at the trailing edge.
+        project.coordinate(withNormalizedOffset: CGVector(dx: 0.94, dy: 0.5)).tap()
+        XCTAssertEqual(project.value as? String, "1")
+        save("20-new-recipe", app)
+        app.buttons["devfactory.new.create"].tap()
+        XCTAssertTrue(element("devfactory.recipe", in: app).waitForExistence(timeout: 8), "Create opens the recipe.")
+        save("21-recipe", app)
+
+        app.buttons["devfactory.recipe.run"].tap()
+        let task = element("devfactory.run-sheet.task", in: app)
+        XCTAssertTrue(task.waitForExistence(timeout: 5))
+        task.tap()
+        task.typeText("Fix the widget tap")
+        app.buttons["devfactory.run-sheet.start"].tap()
+        XCTAssertTrue(element("devfactory.group", in: app).waitForExistence(timeout: 8), "Run opens its start.")
+        XCTAssertTrue(element("devfactory.run.bighelp", in: app).waitForExistence(timeout: 8))
+        save("22-new-run", app)
+    }
+
     /// Out of the box there's no Bighelp IDE: no switch in ☰.
     @MainActor
     func testCodeModeIsOffByDefault() throws {

@@ -343,6 +343,12 @@ on the home with a line per session, and opens one chat for all of them: colored
 own chat), your messages on the right, and under each one every session's answer in a single block. `#` lists
 the batch's sessions, then the project's open pull requests; the chip and a line over the box say who gets it.
 
+Dev Factory (☰ › Dev Factory in Bighelp IDE): coding recipes across projects. Its home lists what runs now
+(one card per start, a line per project), the recipes (projects as small code chips, a Run button), then the
+templates new recipes start from. A start's screen has one card per project: its step track, what it does now
+in the computer's own words, and only the buttons it needs (Approve and Look at changes, Try again, the pull
+request). A recipe shows its projects, where runs work and its steps; Run asks for its inputs and projects.
+
 Markdown files open rendered, never as raw text: from Changes (a Preview tab beside the diff) and from paths in an
 IDE chat's messages, which are links. Edit shows the text; Save asks before replacing a file that changed meanwhile.
 

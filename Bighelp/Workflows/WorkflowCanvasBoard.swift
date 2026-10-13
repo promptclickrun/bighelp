@@ -332,9 +332,9 @@ struct WorkflowCanvasBoard: View {
         case .agent: context.agentName(model.agentID(for: stage.role)) ?? definition?.role(stage.role)?.label ?? "No agent yet"
         case .check: stage.rules.count == 1 ? "1 rule" : "\(stage.rules.count) rules"
         case .decision: stage.sources.count > 1 ? "\(stage.sources.count) verdicts" : stage.on ?? ""
-        case .signoff: "You approve the file"
+        case .signoff: stage.signsChanges ? "You approve the changes" : "You approve the file"
         case .parallel: stage.subtitle { context.agentName(model.agentID(for: $0)) }
-        case .delivery: stage.subtitle { _ in nil }
+        case .delivery, .command, .pullRequest: stage.subtitle { _ in nil }
         case .unknown: ""
         }
     }

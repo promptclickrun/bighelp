@@ -799,7 +799,12 @@ enum WorkflowVectorCheck {
         }
         if body["workflow"] != nil { _ = try WorkflowDetail(json: body) }
         if let runs = body["runs"]?.array {
-            #expect(WorkflowRunPage(json: body).runs.count == runs.count, "\(name)")
+            // A Dev Factory start lists its runs as {run_id, project}; a page lists whole runs.
+            if body["group_id"] != nil {
+                #expect(try WorkflowCodeStart(json: body).runs.count == runs.count, "\(name)")
+            } else {
+                #expect(WorkflowRunPage(json: body).runs.count == runs.count, "\(name)")
+            }
         }
         if let run = body["run"]?.object {
             if run["stages"] != nil { _ = try WorkflowRunDetail(json: body) }

@@ -31,6 +31,8 @@ extension RootShellView {
             codeChangesDestination(sessionID: sessionID)
         case (.codeBatch(let id), _):
             codeBatchDestination(id: id)
+        case (.devFactory, _), (.devFactoryRecipe, _), (.devFactoryGroup, _), (.devFactoryChanges, _):
+            devFactoryDestination(route)
         case (.board(let tab), _):
             agentBoardPage(tab)
         case (.allHostsChats, _):

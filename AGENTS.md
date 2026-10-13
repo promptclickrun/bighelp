@@ -215,6 +215,12 @@ change in both repos.
   each session's answer shows under the message by time. `#` mentions route (`CodeBatchRouting`): a session
   mention picks it and drops out of the text; a pull request mention is spelled out with its branch and goes
   to the session on that branch.
+- Dev Factory (☰ › Dev Factory) is Workflows with `schemaVersion: 3` recipes (plugin `native-workflows-code-v1`,
+  contract in bighelp-plugin's docs/DEV_FACTORY.md; vectors in `BighelpTests/Fixtures/Workflows/*-code.json`).
+  A recipe lists git projects; `startCodeRun` makes one run per project under a `group_id`, each in its own
+  worktree. New stage kinds `command` and `pullRequest`, and sign-off on the changes (`signsChanges`,
+  approved with `changesSignoff.sha256`). Recipes and their runs show only in Dev Factory: `WorkflowsStore`
+  leaves them out. "Look at changes" opens the IDE's Changes screen on the run's worktree, without Ship.
 
 ### SwiftUI traps we've hit
 

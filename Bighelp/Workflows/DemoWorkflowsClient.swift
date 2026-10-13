@@ -239,6 +239,59 @@ final class DemoWorkflowsClient: WorkflowsClient {
         return run.summary
     }
 
+    /// Dev Factory, like the plugin: one run per project under one group, each in its own worktree.
+    func startCodeRun(workflowID: String, revision: Int, inputs: WorkflowJSON, clientRunToken: String,
+                      projects: [String]?) async throws -> WorkflowCodeStart {
+        await pause()
+        if let existing = runs.values.first(where: { $0.summary.clientRunToken == clientRunToken }),
+           let group = existing.summary.code?.groupID {
+            let members = runs.values.filter { $0.summary.code?.groupID == group }.map(\.summary).sorted { $0.number < $1.number }
+            return WorkflowCodeStart(groupID: group, runs: members.map { ($0.id, $0.code?.project.key ?? "") },
+                                     first: members[0])
+        }
+        guard let workflow = workflows[workflowID], workflow.definition.isCodeRecipe, validation(workflow).valid else {
+            throw WorkspaceClientError.rejected(code: "not_valid")
+        }
+        let chosen = workflow.definition.codeProjects.filter { projects?.contains($0.key) ?? true }
+        guard !chosen.isEmpty else { throw WorkspaceClientError.rejected(code: "projects_invalid") }
+        nextWorkflow += 1
+        let group = "grp-demo-\(nextWorkflow)"
+        var started: [WorkflowRunSummary] = []
+        for (index, project) in chosen.enumerated() {
+            let summary = try await startRun(workflowID: workflowID, revision: revision, inputs: inputs,
+                                             clientRunToken: index == 0 ? clientRunToken : UUID().uuidString.lowercased())
+            guard var run = runs[summary.id] else { continue }
+            run.summary.code = Self.codeRun(group: group, project: project, recipe: workflow.definition, run: summary.id)
+            runs[summary.id] = run
+            started.append(run.summary)
+        }
+        return WorkflowCodeStart(groupID: group, runs: started.map { ($0.id, $0.code?.project.key ?? "") }, first: started[0])
+    }
+
+    func codeTemplates() async throws -> [WorkflowTemplate] {
+        Self.codeTemplateList.map(\.template)
+    }
+
+    /// A Dev Factory run's folder: a new worktree (`.worktrees/factory-…`) in its project.
+    private static func codeRun(group: String, project: WorkflowCodeProject, recipe: WorkflowDefinition,
+                                run: String, reason: String? = nil,
+                                pullRequest: WorkflowCodeRun.PullRequest? = nil) -> WorkflowCodeRun {
+        let slug = CodeBranchName.worktreeName(for: recipe.name.lowercased().replacingOccurrences(of: " ", with: "-"))
+        let name = "factory-\(slug)-\(run.suffix(6))"
+        let folder = project.path ?? "/Users/demo/code/\(project.key)"
+        return WorkflowCodeRun(groupID: group, project: project,
+                               workspace: .init(placement: recipe.codeWorkspace.placement,
+                                                path: recipe.codeWorkspace.placement == "local" ? folder : folder + "/.worktrees/" + name,
+                                                branch: "factory/" + String(name.dropFirst("factory-".count)),
+                                                base: recipe.codeWorkspace.base ?? "main"),
+                               pullRequest: pullRequest, reason: reason)
+    }
+
+    /// What a run's sign-off on changes binds to, here: the run and how far it got.
+    private static func changesSHA(_ run: Run) -> String {
+        WorkflowArtifactReader.sha256(Data("\(run.summary.id)/\(run.iteration)".utf8))
+    }
+
     func runs(workflowID: String?, filter: WorkflowRunFilter, before: String?, limit: Int) async throws -> WorkflowRunPage {
         await pause()
         let all = runs.values.map(\.summary)
@@ -285,9 +338,12 @@ final class DemoWorkflowsClient: WorkflowsClient {
             run.summary.waiting = nil
             log(&run, "cancelled", run.summary.stageKey, "Run cancelled")
         case .retry:
-            guard [.needsAttention, .failed].contains(run.summary.state) else {
+            let waitsOnStep = run.summary.state == .waitingForYou && ["command", "pull_request"].contains(run.summary.waiting?.kind)
+            guard [.needsAttention, .failed].contains(run.summary.state) || waitsOnStep else {
                 throw WorkspaceClientError.rejected(code: "not_allowed")
             }
+            run.summary.waiting = nil
+            run.summary.code?.reason = nil
             run.summary.state = .running
             run.summary.stageState = .running
             run.summary.attention = nil
@@ -310,6 +366,30 @@ final class DemoWorkflowsClient: WorkflowsClient {
         guard var run = runs[runID] else { throw WorkspaceClientError.rejected(code: "not_found") }
         guard run.summary.state == .waitingForYou, run.summary.waiting?.stageKey == stageKey else {
             throw WorkspaceClientError.rejected(code: "not_waiting")
+        }
+        if run.summary.code != nil {
+            guard Self.changesSHA(run) == artifactSHA256 else { throw WorkspaceClientError.rejected(code: "approval_stale") }
+            run.summary.waiting = nil
+            run.summary.code?.reason = nil
+            run.summary.version += 1
+            run.summary.updatedAt = .now
+            run.history.append(.init(index: run.history.count, stageKey: stageKey,
+                                     title: decision == .approve ? "Approved by you" : "You asked for changes",
+                                     iteration: run.iteration, outcome: decision == .approve ? "approved" : "changes",
+                                     agentID: nil, durationMs: nil, notes: []))
+            let stages = workflows[run.summary.workflowID]?.definition.stages ?? []
+            if decision == .changes { run.stageIndex = 0; run.iteration += 1 } else { run.stageIndex += 1 }
+            run.summary.stagesDone = run.stageIndex
+            run.summary.stageKey = stages[safe: run.stageIndex]?.key
+            run.summary.stageTitle = stages[safe: run.stageIndex]?.title
+            run.summary.state = .accepted
+            run.summary.stageState = .planned
+            run.scripted = true
+            run.lastStep = .now
+            log(&run, decision == .approve ? "approved" : "changes", stageKey,
+                decision == .approve ? "You approved the changes" : "You asked for changes")
+            runs[runID] = run
+            return run.summary
         }
         guard currentFile(run)?.sha256 == artifactSHA256 else { throw WorkspaceClientError.rejected(code: "approval_stale") }
         let stages = workflows[run.summary.workflowID]?.definition.stages ?? []
@@ -380,6 +460,8 @@ final class DemoWorkflowsClient: WorkflowsClient {
         var definition: WorkflowDefinition
         if let yours = yourTemplates.first(where: { $0.template.id == id }) {
             definition = yours.definition
+        } else if let code = Self.codeTemplateList.first(where: { $0.template.id == id }) {
+            definition = code.definition
         } else if id == "three-takes" {
             definition = Self.threeTakes
         } else {
@@ -427,11 +509,14 @@ final class DemoWorkflowsClient: WorkflowsClient {
     private func summary(_ workflow: Workflow) -> WorkflowSummary {
         let used = Set(workflow.definition.allStages.filter { $0.kind == .agent }.compactMap(\.role))
         let unbound = workflow.definition.roles.map(\.key).filter { used.contains($0) && workflow.bindings[$0] == nil }
-        return WorkflowSummary(id: workflow.id, name: workflow.definition.name, revision: workflow.revision,
-                               hasDraft: workflow.hasDraft, stageCount: workflow.definition.stages.count,
-                               needsSetupRoles: unbound, valid: validation(workflow).valid,
-                               lastRunAt: workflow.lastRunAt, stageKinds: workflow.definition.stages.map(\.kind),
-                               pinned: workflow.pinned, archived: workflow.archived, trigger: workflow.trigger)
+        var value = WorkflowSummary(id: workflow.id, name: workflow.definition.name, revision: workflow.revision,
+                                    hasDraft: workflow.hasDraft, stageCount: workflow.definition.stages.count,
+                                    needsSetupRoles: unbound, valid: validation(workflow).valid,
+                                    lastRunAt: workflow.lastRunAt, stageKinds: workflow.definition.stages.map(\.kind),
+                                    pinned: workflow.pinned, archived: workflow.archived, trigger: workflow.trigger)
+        value.schemaVersion = workflow.definition.schemaVersion
+        value.projects = workflow.definition.codeProjects.map { WorkflowCodeProject(key: $0.key, label: $0.label, path: nil) }
+        return value
     }
 
     private func validation(_ workflow: Workflow) -> WorkflowValidation {
@@ -537,7 +622,14 @@ final class DemoWorkflowsClient: WorkflowsClient {
         }
         var actions: Set<String> = []
         if !run.summary.state.isFinished { actions.insert("cancel") }
-        if [.needsAttention, .failed].contains(run.summary.state) { actions.insert("retry") }
+        if [.needsAttention, .failed].contains(run.summary.state)
+            || ["command", "pull_request"].contains(run.summary.waiting?.kind) { actions.insert("retry") }
+        var changes: WorkflowChangesSignoff?
+        if run.summary.code != nil, run.summary.waiting?.kind == "signoff", let key = run.summary.waiting?.stageKey {
+            changes = WorkflowChangesSignoff(stageKey: key, sha256: Self.changesSHA(run), files: 3, additions: 21,
+                                             deletions: 18, branch: run.summary.code?.workspace?.branch,
+                                             base: run.summary.code?.workspace?.base)
+        }
         let counted = stages.flatMap(\.attempts).compactMap(\.tokens)
         let tokens = run.fallbackRunner ? nil : counted.reduce(WorkflowTokens(input: 0, output: 0)) {
             WorkflowTokens(input: $0.input + $1.input, output: $0.output + $1.output)
@@ -554,8 +646,11 @@ final class DemoWorkflowsClient: WorkflowsClient {
                 return agent
             }
         }
-        return WorkflowRunDetail(summary: run.summary, inputs: run.inputs, stages: shown, outputs: run.outputs,
-                                 signoff: signoff, tokens: tokens, allowedActions: actions)
+        var value = WorkflowRunDetail(summary: run.summary, inputs: run.inputs, stages: shown, outputs: run.outputs,
+                                      signoff: run.summary.code == nil ? signoff : nil, tokens: tokens,
+                                      allowedActions: actions)
+        value.changesSignoff = changes
+        return value
     }
 
     /// One step forward for a run started in the app.
@@ -594,6 +689,13 @@ final class DemoWorkflowsClient: WorkflowsClient {
         log(&run, "accepted", stage.key, "\(stage.title) output accepted")
         run.stageIndex += 1
         run.summary.stagesDone = run.stageIndex
+        if stage.kind == .pullRequest, let code = run.summary.code {
+            nextRunNumber += 1
+            let number = 140 + nextRunNumber
+            run.summary.code?.pullRequest = .init(url: URL(string: "https://github.com/demo/\(code.project.key)/pull/\(number)")!,
+                                                  number: number)
+            log(&run, "pull_request_opened", stage.key, "Opened pull request #\(number)")
+        }
         guard let next = stages[safe: run.stageIndex] else {
             run.summary.state = .succeeded
             return
@@ -604,6 +706,7 @@ final class DemoWorkflowsClient: WorkflowsClient {
             run.summary.state = .waitingForYou
             run.summary.stageState = .waitingForYou
             run.summary.waiting = .init(kind: "signoff", stageKey: next.key, since: .now)
+            if let code = run.summary.code { run.summary.code?.reason = "Look at the changes in \(code.project.label) and approve them." }
             log(&run, "waiting", next.key, "Waiting for your sign-off")
         } else {
             run.summary.state = .accepted
@@ -758,9 +861,127 @@ final class DemoWorkflowsClient: WorkflowsClient {
                       sent, quiet] {
             runs[value.summary.id] = value
         }
+        seedDevFactory()
+    }
+
+    /// Dev Factory's sample: "Bump a dependency everywhere" on three projects, started a few minutes
+    /// ago: one runs its tests, one waits for your sign-off, one's tests still fail after two fixes.
+    private func seedDevFactory() {
+        var recipe = Self.codeRecipe(id: "bump-dependency")
+        recipe.name = "Bump a dependency everywhere"
+        recipe.codeProjects = [
+            WorkflowCodeProject(key: "bighelp", label: "bighelp", path: "/Users/demo/code/bighelp"),
+            WorkflowCodeProject(key: "bighelp-plugin", label: "bighelp-plugin", path: "/Users/demo/code/bighelp-plugin"),
+            WorkflowCodeProject(key: "site", label: "site", path: "/Users/demo/code/site"),
+        ]
+        for index in recipe.stages.indices where recipe.stages[index].kind == .command {
+            recipe.stages[index].run = ["*": "swift test", "bighelp-plugin": "python -m pytest", "site": "npm test"]
+            recipe.stages[index].runIsShared = false
+        }
+        workflows["wf-factory"] = Workflow(id: "wf-factory", definition: recipe, revision: 1, draftVersion: 1,
+                                           hasDraft: false, bindings: ["coder": "default"],
+                                           lastRunAt: now.addingTimeInterval(-360))
+        order.append("wf-factory")
+        let stages = recipe.stages
+        func run(_ number: Int, _ project: WorkflowCodeProject, stage: Int, state: WorkflowRunState,
+                 waiting: String? = nil, reason: String? = nil) -> Run {
+            let id = "run-\(number)"
+            var summary = WorkflowRunSummary(
+                id: id, number: number, workflowID: "wf-factory", workflowName: recipe.name, revision: 1, state: state,
+                stageKey: stages[stage].key, stageTitle: stages[stage].title,
+                stageState: waiting == nil ? .running : .waitingForYou, stagesDone: stage, stageCount: stages.count,
+                startedAt: now.addingTimeInterval(-360), updatedAt: now.addingTimeInterval(-30),
+                waiting: waiting.map { .init(kind: $0, stageKey: stages[stage].key, since: now.addingTimeInterval(-60)) },
+                version: 1)
+            summary.code = Self.codeRun(group: "grp-demo-1", project: project, recipe: recipe, run: id, reason: reason)
+            return Run(summary: summary, stageIndex: stage, iteration: 1, inputs: ["package": .string("markdown-kit"),
+                                                                                   "version": .string("3.0")],
+                       outputs: [], history: [], reviewNotes: [], events: [], scripted: false, lastStep: now)
+        }
+        let projects = recipe.codeProjects
+        for value in [
+            run(41, projects[0], stage: 1, state: .running),
+            run(42, projects[1], stage: 2, state: .waitingForYou, waiting: "signoff",
+                reason: "Look at the changes in bighelp-plugin and approve them."),
+            run(43, projects[2], stage: 1, state: .waitingForYou, waiting: "command",
+                reason: "Run the tests: still failing after 2 tries."),
+        ] {
+            runs[value.summary.id] = value
+        }
     }
 
     // MARK: Made-up content
+
+    /// Dev Factory's three templates, as the plugin has them (no projects until you pick some).
+    private static let codeTemplateList: [Template] = [
+        Template(template: WorkflowTemplate(id: "fix-test-pr", name: "Fix, test, open a PR",
+                                            description: "An agent fixes what you describe in each project, the tests run (the agent fixes what they find), you review the changes and a pull request opens.",
+                                            stageCount: 4),
+                 definition: codeRecipe(id: "fix-test-pr")),
+        Template(template: WorkflowTemplate(id: "bump-dependency", name: "Bump a dependency everywhere",
+                                            description: "An agent updates one package in each project and fixes what breaks, the tests run, you review the changes and a pull request opens.",
+                                            stageCount: 4),
+                 definition: codeRecipe(id: "bump-dependency")),
+        Template(template: WorkflowTemplate(id: "test-sweep", name: "Nightly test sweep",
+                                            description: "The tests run in each project as it is. A failing project waits for you; no AI runs.",
+                                            stageCount: 1),
+                 definition: codeRecipe(id: "test-sweep")),
+    ]
+
+    static func codeRecipe(id: String) -> WorkflowDefinition {
+        let coder: BighelpJSONValue = .array([.object(["key": .string("coder"), "label": .string("Coder")])])
+        let tests: WorkflowJSON = [
+            "key": .string("tests"), "kind": .string("command"), "title": .string("Tests pass"),
+            "run": .string("make test"), "minutes": .integer(20),
+            "fix": .object(["role": .string("coder"), "instructions": .string("The tests fail. Fix the code."),
+                            "maxTries": .integer(2)]),
+            "next": .string("review"),
+        ]
+        let review: WorkflowJSON = ["key": .string("review"), "kind": .string("signoff"),
+                                    "title": .string("Look at the changes"), "changes": .boolean(true),
+                                    "next": .string("open_pr")]
+        let pull: WorkflowJSON = ["key": .string("open_pr"), "kind": .string("pull_request"),
+                                  "title": .string("Commit, push and open the PR"), "titleFrom": .string("fix.title"),
+                                  "next": .null]
+        switch id {
+        case "test-sweep":
+            return WorkflowDefinition(json: [
+                "schemaVersion": .integer(3), "name": .string("Nightly test sweep"),
+                "description": .string("The tests run in each project as it is."), "roles": .array([]),
+                "inputs": .array([]), "limits": .object(["stageMinutes": .integer(20), "maxRevisions": .integer(0)]),
+                "projects": .array([]), "workspace": .object(["placement": .string("local")]),
+                "stages": .array([.object(["key": .string("tests"), "kind": .string("command"),
+                                           "title": .string("Tests pass"), "run": .string("make test"),
+                                           "next": .null])]),
+            ])
+        default:
+            let bump = id == "bump-dependency"
+            let inputs: [BighelpJSONValue] = bump
+                ? [.object(["key": .string("package"), "label": .string("Package"), "type": .string("text"),
+                            "required": .boolean(true)]),
+                   .object(["key": .string("version"), "label": .string("Version"), "type": .string("text"),
+                            "required": .boolean(true)])]
+                : [.object(["key": .string("task"), "label": .string("What to fix"), "type": .string("long_text"),
+                            "required": .boolean(true)])]
+            let fix: WorkflowJSON = [
+                "key": .string("fix"), "kind": .string("agent"), "role": .string("coder"),
+                "title": .string(bump ? "Update {package} to {version} and fix what breaks" : "Fix it"),
+                "instructions": .string(bump ? "Update {package} to {version} in {project.label}, then fix what breaks."
+                                             : "Fix this in {project.label}."),
+                "uses": .array([.string(bump ? "inputs.package" : "inputs.task")]),
+                "outputs": .array([.object(["name": .string("title"), "type": .string("text")])]),
+                "next": .string("tests"),
+            ]
+            return WorkflowDefinition(json: [
+                "schemaVersion": .integer(3), "name": .string(bump ? "Bump a dependency everywhere" : "Fix, test, open a PR"),
+                "description": .string("An agent changes the code, the tests run, you review and a pull request opens."),
+                "roles": coder, "inputs": .array(inputs),
+                "limits": .object(["stageMinutes": .integer(30), "maxRevisions": .integer(2)]),
+                "projects": .array([]), "workspace": .object(["placement": .string("worktree")]),
+                "stages": .array([.object(fix), .object(tests), .object(review), .object(pull)]),
+            ])
+        }
+    }
 
     /// Charts yesterday's made-up numbers and sends them. Nothing new: the decision ends the run as succeeded.
     static var morningNumbers: WorkflowDefinition {

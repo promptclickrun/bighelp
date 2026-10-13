@@ -1,0 +1,95 @@
+{
+  "route": "workflows/templates/list",
+  "request": {
+    "includeCode": true
+  },
+  "response": {
+    "templates": [
+      {
+        "description": "One agent researches the topic, one writes a draft and one reviews it. You approve the final file.",
+        "id": "research-draft-review",
+        "name": "Research, draft, review",
+        "roles": [
+          {
+            "key": "researcher",
+            "label": "Researcher"
+          },
+          {
+            "key": "writer",
+            "label": "Writer"
+          },
+          {
+            "key": "reviewer",
+            "label": "Reviewer"
+          }
+        ],
+        "source": "builtin",
+        "stageCount": 6,
+        "updatedAt": null
+      },
+      {
+        "description": "Three agents answer at the same time from different angles. When all three agree, one writes the answer from them, and you sign it off.",
+        "id": "three-takes",
+        "name": "Three takes, one answer",
+        "roles": [
+          {
+            "key": "researcher",
+            "label": "Researcher"
+          },
+          {
+            "key": "skeptic",
+            "label": "Skeptic"
+          },
+          {
+            "key": "practitioner",
+            "label": "Practitioner"
+          },
+          {
+            "key": "writer",
+            "label": "Writer"
+          }
+        ],
+        "source": "builtin",
+        "stageCount": 4,
+        "updatedAt": null
+      },
+      {
+        "description": "An agent fixes what you describe in each project, the tests run (the agent fixes what they find), you review the changes and a pull request opens.",
+        "id": "fix-test-pr",
+        "name": "Fix, test, open a PR",
+        "roles": [
+          {
+            "key": "coder",
+            "label": "Coder"
+          }
+        ],
+        "source": "builtin",
+        "stageCount": 4,
+        "updatedAt": null
+      },
+      {
+        "description": "In each project an agent moves one package to a new version and fixes what breaks, the tests run, you review the changes and a pull request opens.",
+        "id": "bump-dependency",
+        "name": "Bump a dependency everywhere",
+        "roles": [
+          {
+            "key": "coder",
+            "label": "Coder"
+          }
+        ],
+        "source": "builtin",
+        "stageCount": 4,
+        "updatedAt": null
+      },
+      {
+        "description": "Runs each project's tests on its current branch. A project whose tests fail waits for you; nothing is changed and no AI runs.",
+        "id": "test-sweep",
+        "name": "Nightly test sweep",
+        "roles": [],
+        "source": "builtin",
+        "stageCount": 1,
+        "updatedAt": null
+      }
+    ]
+  }
+}

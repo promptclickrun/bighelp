@@ -83,7 +83,7 @@ extension RootShellView {
     static let workflowAlertPrefix = "workflow.run."
 
     @discardableResult
-    private func prepareWorkflowsStore() -> WorkflowsStore? {
+    func prepareWorkflowsStore() -> WorkflowsStore? {
         if let workflowsStore { return workflowsStore }
         guard let client = makeWorkflowsClient() else { return nil }
         let store = WorkflowsStore(client: client, support: workflowsAvailability.support)

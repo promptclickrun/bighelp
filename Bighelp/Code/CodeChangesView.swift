@@ -162,11 +162,14 @@ final class CodeChangesModel {
 
 struct CodeChangesView: View {
     @State private var model: CodeChangesModel
+    /// False where something else ships (a Dev Factory run's own pull request step).
+    let canShip: Bool
     @State private var isShipping = false
     @Environment(\.openURL) private var openURL
 
-    init(model: CodeChangesModel) {
+    init(model: CodeChangesModel, canShip: Bool = true) {
         _model = State(initialValue: model)
+        self.canShip = canShip
     }
 
     var body: some View {
@@ -204,7 +207,7 @@ struct CodeChangesView: View {
         .background(BighelpThemeCanvas(theme: theme).ignoresSafeArea())
         .navigationTitle(model.session.title)
         .navigationBarTitleDisplayMode(.inline)
-        .safeAreaInset(edge: .bottom, spacing: 0) { shipBar }
+        .safeAreaInset(edge: .bottom, spacing: 0) { if canShip { shipBar } }
         .refreshable { await model.load() }
         .task { await model.load() }
         .bighelpSheet(item: Binding(get: { model.diff }, set: { if $0 == nil { model.closeDiff() } })) { diff in

@@ -1,0 +1,107 @@
+{
+  "route": "workflows/draft/save",
+  "request": {
+    "workflowId": "wf_0f0c0a310e2eb91e",
+    "baseDraftVersion": 1,
+    "definition": {
+      "description": "An agent fixes what you describe in each project, the tests run (the agent fixes what they find), you review the changes and a pull request opens.",
+      "inputs": [
+        {
+          "key": "task",
+          "label": "What to fix",
+          "required": true,
+          "sample": "The settings screen crashes when the name field is empty.",
+          "type": "long_text"
+        }
+      ],
+      "limits": {
+        "maxRevisions": 2,
+        "stageMinutes": 30
+      },
+      "name": "Fix the check",
+      "projects": [
+        {
+          "key": "app",
+          "label": "App",
+          "path": "/Users/you/code/app"
+        },
+        {
+          "key": "web",
+          "label": "Web",
+          "path": "/Users/you/code/web"
+        }
+      ],
+      "roles": [
+        {
+          "key": "coder",
+          "label": "Coder"
+        }
+      ],
+      "schemaVersion": 3,
+      "stages": [
+        {
+          "instructions": "Fix this in {project.label}: find the cause in the code, change it and add or update a test that covers it. Keep the change small. Leave the changes in the folder. Hand off a short pull request title and a summary of what you changed and why.",
+          "key": "fix",
+          "kind": "agent",
+          "next": "tests",
+          "outputs": [
+            {
+              "name": "title",
+              "type": "text"
+            },
+            {
+              "name": "summary",
+              "type": "markdown_file"
+            }
+          ],
+          "role": "coder",
+          "title": "Fix it",
+          "tools": [],
+          "uses": [
+            "inputs.task"
+          ]
+        },
+        {
+          "fix": {
+            "instructions": "The tests fail. Read their output, find the cause and fix the code. Change a test only when the test itself is wrong.",
+            "maxTries": 1,
+            "role": "coder"
+          },
+          "key": "tests",
+          "kind": "command",
+          "next": "review",
+          "run": {
+            "*": "sh check.sh"
+          },
+          "title": "Run the tests"
+        },
+        {
+          "changes": true,
+          "key": "review",
+          "kind": "signoff",
+          "next": "open_pr",
+          "title": "Review the changes"
+        },
+        {
+          "key": "open_pr",
+          "kind": "pull_request",
+          "next": null,
+          "title": "Open a pull request",
+          "titleFrom": "fix.title"
+        }
+      ],
+      "workspace": {
+        "placement": "worktree"
+      }
+    }
+  },
+  "response": {
+    "draftVersion": 2,
+    "validation": {
+      "host": true,
+      "issues": [],
+      "valid": true
+    },
+    "workflowId": "wf_0f0c0a310e2eb91e"
+  }
+}

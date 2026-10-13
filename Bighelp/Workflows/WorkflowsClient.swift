@@ -25,11 +25,13 @@ struct WorkflowFeatures: OptionSet, Sendable {
     static let delivery = WorkflowFeatures(rawValue: 1 << 1)
     /// A decision's way can end the run (`native-workflows-outcomes-v1`, plugin 3.10.0).
     static let outcomes = WorkflowFeatures(rawValue: 1 << 2)
-    static let all: WorkflowFeatures = [.parallel, .delivery, .outcomes]
+    /// Dev Factory's coding recipes (`native-workflows-code-v1`).
+    static let code = WorkflowFeatures(rawValue: 1 << 3)
+    static let all: WorkflowFeatures = [.parallel, .delivery, .outcomes, .code]
 
     static let names: [(String, WorkflowFeatures)] = [
         ("native-workflows-parallel-v1", .parallel), ("native-workflows-delivery-v1", .delivery),
-        ("native-workflows-outcomes-v1", .outcomes),
+        ("native-workflows-outcomes-v1", .outcomes), ("native-workflows-code-v1", .code),
     ]
 
     init(rawValue: Int) { self.rawValue = rawValue }
@@ -79,11 +81,21 @@ protocol WorkflowsClient: AnyObject {
     func features() async -> WorkflowFeatures
     /// Where a delivery stage can send: the computer's own list, as scheduled tasks use.
     func deliveryTargets() async throws -> [ScheduledTaskDeliveryTarget]
+    /// Dev Factory: starts a recipe on some of its projects (all when nil); one run per project.
+    func startCodeRun(workflowID: String, revision: Int, inputs: WorkflowJSON, clientRunToken: String,
+                      projects: [String]?) async throws -> WorkflowCodeStart
+    /// Dev Factory's templates (`templates/list` with `includeCode`), without the other templates.
+    func codeTemplates() async throws -> [WorkflowTemplate]
 }
 
 extension WorkflowsClient {
     func features() async -> WorkflowFeatures { [] }
     func deliveryTargets() async throws -> [ScheduledTaskDeliveryTarget] { [] }
+    func startCodeRun(workflowID: String, revision: Int, inputs: WorkflowJSON, clientRunToken: String,
+                      projects: [String]?) async throws -> WorkflowCodeStart {
+        throw WorkspaceClientError.unavailable(.pluginRequired)
+    }
+    func codeTemplates() async throws -> [WorkflowTemplate] { [] }
 
     /// The plugin's own check, read like the rest: true when Workflows run here.
     func isAvailable() async throws -> Bool {
@@ -193,6 +205,28 @@ final class DirectHermesWorkflowsClient: WorkflowsClient {
             // Hosts that don't echo the token: the same token returns the same run.
             return try Self.run(try await perform(.workflowsRunsStart, payload))
         }
+    }
+
+    /// Dev Factory: one run per project under one group. The same token returns the same start.
+    func startCodeRun(workflowID: String, revision: Int, inputs: WorkflowJSON, clientRunToken: String,
+                      projects: [String]?) async throws -> WorkflowCodeStart {
+        var payload: WorkflowJSON = [
+            "workflowId": .string(workflowID), "revision": .integer(revision), "inputs": .object(inputs),
+            "clientRunToken": .string(clientRunToken), "sample": .boolean(false),
+        ]
+        if let projects { payload["projects"] = .array(projects.prefix(10).map(BighelpJSONValue.string)) }
+        do {
+            return try WorkflowCodeStart(json: try await perform(.workflowsRunsStart, payload))
+        } catch WorkspaceClientError.outcomeUnknown {
+            return try WorkflowCodeStart(json: try await perform(.workflowsRunsStart, payload))
+        }
+    }
+
+    func codeTemplates() async throws -> [WorkflowTemplate] {
+        let plain = Set(try await templates().map(\.id))
+        let result = try await perform(.workflowsTemplatesList, ["includeCode": .boolean(true)])
+        return WorkflowDecode.objects(result["templates"], max: 100).compactMap(WorkflowTemplate.init(json:))
+            .filter { !plain.contains($0.id) }
     }
 
     func runs(workflowID: String?, filter: WorkflowRunFilter, before: String?, limit: Int) async throws -> WorkflowRunPage {

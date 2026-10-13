@@ -152,16 +152,19 @@ struct WorkflowInputFields: View {
             Picker(input.label, selection: binding) {
                 ForEach(input.choices, id: \.self) { Text($0).tag($0) }
             }
+            .accessibilityIdentifier("\(identifier).\(input.key)")
         case .longText:
             VStack(alignment: .leading) {
                 Text(input.label).font(.bighelp(.footnote)).foregroundStyle(theme.secondaryText)
                 TextEditor(text: binding).frame(minHeight: 120)
+                    .accessibilityIdentifier("\(identifier).\(input.key)")
             }
         case .number:
             LabeledContent(input.label) {
                 TextField(input.label, text: binding, prompt: Text("Number").bighelpFieldHint(theme))
                     .keyboardType(.numberPad)
                     .multilineTextAlignment(.trailing)
+                    .accessibilityIdentifier("\(identifier).\(input.key)")
             }
         case .text:
             LabeledContent(input.label) {

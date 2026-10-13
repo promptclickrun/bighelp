@@ -60,6 +60,11 @@ enum AppRoute: Hashable {
     case codeChanges(sessionID: String)
     /// Orchestration mode's chat for a batch sent with Send all.
     case codeBatch(id: UUID)
+    /// Dev Factory (☰ › Dev Factory in Bighelp IDE): its home, a recipe, one start's runs, a run's changes.
+    case devFactory
+    case devFactoryRecipe(id: String)
+    case devFactoryGroup(id: String)
+    case devFactoryChanges(runID: String)
 
     /// Screens about every computer, which stay put when the working computer changes.
     var isAllHosts: Bool { self == .allHostsChats }

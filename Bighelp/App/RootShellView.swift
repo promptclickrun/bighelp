@@ -111,6 +111,7 @@ struct RootShellView: View {
     /// Bighelp IDE's home for the selected computer (`cacheScopeID`), kept through reconnects.
     @State var codeHome: CodeHomeStore?
     @State var codeSheet: CodeSheet?
+    @State var devFactory: DevFactoryStore?
     @State var kanbanModel: KanbanBoardModel?
     @State var kanbanAvailability = KanbanAvailability()
     @State var kanbanTaskToOpen: String?

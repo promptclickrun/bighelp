@@ -1,0 +1,52 @@
+{
+  "route": "workflows/runs/start",
+  "request": {
+    "workflowId": "wf_0f0c0a310e2eb91e",
+    "revision": 1,
+    "inputs": {
+      "task": "Fix it"
+    },
+    "clientRunToken": "4c741b1f-23c1-445f-babe-596b56ece2a7",
+    "projects": [
+      "app"
+    ]
+  },
+  "response": {
+    "group_id": "grp_ca29965cc4f52207",
+    "run": {
+      "endedAt": null,
+      "group_id": "grp_ca29965cc4f52207",
+      "id": "run_164e6fc2109deb6c",
+      "iteration": 1,
+      "number": 1,
+      "paused": false,
+      "project": {
+        "key": "app",
+        "label": "App",
+        "path": "/Users/you/code/app"
+      },
+      "pull_request": null,
+      "reason": null,
+      "revision": 1,
+      "sample": false,
+      "stageCount": 4,
+      "stageKey": "fix",
+      "stageState": "pending",
+      "stageTitle": "Fix it",
+      "stagesDone": 0,
+      "startedAt": null,
+      "state": "planned",
+      "updatedAt": "2026-10-13T17:23:57Z",
+      "version": 1,
+      "workflowId": "wf_0f0c0a310e2eb91e",
+      "workflowName": "Fix the check",
+      "workspace": null
+    },
+    "runs": [
+      {
+        "project": "app",
+        "run_id": "run_164e6fc2109deb6c"
+      }
+    ]
+  }
+}

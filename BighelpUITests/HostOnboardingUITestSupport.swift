@@ -3,6 +3,12 @@ import XCTest
 /// Real onboarding against an open (no sign-in) isolated host from
 /// Scripts/HostSignInMatrixProbe.py, for tests that run without demo fixtures.
 extension BighelpUITestCase {
+    /// The very first setup asks once to share data with AI providers; agrees when it does.
+    @MainActor func agreeToAIDataIfAsked(_ app: XCUIApplication) {
+        let agree = app.buttons["onboarding.ai-consent.agree"]
+        if agree.waitForExistence(timeout: 3) { agree.tap() }
+    }
+
     @MainActor func onboardOpenHost(_ app: XCUIApplication, address: String) throws {
         let start = app.buttons["onboarding.get-started"]
         let field = app.textFields["host-setup.address"]
@@ -10,6 +16,7 @@ extension BighelpUITestCase {
         if !field.waitForExistence(timeout: 5) {
             XCTAssertTrue(start.waitForExistence(timeout: 20))
             start.tap()
+            agreeToAIDataIfAsked(app)
         }
         XCTAssertTrue(field.waitForExistence(timeout: 10))
         field.tap()

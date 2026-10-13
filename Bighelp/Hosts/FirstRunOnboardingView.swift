@@ -13,6 +13,8 @@ struct FirstRunOnboardingView: View {
 
     @AppStorage("loopdy.onboarding.first-run-v1.step")
     private var savedStepRawValue = 0
+    @AppStorage(AIDataConsent.key) private var agreedToAIData = false
+    @State private var isAskingAIConsent = false
     @State private var step: Step = .welcome
     @State private var connectionBackStep: Step = .welcome
     @State private var hostConnectionCommitted = false
@@ -68,6 +70,15 @@ struct FirstRunOnboardingView: View {
             if hostID != nil, step != .host {
                 move(to: .host)
             }
+        }
+        .bighelpSheet(isPresented: $isAskingAIConsent) {
+            AIDataConsentSheet {
+                agreedToAIData = true
+                isAskingAIConsent = false
+                move(to: .host)
+            }
+            .presentationDetents([.medium])
+            .bighelpSheetSize(.compact)
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("onboarding.screen")
@@ -195,7 +206,7 @@ struct FirstRunOnboardingView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 0) {
                 actionFooter(title: "Get Started", identifier: "onboarding.get-started") {
-                    move(to: .host)
+                    continueToConnect()
                 }
                 Button {
                     move(to: .appearance)
@@ -280,7 +291,7 @@ struct FirstRunOnboardingView: View {
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             actionFooter(title: "Continue", identifier: "onboarding.appearance.continue") {
-                move(to: .host)
+                continueToConnect()
             }
         }
         .accessibilityElement(children: .contain)
@@ -317,6 +328,11 @@ struct FirstRunOnboardingView: View {
         }
         .frame(maxWidth: .infinity)
         .background(.bar)
+    }
+
+    /// Connecting comes after the one-time agreement to share data with AI providers.
+    private func continueToConnect() {
+        if agreedToAIData { move(to: .host) } else { isAskingAIConsent = true }
     }
 
     private func moveBack() {

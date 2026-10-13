@@ -1075,6 +1075,7 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         XCTAssertTrue(getStarted.waitForExistence(timeout: 15))
         capture("native-production-welcome", app)
         getStarted.tap()
+        agreeToAIDataIfAsked(app)
         let address = app.textFields["host-setup.address"]
         XCTAssertTrue(address.waitForExistence(timeout: 15), "A fresh native workspace must not require a bighelp account.")
         guard address.exists else { capture("native-production-entry", app); return }

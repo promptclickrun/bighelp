@@ -493,6 +493,10 @@ New code uses Bighelp names. Don't "finish" the rename on this list.
 
 ### Secrets and access
 
+- The very first setup asks once to share data with the host and its AI providers (`AIDataConsent`, App Review
+  5.1.1(i)/5.1.2(i)), before any computer is connected. Never ask again: not after updates, not for new hosts. Never
+  rename its key, and keep its text short and free of company names.
+
 - Credentials live in the Keychain, never in `UserDefaults` or logs.
 - Proxy custom headers have their own Keychain service and a list of reserved header names they can't use.
 - `Config/Local.xcconfig` (team ID, keys) is git-ignored. See `Config/Local.xcconfig.example`.

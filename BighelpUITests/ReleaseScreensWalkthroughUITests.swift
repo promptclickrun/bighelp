@@ -25,6 +25,7 @@ final class ReleaseScreensWalkthroughUITests: BighelpUITestCase {
         let start = app.buttons["onboarding.get-started"]
         XCTAssertTrue(start.waitForExistence(timeout: 20))
         start.tap()
+        agreeToAIDataIfAsked(app)
         let address = app.textFields["host-setup.address"]
         XCTAssertTrue(address.waitForExistence(timeout: 10))
         address.tap()

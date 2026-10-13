@@ -15,6 +15,11 @@ final class FirstRunOnboardingUITests: BighelpUITestCase {
         XCTAssertTrue(next.isHittable)
         capture("Appearance portrait")
         next.tap()
+        // Asked once, before connecting to anything.
+        let agree = app.buttons["onboarding.ai-consent.agree"]
+        XCTAssertTrue(agree.waitForExistence(timeout: 5))
+        capture("AI data agreement")
+        agree.tap()
         XCTAssertTrue(app.textFields["host-setup.address"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["onboarding.back"].isHittable)
         app.textFields["host-setup.address"].tap()
@@ -26,6 +31,7 @@ final class FirstRunOnboardingUITests: BighelpUITestCase {
         app.buttons["onboarding.back"].tap()
         XCTAssertTrue(next.waitForExistence(timeout: 5))
         next.tap()
+        XCTAssertFalse(agree.waitForExistence(timeout: 2), "Agreed once: never asked again.")
         XCTAssertTrue(app.textFields["host-setup.address"].waitForExistence(timeout: 5))
         XCTAssertEqual(app.textFields["host-setup.address"].value as? String, "localhost")
     }
@@ -45,6 +51,7 @@ final class FirstRunOnboardingUITests: BighelpUITestCase {
         XCTAssertTrue(next.isHittable)
         capture("Appearance landscape")
         next.tap()
+        agreeToAIDataIfAsked(app)
         XCTAssertTrue(app.textFields["host-setup.address"].waitForExistence(timeout: 5))
         capture("Connection landscape")
     }
@@ -69,6 +76,29 @@ final class FirstRunOnboardingUITests: BighelpUITestCase {
         for _ in 0..<4 where !restored.isHittable { app.swipeUp() }
         XCTAssertTrue(restored.isSelected)
         XCTAssertTrue(app.segmentedControls["settings.appearance"].buttons["Dark"].isSelected)
+    }
+
+    /// The agreement to share data with AI providers is asked the very first time only:
+    /// a relaunch and another Get Started don't ask again.
+    func testAIDataAgreementIsAskedOnlyTheFirstTime() {
+        let app = launchFresh()
+        let start = app.buttons["onboarding.get-started"]
+        XCTAssertTrue(start.waitForExistence(timeout: 15))
+        start.tap()
+        let agree = app.buttons["onboarding.ai-consent.agree"]
+        XCTAssertTrue(agree.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["onboarding.ai-consent.privacy"].exists, "It links the privacy policy.")
+        agree.tap()
+        XCTAssertTrue(app.textFields["host-setup.address"].waitForExistence(timeout: 5))
+        app.terminate()
+        app.launch()
+        let back = app.buttons["onboarding.back"]
+        XCTAssertTrue(back.waitForExistence(timeout: 15))
+        back.tap()
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        start.tap()
+        XCTAssertFalse(agree.waitForExistence(timeout: 2), "Never asked again.")
+        XCTAssertTrue(app.textFields["host-setup.address"].waitForExistence(timeout: 5))
     }
 
     func testConfiguredWorkspaceSkipsFirstRun() {

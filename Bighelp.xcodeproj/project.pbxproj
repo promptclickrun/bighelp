@@ -857,6 +857,7 @@
 		932A00B950E6AAF1307E45F9 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2469077E01CAA7FC2AF4BE56 /* Assets.xcassets */; };
 		934CC49CA58B4F570B437508 /* AgentAvatarBackdropTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D78717881D79C2F793798DC /* AgentAvatarBackdropTests.swift */; };
 		937480A7273A81C4A9269DC5 /* SessionCatalogStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AACDD67B5DC504EDCABB804B /* SessionCatalogStoreTests.swift */; };
+		9393922C3C2DD3AC80FA29B5 /* AIDataConsentSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8142BA18CBC055A6D2B5EB /* AIDataConsentSheet.swift */; };
 		939FDE3812DD79DE87394D2F /* DirectHermesAccessCredentialsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFA7E4FAA3985E6559B42726 /* DirectHermesAccessCredentialsTests.swift */; };
 		93A85797C97F297A3DEC4EF7 /* WatchChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAC0AA2B511B57914C6D27F1 /* WatchChatView.swift */; };
 		9421CB544618B69706737591 /* VoiceModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 453E3551DA8DC888E2F2FB05 /* VoiceModel.swift */; };
@@ -2720,6 +2721,7 @@
 		CE0D46B41203E5ABB073CFB3 /* DeviceToolCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceToolCoordinator.swift; sourceTree = "<group>"; };
 		CE2D42C5A3A573D67E83CB3A /* CapabilitiesManagementModels+State.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CapabilitiesManagementModels+State.swift"; sourceTree = "<group>"; };
 		CE55F4616453540B7AC56768 /* TeamCallTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamCallTests.swift; sourceTree = "<group>"; };
+		CE8142BA18CBC055A6D2B5EB /* AIDataConsentSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIDataConsentSheet.swift; sourceTree = "<group>"; };
 		CE87973F7A7838E224AE097E /* ResponseHapticsSettingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResponseHapticsSettingsTests.swift; sourceTree = "<group>"; };
 		CEA7CE183DB9ED1863F32864 /* WorkflowsEditingUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowsEditingUITests.swift; sourceTree = "<group>"; };
 		CEC754C6DAA63826BCB4CC60 /* WorkspaceManagementModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceManagementModels.swift; sourceTree = "<group>"; };
@@ -3788,6 +3790,7 @@
 		90B0DAF2CF3AD177F76ACA6F /* Hosts */ = {
 			isa = PBXGroup;
 			children = (
+				CE8142BA18CBC055A6D2B5EB /* AIDataConsentSheet.swift */,
 				2A0A1C71EA4895F05F28839F /* BighelpConfiguredHostsView.swift */,
 				1B4E385A914CB050D5C4ADC7 /* BighelpHostRegistry.swift */,
 				3CEE2FDBEA76CC233FEB5E2A /* DirectHostNotificationClient.swift */,
@@ -5622,6 +5625,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9393922C3C2DD3AC80FA29B5 /* AIDataConsentSheet.swift in Sources */,
 				8D991B82F85FEB62610C434C /* AIProviderBrand.swift in Sources */,
 				CF9D19C6AE5D6A7C76176688 /* AchievementsModels.swift in Sources */,
 				78ED012B91C715FBA95C572B /* AchievementsStore.swift in Sources */,

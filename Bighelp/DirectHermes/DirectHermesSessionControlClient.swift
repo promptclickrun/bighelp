@@ -132,6 +132,20 @@ final class DirectHermesSessionControlClient: SessionRuntimeControlConfirming, S
         return SessionFastMode(mode: mode, unavailableReason: nil)
     }
 
+    /// Sets the session's own YOLO flag (Hermes' `config.set yolo`, session scope). Hermes
+    /// answers "1" or "0", so the reply confirms it; there is no separate read.
+    func setYOLO(_ on: Bool, sessionID: String, agentID: String) async throws {
+        let coordinate = try coordinate(sessionID: sessionID, agentID: agentID)
+        guard let runtimeID = coordinate.runtimeSessionID else { throw WorkspaceClientError.invalidRequest }
+        let response = try await perform(.configSet, payload: [
+            "profile": .string(agentID), "session_id": .string(runtimeID),
+            "key": .string("yolo"), "value": .string(on ? "on" : "off"), "scope": .string("session")
+        ], sessionID: sessionID, coordinate: coordinate, capability: .approvalsRespond)
+        guard response["key"]?.string == "yolo", response["value"]?.string == (on ? "1" : "0") else {
+            throw WorkspaceClientError.outcomeUnknown
+        }
+    }
+
     func openPicker(_ request: BighelpLinkPickerOpenRequest) async throws -> BighelpLinkPicker {
         guard BighelpLinkPickerValidation.opaque(request.requestID, minimum: 16, maximum: 128),
               request.sentAt > 0 else {

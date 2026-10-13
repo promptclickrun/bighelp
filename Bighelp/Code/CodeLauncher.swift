@@ -5,6 +5,9 @@ import Foundation
 protocol CodeSessionStarting {
     /// A new chat with `agentID` working in exactly `folder`, on `runtime`'s model choices; returns its session ID.
     func startSession(agentID: String, folder: String, title: String, runtime: CodeRuntimeChoice) async throws -> String
+    /// Applies `mode`'s session settings (YOLO) before the first message.
+    func apply(_ mode: CodeSessionMode, toSession sessionID: String, agentID: String) async throws
+    /// Sends `message` as the next turn. A leading slash command runs as a command.
     func send(_ message: String, toSession sessionID: String) async throws
 }
 
@@ -20,6 +23,10 @@ struct CodeLaunchRequest: Equatable, Sendable {
     /// New worktree: the new branch's name; nil names it from the message.
     let newBranch: String?
     var runtime = CodeRuntimeChoice()
+    var mode = CodeSessionMode.standard
+
+    /// What the session gets as its first message: Plan mode makes it `/plan …`.
+    var firstMessage: String { mode.firstMessage(message) }
 }
 
 enum CodeLaunchError: LocalizedError, Equatable {
@@ -36,8 +43,8 @@ enum CodeLaunchError: LocalizedError, Equatable {
 
 /// One Send: (1) make the worktree, or switch the local checkout's branch, with the
 /// host's own git routes, (2) start a session in that folder on the chosen model,
-/// (3) send the message. The session exists as soon as step 2 returns, so a failed
-/// send still leaves a session to open (`onSessionStarted`). `CodeHomeStore` runs
+/// (3) apply the mode and send the message. The session exists as soon as step 2
+/// returns, so a failed send still leaves a session to open (`onSessionStarted`). `CodeHomeStore` runs
 /// steps 1 and 2 of back-to-back sends one at a time (`start`): Hermes starts one new
 /// chat per agent at a time, and a worktree changes the repository the next one reads.
 @MainActor
@@ -53,7 +60,8 @@ struct CodeLauncher {
         let record = try await start(request, progress: progress)
         onSessionStarted(record)
         progress(.sending)
-        try await sessions.send(request.message, toSession: record.id)
+        try await sessions.apply(request.mode, toSession: record.id, agentID: request.agentID)
+        try await sessions.send(request.firstMessage, toSession: record.id)
         return record
     }
 
@@ -79,7 +87,7 @@ struct CodeLauncher {
                                                         runtime: request.runtime)
         return CodeSessionRecord(id: sessionID, agentID: request.agentID, projectID: request.project.id,
                                  projectName: request.project.name, title: title, folder: folder,
-                                 branch: branch, placement: request.placement, startedAt: .now)
+                                 branch: branch, placement: request.placement, startedAt: .now, mode: request.mode)
     }
 
     private func makeWorktree(_ request: CodeLaunchRequest,
@@ -91,7 +99,7 @@ struct CodeLauncher {
             guard !taken.contains(chosen) else { throw CodeLaunchError.branchExists(chosen) }
             branch = chosen
         } else {
-            branch = CodeBranchName.suggested(for: request.message, taken: taken)
+            branch = CodeBranchName.suggested(for: CodeSessionTitle.withoutCommand(request.message), taken: taken)
         }
         let base = request.branch.flatMap { name in snapshot.baseBranches.contains { $0.name == name } ? name : nil }
         let prepared = try git.prepare(.addWorktree(name: CodeBranchName.worktreeName(for: branch), branch: branch,
@@ -128,15 +136,39 @@ struct CodeChatSessionStarter: CodeSessionStarting {
         return try await catalog.createDirect(agentID: agentID, folder: folder, title: title, runtime: start).id
     }
 
+    func apply(_ mode: CodeSessionMode, toSession sessionID: String, agentID: String) async throws {
+        guard mode == .yolo else { return }
+        // Demo chats have no Hermes settings; their sample replies need no approvals.
+        guard features.hasNativeSessionControls else { return }
+        do {
+            try await features.setSessionYOLO(true, sessionID: sessionID, agentID: agentID)
+        } catch {
+            throw CodeStartError.yoloRefused
+        }
+    }
+
     func send(_ message: String, toSession sessionID: String) async throws {
         let chat = try BighelpShortcutWorkspace.chatModel(sessionID: sessionID, in: features)
         try await BighelpShortcutService.awaitTransportReady(chat)
-        if chat.nativeConversationClient != nil {
+        if chat.nativeConversationClient != nil, !message.hasPrefix("/") {
             try await chat.submitWithoutWaiting(message: message, attachments: [])
         } else {
-            // Demo chats have no host queue: they play their sample reply in place.
+            // A slash command takes the message box's own path, which runs it as a
+            // command (`/plan` expands to its planning prompt there). Demo chats have no
+            // host queue either: they play their sample reply in place.
+            await chat.slashCommandCatalog?.loadIfNeeded(for: message)
             chat.draft = message
             Task { await chat.send() }
+        }
+    }
+}
+
+enum CodeStartError: LocalizedError, Equatable {
+    case yoloRefused
+
+    var errorDescription: String? {
+        switch self {
+        case .yoloRefused: "Hermes didn't turn on YOLO for this session, so nothing was sent. Open it to try again."
         }
     }
 }

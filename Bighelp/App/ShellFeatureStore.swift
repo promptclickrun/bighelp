@@ -155,6 +155,25 @@ final class ShellFeatureStore {
     // views, and are retired when presentation resumes or the account changes.
     private var backgroundActivityProjections: [String: BackgroundActivityProjection] = [:]
 
+    // MARK: Bighelp IDE
+
+    /// True when sessions here have Hermes' own settings (a live host, not the demo).
+    var hasNativeSessionControls: Bool { sessionControlMessaging is any SessionYOLOControlling }
+
+    /// Turns a session's YOLO setting (no approval prompts) on or off; Bighelp IDE's YOLO mode.
+    func setSessionYOLO(_ on: Bool, sessionID: String, agentID: String) async throws {
+        guard let controls = sessionControlMessaging as? any SessionYOLOControlling else {
+            throw WorkspaceClientError.unavailable(.unsupportedOperation)
+        }
+        try await controls.setYOLO(on, sessionID: sessionID, agentID: agentID)
+    }
+
+    /// The slash commands a new session of `agentID` working in `folder` will have, before it exists.
+    func draftSlashCommands(agentID: String, folder: String?) async throws -> [SlashCommandDescriptor] {
+        guard let slashCommandCatalogClient else { return [] }
+        return try await slashCommandCatalogClient.draftCatalog(agentID: agentID, folder: folder)
+    }
+
     func setChatPresentationDeferred(_ deferred: Bool) {
         guard defersChatPresentation != deferred else { return }
         // Keep the batch open while mounted models publish their final

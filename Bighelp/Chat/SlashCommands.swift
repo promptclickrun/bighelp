@@ -158,6 +158,14 @@ struct SlashCommandIndex: Equatable, Sendable {
 @MainActor
 protocol SlashCommandCatalogClient: AnyObject {
     func catalog(sessionID: String, agentID: String) async throws -> [SlashCommandDescriptor]
+    /// The commands a new session would have, before it exists (Bighelp IDE's / list).
+    func draftCatalog(agentID: String, folder: String?) async throws -> [SlashCommandDescriptor]
+}
+
+extension SlashCommandCatalogClient {
+    func draftCatalog(agentID: String, folder: String?) async throws -> [SlashCommandDescriptor] {
+        throw WorkspaceClientError.unavailable(.unsupportedOperation)
+    }
 }
 
 /// Adapts Hermes' official `commands.catalog` response to the native composer
@@ -187,6 +195,14 @@ final class DirectHermesSlashCommandCatalogClient: SlashCommandCatalogClient {
             "profile": .string(profile),
         ])
         return try Self.decode(response)
+    }
+
+    /// Hermes binds a session-less catalog to the profile, and to `cwd` for project-local skills.
+    func draftCatalog(agentID: String, folder: String?) async throws -> [SlashCommandDescriptor] {
+        let profile = try DirectHermesCoreRequestScope.profile(agentID)
+        var payload: [String: BighelpJSONValue] = ["profile": .string(profile)]
+        if let folder, !folder.isEmpty, folder.utf8.count <= 4_096 { payload["cwd"] = .string(folder) }
+        return try Self.decode(try await scope.perform(.commandsCatalog, payload))
     }
 
     private static func decode(_ response: [String: BighelpJSONValue]) throws -> [SlashCommandDescriptor] {
@@ -330,6 +346,10 @@ final class WorkspaceSlashCommandCatalogProxy: SlashCommandCatalogClient {
     func catalog(sessionID: String, agentID: String) async throws -> [SlashCommandDescriptor] {
         try await box.value().catalog(sessionID: sessionID, agentID: agentID)
     }
+
+    func draftCatalog(agentID: String, folder: String?) async throws -> [SlashCommandDescriptor] {
+        try await box.value().draftCatalog(agentID: agentID, folder: folder)
+    }
 }
 
 @MainActor
@@ -446,6 +466,30 @@ final class FixtureSlashCommandCatalogClient: SlashCommandCatalogClient {
                 source: .core,
                 requiresArguments: false
             ),
+            SlashCommandDescriptor(
+                name: "plan",
+                description: "Write a plan before changing anything",
+                category: "Workflow",
+                argsHint: "[task]",
+                aliases: [],
+                argumentMode: .text,
+                source: .core,
+                requiresArguments: false
+            ),
+            SlashCommandDescriptor(
+                name: "review",
+                description: "Review the changes on this branch",
+                category: "Skills",
+                argsHint: "",
+                aliases: [],
+                argumentMode: .text,
+                source: .skill,
+                requiresArguments: false
+            ),
         ]
+    }
+
+    func draftCatalog(agentID: String, folder: String?) async throws -> [SlashCommandDescriptor] {
+        try await catalog(sessionID: "", agentID: agentID)
     }
 }

@@ -1,8 +1,9 @@
 import Foundation
 
 /// Demo mode's git: each sample project's main folder on `main`, plus the worktrees
-/// Bighelp IDE makes. A new worktree comes with two sample changed files, so Changes
-/// and Ship have something to show; commit, push and PR move them along.
+/// Bighelp IDE makes. A new worktree comes with three sample changed files (one is the
+/// plan `DemoHostTextFiles` serves), so Changes, its Markdown preview and Ship have
+/// something to show; commit, push and PR move them along.
 @MainActor
 final class DemoCodeGit: StockGitManaging {
     private struct Folder {
@@ -131,6 +132,7 @@ final class DemoCodeGit: StockGitManaging {
     private static let sampleChanges = [
         StockGitReviewFile(path: "Bighelp/App/BighelpIncomingLinkCenter.swift", added: 18, removed: 4, status: "M", isStaged: false),
         StockGitReviewFile(path: "BighelpTests/IncomingLinkQueueTests.swift", added: 21, removed: 0, status: "A", isStaged: false),
+        StockGitReviewFile(path: DemoHostTextFiles.planPath, added: 19, removed: 0, status: "A", isStaged: false),
     ]
 
     private static func sampleDiff(_ file: String) -> String {

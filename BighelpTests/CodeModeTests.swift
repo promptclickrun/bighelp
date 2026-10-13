@@ -142,6 +142,107 @@ struct CodeModeTests {
         #expect(reopened.sessions.count == 2)
     }
 
+    /// Plan mode starts the session with Hermes' own `/plan`; a message that is already a command keeps it.
+    @Test func planModeSendsTheFirstMessageThroughPlan() async throws {
+        let sessions = RecordingCodeSessions()
+        var plan = request(placement: .local)
+        plan.mode = .plan
+        let command = CodeLaunchRequest(message: "/review the branch", agentID: plan.agentID, project: plan.project,
+                                        placement: .local, branch: nil, newBranch: nil, mode: .plan)
+
+        let first = try await CodeLauncher(git: RecordingCodeGit(), sessions: sessions).launch(
+            plan, progress: { _ in }, onSessionStarted: { _ in })
+        let second = try await CodeLauncher(git: RecordingCodeGit(), sessions: sessions).launch(
+            command, progress: { _ in }, onSessionStarted: { _ in })
+
+        #expect(sessions.sent == ["/plan Fix the widget tap@\(first.id)", "/review the branch@\(second.id)"])
+        #expect(first.mode == .plan)
+        // The command isn't part of the session's name.
+        #expect(second.title == "the branch")
+        #expect(CodeSessionTitle.from("/plan Add a loading state") == "Add a loading state")
+        #expect(CodeSessionTitle.from("/compress") == "/compress")
+    }
+
+    /// YOLO is on for the session before its first message goes out.
+    @Test func yoloIsOnBeforeTheFirstMessage() async throws {
+        let sessions = RecordingCodeSessions()
+        var yolo = request(placement: .local)
+        yolo.mode = .yolo
+
+        let record = try await CodeLauncher(git: RecordingCodeGit(), sessions: sessions).launch(
+            yolo, progress: { _ in }, onSessionStarted: { _ in })
+
+        #expect(sessions.events == ["start", "apply yolo@\(record.id)", "send Fix the widget tap@\(record.id)"])
+    }
+
+    /// When Hermes refuses YOLO, nothing is sent, and the session's card still opens it.
+    @Test func aRefusedYOLOSendsNothingAndKeepsTheSession() async throws {
+        let suiteName = #function
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let sessions = RecordingCodeSessions()
+        sessions.applyError = CodeStartError.yoloRefused
+        let store = CodeHomeStore(scopeID: "computer", agentID: "default", source: DemoCodeProjectSource(),
+                                  git: { RecordingCodeGit() }, starter: sessions, defaults: defaults)
+        await store.load()
+        store.mode = .yolo
+
+        #expect(store.send("Fix the widget tap"))
+        for _ in 0..<100 where store.launches.first?.step.isFailed != true { try await Task.sleep(for: .milliseconds(20)) }
+
+        #expect(sessions.sent.isEmpty)
+        #expect(store.projectSessions.count == 1)
+        #expect(store.launches.first?.sessionID == store.projectSessions.first?.id)
+        #expect(store.launches.first?.step == .failed(CodeStartError.yoloRefused.errorDescription ?? ""))
+    }
+
+    /// The mode button stays as it was left, per computer.
+    @Test func theModeIsKeptPerComputer() {
+        let suiteName = #function
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = CodeHomeStore(scopeID: "computer", agentID: "default", source: DemoCodeProjectSource(),
+                                  git: { RecordingCodeGit() }, starter: RecordingCodeSessions(), defaults: defaults)
+        store.mode = .plan
+
+        let reopened = CodeHomeStore(scopeID: "computer", agentID: "default", source: DemoCodeProjectSource(),
+                                     git: { RecordingCodeGit() }, starter: RecordingCodeSessions(), defaults: defaults)
+        let other = CodeHomeStore(scopeID: "other", agentID: "default", source: DemoCodeProjectSource(),
+                                  git: { RecordingCodeGit() }, starter: RecordingCodeSessions(), defaults: defaults)
+        #expect(reopened.mode == .plan)
+        #expect(other.mode == .standard)
+    }
+
+    /// The / list loads once for an agent and project, again after either changes.
+    @Test func commandsLoadOncePerAgentAndProject() async {
+        let suiteName = #function
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        var loads: [String] = []
+        let store = CodeHomeStore(
+            scopeID: "computer", agentID: "default", source: DemoCodeProjectSource(),
+            git: { RecordingCodeGit() }, starter: RecordingCodeSessions(),
+            loadCommands: { agent, folder in
+                loads.append("\(agent)@\(folder ?? "-")")
+                return [SlashCommandDescriptor(name: "plan", description: "Plan", category: "Workflow", argsHint: "",
+                                               aliases: [], argumentMode: .text, source: .core, requiresArguments: false)]
+            },
+            defaults: defaults)
+        await store.load()
+        let folder = store.project?.folder ?? "-"
+
+        await store.loadCommandsIfNeeded()
+        await store.loadCommandsIfNeeded()
+        await store.selectAgent("coder")
+        await store.loadCommandsIfNeeded()
+
+        #expect(loads == ["default@\(folder)", "coder@\(store.project?.folder ?? "-")"])
+        #expect(store.commands.map(\.name) == ["plan"])
+    }
+
     private func request(placement: CodePlacement, newBranch: String? = nil) -> CodeLaunchRequest {
         CodeLaunchRequest(message: "Fix the widget tap", agentID: "default",
                           project: CodeProject(id: "app", name: "app", folder: "/Users/demo/code/app"),
@@ -183,6 +284,9 @@ private final class RecordingCodeGit: StockGitManaging {
 private final class RecordingCodeSessions: CodeSessionStarting {
     private(set) var started: [(id: String, folder: String, title: String)] = []
     private(set) var sent: [String] = []
+    /// Every call in order: "start", "apply <mode>@<id>", "send <message>@<id>".
+    private(set) var events: [String] = []
+    var applyError: Error?
     private(set) var runtimes: [CodeRuntimeChoice] = []
     /// The most session starts under way at the same moment.
     private(set) var mostAtOnce = 0
@@ -199,12 +303,19 @@ private final class RecordingCodeSessions: CodeSessionStarting {
         let id = "session-\(started.count + 1)"
         started.append((id, folder, title))
         runtimes.append(runtime)
+        events.append("start")
         return id
+    }
+
+    func apply(_ mode: CodeSessionMode, toSession sessionID: String, agentID: String) async throws {
+        if let applyError { throw applyError }
+        if mode != .standard { events.append("apply \(mode.rawValue)@\(sessionID)") }
     }
 
     func send(_ message: String, toSession sessionID: String) async throws {
         if let sendError { throw sendError }
         sent.append("\(message)@\(sessionID)")
+        events.append("send \(message)@\(sessionID)")
     }
 }
 
@@ -325,5 +436,92 @@ private final class WorktreeHost: DirectHermesRPC, DirectHermesAuthenticatedHTTP
         default:
             throw DirectHermesError.invalidResponse
         }
+    }
+}
+
+/// Markdown paths in IDE chats open the viewer; everything else stays plain text.
+struct HostFileLinkTests {
+    @Test func markdownPathsAreFoundAndWebAddressesAreNot() {
+        let text = "Saved .hermes/plans/2026-10-13_0915-usage.md and ~/notes/todo.md, see /Users/demo/app/README.markdown. "
+            + "Not https://example.com/guide.md, not data.md5 or README.mdx."
+        let found = HostFileLink.markdownPathRanges(in: text).map { String(text[$0]) }
+
+        #expect(found == [".hermes/plans/2026-10-13_0915-usage.md", "~/notes/todo.md", "/Users/demo/app/README.markdown"])
+    }
+
+    @Test func relativePathsResolveInsideTheSessionFolder() {
+        #expect(HostFileLink.resolve(".hermes/plans/a.md", in: "/repo/.worktrees/x") == "/repo/.worktrees/x/.hermes/plans/a.md")
+        #expect(HostFileLink.resolve("./docs/b.md", in: "/repo/") == "/repo/docs/b.md")
+        #expect(HostFileLink.resolve("/abs/c.md", in: "/repo") == "/abs/c.md")
+        #expect(HostFileLink.resolve("~/d.md", in: "/repo") == "~/d.md")
+    }
+
+    @Test func aLinkCarriesThePathBothWays() throws {
+        let url = try #require(HostFileLink.url(for: "docs/a plan & notes.md"))
+        #expect(HostFileLink.path(from: url) == "docs/a plan & notes.md")
+        #expect(HostFileLink.path(from: URL(string: "https://example.com/a.md")!) == nil)
+    }
+}
+
+/// The viewer never overwrites a file that changed on the computer without asking.
+@MainActor
+struct MarkdownFileModelTests {
+    @Test func saveWritesWhenTheFileIsUnchanged() async {
+        let files = FakeTextFiles(["/repo/plan.md": "# Plan"])
+        let model = MarkdownFileModel(path: "/repo/plan.md", access: files)
+        await model.load()
+        model.beginEditing()
+        model.draft = "# Plan\n\n1. Ship it"
+
+        #expect(await model.save())
+        #expect(files.contents["/repo/plan.md"] == "# Plan\n\n1. Ship it")
+        #expect(!model.isEditing)
+        #expect(model.file?.text == "# Plan\n\n1. Ship it")
+    }
+
+    @Test func aFileChangedOnTheComputerAsksFirst() async {
+        let files = FakeTextFiles(["/repo/plan.md": "# Plan"])
+        let model = MarkdownFileModel(path: "/repo/plan.md", access: files)
+        await model.load()
+        model.beginEditing()
+        model.draft = "# Mine"
+        files.contents["/repo/plan.md"] = "# Theirs"
+
+        #expect(await model.save() == false)
+        #expect(model.hasConflict)
+        #expect(files.contents["/repo/plan.md"] == "# Theirs")
+
+        #expect(await model.save(replacing: true))
+        #expect(files.contents["/repo/plan.md"] == "# Mine")
+    }
+
+    @Test func aLongFileOpensReadOnly() async {
+        let files = FakeTextFiles(["/repo/big.md": "# Big"], truncated: true)
+        let model = MarkdownFileModel(path: "/repo/big.md", access: files)
+        await model.load()
+        model.beginEditing()
+
+        #expect(!model.canEdit)
+        #expect(!model.isEditing)
+    }
+}
+
+@MainActor
+private final class FakeTextFiles: HostTextFileAccess {
+    var contents: [String: String]
+    let truncated: Bool
+
+    init(_ contents: [String: String], truncated: Bool = false) {
+        self.contents = contents
+        self.truncated = truncated
+    }
+
+    func read(_ path: String) async throws -> HostTextFile {
+        guard let text = contents[path] else { throw WorkspaceClientError.invalidRequest }
+        return HostTextFile(path: path, text: text, isTruncated: truncated, isBinary: false)
+    }
+
+    func write(_ path: String, text: String) async throws {
+        contents[path] = text
     }
 }

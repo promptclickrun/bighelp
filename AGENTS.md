@@ -200,6 +200,15 @@ change in both repos.
   title or description (they come from the commits); "Ask the agent to open it" sends the session a message.
 - Cards show only what the live chat or the session list says (`CodeChatStatusReader`): waiting prompts are
   "Needs you", running work shows its tool. Demo mode uses `DemoCodeProjectSource` and `DemoCodeGit`.
+- The mode button (`CodeSessionMode`) uses Hermes' own options: Plan sends the first message as `/plan …` (Hermes
+  writes `.hermes/plans/<date>-<slug>.md` and changes no code); YOLO sets the session's `yolo` config (session
+  scope, `setYOLO`) before the first message. A refused YOLO sends nothing and keeps the card.
+- A first message that starts with `/` takes the chat's own send path, which runs it as a command (`/plan` expands
+  to its planning prompt there); `submitWithoutWaiting` (`prompt.submit`) would send it as plain text. The `/` list
+  loads before the session exists: `commands.catalog` with `profile` and `cwd`, no `session_id`.
+- Markdown files open in `MarkdownFileSheet` through Hermes' `/api/fs/read-text` and `/api/fs/write-text`
+  (`HostTextFileAccess`; demo: `DemoHostTextFiles`). Save re-reads first and never overwrites a file that changed
+  without asking. IDE chats link Markdown paths (`HostFileLink`, `opensHostFiles`) against the session's folder.
 
 ### SwiftUI traps we've hit
 

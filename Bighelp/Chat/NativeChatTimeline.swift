@@ -534,6 +534,7 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             values.openURL = source.openURL
             values.openWiki = source.openWiki
             values.openGitHub = source.openGitHub
+            values.opensHostFiles = source.opensHostFiles
             values.chatCardInteractions = source.chatCardInteractions
             values.bighelpCardDataClient = source.bighelpCardDataClient
             values.bighelpSessionContentReader = source.bighelpSessionContentReader

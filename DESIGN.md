@@ -329,12 +329,24 @@ An opt-in second home for coding (Settings › Bighelp IDE; Bighelp Chat stays t
 Launchpad: filter chips (All, Running, Needs you, Ready), one card per session (a still status dot, its name, its
 branch in code type, what it's doing now) and a message box pinned at the bottom in place of the bottom bar. Under
 the box, three chips choose the project, where it runs (New worktree, the default, or Local checkout) and the
-branch; they stay set, so each send starts the next session at once and adds its card. Inside the box, the agent
-and a model chip (model, reasoning, fast mode) set what new sessions run on. A card opens the session's ordinary
+branch; they stay set, so each send starts the next session at once and adds its card. Inside the box, the agent's
+face, a model chip (model, reasoning, fast mode; a long name truncates, never the buttons beside it) and a mode
+button (Default, Plan, YOLO) set what new sessions run on. A card opens the session's ordinary
 chat, where steer, queue and approvals work as in every chat; it has no bottom bar while Bighelp IDE is the home.
 Touch and hold a card (right-click on the Mac) for Changes: uncommitted files, then the branch's commits, and Ship
 (commit, push, pull request). ☰ keeps one menu: a Bighelp Chat / Bighelp IDE switch on top, then Sessions, Projects, Pull
 requests, Worktrees, Kanban and Settings. Nothing animates on the cards.
+
+Markdown files open rendered, never as raw text: from Changes (a Preview tab beside the diff) and from paths in an
+IDE chat's messages, which are links. Edit shows the text; Save asks before replacing a file that changed meanwhile.
+
+### Lists over the message box
+
+The `/` list (every chat, and the IDE's message box) and the `#` list share one look (`BighelpSuggestionList`): one
+header line (filters or a title, the match count), then rows of an icon, the name after its `/` or `#` in the
+action color, one line of detail, and a small capitals tag (SKILL, COMMAND, NEEDS YOU, OPEN). The list takes the
+room between the top bar and the message box, up to about eight rows (about five with the iPhone keyboard up), and
+shrinks to fit a short list. Hold a row (right-click on the Mac) for its details.
 
 ## Mac pointer and keyboard
 

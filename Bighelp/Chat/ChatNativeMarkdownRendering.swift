@@ -13,6 +13,8 @@ struct ChatNativeMarkdownStyle {
     /// Interim agent messages render slightly smaller than the answer.
     var textScale: CGFloat = 1
     var mentionIdentities: [ChatMentionIdentity] = []
+    /// Markdown file paths become links that open the viewer (Bighelp IDE chats).
+    var linksMarkdownFiles = false
 }
 
 /// One rendered revision per native text view. The cache never crosses a
@@ -27,9 +29,11 @@ final class ChatNativeMarkdownRenderCache {
         let typography: BighelpThemeTypography
         let colors: [CGColor]
         let mentionIdentities: [ChatMentionIdentity]
+        let linksMarkdownFiles: Bool
 
         init(_ style: ChatNativeMarkdownStyle) {
             mentionIdentities = style.mentionIdentities
+            linksMarkdownFiles = style.linksMarkdownFiles
             lineSpacing = style.proseLineSpacing
             textScale = style.textScale
             typeface = style.theme.typeface
@@ -313,6 +317,7 @@ enum ChatNativeMarkdownAttributedBuilder {
         }
 
         ChatMentionRendering.apply(to: result, identities: style.mentionIdentities, traits: style.traitCollection)
+        if style.linksMarkdownFiles { HostFileLink.addLinks(to: result, color: style.accent) }
         return result
     }
 

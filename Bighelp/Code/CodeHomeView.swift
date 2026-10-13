@@ -6,6 +6,7 @@ struct CodeHomeContext {
     let store: CodeHomeStore
     let status: any CodeSessionStatusReading
     let agents: [AgentProfile]
+    var avatarURL: (AgentProfile) -> URL? = { _ in nil }
     let onOpenSession: (CodeSessionRecord) -> Void
     let onOpenChanges: (CodeSessionRecord) -> Void
     let onPullRequests: () -> Void
@@ -55,7 +56,7 @@ struct CodeHomeView: View {
         .simultaneousGesture(TapGesture().onEnded { BighelpKeyboard.dismiss() })
         .background(BighelpThemeCanvas(theme: theme).ignoresSafeArea())
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            CodeComposer(store: store, agents: context.agents, onWorktrees: context.onWorktrees)
+            CodeComposer(store: store, agents: context.agents, avatarURL: context.avatarURL, onWorktrees: context.onWorktrees)
                 .frame(maxWidth: 720)
                 .frame(maxWidth: .infinity)
         }
@@ -224,6 +225,9 @@ struct CodeSessionCard: View {
             case .failed(let reason):
                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(theme.danger)
                 Text(reason).foregroundStyle(theme.secondaryText).lineLimit(2)
+            }
+            if let mode = session.mode, mode != .standard {
+                CodePill(text: mode.title, tint: mode == .yolo ? theme.warning : theme.action, systemImage: mode.systemImage)
             }
             Spacer(minLength: 0)
             // Worked out when the card draws; no ticking timer.

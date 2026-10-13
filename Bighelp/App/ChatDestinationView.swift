@@ -68,6 +68,8 @@ struct ChatDestinationView: View {
     let onOpenAgentSessions: (String) -> Void
     let onOpenApproval: (ApprovalRequest) -> Void
     let onForkMessage: ((String) -> Void)?
+    /// Bighelp IDE sessions: Markdown paths in messages open the viewer.
+    let hostFiles: HostFileLinkContext?
 
     private var currentAppearanceScope: SessionAppearanceScope? {
         let authority = model.nativeConversationClient?.nativeWorkspaceAuthority ?? appearanceAuthority
@@ -139,7 +141,8 @@ struct ChatDestinationView: View {
         onOpenAgentSessions: @escaping (String) -> Void,
         onOpenApproval: @escaping (ApprovalRequest) -> Void,
         onForkMessage: ((String) -> Void)?,
-        appearanceAuthority: WorkspaceAuthority? = nil
+        appearanceAuthority: WorkspaceAuthority? = nil,
+        hostFiles: HostFileLinkContext? = nil
     ) {
         self.model = model
         self.appState = appState
@@ -159,6 +162,7 @@ struct ChatDestinationView: View {
         self.sessionOrganizationHostID = sessionOrganizationHostID
         self.responseHapticsCoveredByRoot = responseHapticsCoveredByRoot
         self.appearanceAuthority = appearanceAuthority
+        self.hostFiles = hostFiles
         self.headerActions = ChatHeaderActions(newChat: onNewChat)
         self.onNewChat = onNewChat
         self.onStartSession = onStartSession
@@ -343,6 +347,8 @@ struct ChatDestinationView: View {
 
     private var chatCanvas: some View {
         referenceChatCanvas
+        // Inside the chat's own link action, so file links open the viewer and the rest reach it.
+        .hostFileLinks(hostFiles)
         .environment(\.openURL, chatOpenURLAction)
         .background(ResponseHapticsSurface(controller: responseHaptics))
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)

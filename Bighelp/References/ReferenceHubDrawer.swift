@@ -2,6 +2,8 @@ import SwiftUI
 
 /// One bottom-anchored suggestion surface, shared by compact and expanded source.
 /// Provider previews are inline, so browsing never steals the native responder.
+/// One header line (filters, count, close), then rows in the same style as Bighelp
+/// IDE's lists (`BighelpSuggestionList`); the rows take the room above the message box.
 struct ReferenceHubDrawer: View {
     let hub: ReferenceHubStore
     let commands: SlashCommandCatalogModel?
@@ -10,11 +12,8 @@ struct ReferenceHubDrawer: View {
     var reservesResultsSpace = false
     @State private var inspectedCommand: SlashCommandDescriptor?
     @State private var inspectedSkill: HermesSkillSummary?
-    #if targetEnvironment(macCatalyst)
-    @State private var macResultsContentHeight: CGFloat = 0
-    @State private var macRoomAbove: CGFloat = 0
-    #endif
-    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @State private var resultsContentHeight: CGFloat = 0
+    @State private var roomAbove: CGFloat = 0
 
     @BighelpThemeReader private var theme
 
@@ -45,47 +44,7 @@ struct ReferenceHubDrawer: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if verticalSizeClass != .compact {
-                HStack(spacing: BighelpTokens.space8) {
-                    Text("Skills & commands").font(.bighelp(.headline))
-                    if hub.isLoading || hub.isResolving || commands?.isLoading == true { ProgressView().accessibilityLabel("Loading skills and commands") }
-                    Spacer(minLength: 0)
-                    #if targetEnvironment(macCatalyst)
-                    Text("↑ ↓ to move, Return to choose, Esc to close")
-                        .font(.bighelp(.caption)).foregroundStyle(theme.secondaryText)
-                        .lineLimit(1)
-                        .accessibilityHidden(true)
-                    #endif
-                    Button("Dismiss references", systemImage: "xmark") { hub.dismiss() }
-                        .labelStyle(.iconOnly)
-                        .frame(width: 44, height: 44)
-                        .accessibilityIdentifier("reference-hub.dismiss")
-                }
-            }
-            ScrollView(.horizontal) {
-                HStack(spacing: BighelpTokens.space8) {
-                    if verticalSizeClass == .compact {
-                        Button("Dismiss references", systemImage: "xmark") { hub.dismiss() }
-                            .labelStyle(.iconOnly).frame(width: 44, height: 44)
-                            .accessibilityIdentifier("reference-hub.dismiss")
-                        if hub.isLoading || hub.isResolving || commands?.isLoading == true { ProgressView().accessibilityLabel("Loading skills and commands") }
-                    }
-                    ForEach([ReferenceCategory.skills, .commands], id: \.rawValue) { category in
-                        Button(category.label) {
-                            inspectedCommand = nil
-                            inspectedSkill = nil
-                            hub.selectCategory(category)
-                        }
-                        .font(.bighelp(.subheadline).weight(hub.category == category ? .semibold : .regular))
-                        .padding(.horizontal, BighelpTokens.space12)
-                        .frame(minHeight: 44)
-                        .background(hub.category == category ? theme.raisedSurface : theme.surface, in: .capsule)
-                        .accessibilityAddTraits(hub.category == category ? .isSelected : [])
-                        .accessibilityIdentifier("reference-hub.filter.\(category.rawValue)")
-                    }
-                }
-            }
-            .scrollIndicators(.hidden)
+            header
             Divider()
             ScrollViewReader { proxy in
                 ScrollView {
@@ -106,9 +65,7 @@ struct ReferenceHubDrawer: View {
                         }
                     }
                     .padding(.vertical, BighelpTokens.space8)
-                    #if targetEnvironment(macCatalyst)
-                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { macResultsContentHeight = $0 }
-                    #endif
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { resultsContentHeight = $0 }
                 }
                 .dismissesKeyboardOnScroll(false)
                 .onChange(of: hub.keyboard.highlightedID) { _, id in
@@ -116,15 +73,7 @@ struct ReferenceHubDrawer: View {
                     proxy.scrollTo(id)
                 }
             }
-            #if targetEnvironment(macCatalyst)
-            .frame(minHeight: min(macResultsHeight, 120), maxHeight: macResultsHeight)
-            #else
-            .frame(
-                minHeight: reservesResultsSpace ? (verticalSizeClass == .compact ? 60 : 120) : nil,
-                maxHeight: reservesResultsSpace ? (verticalSizeClass == .compact ? 60 : 120)
-                    : (verticalSizeClass == .compact ? 60 : 240)
-            )
-            #endif
+            .frame(minHeight: reservesResultsSpace ? min(resultsHeight, 120) : nil, maxHeight: resultsHeight)
         }
         .padding(.horizontal, BighelpTokens.space12)
         .foregroundStyle(theme.primaryText)
@@ -150,10 +99,10 @@ struct ReferenceHubDrawer: View {
             inspectedCommand = nil
             inspectedSkill = nil
         }
-        #if targetEnvironment(macCatalyst)
         // The drawer's bottom edge sits on the message box, so its height in
         // the window is the room left above the message box.
-        .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxY } action: { macRoomAbove = $0 }
+        .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxY } action: { roomAbove = $0 }
+        #if targetEnvironment(macCatalyst)
         .onChange(of: keyboardRows, initial: true) { _, rows in
             hub.keyboard.publish(rows: rows.ids, isInspecting: rows.isInspecting)
         }
@@ -171,14 +120,56 @@ struct ReferenceHubDrawer: View {
         #endif
     }
 
-    #if targetEnvironment(macCatalyst)
-    /// Results get about half the room above the message box (at most 440 pt,
-    /// enough for eight or nine rows) and shrink to fit a short list.
-    private var macResultsHeight: CGFloat {
-        let cap = min(max(macRoomAbove * 0.5, 200), 440)
-        return min(max(macResultsContentHeight, 60), cap)
+    /// One line: the filters, the count, then close. The old title row and filter row took 88 pt.
+    private var header: some View {
+        HStack(spacing: BighelpTokens.space8) {
+            ForEach([ReferenceCategory.skills, .commands], id: \.rawValue) { category in
+                Button(category.label) {
+                    inspectedCommand = nil
+                    inspectedSkill = nil
+                    hub.selectCategory(category)
+                }
+                .font(.bighelp(.subheadline).weight(hub.category == category ? .semibold : .regular))
+                .padding(.horizontal, BighelpTokens.space12)
+                .frame(minHeight: BighelpTokens.scaled(32))
+                .background(hub.category == category ? theme.raisedSurface : theme.surface, in: .capsule)
+                .contentShape(.capsule)
+                .accessibilityAddTraits(hub.category == category ? .isSelected : [])
+                .accessibilityIdentifier("reference-hub.filter.\(category.rawValue)")
+            }
+            if hub.isLoading || hub.isResolving || commands?.isLoading == true {
+                ProgressView().controlSize(.small).accessibilityLabel("Loading skills and commands")
+            }
+            Spacer(minLength: 0)
+            #if targetEnvironment(macCatalyst)
+            Text("↑ ↓ to move, Return to choose, Esc to close")
+                .font(.bighelp(.caption)).foregroundStyle(theme.secondaryText)
+                .lineLimit(1)
+                .accessibilityHidden(true)
+            #else
+            let count = hub.results.count + matchingCommands.count + matchingSkills.count
+            if count > 0, hub.preview == nil, inspectedCommand == nil, inspectedSkill == nil {
+                Text(count == 1 ? "1 match" : "\(count) matches")
+                    .font(.bighelp(.footnote))
+                    .foregroundStyle(theme.tertiaryText)
+            }
+            #endif
+            Button("Dismiss references", systemImage: "xmark") { hub.dismiss() }
+                .labelStyle(.iconOnly)
+                .frame(width: 44, height: 44)
+                .accessibilityIdentifier("reference-hub.dismiss")
+        }
     }
-    #endif
+
+    /// Up to about eight rows, inside the room between the top bar and the message box
+    /// (about five with the keyboard up on iPhone), shrinking to fit a short list.
+    private var resultsHeight: CGFloat {
+        let row = BighelpTokens.scaled(56)
+        let clearance: CGFloat = BighelpPlatform.isMac ? 60 : 110
+        let room = max(roomAbove - clearance - BighelpTokens.scaled(48), row * 1.2)
+        let cap = min(room, row * 8)
+        return min(max(resultsContentHeight, row), cap)
+    }
 
     /// The rows ↑ and ↓ move through, top to bottom; none while a preview shows.
     private var keyboardRows: ReferenceHubKeyboardRows {
@@ -229,23 +220,20 @@ struct ReferenceHubDrawer: View {
             .modifier(ReferenceHubRowChrome(id: Self.keyboardID(result), highlightedID: hub.keyboard.highlightedID))
         }
         ForEach(matchingCommands) { command in
-            HStack(spacing: 8) {
-                Button { hub.insertCatalogToken(name: command.name) } label: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("/\(command.name)").font(.bighelp(.body).weight(.medium))
-                        Text(command.description).font(.bighelp(.caption)).foregroundStyle(theme.secondaryText)
-                    }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                }
-                .buttonStyle(.plain)
-                .accessibilityHint("Insert text and continue typing. Does not execute this command.")
-                .accessibilityIdentifier("reference-hub.command.\(command.name)")
-                Button("Inspect /\(command.name)", systemImage: "info.circle") {
-                    hub.beginLocalInspection()
-                    inspectedCommand = command
-                }
-                    .labelStyle(.iconOnly).frame(width: 44, height: 44)
-                    .accessibilityIdentifier("reference-hub.inspect-command.\(command.name)")
+            let inspect = {
+                hub.beginLocalInspection()
+                inspectedCommand = command
             }
+            Button { hub.insertCatalogToken(name: command.name) } label: {
+                ReferenceHubSuggestionRow(systemImage: command.source == .skill ? "wand.and.stars" : "command",
+                                          sigil: "/", name: command.name, detail: command.description,
+                                          tag: command.source == .skill ? "Skill" : "Command")
+            }
+            .buttonStyle(.plain)
+            .contextMenu { Button("Details", systemImage: "info.circle", action: inspect) }
+            .accessibilityAction(named: "Details", inspect)
+            .accessibilityHint("Insert text and continue typing. Does not execute this command.")
+            .accessibilityIdentifier("reference-hub.command.\(command.name)")
             .modifier(ReferenceHubRowChrome(id: Self.keyboardID(command), highlightedID: hub.keyboard.highlightedID))
         }
         ForEach(matchingSkills) { skill in
@@ -253,10 +241,8 @@ struct ReferenceHubDrawer: View {
                 hub.beginLocalInspection()
                 inspectedSkill = skill
             } label: {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(skill.name).font(.bighelp(.body))
-                    Text(skill.description).font(.bighelp(.caption)).foregroundStyle(theme.secondaryText)
-                }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                ReferenceHubSuggestionRow(systemImage: "wand.and.stars", sigil: "", name: skill.name,
+                                          detail: skill.description, tag: "Skill")
             }.buttonStyle(.plain)
             .modifier(ReferenceHubRowChrome(id: Self.keyboardID(skill), highlightedID: hub.keyboard.highlightedID))
         }
@@ -321,6 +307,38 @@ struct ReferenceHubDrawer: View {
             Button("Back to results") { hub.closePreview() }.frame(minHeight: 44)
         }
     }
+}
+
+/// A command or skill row: an icon, the name after its sigil, one line, and a tag.
+private struct ReferenceHubSuggestionRow: View {
+    let systemImage: String
+    let sigil: String
+    let name: String
+    let detail: String
+    let tag: String
+
+    var body: some View {
+        HStack(spacing: BighelpTokens.space12) {
+            Image(systemName: systemImage)
+                .font(.bighelp(.body))
+                .frame(width: BighelpTokens.scaled(28))
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(Text(sigil).foregroundStyle(theme.action))\(name)")
+                    .font(.bighelp(.body).weight(.semibold))
+                    .lineLimit(1)
+                Text(detail)
+                    .font(.bighelp(.subheadline))
+                    .foregroundStyle(theme.secondaryText)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            BighelpSuggestionTag(text: tag)
+        }
+        .frame(minHeight: BighelpTokens.scaled(48))
+        .contentShape(.rect)
+    }
+
+    @BighelpThemeReader private var theme
 }
 
 struct ReferenceHubKeyboardRows: Equatable {

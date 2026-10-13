@@ -31,6 +31,48 @@ enum CodePlacement: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// How a new Bighelp IDE session works (the message box's mode button). Each is a
+/// Hermes option: Plan sends the first message through `/plan`, which writes a
+/// Markdown plan and changes no code; YOLO turns on the session's own YOLO
+/// setting (no approval prompts) before the first message.
+enum CodeSessionMode: String, Codable, CaseIterable, Identifiable, Sendable {
+    case standard = "default"
+    case plan
+    case yolo
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .standard: "Default"
+        case .plan: "Plan"
+        case .yolo: "YOLO"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .standard: "Asks before risky commands, as usual."
+        case .plan: "Writes a plan first. Changes no code."
+        case .yolo: "Runs commands without asking."
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .standard: "hand.raised"
+        case .plan: "list.bullet.clipboard"
+        case .yolo: "bolt"
+        }
+    }
+
+    /// The first message as Hermes gets it. A message that is already a slash command keeps it.
+    func firstMessage(_ message: String) -> String {
+        guard self == .plan, !message.hasPrefix("/") else { return message }
+        return "/plan " + message
+    }
+}
+
 /// A project Bighelp IDE can start sessions in: a Hermes project with one main folder.
 struct CodeProject: Identifiable, Equatable, Sendable {
     let id: String
@@ -62,6 +104,8 @@ struct CodeSessionRecord: Codable, Identifiable, Equatable, Sendable {
     let branch: String?
     let placement: CodePlacement
     let startedAt: Date
+    /// Nil on cards saved before the mode button.
+    var mode: CodeSessionMode?
 }
 
 /// A send that hasn't become a session yet, or couldn't.
@@ -72,6 +116,11 @@ struct CodeLaunch: Identifiable, Equatable, Sendable {
         case startingSession
         case sending
         case failed(String)
+
+        var isFailed: Bool {
+            if case .failed = self { return true }
+            return false
+        }
     }
 
     let id: UUID
@@ -119,9 +168,11 @@ enum CodeSessionFilter: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// A session's name from the message that starts it: its first line, trimmed.
+/// A session's name from the message that starts it: its first line, trimmed, without
+/// a leading slash command ("/plan Add a loading state" is "Add a loading state").
 enum CodeSessionTitle {
     static func from(_ message: String) -> String {
+        let message = withoutCommand(message)
         let line = message.split(whereSeparator: \.isNewline).first.map(String.init) ?? message
         let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count > maximumLength else { return trimmed.isEmpty ? "Coding session" : trimmed }
@@ -129,6 +180,14 @@ enum CodeSessionTitle {
     }
 
     private static let maximumLength = 80
+
+    /// The text after a leading `/command`, or the message itself; a bare command stays.
+    static func withoutCommand(_ message: String) -> String {
+        let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasPrefix("/"), let space = trimmed.firstIndex(where: \.isWhitespace) else { return trimmed }
+        let rest = trimmed[space...].trimmingCharacters(in: .whitespacesAndNewlines)
+        return rest.isEmpty ? trimmed : rest
+    }
 }
 
 /// The model, reasoning and fast mode new sessions start with (the message box's

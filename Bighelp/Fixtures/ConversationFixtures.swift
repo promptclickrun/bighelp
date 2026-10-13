@@ -31,6 +31,15 @@ class ConversationFixtureClient: AttachmentConversationClient, CompactingConvers
     func send(message: String, conversationID: String) async throws -> ConversationResponse {
         guard !shouldFail else { throw ConversationFixtureError.unavailable }
 
+        // Bighelp IDE's Plan mode: the demo "writes" the plan `DemoHostTextFiles` serves.
+        if message.hasPrefix("/plan") {
+            return ConversationResponse(items: [
+                assistantItem(
+                    conversationID: conversationID,
+                    content: .message("I wrote the plan to `\(DemoHostTextFiles.planPath)`. It has three steps and two tests. Want me to start on it?")
+                )
+            ])
+        }
         return ConversationResponse(items: [
             assistantItem(
                 conversationID: conversationID,

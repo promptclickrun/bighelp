@@ -19,6 +19,11 @@ final class CodeHomeStore {
     var newBranchName: String?
     /// The model chip: model, reasoning and fast mode for new sessions.
     var runtime = CodeRuntimeChoice() { didSet { save() } }
+    /// The mode button: Default, Plan or YOLO for new sessions.
+    var mode = CodeSessionMode.standard { didSet { save() } }
+    /// The slash commands a new session will have, for the message box's / list.
+    private(set) var commands: [SlashCommandDescriptor] = []
+    private(set) var commandsError: String?
     /// The selected project's main folder, as git sees it now.
     private(set) var git: StockGitSnapshot?
     private(set) var isLoading = false
@@ -34,6 +39,10 @@ final class CodeHomeStore {
     @ObservationIgnored let gitClient: @MainActor () throws -> any StockGitManaging
     @ObservationIgnored private let starter: any CodeSessionStarting
     @ObservationIgnored private let loadModels: @MainActor (String) async throws -> [BighelpLinkModelProvider]
+    @ObservationIgnored private let loadCommands: @MainActor (_ agentID: String, _ folder: String?) async throws
+        -> [SlashCommandDescriptor]
+    /// The agent and folder `commands` were loaded for.
+    @ObservationIgnored private var commandsKey: String?
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var gitRequest: UUID?
     /// The last send still making its folder and session; the next one waits for it.
@@ -43,12 +52,14 @@ final class CodeHomeStore {
          git: @escaping @MainActor () throws -> any StockGitManaging,
          starter: any CodeSessionStarting,
          loadModels: @escaping @MainActor (String) async throws -> [BighelpLinkModelProvider] = { _ in [] },
+         loadCommands: @escaping @MainActor (String, String?) async throws -> [SlashCommandDescriptor] = { _, _ in [] },
          defaults: UserDefaults = .standard) {
         self.scopeID = scopeID
         self.source = source
         gitClient = git
         self.starter = starter
         self.loadModels = loadModels
+        self.loadCommands = loadCommands
         self.defaults = defaults
         let saved = Self.saved(scopeID, in: defaults)
         self.agentID = saved?.agentID ?? agentID
@@ -56,6 +67,7 @@ final class CodeHomeStore {
         placement = saved?.placement ?? .newWorktree
         branch = saved?.branch
         runtime = saved?.runtime ?? CodeRuntimeChoice()
+        mode = saved?.mode ?? .standard
         sessions = saved?.sessions ?? []
     }
 
@@ -147,6 +159,22 @@ final class CodeHomeStore {
         }
     }
 
+    /// Loads the / list for the agent and project once; a later call for the same pair does nothing.
+    func loadCommandsIfNeeded() async {
+        let key = agentID + "\n" + (project?.folder ?? "")
+        guard commandsKey != key else { return }
+        commandsKey = key
+        do {
+            commands = try await loadCommands(agentID, project?.folder)
+            commandsError = nil
+        } catch is CancellationError {
+            commandsKey = nil
+        } catch {
+            commandsKey = nil
+            commandsError = "Commands couldn't load from Hermes."
+        }
+    }
+
     /// The models this agent can use, grouped by provider.
     func modelProviders() async throws -> [BighelpLinkModelProvider] {
         try await loadModels(agentID)
@@ -179,7 +207,7 @@ final class CodeHomeStore {
         guard !message.isEmpty, let project, let git = try? gitClient() else { return false }
         let request = CodeLaunchRequest(message: message, agentID: agentID, project: project, placement: placement,
                                         branch: branch, newBranch: placement == .newWorktree ? newBranchName : nil,
-                                        runtime: runtime)
+                                        runtime: runtime, mode: mode)
         newBranchName = nil
         let launch = CodeLaunch(id: UUID(), title: CodeSessionTitle.from(message), projectID: project.id,
                                 placement: placement, branch: placement == .local ? branchTitle : nil,
@@ -197,7 +225,8 @@ final class CodeHomeStore {
                 let record = try await setup.value
                 self?.update(launch.id) { $0.sessionID = record.id; $0.step = .sending }
                 self?.remember(record)
-                try await starter.send(request.message, toSession: record.id)
+                try await starter.apply(request.mode, toSession: record.id, agentID: request.agentID)
+                try await starter.send(request.firstMessage, toSession: record.id)
                 self?.launches.removeAll { $0.id == launch.id }
             } catch {
                 let reason = (error as? LocalizedError)?.errorDescription ?? "Hermes couldn't start this session."
@@ -239,6 +268,7 @@ final class CodeHomeStore {
         var placement: CodePlacement
         var branch: String?
         var runtime: CodeRuntimeChoice?
+        var mode: CodeSessionMode?
         var sessions: [CodeSessionRecord]
     }
 
@@ -255,7 +285,7 @@ final class CodeHomeStore {
         var all: [String: Saved] = (defaults.data(forKey: Self.savedKey))
             .flatMap { try? JSONDecoder().decode([String: Saved].self, from: $0) } ?? [:]
         all[scopeID] = Saved(agentID: agentID, projectID: projectID, placement: placement, branch: branch,
-                             runtime: runtime, sessions: sessions)
+                             runtime: runtime, mode: mode, sessions: sessions)
         // A handful of computers at most; drop the oldest beyond that.
         if all.count > 16, let stale = all.keys.first(where: { $0 != scopeID }) { all[stale] = nil }
         if let data = try? JSONEncoder().encode(all) { defaults.set(data, forKey: Self.savedKey) }

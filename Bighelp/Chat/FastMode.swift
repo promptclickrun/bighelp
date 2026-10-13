@@ -54,6 +54,12 @@ struct SessionFastMode: Equatable, Sendable {
     var title: String { unavailableReason == nil ? (mode?.title ?? "Unknown") : "Unavailable" }
 }
 
+/// A session's own YOLO setting: Hermes runs its commands without approval prompts.
+@MainActor
+protocol SessionYOLOControlling {
+    func setYOLO(_ on: Bool, sessionID: String, agentID: String) async throws
+}
+
 @MainActor
 protocol SessionFastModeControlling {
     func loadFastMode(sessionID: String, agentID: String) async throws -> SessionFastMode

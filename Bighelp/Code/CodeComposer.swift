@@ -1,11 +1,14 @@
 import SwiftUI
 
-/// Bighelp IDE's message box. Under it, three chips choose the project, where the
-/// session works (a new worktree or the local checkout) and its branch; they stay
-/// set after each send, so the next message starts the next session right away.
+/// Bighelp IDE's message box. In it: the agent, the model chip (it truncates, never
+/// the buttons) and the mode button (Default, Plan, YOLO). Under it, three chips choose
+/// the project, where the session works (a new worktree or the local checkout) and its
+/// branch; they stay set after each send, so the next message starts the next session
+/// right away. Typing `/` first shows the new session's commands and skills.
 struct CodeComposer: View {
     @Bindable var store: CodeHomeStore
     let agents: [AgentProfile]
+    var avatarURL: (AgentProfile) -> URL? = { _ in nil }
     let onWorktrees: () -> Void
     @State private var message = ""
     @State private var isPickingProject = false
@@ -15,6 +18,10 @@ struct CodeComposer: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: BighelpTokens.space8) {
+            if isTypingCommand {
+                slashList
+                    .transition(.opacity)
+            }
             VStack(alignment: .leading, spacing: BighelpTokens.space8) {
                 TextField("Describe a change…", text: $message, axis: .vertical)
                     .font(.bighelp(.body))
@@ -23,11 +30,16 @@ struct CodeComposer: View {
                     .focused($isFocused)
                     .bighelpMacFieldArea()
                     .accessibilityIdentifier("code.composer.field")
-                HStack(spacing: BighelpTokens.space12) {
+                HStack(spacing: BighelpTokens.space8) {
                     agentMenu
+                        .fixedSize()
                     runtimeChip
+                        .layoutPriority(-1)
+                    modeMenu
+                        .fixedSize()
                     Spacer(minLength: 0)
                     sendButton
+                        .fixedSize()
                 }
             }
             .padding(.horizontal, BighelpTokens.space16)
@@ -58,6 +70,85 @@ struct CodeComposer: View {
             CodeRuntimePicker(store: store)
                 .bighelpSheetSize(.standard)
         }
+        .task(id: isTypingCommand) {
+            if isTypingCommand { await store.loadCommandsIfNeeded() }
+        }
+    }
+
+    // MARK: The / list
+
+    /// A `/` with no space after it yet: the list is open.
+    private var isTypingCommand: Bool {
+        message.hasPrefix("/") && !message.contains(where: \.isWhitespace)
+    }
+
+    private var matchingCommands: [SlashCommandDescriptor] {
+        SlashCommandIndex(commands: store.commands).suggestions(for: message).sorted { lhs, rhs in
+            if (lhs.source == .skill) != (rhs.source == .skill) { return lhs.source == .skill }
+            return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+        }
+    }
+
+    private var slashList: some View {
+        let commands = matchingCommands
+        return BighelpSuggestionList(
+            suggestions: commands.map { command in
+                BighelpSuggestion(id: command.name,
+                                  icon: .symbol(command.source == .skill ? "wand.and.stars" : "command"),
+                                  sigil: "/", name: command.name, detail: command.description,
+                                  tag: command.source == .skill ? "Skill" : "Command")
+            },
+            identifier: "code.slash",
+            emptyText: store.commandsError ?? (store.commands.isEmpty ? "Loading commands…" : "No matching commands."),
+            onPick: { picked in
+                guard let command = commands.first(where: { $0.name == picked.id }) else { return }
+                message = SlashCommandIndex(commands: [command]).draft(selecting: command)
+                isFocused = true
+            }
+        ) {
+            BighelpSuggestionHeader(systemImage: "command", title: "Commands and skills",
+                                    count: store.commands.isEmpty ? nil : commands.count,
+                                    isLoading: store.commands.isEmpty && store.commandsError == nil)
+        }
+    }
+
+    // MARK: The mode button
+
+    private var modeMenu: some View {
+        Menu {
+            Section("How should this session work?") {
+                ForEach(CodeSessionMode.allCases) { mode in
+                    Button {
+                        store.mode = mode
+                    } label: {
+                        Label(mode.title, systemImage: store.mode == mode ? "checkmark" : mode.systemImage)
+                        Text(mode.detail)
+                    }
+                    .accessibilityIdentifier("code.mode.\(mode.rawValue)")
+                }
+            }
+        } label: {
+            HStack(spacing: BighelpTokens.space4) {
+                Image(systemName: store.mode.systemImage)
+                Text(store.mode.title).lineLimit(1)
+            }
+            .font(.bighelp(.subheadline).weight(.semibold))
+            .foregroundStyle(modeTint)
+            .padding(.horizontal, BighelpTokens.space8)
+            .frame(minHeight: BighelpTokens.scaled(30))
+            .background(modeTint.opacity(store.mode == .standard ? 0 : 0.14), in: .capsule)
+            .contentShape(.capsule)
+        }
+        .accessibilityLabel("Mode: \(store.mode.title)")
+        .accessibilityIdentifier("code.composer.mode")
+    }
+
+    private var modeTint: Color {
+        switch store.mode {
+        case .standard: theme.secondaryText
+        case .plan: theme.action
+        case .yolo: theme.warning
+        }
     }
 
     /// The model, reasoning and fast mode new sessions start with.
@@ -65,6 +156,7 @@ struct CodeComposer: View {
         Button { isPickingRuntime = true } label: {
             Text(runtimeTitle)
                 .lineLimit(1)
+                .truncationMode(.tail)
                 .font(.bighelp(.subheadline).weight(.medium))
                 .foregroundStyle(theme.secondaryText)
                 .frame(minHeight: BighelpTokens.scaled(36))
@@ -115,16 +207,22 @@ struct CodeComposer: View {
                 }
             }
         } label: {
-            HStack(spacing: BighelpTokens.space4) {
-                Image(systemName: "person.crop.circle")
-                Text(agents.first { $0.id == store.agentID }?.name ?? "Agent").lineLimit(1)
+            HStack(spacing: 2) {
+                if let agent = agents.first(where: { $0.id == store.agentID }) {
+                    AgentLiveAvatar(agentID: agent.id, displayName: agent.name, imageURL: avatarURL(agent),
+                                    size: BighelpTokens.scaled(24), showsBadge: false)
+                } else {
+                    Image(systemName: "person.crop.circle")
+                }
+                Image(systemName: "chevron.down")
+                    .font(.bighelp(.caption2).weight(.semibold))
             }
             .font(.bighelp(.subheadline).weight(.medium))
             .foregroundStyle(theme.secondaryText)
             .frame(minHeight: BighelpTokens.scaled(36))
             .contentShape(.rect)
         }
-        .accessibilityLabel("Agent")
+        .accessibilityLabel("Agent: \(agents.first { $0.id == store.agentID }?.name ?? "none")")
         .accessibilityIdentifier("code.composer.agent")
     }
 

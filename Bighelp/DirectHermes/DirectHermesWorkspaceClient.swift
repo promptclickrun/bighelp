@@ -132,6 +132,34 @@ final class DirectHermesWorkspaceClient: WorkspaceOperationPerforming {
         return result
     }
 
+    /// Stock Hermes's text file preview (`/api/fs/read-text`, the first 512 KB) for the
+    /// Markdown viewer. Hermes checks the path; the app asks only for files the person opens.
+    func readTextFile(path: String, profileID: String, owner expectedOwner: WorkspaceOwner) async throws -> BighelpJSONValue {
+        try check(expectedOwner)
+        guard !path.isEmpty, path.utf8.count <= 4_096 else { throw WorkspaceClientError.invalidRequest }
+        let result = try await http.request(.init(
+            path: "/api/fs/read-text", method: .get,
+            query: [.init(name: "path", value: path), .init(name: "profile", value: profileID)],
+            maximumResponseBytes: 2_097_152))
+        try check(expectedOwner)
+        return result
+    }
+
+    /// Stock Hermes's text file save (`/api/fs/write-text`): it replaces a regular file in
+    /// one step and never makes folders. The viewer re-reads before saving to catch changes.
+    func writeTextFile(path: String, text: String, profileID: String,
+                       owner expectedOwner: WorkspaceOwner) async throws -> BighelpJSONValue {
+        try check(expectedOwner)
+        guard !path.isEmpty, path.utf8.count <= 4_096, text.utf8.count <= HostTextFile.maximumSaveBytes else {
+            throw WorkspaceClientError.invalidRequest
+        }
+        let result = try await http.request(.init(
+            path: "/api/fs/write-text", method: .post, query: [.init(name: "profile", value: profileID)],
+            body: ["path": .string(path), "content": .string(text)], maximumResponseBytes: 16_384))
+        try check(expectedOwner)
+        return result
+    }
+
     /// Explicit file deliveries use the existing stock managed-file policy.
     /// Never retry a refused image or broaden the host's configured root here.
     func readDeliveredFile(path: String, owner expectedOwner: WorkspaceOwner) async throws -> BighelpJSONValue {
@@ -259,7 +287,7 @@ final class DirectHermesWorkspaceClient: WorkspaceOperationPerforming {
         case .slashExecute:
             return try rpc(operation, payload, allowed: ["session_id", "profile", "command"], required: ["session_id", "command"])
         case .commandsCatalog:
-            return try rpc(operation, payload, allowed: ["session_id", "profile"])
+            return try rpc(operation, payload, allowed: ["session_id", "profile", "cwd"])
         case .modelOptions:
             return try rpc(operation, payload,
                            allowed: ["profile", "session_id", "explicit_only", "include_unconfigured", "refresh"])

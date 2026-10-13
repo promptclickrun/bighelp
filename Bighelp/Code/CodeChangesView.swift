@@ -11,6 +11,8 @@ final class CodeChangesModel {
     /// A worktree's committed changes against where its branch started.
     private(set) var branchFiles: [StockGitReviewFile] = []
     private(set) var diff: StockGitDiff?
+    /// A Markdown file's rendered view, beside its diff.
+    private(set) var preview: MarkdownFileModel?
     private(set) var isLoading = false
     private(set) var isShipping = false
     private(set) var shipStep: String?
@@ -20,13 +22,16 @@ final class CodeChangesModel {
     @ObservationIgnored private let main: StockGitProjectTarget
     @ObservationIgnored private let git: @MainActor () throws -> any StockGitManaging
     @ObservationIgnored private let sendToSession: @MainActor (String) async throws -> Void
+    @ObservationIgnored private let textFiles: (any HostTextFileAccess)?
 
     init(session: CodeSessionRecord, projectFolder: String, git: @escaping @MainActor () throws -> any StockGitManaging,
+         textFiles: (any HostTextFileAccess)? = nil,
          sendToSession: @escaping @MainActor (String) async throws -> Void) {
         self.session = session
         main = StockGitProjectTarget(profileID: session.agentID, projectID: session.projectID, cwd: projectFolder,
                                      projectName: session.projectName)
         self.git = git
+        self.textFiles = textFiles
         self.sendToSession = sendToSession
     }
 
@@ -73,6 +78,10 @@ final class CodeChangesModel {
     }
 
     func open(_ file: StockGitReviewFile) async {
+        preview = nil
+        if let textFiles, HostFileLink.isMarkdown(file.path), file.status != "D" {
+            preview = MarkdownFileModel(path: HostFileLink.resolve(file.path, in: session.folder), access: textFiles)
+        }
         do {
             let client = try git()
             if uncommittedPaths.contains(file.path) {
@@ -89,7 +98,10 @@ final class CodeChangesModel {
         }
     }
 
-    func closeDiff() { diff = nil }
+    func closeDiff() {
+        diff = nil
+        preview = nil
+    }
 
     /// Commits everything uncommitted with `message`, then pushes and opens a pull
     /// request when asked. Each step is the host's own git route, confirmed by a
@@ -196,7 +208,7 @@ struct CodeChangesView: View {
         .refreshable { await model.load() }
         .task { await model.load() }
         .bighelpSheet(item: Binding(get: { model.diff }, set: { if $0 == nil { model.closeDiff() } })) { diff in
-            CodeDiffSheet(diff: diff).bighelpSheetSize(.large)
+            CodeDiffSheet(diff: diff, preview: model.preview).bighelpSheetSize(.large)
         }
         .bighelpSheet(isPresented: $isShipping) {
             CodeShipSheet(model: model).bighelpSheetSize(.standard)
@@ -278,34 +290,61 @@ extension StockGitDiff: Identifiable {
     var id: String { path }
 }
 
-/// One file's diff, added lines green and removed ones red.
+/// One file's diff, added lines green and removed ones red. A Markdown file opens on
+/// its rendered Preview (with Edit), and Changes shows the diff.
 struct CodeDiffSheet: View {
     let diff: StockGitDiff
+    var preview: MarkdownFileModel?
     @Environment(\.dismiss) private var dismiss
+    @State private var showsPreview = true
 
     var body: some View {
         NavigationStack {
-            ScrollView([.vertical, .horizontal]) {
-                VStack(alignment: .leading, spacing: 0) {
-                    ForEach(Array(diff.text.split(separator: "\n", omittingEmptySubsequences: false).enumerated()),
-                            id: \.offset) { _, line in
-                        Text(line.isEmpty ? " " : String(line))
-                            .font(.system(.caption, design: .monospaced))
-                            .foregroundStyle(theme.primaryText)
-                            .padding(.horizontal, BighelpTokens.space12)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(background(for: line))
-                    }
+            Group {
+                if let preview, showsPreview {
+                    MarkdownFileContent(model: preview)
+                } else {
+                    diffText
                 }
-                .padding(.vertical, BighelpTokens.space8)
             }
-            .background(theme.canvas.ignoresSafeArea())
             .navigationTitle((diff.path as NSString).lastPathComponent)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+                if preview != nil {
+                    ToolbarItem(placement: .principal) {
+                        Picker("Show", selection: $showsPreview) {
+                            Text("Preview").tag(true)
+                            Text("Changes").tag(false)
+                        }
+                        .bighelpSegmentedPicker()
+                        .fixedSize()
+                        .accessibilityIdentifier("code.diff.mode")
+                    }
+                }
+            }
         }
+        .interactiveDismissDisabled(preview?.hasChanges == true)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("code.diff")
+    }
+
+    private var diffText: some View {
+        ScrollView([.vertical, .horizontal]) {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(diff.text.split(separator: "\n", omittingEmptySubsequences: false).enumerated()),
+                        id: \.offset) { _, line in
+                    Text(line.isEmpty ? " " : String(line))
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(theme.primaryText)
+                        .padding(.horizontal, BighelpTokens.space12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(background(for: line))
+                }
+            }
+            .padding(.vertical, BighelpTokens.space8)
+        }
+        .background(theme.canvas.ignoresSafeArea())
     }
 
     private func background(for line: Substring) -> Color {

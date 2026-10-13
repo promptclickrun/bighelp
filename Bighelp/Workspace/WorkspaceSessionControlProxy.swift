@@ -1,7 +1,8 @@
 import Foundation
 
 @MainActor
-final class WorkspaceSessionControlProxy: SessionRuntimeControlConfirming, SessionRuntimeControlSupporting, SessionFastModeControlling {
+final class WorkspaceSessionControlProxy: SessionRuntimeControlConfirming, SessionRuntimeControlSupporting, SessionFastModeControlling,
+    SessionYOLOControlling {
     private let box: WorkspaceOwnedClientBox<DirectHermesSessionControlClient>
 
     init(box: WorkspaceOwnedClientBox<DirectHermesSessionControlClient>) { self.box = box }
@@ -16,6 +17,10 @@ final class WorkspaceSessionControlProxy: SessionRuntimeControlConfirming, Sessi
 
     func setFastMode(_ mode: FastMode, sessionID: String, agentID: String) async throws -> SessionFastMode {
         try await box.value().setFastMode(mode, sessionID: sessionID, agentID: agentID)
+    }
+
+    func setYOLO(_ on: Bool, sessionID: String, agentID: String) async throws {
+        try await box.value().setYOLO(on, sessionID: sessionID, agentID: agentID)
     }
 
     func openPicker(_ request: BighelpLinkPickerOpenRequest) async throws -> BighelpLinkPicker {

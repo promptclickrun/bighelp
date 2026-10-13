@@ -71,6 +71,7 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
     var mentionIdentities: [ChatMentionIdentity] = []
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.opensHostFiles) private var opensHostFiles
 
     func makeCoordinator() -> Coordinator {
         Coordinator(openURL: openURL, copyActionLabel: copyActionLabel, onCopy: onCopy,
@@ -151,7 +152,8 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
                 traitCollection: view.traitCollection,
                 theme: theme,
                 textScale: textScale,
-                mentionIdentities: mentionIdentities
+                mentionIdentities: mentionIdentities,
+                linksMarkdownFiles: opensHostFiles
             )
         )
         view.accessibilityLabel = "\(speakerName): \(ChatMentionRendering.plainText(updatedText, usingNames: true))"

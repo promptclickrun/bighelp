@@ -60,9 +60,11 @@ extension RootShellView {
             git = { demo }
         }
         let defaults = agentRuntimeDefaults
+        let features = featureStore
         codeHome = CodeHomeStore(scopeID: scope, agentID: workspaceAgentID, source: source, git: git,
-                                 starter: CodeChatSessionStarter(catalog: sessionCatalog, features: featureStore),
-                                 loadModels: { try await defaults.loadModelProviders(agentID: $0) })
+                                 starter: CodeChatSessionStarter(catalog: sessionCatalog, features: features),
+                                 loadModels: { try await defaults.loadModelProviders(agentID: $0) },
+                                 loadCommands: { try await features.draftSlashCommands(agentID: $0, folder: $1) })
     }
 
     private func codeContext(_ store: CodeHomeStore) -> CodeHomeContext {
@@ -70,6 +72,7 @@ extension RootShellView {
             store: store,
             status: CodeChatStatusReader(catalog: sessionCatalog, features: featureStore),
             agents: agents.profiles,
+            avatarURL: { [agents] in agents.avatarURL(for: $0) },
             onOpenSession: { openCodeSession($0) },
             onOpenChanges: { appState.open(.codeChanges(sessionID: $0.id)) },
             onPullRequests: { codeSheet = .pullRequests },
@@ -110,6 +113,23 @@ extension RootShellView {
         openSession(record.summary)
     }
 
+    /// Text files on the computer as `profileID` sees them: Hermes' own file routes, or the demo's.
+    func hostTextFiles(profileID: String) -> (any HostTextFileAccess)? {
+        if nativeRuntime != nil {
+            guard let client = workspaceConnections?.workspace as? DirectHermesWorkspaceClient,
+                  let owner = currentWorkspaceOwner else { return nil }
+            return LiveHostTextFiles(client: client, owner: owner, profileID: profileID)
+        }
+        return canUseCodeMode ? DemoHostTextFiles.shared : nil
+    }
+
+    /// A Bighelp IDE session's chat links Markdown paths to the viewer, inside its folder.
+    func codeFileLinks(sessionID: String) -> HostFileLinkContext? {
+        guard let session = codeHome?.sessions.first(where: { $0.id == sessionID }),
+              let files = hostTextFiles(profileID: session.agentID) else { return nil }
+        return HostFileLinkContext(folder: session.folder, files: files)
+    }
+
     @ViewBuilder
     func codeChangesDestination(sessionID: String) -> some View {
         if let store = codeHome, let session = store.sessions.first(where: { $0.id == sessionID }),
@@ -117,6 +137,7 @@ extension RootShellView {
             let starter = CodeChatSessionStarter(catalog: sessionCatalog, features: featureStore)
             CodeChangesView(model: CodeChangesModel(
                 session: session, projectFolder: project.folder, git: store.gitClient,
+                textFiles: hostTextFiles(profileID: session.agentID),
                 sendToSession: { try await starter.send($0, toSession: sessionID) }))
         } else {
             ContentUnavailableView("Changes aren't available", systemImage: "plus.forwardslash.minus",

@@ -209,6 +209,12 @@ change in both repos.
 - Markdown files open in `MarkdownFileSheet` through Hermes' `/api/fs/read-text` and `/api/fs/write-text`
   (`HostTextFileAccess`; demo: `DemoHostTextFiles`). Save re-reads first and never overwrites a file that changed
   without asking. IDE chats link Markdown paths (`HostFileLink`, `opensHostFiles`) against the session's folder.
+- Orchestration mode: Stage keeps a job with its chips (`CodeStagedJob`, saved per computer), and Send all
+  starts the staged jobs as one `CodeBatch` through the same one-at-a-time setup. The app combines the batch's
+  sessions (`CodeBatchChatView`): a message goes to each through `sendCardReply` (it steers a running turn), and
+  each session's answer shows under the message by time. `#` mentions route (`CodeBatchRouting`): a session
+  mention picks it and drops out of the text; a pull request mention is spelled out with its branch and goes
+  to the session on that branch.
 
 ### SwiftUI traps we've hit
 

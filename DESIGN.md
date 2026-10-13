@@ -337,6 +337,12 @@ Touch and hold a card (right-click on the Mac) for Changes: uncommitted files, t
 (commit, push, pull request). ☰ keeps one menu: a Bighelp Chat / Bighelp IDE switch on top, then Sessions, Projects, Pull
 requests, Worktrees, Kanban and Settings. Nothing animates on the cards.
 
+Orchestration mode: Stage (beside Send; an icon once something is staged) keeps the message, with the chips as
+they are, in a tray over the box, and Send all with its count starts them all as one batch. A batch is one card
+on the home with a line per session, and opens one chat for all of them: colored pills (each opens that session's
+own chat), your messages on the right, and under each one every session's answer in a single block. `#` lists
+the batch's sessions, then the project's open pull requests; the chip and a line over the box say who gets it.
+
 Markdown files open rendered, never as raw text: from Changes (a Preview tab beside the diff) and from paths in an
 IDE chat's messages, which are links. Edit shows the text; Save asks before replacing a file that changed meanwhile.
 

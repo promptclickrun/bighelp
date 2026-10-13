@@ -1,3 +1,5 @@
+import Foundation
+
 enum AppTab: String, CaseIterable, Identifiable {
     case home, agents, sessions, inbox, profile, scheduledTasks, workspace
     case feed, ideas, goals, apps
@@ -56,6 +58,8 @@ enum AppRoute: Hashable {
     case board(AppTab)
     /// A Bighelp IDE session's changes, with Ship.
     case codeChanges(sessionID: String)
+    /// Orchestration mode's chat for a batch sent with Send all.
+    case codeBatch(id: UUID)
 
     /// Screens about every computer, which stay put when the working computer changes.
     var isAllHosts: Bool { self == .allHostsChats }

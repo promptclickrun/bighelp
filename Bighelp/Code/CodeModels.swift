@@ -106,6 +106,8 @@ struct CodeSessionRecord: Codable, Identifiable, Equatable, Sendable {
     let startedAt: Date
     /// Nil on cards saved before the mode button.
     var mode: CodeSessionMode?
+    /// The batch it was sent with (Send all), if any.
+    var batchID: UUID?
 }
 
 /// A send that hasn't become a session yet, or couldn't.
@@ -131,6 +133,8 @@ struct CodeLaunch: Identifiable, Equatable, Sendable {
     var step: Step
     /// Set once Hermes has the session, so a failed send still opens it.
     var sessionID: String?
+    /// The batch it belongs to (Send all), if any.
+    var batchID: UUID?
 }
 
 /// What a card says about its session, from the live chat (never guessed).

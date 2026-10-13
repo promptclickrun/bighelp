@@ -4,7 +4,8 @@ import Observation
 /// Bighelp IDE's home for one computer: what the three chips under the message box
 /// hold (project, where it runs, branch), the agent that runs the sessions, and
 /// the sessions sent from here. Each Send starts its own session and returns at
-/// once, so several can be sent back to back.
+/// once, so several can be sent back to back. Orchestration mode stages jobs (each
+/// with its own chips) and Send all starts them as one batch.
 @MainActor
 @Observable
 final class CodeHomeStore {
@@ -29,6 +30,10 @@ final class CodeHomeStore {
     private(set) var isLoading = false
     private(set) var sessions: [CodeSessionRecord] = []
     private(set) var launches: [CodeLaunch] = []
+    /// Jobs staged for Send all, for any project.
+    private(set) var staged: [CodeStagedJob] = []
+    /// Batches sent with Send all, newest first.
+    private(set) var batches: [CodeBatch] = []
     var filter: CodeSessionFilter = .all
     var errorMessage: String?
 
@@ -69,6 +74,8 @@ final class CodeHomeStore {
         runtime = saved?.runtime ?? CodeRuntimeChoice()
         mode = saved?.mode ?? .standard
         sessions = saved?.sessions ?? []
+        staged = saved?.staged ?? []
+        batches = saved?.batches ?? []
     }
 
     var project: CodeProject? { projects.first { $0.id == projectID } }
@@ -78,9 +85,34 @@ final class CodeHomeStore {
         sessions.filter { $0.projectID == projectID }
     }
 
-    /// Sends for the selected project that have no session yet (or never got one).
+    /// Sends for the selected project that have no session yet (or never got one); a
+    /// batch's own show on its card.
     var projectLaunches: [CodeLaunch] {
-        launches.filter { $0.projectID == projectID && $0.sessionID == nil }
+        launches.filter { $0.projectID == projectID && $0.sessionID == nil && $0.batchID == nil }
+    }
+
+    /// The selected project's sessions that aren't in a batch: each has its own card.
+    var projectSingleSessions: [CodeSessionRecord] {
+        projectSessions.filter { $0.batchID == nil }
+    }
+
+    /// The selected project's staged jobs, in the order they were staged.
+    var projectStaged: [CodeStagedJob] {
+        staged.filter { $0.projectID == projectID }
+    }
+
+    /// The selected project's batches, newest first.
+    var projectBatches: [CodeBatch] {
+        batches.filter { $0.projectID == projectID }
+    }
+
+    func batch(id: UUID) -> CodeBatch? {
+        batches.first { $0.id == id }
+    }
+
+    /// A batch's jobs that haven't become sessions yet.
+    func pendingLaunches(of batch: CodeBatch) -> [CodeLaunch] {
+        launches.filter { $0.batchID == batch.id && $0.sessionID == nil }
     }
 
     /// A session's own send while it's still under way or failed: shown instead of the chat's status.
@@ -203,15 +235,89 @@ final class CodeHomeStore {
     /// Starts a session for `message` and returns at once. False when there's no project to send to.
     @discardableResult
     func send(_ message: String) -> Bool {
+        guard let job = job(for: message) else { return false }
+        return launch(job, batchID: nil)
+    }
+
+    /// Stages `message` with the chips as they are now, for Send all. False when there's nothing to stage.
+    @discardableResult
+    func stage(_ message: String) -> Bool {
+        guard let job = job(for: message) else { return false }
+        staged.append(job)
+        save()
+        return true
+    }
+
+    func unstage(_ id: UUID) {
+        staged.removeAll { $0.id == id }
+        save()
+    }
+
+    func clearStaged() {
+        staged.removeAll { $0.projectID == projectID }
+        save()
+    }
+
+    /// Starts the selected project's staged jobs, then `message` if there is one, as one batch.
+    @discardableResult
+    func sendAll(including message: String = "") -> CodeBatch? {
+        var jobs = projectStaged
+        if let last = job(for: message) { jobs.append(last) }
+        guard let project, !jobs.isEmpty, (try? gitClient()) != nil else { return nil }
+        let batch = CodeBatch(id: UUID(), projectID: project.id, title: CodeBatch.title(for: jobs), createdAt: .now,
+                              jobCount: jobs.count, sessionIDs: [], messages: [])
+        batches.insert(batch, at: 0)
+        if batches.count > Self.maximumBatches { batches.removeLast(batches.count - Self.maximumBatches) }
+        staged.removeAll { job in jobs.contains { $0.id == job.id } }
+        save()
+        for job in jobs { launch(job, batchID: batch.id) }
+        return batch
+    }
+
+    /// Keeps a message sent from a batch chat.
+    func record(_ message: CodeBatchMessage, in batchID: UUID) {
+        guard let index = batches.firstIndex(where: { $0.id == batchID }) else { return }
+        batches[index].messages.append(message)
+        if batches[index].messages.count > CodeBatch.maximumMessages { batches[index].messages.removeFirst() }
+        save()
+    }
+
+    func rename(_ batch: CodeBatch, to title: String) {
+        let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty, let index = batches.firstIndex(where: { $0.id == batch.id }) else { return }
+        batches[index].title = String(title.prefix(80))
+        save()
+    }
+
+    /// Forgets a batch's card and its sessions' cards. The sessions stay on the computer.
+    func forget(_ batch: CodeBatch) {
+        batches.removeAll { $0.id == batch.id }
+        sessions.removeAll { $0.batchID == batch.id }
+        save()
+    }
+
+    /// A job from `message` and the chips as they are now; nil when there's nothing to send or no project.
+    private func job(for message: String) -> CodeStagedJob? {
         let message = message.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !message.isEmpty, let project, let git = try? gitClient() else { return false }
-        let request = CodeLaunchRequest(message: message, agentID: agentID, project: project, placement: placement,
-                                        branch: branch, newBranch: placement == .newWorktree ? newBranchName : nil,
-                                        runtime: runtime, mode: mode)
-        newBranchName = nil
-        let launch = CodeLaunch(id: UUID(), title: CodeSessionTitle.from(message), projectID: project.id,
-                                placement: placement, branch: placement == .local ? branchTitle : nil,
-                                step: placement == .newWorktree ? .makingWorktree : .startingSession)
+        guard !message.isEmpty, let project else { return nil }
+        defer { newBranchName = nil }
+        return CodeStagedJob(id: UUID(), message: message, agentID: agentID, projectID: project.id,
+                             placement: placement, branch: branch,
+                             newBranch: placement == .newWorktree ? newBranchName : nil, runtime: runtime, mode: mode)
+    }
+
+    @discardableResult
+    private func launch(_ job: CodeStagedJob, batchID: UUID?) -> Bool {
+        guard let project = projects.first(where: { $0.id == job.projectID }), let git = try? gitClient() else {
+            return false
+        }
+        let request = CodeLaunchRequest(message: job.message, agentID: job.agentID, project: project,
+                                        placement: job.placement, branch: job.branch, newBranch: job.newBranch,
+                                        runtime: job.runtime, mode: job.mode)
+        let launch = CodeLaunch(id: UUID(), title: job.title, projectID: project.id, placement: job.placement,
+                                branch: job.placement == .local ? (job.branch ?? branchTitle) : nil,
+                                step: job.placement == .newWorktree ? .makingWorktree : .startingSession,
+                                batchID: batchID)
         launches.insert(launch, at: 0)
         let launcher = CodeLauncher(git: git, sessions: starter)
         let previous = setupTail
@@ -222,9 +328,11 @@ final class CodeHomeStore {
         setupTail = Task { _ = try? await setup.value }
         Task { @MainActor [weak self, starter] in
             do {
-                let record = try await setup.value
+                var record = try await setup.value
+                record.batchID = batchID
                 self?.update(launch.id) { $0.sessionID = record.id; $0.step = .sending }
                 self?.remember(record)
+                if let batchID { self?.add(record.id, toBatch: batchID) }
                 try await starter.apply(request.mode, toSession: record.id, agentID: request.agentID)
                 try await starter.send(request.firstMessage, toSession: record.id)
                 self?.launches.removeAll { $0.id == launch.id }
@@ -253,6 +361,13 @@ final class CodeHomeStore {
         change(&launches[index])
     }
 
+    private func add(_ sessionID: String, toBatch batchID: UUID) {
+        guard let index = batches.firstIndex(where: { $0.id == batchID }),
+              !batches[index].sessionIDs.contains(sessionID) else { return }
+        batches[index].sessionIDs.append(sessionID)
+        save()
+    }
+
     private func remember(_ record: CodeSessionRecord) {
         sessions.removeAll { $0.id == record.id }
         sessions.insert(record, at: 0)
@@ -270,10 +385,13 @@ final class CodeHomeStore {
         var runtime: CodeRuntimeChoice?
         var mode: CodeSessionMode?
         var sessions: [CodeSessionRecord]
+        var staged: [CodeStagedJob]?
+        var batches: [CodeBatch]?
     }
 
     static let savedKey = "bighelp.code.by-scope"
     private static let maximumSessions = 60
+    private static let maximumBatches = 20
 
     private static func saved(_ scopeID: String, in defaults: UserDefaults) -> Saved? {
         guard let data = defaults.data(forKey: savedKey),
@@ -285,7 +403,7 @@ final class CodeHomeStore {
         var all: [String: Saved] = (defaults.data(forKey: Self.savedKey))
             .flatMap { try? JSONDecoder().decode([String: Saved].self, from: $0) } ?? [:]
         all[scopeID] = Saved(agentID: agentID, projectID: projectID, placement: placement, branch: branch,
-                             runtime: runtime, mode: mode, sessions: sessions)
+                             runtime: runtime, mode: mode, sessions: sessions, staged: staged, batches: batches)
         // A handful of computers at most; drop the oldest beyond that.
         if all.count > 16, let stale = all.keys.first(where: { $0 != scopeID }) { all[stale] = nil }
         if let data = try? JSONEncoder().encode(all) { defaults.set(data, forKey: Self.savedKey) }

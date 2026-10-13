@@ -123,10 +123,18 @@ final class DemoCodeGit: StockGitManaging {
             worktrees: worktrees,
             githubAuthentication: StockGitGitHubAuthentication(isAvailable: true, isAuthenticated: true),
             ship: StockGitShipState(isGitHubCLIReady: true, currentPullRequest: folder.pullRequest),
-            pullRequests: folders.values.compactMap(\.pullRequest),
+            pullRequests: Self.samplePullRequests(target.projectName) + folders.values.compactMap(\.pullRequest),
             commitContext: StockGitCommitContext(diff: "", recentSubjects: ["Build 115"]),
             verification: nil, facts: nil
         )
+    }
+
+    /// Two open pull requests from other work, so `#` in a batch chat lists some.
+    private static func samplePullRequests(_ project: String) -> [StockGitPullRequest] {
+        [StockGitPullRequest(number: 138, branch: "code/widget-agent-name", title: "Widget shows the wrong agent",
+                             url: URL(string: "https://github.com/demo/\(project)/pull/138")!, state: "open", isDraft: false),
+         StockGitPullRequest(number: 131, branch: "code/widget-refresh-sign-in", title: "Refresh widgets after sign-in",
+                             url: URL(string: "https://github.com/demo/\(project)/pull/131")!, state: "open", isDraft: true)]
     }
 
     private static let sampleChanges = [

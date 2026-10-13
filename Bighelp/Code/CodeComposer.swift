@@ -5,6 +5,8 @@ import SwiftUI
 /// the project, where the session works (a new worktree or the local checkout) and its
 /// branch; they stay set after each send, so the next message starts the next session
 /// right away. Typing `/` first shows the new session's commands and skills.
+/// Orchestration mode: Stage keeps the message (with the chips as they are) in a tray
+/// above the box, and Send all starts every staged job as one batch.
 struct CodeComposer: View {
     @Bindable var store: CodeHomeStore
     let agents: [AgentProfile]
@@ -22,6 +24,9 @@ struct CodeComposer: View {
                 slashList
                     .transition(.opacity)
             }
+            if !store.projectStaged.isEmpty {
+                stagedTray
+            }
             VStack(alignment: .leading, spacing: BighelpTokens.space8) {
                 TextField("Describe a change…", text: $message, axis: .vertical)
                     .font(.bighelp(.body))
@@ -38,8 +43,15 @@ struct CodeComposer: View {
                     modeMenu
                         .fixedSize()
                     Spacer(minLength: 0)
-                    sendButton
+                    stageButton
                         .fixedSize()
+                    if hasStaged {
+                        sendAllButton
+                            .fixedSize()
+                    } else {
+                        sendButton
+                            .fixedSize()
+                    }
                 }
             }
             .padding(.horizontal, BighelpTokens.space16)
@@ -130,12 +142,14 @@ struct CodeComposer: View {
         } label: {
             HStack(spacing: BighelpTokens.space4) {
                 Image(systemName: store.mode.systemImage)
-                Text(store.mode.title).lineLimit(1)
+                // Default is the usual way, so its icon is enough; and while jobs are
+                // staged, Send all needs the room.
+                if !hasStaged, store.mode != .standard { Text(store.mode.title).lineLimit(1) }
             }
             .font(.bighelp(.subheadline).weight(.semibold))
             .foregroundStyle(modeTint)
             .padding(.horizontal, BighelpTokens.space8)
-            .frame(minHeight: BighelpTokens.scaled(30))
+            .frame(minWidth: BighelpTokens.scaled(30), minHeight: BighelpTokens.scaled(30))
             .background(modeTint.opacity(store.mode == .standard ? 0 : 0.14), in: .capsule)
             .contentShape(.capsule)
         }
@@ -177,6 +191,136 @@ struct CodeComposer: View {
 
     private var canSend: Bool {
         store.project != nil && !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    // MARK: Orchestration mode
+
+    private var hasStaged: Bool { !store.projectStaged.isEmpty }
+
+    /// Staged jobs plus the one in the box, if any.
+    private var sendAllCount: Int { store.projectStaged.count + (canSend ? 1 : 0) }
+
+    /// Keeps the message for Send all. With jobs staged it shrinks to its icon, so Send all fits.
+    private var stageButton: some View {
+        Button {
+            if store.stage(message) { message = "" }
+        } label: {
+            HStack(spacing: BighelpTokens.space4) {
+                Image(systemName: "rectangle.stack.badge.plus")
+                if !hasStaged { Text("Stage") }
+            }
+            .font(.bighelp(.subheadline).weight(.semibold))
+            .foregroundStyle(canSend ? theme.primaryText : theme.secondaryText)
+            .padding(.horizontal, hasStaged ? 0 : BighelpTokens.space12)
+            .frame(minWidth: BighelpTokens.scaled(36), minHeight: BighelpTokens.scaled(36))
+            .background(theme.raisedSurface, in: .capsule)
+            .contentShape(.capsule)
+        }
+        .bighelpPlainButtonStyle(.capsule)
+        .disabled(!canSend)
+        .keyboardShortcut(.return, modifiers: [.command, .shift])
+        .bighelpIconLabel("Stage for Send all", shortcut: "⇧⌘↩")
+        .accessibilityIdentifier("code.composer.stage")
+    }
+
+    private var sendAllButton: some View {
+        Button {
+            if store.sendAll(including: message) != nil { message = "" }
+        } label: {
+            HStack(spacing: BighelpTokens.space8) {
+                Text("Send all").lineLimit(1)
+                Text("\(sendAllCount)")
+                    .font(.bighelp(.caption).weight(.bold))
+                    .padding(.horizontal, 6)
+                    .frame(minWidth: 20, minHeight: 20)
+                    .background(theme.actionForeground.opacity(0.25), in: .capsule)
+            }
+            .font(.bighelp(.subheadline).weight(.semibold))
+            .foregroundStyle(theme.actionForeground)
+            .padding(.leading, BighelpTokens.space12)
+            .padding(.trailing, BighelpTokens.space8)
+            .frame(minHeight: BighelpTokens.scaled(36))
+            .background(theme.action, in: .capsule)
+            .contentShape(.capsule)
+        }
+        .bighelpPlainButtonStyle(.capsule)
+        .disabled(store.project == nil || sendAllCount == 0)
+        .keyboardShortcut(.return, modifiers: .command)
+        .accessibilityLabel("Send all \(sendAllCount)")
+        .accessibilityIdentifier("code.composer.send-all")
+    }
+
+    /// The staged jobs, each with the chips it was staged with; a tap on × takes one out.
+    private var stagedTray: some View {
+        let jobs = store.projectStaged
+        return VStack(alignment: .leading, spacing: BighelpTokens.space8) {
+            HStack {
+                Text("Staged").font(.bighelp(.subheadline).weight(.semibold))
+                    + Text(jobs.count == 1 ? " · 1 job" : " · \(jobs.count) jobs")
+                    .font(.bighelp(.subheadline)).foregroundStyle(theme.secondaryText)
+                Spacer(minLength: 0)
+                Button("Clear") { store.clearStaged() }
+                    .font(.bighelp(.subheadline))
+                    .foregroundStyle(theme.secondaryText)
+                    .accessibilityIdentifier("code.staged.clear")
+            }
+            ScrollView {
+                VStack(spacing: BighelpTokens.space8) {
+                    ForEach(Array(jobs.enumerated()), id: \.element.id) { index, job in
+                        stagedRow(job, number: index + 1)
+                    }
+                }
+            }
+            .frame(height: CGFloat(min(jobs.count, 3)) * BighelpTokens.scaled(56)
+                   + CGFloat(min(jobs.count, 3) - 1) * BighelpTokens.space8)
+            .scrollIndicators(.hidden)
+        }
+        .padding(BighelpTokens.space12)
+        .background(theme.surface, in: .rect(cornerRadius: 20))
+        .overlay { RoundedRectangle(cornerRadius: 20).stroke(theme.border, lineWidth: BighelpTokens.hairline) }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("code.staged")
+    }
+
+    private func stagedRow(_ job: CodeStagedJob, number: Int) -> some View {
+        let color = CodeSessionColor.color(at: number - 1)
+        return HStack(spacing: BighelpTokens.space12) {
+            Text("\(number)")
+                .font(.bighelp(.caption).weight(.bold))
+                .foregroundStyle(color)
+                .frame(width: BighelpTokens.scaled(22), height: BighelpTokens.scaled(22))
+                .background(color.opacity(0.2), in: .circle)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(job.title)
+                    .font(.bighelp(.subheadline).weight(.medium))
+                    .foregroundStyle(theme.primaryText)
+                    .lineLimit(1)
+                Label(stagedDetail(job), systemImage: job.placement.systemImage)
+                    .font(.bighelp(.caption))
+                    .foregroundStyle(theme.secondaryText)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Button("Remove", systemImage: "xmark") { store.unstage(job.id) }
+                .labelStyle(.iconOnly)
+                .font(.bighelp(.footnote).weight(.semibold))
+                .foregroundStyle(theme.secondaryText)
+                .frame(width: 32, height: 32)
+                .contentShape(.rect)
+                .bighelpPlainButtonStyle()
+                .accessibilityIdentifier("code.staged.remove.\(number)")
+        }
+        .padding(.horizontal, BighelpTokens.space8)
+        .frame(minHeight: BighelpTokens.scaled(56))
+        .background(theme.raisedSurface, in: .rect(cornerRadius: 14))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("code.staged.job.\(number)")
+    }
+
+    private func stagedDetail(_ job: CodeStagedJob) -> String {
+        let model = job.runtime.modelID.map { ModelNameCatalogStore.shared.displayName(for: $0) } ?? "Agent's model"
+        return [job.placement.title, job.branch, model, job.mode == .standard ? nil : job.mode.title]
+            .compactMap { $0 }.joined(separator: " · ")
     }
 
     private var sendButton: some View {

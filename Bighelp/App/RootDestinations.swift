@@ -29,6 +29,8 @@ extension RootShellView {
             usageDestination
         case (.codeChanges(let sessionID), _):
             codeChangesDestination(sessionID: sessionID)
+        case (.codeBatch(let id), _):
+            codeBatchDestination(id: id)
         case (.board(let tab), _):
             agentBoardPage(tab)
         case (.allHostsChats, _):

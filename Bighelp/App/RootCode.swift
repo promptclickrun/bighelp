@@ -75,6 +75,7 @@ extension RootShellView {
             avatarURL: { [agents] in agents.avatarURL(for: $0) },
             onOpenSession: { openCodeSession($0) },
             onOpenChanges: { appState.open(.codeChanges(sessionID: $0.id)) },
+            onOpenBatch: { appState.open(.codeBatch(id: $0.id)) },
             onPullRequests: { codeSheet = .pullRequests },
             onWorktrees: { codeSheet = .worktrees },
             onRefreshActivity: { await nativeRuntime?.refreshActiveSessions() },
@@ -141,6 +142,27 @@ extension RootShellView {
                 sendToSession: { try await starter.send($0, toSession: sessionID) }))
         } else {
             ContentUnavailableView("Changes aren't available", systemImage: "plus.forwardslash.minus",
+                description: Text("Open Code from the menu, then try again."))
+        }
+    }
+
+    /// Orchestration mode's chat: the batch's sessions in one place.
+    @ViewBuilder
+    func codeBatchDestination(id: UUID) -> some View {
+        if let store = codeHome, store.batch(id: id) != nil {
+            let features = featureStore
+            CodeBatchChatView(
+                model: CodeBatchChatModel(
+                    batchID: id, store: store,
+                    status: CodeChatStatusReader(catalog: sessionCatalog, features: features),
+                    prepareChat: { sessionID in
+                        let chat = try BighelpShortcutWorkspace.chatModel(sessionID: sessionID, in: features)
+                        try await BighelpShortcutService.awaitTransportReady(chat)
+                        return chat
+                    }),
+                onOpenSession: { openCodeSession($0) })
+        } else {
+            ContentUnavailableView("This batch isn't here anymore", systemImage: "square.stack.3d.up.slash",
                 description: Text("Open Code from the menu, then try again."))
         }
     }

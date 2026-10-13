@@ -178,6 +178,71 @@ final class CodeModeUITests: BighelpUITestCase {
         save("11-plan-in-changes", app)
     }
 
+    /// Orchestration mode: two staged jobs and the one in the box go out with Send all as
+    /// one batch; its chat sends to every session, `#` lists the sessions and the project's
+    /// open pull requests, and a mention sends to that session only.
+    @MainActor
+    func testStagedJobsSendAllAndTheBatchChat() throws {
+        let app = makeApp()
+        let appearance = ProcessInfo.processInfo.environment["BIGHELP_CODE_MODE_APPEARANCE"] ?? "dark"
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays",
+                               "-bighelp.settings.code-mode", "YES", "-bighelp.settings.code-mode.open-in", "code",
+                               "-loopdy.demo.appearance", appearance]
+        app.launch()
+        XCTAssertTrue(element("code.screen", in: app).waitForExistence(timeout: 10))
+
+        stage("Fix the widget tap when the host is asleep", in: app)
+        XCTAssertTrue(element("code.staged", in: app).waitForExistence(timeout: 3), "Stage keeps it in the tray.")
+        stage("Add a loading state to the Usage page", in: app)
+        XCTAssertTrue(element("code.staged.job.2", in: app).exists)
+        let field = element("code.composer.field", in: app)
+        field.tap()
+        field.typeText("Write tests for the branch name helper")
+        let sendAll = app.buttons["code.composer.send-all"]
+        XCTAssertEqual(sendAll.label, "Send all 3")
+        XCTAssertLessThanOrEqual(sendAll.frame.maxX, element("code.composer.field", in: app).frame.maxX + 2,
+                                 "Send all stays inside the message box.")
+        save("12-staged", app)
+        sendAll.tap()
+
+        let card = app.buttons["code.batch-card"]
+        XCTAssertTrue(card.waitForExistence(timeout: 10), "The batch shows as one card.")
+        XCTAssertFalse(element("code.staged", in: app).exists, "Send all empties the tray.")
+        let deadline = Date().addingTimeInterval(15)
+        while card.label.contains("Starting"), Date() < deadline { usleep(300_000) }
+        save("13-batch-card", app)
+
+        card.tap()
+        XCTAssertTrue(element("code.batch", in: app).waitForExistence(timeout: 5), "The card opens the batch chat.")
+        for index in 0..<3 {
+            XCTAssertTrue(app.buttons["code.batch.member.\(index)"].waitForExistence(timeout: 5))
+        }
+        save("14-batch-chat", app)
+
+        let batchField = app.textViews["code.batch.field"]
+        XCTAssertTrue(batchField.waitForExistence(timeout: 3))
+        batchField.tap()
+        batchField.typeText("#")
+        XCTAssertTrue(element("code.batch.mentions", in: app).waitForExistence(timeout: 3), "# opens the list.")
+        XCTAssertTrue(element("code.batch.mentions.row.session.0", in: app).exists)
+        XCTAssertTrue(element("code.batch.mentions.row.pr.138", in: app).exists, "Open pull requests list too.")
+        save("15-hash", app)
+        element("code.batch.mentions.row.session.0", in: app).tap()
+        XCTAssertTrue((batchField.value as? String)?.hasPrefix("#Widget tap ") == true)
+        batchField.typeText("use the shared host check")
+        XCTAssertTrue(element("code.batch.goes", in: app).waitForExistence(timeout: 3), "It says where it goes.")
+        XCTAssertFalse(element("code.batch.mentions", in: app).exists, "Typing on after a pick closes the list.")
+        XCTAssertEqual(app.buttons["code.batch.target"].label, "Sends to one session")
+        save("16-mention", app)
+        app.buttons["code.batch.send"].tap()
+
+        let sent = element("code.batch.sent", in: app)
+        XCTAssertTrue(sent.waitForExistence(timeout: 5), "The message shows in the batch chat.")
+        XCTAssertTrue(app.staticTexts["To Widget tap"].waitForExistence(timeout: 3) || app.buttons["To Widget tap"].exists
+                      || app.otherElements["To Widget tap"].exists, "Only the mentioned session got it.")
+        save("17-sent", app)
+    }
+
     /// Out of the box there's no Bighelp IDE: no switch in ☰.
     @MainActor
     func testCodeModeIsOffByDefault() throws {
@@ -188,6 +253,15 @@ final class CodeModeUITests: BighelpUITestCase {
         XCTAssertTrue(element("navigation.menu", in: app).waitForExistence(timeout: 5))
         XCTAssertFalse(element("menu.experience", in: app).exists)
         XCTAssertTrue(app.buttons["menu.agents"].exists)
+    }
+
+    @MainActor
+    private func stage(_ message: String, in app: XCUIApplication) {
+        let field = element("code.composer.field", in: app)
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap()
+        field.typeText(message)
+        app.buttons["code.composer.stage"].tap()
     }
 
     @MainActor

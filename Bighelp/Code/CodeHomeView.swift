@@ -9,6 +9,7 @@ struct CodeHomeContext {
     var avatarURL: (AgentProfile) -> URL? = { _ in nil }
     let onOpenSession: (CodeSessionRecord) -> Void
     let onOpenChanges: (CodeSessionRecord) -> Void
+    var onOpenBatch: (CodeBatch) -> Void = { _ in }
     let onPullRequests: () -> Void
     let onWorktrees: () -> Void
     /// Asks Hermes which sessions are running, for cards whose chat isn't open.
@@ -21,6 +22,8 @@ struct CodeHomeContext {
 /// live status, and the message box that starts a new one with each send.
 struct CodeHomeView: View {
     let context: CodeHomeContext
+    @State private var renaming: CodeBatch?
+    @State private var newTitle = ""
 
     var body: some View {
         let store = context.store
@@ -36,10 +39,14 @@ struct CodeHomeView: View {
                 ForEach(store.projectLaunches) { launch in
                     CodeLaunchCard(launch: launch) { store.dismiss(launch) }
                 }
+                ForEach(visibleBatches) { batch in
+                    batchCard(batch)
+                }
                 ForEach(visibleSessions) { session in
                     sessionCard(session)
                 }
-                if store.projectLaunches.isEmpty && store.projectSessions.isEmpty && !store.isLoading {
+                if store.projectLaunches.isEmpty && store.projectSessions.isEmpty && store.projectBatches.isEmpty
+                    && !store.isLoading {
                     empty
                 }
             }
@@ -78,6 +85,14 @@ struct CodeHomeView: View {
         }
         .refreshable { await reload() }
         .task(id: context.connectionKey) { await reload() }
+        .alert("Rename batch", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
+            TextField("Name", text: $newTitle)
+                .accessibilityIdentifier("code.batch.rename")
+            Button("Save") {
+                if let renaming { context.store.rename(renaming, to: newTitle) }
+            }
+            Button("Cancel", role: .cancel) {}
+        }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("code.screen")
     }
@@ -93,8 +108,45 @@ struct CodeHomeView: View {
 
     private var visibleSessions: [CodeSessionRecord] {
         let store = context.store
-        guard store.filter != .all else { return store.projectSessions }
-        return store.projectSessions.filter { status(of: $0).filter == store.filter }
+        guard store.filter != .all else { return store.projectSingleSessions }
+        return store.projectSingleSessions.filter { status(of: $0).filter == store.filter }
+    }
+
+    /// A batch shows under a filter when any of its sessions matches it.
+    private var visibleBatches: [CodeBatch] {
+        let store = context.store
+        guard store.filter != .all else { return store.projectBatches }
+        return store.projectBatches.filter { batch in
+            batch.sessionIDs.contains { id in
+                store.sessions.first { $0.id == id }.map { status(of: $0).filter == store.filter } ?? false
+            }
+        }
+    }
+
+    private func batchCard(_ batch: CodeBatch) -> some View {
+        let store = context.store
+        let members = CodeBatchMember.members(of: batch, sessions: store.sessions)
+        let pending = store.pendingLaunches(of: batch).reversed()
+        let lines = members.map { member in
+            CodeBatchCard.Line(id: member.id, title: member.title, color: member.color,
+                               status: store.sessions.first { $0.id == member.id }.map(status(of:)) ?? .ready)
+        } + pending.enumerated().map { offset, launch in
+            CodeBatchCard.Line(id: launch.id.uuidString, title: launch.title,
+                               color: CodeSessionColor.color(at: members.count + offset),
+                               status: launch.step.isFailed ? .failed("Couldn't start") : .starting("Setting up"))
+        }
+        return Button { context.onOpenBatch(batch) } label: {
+            CodeBatchCard(batch: batch, lines: lines, startedCount: members.count)
+        }
+        .buttonStyle(.bighelpTilePress)
+        .contextMenu {
+            Button("Rename", systemImage: "pencil") {
+                renaming = batch
+                newTitle = batch.title
+            }
+            Button("Remove from list", systemImage: "eye.slash") { store.forget(batch) }
+        }
+        .accessibilityIdentifier("code.batch-card")
     }
 
     private func status(of session: CodeSessionRecord) -> CodeSessionStatus {
@@ -173,6 +225,91 @@ struct CodeHomeView: View {
 }
 
 /// One session: its status dot, name, where it works and what it's doing now.
+/// A batch sent with Send all: one card, one line per session with its live status.
+struct CodeBatchCard: View {
+    struct Line: Identifiable {
+        let id: String
+        let title: String
+        let color: Color
+        let status: CodeSessionStatus
+    }
+
+    let batch: CodeBatch
+    let lines: [Line]
+    let startedCount: Int
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: BighelpTokens.space8) {
+            HStack(spacing: BighelpTokens.space12) {
+                Image(systemName: "square.stack.3d.up")
+                    .font(.bighelp(.subheadline).weight(.semibold))
+                    .foregroundStyle(theme.action)
+                    .frame(width: BighelpTokens.scaled(30), height: BighelpTokens.scaled(30))
+                    .background(theme.action.opacity(0.14), in: .rect(cornerRadius: 9))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(batch.title)
+                        .font(.bighelp(.headline))
+                        .foregroundStyle(theme.primaryText)
+                        .lineLimit(1)
+                    Text(subtitle)
+                        .font(.bighelp(.caption))
+                        .foregroundStyle(theme.secondaryText)
+                }
+                Spacer(minLength: 0)
+                if needsYou > 0 {
+                    CodePill(text: needsYou == 1 ? "1 needs you" : "\(needsYou) need you", tint: theme.warning)
+                }
+            }
+            ForEach(lines) { line in
+                HStack(spacing: BighelpTokens.space8) {
+                    Circle().fill(line.color).frame(width: 8, height: 8)
+                    Text(line.title)
+                        .font(.bighelp(.subheadline))
+                        .foregroundStyle(theme.primaryText)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                    Text(line.status.shortTitle)
+                        .font(.bighelp(.footnote))
+                        .foregroundStyle(color(for: line.status))
+                }
+            }
+            if startedCount < batch.jobCount {
+                Text("Starting \(min(startedCount + 1, batch.jobCount)) of \(batch.jobCount). "
+                     + "Sessions start one at a time, then run side by side.")
+                    .font(.bighelp(.caption))
+                    .foregroundStyle(theme.secondaryText)
+            }
+        }
+        .padding(BighelpTokens.space16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(theme.surface, in: .rect(cornerRadius: BighelpTokens.radius16))
+        .overlay {
+            RoundedRectangle(cornerRadius: BighelpTokens.radius16)
+                .stroke(theme.border, lineWidth: BighelpTokens.hairline)
+        }
+        .contentShape(.rect)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var needsYou: Int { lines.filter { $0.status.filter == .needsYou }.count }
+
+    private var subtitle: String {
+        let count = batch.jobCount == 1 ? "1 session" : "\(batch.jobCount) sessions"
+        return count + " · " + batch.createdAt.formatted(.relative(presentation: .named, unitsStyle: .abbreviated))
+    }
+
+    private func color(for status: CodeSessionStatus) -> Color {
+        switch status {
+        case .needsYou: theme.warning
+        case .running, .starting: theme.action
+        case .failed: theme.danger
+        case .ready: theme.secondaryText
+        }
+    }
+
+    @BighelpThemeReader private var theme
+}
+
 struct CodeSessionCard: View {
     let session: CodeSessionRecord
     let status: CodeSessionStatus

@@ -243,6 +243,125 @@ struct CodeModeTests {
         #expect(store.commands.map(\.name) == ["plan"])
     }
 
+    /// Each staged job keeps the chips it was staged with; Send all starts them, and the
+    /// message in the box, as one batch whose sessions don't get cards of their own.
+    @Test func sendAllStartsTheStagedJobsAsOneBatch() async throws {
+        let suiteName = #function
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let sessions = RecordingCodeSessions()
+        let store = CodeHomeStore(scopeID: "computer", agentID: "default", source: DemoCodeProjectSource(),
+                                  git: { RecordingCodeGit() }, starter: sessions, defaults: defaults)
+        await store.load()
+
+        store.placement = .local
+        #expect(store.stage("Fix the widget tap"))
+        store.placement = .newWorktree
+        store.mode = .plan
+        #expect(store.stage("Add a loading state"))
+        #expect(store.projectStaged.map(\.placement) == [.local, .newWorktree])
+        #expect(store.projectStaged.map(\.mode) == [.standard, .plan])
+        #expect(sessions.started.isEmpty, "Staging starts nothing.")
+
+        let batch = try #require(store.sendAll(including: "Write tests for the helper"))
+        #expect(batch.jobCount == 3)
+        #expect(store.projectStaged.isEmpty)
+        for _ in 0..<200 where !store.launches.isEmpty { try await Task.sleep(for: .milliseconds(20)) }
+
+        #expect(store.batch(id: batch.id)?.sessionIDs == ["session-1", "session-2", "session-3"])
+        #expect(sessions.sent == ["Fix the widget tap@session-1", "/plan Add a loading state@session-2",
+                                  "/plan Write tests for the helper@session-3"])
+        #expect(sessions.mostAtOnce == 1, "A batch's sessions start one at a time.")
+        #expect(store.projectSingleSessions.isEmpty)
+        #expect(store.projectSessions.count == 3)
+        let reopened = CodeHomeStore(scopeID: "computer", agentID: "default", source: DemoCodeProjectSource(),
+                                     git: { RecordingCodeGit() }, starter: sessions, defaults: defaults)
+        #expect(reopened.batches.map(\.sessionIDs) == [["session-1", "session-2", "session-3"]])
+    }
+
+    @Test func stagedJobsSurviveARelaunchUntilSentOrRemoved() async {
+        let suiteName = #function
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = CodeHomeStore(scopeID: "computer", agentID: "default", source: DemoCodeProjectSource(),
+                                  git: { RecordingCodeGit() }, starter: RecordingCodeSessions(), defaults: defaults)
+        await store.load()
+        store.stage("Fix the widget tap")
+        store.stage("Add a loading state")
+        store.unstage(store.projectStaged[0].id)
+
+        let reopened = CodeHomeStore(scopeID: "computer", agentID: "default", source: DemoCodeProjectSource(),
+                                     git: { RecordingCodeGit() }, starter: RecordingCodeSessions(), defaults: defaults)
+        await reopened.load()
+        #expect(reopened.projectStaged.map(\.message) == ["Add a loading state"])
+        #expect(!reopened.stage("   "), "Nothing to stage.")
+    }
+
+    /// Under each message, a session's answer is its last one before the next message it got;
+    /// status and questions show only under the newest one.
+    @Test func eachSessionsAnswerShowsUnderTheRightMessage() async throws {
+        let suiteName = #function
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = CodeHomeStore(scopeID: "computer", agentID: "default", source: DemoCodeProjectSource(),
+                                  git: { RecordingCodeGit() }, starter: RecordingCodeSessions(), defaults: defaults)
+        await store.load()
+        store.stage("Fix the widget tap")
+        let batch = try #require(store.sendAll(including: "Add a loading state"))
+        for _ in 0..<200 where !store.launches.isEmpty { try await Task.sleep(for: .milliseconds(20)) }
+        let sent = Date(timeIntervalSinceNow: -60)
+        store.record(CodeBatchMessage(id: UUID(), text: "#Widget tap use the shared check", sessionIDs: ["session-1"],
+                                      sentAt: sent), in: batch.id)
+        let answer = { (id: String, text: String, at: Date) in
+            TimelineItem(id: id, role: .assistant, sender: .agent(id: "default", snapshot: .init(name: "Avery", avatarFileName: nil)),
+                         content: .message(text), metadata: .init(timestamp: at))
+        }
+        let chats = [
+            "session-1": ChatModel(conversationID: "session-1", client: ConversationFixtureClient(), initialItems: [
+                answer("a1", "Started on the host check.", sent.addingTimeInterval(-30)),
+                answer("a2", "Switched to the shared check.", sent.addingTimeInterval(10)),
+            ]),
+            "session-2": ChatModel(conversationID: "session-2", client: ConversationFixtureClient(), initialItems: [
+                answer("b1", "Placeholder added.", sent.addingTimeInterval(20)),
+            ]),
+        ]
+        let model = CodeBatchChatModel(batchID: batch.id, store: store, status: ReadyStatus(),
+                                       prepareChat: { id in try #require(chats[id]) })
+        await model.prepare()
+
+        let atStart = model.replies(to: nil)
+        #expect(atStart.map(\.text) == ["Started on the host check.", "Placeholder added."])
+        #expect(atStart.map(\.isLatest) == [false, true])
+        let underMessage = model.replies(to: try #require(store.batch(id: batch.id)?.messages.first))
+        #expect(underMessage.map(\.member.id) == ["session-1"])
+        #expect(underMessage.first?.text == "Switched to the shared check.")
+        #expect(underMessage.first?.isLatest == true)
+    }
+
+    /// A session that can't take a message is named; the others still get it.
+    @Test func aSessionThatCantTakeAMessageIsNamed() async throws {
+        let suiteName = #function
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = CodeHomeStore(scopeID: "computer", agentID: "default", source: DemoCodeProjectSource(),
+                                  git: { RecordingCodeGit() }, starter: RecordingCodeSessions(), defaults: defaults)
+        await store.load()
+        store.stage("Fix the widget tap")
+        let batch = try #require(store.sendAll(including: "Add a loading state"))
+        for _ in 0..<200 where !store.launches.isEmpty { try await Task.sleep(for: .milliseconds(20)) }
+        let model = CodeBatchChatModel(batchID: batch.id, store: store, status: ReadyStatus(),
+                                       prepareChat: { _ in throw WorkspaceClientError.transportUnavailable })
+
+        #expect(await model.send("Keep each change small", fallback: ["session-1", "session-2"]))
+
+        #expect(store.batch(id: batch.id)?.messages.map(\.text) == ["Keep each change small"])
+        #expect(model.errorMessage == "Widget tap, Loading state couldn't take it right now. Open it to try again.")
+    }
+
     private func request(placement: CodePlacement, newBranch: String? = nil) -> CodeLaunchRequest {
         CodeLaunchRequest(message: "Fix the widget tap", agentID: "default",
                           project: CodeProject(id: "app", name: "app", folder: "/Users/demo/code/app"),
@@ -524,4 +643,9 @@ private final class FakeTextFiles: HostTextFileAccess {
     func write(_ path: String, text: String) async throws {
         contents[path] = text
     }
+}
+
+@MainActor
+private struct ReadyStatus: CodeSessionStatusReading {
+    func status(of sessionID: String) -> CodeSessionStatus { .ready }
 }

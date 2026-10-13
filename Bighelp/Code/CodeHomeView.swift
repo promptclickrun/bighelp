@@ -49,7 +49,7 @@ struct CodeHomeView: View {
             .frame(maxWidth: .infinity)
         }
         .scrollIndicators(.hidden)
-        .scrollDismissesKeyboard(.interactively)
+        .dismissesKeyboardOnScroll(true)
         .background(BighelpThemeCanvas(theme: theme).ignoresSafeArea())
         .safeAreaInset(edge: .bottom, spacing: 0) {
             CodeComposer(store: store, agents: context.agents, onWorktrees: context.onWorktrees)

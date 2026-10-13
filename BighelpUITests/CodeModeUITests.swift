@@ -68,6 +68,29 @@ final class CodeModeUITests: BighelpUITestCase {
         XCTAssertTrue(element("code.screen", in: app).waitForNonExistence(timeout: 5), "Bighelp Chat leaves Code.")
     }
 
+    /// A tap outside the message box puts the keyboard away, on an empty home and
+    /// between session cards (it used to stay up until you scrolled just right).
+    @MainActor
+    func testTappingOutsideTheMessageBoxClosesTheKeyboard() throws {
+        let app = makeApp()
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays",
+                               "-bighelp.settings.code-mode", "YES", "-bighelp.settings.code-mode.open-in", "code"]
+        app.launch()
+        XCTAssertTrue(element("code.screen", in: app).waitForExistence(timeout: 10))
+        let field = element("code.composer.field", in: app)
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+
+        field.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35)).tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 3), "The empty home closes the keyboard.")
+
+        send("Fix the widget tap", in: app)
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.42)).tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 3), "Space under the cards closes the keyboard.")
+    }
+
     /// Out of the box there's no Bighelp IDE: no switch in ☰.
     @MainActor
     func testCodeModeIsOffByDefault() throws {

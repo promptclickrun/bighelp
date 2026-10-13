@@ -50,6 +50,9 @@ struct CodeHomeView: View {
         }
         .scrollIndicators(.hidden)
         .dismissesKeyboardOnScroll(true)
+        // A tap anywhere outside the message box puts the keyboard away, as in
+        // Messages. Simultaneous, so cards and chips still take their taps.
+        .simultaneousGesture(TapGesture().onEnded { BighelpKeyboard.dismiss() })
         .background(BighelpThemeCanvas(theme: theme).ignoresSafeArea())
         .safeAreaInset(edge: .bottom, spacing: 0) {
             CodeComposer(store: store, agents: context.agents, onWorktrees: context.onWorktrees)

@@ -29,7 +29,7 @@ final class CodeModeHostUITests: BighelpUITestCase {
         probe.tap()
 
         if let model = environment["BIGHELP_CODE_MODEL"] {
-            app.buttons["code.composer.model"].tap()
+            app.buttons["code.composer.agent"].tap()
             app.buttons["code.runtime.model"].tap()
             // Lists build only the rows on screen: search narrows it to the model.
             let search = app.searchFields["code.runtime.search"].firstMatch
@@ -155,7 +155,7 @@ final class CodeModeHostUITests: BighelpUITestCase {
 
     @MainActor
     private func pick(_ model: String, provider: String?, in app: XCUIApplication) {
-        app.buttons["code.composer.model"].tap()
+        app.buttons["code.composer.agent"].tap()
         app.buttons["code.runtime.model"].tap()
         let search = app.searchFields["code.runtime.search"].firstMatch
         XCTAssertTrue(search.waitForExistence(timeout: 10))

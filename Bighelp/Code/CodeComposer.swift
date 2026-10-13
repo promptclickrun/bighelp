@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// Bighelp IDE's message box. In it: the agent, the model chip (it truncates, never
-/// the buttons) and the mode button (Default, Plan, YOLO). Under it, three chips choose
+/// Bighelp IDE's message box: the text with Send beside it, then a line with the agent
+/// (its chip opens the model, reasoning and fast mode for new sessions), the mode
+/// (Default, Plan, YOLO) and Stage, each a full-size target. Under it, three chips choose
 /// the project, where the session works (a new worktree or the local checkout) and its
 /// branch; they stay set after each send, so the next message starts the next session
 /// right away. Typing `/` first shows the new session's commands and skills.
@@ -28,23 +29,15 @@ struct CodeComposer: View {
                 stagedTray
             }
             VStack(alignment: .leading, spacing: BighelpTokens.space8) {
-                TextField("Describe a change…", text: $message, axis: .vertical)
-                    .font(.bighelp(.body))
-                    .foregroundStyle(theme.primaryText)
-                    .lineLimit(1...6)
-                    .focused($isFocused)
-                    .bighelpMacFieldArea()
-                    .accessibilityIdentifier("code.composer.field")
-                HStack(spacing: BighelpTokens.space8) {
-                    agentMenu
-                        .fixedSize()
-                    runtimeChip
-                        .layoutPriority(-1)
-                    modeMenu
-                        .fixedSize()
-                    Spacer(minLength: 0)
-                    stageButton
-                        .fixedSize()
+                HStack(alignment: .bottom, spacing: BighelpTokens.space8) {
+                    TextField("Describe a change…", text: $message, axis: .vertical)
+                        .font(.bighelp(.body))
+                        .foregroundStyle(theme.primaryText)
+                        .lineLimit(1...6)
+                        .focused($isFocused)
+                        .padding(.vertical, BighelpTokens.space8)
+                        .bighelpMacFieldArea()
+                        .accessibilityIdentifier("code.composer.field")
                     if hasStaged {
                         sendAllButton
                             .fixedSize()
@@ -53,10 +46,19 @@ struct CodeComposer: View {
                             .fixedSize()
                     }
                 }
+                HStack(spacing: BighelpTokens.space8) {
+                    agentChip
+                        .layoutPriority(-1)
+                    modeMenu
+                        .fixedSize()
+                    Spacer(minLength: 0)
+                    stageButton
+                        .fixedSize()
+                }
             }
-            .padding(.horizontal, BighelpTokens.space16)
-            .padding(.top, BighelpTokens.space12)
-            .padding(.bottom, BighelpTokens.space8)
+            .padding(.leading, BighelpTokens.space16)
+            .padding(.trailing, BighelpTokens.space12)
+            .padding(.vertical, BighelpTokens.space12)
             .bighelpSurface(.composer)
             ScrollView(.horizontal) {
                 HStack(spacing: BighelpTokens.space8) {
@@ -79,7 +81,7 @@ struct CodeComposer: View {
                 .bighelpSheetSize(.standard)
         }
         .bighelpSheet(isPresented: $isPickingRuntime) {
-            CodeRuntimePicker(store: store)
+            CodeRuntimePicker(store: store, agents: agents, avatarURL: avatarURL)
                 .bighelpSheetSize(.standard)
         }
         .task(id: isTypingCommand) {
@@ -142,15 +144,13 @@ struct CodeComposer: View {
         } label: {
             HStack(spacing: BighelpTokens.space4) {
                 Image(systemName: store.mode.systemImage)
-                // Default is the usual way, so its icon is enough; and while jobs are
-                // staged, Send all needs the room.
-                if !hasStaged, store.mode != .standard { Text(store.mode.title).lineLimit(1) }
+                Text(store.mode.title).lineLimit(1)
             }
             .font(.bighelp(.subheadline).weight(.semibold))
             .foregroundStyle(modeTint)
-            .padding(.horizontal, BighelpTokens.space8)
-            .frame(minWidth: BighelpTokens.scaled(30), minHeight: BighelpTokens.scaled(30))
-            .background(modeTint.opacity(store.mode == .standard ? 0 : 0.14), in: .capsule)
+            .padding(.horizontal, BighelpTokens.space12)
+            .frame(minHeight: BighelpTokens.scaled(44))
+            .background(store.mode == .standard ? theme.raisedSurface : modeTint.opacity(0.14), in: .capsule)
             .contentShape(.capsule)
         }
         .accessibilityLabel("Mode: \(store.mode.title)")
@@ -165,20 +165,36 @@ struct CodeComposer: View {
         }
     }
 
-    /// The model, reasoning and fast mode new sessions start with.
-    private var runtimeChip: some View {
-        Button { isPickingRuntime = true } label: {
-            Text(runtimeTitle)
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .font(.bighelp(.subheadline).weight(.medium))
-                .foregroundStyle(theme.secondaryText)
-                .frame(minHeight: BighelpTokens.scaled(36))
-                .contentShape(.rect)
+    /// The agent new sessions start with, by name; it opens the agent, model, reasoning and fast mode.
+    private var agentChip: some View {
+        let agent = agents.first { $0.id == store.agentID }
+        return Button { isPickingRuntime = true } label: {
+            HStack(spacing: BighelpTokens.space8) {
+                if let agent {
+                    AgentLiveAvatar(agentID: agent.id, displayName: agent.name, imageURL: avatarURL(agent),
+                                    size: BighelpTokens.scaled(26), showsBadge: false)
+                } else {
+                    Image(systemName: "person.crop.circle")
+                }
+                Text(agent?.name ?? "Agent")
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Image(systemName: "chevron.right")
+                    .font(.bighelp(.caption2).weight(.semibold))
+                    .foregroundStyle(theme.secondaryText)
+            }
+            .font(.bighelp(.subheadline).weight(.semibold))
+            .foregroundStyle(theme.primaryText)
+            .padding(.leading, BighelpTokens.space8)
+            .padding(.trailing, BighelpTokens.space12)
+            .frame(minHeight: BighelpTokens.scaled(44))
+            .background(theme.raisedSurface, in: .capsule)
+            .contentShape(.capsule)
         }
-        .bighelpPlainButtonStyle()
-        .accessibilityLabel("Model: \(runtimeTitle)")
-        .accessibilityIdentifier("code.composer.model")
+        .bighelpPlainButtonStyle(.capsule)
+        .accessibilityLabel("Agent: \(agent?.name ?? "none"), \(runtimeTitle)")
+        .accessibilityHint("Changes the agent, model, reasoning and fast mode for new sessions.")
+        .accessibilityIdentifier("code.composer.agent")
     }
 
     private var runtimeTitle: String {
@@ -212,7 +228,7 @@ struct CodeComposer: View {
             .font(.bighelp(.subheadline).weight(.semibold))
             .foregroundStyle(canSend ? theme.primaryText : theme.secondaryText)
             .padding(.horizontal, hasStaged ? 0 : BighelpTokens.space12)
-            .frame(minWidth: BighelpTokens.scaled(36), minHeight: BighelpTokens.scaled(36))
+            .frame(minWidth: BighelpTokens.scaled(44), minHeight: BighelpTokens.scaled(44))
             .background(theme.raisedSurface, in: .capsule)
             .contentShape(.capsule)
         }
@@ -237,9 +253,9 @@ struct CodeComposer: View {
             }
             .font(.bighelp(.subheadline).weight(.semibold))
             .foregroundStyle(theme.actionForeground)
-            .padding(.leading, BighelpTokens.space12)
-            .padding(.trailing, BighelpTokens.space8)
-            .frame(minHeight: BighelpTokens.scaled(36))
+            .padding(.leading, BighelpTokens.space16)
+            .padding(.trailing, BighelpTokens.space12)
+            .frame(minHeight: BighelpTokens.scaled(44))
             .background(theme.action, in: .capsule)
             .contentShape(.capsule)
         }
@@ -330,8 +346,8 @@ struct CodeComposer: View {
             Image(systemName: "arrow.up")
                 .font(.bighelp(.body).weight(.bold))
                 .foregroundStyle(canSend ? theme.actionForeground : theme.secondaryText)
-                .frame(width: BighelpTokens.scaled(36), height: BighelpTokens.scaled(36))
-                .background(canSend ? theme.action : theme.surface, in: .circle)
+                .frame(width: BighelpTokens.scaled(44), height: BighelpTokens.scaled(44))
+                .background(canSend ? theme.action : theme.raisedSurface, in: .circle)
                 .contentShape(.circle)
         }
         .bighelpPlainButtonStyle(.circle)
@@ -339,35 +355,6 @@ struct CodeComposer: View {
         .keyboardShortcut(.return, modifiers: .command)
         .bighelpIconLabel("Start session", shortcut: "⌘↩")
         .accessibilityIdentifier("code.composer.send")
-    }
-
-    private var agentMenu: some View {
-        Menu {
-            ForEach(agents) { agent in
-                Button {
-                    Task { await store.selectAgent(agent.id) }
-                } label: {
-                    if agent.id == store.agentID { Label(agent.name, systemImage: "checkmark") } else { Text(agent.name) }
-                }
-            }
-        } label: {
-            HStack(spacing: 2) {
-                if let agent = agents.first(where: { $0.id == store.agentID }) {
-                    AgentLiveAvatar(agentID: agent.id, displayName: agent.name, imageURL: avatarURL(agent),
-                                    size: BighelpTokens.scaled(24), showsBadge: false)
-                } else {
-                    Image(systemName: "person.crop.circle")
-                }
-                Image(systemName: "chevron.down")
-                    .font(.bighelp(.caption2).weight(.semibold))
-            }
-            .font(.bighelp(.subheadline).weight(.medium))
-            .foregroundStyle(theme.secondaryText)
-            .frame(minHeight: BighelpTokens.scaled(36))
-            .contentShape(.rect)
-        }
-        .accessibilityLabel("Agent: \(agents.first { $0.id == store.agentID }?.name ?? "none")")
-        .accessibilityIdentifier("code.composer.agent")
     }
 
     private var projectChip: some View {
@@ -681,10 +668,12 @@ struct CodeBranchPicker: View {
     @BighelpThemeReader private var theme
 }
 
-/// The model chip's sheet: the model (or the agent's own), the reasoning level and
-/// fast mode for new sessions. Each session applies them before its first message.
+/// The agent chip's sheet: the agent new sessions run with, then its model (or the agent's
+/// own), reasoning level and fast mode. Each session applies them before its first message.
 struct CodeRuntimePicker: View {
     @Bindable var store: CodeHomeStore
+    var agents: [AgentProfile] = []
+    var avatarURL: (AgentProfile) -> URL? = { _ in nil }
     @Environment(\.dismiss) private var dismiss
     @State private var providers: [BighelpLinkModelProvider] = []
     @State private var isLoading = true
@@ -694,6 +683,29 @@ struct CodeRuntimePicker: View {
     var body: some View {
         NavigationStack {
             Form {
+                if agents.count > 1 {
+                    Section("Agent") {
+                        ForEach(agents) { agent in
+                            Button {
+                                Task { await store.selectAgent(agent.id) }
+                            } label: {
+                                HStack(spacing: BighelpTokens.space12) {
+                                    AgentLiveAvatar(agentID: agent.id, displayName: agent.name, imageURL: avatarURL(agent),
+                                                    size: BighelpTokens.scaled(30), showsBadge: false)
+                                    Text(agent.name).foregroundStyle(theme.primaryText)
+                                    Spacer(minLength: 0)
+                                    if agent.id == store.agentID {
+                                        Image(systemName: "checkmark").foregroundStyle(theme.action)
+                                    }
+                                }
+                                .contentShape(.rect)
+                            }
+                            .bighelpPlainButtonStyle()
+                            .accessibilityIdentifier("code.runtime.agent.\(agent.id)")
+                        }
+                    }
+                    .listRowBackground(theme.surface)
+                }
                 Section("Model") {
                     NavigationLink {
                         modelList
@@ -725,10 +737,11 @@ struct CodeRuntimePicker: View {
             }
             .scrollContentBackground(.hidden)
             .background(theme.canvas.ignoresSafeArea())
-            .navigationTitle("Model")
+            .navigationTitle(agents.first { $0.id == store.agentID }?.name ?? "Agent")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
-            .task { await load() }
+            // Models are the agent's own: a new agent loads its list.
+            .task(id: store.agentID) { await load() }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("code.runtime")

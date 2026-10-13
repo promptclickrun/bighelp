@@ -144,8 +144,9 @@ final class CodeModeUITests: BighelpUITestCase {
         app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Plan")).firstMatch.tap()
         XCTAssertEqual(app.buttons["code.composer.mode"].label, "Mode: Plan")
 
-        // A long model chip ("GPT-5.6 Mini · X-High · Fast") truncates; the buttons beside it keep their place.
-        app.buttons["code.composer.model"].tap()
+        // The agent chip opens the model, reasoning and fast mode; Send sits beside the text, and the
+        // agent, mode and Stage each keep a full-size place on the line under it.
+        app.buttons["code.composer.agent"].tap()
         app.buttons["code.runtime.model"].tap()
         let mini = app.buttons["code.runtime.model.openai.gpt-5.6-mini"]
         XCTAssertTrue(mini.waitForExistence(timeout: 5))
@@ -156,14 +157,18 @@ final class CodeModeUITests: BighelpUITestCase {
         app.buttons["code.runtime.fast"].tap()
         app.buttons["On"].firstMatch.tap()
         app.buttons["Done"].firstMatch.tap()
-        let model = app.buttons["code.composer.model"]
+        let agent = app.buttons["code.composer.agent"]
         let mode = app.buttons["code.composer.mode"]
+        let stageButton = app.buttons["code.composer.stage"]
         let sendButton = app.buttons["code.composer.send"]
-        XCTAssertTrue(model.waitForExistence(timeout: 3))
-        XCTAssertEqual(model.label, "Model: GPT-5.6 Mini · X-High · Fast")
-        XCTAssertLessThanOrEqual(model.frame.maxX, mode.frame.minX + 1, "The model name stops before the mode button.")
-        XCTAssertLessThanOrEqual(mode.frame.maxX, sendButton.frame.minX + 1)
-        XCTAssertTrue(sendButton.isHittable)
+        XCTAssertTrue(agent.waitForExistence(timeout: 3))
+        XCTAssertTrue(agent.label.hasSuffix("GPT-5.6 Mini · X-High · Fast"), agent.label)
+        XCTAssertLessThan(sendButton.frame.maxY, agent.frame.minY + 1, "Send sits beside the text, above the chips.")
+        XCTAssertLessThanOrEqual(agent.frame.maxX, mode.frame.minX - 4, "The agent stops before the mode.")
+        XCTAssertLessThanOrEqual(mode.frame.maxX, stageButton.frame.minX - 4)
+        for control in [agent, mode, stageButton, sendButton] {
+            XCTAssertGreaterThanOrEqual(control.frame.height, 44, "\(control.identifier) is a full-size target")
+        }
         save("10-mode", app)
 
         // Changes: the plan file opens on its rendered preview.
@@ -200,7 +205,9 @@ final class CodeModeUITests: BighelpUITestCase {
         field.typeText("Write tests for the branch name helper")
         let sendAll = app.buttons["code.composer.send-all"]
         XCTAssertEqual(sendAll.label, "Send all 3")
-        XCTAssertLessThanOrEqual(sendAll.frame.maxX, element("code.composer.field", in: app).frame.maxX + 2,
+        XCTAssertGreaterThanOrEqual(sendAll.frame.minX, element("code.composer.field", in: app).frame.maxX,
+                                    "Send all sits beside the text.")
+        XCTAssertLessThanOrEqual(sendAll.frame.maxX, app.windows.firstMatch.frame.maxX - 12,
                                  "Send all stays inside the message box.")
         save("12-staged", app)
         sendAll.tap()

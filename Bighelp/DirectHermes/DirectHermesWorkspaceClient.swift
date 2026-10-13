@@ -682,24 +682,21 @@ final class DirectHermesWorkspaceClient: WorkspaceOperationPerforming {
     }
 
     /// What callers see when Hermes or the transport fails an operation.
+    /// Codes callers act on keep Hermes' own words for the alert.
     static func workspaceError(_ error: any Error, for operation: WorkspaceOperation) -> any Error {
-        if operation == .projectsGet, (error as? DirectHermesError) == .rpcRejected(code: 5062) {
-            return WorkspaceClientError.rejected(code: "project_not_found")
-        }
+        guard case .rpcRejected(let code, let message)? = error as? DirectHermesError else { return safeError(error) }
+        switch (operation, code) {
+        case (.projectsGet, 5062): return WorkspaceClientError.rejected(code: "project_not_found", message: message)
         // Hermes refuses parameters it doesn't know with 4000, so a caller can
         // retry without a field an older release lacks.
-        if operation == .sessionCreate, (error as? DirectHermesError) == .rpcRejected(code: 4000) {
-            return WorkspaceClientError.rejected(code: "invalid_params")
-        }
+        case (.sessionCreate, 4000): return WorkspaceClientError.rejected(code: "invalid_params", message: message)
         // 4007: no such chat. Resuming "Bot Chat" by name tells an agent without one this way.
-        if operation == .sessionResume, (error as? DirectHermesError) == .rpcRejected(code: 4007) {
-            return WorkspaceClientError.rejected(code: "4007")
+        case (.sessionResume, 4007): return WorkspaceClientError.rejected(code: "4007", message: message)
+        // 4022: Hermes won't take the title: another chat holds it (a first Bot Chat checks
+        // who), or it's a hidden Bot Chat's.
+        case (.sessionTitle, 4022): return WorkspaceClientError.rejected(code: "4022", message: message)
+        default: return safeError(error)
         }
-        // 4022: the title is taken. A first Bot Chat checks who holds it.
-        if operation == .sessionTitle, (error as? DirectHermesError) == .rpcRejected(code: 4022) {
-            return WorkspaceClientError.rejected(code: "4022")
-        }
-        return safeError(error)
     }
 
     private static func safeError(_ error: any Error) -> any Error {

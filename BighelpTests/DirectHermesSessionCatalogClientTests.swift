@@ -1257,6 +1257,92 @@ struct DirectHermesSessionCatalogClientTests {
                                       "archived": .boolean(true), "hidden": .boolean(true)]])
     }
 
+    /// New Bot Chat sets the Bot Chat aside: Hermes won't rename a hidden "Bot Chat", so the row it
+    /// renames is unhidden first, even when that isn't the registry's root (a chat Hermes compacted
+    /// before it compacted in place) or the app no longer knows the root after a reconnect.
+    @Test func newBotChatUnhidesTheRowItRenames() async throws {
+        @MainActor final class Host { var hidden: Set<String> = ["canonical-root", "tip"]; var title = "Bot Chat" }
+        let host = Host()
+        let workspace = try SessionWorkspaceStub()
+        workspace.handler = { operation, payload in
+            switch operation {
+            case .profilesList: return Self.profiles(canonical: "canonical-root", resolved: "tip")
+            case .sessionResume, .sessionActivate: return Self.attached(stored: "tip")
+            case .sessionUpdate:
+                if payload["hidden"] == .boolean(false), let id = payload["session_id"]?.string { host.hidden.remove(id) }
+                return payload.merging(["ok": .boolean(true)]) { $1 }
+            case .sessionTitle:
+                // As Hermes' SessionDB.set_session_title answers for the live row.
+                guard !host.hidden.contains("tip") else {
+                    throw WorkspaceClientError.rejected(code: "4022", message: HermesRefusalMessage(
+                        "This is the bot's canonical Bot Chat — its name is its identity, and renaming it would orphan the conversation."))
+                }
+                host.title = payload["title"]?.string ?? host.title
+                return ["pending": .boolean(false), "title": .string(host.title)]
+            case .sessionDetail:
+                return ["id": payload["session_id"]!, "profile": .string("alpha"), "title": .string(host.title),
+                        "hidden": .boolean(host.hidden.contains(payload["session_id"]?.string ?? ""))]
+            default:
+                Issue.record("Unexpected \(operation)")
+                throw WorkspaceClientError.invalidRequest
+            }
+        }
+        let sessions = Self.client(workspace)
+        guard case .resolved(let botChat) = try await sessions.resolveCanonicalChat(profileID: "alpha") else {
+            Issue.record("Expected the Bot Chat")
+            return
+        }
+        let retired = SessionRecord.retiredBotChatTitle(at: .now)
+        try await sessions.rename(botChat.record, title: retired)
+        #expect(host.title == (try SessionTitleRules.validated(retired)))
+        #expect(host.hidden.isEmpty, "The retired Bot Chat shows as a regular chat")
+    }
+
+    /// After a reconnect the idle Bot Chat wasn't in Hermes' saved list (it's hidden) nor among its
+    /// busy live chats, so the app rebuilt it as unsaved and New Bot Chat refused it ("Check the
+    /// connection") without asking Hermes, which has its row.
+    @Test func newBotChatWorksOnABotChatTheAppNoLongerKnows() async throws {
+        @MainActor final class Host { var hidden = true; var title = "Bot Chat" }
+        let host = Host()
+        let workspace = try SessionWorkspaceStub()
+        workspace.handler = { operation, payload in
+            @MainActor func row() throws -> BighelpJSONValue {
+                var row = try #require(Self.session(id: "bot-live").object)
+                row["title"] = .string(host.title)
+                row["hidden"] = .boolean(host.hidden)
+                return .object(row)
+            }
+            switch operation {
+            case .profilesList: return Self.profiles(canonical: "bot-live")
+            case .sessionsList:
+                return ["sessions": .array([try row()]), "total": .integer(1), "offset": payload["offset"] ?? .integer(0),
+                        "limit": .integer(100)]
+            case .sessionDetail: return try #require(try row().object)
+            case .sessionUpdate:
+                if payload["hidden"] == .boolean(false) { host.hidden = false }
+                if let title = payload["title"]?.string {
+                    // As Hermes' SessionDB.set_session_title answers.
+                    guard !host.hidden else {
+                        throw DirectHermesError.rpcRejected(code: 4022, message: HermesRefusalMessage("This is the bot's canonical Bot Chat"))
+                    }
+                    host.title = title
+                }
+                return payload.merging(["ok": .boolean(true)]) { $1 }
+            default:
+                Issue.record("Unexpected \(operation)")
+                throw WorkspaceClientError.invalidRequest
+            }
+        }
+        let sessions = Self.client(workspace)
+        let botChat = SessionRecord(
+            id: try DirectHermesSessionIdentity.appID(owner: try #require(workspace.owner), profileID: "alpha", anchorID: "bot-live"),
+            kind: .direct, agentIDs: ["alpha"], title: "Bot Chat")
+        let retired = try SessionTitleRules.validated(SessionRecord.retiredBotChatTitle(at: .now))
+        try await sessions.rename(botChat, title: retired)
+        #expect(host.title == retired)
+        #expect(!host.hidden)
+    }
+
     /// Without a source Hermes labels the chat "tui" and tells the agent it's in a terminal: no files,
     /// no cards, reminders can't reach anyone. Reopened chats must keep the same label.
     @Test func chatsTellHermesTheyComeFromBighelp() async throws {

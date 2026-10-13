@@ -1137,15 +1137,31 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
     func rename(_ record: SessionRecord, title: String) async throws {
         let title = try SessionTitleRules.validated(title)
         var binding = try candidate(for: record)
-        guard !binding.isLiveDiscoveryOnly else {
-            throw DirectHermesSessionError.sessionNotPersisted
+        if binding.isLiveDiscoveryOnly {
+            // A hidden Bot Chat isn't in Hermes' saved list, only among its live chats, so after a
+            // reconnect it looks unsaved here. Hermes' own row decides; a draft without one waits.
+            guard let stored = binding.coordinate.storedSessionID,
+                  (try? await detail(profileID: binding.coordinate.profileID, storedID: stored)) != nil else {
+                throw DirectHermesSessionError.sessionNotPersisted
+            }
+            binding.isLiveDiscoveryOnly = false
+            binding.durability = .persisted
         }
+        // Hermes won't rename a hidden "Bot Chat", an agent's canonical one, so each row the rename
+        // touches is unhidden first. After a compaction the live row is the newest of the chat's
+        // history, not the registry's root, and is hidden too.
+        let isBotChat = record.isBotChat || binding.record.isBotChat
+        var unhidden: Set<String> = []
         if let canonical = binding.canonicalRegistryID {
             try await releaseBotChat(canonical, profileID: binding.coordinate.profileID)
+            unhidden.insert(canonical)
             binding.canonicalRegistryID = nil
         }
         let targetID: String
         if let live = binding.coordinate.runtimeSessionID {
+            if isBotChat, let stored = binding.coordinate.storedSessionID, !unhidden.contains(stored) {
+                try await releaseBotChat(stored, profileID: binding.coordinate.profileID)
+            }
             let response = try await perform(.sessionTitle, ["session_id": .string(live), "title": .string(title)])
             guard response["pending"]?.boolean == false, response["title"]?.string == title else {
                 throw WorkspaceClientError.outcomeUnknown
@@ -1155,8 +1171,9 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
             targetID = try DirectHermesSessionValidation.string(binding.coordinate.storedSessionID.map(BighelpJSONValue.string))
         } else {
             let catalog = try await refreshedCatalogCoordinate(for: binding)
-            if let canonical = catalog.canonicalRegistryID {
-                try await releaseBotChat(canonical, profileID: binding.coordinate.profileID)
+            for row in [catalog.canonicalRegistryID, isBotChat ? catalog.rowID : nil].compactMap({ $0 })
+                where unhidden.insert(row).inserted {
+                try await releaseBotChat(row, profileID: binding.coordinate.profileID)
             }
             targetID = catalog.rowID
             binding.catalog = catalog

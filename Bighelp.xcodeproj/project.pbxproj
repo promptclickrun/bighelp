@@ -706,6 +706,7 @@
 		7AE6F3475E648035CD4C8EDE /* WorkspaceCatalogFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = F338D93CB5697466AD655EC1 /* WorkspaceCatalogFixtures.swift */; };
 		7B4202245F9346B035692A24 /* PersonalityStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A693268CC41E91CE0E9F71A8 /* PersonalityStoreTests.swift */; };
 		7B727A8F0DA82454D4B849D8 /* DirectHermesGoalControlTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75A9A6B0C9E8C9BEC16C2B8E /* DirectHermesGoalControlTests.swift */; };
+		7BDCC2A37F808393A7DD8AE7 /* NewBotChatHostUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC90F1E6006570C9305AFBF4 /* NewBotChatHostUITests.swift */; };
 		7BDF3997E6662235824BD760 /* live-weather.json in Resources */ = {isa = PBXBuildFile; fileRef = B0A56EB5D07569F9E6429927 /* live-weather.json */; };
 		7BE34633857A18B677F46A67 /* VoiceTurnCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B72D11F361B8DFCCADE3DF /* VoiceTurnCapture.swift */; };
 		7BFD261066C0ABA64B622CC9 /* ChatImageStack.swift in Sources */ = {isa = PBXBuildFile; fileRef = F01086DE6C5EB56F04C92807 /* ChatImageStack.swift */; };
@@ -2927,6 +2928,7 @@
 		FC3F5DFA60CB944EBA4AC304 /* ChatTimelinePresentationPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatTimelinePresentationPolicy.swift; sourceTree = "<group>"; };
 		FC5FF84A7BFB9842FEF2E239 /* SlashCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlashCommands.swift; sourceTree = "<group>"; };
 		FC7A06A6391FB704F789A1C5 /* DirectHermesProjectGitClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectHermesProjectGitClientTests.swift; sourceTree = "<group>"; };
+		FC90F1E6006570C9305AFBF4 /* NewBotChatHostUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewBotChatHostUITests.swift; sourceTree = "<group>"; };
 		FCB46164ED10DBD654E8A0FA /* QuietHoursUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuietHoursUITests.swift; sourceTree = "<group>"; };
 		FCD72AB088AD85CF46830B9D /* BighelpCardCatalogClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpCardCatalogClientTests.swift; sourceTree = "<group>"; };
 		FD8984FDAE443FADB5D80A91 /* DirectHermesModelAdministrationClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectHermesModelAdministrationClient.swift; sourceTree = "<group>"; };
@@ -4300,6 +4302,7 @@
 				F0F5EA641F106E35BD8FE868 /* ModelConfirmationUITests.swift */,
 				9ADF27E2CDA198F28038830E /* NativeSubagentProductionUITests.swift */,
 				890274CE80C4CC5D8A048163 /* NativeWorkspaceProductionUITests.swift */,
+				FC90F1E6006570C9305AFBF4 /* NewBotChatHostUITests.swift */,
 				9D43B98A57E0784696329BB4 /* PinnedAgentsWidgetUITests.swift */,
 				DC38D0D5259ADD3E10988468 /* PluginReleaseUpdateHostUITests.swift */,
 				76A9E790A09E41281C7CF8C7 /* ProjectsAndBoardHostUITests.swift */,
@@ -6935,6 +6938,7 @@
 				B3347B167D7830ADCFFE0D76 /* ModelConfirmationUITests.swift in Sources */,
 				E0FC4D0756B791358EA0DA7F /* NativeSubagentProductionUITests.swift in Sources */,
 				EDE0D703B5A96188D6357DAD /* NativeWorkspaceProductionUITests.swift in Sources */,
+				7BDCC2A37F808393A7DD8AE7 /* NewBotChatHostUITests.swift in Sources */,
 				C8C3BFD6A8B48C6CDD9806E9 /* PinnedAgentsWidgetUITests.swift in Sources */,
 				31AE5D4F20F7FAC9AF75F21C /* PluginReleaseUpdateHostUITests.swift in Sources */,
 				6AF03C308DFFF1432E48DAD0 /* ProjectsAndBoardHostUITests.swift in Sources */,

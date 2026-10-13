@@ -41,6 +41,11 @@ struct DirectHermesWorkspaceClientTests {
         #expect(long.text?.count == HermesRefusalMessage.maximumCharacters && long.text?.hasSuffix("…") == true)
         #expect(HermesRefusalMessage(" \n ").sentence == nil)
         #expect(WorkspaceClientError.rejected(code: nil).localizedDescription == "Hermes rejected this operation.")
+        // Codes callers act on keep the words too: New Bot Chat's alert said "Check the connection".
+        let titleRefused = DirectHermesWorkspaceClient.workspaceError(
+            DirectHermesError.rpcRejected(code: 4022, message: HermesRefusalMessage("Title is in use")), for: .sessionTitle)
+        #expect(titleRefused as? WorkspaceClientError == .rejected(code: "4022"))
+        #expect(HermesRefusalMessage.sentence(in: titleRefused) == "Hermes said: Title is in use")
     }
 
     @Test func nativeCreationOptionsRouteWithoutSelectiveFlags() throws {

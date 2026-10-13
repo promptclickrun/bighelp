@@ -141,8 +141,12 @@ struct CodeChatSessionStarter: CodeSessionStarting {
         // Demo chats have no Hermes settings; their sample replies need no approvals.
         guard features.hasNativeSessionControls else { return }
         do {
+            // The session's chat attaches it to the live connection first, as a send does.
+            let chat = try BighelpShortcutWorkspace.chatModel(sessionID: sessionID, in: features)
+            try await BighelpShortcutService.awaitTransportReady(chat)
             try await features.setSessionYOLO(true, sessionID: sessionID, agentID: agentID)
         } catch {
+            NSLog("bighelp: YOLO for a new IDE session failed: %@", String(describing: error))
             throw CodeStartError.yoloRefused
         }
     }

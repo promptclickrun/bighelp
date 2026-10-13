@@ -135,7 +135,8 @@ final class DirectHermesSessionControlClient: SessionRuntimeControlConfirming, S
     /// Sets the session's own YOLO flag (Hermes' `config.set yolo`, session scope). Hermes
     /// answers "1" or "0", so the reply confirms it; there is no separate read.
     func setYOLO(_ on: Bool, sessionID: String, agentID: String) async throws {
-        let coordinate = try coordinate(sessionID: sessionID, agentID: agentID)
+        // A brand-new session is live (it has a runtime ID) before Hermes stores it at its first turn.
+        let coordinate = try liveCoordinate(sessionID: sessionID, agentID: agentID)
         guard let runtimeID = coordinate.runtimeSessionID else { throw WorkspaceClientError.invalidRequest }
         let response = try await perform(.configSet, payload: [
             "profile": .string(agentID), "session_id": .string(runtimeID),
@@ -549,6 +550,22 @@ final class DirectHermesSessionControlClient: SessionRuntimeControlConfirming, S
               DirectHermesSessionValidation.same(coordinate.sessionID, sessionID),
               DirectHermesSessionValidation.same(coordinate.profileID, agentID),
               coordinate.runtimeSessionID != nil, coordinate.storedSessionID != nil else {
+            throw WorkspaceClientError.unavailable(.unsupportedOperation)
+        }
+        try requireCurrent(sessionID: sessionID, coordinate: coordinate)
+        return coordinate
+    }
+
+    /// The session's live coordinate, stored or not yet (a new session before its first turn).
+    private func liveCoordinate(sessionID: String, agentID: String) throws -> WorkspaceSessionCoordinate {
+        let identity = try DirectHermesSessionIdentity.decode(sessionID, owner: owner)
+        guard DirectHermesSessionValidation.same(identity.profileID, agentID) else {
+            throw WorkspaceClientError.invalidRequest
+        }
+        guard let coordinate = resolveSession(sessionID), coordinate.owner == owner,
+              DirectHermesSessionValidation.same(coordinate.sessionID, sessionID),
+              DirectHermesSessionValidation.same(coordinate.profileID, agentID),
+              coordinate.runtimeSessionID != nil else {
             throw WorkspaceClientError.unavailable(.unsupportedOperation)
         }
         try requireCurrent(sessionID: sessionID, coordinate: coordinate)

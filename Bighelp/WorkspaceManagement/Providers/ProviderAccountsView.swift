@@ -323,6 +323,22 @@ final class ProviderAccountsStore {
         }
     }
 
+    /// Refresh model catalogs: Hermes asks every provider for its newest models, so the model
+    /// pickers list models a provider added since Hermes last looked.
+    func refreshModelCatalogs() async {
+        guard begin("Refreshing model catalogs") else { return }
+        defer { finish() }
+        do {
+            _ = try await client.listProviders(profileID: profileID, refresh: true)
+            guard ownsScope else { return }
+            try await reloadAfterMutation(message: "Hermes refreshed every provider's model catalog.")
+        } catch is CancellationError {
+        } catch {
+            guard ownsScope else { return }
+            errorMessage = Self.message(error)
+        }
+    }
+
     func disconnectOAuth(providerID: String) async {
         guard begin("Disconnecting account") else { return }
         defer { finish() }
@@ -585,6 +601,7 @@ struct ProviderAccountsView: View {
                             searchResults(overview.matching(search), portal: snapshot.portal)
                         } else {
                             yourProvidersSection(overview.connected, portal: snapshot.portal)
+                            refreshCatalogsSection
                             signInSection(overview.signIns)
                             Section {
                                 NavigationLink {
@@ -718,6 +735,18 @@ struct ProviderAccountsView: View {
             }
         } header: {
             Text("Your providers")
+        }
+    }
+
+    private var refreshCatalogsSection: some View {
+        Section {
+            Button("Refresh model catalogs", systemImage: "arrow.clockwise") {
+                Task { await store.refreshModelCatalogs() }
+            }
+            .disabled(store.isBusy)
+            .accessibilityIdentifier("providers.refresh-model-catalogs")
+        } footer: {
+            Text("Asks each provider for its newest models, for the model pickers.")
         }
     }
 

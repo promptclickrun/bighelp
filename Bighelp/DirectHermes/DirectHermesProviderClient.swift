@@ -251,7 +251,9 @@ final class DirectHermesProviderClient {
                 .init(name: "include_unconfigured", value: "true"),
                 .init(name: "explicit_only", value: "false"),
             ],
-            maximumResponseBytes: 2_097_152
+            maximumResponseBytes: 2_097_152,
+            // A refresh asks every provider for its models again; slow ones take a while.
+            timeout: refresh ? 120 : 20
         )) } catch is CancellationError {
             throw CancellationError()
         } catch {

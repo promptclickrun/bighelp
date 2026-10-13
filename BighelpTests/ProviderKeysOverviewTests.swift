@@ -6,6 +6,22 @@ import Testing
 /// the API keys you can add. Technical settings stay under Advanced.
 @MainActor
 struct ProviderKeysOverviewTests {
+    /// Refresh model catalogs asks Hermes to fetch every provider's models again, with time
+    /// for slow providers, then shows the result.
+    @Test func refreshModelCatalogsAsksHermesForEveryProvidersNewestModels() async throws {
+        let authority = try WorkspaceAuthority.direct(endpointIdentity: "https://demo-mac.example", providerID: "demo", userID: "demo")
+        let owner = WorkspaceOwner(authority: authority, authenticationGeneration: UUID(), connectionGeneration: UUID())
+        let transport = DemoProviderKeysTransport()
+        let store = ProviderAccountsStore(hostName: "Demo Mac", profileID: "default", servingProfileID: "default",
+            client: DirectHermesProviderClient(rpc: transport, http: transport, owner: owner, currentOwner: { owner }))
+        await store.load()
+        #expect(transport.catalogRefreshTimeouts.isEmpty, "Opening the screen reads the saved catalogs")
+        await store.refreshModelCatalogs()
+        #expect(transport.catalogRefreshTimeouts == [120])
+        #expect(store.successMessage == "Hermes refreshed every provider's model catalog.")
+        #expect(store.errorMessage == nil && !store.isBusy)
+    }
+
     private func account(_ id: String, _ name: String, flow: DirectHermesOAuthProvider.Flow, loggedIn: Bool = false,
                          freeTier: Bool? = nil, tier: String? = nil, command: String? = nil,
                          canDisconnect: Bool = true, error: String? = nil) -> DirectHermesOAuthProvider {

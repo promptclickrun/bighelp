@@ -82,6 +82,29 @@ final class DefaultModelUITests: BighelpUITestCase {
         }
     }
 
+    /// Settings › AI providers › Refresh model catalogs.
+    @MainActor
+    func testRefreshModelCatalogsFromAIProviders() {
+        for appearance in ["light", "dark"] {
+            let app = makeApp()
+            app.launchArguments += ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.demo.appearance", appearance]
+            app.launch()
+            _ = app.buttons.matching(NSPredicate(format: "identifier IN %@", ["home.drawer.open", "chat.menu", "tab.profile"]))
+                .firstMatch.waitForExistence(timeout: 60)
+            openSettings(in: app)
+            settingsRow("settings.providers", in: app).tap()
+            XCTAssertTrue(app.navigationBars["Provider Keys"].waitForExistence(timeout: 8))
+            let refresh = app.buttons["providers.refresh-model-catalogs"]
+            XCTAssertTrue(refresh.waitForExistence(timeout: 10), "Under Your providers")
+            evidence("provider-keys-\(appearance)", app)
+            refresh.tap()
+            XCTAssertTrue(app.descendants(matching: .any)["providers.confirmed"].waitForExistence(timeout: 10),
+                          "Hermes refreshed the catalogs")
+            evidence("provider-keys-refreshed-\(appearance)", app)
+            app.terminate()
+        }
+    }
+
     // MARK: - Steps
 
     @MainActor

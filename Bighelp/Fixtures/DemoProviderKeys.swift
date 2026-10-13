@@ -9,6 +9,8 @@ final class DemoProviderKeysTransport: DirectHermesRPC, DirectHermesAuthenticate
     var onEvent: ((DirectHermesEvent) -> Void)?
 
     private(set) var signedIn: Set<String> = ["nous"]
+    /// Seconds each Refresh model catalogs request was allowed, in order.
+    private(set) var catalogRefreshTimeouts: [TimeInterval] = []
     private var savedKeys: Set<String> = ["OPENROUTER_API_KEY"]
     private var sessions: [String: (provider: String, checks: Int)] = [:]
 
@@ -65,6 +67,7 @@ final class DemoProviderKeysTransport: DirectHermesRPC, DirectHermesAuthenticate
         let path = request.path
         switch (request.method, path) {
         case (.get, "/api/model/options"):
+            if request.query.contains(.init(name: "refresh", value: "true")) { catalogRefreshTimeouts.append(request.timeout) }
             return .object(["providers": .array(Self.keys.filter(\.secret).map { key in
                 .object(["slug": .string(key.provider), "name": .string(key.label), "auth_type": .string("api_key"),
                          "authenticated": .boolean(savedKeys.contains(key.id)), "key_env": .string(key.id),

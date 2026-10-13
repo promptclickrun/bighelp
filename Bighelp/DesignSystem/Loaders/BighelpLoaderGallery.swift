@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Debug builds only: every loader in every state, opened with the launch
 /// argument `-bighelp-loader-gallery`. Optional presets for screenshots:
-/// `-bighelp-loader-gallery-section images|cards|hosts|activity|buttons|scroll`,
+/// `-bighelp-loader-gallery-section noodle|images|cards|hosts|activity|buttons|scroll`,
 /// `-bighelp-loader-gallery-appearance light|dark`,
 /// `-bighelp-loader-gallery-motion still|low-power|inactive` and
 /// `-bighelp-loader-gallery-anchor "<panel title>"` (scrolls to that panel),
@@ -33,10 +33,11 @@ enum BighelpLoaderGallery {
 
 #if DEBUG
 private enum GallerySection: String, CaseIterable, Identifiable {
-    case images, cards, hosts, activity, buttons, scroll
+    case noodle, images, cards, hosts, activity, buttons, scroll
     var id: Self { self }
     var title: String {
         switch self {
+        case .noodle: "Noodle"
         case .images: "Images"
         case .cards: "Cards"
         case .hosts: "Hosts"
@@ -76,7 +77,7 @@ private enum GalleryMotion: String, CaseIterable, Identifiable {
 
 private struct BighelpLoaderGalleryView: View {
     @State private var section = GallerySection(
-        rawValue: UserDefaults.standard.string(forKey: "bighelp-loader-gallery-section") ?? "") ?? .images
+        rawValue: UserDefaults.standard.string(forKey: "bighelp-loader-gallery-section") ?? "") ?? .noodle
     @State private var appearance = GalleryAppearance(
         rawValue: UserDefaults.standard.string(forKey: "bighelp-loader-gallery-appearance") ?? "") ?? .system
     @State private var motion = GalleryMotion(
@@ -152,12 +153,59 @@ private struct BighelpLoaderGalleryView: View {
     @ViewBuilder
     private var content: some View {
         switch section {
+        case .noodle: GalleryNoodle()
         case .images: GalleryImages()
         case .cards: GalleryCards()
         case .hosts: GalleryHosts()
         case .activity: GalleryActivity()
         case .buttons: GalleryButtons()
         case .scroll: GalleryScrollTest()
+        }
+    }
+}
+
+/// Every brand-kit motion where the app plays it, and the chat's one-loader rule.
+private struct GalleryNoodle: View {
+    private static let uses: [(BighelpNoodleMotion, String)] = [
+        (.loader, "Loading"), (.thinking, "Thinking"), (.listening, "Voice: listening"),
+        (.talking, "Voice: talking"), (.resting, "Voice: paused"), (.launch, "Connecting"),
+        (.spring, "Reconnecting"), (.lasso, "Searching"), (.infinity, "Helper agents"),
+        (.squiggle, "Sending"), (.question, "Can't open a page"), (.exit, "Ending a call"),
+        (.reveal, "First run"), (.hello, "After the reveal"), (.idle, "Empty places"),
+        (.done, "Work finished"), (.heart, "Favorite model"), (.bunny, "Settings, three taps"),
+        (.pull, "Pull to refresh"),
+    ]
+    @State private var focus = BighelpActivityLoaderFocus()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: BighelpTokens.space24) {
+            GalleryPanel(title: "Wordmark") {
+                BighelpWordmark(height: 44)
+            }
+            GalleryPanel(title: "Motions", note: "One-shots repeat here so you can watch them.") {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: BighelpTokens.space16)],
+                          spacing: BighelpTokens.space20) {
+                    ForEach(Self.uses, id: \.0) { motion, use in
+                        VStack(spacing: BighelpTokens.space8) {
+                            BighelpNoodleView(motion: motion, size: 44,
+                                              playback: motion == .pull ? .progress(0.7) : .loop(pause: 0.8))
+                                .frame(width: 64, height: 64)
+                            Text(motion.rawValue).font(.bighelp(.footnote, weight: .semibold))
+                            Text(use).font(.bighelp(.caption)).foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+            }
+            GalleryPanel(title: "Chat: one loader", note: "Both folders are live; only the newest plays.") {
+                VStack(alignment: .leading, spacing: 0) {
+                    BighelpActivityRow(phase: .thinking, loaderID: "thinking")
+                    BighelpActivityRow(phase: .working(BighelpToolActivityCatalog.fallback), loaderID: "work")
+                }
+                .environment(\.bighelpActivityLoaderFocus, focus)
+                .onAppear { focus.activeID = "work" }
+            }
         }
     }
 }

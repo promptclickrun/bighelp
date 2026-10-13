@@ -43,8 +43,8 @@ struct WatchAgentOrb: View {
     }
 }
 
-/// Ember, bighelp's mark.
-struct WatchEmberMark: View {
+/// The Noodle, bighelp's mark.
+struct WatchBrandMark: View {
     var size: CGFloat = 22
 
     var body: some View {

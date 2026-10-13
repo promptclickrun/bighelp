@@ -200,7 +200,7 @@ struct AgentMediaTile: View {
                 }
                 .overlay {
                     if store.openingID == item.id {
-                        BighelpSpinner(size: 18, lineWidth: 2, color: .white)
+                        BighelpSpinner(size: 18, color: .white)
                             .padding(10)
                             .background(.black.opacity(0.4), in: Circle())
                     }

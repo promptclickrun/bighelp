@@ -208,7 +208,7 @@ struct CodeChangesView: View {
         .navigationTitle(model.session.title)
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .bottom, spacing: 0) { if canShip { shipBar } }
-        .refreshable { await model.load() }
+        .bighelpRefreshable { await model.load() }
         .task { await model.load() }
         .bighelpSheet(item: Binding(get: { model.diff }, set: { if $0 == nil { model.closeDiff() } })) { diff in
             CodeDiffSheet(diff: diff, preview: model.preview).bighelpSheetSize(.large)

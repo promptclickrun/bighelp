@@ -894,6 +894,7 @@ struct BighelpModelPickerSheet: View {
                         .reflectiveVisionIcon()
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(pinned ? theme.action : theme.secondaryText)
+                        .bighelpNoodleMoment(.heart, when: pinned, size: 26)
                         .frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
                         .contentShape(Rectangle())
                         .accessibilityHidden(true)

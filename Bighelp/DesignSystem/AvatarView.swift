@@ -54,7 +54,7 @@ struct AvatarView: View {
                     .clipShape(.circle)
                     .overlay(alignment: .topTrailing) {
                         if state == .nudge {
-                            Circle().fill(EmberBrand.ember)
+                            Circle().fill(BighelpBrand.ember)
                                 .frame(width: size * 0.24, height: size * 0.24)
                                 .overlay(Circle().stroke(.white, lineWidth: max(1, size * 0.03)))
                         }

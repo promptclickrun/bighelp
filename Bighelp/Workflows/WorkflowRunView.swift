@@ -47,7 +47,7 @@ struct WorkflowRunView: View {
         .navigationTitle(model.summary.map { "Run \($0.number)" } ?? "Run")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
-        .refreshable { await model.load() }
+        .bighelpRefreshable { await model.load() }
     }
 }
 

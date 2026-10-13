@@ -21,7 +21,7 @@ enum AgentLiveState: String, CaseIterable, Sendable {
         case .listening: Color(hex: "007AFF")
         case .thinking: Color(hex: "F28B32")
         case .speaking, .happy: Color(hex: "1E7A4E")
-        case .nudge: EmberBrand.ember
+        case .nudge: BighelpBrand.ember
         }
     }
 }
@@ -116,7 +116,7 @@ struct AgentPersonaAvatar: View {
             }
             if state == .nudge {
                 let badge = CGRect(x: s * 0.73, y: s * 0.05, width: s * 0.22, height: s * 0.22)
-                context.fill(Path(ellipseIn: badge), with: .color(EmberBrand.ember))
+                context.fill(Path(ellipseIn: badge), with: .color(BighelpBrand.ember))
                 context.stroke(Path(ellipseIn: badge), with: .color(.white), lineWidth: s * 0.03)
             }
         }

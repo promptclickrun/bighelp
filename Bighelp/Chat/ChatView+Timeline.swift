@@ -37,6 +37,7 @@ extension ChatView {
     }
     var timeline: some View {
         let rows = canvasRows
+        let activeLoader = ChatCanvasTranscriptProjection.activeLoaderID(in: rows, isSending: model.isSending)
         let firstID = rows.first?.id
         let groupedIDs = Self.groupedMessageRowIDs(rows)
         let continuedIDs = Self.continuedMessageRowIDs(rows)
@@ -57,6 +58,10 @@ extension ChatView {
                 .environment(\.chatMessageContinuesPrevious, continuedIDs.contains(row.id))
         }
         .simultaneousGesture(TapGesture().onEnded { dismissKeyboard() })
+        // Only the timeline's rows share one loader (sheets over the chat keep their own).
+        // Rows read the focus themselves, so an unchanged row still stops or starts its loader.
+        .environment(\.bighelpActivityLoaderFocus, model.loaderFocus)
+        .onChange(of: activeLoader, initial: true) { _, id in model.loaderFocus.activeID = id }
         .onChange(of: fittingRailScrollRequest.generation) { _, _ in
             switch fittingRailScrollRequest.direction {
             case .towardLatest: timelineController.scrollToLatest(animated: !reduceMotion)

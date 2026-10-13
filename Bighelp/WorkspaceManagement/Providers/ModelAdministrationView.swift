@@ -320,7 +320,7 @@ struct ModelAdministrationView: View {
                 }
                 .listStyle(.insetGrouped)
                 .disabled(fastModeDefaults?.isSaving == true)
-                .refreshable { await store.refresh() }
+                .bighelpRefreshable { await store.refresh() }
             } else {
                 ContentUnavailableView(
                     "Models unavailable", systemImage: "cpu",

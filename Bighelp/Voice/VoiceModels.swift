@@ -44,6 +44,45 @@ enum VoiceOrbPresentation {
     }
 }
 
+/// The Noodle in the voice pill acts out the call: it listens, thinks and talks along,
+/// rests while paused or muted, and asks when something went wrong.
+enum VoiceNoodle {
+    static func motion(_ state: AgentLiveState) -> BighelpNoodleMotion {
+        switch state {
+        case .listening: .listening
+        case .thinking: .thinking
+        case .speaking: .talking
+        case .idle: .resting
+        case .happy: .done
+        case .nudge: .hello
+        }
+    }
+
+    static func motion(turnBased status: VoiceStatus, live: AgentLiveState) -> BighelpNoodleMotion {
+        switch status {
+        case .listening, .working, .speaking: motion(live)
+        case .paused: .resting
+        case .unavailable: .question
+        }
+    }
+
+    static func motion(livePhase phase: LiveVoiceModel.Phase, live: AgentLiveState) -> BighelpNoodleMotion {
+        switch phase {
+        case .live: motion(live)
+        case .preparing, .connecting: .launch
+        case .interrupted: .resting
+        case .idle: .idle
+        case .ended: .exit
+        case .failed: .question
+        }
+    }
+
+    /// Connecting repeats its launch with a rest; the rest play as the kit made them.
+    static func playback(_ motion: BighelpNoodleMotion) -> BighelpNoodlePlayback {
+        motion == .launch ? .loop(pause: 0.6) : .automatic
+    }
+}
+
 enum VoiceViewPresentation {
     /// Voice mode keeps the state cue compact so the orb remains the visual focus.
     static let statusUsesFullWidthSurface = false

@@ -109,7 +109,7 @@ struct WorkspaceFileTransferView: View {
             constraintsSection
         }
         .listStyle(.insetGrouped)
-        .refreshable { await store.refresh() }
+        .bighelpRefreshable { await store.refresh() }
         .toolbar { toolbar }
     }
 

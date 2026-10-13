@@ -86,7 +86,7 @@ struct PersonalitiesView: View {
         .task {
             if store.loadState == .idle { await store.load() }
         }
-        .refreshable { await store.load() }
+        .bighelpRefreshable { await store.load() }
         .background(theme.canvas.ignoresSafeArea())
     }
 

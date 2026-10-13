@@ -75,7 +75,7 @@ struct WorkspaceManagementView: View {
         .background(theme.canvas)
         .foregroundStyle(theme.primaryText)
         .searchable(text: $store.search, prompt: "Search \(destination.title.lowercased())")
-        .refreshable { await store.refresh() }
+        .bighelpRefreshable { await store.refresh() }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button { Task { await store.refresh() } } label: {

@@ -75,7 +75,7 @@ struct CuratorView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .refreshable { await store.refresh() }
+        .bighelpRefreshable { await store.refresh() }
         .confirmationDialog(
             "Run Curator on this Hermes host?",
             isPresented: $showingRunConfirmation,

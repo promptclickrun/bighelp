@@ -202,7 +202,7 @@ struct DashboardView: View {
             await model.expireAttentionWhenDue()
         }
         .onAppear { model.expireAttention() }
-        .refreshable { await refreshHome() }
+        .bighelpRefreshable { await refreshHome() }
         #if targetEnvironment(macCatalyst)
         // A Mac list can't be pulled down to refresh.
         .toolbar {

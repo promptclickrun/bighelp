@@ -84,7 +84,7 @@ change in both repos.
 | `Bighelp/Spatial/` | Vision Pro: the agent in the room (`SpatialAvatarModel`, its volume and voice panel, its Settings section) |
 | `BighelpWatch/`, `BighelpWatchShared/`, `Bighelp/Watch/` | The Watch app, the Watch–iPhone wire (`WatchWire`), and the iPhone's `WatchRelay` that answers it |
 | `Bighelp/CarPlay/` | CarPlay's hands-free voice chat (`CarPlayVoiceSession`) and its scene |
-| `Bighelp/DesignSystem/` | `BighelpTheme`, `BighelpTokens`, glass surfaces, fonts, provider logos, `BighelpDeferredSection` |
+| `Bighelp/DesignSystem/` | `BighelpTheme`, `BighelpTokens`, glass surfaces, fonts, provider logos, `BighelpDeferredSection`, the Noodle brand and its motions (`Noodle/`) |
 | `Bighelp/Hosts/`, `Bighelp/LiveActivity/`, `Bighelp/Notifications/`, `Bighelp/Shortcuts/` | Host setup, Live Activities, notifications, App Intents |
 | `BighelpTests/` (Swift Testing), `BighelpUITests/` (XCUITest) | Tests. The UI test base class `BighelpUITestCase` is in `ReferenceHubUITests.swift` |
 | `BighelpVisionUITests/` | Vision Pro UI tests, run with the `BighelpVision` scheme |
@@ -486,6 +486,11 @@ New code uses Bighelp names. Don't "finish" the rename on this list.
 
 ### Avatars and art
 
+- The brand is the Noodle (DESIGN.md › Noodle). Its motions are the brand kit's Lottie files in
+  `Bighelp/Resources/Noodle`, drawn natively by `BighelpNoodleView`, which reads only what the kit's generator
+  writes. Replace them with the kit's own output, never hand-edited, and check them in the loader gallery.
+- The chat plays one loader at a time, on its newest live folder (`BighelpActivityLoaderFocus`). A new live
+  indicator in the chat goes through that focus, not its own animation.
 - The avatar kit's source is `Design/AvatarKit`. `tools/export_native.py` writes `Bighelp/Resources/AvatarKit.json`,
   which the app draws natively.
 - The avatar picker's characters come from the avatar catalog (`avatars.bighelp.app`, `services/avatars`;

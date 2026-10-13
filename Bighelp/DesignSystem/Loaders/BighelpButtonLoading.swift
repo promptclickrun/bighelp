@@ -42,8 +42,7 @@ struct BighelpButtonLoadingLabel<Idle: View>: View {
                     EmptyView()
                 case .working(let text):
                     HStack(spacing: BighelpTokens.space8) {
-                        BighelpSpinner(size: markSide, lineWidth: 2, color: ink, trackOpacity: 0.25,
-                                       period: BighelpLoaderTiming.stepSpin)
+                        BighelpSpinner(size: markSide, color: ink)
                         Text(text)
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)

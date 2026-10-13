@@ -454,11 +454,11 @@ private struct ArtifactsSearchAndRefresh: ViewModifier {
 
     func body(content: Content) -> some View {
         if isEmbedded {
-            content.refreshable { await refresh() }
+            content.bighelpRefreshable { await refresh() }
         } else {
             content
                 .searchable(text: $search, prompt: "Search files, paths, or types")
-                .refreshable { await refresh() }
+                .bighelpRefreshable { await refresh() }
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Refresh", systemImage: "arrow.clockwise") {

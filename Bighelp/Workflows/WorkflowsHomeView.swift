@@ -85,7 +85,7 @@ struct WorkflowsHomeView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) { newMenu }
         }
-        .refreshable { await store.load() }
+        .bighelpRefreshable { await store.load() }
         .onAppear { store.setOnScreen(true) }
         .onDisappear { store.setOnScreen(false) }
         // One alert per view: SwiftUI presents only one of several on the same view.

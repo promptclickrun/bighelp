@@ -102,7 +102,12 @@ struct WorkspaceUnavailableView: View {
 
     var body: some View {
         ContentUnavailableView {
-            Label(destination.title, systemImage: destination.symbol)
+            Label {
+                Text(destination.title)
+            } icon: {
+                // The kit's question: didn't catch that.
+                BighelpNoodleView(motion: .question, size: 48)
+            }
         } description: {
             Text("\(reason)\n\nSelected host: \(hostName)")
         }
@@ -123,7 +128,7 @@ struct WorkspaceReconnectingView: View {
             Label {
                 Text(destination.title)
             } icon: {
-                ProgressView()
+                BighelpNoodleView(motion: .spring, size: 48, playback: .loop(pause: 0.3))
             }
         } description: {
             Text("Reconnecting to \(hostName)…")
@@ -216,7 +221,7 @@ struct WorkspaceSessionContentView: View {
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityIdentifier("workspace.content.\(destination.rawValue)")
         .task(id: limit) { await load() }
-        .refreshable { await load() }
+        .bighelpRefreshable { await load() }
     }
 
     private var hasContent: Bool {

@@ -2,7 +2,7 @@
 
 ## Authority and scope
 
-The current authority is the **Ember brand kit** (bighelp, a Longview company) and its blended direction:
+The current authority is the **Noodle brand kit** (`BighelpBrand`, the Ember palette) and its blended direction:
 1a "Messages, evolved" structure, 1b "Center stage" warm cream as light mode, and 1c "After dark" as dark mode.
 The app is a simple messaging experience for personal assistant agents. Earlier bighelp/iOS 27 Builder references
 are historical (`docs/ui-v3-design.md`).
@@ -19,9 +19,10 @@ are historical (`docs/ui-v3-design.md`).
 
 ## Visual language
 
-- **Ember** (`EmberMark`, `EmberWordmark`, `EmberLockup`) is a perfect coral (#FF8A7A) circle with eyes gazing up. It
-  appears only in chrome (root nav bars, icon, splash), never as a chat participant and never in an agent color.
-  The wordmark is lowercase SF Pro Rounded heavy and always ends with the coral period: `bighelp.`
+- **The Noodle** (`BighelpNoodleMark`, `BighelpWordmark`) is one continuous Ember (#FF8A7A) stroke that writes a
+  lowercase b and kicks out at the bottom left as a chat-bubble tail. It appears in chrome (root nav bars, icon,
+  setup) and as the app's loaders, never as a chat participant and never in an agent color. In the wordmark the mark
+  stands in for the b, then "ighelp" in the kit's outlined Nunito: ink by day, cream after dark. See **Noodle** below.
 - Light: cream canvas #FFF9F5, white cards, #F3ECE6 incoming bubbles, ink #1C1A19. Dark: #121110 canvas,
   #1E1C1B / #292624 surfaces, cream text. Actions are lavender-purple (#7B52E0 light, #C9B6FF dark); outgoing
   bubbles #7B52E0 with white text. All of this lives in `BighelpTheme` so screens read theme tokens, not system colors.
@@ -121,7 +122,7 @@ The app icon badge means "something arrived while you were away": pushes set it,
 (`BighelpAppBadge`). The app never sets a count of its own, so it can't get stuck on items the user can't see.
 
 **Apple Watch** is a remote for bighelp on the iPhone, in the same dark palette (lavender actions and your own
-messages, Ember's mark). Home puts **Talk to** your agent first (dictate or type; replies are read aloud unless the
+messages, the Noodle mark). Home puts **Talk to** your agent first (dictate or type; replies are read aloud unless the
 speaker button is off), then **Needs you** (approvals showing exactly what they're for, wider approvals asking
 again; questions with their choices or a spoken answer), recent **Chats**, and the agent's **Feed, Ideas and Goals**
 with each item's full text. Change agent sits at the bottom. **Open on iPhone** goes straight there when bighelp is
@@ -391,6 +392,35 @@ iPhone, iPad and Vision Pro stay exactly as they are.
   the sidebar opens and closes from every screen, including pages with no ☰. Drag the line between the sidebar
   and the page to make it narrower or wider (the page keeps at least 380 points); the width is remembered, and a
   double-click on the line goes back to the usual width.
+
+## Noodle
+
+The kit's 19 motions ship as its Lottie files (`Resources/Noodle`) and are drawn natively (`BighelpNoodleView`,
+no Lottie library): at most 30 frames a second, only on screen, and the still mark with Reduce Motion, in Low Power
+Mode and in the background. The loader gallery (`-bighelp-loader-gallery`, Noodle) shows each one. Where they play:
+
+| Motion | Where |
+|---|---|
+| loader | Anything loading: every indeterminate `ProgressView` (`BighelpNoodleProgressStyle`, set at the app's root), `BighelpSpinner`, the chat's active tool folder |
+| thinking | Reasoning: the chat's active thinking row, a folder between calls, voice while the agent works |
+| listening, talking, resting | The voice pill: the microphone is open, the agent speaks, the call is paused or muted |
+| launch | Connecting (host setup, the connection pill, live voice), restoring a session |
+| spring | Reconnecting |
+| lasso | Searching (models, skills, chats) |
+| infinity | Helper agents running in the chat's active folder |
+| squiggle | Sending from the message box |
+| question | A page that can't open, voice that isn't available |
+| exit | Ending a voice call |
+| reveal, then hello | The first run's welcome |
+| idle | Empty places (no agents yet) |
+| done | An IDE session or a Dev Factory run that finishes while you watch (`bighelpNoodleMoment`) |
+| heart | Pinning a favorite model |
+| bunny | Three taps on the wordmark under Settings › Help & feedback |
+| pull | Pull to refresh (`bighelpRefreshable`): its frames follow the pull, then the loader plays |
+
+**The chat plays one loader at a time**: on its newest live tool folder or thinking row
+(`ChatCanvasTranscriptProjection.activeLoaderID`, `BighelpActivityLoaderFocus`). Every other row, and each tool step
+inside a folder, stays still.
 
 ## Protected behavior
 

@@ -41,7 +41,7 @@ struct MessagingOnboardingView: View {
                 }
                 .listStyle(.insetGrouped)
                 .searchable(text: $search, prompt: "Search platforms")
-                .refreshable { await store.refresh() }
+                .bighelpRefreshable { await store.refresh() }
             } else {
                 ContentUnavailableView(
                     "Workspace changed",

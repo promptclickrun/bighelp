@@ -311,7 +311,7 @@ struct ProjectChangesView: View {
             .padding(BighelpTokens.space16)
             .frame(maxWidth: .infinity)
         }
-        .refreshable { await store.refresh() }
+        .bighelpRefreshable { await store.refresh() }
     }
 
     private func statusHeader(_ status: ProjectGitStatus) -> some View {

@@ -318,6 +318,7 @@ struct ChatSessionControlsPopover: View {
                 Image(systemName: pinned ? "star.fill" : "star")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(pinned ? Color(red: 0.89, green: 0.66, blue: 0.23) : theme.tertiaryText)
+                    .bighelpNoodleMoment(.heart, when: pinned, size: 24)
                     .frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
                     .contentShape(.rect)
             }

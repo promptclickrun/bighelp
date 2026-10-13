@@ -37,7 +37,7 @@ struct ProjectsLifecycleView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("Projects")
         .navigationBarTitleDisplayMode(.inline)
-        .refreshable { await store.load() }
+        .bighelpRefreshable { await store.load() }
         .task { if store.overview == nil { await store.load() } }
         .bighelpSheet(item: $createRepository) { repository in
             createProjectSheet(repository)
@@ -250,7 +250,7 @@ private struct ProjectLifecycleDetailView: View {
             await store.loadDetail(projectID: projectID)
             refreshStockGitReview()
         }
-        .refreshable { await store.loadDetail(projectID: projectID) }
+        .bighelpRefreshable { await store.loadDetail(projectID: projectID) }
         .onChange(of: store.overview) { _, _ in refreshStockGitReview() }
         .accessibilityIdentifier("workspace.project.lifecycle.detail")
     }

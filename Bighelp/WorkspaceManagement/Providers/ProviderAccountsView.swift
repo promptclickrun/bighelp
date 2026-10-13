@@ -627,7 +627,7 @@ struct ProviderAccountsView: View {
                     }
                 }
                 .searchable(text: $search, prompt: "Search providers")
-                .refreshable { await store.refresh() }
+                .bighelpRefreshable { await store.refresh() }
             } else {
                 ContentUnavailableView(
                     "Provider keys unavailable", systemImage: "person.crop.circle.badge.exclamationmark",
@@ -838,7 +838,7 @@ struct ProviderAccountsView: View {
         }
         .navigationTitle("Advanced")
         .navigationBarTitleDisplayMode(.inline)
-        .refreshable { await store.refresh() }
+        .bighelpRefreshable { await store.refresh() }
         .bighelpSheet(isPresented: $addingEndpoint) {
             NavigationStack {
                 ProviderEndpointEditorView(store: store, endpoint: nil) { addingEndpoint = false }

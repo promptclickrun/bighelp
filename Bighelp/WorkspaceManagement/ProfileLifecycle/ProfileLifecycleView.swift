@@ -47,7 +47,7 @@ struct ProfileLifecycleView: View {
                     setupSection
                     onboardingSection
                 }
-                .refreshable { await store.refresh() }
+                .bighelpRefreshable { await store.refresh() }
             } else {
                 ContentUnavailableView(
                     "Profile lifecycle unavailable",

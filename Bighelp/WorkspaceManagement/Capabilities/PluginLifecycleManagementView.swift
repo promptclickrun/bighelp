@@ -82,7 +82,7 @@ struct PluginLifecycleManagementView: View {
         }
         .listStyle(.insetGrouped)
         .searchable(text: $search, prompt: "Search plugins")
-        .refreshable { await model.load() }
+        .bighelpRefreshable { await model.load() }
         .task { if model.snapshot == nil { await model.load() } }
         .bighelpSheet(item: $installCandidate) { entry in
             PluginInstallReviewView(entry: entry, isBusy: model.isBusy) {

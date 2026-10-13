@@ -102,7 +102,7 @@ struct HermesKanbanAdministrationView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("Kanban Administration")
         .navigationBarTitleDisplayMode(.inline)
-        .refreshable { await store.loadAdministration(board: boardSlug) }
+        .bighelpRefreshable { await store.loadAdministration(board: boardSlug) }
         .task { await store.loadAdministration(board: boardSlug) }
         .accessibilityIdentifier("kanban.administration")
     }

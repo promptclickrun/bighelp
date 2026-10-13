@@ -30,7 +30,7 @@ struct BighelpActionRow: View {
                 }
                 Spacer(minLength: BighelpTokens.space8)
                 if isWorking {
-                    BighelpSpinner(size: 16, lineWidth: 2, color: tint ?? theme.action)
+                    BighelpSpinner(size: 16, color: tint)
                 }
             }
             .frame(minHeight: 52)

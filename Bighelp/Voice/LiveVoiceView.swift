@@ -127,12 +127,11 @@ struct LiveVoiceView: View {
         .accessibilityIdentifier("live-voice.screen")
     }
 
-    /// "● Agent · state" — the same pill as turn-based voice.
+    /// The Noodle acting out the call, then "Agent · state": the same pill as turn-based voice.
     private var statusPill: some View {
-        HStack(spacing: BighelpTokens.space8) {
-            Circle()
-                .fill(statusDotColor)
-                .frame(width: 8, height: 8)
+        let noodle = VoiceNoodle.motion(livePhase: model.phase, live: liveState)
+        return HStack(spacing: BighelpTokens.space8) {
+            BighelpNoodleView(motion: noodle, size: 22, playback: VoiceNoodle.playback(noodle))
             Text("\(model.agentName) · \(statusText)")
                 .bighelpFont(.label, weight: .semibold)
                 .lineLimit(1)
@@ -166,15 +165,6 @@ struct LiveVoiceView: View {
 
     private var statusText: String {
         model.phase == .live ? liveState.label : model.phase.title
-    }
-
-    private var statusDotColor: Color {
-        switch model.phase {
-        case .live: liveState.dotColor
-        case .failed: theme.danger
-        case .interrupted, .preparing, .connecting: theme.warning
-        case .idle, .ended: AgentLiveState.idle.dotColor
-        }
     }
 
     private var captionText: String {

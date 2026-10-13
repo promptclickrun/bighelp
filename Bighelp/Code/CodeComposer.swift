@@ -520,7 +520,7 @@ struct CodeProjectPicker: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
-            .refreshable { await store.load() }
+            .bighelpRefreshable { await store.load() }
             .task { if store.projects.isEmpty { await store.load() } }
         }
         .accessibilityElement(children: .contain)

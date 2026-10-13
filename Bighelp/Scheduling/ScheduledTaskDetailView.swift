@@ -88,7 +88,7 @@ struct ScheduledTaskDetailView: View {
             guard let task = store.task(id: taskID, agentID: owningAgentID) else { return }
             await store.loadDetail(id: task.id, agentID: task.agentID)
         }
-        .refreshable {
+        .bighelpRefreshable {
             guard let task = store.task(id: taskID, agentID: owningAgentID) else { return }
             await store.loadDetail(id: task.id, agentID: task.agentID)
             await store.loadRuns(id: task.id, agentID: task.agentID)

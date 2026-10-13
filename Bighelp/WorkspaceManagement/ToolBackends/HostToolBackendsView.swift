@@ -25,7 +25,7 @@ struct HostToolBackendsView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("Tool Backends")
         .navigationBarTitleDisplayMode(.inline)
-        .refreshable { await store.load() }
+        .bighelpRefreshable { await store.load() }
         .task { if store.terminal == nil { await store.load() } }
         .confirmationDialog(
             store.review?.title ?? "Review host change",

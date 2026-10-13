@@ -75,7 +75,7 @@ struct CredentialVaultView: View {
                         .disabled(model.state != .ready)
                 }
             }
-            .refreshable { await model.load() }
+            .bighelpRefreshable { await model.load() }
             .task { await model.load() }
             .bighelpSheet(isPresented: $isAdding) { CredentialVaultAddView(model: model).bighelpSheetSize(.standard) }
             .bighelpSheet(item: $editing) { CredentialVaultAddView(model: model, editing: $0).bighelpSheetSize(.standard) }

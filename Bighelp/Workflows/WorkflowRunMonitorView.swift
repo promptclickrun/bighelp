@@ -199,7 +199,7 @@ struct WorkflowRunMonitorView: View {
                 }
                 .padding(.horizontal, BighelpTokens.space4)
             }
-            .refreshable { await list.load() }
+            .bighelpRefreshable { await list.load() }
         }
         .padding(.top, BighelpTokens.space12)
     }

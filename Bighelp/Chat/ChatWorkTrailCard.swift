@@ -45,7 +45,10 @@ struct ChatWorkTrailCard: View {
                 isExpanded: Binding(get: { disclosures.isExpanded(turn, isLive: isLive) },
                                     set: { disclosures.setExpanded($0, for: turn) }),
                 onDisclosureChange: onDisclosureChange,
-                accessibilityIdentifier: "chat.work-trail.\(turn.id)"
+                accessibilityIdentifier: "chat.work-trail.\(turn.id)",
+                loaderID: ChatLoaderID.workTrail(turn),
+                // Helper agents keep going on their own: the kit's infinity.
+                loaderMotion: turn.events.last { $0.lifecycle == .running }?.kind == .subagent ? .infinity : nil
             )
             if isExpanded, rendersExpandedEvents {
                 ForEach(turn.events) { event in

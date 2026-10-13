@@ -318,7 +318,7 @@ struct SettingsView: View {
     }
 
     private var helpAndFeedback: some View {
-        Section("Help & feedback") {
+        Section {
             Link("Report a problem", destination: URL(string: "https://github.com/promptclickrun/bighelp/issues")!)
             Link("Hermes documentation", destination: URL(string: "https://hermes-agent.nousresearch.com/docs")!)
             #if targetEnvironment(macCatalyst)
@@ -327,6 +327,10 @@ struct SettingsView: View {
             LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")
             LabeledContent("Build", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "")
             #endif
+        } header: {
+            Text("Help & feedback")
+        } footer: {
+            BighelpBunnySignature()
         }
     }
 
@@ -546,5 +550,26 @@ struct ClearCacheConfirmation: ViewModifier {
         } message: {
             Text("bighelp will keep your account and preferences, clear cached data for the selected host, then pull fresh agents, sessions, and account data.")
         }
+    }
+}
+
+/// The wordmark under Help & feedback. Tap it three times and the b does a shadow-puppet
+/// bunny (the kit's easter egg).
+private struct BighelpBunnySignature: View {
+    @State private var taps = 0
+    @State private var motion: BighelpNoodleMotion?
+
+    var body: some View {
+        BighelpWordmark(height: 24, motion: motion) { motion = nil }
+            .frame(maxWidth: .infinity)
+            .padding(.top, BighelpTokens.space24)
+            .contentShape(.rect)
+            .onTapGesture {
+                taps += 1
+                guard taps >= 3 else { return }
+                taps = 0
+                motion = .bunny
+            }
+            .accessibilityIdentifier("settings.signature")
     }
 }

@@ -130,6 +130,31 @@ enum ChatCanvasTranscriptProjection {
         }
         return result
     }
+
+    /// The chat plays one loader at a time: on the newest live tool folder or running
+    /// thinking row while a turn runs. Every other row stays still.
+    static func activeLoaderID(in rows: [ChatCanvasRow], isSending: Bool) -> String? {
+        guard isSending else { return nil }
+        for row in rows.reversed() {
+            switch row {
+            case .workTrailHeader(let trail, let isLive) where isLive:
+                return ChatLoaderID.workTrail(trail)
+            case .transcript(.entry(.activity(let turn))):
+                if !turn.events.isEmpty, turn.events.allSatisfy({ $0.kind == .reasoning }),
+                   turn.events.contains(where: { $0.lifecycle == .running }) {
+                    return ChatLoaderID.thinking(turn.events)
+                }
+            default: continue
+            }
+        }
+        return nil
+    }
+}
+
+/// The names the chat's folders answer to in `BighelpActivityLoaderFocus`.
+enum ChatLoaderID {
+    static func workTrail(_ trail: ChatActivityTurn) -> String { "work-trail:\(trail.id)" }
+    static func thinking(_ events: [ChatActivityEvent]) -> String { "thinking:\(events.first?.id ?? "")" }
 }
 
 @MainActor @Observable
@@ -340,6 +365,7 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             let cameraID: ObjectIdentifier?
             let providerStoreID: ObjectIdentifier?
             let disclosureStoreID: ObjectIdentifier?
+            let loaderFocusID: ObjectIdentifier?
             let cardInteractionScope: ChatCardInteractionScope?
             let hasContentReader: Bool
             let scenePhase: ScenePhase
@@ -361,6 +387,7 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
                 cameraID = environment.reflectiveVisionCamera.map(ObjectIdentifier.init)
                 providerStoreID = environment.providerLogoStore.map(ObjectIdentifier.init)
                 disclosureStoreID = environment.chatActivityDisclosureStore.map(ObjectIdentifier.init)
+                loaderFocusID = environment.bighelpActivityLoaderFocus.map(ObjectIdentifier.init)
                 cardInteractionScope = environment.chatCardInteractions?.scope
                 hasContentReader = environment.bighelpSessionContentReader != nil
                 scenePhase = environment.scenePhase
@@ -524,6 +551,7 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             values.bighelpUIV2Enabled = source.bighelpUIV2Enabled
             values.bighelpUIV3Enabled = source.bighelpUIV3Enabled
             values.chatActivityDisclosureStore = source.chatActivityDisclosureStore
+            values.bighelpActivityLoaderFocus = source.bighelpActivityLoaderFocus
             values.colorScheme = source.colorScheme
             values.dynamicTypeSize = source.dynamicTypeSize
             values.locale = source.locale

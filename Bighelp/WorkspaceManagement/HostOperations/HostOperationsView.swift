@@ -43,7 +43,7 @@ struct HostOperationsView<MoreLinks: View>: View {
         .bighelpFormSurface()
         .navigationTitle("System")
         .navigationBarTitleDisplayMode(.inline)
-        .refreshable { await store.load() }
+        .bighelpRefreshable { await store.load() }
         .task { if store.overview == nil { await store.load() } }
         .task(id: hostRegistry?.selectedHostID) {
             guard let hostRegistry, let hostID = hostRegistry.selectedHostID,

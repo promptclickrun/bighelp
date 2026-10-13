@@ -442,7 +442,7 @@ enum ScheduledTaskDeliverySelection {
 
     /// Hermes names this app's delivery platform "loopdy"; people know it as bighelp.
     static func displayName(id: String, name: String) -> String {
-        id.caseInsensitiveCompare("loopdy") == .orderedSame ? "\(EmberBrand.appName) app" : name
+        id.caseInsensitiveCompare("loopdy") == .orderedSame ? "\(BighelpBrand.appName) app" : name
     }
 
     static func resolve(

@@ -97,14 +97,6 @@ struct BighelpLoaderMotionTests {
         #expect(start.opacity == 0 && middle.opacity == 1)
         #expect(middle.position > 0.5)
     }
-
-    @Test func theOrbBlinksOnceALoop() {
-        #expect(BighelpOrbGlyph.eyes(at: .still) == (0, 1))
-        let blink = BighelpOrbGlyph.eyes(at: BighelpLoaderTime(seconds: 3.2 * 100 + 3.2 * 0.48))
-        #expect(blink.openness < 0.15)
-        let glancing = BighelpOrbGlyph.eyes(at: BighelpLoaderTime(seconds: 3.2 * 100 + 3.2 * 0.35))
-        #expect(glancing.glance == -1.4 && glancing.openness == 1)
-    }
 }
 
 struct BighelpConnectionStatusTests {

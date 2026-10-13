@@ -42,7 +42,7 @@ struct HostBackupView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("Backups & Checkpoints")
         .navigationBarTitleDisplayMode(.inline)
-        .refreshable { await store.refreshBackups() }
+        .bighelpRefreshable { await store.refreshBackups() }
         .confirmationDialog(
             "Create a host backup?",
             isPresented: $confirmsBackup,

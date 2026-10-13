@@ -133,20 +133,11 @@ struct BighelpConnectionIndicator: View {
         ZStack {
             switch phase {
             case .connecting:
-                BighelpLoaderClock(cadence: .smooth) { time in
-                    HStack(spacing: 2.5 * unit) {
-                        ForEach(0..<3, id: \.self) { index in
-                            let lift = BighelpConnectionMotion.bounce(time, index: index)
-                            Circle().fill(color)
-                                .frame(width: 3.5 * unit, height: 3.5 * unit)
-                                .offset(y: -3 * unit * lift)
-                                .opacity(time.isStill ? 0.85 : 0.35 + 0.65 * lift)
-                        }
-                    }
-                }
+                // The kit's launch: a dot pops in and unspools into the b.
+                BighelpNoodleView(motion: .launch, size: side, playback: .loop(pause: 0.6), tint: color)
             case .reconnecting:
-                BighelpSpinner(size: 13 * unit, lineWidth: 2 * unit, color: color, trackOpacity: 0.22,
-                               period: BighelpLoaderTiming.arcSpin)
+                // The kit's spring: bouncing back.
+                BighelpNoodleView(motion: .spring, size: side, playback: .loop(pause: 0.3), tint: color)
             case .connected:
                 Circle().fill(color)
                     .frame(width: 8 * unit, height: 8 * unit)

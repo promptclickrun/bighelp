@@ -231,7 +231,7 @@ struct PairingManagementView: View {
                     }
                 }
                 .listStyle(.insetGrouped)
-                .refreshable { await store.refresh() }
+                .bighelpRefreshable { await store.refresh() }
             } else {
                 ContentUnavailableView(
                     "Workspace changed", systemImage: "person.crop.circle.badge.xmark",

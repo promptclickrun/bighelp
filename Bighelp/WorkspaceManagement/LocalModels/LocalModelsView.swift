@@ -34,7 +34,7 @@ struct LocalModelsView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("Local Models")
         .navigationBarTitleDisplayMode(.inline)
-        .refreshable { await store.refresh() }
+        .bighelpRefreshable { await store.refresh() }
         .task { if store.status == nil { await store.load() } }
         .confirmationDialog(
             store.review?.title ?? "Review host change",

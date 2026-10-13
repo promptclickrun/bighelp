@@ -503,7 +503,7 @@ struct BighelpMenuChatRow: View {
 
 /// The bighelp lockup in the top bar. Touch and hold it to switch hosts; on
 /// the Mac, click it.
-struct EmberHostSwitcherLockup: View {
+struct BighelpHostSwitcherLockup: View {
     var demoHosts: DemoHosts?
     @Environment(\.bighelpHostRegistry) private var registry
 
@@ -512,20 +512,20 @@ struct EmberHostSwitcherLockup: View {
         if hosts.hosts.count + (hosts.add == nil ? 0 : 1) > 0 {
             #if targetEnvironment(macCatalyst)
             // A click that does nothing reads as broken on a Mac, where holding is rare.
-            Menu { hostItems(hosts) } label: { EmberLockup(markSize: 28) }
-                .accessibilityLabel(EmberBrand.appName)
+            Menu { hostItems(hosts) } label: { BighelpWordmark(height: 26) }
+                .accessibilityLabel(BighelpBrand.appName)
                 .accessibilityHint("Switch hosts.")
                 .accessibilityIdentifier("brand.host-switcher")
             #else
             Menu { hostItems(hosts) } label: {
-                EmberLockup(markSize: 28)
+                BighelpWordmark(height: 26)
             } primaryAction: {}
-            .accessibilityLabel(EmberBrand.appName)
+            .accessibilityLabel(BighelpBrand.appName)
             .accessibilityHint("Touch and hold to switch hosts.")
             .accessibilityIdentifier("brand.host-switcher")
             #endif
         } else {
-            EmberLockup(markSize: 28)
+            BighelpWordmark(height: 26)
         }
     }
 

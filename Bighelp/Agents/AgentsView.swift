@@ -189,7 +189,7 @@ struct AgentsView: View {
                 await botModeRooms?.refreshNativeRoomCatalog()
             }
         }
-        .refreshable { await refresh() }
+        .bighelpRefreshable { await refresh() }
         .bighelpSheet(item: $actionAgent, onDismiss: finishAgentActionSheet) { agent in
             AgentActionSheet(
                 agent: agent,

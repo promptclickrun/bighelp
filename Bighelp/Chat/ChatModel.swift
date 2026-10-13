@@ -9,6 +9,8 @@ final class ChatModel {
     // owner. Internal implementation seams are not independent state owners.
     let conversationID: String
     let activityDisclosures = ChatActivityDisclosureStore()
+    /// The one folder whose loader plays (`ChatCanvasTranscriptProjection.activeLoaderID`).
+    let loaderFocus = BighelpActivityLoaderFocus()
     let nativeSessionResumeProgress = NativeSessionResumeProgressPresentation()
 
     @ObservationIgnored let responseTextGrowthSubject = PassthroughSubject<ResponseTextGrowth, Never>()

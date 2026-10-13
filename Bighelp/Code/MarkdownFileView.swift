@@ -240,7 +240,7 @@ struct MarkdownFileContent: View {
             .frame(maxWidth: 760, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
-        .refreshable { await model.load() }
+        .bighelpRefreshable { await model.load() }
     }
 
     private var editor: some View {

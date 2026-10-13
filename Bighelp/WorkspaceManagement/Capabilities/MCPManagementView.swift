@@ -80,7 +80,7 @@ struct MCPManagementView: View {
         }
         .listStyle(.insetGrouped)
         .searchable(text: $search, prompt: "Search MCP servers")
-        .refreshable { await model.load() }
+        .bighelpRefreshable { await model.load() }
         .task { if model.snapshot == nil { await model.load() } }
         .bighelpSheet(isPresented: $showsAdd) {
             MCPServerFormView(isBusy: model.isBusy) { draft in

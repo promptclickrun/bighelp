@@ -248,7 +248,7 @@ struct HostSetupView: View {
                         .disabled(isWorking)
                         .accessibilityIdentifier("host-setup.back")
                 } else if !firstRunPresentation {
-                    BighelpLogo(presentation: .mark, height: 36).accessibilityHidden(true)
+                    BighelpLogo(presentation: .mark, height: 36, motion: .launch).accessibilityHidden(true)
                 }
                 Text(headerTitle)
                     .bighelpFont(.sectionTitle)

@@ -372,6 +372,8 @@ struct FirstRunOnboardingView: View {
 
 private struct FirstRunCompanionConstellation: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// The b writes itself in, waves hello, then rests.
+    @State private var logoMotion: BighelpNoodleMotion? = .reveal
 
     var body: some View {
         GeometryReader { proxy in
@@ -392,7 +394,9 @@ private struct FirstRunCompanionConstellation: View {
                             .stroke(theme.border, lineWidth: BighelpTokens.hairline)
                     }
 
-                BighelpLogo(height: 52)
+                BighelpLogo(height: 52, motion: logoMotion) {
+                    logoMotion = logoMotion == .reveal ? .hello : nil
+                }
                     .padding(.horizontal, BighelpTokens.space32)
                     .padding(.vertical, BighelpTokens.space20)
                     .background(.thinMaterial, in: .capsule)

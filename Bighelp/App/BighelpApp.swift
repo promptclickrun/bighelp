@@ -53,6 +53,7 @@ struct BighelpApp: App {
 
     init() {
         let arguments = ProcessInfo.processInfo.arguments
+        BighelpPullToRefreshMetrics.hideSystemSpinner()
         #if DEBUG && targetEnvironment(simulator)
         // Reset preferences once per UI test, while retaining them across that
         // test's process relaunches. Launch-argument overrides remain intact.
@@ -494,6 +495,7 @@ struct BighelpApp: App {
             .environment(\.bighelpUIV2Enabled, settings.uiV2Enabled)
             .environment(\.bighelpUIV3Enabled, settings.interfaceVersion == .v3)
             .environment(\.nerdModeEnabled, settings.nerdModeEnabled)
+            .progressViewStyle(BighelpNoodleProgressStyle())
             .modifier(BighelpTextSizing())
             #if os(visionOS)
             .modifier(SpatialAvatarMainWindowHooks(model: spatialAvatar))

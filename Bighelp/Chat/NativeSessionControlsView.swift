@@ -142,7 +142,7 @@ struct NativeSessionControlsView: View {
             }
         }
         .formStyle(.grouped)
-        .refreshable { await model.loadInitialState() }
+        .bighelpRefreshable { await model.loadInitialState() }
     }
 
     @ViewBuilder

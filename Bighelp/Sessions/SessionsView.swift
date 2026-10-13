@@ -166,7 +166,7 @@ struct SessionsView: View {
                 await model.load()
             }
         }
-        .refreshable {
+        .bighelpRefreshable {
             await model.load()
         }
         .onDisappear {

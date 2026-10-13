@@ -87,7 +87,7 @@ struct HostDiagnosticsView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("Diagnostics")
         .navigationBarTitleDisplayMode(.inline)
-        .refreshable { await store.refreshDiagnostics() }
+        .bighelpRefreshable { await store.refreshDiagnostics() }
         .confirmationDialog(
             diagnosticAction.map { "Run \($0.title)?" } ?? "Run host check?",
             isPresented: Binding(

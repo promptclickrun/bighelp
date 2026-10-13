@@ -690,18 +690,15 @@ struct DesignSystemTests {
         }
     }
 
-    @Test func compiledBrandAssetsArePresentWithExpectedPixelContracts() throws {
-        let mark = try #require(UIImage(named: "BighelpMarkColor")?.cgImage)
-        let wordmarkImage = try #require(UIImage(named: "BighelpWordmarkMask"))
-        let wordmark = try #require(wordmarkImage.cgImage)
+    /// The Noodle mark (cards may use it as an icon) and the wordmark's letters, drawn in
+    /// the theme's ink, ship as vectors.
+    @Test func compiledBrandAssetsArePresent() throws {
+        let mark = try #require(UIImage(named: "BighelpMarkColor"))
+        let letters = try #require(UIImage(named: "BighelpWordmarkLetters"))
 
-        #expect(mark.width == 269)
-        #expect(mark.height == 200)
-        #expect(hasAlpha(mark.alphaInfo))
-        #expect(wordmark.width == 675)
-        #expect(wordmark.height == 210)
-        #expect(hasAlpha(wordmark.alphaInfo))
-        #expect(wordmarkImage.renderingMode == .alwaysTemplate)
+        #expect(abs(mark.size.width / mark.size.height - 86.0 / 98.0) < 0.01)
+        #expect(abs(letters.size.width / letters.size.height - 2870.0 / 915.0) < 0.01)
+        #expect(letters.renderingMode == .alwaysTemplate)
     }
 
     private func roleHexes(_ theme: BighelpTheme) -> [String] {
@@ -745,17 +742,6 @@ struct DesignSystemTests {
                 : pow((component + 0.055) / 1.055, 2.4)
         }
         return (0.2126 * linear[0]) + (0.7152 * linear[1]) + (0.0722 * linear[2])
-    }
-
-    private func hasAlpha(_ alphaInfo: CGImageAlphaInfo) -> Bool {
-        switch alphaInfo {
-        case .premultipliedLast, .premultipliedFirst, .last, .first, .alphaOnly:
-            true
-        case .none, .noneSkipLast, .noneSkipFirst:
-            false
-        @unknown default:
-            false
-        }
     }
 }
 

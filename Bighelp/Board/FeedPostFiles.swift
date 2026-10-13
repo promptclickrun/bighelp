@@ -352,7 +352,7 @@ struct FeedPostDetailSheet: View {
     @ViewBuilder
     private func openingSpinner(_ item: AgentBoardItem, _ file: AgentBoardItem.File) -> some View {
         if context.store.isOpening(item, file) {
-            BighelpSpinner(size: 18, lineWidth: 2, color: .white)
+            BighelpSpinner(size: 18, color: .white)
                 .padding(10)
                 .background(.black.opacity(0.4), in: Circle())
         }

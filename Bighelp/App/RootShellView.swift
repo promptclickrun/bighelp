@@ -590,7 +590,7 @@ struct RootShellView: View {
             }
             // Ember lives only in chrome: the brand bar on root screens.
             // Touch and hold it to switch hosts.
-            EmberBrandToolbarItem(demoHosts: demoHosts)
+            BighelpBrandToolbarItem(demoHosts: demoHosts)
             // All agents has its own options there instead (☰ switches back to one host).
             if fleetModeOn, appState.path.isEmpty, appState.selectedTab == .scheduledTasks { fleetToolbar }
         }

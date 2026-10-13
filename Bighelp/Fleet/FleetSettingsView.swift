@@ -41,7 +41,7 @@ struct FleetSettingsView: View {
         .bighelpFormSurface()
         .navigationTitle("Fleet settings")
         .navigationBarTitleDisplayMode(.inline)
-        .refreshable { await store.refresh(force: true) }
+        .bighelpRefreshable { await store.refresh(force: true) }
         .task { await store.refreshIfNeeded() }
         .confirmationDialog(confirmationTitle, isPresented: isConfirming, titleVisibility: .visible,
                             presenting: confirmation) { confirmation in

@@ -207,7 +207,7 @@ struct FleetHomeView: View {
                 ToolbarItem(placement: .topBarTrailing) { organizeMenu }
             }
         }
-        .refreshable {
+        .bighelpRefreshable {
             fleet.refresh(force: true)
             await fleet.waitForReads()
         }
@@ -605,7 +605,7 @@ struct FleetChatsView: View {
         .dismissesKeyboardOnScroll(true, immediately: true)
         .background(BighelpThemeCanvas(theme: theme).ignoresSafeArea())
         .toolbar { ToolbarItem(placement: .topBarTrailing) { filterMenu } }
-        .refreshable {
+        .bighelpRefreshable {
             fleet.refresh(force: true)
             await fleet.waitForReads()
         }
@@ -822,7 +822,7 @@ struct FleetTasksView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .refreshable {
+        .bighelpRefreshable {
             fleet.refresh(force: true)
             await fleet.waitForReads()
         }

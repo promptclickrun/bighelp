@@ -103,6 +103,37 @@ struct ChatToolFolderTests {
                 == [false, false])
     }
 
+    /// The chat plays one loader at a time: on its newest live tool folder or running
+    /// thinking, never on two rows, and never after the turn ends.
+    @Test func theChatPlaysOneLoaderOnItsNewestLiveFolder() {
+        func thinking(_ id: String, _ lifecycle: ChatActivityLifecycle, order: Int) -> ChatActivityEvent {
+            ChatActivityEvent(eventID: id, sessionID: "session", turnID: "turn", kind: .reasoning, lifecycle: lifecycle,
+                              title: "Thinking", summary: nil, detail: nil, occurredAt: 1, sourceOrder: order)
+        }
+        let store = ChatActivityDisclosureStore()
+        let thought = thinking("r1", .running, order: 2)
+        let folder = ChatActivityTurn(id: "work", events: [tool("a", "read_file", lifecycle: .running, order: 3)])
+        let rows: [ChatTurnDisplayRow] = [
+            .entry(.message(message("q", human: true, order: 1))),
+            .entry(.activity(ChatActivityTurn(id: "think", events: [thought]))), .entry(.activity(folder)),
+        ]
+        let canvas = ChatCanvasTranscriptProjection.rows(from: rows, disclosures: store, isSending: true)
+        #expect(ChatCanvasTranscriptProjection.activeLoaderID(in: canvas, isSending: true) == ChatLoaderID.workTrail(folder))
+
+        let thinkingOnly = Array(rows.prefix(2))
+        let thinkingCanvas = ChatCanvasTranscriptProjection.rows(from: thinkingOnly, disclosures: store, isSending: true)
+        #expect(ChatCanvasTranscriptProjection.activeLoaderID(in: thinkingCanvas, isSending: true)
+                == ChatLoaderID.thinking([thought]))
+        #expect(ChatCanvasTranscriptProjection.activeLoaderID(in: canvas, isSending: false) == nil)
+
+        // A focus lets only its row move.
+        let focus = BighelpActivityLoaderFocus()
+        focus.activeID = ChatLoaderID.workTrail(folder)
+        #expect(focus.allows(ChatLoaderID.workTrail(folder)))
+        #expect(!focus.allows(ChatLoaderID.thinking([thought])))
+        #expect(!focus.allows(nil))
+    }
+
     // MARK: The finished turn
 
     @Test func aFinishedTurnFoldsItsFoldersIntoWorkedForWithTheRealTimeAndSteps() {

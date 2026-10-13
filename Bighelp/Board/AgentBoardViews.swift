@@ -69,7 +69,7 @@ struct BoardScroll<Content: View>: View {
         }
         .scrollIndicators(.hidden)
         .overlay(alignment: .top) { AgentBoardHeaderButtons(context: context) }
-        .refreshable { await context.store.load(agentID: context.agentID) }
+        .bighelpRefreshable { await context.store.load(agentID: context.agentID) }
         .task(id: context.agentID) {
             if context.store.agentID != context.agentID || context.store.state == .idle {
                 await context.store.load(agentID: context.agentID)
@@ -819,7 +819,7 @@ private struct IdeaDetailSheet: View {
                     } label: {
                         Group {
                             if isAccepting {
-                                ProgressView().tint(theme.actionForeground)
+                                BighelpNoodleView(motion: .loader, size: 20, tint: theme.actionForeground)
                             } else {
                                 Text(acceptFailed ? "Try again" : "Let's do it")
                             }
@@ -979,7 +979,7 @@ struct AgentAppsView<Artifacts: View>: View {
                 .padding(.horizontal, BighelpTokens.space20)
             }
         }
-        .refreshable { await media.load(agentID: context.agentID) }
+        .bighelpRefreshable { await media.load(agentID: context.agentID) }
         .task(id: context.agentID) { await media.load(agentID: context.agentID) }
         .bighelpSheet(item: $preview) { ChatAttachmentPreviewView(attachment: $0).bighelpSheetSize(.large) }
         .padding(.bottom, 100)

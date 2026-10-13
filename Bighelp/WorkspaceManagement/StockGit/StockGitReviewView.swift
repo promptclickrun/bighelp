@@ -19,7 +19,7 @@ struct StockGitReviewView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("Project Changes")
         .navigationBarTitleDisplayMode(.inline)
-        .refreshable { await store.load() }
+        .bighelpRefreshable { await store.load() }
         .task { if store.snapshot == nil { await store.load() } }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {

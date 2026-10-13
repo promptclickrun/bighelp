@@ -483,7 +483,7 @@ struct KanbanLaneList: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .refreshable { await model.refresh() }
+        .bighelpRefreshable { await model.refresh() }
         .accessibilityIdentifier("kanban.lane.\(lane.rawValue)")
     }
 
@@ -549,7 +549,7 @@ struct KanbanLaneColumn: View {
                 .padding(.bottom, BighelpTokens.space16)
             }
             .scrollIndicators(.hidden)
-            .refreshable { await model.refresh() }
+            .bighelpRefreshable { await model.refresh() }
         }
         .padding(BighelpTokens.space12)
         .frame(width: width)

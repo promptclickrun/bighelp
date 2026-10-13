@@ -17,7 +17,7 @@ struct WorktreeManagementView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("Branches & Worktrees")
         .navigationBarTitleDisplayMode(.inline)
-        .refreshable { await store.load() }
+        .bighelpRefreshable { await store.load() }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {

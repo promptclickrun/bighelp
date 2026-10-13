@@ -77,7 +77,7 @@ struct HermesAchievementsView: View {
                     }
                 }
                 .listStyle(.insetGrouped)
-                .refreshable { await store.refresh() }
+                .bighelpRefreshable { await store.refresh() }
             }
         }
         .navigationTitle("Achievements")

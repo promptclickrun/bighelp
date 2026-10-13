@@ -177,7 +177,7 @@ struct AgentsEmptyStateView: View {
 
     var body: some View {
         VStack(spacing: BighelpTokens.space12) {
-            EmberMark(size: 72)
+            BighelpNoodleView(motion: .idle, size: 72)
             Text("No agents yet")
                 .bighelpFont(.screenTitle)
                 .foregroundStyle(theme.primaryText)

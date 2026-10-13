@@ -29,6 +29,28 @@ enum BighelpActivityPhase: Equatable, Sendable {
     }
 }
 
+/// On a screen where only one live row may play its loader (the chat plays it on its
+/// active folder alone), the screen names that row here and each row compares its
+/// `loaderID`. Without a focus, every live row plays.
+@MainActor
+@Observable
+final class BighelpActivityLoaderFocus {
+    var activeID: String?
+
+    func allows(_ id: String?) -> Bool { id != nil && id == activeID }
+}
+
+private struct BighelpActivityLoaderFocusKey: EnvironmentKey {
+    static let defaultValue: BighelpActivityLoaderFocus? = nil
+}
+
+extension EnvironmentValues {
+    var bighelpActivityLoaderFocus: BighelpActivityLoaderFocus? {
+        get { self[BighelpActivityLoaderFocusKey.self] }
+        set { self[BighelpActivityLoaderFocusKey.self] = newValue }
+    }
+}
+
 /// One thing the agent did, as a line in the unfolded row.
 struct BighelpActivityStep: Identifiable, Equatable, Sendable {
     let id: String
@@ -41,7 +63,7 @@ struct BighelpActivityStep: Identifiable, Equatable, Sendable {
     var meta: String?
     /// The meta counts something added, in the success color.
     var metaIsAddition = false
-    /// Still running: a small spinner takes the glyph's place.
+    /// Still running (its row says so with its loader).
     var isRunning = false
     /// The meta reports a failure ("Failed"), in the danger color.
     var metaIsFailure = false
@@ -195,13 +217,18 @@ struct BighelpActivityRow: View {
     var detailsBelow = false
     var onDisclosureChange: () -> Void = {}
     var accessibilityIdentifier: String?
+    /// Names the row for a screen's `BighelpActivityLoaderFocus`.
+    var loaderID: String?
+    /// The Noodle to play while live; nil plays thinking or the loader by the phase.
+    var loaderMotion: BighelpNoodleMotion?
 
     private let expansion: Binding<Bool>?
     @State private var localExpanded: Bool
 
     init(phase: BighelpActivityPhase, steps: [BighelpActivityStep] = [], stepCount: Int? = nil,
          note: String? = nil, detailsBelow: Bool = false, isExpanded: Binding<Bool>,
-         onDisclosureChange: @escaping () -> Void = {}, accessibilityIdentifier: String? = nil) {
+         onDisclosureChange: @escaping () -> Void = {}, accessibilityIdentifier: String? = nil,
+         loaderID: String? = nil, loaderMotion: BighelpNoodleMotion? = nil) {
         self.phase = phase
         self.steps = steps
         self.stepCount = stepCount
@@ -209,14 +236,18 @@ struct BighelpActivityRow: View {
         self.detailsBelow = detailsBelow
         self.onDisclosureChange = onDisclosureChange
         self.accessibilityIdentifier = accessibilityIdentifier
+        self.loaderID = loaderID
+        self.loaderMotion = loaderMotion
         expansion = isExpanded
         _localExpanded = State(initialValue: isExpanded.wrappedValue)
     }
 
     /// Keeps its own open/closed state.
     init(phase: BighelpActivityPhase, steps: [BighelpActivityStep] = [], stepCount: Int? = nil,
-         note: String? = nil, startsExpanded: Bool = false, accessibilityIdentifier: String? = nil) {
+         note: String? = nil, startsExpanded: Bool = false, accessibilityIdentifier: String? = nil,
+         loaderID: String? = nil) {
         self.phase = phase
+        self.loaderID = loaderID
         self.steps = steps
         self.stepCount = stepCount
         self.note = note
@@ -229,6 +260,10 @@ struct BighelpActivityRow: View {
     @BighelpLoaderMotionReader private var motion
     @BighelpLoaderScaled(relativeTo: .subheadline) private var glyphSide: CGFloat = BighelpActivityMetrics.glyphSide
     @State private var isHovered = false
+    @Environment(\.bighelpActivityLoaderFocus) private var loaderFocus
+
+    /// Live, and the one row allowed to move when the screen allows only one.
+    private var playsLoader: Bool { phase.isLive && (loaderFocus?.allows(loaderID) ?? true) }
 
     private var isExpanded: Bool { expansion?.wrappedValue ?? localExpanded }
     private var hasDetails: Bool { detailsBelow || !steps.isEmpty || note?.isEmpty == false }
@@ -267,7 +302,7 @@ struct BighelpActivityRow: View {
                 Text(label)
                     .lineLimit(1)
                     .truncationMode(.tail)
-                    .bighelpShimmer(isActive: phase.isLive)
+                    .bighelpShimmer(isActive: playsLoader)
                     .contentTransition(.opacity)
                 if let meta = BighelpActivitySummary.stepCountLabel(count) {
                     Text(meta)
@@ -336,14 +371,14 @@ struct BighelpActivityRow: View {
         case .failed: theme.danger
         case .thinking, .working, .thought, .stopped: theme.tertiaryText
         }
-        return BighelpLoaderClock(isRunning: phase.isLive, cadence: .soft) { time in
-            let breath = time.pingPong(BighelpLoaderTiming.breathe / 2, rest: 0.5)
-            BighelpActivityGlyphView(glyph: BighelpActivitySummary.glyph(for: phase), side: glyphSide,
-                                     time: phase.isLive ? time : .still)
-                .scaleEffect(time.isStill ? 1 : 0.92 + 0.14 * breath)
-                .opacity(time.isStill ? 1 : 0.6 + 0.4 * breath)
+        return Group {
+            if playsLoader {
+                BighelpNoodleView(motion: loaderMotion ?? (phase == .thinking ? .thinking : .loader), size: glyphSide)
+            } else {
+                BighelpActivityGlyphView(glyph: BighelpActivitySummary.glyph(for: phase), side: glyphSide)
+                    .foregroundStyle(color)
+            }
         }
-        .foregroundStyle(color)
         .frame(width: glyphSide, height: glyphSide)
         .accessibilityHidden(true)
     }
@@ -362,7 +397,7 @@ struct BighelpActivityRow: View {
                     .padding(.vertical, 3)
             }
             ForEach(steps) { step in
-                BighelpActivityStepRow(step: step, showsSpinner: step.isRunning && phase.isLive)
+                BighelpActivityStepRow(step: step)
                     .transition(motion.moves
                         ? .asymmetric(insertion: .opacity.combined(with: .offset(y: 3)), removal: .opacity)
                         : .opacity)
@@ -406,12 +441,10 @@ private struct BighelpActivityRail: ViewModifier {
     }
 }
 
-/// One step as a line: its glyph (or a spinner while it runs), the words, a
-/// monospaced detail cut short to fit, and a short trailing meta.
+/// One step as a line: its glyph, the words, a monospaced detail cut short to fit,
+/// and a short trailing meta. A running step moves only through its row's loader.
 struct BighelpActivityStepRow: View {
     let step: BighelpActivityStep
-    /// Spin in the glyph's place. Only while the step and its row are live.
-    var showsSpinner = false
 
     @BighelpThemeReader private var theme
     @BighelpLoaderScaled(relativeTo: .footnote) private var glyphSide: CGFloat = BighelpActivityMetrics.stepGlyphSide
@@ -419,13 +452,7 @@ struct BighelpActivityStepRow: View {
 
     var body: some View {
         HStack(spacing: BighelpTokens.space8) {
-            Group {
-                if showsSpinner {
-                    BighelpSpinner(size: glyphSide * 0.75, lineWidth: 1.6)
-                } else {
-                    BighelpActivityGlyphView(glyph: step.glyph, side: glyphSide, time: .still)
-                }
-            }
+            BighelpActivityGlyphView(glyph: step.glyph, side: glyphSide)
             .foregroundStyle(theme.tertiaryText)
             .frame(width: glyphSide, height: glyphSide)
             Text(step.label)
@@ -462,11 +489,10 @@ struct BighelpActivityStepRow: View {
     }
 }
 
-/// Draws an activity glyph at a size. The thinking orb blinks on the clock it's given.
+/// Draws an activity glyph at a size, still. Thinking is the Noodle at rest.
 struct BighelpActivityGlyphView: View {
     let glyph: BighelpActivityGlyph
     let side: CGFloat
-    var time: BighelpLoaderTime = .still
 
     var body: some View {
         Group {
@@ -476,68 +502,16 @@ struct BighelpActivityGlyphView: View {
             case .symbol(let name):
                 BighelpSymbolImage(systemName: name)
             case .thinking:
-                BighelpOrbGlyph(time: time)
+                // The Noodle at rest, in the row's color; the loader plays in its place while live.
+                BighelpNoodleShape()
+                    .stroke(style: StrokeStyle(lineWidth: side * 0.13, lineCap: .round, lineJoin: .round))
+                    .padding(side * 0.14)
             case .done:
                 Image(systemName: "checkmark").resizable().scaledToFit()
                     .fontWeight(.bold).scaleEffect(0.72)
             }
         }
         .frame(width: side, height: side)
-    }
-}
-
-/// bighelp's agent orb as a line glyph, with eyes that look around and blink.
-/// Drawn on the 24-point glyph grid in the current foreground style.
-struct BighelpOrbGlyph: View {
-    var time: BighelpLoaderTime = .still
-
-    /// The eyes' sideways glance (in grid points) and how open they are, through
-    /// one 3.2 s loop: center, left, right, center, with a blink in the middle.
-    static func eyes(at time: BighelpLoaderTime) -> (glance: Double, openness: Double) {
-        guard !time.isStill else { return (0, 1) }
-        let p = time.phase(BighelpLoaderTiming.orbEyes)
-        func ease(_ from: Double, _ to: Double, _ start: Double, _ end: Double) -> Double {
-            from + (to - from) * BighelpLoaderCurve.easeInOut((p - start) / (end - start))
-        }
-        let glance: Double = switch p {
-        case ..<0.18: 0
-        case ..<0.25: ease(0, -1.4, 0.18, 0.25)
-        case ..<0.45: -1.4
-        case ..<0.52: ease(-1.4, 1.4, 0.45, 0.52)
-        case ..<0.70: 1.4
-        case ..<0.78: ease(1.4, 0, 0.70, 0.78)
-        default: 0
-        }
-        let openness: Double = switch p {
-        case 0.46..<0.48: 1 - 0.9 * (p - 0.46) / 0.02
-        case 0.48..<0.50: 0.1 + 0.9 * (p - 0.48) / 0.02
-        default: 1
-        }
-        return (glance, openness)
-    }
-
-    var body: some View {
-        Canvas { context, size in
-            let scale = min(size.width, size.height) / 24
-            context.translateBy(x: (size.width - 24 * scale) / 2, y: (size.height - 24 * scale) / 2)
-            context.scaleBy(x: scale, y: scale)
-            var orb = Path()
-            orb.move(to: CGPoint(x: 3.935, y: 13.196))
-            orb.addCurve(to: CGPoint(x: 12, y: 4.235), control1: CGPoint(x: 3.935, y: 6.476), control2: CGPoint(x: 7.52, y: 4.235))
-            orb.addCurve(to: CGPoint(x: 20.064, y: 13.196), control1: CGPoint(x: 16.48, y: 4.235), control2: CGPoint(x: 20.064, y: 6.476))
-            orb.addCurve(to: CGPoint(x: 12, y: 19.916), control1: CGPoint(x: 20.064, y: 17.9), control2: CGPoint(x: 16.704, y: 19.916))
-            orb.addCurve(to: CGPoint(x: 3.935, y: 13.196), control1: CGPoint(x: 7.295, y: 19.916), control2: CGPoint(x: 3.935, y: 17.9))
-            orb.closeSubpath()
-            context.stroke(orb, with: .foreground, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-            let eyes = Self.eyes(at: time)
-            let radius = 1.288
-            for x in [9.424, 14.576] {
-                let height = radius * 2 * eyes.openness
-                let rect = CGRect(x: x + eyes.glance - radius, y: 10.508 - height / 2, width: radius * 2, height: height)
-                context.fill(Path(ellipseIn: rect), with: .foreground)
-            }
-        }
-        .accessibilityHidden(true)
     }
 }
 

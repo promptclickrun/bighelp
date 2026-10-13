@@ -32,7 +32,7 @@ struct HostExtensionsView: View {
             if kanban.mount == .unknown { await kanban.load() }
             if achievements.mount == .unknown { await achievements.load() }
         }
-        .refreshable {
+        .bighelpRefreshable {
             await kanban.load()
             await achievements.load()
         }

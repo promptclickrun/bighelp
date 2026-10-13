@@ -75,7 +75,7 @@ struct DevFactoryHomeView: View {
         .background(BighelpThemeCanvas(theme: theme).ignoresSafeArea())
         .navigationTitle("Dev Factory")
         .navigationBarTitleDisplayMode(.inline)
-        .refreshable { await store.load() }
+        .bighelpRefreshable { await store.load() }
         .task { await store.load() }
         .bighelpSheet(item: $newFrom) { template in
             DevFactoryNewRecipeSheet(context: context, template: template)
@@ -503,7 +503,7 @@ struct DevFactoryRecipeView: View {
             DevFactoryRunSheet(context: context, recipe: recipe).bighelpSheetSize(.standard)
         }
         .task { await load() }
-        .refreshable { await load() }
+        .bighelpRefreshable { await load() }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("devfactory.recipe")
     }

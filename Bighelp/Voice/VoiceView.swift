@@ -431,10 +431,9 @@ struct VoiceView: View {
     }
 
     private var authoritativeStatus: some View {
-        HStack(spacing: BighelpTokens.space8) {
-            Circle()
-                .fill(statusIndicatorColor)
-                .frame(width: 8, height: 8)
+        let noodle = VoiceNoodle.motion(turnBased: model.status, live: liveState)
+        return HStack(spacing: BighelpTokens.space8) {
+            BighelpNoodleView(motion: noodle, size: 22, playback: VoiceNoodle.playback(noodle))
             Text("\(model.agentName) · \(statusText)")
                 .bighelpFont(.label, weight: .semibold)
                 .lineLimit(1)
@@ -453,17 +452,6 @@ struct VoiceView: View {
         .accessibilityLabel(model.status.label)
         .accessibilityValue(model.status == .working ? "In progress" : "")
         .accessibilityIdentifier("voice.status")
-    }
-
-    private var statusIndicatorColor: Color {
-        switch model.status {
-        case .listening, .working, .speaking:
-            liveState.dotColor
-        case .paused:
-            theme.warning
-        case .unavailable:
-            theme.danger
-        }
     }
 
     /// A subtle, level-driven breath while the microphone hears you.
@@ -678,12 +666,8 @@ struct VoiceView: View {
         } label: {
             HStack(spacing: BighelpTokens.space8) {
                 if model.isEndPending {
-                    BighelpThinkingOrb(
-                        scenario: .working,
-                        scale: .inline,
-                        surface: theme.actionThinkingOrbSurface
-                    )
-                    .accessibilityHidden(true)
+                    // The b reels itself in: the call is ending.
+                    BighelpNoodleView(motion: .exit, size: 20, tint: .white)
                 } else {
                     Image(systemName: "phone.down.fill")
                         .font(.system(size: 17, weight: .semibold))

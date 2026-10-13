@@ -11,11 +11,8 @@ enum BighelpLoaderTiming {
     static let shimmer: TimeInterval = 1.9
     static let skeletonSweep: TimeInterval = 1.7
     static let dotsBounce: TimeInterval = 1.1
-    static let arcSpin: TimeInterval = 0.8
-    static let stepSpin: TimeInterval = 0.75
     static let breathe: TimeInterval = 2.4
     static let ping: TimeInterval = 2.4
-    static let orbEyes: TimeInterval = 3.2
     static let glowSweep: TimeInterval = 3.2
     static let developScan: TimeInterval = 2.6
     static let packetTravel: TimeInterval = 1.6

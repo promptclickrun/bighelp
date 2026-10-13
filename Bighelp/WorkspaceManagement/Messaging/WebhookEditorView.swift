@@ -235,7 +235,7 @@ struct WebhookEditorView: View {
                 }
                 .listStyle(.insetGrouped)
                 .searchable(text: $search, prompt: "Search webhooks")
-                .refreshable { await store.refresh() }
+                .bighelpRefreshable { await store.refresh() }
             } else {
                 ContentUnavailableView(
                     "Workspace changed", systemImage: "arrow.triangle.branch",

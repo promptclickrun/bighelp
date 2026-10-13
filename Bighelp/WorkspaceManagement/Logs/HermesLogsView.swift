@@ -123,7 +123,7 @@ struct HermesLogsView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .refreshable { await store.refresh() }
+        .bighelpRefreshable { await store.refresh() }
     }
 
     private var filterSection: some View {

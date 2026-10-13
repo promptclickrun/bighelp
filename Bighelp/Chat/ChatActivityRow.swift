@@ -74,8 +74,7 @@ struct ChatActivityRow: View {
     }
 
     private var stepLine: some View {
-        BighelpActivityStepRow(step: ChatActivityPresentation.step(for: event),
-                               showsSpinner: event.lifecycle == .running)
+        BighelpActivityStepRow(step: ChatActivityPresentation.step(for: event))
     }
 
     /// Touch needs a full target; the Mac's pointer keeps the stack compact.
@@ -205,7 +204,8 @@ struct ChatThinkingRow: View {
                 else { localExpanded = expanded }
             }),
             onDisclosureChange: onDisclosureChange,
-            accessibilityIdentifier: "chat.activity.\(events.first?.eventID ?? "reasoning")"
+            accessibilityIdentifier: "chat.activity.\(events.first?.eventID ?? "reasoning")",
+            loaderID: ChatLoaderID.thinking(events)
         )
     }
 }

@@ -215,6 +215,8 @@ struct AdaptiveComposerActionButton: View {
             BighelpThinkingOrb(
                 scenario: .composing,
                 scale: .inline,
+                // Hidden, not removed, so the swap can fade: don't draw frames nobody sees.
+                isPaused: !isBusy,
                 surface: uiV3Enabled ? .automatic : theme.actionThinkingOrbSurface
             )
                 .accessibilityHidden(true)

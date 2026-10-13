@@ -49,7 +49,7 @@ struct ToolsetManagementView: View {
         }
         .listStyle(.insetGrouped)
         .searchable(text: $search, prompt: "Search toolsets")
-        .refreshable { await model.load() }
+        .bighelpRefreshable { await model.load() }
         .task { if model.snapshot == nil { await model.load() } }
     }
 }

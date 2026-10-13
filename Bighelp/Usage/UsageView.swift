@@ -65,7 +65,7 @@ struct UsageView: View {
         }
         // Exports are only for the share sheet.
         .onDisappear { UsageExporter.removeAll() }
-        .refreshable { await refresh() }
+        .bighelpRefreshable { await refresh() }
         .task {
             await store.load(refresh: false)
             if let providerUsage, providerUsage.isAvailable, providerUsage.report == nil {

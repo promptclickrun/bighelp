@@ -108,7 +108,7 @@ struct SkillsHubManagementView: View {
         .onChange(of: model.query) { _, query in
             if !ManagementSearch.isActive(query) { model.clearSearch() }
         }
-        .refreshable { await model.load() }
+        .bighelpRefreshable { await model.load() }
         .task { if model.snapshot == nil { await model.load() } }
         .bighelpSheet(item: Binding(
             get: { model.review },

@@ -54,6 +54,9 @@ struct BighelpThinkingOrbPresentation: Sendable {
     let size: OrbSize
     let displaySize: Double?
     let visibleLabel: String?
+    /// The brand kit's motion for the scenario, and how it plays.
+    let motion: BighelpNoodleMotion
+    let playback: BighelpNoodlePlayback
 
     var hidesOrbFromAccessibility: Bool {
         visibleLabel != nil
@@ -64,12 +67,31 @@ struct BighelpThinkingOrbPresentation: Sendable {
         scale: BighelpThinkingOrbScale,
         visibleLabel: String? = nil
     ) -> Self {
-        Self(
+        let noodle = noodle(for: scenario)
+        return Self(
             state: state(for: scenario),
             size: size(for: scale),
             displaySize: nil,
-            visibleLabel: visibleLabel
+            visibleLabel: visibleLabel,
+            motion: noodle.motion,
+            playback: noodle.playback
         )
+    }
+
+    /// Plain loading writes the b; the rest use the kit's motion for what's going on.
+    /// Tricks loop with a short rest so each pass reads as one gesture.
+    private static func noodle(for scenario: BighelpThinkingOrbScenario)
+        -> (motion: BighelpNoodleMotion, playback: BighelpNoodlePlayback) {
+        switch scenario {
+        case .working: (.loader, .automatic)
+        case .searching: (.lasso, .loop(pause: 0.4))
+        case .reasoning: (.thinking, .automatic)
+        case .listening: (.listening, .automatic)
+        case .connecting, .shaping: (.launch, .loop(pause: 0.6))
+        case .coordinating: (.infinity, .loop())
+        case .composing: (.squiggle, .loop(pause: 0.3))
+        case .waiting: (.resting, .automatic)
+        }
     }
 
     static func shouldPause(
@@ -112,10 +134,10 @@ struct BighelpThinkingOrbPresentation: Sendable {
     }
 }
 
+/// bighelp's loader: the brand kit's Noodle, acting out the scenario (DESIGN.md › Noodle).
 struct BighelpThinkingOrb: View {
     let scenario: BighelpThinkingOrbScenario
     let scale: BighelpThinkingOrbScale
-    let speed: Double
     let isPaused: Bool
     let displaySize: Double?
     let visibleLabel: String?
@@ -127,7 +149,6 @@ struct BighelpThinkingOrb: View {
     init(
         scenario: BighelpThinkingOrbScenario,
         scale: BighelpThinkingOrbScale = .standard,
-        speed: Double = 1,
         isPaused: Bool = false,
         displaySize: Double? = nil,
         visibleLabel: String? = nil,
@@ -136,7 +157,6 @@ struct BighelpThinkingOrb: View {
     ) {
         self.scenario = scenario
         self.scale = scale
-        self.speed = speed
         self.isPaused = isPaused
         self.displaySize = displaySize
         self.visibleLabel = visibleLabel
@@ -164,19 +184,23 @@ struct BighelpThinkingOrb: View {
     }
 
     private func orb(for presentation: BighelpThinkingOrbPresentation) -> some View {
-        BighelpThinkingMark(
-            scenario: scenario,
-            displaySize: CGFloat(
-                displaySize ?? presentation.displaySize ?? Double(presentation.size.rawValue)
-            ),
-            speed: speed,
-            isPaused: BighelpThinkingOrbPresentation.shouldPause(
-                explicitly: isPaused,
-                scenePhase: scenePhase
-            ),
-            surface: surface,
-            accessibilityLabel: presentation.state.label,
-            tint: tint
+        BighelpNoodleView(
+            motion: presentation.motion,
+            size: CGFloat(displaySize ?? presentation.displaySize ?? Double(presentation.size.rawValue)),
+            playback: presentation.playback,
+            tint: noodleTint,
+            isPaused: BighelpThinkingOrbPresentation.shouldPause(explicitly: isPaused, scenePhase: scenePhase),
+            accessibilityLabel: presentation.hidesOrbFromAccessibility ? nil : presentation.state.label
         )
+    }
+
+    /// The kit's Ember by default; black or white when it sits on a filled button.
+    private var noodleTint: Color? {
+        if let tint { return tint }
+        switch surface {
+        case .automatic: return nil
+        case .light: return .black
+        case .dark: return .white
+        }
     }
 }

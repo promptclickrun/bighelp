@@ -74,7 +74,7 @@ struct ProjectsHomeView: View {
                     .accessibilityIdentifier("projects.new")
             }
         }
-        .refreshable { await reload() }
+        .bighelpRefreshable { await reload() }
         .task { await reload() }
         .bighelpSheet(isPresented: $isCreating) {
             HermesWorkspaceCreateView(store: context.workspaces, agentID: context.agentID, noun: "Project") {
@@ -321,7 +321,7 @@ struct ProjectDetailView: View {
                 .accessibilityIdentifier("project.options")
             }
         }
-        .refreshable { await refresh() }
+        .bighelpRefreshable { await refresh() }
         .task(id: projectID) {
             if context.workspaces.catalog == nil { await context.workspaces.load(agentID: context.agentID) }
             if context.store.details.isEmpty { await context.store.refresh() }

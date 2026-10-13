@@ -803,7 +803,7 @@ struct WorkflowDeliveryAndOutcomeTests {
         #expect(!WorkflowDeliveryPlace.isValid("Telegram"))
         #expect(!WorkflowDeliveryPlace.isValid("slack:"))
         #expect(!WorkflowDeliveryPlace.isValid("slack: C01"))
-        #expect(WorkflowDeliveryPlace.title("loopdy") == "\(EmberBrand.appName) app")
+        #expect(WorkflowDeliveryPlace.title("loopdy") == "\(BighelpBrand.appName) app")
         #expect(WorkflowDeliveryPlace.title("local") == "kept here")
     }
 

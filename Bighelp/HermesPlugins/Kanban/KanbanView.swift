@@ -63,7 +63,7 @@ struct HermesKanbanView: View {
                     }
                 }
                 .listStyle(.insetGrouped)
-                .refreshable { await store.load() }
+                .bighelpRefreshable { await store.load() }
             }
         }
         .navigationTitle("Kanban")
@@ -197,7 +197,7 @@ private struct HermesKanbanBoardView: View {
                     }
                 }
                 .listStyle(.insetGrouped)
-                .refreshable { await store.openBoard(slug) }
+                .bighelpRefreshable { await store.openBoard(slug) }
                 .navigationTitle(snapshot.board.name)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -394,7 +394,7 @@ private struct HermesKanbanTaskView: View {
                     }
                 }
                 .listStyle(.insetGrouped)
-                .refreshable { await store.openTask(taskID, board: boardSlug) }
+                .bighelpRefreshable { await store.openTask(taskID, board: boardSlug) }
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Edit") { showsEditor = true }.disabled(!store.canAct)

@@ -122,7 +122,7 @@ struct DevFactoryRunGroupView: View {
         .background(BighelpThemeCanvas(theme: theme).ignoresSafeArea())
         .navigationTitle(model.group?.name ?? "Run")
         .navigationBarTitleDisplayMode(.inline)
-        .refreshable { await model.refresh() }
+        .bighelpRefreshable { await model.refresh() }
         .task { await model.appear() }
         .onDisappear { model.disappear() }
         .alert("What should change?", isPresented: Binding(get: { askingChanges != nil },
@@ -152,6 +152,8 @@ struct DevFactoryRunGroupView: View {
                     .background(theme.raisedSurface, in: .rect(cornerRadius: 6))
                 Spacer(minLength: 0)
                 CodePill(text: DevFactoryWords.state(run), tint: DevFactoryWords.tint(run, theme))
+                    // A run that finishes while you watch gets the kit's done.
+                    .bighelpNoodleMoment(.done, when: run.state == .succeeded, size: 28)
             }
             if let stages = detail?.stages, !stages.isEmpty {
                 HStack(spacing: 4) {

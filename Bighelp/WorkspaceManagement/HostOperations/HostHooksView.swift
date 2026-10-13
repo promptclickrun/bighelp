@@ -22,7 +22,7 @@ struct HostHooksView: View {
         .navigationTitle("Shell Hooks")
         .navigationBarTitleDisplayMode(.inline)
         .onDisappear { store.closeShellHooks() }
-        .refreshable { await store.refreshShellHooks() }
+        .bighelpRefreshable { await store.refreshShellHooks() }
         .task {
             if store.shellHooks == nil { await store.refreshShellHooks() }
             adoptFirstEventIfNeeded()

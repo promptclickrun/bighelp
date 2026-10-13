@@ -37,7 +37,7 @@ struct ScheduledTasksView: View {
             .task {
                 if store.loadState == .idle { await store.load() }
             }
-            .refreshable { await store.load() }
+            .bighelpRefreshable { await store.load() }
             .bighelpSheet(item: $createAgent, onDismiss: presentQueuedBlueprints) { agent in
                 NavigationStack {
                     ScheduledTaskEditorView(

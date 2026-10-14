@@ -119,7 +119,7 @@ extension DirectHermesConversationClient {
         if detectedContract == .serverRequests, let openRequests = after["open_requests"] {
             guard let requests = openRequests.array else { throw DirectHermesError.invalidResponse }
             if let openRequestRecovery {
-                try openRequestRecovery(openRequests, runtimeID)
+                try openRequestRecovery(openRequests, runtimeID, object["pending_connection"])
             } else if !requests.isEmpty {
                 throw DirectHermesError.invalidResponse
             }

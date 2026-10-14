@@ -295,13 +295,18 @@ struct ProviderSignInSheet: View {
 final class ProviderSignInBrowser: NSObject, ASWebAuthenticationPresentationContextProviding {
     private var session: ASWebAuthenticationSession?
 
-    func start(_ url: URL) {
+    /// `onClose` runs when the person closes the page (never on the Mac, which opens the default
+    /// browser; there the app's return to the front is the signal).
+    func start(_ url: URL, onClose: (@MainActor @Sendable () -> Void)? = nil) {
         #if targetEnvironment(macCatalyst)
         UIApplication.shared.open(url)
         #else
         session?.cancel()
         // Its completion may come on another queue; @Sendable keeps it off the main actor.
-        let session = ASWebAuthenticationSession(url: url, callbackURLScheme: nil) { @Sendable _, _ in }
+        let session = ASWebAuthenticationSession(url: url, callbackURLScheme: nil) { @Sendable _, _ in
+            guard let onClose else { return }
+            Task { @MainActor in onClose() }
+        }
         session.presentationContextProvider = self
         session.prefersEphemeralWebBrowserSession = false
         self.session = session

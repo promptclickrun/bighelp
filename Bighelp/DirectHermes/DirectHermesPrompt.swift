@@ -156,9 +156,12 @@ enum DirectHermesPromptContract: Equatable, Sendable {
     case serverRequests
 }
 
+/// Re-delivers what a resumed chat still waits on: its open server requests and, on Hermes 0.21.4
+/// and later, the connect card it missed (`pending_connection`).
 typealias DirectHermesOpenRequestRecovery = @MainActor (
     _ openRequests: BighelpJSONValue,
-    _ runtimeID: String
+    _ runtimeID: String,
+    _ pendingConnection: BighelpJSONValue?
 ) throws -> Void
 
 struct DirectHermesPromptConnection: Equatable, @unchecked Sendable {

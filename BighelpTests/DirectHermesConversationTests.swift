@@ -675,7 +675,7 @@ struct DirectHermesConversationTests {
             }
             let client = try DirectHermesConversationClient(rpc: rpc, hostIdentity: "host", profile: "default",
                 runtimeID: "runtime", storedID: "saved", title: "Chat", epoch: "epoch",
-                drafts: .init(root: root), openRequestRecovery: { _, _ in delivered = true })
+                drafts: .init(root: root), openRequestRecovery: { _, _, _ in delivered = true })
             await #expect(throws: DirectHermesError.self) { try await client.recover(epoch: "epoch") }
             #expect(!delivered)
             #expect(!client.isReadyForSubmission)
@@ -696,7 +696,7 @@ struct DirectHermesConversationTests {
         }
         let client = try DirectHermesConversationClient(rpc: rpc, hostIdentity: "host", profile: "default",
             runtimeID: "runtime", storedID: "saved", title: "Chat", epoch: "epoch",
-            drafts: .init(root: root), openRequestRecovery: { value, runtime in
+            drafts: .init(root: root), openRequestRecovery: { value, runtime, _ in
                 #expect(runtime == "runtime")
                 delivered.append(value)
             })

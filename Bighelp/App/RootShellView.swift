@@ -286,6 +286,7 @@ struct RootShellView: View {
         .overlay {
             if let workspace = nativeWorkspaceStore {
                 DirectHermesSecurePromptOverlay(workspace: workspace)
+                ConnectorCardOverlay(store: workspace.connectorCardStore)
             }
         }
         .onChange(of: currentDeviceToolScope, initial: true) { _, scope in
@@ -1082,8 +1083,21 @@ struct RootShellView: View {
             },
             onOpenRoute: { route in
                 leaveSettings { openPrepared(route) }
-            }
+            },
+            connectorApps: { connectorAppsModel() }
         )
+    }
+
+    /// Settings › Apps for the computer in use, while it's connected; made-up apps in demo mode.
+    func connectorAppsModel() -> ConnectorAppsModel? {
+        if let workspace = hostRegistry?.selectedWorkspace, let hostID = hostRegistry?.selectedHostID {
+            guard workspace.isConnected else { return nil }
+            return ConnectorAppsModel(service: DirectHermesConnectorAppsService(workspace: workspace),
+                                      scope: hostID.uuidString)
+        }
+        guard usesWorkspaceFixtures else { return nil }
+        return ConnectorAppsModel(service: DemoConnectorAppsService(), scope: "demo",
+                                  defaults: UserDefaults(suiteName: "bighelp.demo.connectors") ?? .standard)
     }
 
     var workspaceActivity: some View {

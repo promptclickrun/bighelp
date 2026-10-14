@@ -421,6 +421,10 @@ struct BighelpApp: App {
                 #if DEBUG && targetEnvironment(simulator)
                 DirectHermesSecurePromptFixture.rootView()
                 #endif
+            } else if isConnectorCardFixture {
+                #if DEBUG && targetEnvironment(simulator)
+                ConnectorCardFixture.rootView()
+                #endif
             } else if BighelpLoaderGallery.isRequested {
                 BighelpLoaderGallery.rootView()
             } else if isCarPlaySessionFixture {
@@ -640,6 +644,14 @@ struct BighelpApp: App {
     private var isSecureInputFixture: Bool {
         #if DEBUG && targetEnvironment(simulator)
         ProcessInfo.processInfo.arguments.contains(DirectHermesSecurePromptFixture.launchArgument)
+        #else
+        false
+        #endif
+    }
+
+    private var isConnectorCardFixture: Bool {
+        #if DEBUG && targetEnvironment(simulator)
+        ProcessInfo.processInfo.arguments.contains(ConnectorCardFixture.launchArgument)
         #else
         false
         #endif

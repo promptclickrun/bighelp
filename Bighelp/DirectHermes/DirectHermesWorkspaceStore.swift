@@ -7,6 +7,8 @@ import SwiftUI
 final class DirectHermesWorkspaceStore {
     let promptStore = DirectHermesPromptStore()
     let securePromptStore = DirectHermesSecurePromptStore()
+    /// Connect cards (`manage_connections`) of the chats on screen.
+    let connectorCardStore = ConnectorCardStore()
     private(set) var address = ""
     private(set) var isConnecting = false
     private(set) var isConnected = false
@@ -328,10 +330,13 @@ final class DirectHermesWorkspaceStore {
                 profile: profile, runtimeID: runtimeID, visibleSessionID: visibleSessionID,
                 connection: context
             )
+            connectorCardStore.bind(profile: profile, runtimeID: runtimeID, visibleSessionID: visibleSessionID,
+                                    connection: context)
             for event in earlyEvents where event.sessionID.map({
                 Data($0.utf8) == Data(runtimeID.utf8)
             }) == true {
                 securePromptStore.acceptLegacyEvent(event, connection: context)
+                connectorCardStore.accept(event, connection: context)
             }
         } catch {
             promptStore.unbind(
@@ -340,11 +345,12 @@ final class DirectHermesWorkspaceStore {
             )
             throw error
         }
-        let recovery: DirectHermesOpenRequestRecovery = { [weak self, weak transport] openRequests, runtime in
+        let recovery: DirectHermesOpenRequestRecovery = { [weak self, weak transport] openRequests, runtime, pendingConnection in
             guard let self, let transport,
                   self.ownsPromptConnection(context, owner: owner, transport: transport) else {
                 throw WorkspaceClientError.ownerChanged
             }
+            self.connectorCardStore.acceptPending(pendingConnection, runtimeID: runtime, connection: context)
             try transport.adoptOpenServerRequests(
                 openRequests,
                 forRuntimeID: runtime,
@@ -374,6 +380,7 @@ final class DirectHermesWorkspaceStore {
             runtimeID: runtimeID, profile: profile, visibleSessionID: visibleSessionID,
             connection: context
         )
+        connectorCardStore.unbind(runtimeID: runtimeID, connection: context)
     }
 
     /// Management stays on this exact authenticated socket, never a Link fallback.
@@ -395,6 +402,22 @@ final class DirectHermesWorkspaceStore {
         guard owner == generation else { throw DirectHermesError.secureStorageChanged }
         return result
     }
+
+    /// Settings › Apps: Hermes' connector methods for the computer's own account, on this socket.
+    func connectorRequest(_ method: String, params: [String: BighelpJSONValue]) async throws -> BighelpJSONValue {
+        guard ConnectorCardStore.methods.contains(method) || Self.connectorAccountMethods.contains(method) else {
+            throw DirectHermesError.invalidResponse
+        }
+        guard isConnected, let client else { throw DirectHermesError.notConnected }
+        let owner = generation
+        let result = try await client.request(method, params: params)
+        guard owner == generation else { throw DirectHermesError.secureStorageChanged }
+        return result
+    }
+
+    private static let connectorAccountMethods: Set<String> = [
+        "connectors.list", "connectors.accounts", "connectors.accounts.rename", "connectors.accounts.remove",
+    ]
 
     private static let vaultMethods: Set<String> = [
         "vault.list", "vault.sources", "vault.source.set", "vault.unlock", "vault.lock", "vault.add", "vault.remove",
@@ -421,6 +444,7 @@ final class DirectHermesWorkspaceStore {
         onBeforeConnectionRetired?()
         if let promptConnection {
             securePromptStore.retireConnection(promptConnection)
+            connectorCardStore.retireConnection(promptConnection)
             promptStore.retireConnection(promptConnection)
             self.promptConnection = nil
         }
@@ -680,6 +704,17 @@ final class DirectHermesWorkspaceStore {
             }
         )
         securePromptStore.beginConnection(promptConnection, dependencies: secureDependencies)
+        connectorCardStore.beginConnection(promptConnection) { [weak self, weak connection] method, params in
+            guard ConnectorCardStore.methods.contains(method), let self, let connection,
+                  self.ownsPromptConnection(promptConnection, owner: owner, transport: connection) else {
+                throw WorkspaceClientError.ownerChanged
+            }
+            let result = try await connection.request(method, params: params)
+            guard self.ownsPromptConnection(promptConnection, owner: owner, transport: connection) else {
+                throw WorkspaceClientError.ownerChanged
+            }
+            return result
+        }
         do {
             try connection.setServerRequestHandler(for: "approval") { [weak self, weak connection] request in
                 guard let self, let connection,
@@ -723,6 +758,7 @@ final class DirectHermesWorkspaceStore {
             }
         } catch {
             securePromptStore.retireConnection(promptConnection)
+            connectorCardStore.retireConnection(promptConnection)
             promptStore.retireConnection(promptConnection)
             self.promptConnection = nil
             client = nil
@@ -736,6 +772,7 @@ final class DirectHermesWorkspaceStore {
         connection.onDisconnect = { [weak self] error in
             guard let self, self.generation == owner else { return }
             self.securePromptStore.retireConnection(promptConnection)
+            self.connectorCardStore.retireConnection(promptConnection)
             self.promptStore.retireConnection(promptConnection)
             self.promptConnection = nil
             self.attemptedApprovalPresentationAcknowledgements.removeAll(keepingCapacity: false)
@@ -759,6 +796,7 @@ final class DirectHermesWorkspaceStore {
                 self.promptStore.acceptCancellation(cancellation, connection: promptConnection)
             }
             self.securePromptStore.acceptLegacyEvent(event, connection: promptConnection)
+            self.connectorCardStore.accept(event, connection: promptConnection)
             if self.isOpening { self.earlyEvents.append(event) }
             for chat in self.chats.values where event.type == "session.reclaimed" || chat.client.runtimeID == event.sessionID {
                 // Reclaim is a global envelope; the client validates both exact

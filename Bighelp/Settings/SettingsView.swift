@@ -33,6 +33,8 @@ struct SettingsView: View {
     var onOpenWorkspaceDestination: ((WorkspaceDestination) -> Void)?
     /// Opens another app route (Hermes tools hub, activity, direct links, ...).
     var onOpenRoute: ((AppRoute) -> Void)?
+    /// Settings › Apps for the computer in use (demo mode: made-up apps); nil hides the row.
+    var connectorApps: (@MainActor () -> ConnectorAppsModel?)?
     /// Shows just this page (Fleet settings links Appearance and Chat here, so there's one copy of each).
     private var openSection: SettingsMenuSection?
     @Environment(\.bighelpNotificationContext) private var notificationContext
@@ -106,10 +108,12 @@ struct SettingsView: View {
         agentDirectory: AgentDirectoryStore? = nil,
         landingScope: String? = nil,
         onOpenWorkspaceDestination: ((WorkspaceDestination) -> Void)? = nil,
-        onOpenRoute: ((AppRoute) -> Void)? = nil
+        onOpenRoute: ((AppRoute) -> Void)? = nil,
+        connectorApps: (@MainActor () -> ConnectorAppsModel?)? = nil
     ) {
         self.onOpenWorkspaceDestination = onOpenWorkspaceDestination
         self.onOpenRoute = onOpenRoute
+        self.connectorApps = connectorApps
         self.focusedDestination = focusedDestination
         _settings = Bindable(wrappedValue: settings)
         _userIdentity = Bindable(wrappedValue: userIdentity)

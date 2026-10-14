@@ -7,6 +7,20 @@ import UIKit
 struct BotScreenCanvas: UIViewRepresentable {
     let model: BotScreenViewerModel
     let label: String
+    // Passed in, not read off the model here, so SwiftUI updates the view whenever they change.
+    let screenSize: BotScreenSize
+    let inControl: Bool
+    let drivesScreen: Bool
+    let wantsKeyboard: Bool
+
+    init(model: BotScreenViewerModel, label: String) {
+        self.model = model
+        self.label = label
+        screenSize = model.screenSize
+        inControl = model.isInControl
+        drivesScreen = model.isInControl && model.touchesDriveScreen
+        wantsKeyboard = model.showsKeyboard
+    }
 
     func makeUIView(context: Context) -> BotScreenCanvasView {
         let view = BotScreenCanvasView()
@@ -17,9 +31,8 @@ struct BotScreenCanvas: UIViewRepresentable {
 
     func updateUIView(_ view: BotScreenCanvasView, context: Context) {
         view.accessibilityLabel = label
-        view.update(screenSize: model.screenSize, inControl: model.isInControl,
-                    drivesScreen: model.isInControl && model.touchesDriveScreen,
-                    wantsKeyboard: model.showsKeyboard)
+        view.update(screenSize: screenSize, inControl: inControl, drivesScreen: drivesScreen,
+                    wantsKeyboard: wantsKeyboard)
     }
 }
 
@@ -138,6 +151,8 @@ final class BotScreenCanvasView: UIView, UIScrollViewDelegate, UIKeyInput, UIPoi
         let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap))
         let secondaryTap = UITapGestureRecognizer(target: self, action: #selector(handleSecondaryTap))
         secondaryTap.buttonMaskRequired = .secondary
+        // A finger's tap would match too and turn every tap into a right-click.
+        secondaryTap.allowedTouchTypes = [NSNumber(value: UITouch.TouchType.indirectPointer.rawValue)]
         let longPress = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress))
         longPress.minimumPressDuration = 0.5
         let drag = UIPanGestureRecognizer(target: self, action: #selector(handleDrag))

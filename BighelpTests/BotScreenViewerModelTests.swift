@@ -26,8 +26,16 @@ struct BotScreenViewerModelTests {
             Issue.record("While a person is in control the still is hidden")
             return
         }
+        // A click reaches the screen and comes back drawn: demo mode marks where it landed.
+        let before = try #require(model.lastFrame)
+        #expect(Self.pixel(before, x: 1_000, y: 200) != Self.clickMark)
+        model.click(.left, at: CGPoint(x: 1_000, y: 200))
+        try await waitUntil { model.lastFrame.map { Self.pixel($0, x: 1_000, y: 200) } == Self.clickMark }
+        // Typing reaches the screen's terminal.
+        let terminal = DemoBotDesktop.terminal
+        let typedBefore = Self.pixels(try #require(model.lastFrame), in: terminal)
         model.type("ls")
-        model.click(.left, at: CGPoint(x: 100, y: 100))
+        try await waitUntil { model.lastFrame.map { Self.pixels($0, in: terminal) } != typedBefore }
         await model.handBack()
         #expect(model.control.holder == .agent)
         #expect(try await service.status(agentID: "default").lease.holder == .agent)
@@ -64,6 +72,25 @@ struct BotScreenViewerModelTests {
         defer { run.cancel() }
         _ = try await service.stop(agentID: "default")
         try await waitUntil { model.phase == .ended("The screen is off.") }
+    }
+
+    /// The demo's click mark, 0x00RRGGBB.
+    private static let clickMark: UInt32 = 0xFF_8A7A
+
+    private static func pixel(_ frame: RFBFrame, x: Int, y: Int) -> UInt32? {
+        pixels(frame, in: RFBRect(x: x, y: y, width: 1, height: 1)).first
+    }
+
+    /// Every fourth pixel of a rectangle, 0x00RRGGBB, read with one copy of the picture.
+    private static func pixels(_ frame: RFBFrame, in rect: RFBRect) -> [UInt32] {
+        guard let data = frame.image.dataProvider?.data as Data? else { return [] }
+        let rowBytes = frame.image.bytesPerRow
+        return (rect.y..<(rect.y + rect.height)).flatMap { y in
+            stride(from: rect.x, to: rect.x + rect.width, by: 4).map { x in
+                let offset = y * rowBytes + x * 4
+                return UInt32(data[offset + 2]) << 16 | UInt32(data[offset + 1]) << 8 | UInt32(data[offset])
+            }
+        }
     }
 
     private func waitUntil(_ condition: () async -> Bool) async throws {

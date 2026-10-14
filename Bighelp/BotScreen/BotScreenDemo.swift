@@ -131,7 +131,7 @@ actor DemoBotDesktop {
     func click(x: Int, y: Int) -> RFBRect {
         let mark = RFBRect(x: max(0, x - 9), y: max(0, y - 9), width: 18, height: 18)
         UIGraphicsPushContext(context)
-        UIColor(red: 1, green: 0.54, blue: 0.48, alpha: 1).setFill()
+        UIColor(red: 1, green: 138 / 255, blue: 122 / 255, alpha: 1).setFill()
         UIBezierPath(ovalIn: CGRect(x: x - 7, y: y - 7, width: 14, height: 14)).fill()
         UIGraphicsPopContext()
         return RFBRect(x: mark.x, y: mark.y, width: min(mark.width, Self.size.width - mark.x),

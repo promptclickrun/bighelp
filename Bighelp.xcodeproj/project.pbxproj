@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0043FABFA2A0003D42A29A56 /* BotScreenUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50DF24CB6BEF6BD9383CCEBA /* BotScreenUITests.swift */; };
 		00650F92F1A4783405619969 /* runs-start.json in Resources */ = {isa = PBXBuildFile; fileRef = 3834D3A41B46698E21994E00 /* runs-start.json */; };
 		008C54331AC97F43C96F1AC4 /* BighelpActivityPose.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD81C509ADE4E67B19BA9F6E /* BighelpActivityPose.swift */; };
 		0095D436CD156D66BD463281 /* ReasoningPaletteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D14822CD27B2AE28D7A9438A /* ReasoningPaletteTests.swift */; };
@@ -1401,6 +1402,7 @@
 		ECBDB3462D3EC5E6954A1393 /* BighelpToolActivityCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CAFE5045EE57412686BCCC3 /* BighelpToolActivityCatalog.swift */; };
 		ECC427FE28D994ADE69DF319 /* ChatActivityPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66E4E333550166DD2DCFE881 /* ChatActivityPresentation.swift */; };
 		ECCB7782A2A02B2D103F792E /* WorkspaceGrantedFilesClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45591296B1B8DF4C7F8DF5E0 /* WorkspaceGrantedFilesClient.swift */; };
+		ECEF5D260ABD56F69DAD6F64 /* BotScreenHostUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE155427C34C90502C9B8AE8 /* BotScreenHostUITests.swift */; };
 		ED1262C4EC3CDEEFCF8D2CBB /* WorkflowStageWays.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3038908E9DE27BD397123580 /* WorkflowStageWays.swift */; };
 		ED69174309D4579A06E663A3 /* NotificationPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2038A52DC5309296BB3CB20 /* NotificationPresentationTests.swift */; };
 		EDD0FF4309C7E540563DFFB9 /* VoiceModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5ECA70B7C1A6646021728982 /* VoiceModelTests.swift */; };
@@ -2107,6 +2109,7 @@
 		506BB5C9E4E4DB2993F126D4 /* BighelpReasoningSlider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpReasoningSlider.swift; sourceTree = "<group>"; };
 		5075EA67E589FD9D2CB5FC85 /* NotoSans-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "NotoSans-SemiBold.ttf"; sourceTree = "<group>"; };
 		508B5494DD3674010E5DD91E /* RichDraftFormatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RichDraftFormatting.swift; sourceTree = "<group>"; };
+		50DF24CB6BEF6BD9383CCEBA /* BotScreenUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BotScreenUITests.swift; sourceTree = "<group>"; };
 		515005CE54D7F43A5B863003 /* WorkflowComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowComponents.swift; sourceTree = "<group>"; };
 		515B729EC6C73BB17D8A272A /* ChatCardMessageProjection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatCardMessageProjection.swift; sourceTree = "<group>"; };
 		517D85803C55B72202A77B6C /* soul-bridge.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "soul-bridge.md"; sourceTree = "<group>"; };
@@ -2847,6 +2850,7 @@
 		CDCFBB5C4E5985D8EC6C78FD /* AgentProfileSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentProfileSheet.swift; sourceTree = "<group>"; };
 		CDE853A92392551EBA916C0E /* WikiNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WikiNavigation.swift; sourceTree = "<group>"; };
 		CE0D46B41203E5ABB073CFB3 /* DeviceToolCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceToolCoordinator.swift; sourceTree = "<group>"; };
+		CE155427C34C90502C9B8AE8 /* BotScreenHostUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BotScreenHostUITests.swift; sourceTree = "<group>"; };
 		CE2D42C5A3A573D67E83CB3A /* CapabilitiesManagementModels+State.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CapabilitiesManagementModels+State.swift"; sourceTree = "<group>"; };
 		CE55F4616453540B7AC56768 /* TeamCallTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamCallTests.swift; sourceTree = "<group>"; };
 		CE8142BA18CBC055A6D2B5EB /* AIDataConsentSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIDataConsentSheet.swift; sourceTree = "<group>"; };
@@ -4532,6 +4536,8 @@
 				F8FFBC9B200835B3E101AA83 /* BighelpMenuUITests.swift */,
 				226B3E15639DDE404A0865BA /* BoardSwipeBlueprintsUITests.swift */,
 				E3CCA76D09B4A42D0FD343AB /* BotChatUITests.swift */,
+				CE155427C34C90502C9B8AE8 /* BotScreenHostUITests.swift */,
+				50DF24CB6BEF6BD9383CCEBA /* BotScreenUITests.swift */,
 				4AEAE8B958F81AA860450230 /* BottomMenuUITests.swift */,
 				E5F79F934C5B97C55FBDEB32 /* CardRepliesUITests.swift */,
 				C3EE16EA439C111EDA369B91 /* CarPlayVoiceUITests.swift */,
@@ -7295,6 +7301,8 @@
 				E0ABA2CFFE7CF938EFC8046A /* BighelpMenuUITests.swift in Sources */,
 				613A69AE78661B735734B0E0 /* BoardSwipeBlueprintsUITests.swift in Sources */,
 				8A79D0A026B2159D4089C56F /* BotChatUITests.swift in Sources */,
+				ECEF5D260ABD56F69DAD6F64 /* BotScreenHostUITests.swift in Sources */,
+				0043FABFA2A0003D42A29A56 /* BotScreenUITests.swift in Sources */,
 				39FC5FBDB150414717D93A83 /* BottomMenuUITests.swift in Sources */,
 				5C97A46B026D0C507BE0A5A8 /* CarPlayVoiceUITests.swift in Sources */,
 				755B2AF3234CF8B3A31AB7B1 /* CardRepliesUITests.swift in Sources */,

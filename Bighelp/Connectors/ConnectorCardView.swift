@@ -140,6 +140,7 @@ struct ConnectorCardView: View {
             Button("Skip", role: .cancel) {
                 Task { await store.skip([target.name], in: card) }
             }
+            .foregroundStyle(.secondary)
             .disabled(store.isWorking(target, in: card))
             .accessibilityIdentifier("connector.card.skip.\(target.name)")
         }
@@ -318,6 +319,7 @@ enum ConnectorCardFixture {
         @State private var store = ConnectorCardStore()
         @State private var identity = NSObject()
         @State private var answers: [String] = []
+        @State private var answered: Set<String> = []
 
         var body: some View {
             NavigationStack {
@@ -339,7 +341,9 @@ enum ConnectorCardFixture {
             store.beginConnection(connection) { method, params in
                 let names = params["result"]?.object?["targets"]?.array?.compactMap { $0.object?["name"]?.string } ?? []
                 answers.append("\(method) \(names.joined(separator: ","))")
-                return .object(["status": .string("ok"), "settled": .boolean(false)])
+                answered.formUnion(names)
+                // Like Hermes: the operation settles once every row has its answer.
+                return .object(["status": .string("ok"), "settled": .boolean(answered.count == 3)])
             }
             store.bind(profile: "juniper", runtimeID: "runtime", visibleSessionID: "chat", connection: connection)
             store.accept(.init(type: "connection.request", sessionID: "runtime", payload: [

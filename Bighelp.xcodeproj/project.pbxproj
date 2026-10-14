@@ -1434,6 +1434,7 @@
 		F5E9F1D3A69D3BFA6EAB6308 /* ReferenceCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = F62835AF1B54DF0076781B3E /* ReferenceCodec.swift */; };
 		F5F595E213CDAE18DE490C55 /* ReferenceProviderAdapters.swift in Sources */ = {isa = PBXBuildFile; fileRef = A99087CC1EE92AC63D73DF39 /* ReferenceProviderAdapters.swift */; };
 		F62DCC59F91BE8711406AEFB /* VoiceHoldLoop.wav in Resources */ = {isa = PBXBuildFile; fileRef = 4257C42FC04B0F807EEA538B /* VoiceHoldLoop.wav */; };
+		F65ED8233D1751368131FBC5 /* ConnectorCardUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60B79A37CF9C353BB0D19087 /* ConnectorCardUITests.swift */; };
 		F6BBE258159B0F21F790EF53 /* ToolsetManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22F447815E049E9EF24628CF /* ToolsetManagementView.swift */; };
 		F735172F333A193C2B4FDF30 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 743A8422BB20CF6C30B55B4B /* SettingsView.swift */; };
 		F748D31409E3D5790C8B3F97 /* NewChatCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 796D456E65153197E2D8FF67 /* NewChatCoordinatorTests.swift */; };
@@ -2178,6 +2179,7 @@
 		6056D88AFCE4AACEDA78AF68 /* BighelpCardValueResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpCardValueResolver.swift; sourceTree = "<group>"; };
 		60766A9532090D8E8A79ACE8 /* BighelpTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpTokens.swift; sourceTree = "<group>"; };
 		609B924E62D63E7AAB4F39D3 /* SubagentCanvasFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubagentCanvasFixture.swift; sourceTree = "<group>"; };
+		60B79A37CF9C353BB0D19087 /* ConnectorCardUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectorCardUITests.swift; sourceTree = "<group>"; };
 		60B812449CE2B56B1B71077C /* WorkflowsHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowsHomeView.swift; sourceTree = "<group>"; };
 		60C035E1E9D9E86ADE7FF305 /* soul-counterpoint.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "soul-counterpoint.md"; sourceTree = "<group>"; };
 		60DBDE69BA245F9F8B1633A4 /* ReferenceStrictJSONParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReferenceStrictJSONParser.swift; sourceTree = "<group>"; };
@@ -4492,6 +4494,7 @@
 				C90E1BD41FB2AE269C8B206C /* CompactHostUITests.swift */,
 				530632539B8C069371C9BC57 /* ComposerGlassUITests.swift */,
 				D12AC6E66E242B6AA18EECAF /* ComposerInteractionUITests.swift */,
+				60B79A37CF9C353BB0D19087 /* ConnectorCardUITests.swift */,
 				3CDABE72B40973455A986015 /* CredentialVaultUITests.swift */,
 				29295CBE65C606B310909E2D /* DefaultModelReasoningUITests.swift */,
 				8E5CDB113F353D5523600CFB /* DefaultModelUITests.swift */,
@@ -7224,6 +7227,7 @@
 				792A0C957D29920889390BB1 /* CompactHostUITests.swift in Sources */,
 				D6953205AD992A7915070EF8 /* ComposerGlassUITests.swift in Sources */,
 				C1FB39C6F4D951394EC6A67A /* ComposerInteractionUITests.swift in Sources */,
+				F65ED8233D1751368131FBC5 /* ConnectorCardUITests.swift in Sources */,
 				FDF931038113A673577D553B /* CredentialVaultUITests.swift in Sources */,
 				2D0E909384E7C02A1E4ED57D /* DefaultModelReasoningUITests.swift in Sources */,
 				27148CBB784CD22E4B829B12 /* DefaultModelUITests.swift in Sources */,

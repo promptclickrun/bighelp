@@ -1,0 +1,142 @@
+import XCTest
+
+/// Hermes' connect card in chat, and Settings › Apps.
+final class ConnectorCardUITests: BighelpUITestCase {
+    /// `-test-connector-card`: two apps and an MCP tool with made-up names. Each button answers Hermes.
+    @MainActor
+    func testTheCardAnswersHermes() {
+        let app = makeApp()
+        app.launchArguments = ["-test-connector-card"]
+        app.launch()
+        let card = app.descendants(matching: .any)["connector.card"].firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: 20), "The card opens for the agent's request")
+        XCTAssertTrue(app.buttons["connector.card.connect.example_mail"].exists, "A sign-in link shows Connect")
+        XCTAssertTrue(app.buttons["connector.card.retry.example_notes"].exists, "An expired link shows Try again")
+        let approve = app.buttons["connector.card.approve.weather"]
+        scrollTo(approve, in: app)
+        XCTAssertFalse(approve.isEnabled, "An install waits for the value it needs")
+        evidence("card", app)
+
+        let key = app.secureTextFields["connector.card.env.WEATHER_API_KEY"]
+        key.tap()
+        key.typeText("made-up-key")
+        approve.tap()
+        let answers = app.staticTexts["connector.fixture.answers"]
+        XCTAssertTrue(answers.waitForLabel(containing: "connection.respond weather", timeout: 5), "Install answered")
+
+        app.buttons["connector.card.not-now"].tap()
+        XCTAssertTrue(answers.waitForLabel(containing: "example_mail", timeout: 5), "Not now skips what's still open")
+        XCTAssertFalse(card.waitForExistence(timeout: 2) && card.isHittable, "The card closes")
+    }
+
+    /// Settings › Apps in demo mode: set up once, then connect an app.
+    @MainActor
+    func testAppsInSettings() {
+        for appearance in ["light", "dark"] {
+            let app = makeApp()
+            app.launchArguments += ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.demo.appearance", appearance]
+            app.launch()
+            _ = app.buttons.matching(NSPredicate(format: "identifier IN %@", ["home.drawer.open", "chat.menu", "tab.profile"]))
+                .firstMatch.waitForExistence(timeout: 60)
+            openSettings(in: app)
+            settingsRow("settings.apps", in: app).tap()
+            let setUp = app.buttons["connector.apps.set-up"]
+            if setUp.waitForExistence(timeout: 5) {
+                evidence("apps-intro-\(appearance)", app)
+                setUp.tap()
+            }
+            let mail = app.buttons["connector.apps.app.example_mail"]
+            XCTAssertTrue(mail.waitForExistence(timeout: 10), "The connected app is listed")
+            evidence("apps-list-\(appearance)", app)
+            let notes = app.buttons["connector.apps.app.example_notes"]
+            if notes.waitForExistence(timeout: 3) {
+                notes.tap()
+                app.buttons["connector.apps.connect"].tap()
+                XCTAssertTrue(app.descendants(matching: .any).matching(
+                    NSPredicate(format: "identifier BEGINSWITH %@", "connector.apps.account.")).firstMatch
+                    .waitForExistence(timeout: 10), "The new account shows")
+                evidence("apps-connected-\(appearance)", app)
+            }
+            app.terminate()
+        }
+    }
+
+    /// A real Hermes (0.21.4 or later) asks to add an MCP tool and the card shows. Skip answers, so
+    /// nothing is installed. Set (as TEST_RUNNER_…):
+    /// - BIGHELP_CONNECTOR_HOST: an open host, e.g. 127.0.0.1:9121
+    /// - BIGHELP_CONNECTOR_MODEL: a /model line for the chat, e.g. "gpt-6-luna --provider openai-codex --session"
+    /// - BIGHELP_CONNECTOR_TOOL: an MCP catalog entry, e.g. "fetch"
+    /// - BIGHELP_UI_EVIDENCE: a folder for screenshots (optional)
+    @MainActor
+    func testARealHostsCardShows() throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard let host = environment["BIGHELP_CONNECTOR_HOST"], let tool = environment["BIGHELP_CONNECTOR_TOOL"] else {
+            throw XCTSkip("Set BIGHELP_CONNECTOR_HOST and BIGHELP_CONNECTOR_TOOL")
+        }
+        let app = makeApp()
+        app.launch()
+        try onboardOpenHost(app, address: host)
+        let composer = app.textViews["chat.composer.text"]
+        XCTAssertTrue(composer.waitForExistence(timeout: 30), "The agent's chat opens")
+        if let model = environment["BIGHELP_CONNECTOR_MODEL"] {
+            send("/model \(model)", in: app)
+            sleep(5)
+        }
+        send("Use manage_connections with action install for the MCP catalog server \"\(tool)\" "
+             + "(connectors: [{\"name\": \"\(tool)\", \"mcp\": true}]). Do nothing else, then tell me the result in one line.",
+             in: app)
+        let card = app.descendants(matching: .any)["connector.card"].firstMatch
+        let shown = card.waitForExistence(timeout: 150)
+        evidence("host-card-\(shown ? "shown" : "missing")", app)
+        XCTAssertTrue(shown, "Hermes' connect card shows in bighelp")
+        guard shown else {
+            // Without the card Hermes waits out its 5 minutes; show what the agent says after.
+            sleep(200)
+            evidence("host-after-deadline", app)
+            return
+        }
+        let skip = app.buttons["connector.card.skip.\(tool)"]
+        scrollTo(skip, in: app)
+        skip.tap()
+        XCTAssertFalse(card.waitForExistence(timeout: 2) && card.isHittable, "Skip settles the card at once")
+        sleep(20)
+        evidence("host-after-skip", app)
+    }
+
+    // MARK: - Steps
+
+    @MainActor
+    private func send(_ text: String, in app: XCUIApplication) {
+        let composer = app.textViews["chat.composer.text"]
+        composer.tap()
+        composer.typeText(text)
+        app.buttons["chat.send"].tap()
+    }
+
+    @MainActor
+    private func scrollTo(_ element: XCUIElement, in app: XCUIApplication) {
+        for _ in 0..<6 where !(element.exists && element.isHittable) {
+            app.swipeUp()
+        }
+    }
+
+    @MainActor
+    private func evidence(_ name: String, _ app: XCUIApplication) {
+        let shot = XCUIScreen.main.screenshot()
+        let attachment = XCTAttachment(screenshot: shot)
+        attachment.name = "connector-\(name)"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        guard let folder = ProcessInfo.processInfo.environment["BIGHELP_UI_EVIDENCE"] else { return }
+        try? FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
+        try? shot.pngRepresentation.write(to: URL(fileURLWithPath: folder).appendingPathComponent("connector-\(name).png"))
+    }
+}
+
+private extension XCUIElement {
+    func waitForLabel(containing text: String, timeout: TimeInterval) -> Bool {
+        let predicate = NSPredicate(format: "label CONTAINS %@", text)
+        return XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: predicate, object: self)], timeout: timeout)
+            == .completed
+    }
+}

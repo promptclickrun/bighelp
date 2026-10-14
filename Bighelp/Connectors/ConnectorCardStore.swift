@@ -1,10 +1,11 @@
 import Foundation
 import Observation
 
-/// The connect cards of the chats on screen. Hermes opens one with `connection.request` when an
-/// agent calls `manage_connections` and then waits (5 minutes) for the person: without an answer the
-/// tool just times out. Answers go back on the same socket (`connection.respond`,
-/// `connectors.connect`, `connectors.operation.wake`), owned by the chat's runtime session.
+/// The connect cards of the chats on screen, drawn inline in each chat. Hermes opens one with
+/// `connection.request` when an agent calls `manage_connections` and then waits (5 minutes) for the
+/// person: without an answer the tool just times out. Answers go back on the same socket
+/// (`connection.respond`, `connectors.connect`, `connectors.operation.wake`), owned by the chat's
+/// runtime session. Several cards can wait at once, each answered on its own.
 @MainActor
 @Observable
 final class ConnectorCardStore {
@@ -49,13 +50,19 @@ final class ConnectorCardStore {
     @ObservationIgnored private var remembered: [String: String] = [:]
     @ObservationIgnored private var catalogRequested = false
 
-    /// The card on screen: the oldest open one of a chat that's showing.
-    var activeCard: Card? {
+    /// One chat's open cards, oldest first.
+    func cards(runtimeID: String, visibleSessionID: String) -> [Card] {
         _ = revision
         return cards.values
-            .filter { bindings[$0.runtimeID] != nil && !$0.operation.isSettled && !$0.operation.isDisplay }
+            .filter { $0.runtimeID == runtimeID && $0.visibleSessionID == visibleSessionID
+                && bindings[$0.runtimeID] != nil && !$0.operation.isSettled && !$0.operation.isDisplay }
             .sorted { ($0.operation.deadline ?? .distantFuture, $0.id) < ($1.operation.deadline ?? .distantFuture, $1.id) }
-            .first
+    }
+
+    /// The newest frame of a card, or nil once Hermes has settled it.
+    func current(_ card: Card) -> Card? {
+        _ = revision
+        return cards[card.id]
     }
 
     func beginConnection(_ value: DirectHermesPromptConnection, request: @escaping Requester) {

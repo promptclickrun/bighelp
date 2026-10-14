@@ -60,25 +60,38 @@ struct ConnectorCardTests {
     @Test func aCardOpensOnlyForAChatOnScreen() {
         let (store, connection, _) = Self.store()
         store.accept(Self.event(runtime: "other"), connection: connection)
-        #expect(store.activeCard == nil)
+        #expect(store.cards(runtimeID: "runtime", visibleSessionID: "chat").first == nil)
         store.accept(Self.event(runtime: "runtime"), connection: connection)
-        #expect(store.activeCard?.id == "op-1")
-        #expect(store.activeCard?.visibleSessionID == "chat")
+        #expect(store.cards(runtimeID: "runtime", visibleSessionID: "chat").first?.id == "op-1")
+        #expect(store.cards(runtimeID: "runtime", visibleSessionID: "chat").first?.visibleSessionID == "chat")
+    }
+
+    /// Each request is its own card, so the agent can ask for several apps without one waiting on another.
+    @Test func severalRequestsWaitSideBySide() {
+        let (store, connection, _) = Self.store()
+        store.accept(Self.event(runtime: "runtime"), connection: connection)
+        var second = Self.request()
+        second["op_id"] = .string("op-2")
+        second["deadline_at"] = .number(1_800_000_100)
+        store.accept(DirectHermesEvent(type: "connection.request", sessionID: "runtime", payload: second, sequence: nil),
+                     connection: connection)
+        #expect(store.cards(runtimeID: "runtime", visibleSessionID: "chat").map(\.id) == ["op-1", "op-2"])
+        #expect(store.cards(runtimeID: "runtime", visibleSessionID: "other-chat").isEmpty)
     }
 
     @Test func anOlderFrameNeverMovesTheCardBack() {
         let (store, connection, _) = Self.store()
         store.accept(Self.event(runtime: "runtime", sequence: 3, state: "connected"), connection: connection)
         store.accept(Self.event(runtime: "runtime", type: "connection.update", sequence: 2, state: "initiated"), connection: connection)
-        #expect(store.activeCard?.operation.sequence == 3)
-        #expect(store.activeCard?.operation.targets.first?.state == .connected)
+        #expect(store.cards(runtimeID: "runtime", visibleSessionID: "chat").first?.operation.sequence == 3)
+        #expect(store.cards(runtimeID: "runtime", visibleSessionID: "chat").first?.operation.targets.first?.state == .connected)
     }
 
     @Test func aSettledUpdateClosesTheCard() {
         let (store, connection, _) = Self.store()
         store.accept(Self.event(runtime: "runtime"), connection: connection)
         store.accept(Self.event(runtime: "runtime", type: "connection.update", sequence: 2, settled: true), connection: connection)
-        #expect(store.activeCard == nil)
+        #expect(store.cards(runtimeID: "runtime", visibleSessionID: "chat").first == nil)
     }
 
     @Test func anAccountUpdateIsNotAChatCard() {
@@ -88,13 +101,13 @@ struct ConnectorCardTests {
         payload["owner"] = .object(["type": .string("account")])
         event = DirectHermesEvent(type: event.type, sessionID: event.sessionID, payload: payload, sequence: nil)
         store.accept(event, connection: connection)
-        #expect(store.activeCard == nil)
+        #expect(store.cards(runtimeID: "runtime", visibleSessionID: "chat").first == nil)
     }
 
     @Test func skipAnswersForTheChatsRuntimeSession() async throws {
         let (store, connection, calls) = Self.store()
         store.accept(Self.event(runtime: "runtime"), connection: connection)
-        let card = try #require(store.activeCard)
+        let card = try #require(store.cards(runtimeID: "runtime", visibleSessionID: "chat").first)
         await store.skipAll(card)
         let call = try #require(calls.values.last)
         #expect(call.method == "connection.respond")
@@ -111,7 +124,7 @@ struct ConnectorCardTests {
     @Test func anApprovalSendsOnlyTheValuesTheToolAskedFor() async throws {
         let (store, connection, calls) = Self.store()
         store.accept(Self.event(runtime: "runtime"), connection: connection)
-        let card = try #require(store.activeCard)
+        let card = try #require(store.cards(runtimeID: "runtime", visibleSessionID: "chat").first)
         let tool = try #require(card.operation.targets.last)
         await store.approve(tool, in: card, environment: ["WEATHER_API_KEY": "made-up-key", "HOME": "/tmp"])
         let answer = try #require(calls.values.last?.params["result"]?.object?["targets"]?.array?.first?.object)
@@ -122,7 +135,7 @@ struct ConnectorCardTests {
     @Test func tryAgainAsksHermesForANewLink() async throws {
         let (store, connection, calls) = Self.store()
         store.accept(Self.event(runtime: "runtime", state: "expired", action: "reconnect", alias: "work"), connection: connection)
-        let card = try #require(store.activeCard)
+        let card = try #require(store.cards(runtimeID: "runtime", visibleSessionID: "chat").first)
         let target = try #require(card.operation.targets.first)
         await store.retry(target, in: card)
         let call = try #require(calls.values.last)
@@ -136,25 +149,25 @@ struct ConnectorCardTests {
         let (store, connection, calls) = Self.store()
         calls.failure = DirectHermesError.rpcRejected(code: 4004)
         store.accept(Self.event(runtime: "runtime"), connection: connection)
-        let card = try #require(store.activeCard)
+        let card = try #require(store.cards(runtimeID: "runtime", visibleSessionID: "chat").first)
         await store.skipAll(card)
-        #expect(store.activeCard == nil)
+        #expect(store.cards(runtimeID: "runtime", visibleSessionID: "chat").first == nil)
     }
 
     @Test func aResumedChatGetsTheCardItMissed() {
         let (store, connection, _) = Self.store()
         store.acceptPending(.object(Self.request()), runtimeID: "runtime", connection: connection)
-        #expect(store.activeCard?.id == "op-1")
+        #expect(store.cards(runtimeID: "runtime", visibleSessionID: "chat").first?.id == "op-1")
     }
 
     @Test func nothingIsSentAfterTheConnectionIsGone() async throws {
         let (store, connection, calls) = Self.store()
         store.accept(Self.event(runtime: "runtime"), connection: connection)
-        let card = try #require(store.activeCard)
+        let card = try #require(store.cards(runtimeID: "runtime", visibleSessionID: "chat").first)
         store.retireConnection(connection)
         await store.skipAll(card)
         #expect(calls.values.isEmpty)
-        #expect(store.activeCard == nil)
+        #expect(store.cards(runtimeID: "runtime", visibleSessionID: "chat").first == nil)
     }
 
     @Test func catalogNamesTheApps() {

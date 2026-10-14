@@ -21,6 +21,8 @@ enum ChatCanvasRow: Identifiable, Equatable {
     case memberFailure(BotModeMemberFailure)
     case clarification(DashboardAttentionItem)
     case directClarification(DirectHermesPrompt)
+    /// Hermes asks to connect apps or tools for this chat (`manage_connections`).
+    case connector(ConnectorCardStore.Card)
     case pending(String, Bool)
     case failure(String)
 
@@ -44,6 +46,7 @@ enum ChatCanvasRow: Identifiable, Equatable {
         case .memberFailure(let failure): "failure:\(failure.memberID)"
         case .clarification(let item): "chat.clarification.\(item.id)"
         case .directClarification(let prompt): "chat.direct-clarification.\(prompt.id)"
+        case .connector(let card): "chat.connector.\(card.id)"
         case .pending: "chat-pending"
         case .failure: "chat.failure"
         }
@@ -68,6 +71,7 @@ enum ChatCanvasRow: Identifiable, Equatable {
         case (.botActivityNotice(let a), .botActivityNotice(let b)): a == b
         case (.clarification(let a), .clarification(let b)): a == b
         case (.directClarification(let a), .directClarification(let b)): a == b
+        case (.connector(let a), .connector(let b)): a == b
         case (.pending(let a, let b), .pending(let c, let d)): a == c && b == d
         case (.welcome, .welcome), (.quickActions, .quickActions), (.bottom, .bottom), (.botRetry, .botRetry): true
         default: false

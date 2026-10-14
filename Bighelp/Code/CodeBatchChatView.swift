@@ -90,6 +90,14 @@ final class CodeBatchChatModel {
         }
     }
 
+    /// A session's connect cards (Hermes' `manage_connections`), with the store that answers them.
+    func connectorCards(of sessionID: String) -> (store: ConnectorCardStore, cards: [ConnectorCardStore.Card])? {
+        guard let client = chats[sessionID]?.nativeConversationClient, let store = client.promptStore?.connectorCards
+        else { return nil }
+        let cards = client.connectorCards
+        return cards.isEmpty ? nil : (store, cards)
+    }
+
     /// The pending question or approval of a session, with its chat's client to answer it.
     func prompt(of sessionID: String) -> (client: DirectHermesConversationClient, prompt: DirectHermesPrompt)? {
         guard let client = chats[sessionID]?.nativeConversationClient, let prompt = client.prompts.first else { return nil }
@@ -294,7 +302,12 @@ struct CodeBatchChatView: View {
                         .textSelection(.enabled)
                         .accessibilityIdentifier("code.batch.reply")
                 }
-                if reply.isLatest { latestState(reply) }
+                if reply.isLatest {
+                    latestState(reply)
+                    if let pending = model.connectorCards(of: reply.member.id) {
+                        ForEach(pending.cards) { card in ConnectorInlineCard(store: pending.store, card: card) }
+                    }
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }

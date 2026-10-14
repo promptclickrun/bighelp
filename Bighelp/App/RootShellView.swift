@@ -286,7 +286,6 @@ struct RootShellView: View {
         .overlay {
             if let workspace = nativeWorkspaceStore {
                 DirectHermesSecurePromptOverlay(workspace: workspace)
-                ConnectorCardOverlay(store: workspace.connectorCardStore)
             }
         }
         .onChange(of: currentDeviceToolScope, initial: true) { _, scope in

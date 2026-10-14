@@ -2,31 +2,37 @@ import XCTest
 
 /// Hermes' connect card in chat, and Settings › Apps.
 final class ConnectorCardUITests: BighelpUITestCase {
-    /// `-test-connector-card`: two apps and an MCP tool with made-up names. Each button answers Hermes.
+    /// `-test-connector-card`: two requests wait inline in one chat (made-up names). Each answer goes
+    /// to Hermes, and a card leaves the chat once every row has its answer.
     @MainActor
-    func testTheCardAnswersHermes() {
+    func testCardsWaitInlineAndAnswerHermes() {
         let app = makeApp()
         app.launchArguments = ["-test-connector-card"]
         app.launch()
-        let card = app.descendants(matching: .any)["connector.card"].firstMatch
-        XCTAssertTrue(card.waitForExistence(timeout: 20), "The card opens for the agent's request")
+        let apps = app.descendants(matching: .any)["connector.card.op-apps"].firstMatch
+        let tool = app.descendants(matching: .any)["connector.card.op-tool"].firstMatch
+        XCTAssertTrue(apps.waitForExistence(timeout: 20), "The apps request shows in the chat")
+        XCTAssertTrue(tool.exists, "A second request shows beside it, not behind it")
         XCTAssertTrue(app.buttons["connector.card.connect.example_mail"].exists, "A sign-in link shows Connect")
         XCTAssertTrue(app.buttons["connector.card.retry.example_notes"].exists, "An expired link shows Try again")
+        evidence("cards", app)
+
         let approve = app.buttons["connector.card.approve.weather"]
         scrollTo(approve, in: app)
         XCTAssertFalse(approve.isEnabled, "An install waits for the value it needs")
-        evidence("card", app)
-
         let key = app.secureTextFields["connector.card.env.WEATHER_API_KEY"]
         key.tap()
         key.typeText("made-up-key")
         approve.tap()
         let answers = app.staticTexts["connector.fixture.answers"]
         XCTAssertTrue(answers.waitForLabel(containing: "connection.respond weather", timeout: 5), "Install answered")
+        XCTAssertTrue(tool.waitForNonExistence(timeout: 5), "The answered request leaves the chat")
+        XCTAssertTrue(apps.exists, "The other request still waits")
 
-        app.buttons["connector.card.not-now"].tap()
-        XCTAssertTrue(answers.waitForLabel(containing: "example_mail", timeout: 5), "Not now skips what's still open")
-        XCTAssertFalse(card.waitForExistence(timeout: 2) && card.isHittable, "The card closes")
+        app.buttons["connector.card.skip.example_mail"].tap()
+        app.buttons["connector.card.skip.example_notes"].tap()
+        XCTAssertTrue(answers.waitForLabel(containing: "example_notes", timeout: 5), "Each skip answered")
+        XCTAssertTrue(apps.waitForNonExistence(timeout: 5), "Every row answered: the card leaves")
     }
 
     /// Settings › Apps in demo mode: set up once, then connect an app.
@@ -91,20 +97,19 @@ final class ConnectorCardUITests: BighelpUITestCase {
         send("Use manage_connections with action install for the MCP catalog server \"\(tool)\" "
              + "(connectors: [{\"name\": \"\(tool)\", \"mcp\": true}]). Do nothing else, then tell me the result in one line.",
              in: app)
-        let card = app.descendants(matching: .any)["connector.card"].firstMatch
-        let shown = card.waitForExistence(timeout: 150)
+        let skip = app.buttons["connector.card.skip.\(tool)"]
+        let shown = skip.waitForExistence(timeout: 150)
         evidence("host-card-\(shown ? "shown" : "missing")", app)
-        XCTAssertTrue(shown, "Hermes' connect card shows in bighelp")
+        XCTAssertTrue(shown, "Hermes' connect card shows in the chat")
         guard shown else {
             // Without the card Hermes waits out its 5 minutes; show what the agent says after.
             sleep(200)
             evidence("host-after-deadline", app)
             return
         }
-        let skip = app.buttons["connector.card.skip.\(tool)"]
         scrollTo(skip, in: app)
         skip.tap()
-        XCTAssertFalse(card.waitForExistence(timeout: 2) && card.isHittable, "Skip settles the card at once")
+        XCTAssertTrue(skip.waitForNonExistence(timeout: 10), "Skip settles the card at once")
         sleep(20)
         evidence("host-after-skip", app)
     }

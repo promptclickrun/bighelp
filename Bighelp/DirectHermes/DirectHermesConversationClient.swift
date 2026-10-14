@@ -77,6 +77,10 @@ final class DirectHermesConversationClient: StreamingConversationClient, Stoppab
             ($0.createdAt, $0.id) < ($1.createdAt, $1.id)
         }
     }
+    /// This chat's connect cards (Hermes' `manage_connections`), oldest first.
+    var connectorCards: [ConnectorCardStore.Card] {
+        promptStore?.connectorCards.cards(runtimeID: runtimeID, visibleSessionID: conversationID) ?? []
+    }
     internal(set) var journal: DirectHermesDraftStore.Record
     internal(set) var projection: DirectHermesProjection
     var sideTaskResults: [DirectHermesSideTaskResult] { projection.sideTaskResults }

@@ -242,6 +242,9 @@ final class DirectHermesPromptStore {
     }
 
     private(set) var revision: UInt64 = 0
+    /// Hermes' connect cards, kept beside the prompts so every chat that holds this store can
+    /// show its own inline.
+    let connectorCards = ConnectorCardStore()
     @ObservationIgnored private var connection: DirectHermesPromptConnection?
     @ObservationIgnored private var bindings: [Data: DirectHermesPromptBinding] = [:]
     @ObservationIgnored private var contracts: [Data: DirectHermesPromptContract] = [:]

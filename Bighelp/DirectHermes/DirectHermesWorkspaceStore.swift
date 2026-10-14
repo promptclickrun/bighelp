@@ -7,8 +7,8 @@ import SwiftUI
 final class DirectHermesWorkspaceStore {
     let promptStore = DirectHermesPromptStore()
     let securePromptStore = DirectHermesSecurePromptStore()
-    /// Connect cards (`manage_connections`) of the chats on screen.
-    let connectorCardStore = ConnectorCardStore()
+    /// Connect cards (`manage_connections`) of the chats on screen, shown inline in each chat.
+    var connectorCardStore: ConnectorCardStore { promptStore.connectorCards }
     private(set) var address = ""
     private(set) var isConnecting = false
     private(set) var isConnected = false

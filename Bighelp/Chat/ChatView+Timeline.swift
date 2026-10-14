@@ -26,6 +26,7 @@ extension ChatView {
         rows += model.memberFailures.map(ChatCanvasRow.memberFailure)
         if dashboardModel != nil { rows += chatClarifications.map(ChatCanvasRow.clarification) }
         rows += directHermesClarifications.map(ChatCanvasRow.directClarification)
+        rows += (model.nativeConversationClient?.connectorCards ?? []).map(ChatCanvasRow.connector)
         if showsPendingMessage { rows.append(.pending(model.workingAgentName ?? agentName, model.isBotMode)) }
         if let message = model.failureMessage { rows.append(.failure(message)) }
         else if !model.retainedUnsentSubmissions.isEmpty {
@@ -194,6 +195,10 @@ extension ChatView {
                     prompt: prompt,
                     inline: true
                 )
+            }
+        case .connector(let card):
+            if let store = model.nativeConversationClient?.promptStore?.connectorCards {
+                ConnectorInlineCard(store: store, card: card)
             }
         case .pending(let name, let isGroup): PendingMessageView(agentName: name, isGroup: isGroup)
         case .failure(let message): failure(message: message)

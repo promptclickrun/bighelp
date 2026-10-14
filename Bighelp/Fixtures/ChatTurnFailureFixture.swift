@@ -70,7 +70,8 @@ private final class ChatTurnFailureFixture {
             runtimeID: "fixture-runtime", storedID: "fixture-stored", title: "Weekend plans",
             epoch: "fixture-epoch", drafts: drafts
         )
-        let controls = SessionRuntimeControlModel(sessionID: client.conversationID, agentID: "kai",
+        // The demo picker takes a Link-style session ID; the native chat's own ID has a colon.
+        let controls = SessionRuntimeControlModel(sessionID: "demo-turn-failure", agentID: "kai",
                                                   messaging: DemoSessionControlMessaging())
         model = ChatModel(conversationID: client.conversationID, client: client, agentID: "kai",
                           initialItems: [], runtimeControls: controls)

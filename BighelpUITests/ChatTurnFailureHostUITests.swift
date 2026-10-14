@@ -41,7 +41,8 @@ final class ChatTurnFailureHostUITests: BighelpUITestCase {
         user.typeText(username)
         let secret = app.secureTextFields["direct-hermes.password"]
         secret.tap()
-        secret.typeText(password)
+        // Return ends editing: iOS's Passwords bar sits over Connect while the box has focus.
+        secret.typeText(password + "\n")
         tapConnect(app)
         let next = app.buttons["host-setup.continue"]
         XCTAssertTrue(next.waitForExistence(timeout: 45), "Connected")

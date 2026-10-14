@@ -426,6 +426,9 @@ sections can crash only on devices ("Thread stack size exceeded").
 
 - The app closes its host connection in the background. A suspended runtime can still report "ready".
 - Shortcuts and widgets first check that the host answers, and reconnect once if it doesn't.
+- A Shortcut on a gateway that isn't in use switches bighelp to it, and the app starts connecting at once.
+  `reconnect()` returns at once while another connection is under way, so the Shortcut waits for that one
+  (`BighelpShortcutConnectionWait`). `ShortcutGatewaySwitchHostUITests` checks it on two real hosts.
 - An incoming widget or link tap during startup is queued until the host runtime is ready. Shortcuts that open a
   screen post their link to `BighelpIncomingLinkCenter`, which takes the same path.
 - An app may have at most 10 App Shortcuts (`BighelpAppShortcuts`); Xcode's App Intents metadata step refuses

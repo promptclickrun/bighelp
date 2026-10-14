@@ -21,7 +21,8 @@ HOME and HERMES_HOME, then runs the matching HostSignInMatrixUITests:
             updates to it (PluginReleaseUpdateHostUITests; needs the internet)
   fleet     two hosts with the bighelp plugin (--plugin) and different agents:
             the all-hosts view lists both and opens an agent on the host that
-            isn't selected (AllHostsHostUITests)
+            isn't selected (AllHostsHostUITests), and Ask an agent on the gateway
+            that isn't in use (ShortcutGatewaySwitchHostUITests)
   media     no sign-in, with the bighelp plugin (--plugin) and the test-only
             Scripts/HostProbePlugin: a generated image stays in the chat after
             the turn ends, and Hermes' vault code and save-login prompts open
@@ -73,7 +74,8 @@ TESTS = {
     "fleet": ["AllHostsHostUITests/testAllHostsListsBothHostsAndOpensTheOther",
               "AllHostsHostUITests/testProviderUsageLoadsInAChatOnTheOtherHost",
               "AllHostsHostUITests/testUsageOpensFromTheMenuWithAllHosts",
-              "AllHostsHostUITests/testSecureInputAndQuestionsWorkInAChatOnTheOtherHost"],
+              "AllHostsHostUITests/testSecureInputAndQuestionsWorkInAChatOnTheOtherHost",
+              "ShortcutGatewaySwitchHostUITests/testAskAnAgentSwitchesToItsGatewayAndGetsTheAnswer"],
     "media": ["testGeneratedImageStaysAfterTheTurnEnds", "testVaultCodePopUpEntersTheCode",
               "testSaveLoginPopUpSavesTheLogin", "testVaultSavesAndImportsLoginsOnTheHost",
               "testACardStreamsBehindALoader"],

@@ -158,13 +158,19 @@ struct BighelpApp: App {
             }
 
             await hostRegistry.selectedWorkspace?.reconnect()
-            await nativeWorkspaces.synchronize()
-            guard matchesNativeWorkspaceKey(key),
-                  let runtime = nativeWorkspaces.current,
-                  runtime.isReady, !runtime.isSuspended,
-                  connections.owner != nil else {
-                return nil
-            }
+            // After a Shortcut switches gateway the app is often connecting already, and
+            // reconnect() returns at once then: wait for that connection, don't fail.
+            let ready = try await BighelpShortcutConnectionWait.untilReady(.init(
+                isWanted: { matchesNativeWorkspaceKey(key) },
+                isConnecting: { hostRegistry.selectedWorkspace?.isConnecting == true },
+                isConnected: { hostRegistry.selectedWorkspace?.isConnected == true },
+                isReady: {
+                    guard let runtime = nativeWorkspaces.current else { return false }
+                    return runtime.isReady && !runtime.isSuspended && connections.owner != nil
+                },
+                synchronize: { await nativeWorkspaces.synchronize() }
+            ))
+            guard ready, let runtime = nativeWorkspaces.current else { return nil }
             return BighelpShortcutWorkspace(runtime: runtime)
         }
         // The host didn't answer: drop the dead socket and connect again.
@@ -221,6 +227,9 @@ struct BighelpApp: App {
         #endif
         _newChatCoordinator = State(initialValue: composition.newChatCoordinator)
         shortcutService = composition.shortcutService
+        #if DEBUG
+        BighelpShortcutAskProbe.runIfRequested(composition.shortcutService)
+        #endif
         _reflectiveVisionCamera = State(initialValue: ReflectiveVisionCamera())
         usesDemoFixtures = composition.usesDemoFixtures
         clearLocalCache = composition.clearLocalCache

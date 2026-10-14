@@ -24,8 +24,10 @@ access was removed in 2.3.0 (105): App Review (guideline 2.5.1) refuses HealthKi
 whose main features don't need health data. The phone never lists or runs `health.read`, so
 the plugin's `iphone_health` tool answers `authorization_required`; a saved Health grant is
 dropped when read.
-Every control starts off. Enabling one requests its native iOS permission from
-that explicit foreground action. Calendar and Reminders authorize direct reads,
+Every data control starts off. Enabling one requests its native iOS permission from
+that explicit foreground action. Appearance ("Let agents change how bighelp looks") is
+the exception: it shares no data and Appearance undoes any change, so it's on until the
+person turns it off, and it needs no iOS permission. Calendar and Reminders authorize direct reads,
 creation, updates and deletion after enablement, with no per-operation approval.
 Location is read-only. OS permission by itself never enables agent access.
 
@@ -113,6 +115,7 @@ are returned only to their active caller, not cached for later retries.
 | `iphone_calendar` | List events in a bounded date range; create; update/delete an exact ID with expected revision. |
 | `iphone_reminders` | List with optional list IDs, completion and undated filters; create; update/delete an exact ID with expected revision. An optional date filter requires start, end and time zone together. |
 | `iphone_location` | `current` only, with no other arguments: where the phone is right now. Needs plugin feature `native-device-location-v1`. |
+| `iphone_appearance` | `get` (no arguments) or `set` with `mode` and/or `color`: light or dark mode and the chat color. Needs plugin feature `native-device-appearance-v1`. |
 
 Calendar creation accepts title/start/end/time zone and optional calendar,
 location, notes and URL. Recurring event results carry `occurrenceStart`;
@@ -154,6 +157,38 @@ only the city and country. A fix takes at most 15 seconds and an address 5.
 - Demo mode (`-use-demo-fixtures`) answers from `DemoDeviceLocationProvider`, a
   made-up place, and never asks iOS.
 
+## Appearance
+
+`appearance.get` and `appearance.set` (`DeviceAppearanceTool`) read and change
+`SettingsStore`, the same values Settings › Appearance changes, so the person's
+next pick there wins.
+
+- `get` returns `mode` (`system`, `light` or `dark`), `color` (a color name, or
+  `#RRGGBB` for a custom color), and the choices: `modes` and `colors` (each
+  `BighelpBubbleColor`'s name as Appearance shows it, lowercased: `lavender` …
+  `ink`).
+- `set` takes `mode`, `color` (a name in any case, or `#rrggbb`) or both, and
+  returns the `mode` and `color` the app shows now. A name goes through
+  `pickBubbleColor`, so it replaces a custom color; a hex becomes the custom
+  color. The page colors don't change.
+- Every value is checked before anything changes: no fields, an unknown field,
+  mode or malformed hex is `invalid_arguments`; a name the app doesn't have is
+  `unknown_color`. The change is applied only after the coordinator's
+  authorization passes again (switch on, chat current, app in front).
+- It's never journaled: setting a look twice is the same as once.
+- The switch is one setting for every host (`bighelp.device-tools.appearance`,
+  missing means on). Off, the phone leaves `appearance` out of the channel's
+  `enabled` list, so the plugin answers `authorization_required`; a call already
+  on the phone gets `permission_disabled`.
+- Older plugins reject `appearance` in `enabled`, so the phone sends it only when
+  `/native/context` lists `native-device-appearance-v1`. On its own, Appearance
+  never puts "open a chat" or "check the plugin" in Device access; it only says
+  when the plugin needs an update. A channel with only Appearance polls every
+  2 seconds instead of 0.75, since it opens for every chat.
+- Demo mode: `-test-agent-appearance '{"mode":"dark","color":"rose"}'` sends that
+  one call through the real coordinator and tool when the first chat opens
+  (`DeviceAppearanceFixture`, `AgentAppearanceUITests`).
+
 ## Mutation reconciliation
 
 Persist the request fingerprint as started before calling EventKit. Completed
@@ -179,6 +214,7 @@ no HealthKit calls. App Review rejects any of them in an app without a main heal
 Native suites:
 `DeviceToolPermissionsTests`, `AppleDeviceToolServiceTests`,
 `DeviceToolCoordinatorTests`, `DeviceToolFileJournalTests`, `DeviceLocationToolTests`,
+`DeviceAppearanceToolTests`, `AgentAppearanceUITests`,
 `BighelpLinkDirectedDeviceToolTests`, existing socket/backpressure and account
 erasure suites, and `DeviceToolPermissionsUITests`.
 

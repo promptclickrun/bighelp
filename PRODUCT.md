@@ -30,6 +30,9 @@ independently off by default under Permissions. The feature requires the updated
 Hermes execution context, plugin and directed Link relay. Enabling Calendar or
 Reminders authorizes direct changes on the user's request without another
 per-operation confirmation; Health access remains read-only.
+Agents can also change how bighelp looks (light or dark mode, the chat color)
+when the user asks. That shares no data and Appearance undoes it, so it's on
+until the user turns it off in Device access, and works only while the chat is open.
 This work does not depend on the unfinished Native harness.
 
 ## Operating Context

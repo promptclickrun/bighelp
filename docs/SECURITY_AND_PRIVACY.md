@@ -22,6 +22,12 @@ after explicit enablement and iOS authorization. Grants belong to the phone, its
 authorization epoch and the selected host. Turning a grant off blocks new and
 in-flight access; it does not revoke the underlying iOS permission.
 
+Agents can also change how bighelp looks (light or dark mode and the chat color)
+with `iphone_appearance`. It reads and changes only those two settings, shares no
+phone data and needs no iOS permission, so it's on until the person turns off
+"Let agents change how bighelp looks" in Device access (one switch for every
+host). It works only while that chat is open and bighelp is in front.
+
 Requested results travel through encrypted directed Link frames to the selected
 Hermes host and may be sent to its AI provider and retained in normal tool/chat
 history. The native mutation journal and plugin retry cache retain only bounded

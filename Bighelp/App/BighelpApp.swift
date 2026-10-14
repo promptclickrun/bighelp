@@ -202,6 +202,7 @@ struct BighelpApp: App {
         hostRegistry.onNativeEvent = { [weak nativeWorkspaces, weak notificationComposition] host, event in
             priorNativeEvent?(host, event)
             nativeWorkspaces?.receive(host: host, event: event)
+            BotScreenEventHub.shared.receive(hostID: host.id, event: event)
             Task { @MainActor [weak notificationComposition] in
                 await notificationComposition?.receiveNativeEvent(host, event)
             }

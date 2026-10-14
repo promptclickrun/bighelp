@@ -247,6 +247,12 @@ final class DirectHermesWorkspaceClient: WorkspaceOperationPerforming {
             return try rpc(operation, payload, allowed: ["localOnly"])
         case .petThumb:
             return try rpc(operation, payload, allowed: ["slug", "url"], required: ["slug"])
+        case .displayStatus, .displayStart, .displayStop, .displayThumbnail:
+            return try rpc(operation, payload, allowed: ["profile"], required: ["profile"])
+        case .displayObserve:
+            return try rpc(operation, payload, allowed: ["profile", "viewer_id"], required: ["profile"])
+        case .displayLeaseAcquire, .displayLeaseRelease:
+            return try rpc(operation, payload, allowed: ["profile", "viewer_id"], required: ["profile", "viewer_id"])
         case .profilesCreate, .profilesClone:
             try fields(payload, allowed: ["name", "clone_from", "clone_all", "no_alias", "mirror_credentials", "description", "no_skills"],
                        required: ["name"])

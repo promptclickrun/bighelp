@@ -1,15 +1,16 @@
 import SwiftUI
 
-/// Tapping an agent's avatar: what it has been doing, what you approved, what
-/// it runs on a schedule, and who it is (vibe, SOUL, MEMORY).
+/// Tapping an agent's avatar: what it has been doing, what you approved, its
+/// screen, what it runs on a schedule, and who it is (vibe, SOUL, MEMORY).
 struct AgentProfileSheet: View {
     enum Tab: String, CaseIterable, Identifiable {
-        case activity, approvals, schedules, identity
+        case activity, approvals, screen, schedules, identity
         var id: String { rawValue }
         var title: String {
             switch self {
             case .activity: "Activity"
             case .approvals: "Approvals"
+            case .screen: "Screen"
             case .schedules: "Schedules"
             case .identity: "Identity"
             }
@@ -18,6 +19,7 @@ struct AgentProfileSheet: View {
             switch self {
             case .activity: "list.bullet"
             case .approvals: "checkmark.shield"
+            case .screen: "display"
             case .schedules: "clock.badge.checkmark"
             case .identity: "touchid"
             }
@@ -35,7 +37,12 @@ struct AgentProfileSheet: View {
     /// Opened from a chat: that chat's model and reasoning, with Change.
     var chatControls: SessionRuntimeControlModel? = nil
     var onChangeModel: (() -> Void)? = nil
+    /// The agent's screen (Hermes Bot Screen). Its tab shows only once the host answers.
+    var screenService: (any BotScreenService)? = nil
+    /// The agent's chats open in the app, for what it's doing on its screen.
+    var screenChats: [ChatModel] = []
     @State private var tab: Tab = .activity
+    @State private var screen: BotScreenTabModel?
     @State private var document: (title: String, body: AgentIdentityDocuments.Document)?
     @Environment(\.dismiss) private var dismiss
 
@@ -74,6 +81,12 @@ struct AgentProfileSheet: View {
         .background(BighelpThemeCanvas(theme: theme).ignoresSafeArea())
         .bighelpSheetSize(.standard)
         .task(id: agent.id) { await store.loadLogs(agentID: agent.id) }
+        .task(id: agent.id) {
+            guard let screenService else { return }
+            let model = BotScreenTabModel(agentID: agent.id, service: screenService)
+            screen = model
+            await model.load()
+        }
         .bighelpSheet(isPresented: Binding(get: { document != nil }, set: { if !$0 { document = nil } })) {
             if let document {
                 IdentityDocumentView(title: document.title, document: document.body)
@@ -130,7 +143,7 @@ struct AgentProfileSheet: View {
 
     private var tabBar: some View {
         HStack(spacing: 4) {
-            ForEach(Tab.allCases) { item in
+            ForEach(visibleTabs) { item in
                 let selected = tab == item
                 Button {
                     withAnimation(.snappy) { tab = item }
@@ -156,11 +169,19 @@ struct AgentProfileSheet: View {
         .background(Capsule().fill(theme.incomingMessageBackground))
     }
 
+    private var visibleTabs: [Tab] {
+        Tab.allCases.filter { $0 != .screen || screen?.showsTab == true }
+    }
+
     @ViewBuilder
     private var content: some View {
         switch tab {
         case .activity: activityList
         case .approvals: approvalsList
+        case .screen:
+            if let screen, screen.showsTab {
+                AgentScreenTab(model: screen, agentName: agent.name, chats: screenChats)
+            }
         case .schedules: schedulesList
         case .identity: identityPanel
         }

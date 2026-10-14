@@ -197,4 +197,13 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     case workflowsUnarchive = "workflows.unarchive"
     // Manual or scheduled (`native-workflows-trigger-v1`).
     case workflowsTriggerSet = "workflows.trigger.set"
+    /// An agent's screen (Hermes 0.22 Bot Screen): its state, a still picture, a ticket to
+    /// watch it, and who's in control.
+    case displayStatus = "display.status"
+    case displayStart = "display.start"
+    case displayStop = "display.stop"
+    case displayThumbnail = "display.thumbnail"
+    case displayObserve = "display.observe"
+    case displayLeaseAcquire = "display.lease.acquire"
+    case displayLeaseRelease = "display.lease.release"
 }

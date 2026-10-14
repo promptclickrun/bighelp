@@ -752,7 +752,9 @@ extension RootShellView {
             },
             onOpenSchedule: { task in afterClosingHomeSheets { openScheduledTask(task) } },
             chatControls: chat?.runtimeControls,
-            onChangeModel: chat.map { chat in { afterClosingHomeSheets { chat.requestSessionControls() } } }
+            onChangeModel: chat.map { chat in { afterClosingHomeSheets { chat.requestSessionControls() } } },
+            screenService: makeBotScreenService(),
+            screenChats: botScreenChats(for: agent)
         )
     }
 

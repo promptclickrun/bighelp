@@ -243,6 +243,18 @@ final class DirectHermesClient: DirectHermesRPC, DirectHermesAuthenticatedHTTP,
         )
     }
 
+    /// Bot Screen's RFB sockets on this connection's session. A reconnect to the same
+    /// computer and sign-in keeps an open screen; signing out or switching ends it.
+    func makeBotScreenStreams(
+        owner: WorkspaceOwner,
+        currentOwner: @escaping @MainActor () -> WorkspaceOwner?
+    ) -> DirectHermesBotScreenStreams {
+        DirectHermesBotScreenStreams(authenticator: authenticator, isCurrent: { [weak self] in
+            guard let self else { return false }
+            return !self.terminallyClosed && currentOwner()?.signIn == owner.signIn
+        })
+    }
+
     deinit {
         socket?.cancel(with: .goingAway, reason: nil)
         readerTask?.cancel()

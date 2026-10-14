@@ -43,9 +43,9 @@ final class NativeDeviceToolSession {
     private var enabled: Set<DeviceToolCapability>
     /// Tools turned on here that this host's plugin is too old to offer.
     private(set) var needsNewerPlugin: Set<DeviceToolCapability> = []
-    /// Appearance is on for every chat and never urgent, so a channel with nothing else waits
-    /// longer between polls and an open chat costs the host less.
-    var pollInterval: Duration { enabled == [.appearance] ? .seconds(2) : .milliseconds(750) }
+    /// Appearance is on for every chat and never urgent, so a channel with nothing else polls every
+    /// 8 seconds: well inside the plugin's 30-second lease and tool timeout, a quarter of the traffic.
+    var pollInterval: Duration { enabled == [.appearance] ? .seconds(8) : .milliseconds(750) }
     private let isAvailable: @MainActor () -> Bool
     private let handle: Handler
     private let closeCleanupFactory: (@MainActor (String) -> (@MainActor () async -> Void)?)?

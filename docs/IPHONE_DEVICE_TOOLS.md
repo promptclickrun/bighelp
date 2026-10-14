@@ -184,7 +184,7 @@ next pick there wins.
   `/native/context` lists `native-device-appearance-v1`. On its own, Appearance
   never puts "open a chat" or "check the plugin" in Device access; it only says
   when the plugin needs an update. A channel with only Appearance polls every
-  2 seconds instead of 0.75, since it opens for every chat.
+  8 seconds instead of 0.75, since it opens for every chat.
 - Demo mode: `-test-agent-appearance '{"mode":"dark","color":"rose"}'` sends that
   one call through the real coordinator and tool when the first chat opens
   (`DeviceAppearanceFixture`, `AgentAppearanceUITests`).

@@ -123,7 +123,7 @@ struct NativeDeviceToolSessionTests {
         let quiet = fixture.session(enabled: [.appearance])
         try await quiet.connect()
         #expect(fixture.http.connectedEnabled == ["appearance"])
-        #expect(quiet.pollInterval == .seconds(2))
+        #expect(quiet.pollInterval == .seconds(8))
         try await quiet.pollOnce()
         #expect(fixture.handled == 1)
         let busy = fixture.session(enabled: [.calendar, .appearance])

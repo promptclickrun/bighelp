@@ -8,6 +8,8 @@ import XCTest
 /// - BIGHELP_BOT_SCREEN_TAP: where to click while in control, as fractions of the screen ("0.5,0.98")
 /// - BIGHELP_BOT_SCREEN_TYPE: text to type after that click, with "\n" for Return
 /// - BIGHELP_BOT_SCREEN_EVIDENCE: a folder for screenshots (optional)
+/// It also runs on a Release build linked with `-Wl,-stack_size,0x100000` (the iPhone's 1 MB main-thread
+/// stack): there the app starts at the real welcome, which this test walks through.
 final class BotScreenHostUITests: BighelpUITestCase {
     @MainActor
     func testStartWatchTakeControlHandBackAndStop() throws {
@@ -103,6 +105,12 @@ final class BotScreenHostUITests: BighelpUITestCase {
 
     @MainActor private func signIn(_ app: XCUIApplication, host: String, user: String, password: String) {
         let address = app.textFields["host-setup.address"]
+        if !address.waitForExistence(timeout: 8) {
+            let start = app.buttons["onboarding.get-started"]
+            XCTAssertTrue(start.waitForExistence(timeout: 20))
+            start.tap()
+            agreeToAIDataIfAsked(app)
+        }
         XCTAssertTrue(address.waitForExistence(timeout: 20))
         address.tap()
         address.typeText(host)
@@ -110,19 +118,23 @@ final class BotScreenHostUITests: BighelpUITestCase {
         let username = app.textFields["direct-hermes.username"]
         XCTAssertTrue(username.waitForExistence(timeout: 45), "The host asks for its sign-in")
         username.tap()
-        username.typeText(user)
+        // Return drops the keyboard, which covers the password box during onboarding.
+        username.typeText(user + "\n")
         let secret = app.secureTextFields["direct-hermes.password"]
         secret.tap()
         // Return ends editing: iOS's Passwords bar sits over Connect while the box has focus.
         secret.typeText(password + "\n")
         tapConnect(app)
-        let next = app.buttons["host-setup.continue"]
+        let next = app.buttons.matching(NSPredicate(format: "identifier IN %@ AND (label == %@ OR label BEGINSWITH %@)",
+            ["host-setup.continue", "host-setup.screen"], "Start chatting", "Let")).firstMatch
         XCTAssertTrue(next.waitForExistence(timeout: 45), "Connected")
         next.tap()
     }
 
     @MainActor private func tapConnect(_ app: XCUIApplication) {
-        let connect = app.buttons["host-setup.connect-host"]
+        // During onboarding the button reports the screen's identifier.
+        let connect = app.buttons.matching(NSPredicate(format: "identifier IN %@ AND label IN %@",
+            ["host-setup.connect-host", "host-setup.screen"], ["Continue", "Connect"])).firstMatch
         for _ in 0..<5 where !(connect.exists && connect.isHittable) { app.swipeUp() }
         XCTAssertTrue(connect.waitForExistence(timeout: 8))
         connect.tap()

@@ -319,8 +319,12 @@ struct BighelpAppComposition {
             isForeground: { UIApplication.shared.applicationState == .active },
             // Demo switches last only for the launch.
             readGrants: { usesFixtures ? [] : defaults.stringArray(forKey: $0) ?? [] },
-            writeGrants: { if !usesFixtures { defaults.set($1, forKey: $0) } }
+            writeGrants: { if !usesFixtures { defaults.set($1, forKey: $0) } },
+            appearanceAllowed: defaults.object(forKey: DeviceToolPermissions.appearanceAllowedKey) == nil
+                || defaults.bool(forKey: DeviceToolPermissions.appearanceAllowedKey),
+            saveAppearanceAllowed: { if !usesFixtures { defaults.set($0, forKey: DeviceToolPermissions.appearanceAllowedKey) } }
         )
+        let appearanceTool = DeviceAppearanceTool(settings: settings)
         let deviceToolCoordinator = DeviceToolCoordinator(
             permissions: deviceToolPermissions,
             journal: DeviceToolFileJournal(url: dataDirectory.appending(path: "device-tool-outcomes-v1.json")),
@@ -330,7 +334,10 @@ struct BighelpAppComposition {
                     && UIApplication.shared.isProtectedDataAvailable
             },
             execute: { operation, arguments, authorize in
-                try await appleDeviceTools.execute(operation: operation, arguments: arguments, authorize: authorize)
+                if DeviceAppearanceTool.operations.contains(operation) {
+                    return try appearanceTool.execute(operation: operation, arguments: arguments, authorize: authorize)
+                }
+                return try await appleDeviceTools.execute(operation: operation, arguments: arguments, authorize: authorize)
             }
         )
         let permissionCenter = PermissionCenter(deviceTools: deviceToolPermissions)
@@ -345,6 +352,12 @@ struct BighelpAppComposition {
                 await deviceToolCoordinator.handle(request, owner: owner, isCurrent: isCurrent)
             }
         }
+        #if DEBUG
+        if usesFixtures {
+            permissionCenter.demoAppearanceCall = DeviceAppearanceFixture(
+                launchArguments: arguments, permissions: deviceToolPermissions, tool: appearanceTool)
+        }
+        #endif
         managedNotificationFactory = BighelpManagedNotificationFactory(
             permissions: permissionCenter, isFixture: usesFixtures)
         let personalities = PersonalityStore(

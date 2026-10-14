@@ -108,6 +108,30 @@ struct NativeDeviceToolSessionTests {
         #expect(session.needsNewerPlugin.isEmpty)
     }
 
+    @Test func appearanceAloneOnAnOlderPluginNeverOpensAChannel() async throws {
+        let fixture = try Fixture()
+        let session = fixture.session(enabled: [.appearance])
+        await #expect(throws: WorkspaceClientError.unavailable(.pluginRequired)) { try await session.connect() }
+        #expect(fixture.http.paths == ["context"])
+        #expect(session.needsNewerPlugin == [.appearance])
+    }
+
+    @Test func newerPluginGetsAppearanceAndAQuietChannelPollsLessOften() async throws {
+        let fixture = try Fixture()
+        fixture.http.features.append("native-device-appearance-v1")
+        fixture.http.request["operation"] = .string("appearance.set")
+        let quiet = fixture.session(enabled: [.appearance])
+        try await quiet.connect()
+        #expect(fixture.http.connectedEnabled == ["appearance"])
+        #expect(quiet.pollInterval == .seconds(2))
+        try await quiet.pollOnce()
+        #expect(fixture.handled == 1)
+        let busy = fixture.session(enabled: [.calendar, .appearance])
+        try await busy.connect()
+        #expect(fixture.http.connectedEnabled == ["appearance", "calendar"])
+        #expect(busy.pollInterval == .milliseconds(750))
+    }
+
     @Test func duplicateRequestIDsInOnePollBatchAreRejectedAtomically() async throws {
         let fixture = try Fixture()
         fixture.http.duplicateRequest = true

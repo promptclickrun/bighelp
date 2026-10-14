@@ -12,7 +12,7 @@ struct PermissionsSettingsView: View {
             }
 
             Section {
-                ForEach(DeviceToolCapability.allCases) { kind in
+                ForEach(DeviceToolCapability.allCases.filter(\.sharesPersonalData)) { kind in
                     DeviceToolPermissionRow(permissions: center.deviceTools, kind: kind)
                 }
             } header: {
@@ -21,6 +21,14 @@ struct PermissionsSettingsView: View {
                 Text(center.deviceTools.scope == nil
                      ? "Connect a host to enable these optional tools."
                      : "Requested data is shared with the selected host and its AI provider. Turn access off to stop agent use. Keep bighelp open while using these tools.")
+            }
+            .listRowBackground(theme.surface)
+
+            Section {
+                AgentAppearancePermissionRow(permissions: center.deviceTools)
+            } footer: {
+                Text("Works only while you have the agent’s chat open. One switch for every host.")
+                    .bighelpFont(.metadata)
             }
             .listRowBackground(theme.surface)
 
@@ -78,6 +86,7 @@ private struct DeviceToolPermissionRow: View {
         case .calendar: "Calendar"
         case .reminders: "Reminders"
         case .location: "Location"
+        case .appearance: "Appearance"
         }
     }
 
@@ -86,6 +95,7 @@ private struct DeviceToolPermissionRow: View {
         case .calendar: "Read, create, update, and delete events directly after you enable access."
         case .reminders: "Read, create, update, and delete reminders directly after you enable access."
         case .location: "Share where you are when your agent asks, for things like finding places near you."
+        case .appearance: "Switch light or dark mode and change your chat color when you ask."
         }
     }
 
@@ -122,6 +132,28 @@ private struct DeviceToolPermissionRow: View {
                 Text("Unavailable on this device.").bighelpFont(.metadata).foregroundStyle(.secondary)
             }
         }
+        .padding(.vertical, BighelpTokens.space4)
+    }
+}
+
+/// On until the person turns it off: it shares nothing and Appearance undoes any change.
+@MainActor
+private struct AgentAppearancePermissionRow: View {
+    let permissions: DeviceToolPermissions
+
+    var body: some View {
+        Toggle(isOn: Binding(
+            get: { permissions.appearanceAllowed },
+            set: { permissions.setAppearanceAllowed($0) }
+        )) {
+            VStack(alignment: .leading, spacing: BighelpTokens.space4) {
+                Text("Let agents change how bighelp looks").bighelpFont(.body, weight: .semibold)
+                Text("When you ask, your agent can switch light or dark mode and change your chat color. You can change it back in Appearance.")
+                    .bighelpFont(.metadata).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .accessibilityIdentifier("permissions.device-tools.appearance")
         .padding(.vertical, BighelpTokens.space4)
     }
 }

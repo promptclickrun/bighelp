@@ -12,7 +12,7 @@ protocol AppleDeviceToolNativeBoundary: AnyObject {
     ) async throws -> [String: BighelpJSONValue]
 }
 
-enum AppleDeviceToolError: Error, Equatable, LocalizedError, Sendable {
+enum AppleDeviceToolError: DeviceToolFailure, Equatable, LocalizedError, Sendable {
     case unsupportedOperation
     case invalidArguments
     case unsupportedRecurrence
@@ -442,6 +442,7 @@ final class LiveAppleDeviceToolNativeBoundary: AppleDeviceToolNativeBoundary {
         case .calendar: eventKitStatus(.event)
         case .reminders: eventKitStatus(.reminder)
         case .location: await location.status()
+        case .appearance: .available
         }
     }
 
@@ -450,6 +451,7 @@ final class LiveAppleDeviceToolNativeBoundary: AppleDeviceToolNativeBoundary {
         case .calendar: await requestFullCalendarAccess()
         case .reminders: await requestFullReminderAccess()
         case .location: await location.request()
+        case .appearance: .available
         }
     }
 

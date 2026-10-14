@@ -43,6 +43,9 @@ final class NativeDeviceToolSession {
     private var enabled: Set<DeviceToolCapability>
     /// Tools turned on here that this host's plugin is too old to offer.
     private(set) var needsNewerPlugin: Set<DeviceToolCapability> = []
+    /// Appearance is on for every chat and never urgent, so a channel with nothing else waits
+    /// longer between polls and an open chat costs the host less.
+    var pollInterval: Duration { enabled == [.appearance] ? .seconds(2) : .milliseconds(750) }
     private let isAvailable: @MainActor () -> Bool
     private let handle: Handler
     private let closeCleanupFactory: (@MainActor (String) -> (@MainActor () async -> Void)?)?
@@ -159,7 +162,7 @@ final class NativeDeviceToolSession {
             onConnected()
             while owns() {
                 try await pollOnce()
-                try await Task.sleep(for: .milliseconds(750))
+                try await Task.sleep(for: pollInterval)
             }
         } catch {
             await close()
@@ -203,6 +206,30 @@ final class NativeDeviceToolSession {
     }
     private func owns() -> Bool { currentOwner() == owner && isAvailable() && !Task.isCancelled }
     private func check() throws { guard owns() else { throw WorkspaceClientError.ownerChanged } }
+}
+
+/// What Settings › Device access says about the phone's channel. Appearance is on for everyone, so on
+/// its own it never asks the person to open a chat or check the plugin; it only says when the plugin
+/// is too old to offer it.
+enum DeviceToolChannelNote {
+    static func noChat(enabled: Set<DeviceToolCapability>) -> String? {
+        enabled.contains(where: \.sharesPersonalData) ? "Open a chat to use this iPhone’s shared data." : nil
+    }
+
+    static func connected(needsNewerPlugin: Set<DeviceToolCapability>) -> String? {
+        let wants = [
+            needsNewerPlugin.contains(.location) ? "share your location" : nil,
+            needsNewerPlugin.contains(.appearance) ? "let agents change how bighelp looks" : nil,
+        ].compactMap { $0 }
+        guard !wants.isEmpty else { return nil }
+        return "To \(wants.joined(separator: " and ")), update the bighelp plugin on this computer."
+    }
+
+    static func failed(enabled: Set<DeviceToolCapability>, needsNewerPlugin: Set<DeviceToolCapability>) -> String? {
+        if !needsNewerPlugin.isEmpty, needsNewerPlugin == enabled { return connected(needsNewerPlugin: needsNewerPlugin) }
+        guard enabled.contains(where: \.sharesPersonalData) else { return nil }
+        return "Device access is not connected. Check the bighelp plugin on this host, then reopen the chat."
+    }
 }
 
 /// One fixed-route cleanup prepared before allocating a phone channel. It

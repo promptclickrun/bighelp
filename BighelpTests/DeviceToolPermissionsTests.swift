@@ -11,7 +11,7 @@ struct DeviceToolPermissionsTests {
         let store = fixture.makeStore()
         store.bind(scope)
         await store.refresh()
-        #expect(DeviceToolCapability.allCases.allSatisfy { !store.isEnabled($0) })
+        #expect(DeviceToolCapability.allCases.filter { $0.sharesPersonalData }.allSatisfy { !store.isEnabled($0) })
         #expect(fixture.requests.isEmpty)
     }
 

@@ -47,6 +47,11 @@ struct DeviceToolResult: Codable, Equatable, Sendable {
     }
 }
 
+/// A tool failure the agent reads by its code (`invalid_arguments`, `unknown_color`…).
+protocol DeviceToolFailure: Error {
+    var code: String { get }
+}
+
 struct DeviceToolJournalEntry: Codable, Equatable, Sendable {
     let fingerprint: String
     let expiresAt: Int
@@ -110,7 +115,7 @@ final class DeviceToolCoordinator {
         do { try authorize() } catch let error as Failure { return failed(error.code) }
         catch { return failed("unavailable") }
 
-        let mutation = !Self.readOperations.contains(request.operation)
+        let mutation = !Self.unjournaledOperations.contains(request.operation)
         let fingerprint = SHA256.hash(data: encoded).map { String(format: "%02x", $0) }.joined()
         if mutation {
             do {
@@ -152,7 +157,7 @@ final class DeviceToolCoordinator {
             do { try authorize() }
             catch let current as Failure { return failed(current.code) }
             catch { return failed("unavailable") }
-            let nativeCode = (error as? Failure)?.code ?? (error as? AppleDeviceToolError)?.code ?? "native_failure"
+            let nativeCode = (error as? Failure)?.code ?? (error as? any DeviceToolFailure)?.code ?? "native_failure"
             // A native commit can finish before a callback/identity error is
             // reported. Do not tell the agent a retry is a fresh safe write.
             let code = mutation && ["native_failure", "identity_mismatch", "invalid_result"].contains(nativeCode)
@@ -175,14 +180,18 @@ final class DeviceToolCoordinator {
         !value.isEmpty && value.utf8.count <= 512 && !value.unicodeScalars.contains { CharacterSet.controlCharacters.contains($0) }
     }
 
-    /// Reads are never journaled: their results (events, where someone is) stay off disk.
-    private static let readOperations: Set<String> = ["calendar.list", "reminders.list", "location.current"]
+    /// Reads are never journaled: their results (events, where someone is) stay off disk. Neither is
+    /// an appearance change: making the app dark twice is the same as once, so there's nothing to reconcile.
+    private static let unjournaledOperations: Set<String> = [
+        "calendar.list", "reminders.list", "location.current", "appearance.get", "appearance.set",
+    ]
 
     private static func capability(for operation: String) -> DeviceToolCapability? {
         switch operation {
         case "calendar.list", "calendar.create", "calendar.update", "calendar.delete": .calendar
         case "reminders.list", "reminders.create", "reminders.update", "reminders.delete": .reminders
         case "location.current": .location
+        case "appearance.get", "appearance.set": .appearance
         default: nil
         }
     }

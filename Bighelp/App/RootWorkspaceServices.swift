@@ -108,6 +108,15 @@ extension RootShellView {
     }
 
     func runNativeDeviceTools() async {
+        #if DEBUG
+        if usesDemoFixtures, let call = permissionCenter.demoAppearanceCall, let scope = currentDeviceToolScope,
+           let conversationID = appState.activeConversationID, scenePhase == .active {
+            await call.send(scope: scope, isCurrent: {
+                appState.activeConversationID == conversationID && scenePhase == .active
+            })
+            return
+        }
+        #endif
         guard let owner = currentWorkspaceOwner, owner.authority.kind == .direct,
               let scope = currentDeviceToolScope, let direct = nativeWorkspaceStore?.nativeClient,
               direct.isConnected,
@@ -120,7 +129,7 @@ extension RootShellView {
         guard let conversationID = appState.activeConversationID,
               let coordinate = nativeRuntime?.bridge.currentCoordinate(for: conversationID),
               coordinate.owner == owner else {
-            permissionCenter.nativeDeviceToolStatus = "Open a chat to use this iPhone’s shared data."
+            permissionCenter.nativeDeviceToolStatus = DeviceToolChannelNote.noChat(enabled: enabled)
             return
         }
         let revision = permissions.revision
@@ -133,19 +142,16 @@ extension RootShellView {
                     && appState.activeConversationID == conversationID
             }, handle: handler)
         permissionCenter.nativeDeviceToolStatus = nil
-        let locationNeedsNewerPlugin = "To share your location, update the bighelp plugin on this computer."
         do {
             try await session.run(onConnected: {
-                if session.needsNewerPlugin.contains(.location) {
-                    permissionCenter.nativeDeviceToolStatus = locationNeedsNewerPlugin
-                }
+                permissionCenter.nativeDeviceToolStatus = DeviceToolChannelNote.connected(
+                    needsNewerPlugin: session.needsNewerPlugin)
             })
         } catch {
             guard !Task.isCancelled, currentWorkspaceOwner == owner,
                   permissions.revision == revision else { return }
-            permissionCenter.nativeDeviceToolStatus = session.needsNewerPlugin == enabled
-                ? locationNeedsNewerPlugin
-                : "Device access is not connected. Check the bighelp plugin on this host, then reopen the chat."
+            permissionCenter.nativeDeviceToolStatus = DeviceToolChannelNote.failed(
+                enabled: enabled, needsNewerPlugin: session.needsNewerPlugin)
         }
     }
 

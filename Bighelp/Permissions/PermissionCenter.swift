@@ -123,6 +123,10 @@ final class PermissionCenter {
     var nativeDeviceToolStatus: String?
     @ObservationIgnored let nativeDeviceToolLifetime = NativeDeviceToolLifetime()
     @ObservationIgnored var nativeDeviceToolHandler: NativeDeviceToolSession.Handler?
+    #if DEBUG
+    /// Demo mode's stand-in for an agent's appearance call (`-test-agent-appearance`).
+    @ObservationIgnored var demoAppearanceCall: DeviceAppearanceFixture?
+    #endif
     private(set) var requestInFlight: PermissionKind?
     private(set) var statuses: [PermissionKind: PermissionStatus]
 

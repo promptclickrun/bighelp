@@ -61,4 +61,34 @@ struct HostOperationsPayloadTests {
         #expect(receipt.summary.preUpdateSHA == nil)
         #expect(receipt.summary.postUpdateSHA == "0123abcd")
     }
+
+    /// Hermes 0.22 runs one gateway for every profile: `gateways` is gone, `profiles` and
+    /// `parked_profiles` are new, and the merge plan's `live_served` is null until it merges.
+    @Test func hermes022StatusAndMergePlanRead() throws {
+        let overview = try DirectHermesHostPayload.overview(try json("""
+        {"version":"0.22.0","release_date":"2026.9.24","gateway_running":true,"gateway_state":"running",
+         "gateway_mode":"single","gateway_shared_with":[],"gateway_platforms":{},"active_agents":0,
+         "gateway_busy":false,"gateway_drainable":true,"restart_drain_timeout":0.0,"active_sessions":0,
+         "profiles":[{"name":"default"},{"name":"work"}],"parked_profiles":[],"multiplex_standalone_reason":null,
+         "components":{"gateway":{"status":"ok","state":"running"},"dashboard":{"status":"ok"},
+                       "storage":{"status":"ok"},"platforms":{"status":"ok","configured":1,"connected":1}},
+         "overall":"ok"}
+        """))
+        #expect(overview.version == "0.22.0")
+        #expect(overview.gatewayMode == "single" && overview.gatewayRunning)
+        let plan = try DirectHermesHostPayload.migrationPlan(try json("""
+        {"default_home":"/opt/data","profiles":[
+           {"profile":"default","home":"/opt/data","pid":null,"service":{"kind":"s6","system":false},
+            "services":[{"kind":"s6","system":false}],"run_as_user":null,"uid":10000,"runtime_home":null},
+           {"profile":"work","home":"/opt/data/profiles/work","pid":null,"service":null,"services":[],
+            "run_as_user":null,"uid":10000,"runtime_home":null}],
+         "standalone_by_config":[],"multiplex_flag_on":false,"live_served":null,"already_multiplexed":false,
+         "interrupted":false,"blockers":[],"notices":["Profiles created after the migration are served at once."],
+         "eligible":false,"command":"hermes gateway migrate --multiplex"}
+        """))
+        #expect(plan.profiles.map(\.id) == ["default", "work"])
+        #expect(plan.profiles.first?.serviceKind == "s6")
+        #expect(plan.liveServedProfiles.isEmpty)
+        #expect(!plan.isEligible)
+    }
 }

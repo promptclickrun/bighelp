@@ -74,6 +74,7 @@ final class ConnectorCardUITests: BighelpUITestCase {
             throw XCTSkip("Set BIGHELP_CONNECTOR_HOST and BIGHELP_CONNECTOR_TOOL")
         }
         let app = makeApp()
+        app.launchArguments = ["-loopdy.home.opens-chat", "YES"]
         app.launch()
         try onboardOpenHost(app, address: host)
         let composer = app.textViews["chat.composer.text"]

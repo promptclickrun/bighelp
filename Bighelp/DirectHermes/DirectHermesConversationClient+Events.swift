@@ -122,7 +122,7 @@ extension DirectHermesConversationClient {
             )
         }
         if event.type == "sudo.request" || event.type == "secret.request" {
-            status = "Hermes needs a secure input response. Complete it through Hermes Desktop; this screen will not collect that secret."
+            status = "Hermes is waiting for a password or secret you enter securely."
         }
         if event.type == "error" { status = "Hermes reported a turn error. Review the conversation before retrying."; turnFailed = true }
         if change.terminalError != nil { turnFailed = true }

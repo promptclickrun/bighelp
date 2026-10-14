@@ -62,7 +62,7 @@ final class ConnectorCardUITests: BighelpUITestCase {
     }
 
     /// A real Hermes (0.21.4 or later) asks to add an MCP tool and the card shows. Skip answers, so
-    /// nothing is installed. Set (as TEST_RUNNER_…):
+    /// nothing is installed. It runs in a new chat; delete it on the host afterwards. Set (as TEST_RUNNER_…):
     /// - BIGHELP_CONNECTOR_HOST: an open host, e.g. 127.0.0.1:9121
     /// - BIGHELP_CONNECTOR_MODEL: a /model line for the chat, e.g. "gpt-6-luna --provider openai-codex --session"
     /// - BIGHELP_CONNECTOR_TOOL: an MCP catalog entry, e.g. "fetch"
@@ -79,9 +79,14 @@ final class ConnectorCardUITests: BighelpUITestCase {
         try onboardOpenHost(app, address: host)
         let composer = app.textViews["chat.composer.text"]
         XCTAssertTrue(composer.waitForExistence(timeout: 30), "The agent's chat opens")
+        // A new chat: the home chat is the person's own, and /model pins the chat it runs in.
+        chatNewChatButton(in: app).tap()
+        confirmNewChatPicker(in: app)
+        XCTAssertTrue(composer.waitForExistence(timeout: 30), "A new chat opens")
+        sleep(3)
         if let model = environment["BIGHELP_CONNECTOR_MODEL"] {
             send("/model \(model)", in: app)
-            sleep(5)
+            sleep(10)
         }
         send("Use manage_connections with action install for the MCP catalog server \"\(tool)\" "
              + "(connectors: [{\"name\": \"\(tool)\", \"mcp\": true}]). Do nothing else, then tell me the result in one line.",
@@ -106,12 +111,20 @@ final class ConnectorCardUITests: BighelpUITestCase {
 
     // MARK: - Steps
 
+    /// Sends and waits until the text has left the message box: a tap while the last turn is
+    /// still finishing can leave it there.
     @MainActor
     private func send(_ text: String, in app: XCUIApplication) {
         let composer = app.textViews["chat.composer.text"]
         composer.tap()
         composer.typeText(text)
-        app.buttons["chat.send"].tap()
+        let sent = NSPredicate(format: "NOT (value CONTAINS %@)", String(text.prefix(24)))
+        for _ in 0..<4 {
+            app.buttons["chat.send"].tap()
+            if XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: sent, object: composer)], timeout: 15)
+                == .completed { return }
+        }
+        XCTFail("The message was sent")
     }
 
     @MainActor

@@ -111,6 +111,8 @@ struct BighelpLinkModelProvider: Decodable, Equatable, Identifiable, Sendable {
     let models: [String]
     /// Native catalog metadata only; the retired Link wire format stays unchanged.
     let fastModeModels: Set<String>?
+    /// How much of the plan is left (native catalog only).
+    let plan: ModelProviderPlan?
 
     init(
         id: String,
@@ -118,7 +120,8 @@ struct BighelpLinkModelProvider: Decodable, Equatable, Identifiable, Sendable {
         isCurrent: Bool,
         isCustom: Bool,
         models: [String],
-        fastModeModels: Set<String>? = nil
+        fastModeModels: Set<String>? = nil,
+        plan: ModelProviderPlan? = nil
     ) {
         self.id = id
         self.name = name
@@ -126,6 +129,7 @@ struct BighelpLinkModelProvider: Decodable, Equatable, Identifiable, Sendable {
         self.isCustom = isCustom
         self.models = models
         self.fastModeModels = fastModeModels
+        self.plan = plan
     }
 
     private enum CodingKeys: String, CodingKey, CaseIterable {
@@ -148,6 +152,7 @@ struct BighelpLinkModelProvider: Decodable, Equatable, Identifiable, Sendable {
         isCustom = try container.decode(Bool.self, forKey: .isCustom)
         models = try container.decode([String].self, forKey: .models)
         fastModeModels = nil
+        plan = nil
         guard
             BighelpLinkPickerValidation.identifier(id, maximum: 128) != nil,
             BighelpLinkPickerValidation.label(name, maximum: 80) != nil,
@@ -163,7 +168,8 @@ struct BighelpLinkModelPicker: Decodable, Equatable, Sendable {
     let sessionID: String
     let currentModel: String
     let currentProvider: String
-    let providers: [BighelpLinkModelProvider]
+    /// Demo runs add made-up plans after decoding.
+    var providers: [BighelpLinkModelProvider]
     let sentAt: Int
     let nativeCoordinate: NativeSessionRuntimePickerCoordinate?
 
@@ -196,7 +202,7 @@ struct BighelpLinkModelPicker: Decodable, Equatable, Sendable {
             return BighelpLinkModelProvider(
                 id: provider.id, name: BighelpLinkPickerValidation.label(provider.name, maximum: 800) ?? provider.id,
                 isCurrent: provider.isCurrent, isCustom: provider.isCustom, models: models,
-                fastModeModels: provider.fastModeModels
+                fastModeModels: provider.fastModeModels, plan: provider.plan
             )
         }
         self.sentAt = sentAt

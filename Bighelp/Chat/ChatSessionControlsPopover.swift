@@ -198,7 +198,27 @@ struct ChatSessionControlsPopover: View {
     private var selectionDetail: String {
         let provider = draft.providerID.map { providerName(for: $0) } ?? "Provider not reported"
         let isCurrent = draft.providerID == controls.currentProvider && draft.modelID == controls.currentModel
-        return isCurrent ? provider + " · in use" : provider + " · applies when you tap Apply"
+        let detail = isCurrent ? provider + " · in use" : provider + " · applies when you tap Apply"
+        guard let providerID = draft.providerID, let modelID = draft.modelID,
+              let plan = planText(providerID: providerID, modelID: modelID) else { return detail }
+        return detail + " · " + plan.text
+    }
+
+    /// "17% left · resets 3:00 PM": the provider's plan, or this model's own limit.
+    private func planText(providerID: String, modelID: String) -> ModelProviderPlan.Summary? {
+        guard let plan = controls.modelProviders.first(where: { $0.id == providerID })?.plan else { return nil }
+        let now = Date()
+        if let limit = plan.modelLimit(modelID, now: now) { return .init(text: limit, isLow: true) }
+        return plan.summary(now: now)
+    }
+
+    private func providerLine(_ item: ChatModelListItem) -> Text {
+        guard let plan = planText(providerID: item.providerID, modelID: item.modelID) else {
+            return Text(item.providerName).font(.bighelp(.caption)).foregroundStyle(theme.secondaryText)
+        }
+        let left = Text(" · \(plan.text)").foregroundStyle(plan.isLow ? theme.danger : theme.secondaryText)
+        return Text("\(Text(item.providerName).foregroundStyle(theme.secondaryText))\(left)")
+            .font(.bighelp(.caption))
     }
 
     @ViewBuilder
@@ -295,7 +315,7 @@ struct ChatSessionControlsPopover: View {
                         Text(ModelNameCatalogStore.shared.displayName(for: item.modelID))
                             .bighelpFont(.label, weight: .semibold)
                             .lineLimit(2)
-                        Text(item.providerName).bighelpFont(.metadata).foregroundStyle(theme.secondaryText).lineLimit(1)
+                        providerLine(item).lineLimit(2)
                     }
                     Spacer(minLength: BighelpTokens.space8)
                     if selected {

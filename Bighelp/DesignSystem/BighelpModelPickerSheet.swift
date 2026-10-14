@@ -805,6 +805,13 @@ struct BighelpModelPickerSheet: View {
                                     .bighelpFont(.metadata)
                                     .foregroundStyle(theme.secondaryText)
                             }
+                            // "17% left · resets 3:00 PM", when the host reports the plan.
+                            if let plan = group.provider.plan?.summary(now: Date()) {
+                                Text(plan.text)
+                                    .bighelpFont(.metadata)
+                                    .foregroundStyle(plan.isLow ? theme.danger : theme.secondaryText)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
                         }
                         Spacer(minLength: BighelpTokens.space8)
                         Image(systemName: providerIsExpanded(group.provider.id)
@@ -869,6 +876,12 @@ struct BighelpModelPickerSheet: View {
                             .foregroundStyle(theme.secondaryText)
                             .lineLimit(1)
                             .multilineTextAlignment(.leading)
+                        if let limit = provider.plan?.modelLimit(modelID, now: Date()) {
+                            Text(limit)
+                                .bighelpFont(.metadata)
+                                .foregroundStyle(theme.danger)
+                                .lineLimit(1)
+                        }
                     }
                     Spacer(minLength: BighelpTokens.space8)
                     Image(systemName: selected ? "checkmark.circle.fill" : "circle")

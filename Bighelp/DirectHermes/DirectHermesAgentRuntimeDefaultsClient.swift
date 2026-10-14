@@ -67,7 +67,8 @@ final class DirectHermesAgentRuntimeDefaultsClient: AgentRuntimeDefaultsConfirmi
                 models: models.filter { !unavailable.contains($0) },
                 fastModeModels: row["capabilities"]?.object.map { capabilities in
                     Set(models.filter { capabilities[$0]?.object?["fast"]?.boolean == true })
-                }
+                },
+                plan: ModelProviderPlan(row: row)
             ))
         }
         return providers

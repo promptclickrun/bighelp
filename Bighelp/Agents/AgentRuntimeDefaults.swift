@@ -444,7 +444,7 @@ final class FixtureAgentRuntimeDefaultsClient: AgentRuntimeDefaultsClient {
                 isCustom: false,
                 models: ["claude-opus-4.1", "claude-sonnet-4.1"]
             ),
-        ]
+        ].map(DemoProviderPlans.adding)
     }
 
     func loadDefaults(agentID: String) async throws -> AgentRuntimeDefaults {

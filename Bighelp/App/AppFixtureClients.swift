@@ -1,5 +1,29 @@
 import Foundation
 
+/// Made-up plans for the demo's model pickers: one provider nearly through its
+/// plan, one limited for a while, one that reports nothing.
+enum DemoProviderPlans {
+    static func plan(for providerID: String, now: Date = .now) -> ModelProviderPlan? {
+        switch providerID {
+        case "openai":
+            ModelProviderPlan(windows: [
+                .init(usedPercent: 83, resetsAt: now.addingTimeInterval(95 * 60)),
+                .init(usedPercent: 40, resetsAt: now.addingTimeInterval(4 * 24 * 60 * 60)),
+            ])
+        case "anthropic":
+            ModelProviderPlan(isLimited: true, limitResetsAt: now.addingTimeInterval(40 * 60))
+        default:
+            nil
+        }
+    }
+
+    static func adding(to provider: BighelpLinkModelProvider) -> BighelpLinkModelProvider {
+        BighelpLinkModelProvider(id: provider.id, name: provider.name, isCurrent: provider.isCurrent,
+                                 isCustom: provider.isCustom, models: provider.models,
+                                 fastModeModels: provider.fastModeModels, plan: plan(for: provider.id))
+    }
+}
+
 @MainActor
 final class DemoSessionControlMessaging: SessionRuntimeControlConfirming, SessionRuntimeControlSupporting, SessionFastModeControlling {
     private var models: [String: (provider: String, model: String)] = [:]
@@ -44,7 +68,7 @@ final class DemoSessionControlMessaging: SessionRuntimeControlConfirming, Sessio
         switch request.kind {
         case .model:
             let current = models[request.sessionID] ?? ("nous", "Hermes-4-405B")
-            return .model(try JSONDecoder().decode(
+            var picker = try JSONDecoder().decode(
                 BighelpLinkModelPicker.self,
                 from: Data(
                     """
@@ -82,7 +106,9 @@ final class DemoSessionControlMessaging: SessionRuntimeControlConfirming, Sessio
                     }
                     """.utf8
                 )
-            ))
+            )
+            picker.providers = picker.providers.map(DemoProviderPlans.adding)
+            return .model(picker)
         case .reasoning:
             let current = reasoning[request.sessionID] ?? "reset"
             return .choice(try JSONDecoder().decode(

@@ -90,8 +90,19 @@ final class DemoModelsTransport: DirectHermesRPC, DirectHermesAuthenticatedHTTP 
     }
 
     private func provider(_ slug: String, _ name: String, _ models: [String], current: Bool) -> BighelpJSONValue {
-        .object(["slug": .string(slug), "name": .string(name), "models": .array(models.map { .string($0) }),
-                 "is_current": .boolean(current)])
+        var row: [String: BighelpJSONValue] = [
+            "slug": .string(slug), "name": .string(name), "models": .array(models.map { .string($0) }),
+            "is_current": .boolean(current),
+        ]
+        // Made-up plan use, shaped as Hermes reports it.
+        if slug == "openai" {
+            let resets = Date().addingTimeInterval(95 * 60).formatted(.iso8601)
+            row["usage"] = .object(["windows": .array([.object([
+                "label": .string("5-hour"), "used_percent": .number(83), "resets_at": .string(resets),
+                "scope": .string("account"),
+            ])])])
+        }
+        return .object(row)
     }
 }
 

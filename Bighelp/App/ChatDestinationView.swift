@@ -59,6 +59,8 @@ struct ChatDestinationView: View {
     let appearanceAuthority: WorkspaceAuthority?
     let headerActions: ChatHeaderActions
     let onNewChat: () -> Void
+    /// Settings › AI providers (a failed turn's Fix sign-in).
+    let onOpenProviderAccounts: () -> Void
     let onStartSession: () -> Void
     let onNewBotChat: (() -> Void)?
     let onContinueInBranch: ((ChatBranchContinuation) -> Void)?
@@ -133,6 +135,7 @@ struct ChatDestinationView: View {
         sessionOrganizationHostID: String?,
         responseHapticsCoveredByRoot: Bool,
         onNewChat: @escaping () -> Void,
+        onOpenProviderAccounts: @escaping () -> Void,
         onStartSession: @escaping () -> Void,
         onNewBotChat: (() -> Void)? = nil,
         onContinueInBranch: ((ChatBranchContinuation) -> Void)? = nil,
@@ -165,6 +168,7 @@ struct ChatDestinationView: View {
         self.hostFiles = hostFiles
         self.headerActions = ChatHeaderActions(newChat: onNewChat)
         self.onNewChat = onNewChat
+        self.onOpenProviderAccounts = onOpenProviderAccounts
         self.onStartSession = onStartSession
         self.onNewBotChat = onNewBotChat
         self.onContinueInBranch = onContinueInBranch
@@ -330,6 +334,7 @@ struct ChatDestinationView: View {
             onChatFilesTap: { isSessionFilesPresented = true },
             onChatAppearanceTap: sessionAppearance == nil ? nil : { isChatAppearancePresented = true },
             onNewChatTap: onNewChat,
+            onOpenProviderAccounts: model.nativeConversationClient == nil ? nil : onOpenProviderAccounts,
             onNewBotChat: onNewBotChat,
             onContinueInBranch: onContinueInBranch,
             consumesSendOnOpen: consumesSendOnOpen,

@@ -29,7 +29,10 @@ extension ChatView {
         rows += (model.nativeConversationClient?.connectorCards ?? []).map(ChatCanvasRow.connector)
         if showsPendingMessage { rows.append(.pending(model.workingAgentName ?? agentName, model.isBotMode)) }
         if let message = model.failureMessage { rows.append(.failure(message)) }
-        else if !model.retainedUnsentSubmissions.isEmpty {
+        else if !model.isSending, let failedTurn = model.failedTurn,
+                ChatTurnFailurePresentation.kind(of: failedTurn.failure) != nil {
+            rows.append(.turnFailure(failedTurn, model.scheduledRetry))
+        } else if !model.retainedUnsentSubmissions.isEmpty {
             rows.append(.failure("Unsent drafts retained: \(model.retainedUnsentSubmissions.count)"))
         }
         if model.shouldShowNewConversationWelcome { rows.append(.quickActions) }
@@ -202,6 +205,9 @@ extension ChatView {
             }
         case .pending(let name, let isGroup): PendingMessageView(agentName: name, isGroup: isGroup)
         case .failure(let message): failure(message: message)
+        case .turnFailure(let failedTurn, let scheduledRetry):
+            ChatTurnFailureCard(model: model, failedTurn: failedTurn, scheduledRetry: scheduledRetry,
+                                onOpenProviderAccounts: onOpenProviderAccounts, onNewChat: onNewChatTap)
         }
     }
     /// Plain message rows immediately followed by a message from the same sender.

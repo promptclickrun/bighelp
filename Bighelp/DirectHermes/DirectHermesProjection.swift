@@ -231,6 +231,8 @@ struct DirectHermesProjection {
     private(set) var running = false
     private(set) var hasLiveEvents = false
     private(set) var turnID = "initial"
+    /// The turn Hermes last reported failed (a final with `status: "error"`).
+    private(set) var failedTurnID: String?
     private var segment = 0
     private var text = ""
     private var reasoning = ""
@@ -512,6 +514,10 @@ struct DirectHermesProjection {
         var reclaim: DirectHermesSessionReclaim?
         var terminal = false
         var terminalError: String?
+        /// How the turn failed, from Hermes' failed final.
+        var turnFailure: ChatTurnFailure?
+        /// Hermes refused the turn before it started: the failed final is its only event.
+        var failedBeforeStart = false
     }
 
     mutating func seedHistory(_ messages: [BighelpJSONValue]) {
@@ -628,6 +634,25 @@ struct DirectHermesProjection {
             segment += 1
             segmentID = nil
         case "message.complete":
+            let failure = ChatTurnFailure(completePayload: p)
+            if failure != nil, !running {
+                // Hermes refuses some turns before message.start (it couldn't build
+                // the agent). Its failed final is then a turn of its own, and its end;
+                // it must not land in the previous turn's reply.
+                turnID = eventKey
+                text = ""
+                reasoning = ""
+                reasoningSegment = 0
+                reasoningSealed = false
+                segment = 0
+                segmentID = nil
+                change.terminal = true
+                change.failedBeforeStart = true
+            }
+            if let failure {
+                failedTurnID = turnID
+                change.turnFailure = failure
+            }
             change.activities += finishReasoning()
             let final = p["text"]?.string ?? text
             if !final.isEmpty { change.items = [publishText(final, eventKey: eventKey, complete: true)] }

@@ -25,6 +25,8 @@ enum ChatCanvasRow: Identifiable, Equatable {
     case connector(ConnectorCardStore.Card)
     case pending(String, Bool)
     case failure(String)
+    /// A turn Hermes reported failed, with its fixes and any timed retry.
+    case turnFailure(ChatModel.FailedTurn, ChatScheduledRetry?)
 
     var id: String {
         switch self {
@@ -49,6 +51,7 @@ enum ChatCanvasRow: Identifiable, Equatable {
         case .connector(let card): "chat.connector.\(card.id)"
         case .pending: "chat-pending"
         case .failure: "chat.failure"
+        case .turnFailure: "chat.turn-failure"
         }
     }
 
@@ -73,6 +76,7 @@ enum ChatCanvasRow: Identifiable, Equatable {
         case (.directClarification(let a), .directClarification(let b)): a == b
         case (.connector(let a), .connector(let b)): a == b
         case (.pending(let a, let b), .pending(let c, let d)): a == c && b == d
+        case (.turnFailure(let a, let b), .turnFailure(let c, let d)): a == c && b == d
         case (.welcome, .welcome), (.quickActions, .quickActions), (.bottom, .bottom), (.botRetry, .botRetry): true
         default: false
         }

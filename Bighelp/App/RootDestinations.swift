@@ -165,6 +165,7 @@ extension RootShellView {
                     || isHostStatusPresented
                     || isHermesWorkspacePresented || actionErrorMessage != nil,
                 onNewChat: { startNewChat(explicitAgentID: nil) },
+                onOpenProviderAccounts: { openWorkspaceDestination(.keys) },
                 onStartSession: {
                     startNewChat(explicitAgentID: model.memberIDs.first)
                 },

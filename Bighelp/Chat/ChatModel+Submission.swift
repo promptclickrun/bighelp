@@ -156,6 +156,8 @@ extension ChatModel {
         hasLocallyPendingPrimaryTurn = true
         failureMessage = nil
         retryRequest = nil
+        // Sending something else replaces the failed turn and its timed retry.
+        clearFailedTurn()
         let isBotModeConversation = if let roomID = botModeRoomID, let botModeRoomStore {
             botModeRoomStore.room(id: roomID) != nil
         } else {
@@ -511,6 +513,7 @@ extension ChatModel {
         let generation = beginOwnerGeneration()
         failureMessage = nil
         retryRequest = nil
+        clearFailedTurn()
         let human = humanItem(content: action.intent)
         appendItem(human)
         appendProjectedMessage(human)
@@ -638,6 +641,8 @@ extension ChatModel {
         ownerGeneration: Int
     ) async throws -> ConversationResponse {
         try validateAttachmentSupport(attachments)
+        // A command's failure isn't sent again as text.
+        lastSubmittedMessage = slashSelection == nil && !message.hasPrefix("/") ? (message, attachments) : nil
         if attachments.isEmpty, let slashSelection, let native = nativeConversationClient {
             return try await native.sendCommand(message: message, selection: slashSelection,
                 conversationID: conversationID, onDraft: { [weak self] item in

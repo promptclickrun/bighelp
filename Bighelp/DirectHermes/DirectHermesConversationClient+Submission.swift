@@ -445,7 +445,10 @@ extension DirectHermesConversationClient {
 
     func completeSubmissionIfReady() {
         guard admitted, terminalSeen, let id = pendingID else { return }
-        if !pendingTurnFailed && !admissionOverlapped {
+        // A turn Hermes reported failed (its failed final) leaves nothing uncertain:
+        // the message reached the host, and the chat offers to send it again.
+        let reportedFailure = pendingTurnID != nil && projection.failedTurnID == pendingTurnID
+        if !admissionOverlapped, !pendingTurnFailed || reportedFailure {
             retireSubmission(id)
         } else { needsRecovery = true }
         let continuation = waiter

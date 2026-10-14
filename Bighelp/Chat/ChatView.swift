@@ -142,6 +142,8 @@ struct ChatView: View {
     let onChatFilesTap: (() -> Void)?
     let onChatAppearanceTap: (() -> Void)?
     let onNewChatTap: () -> Void
+    /// Settings › AI providers, for a failed turn's Fix sign-in. Nil leaves the button out.
+    let onOpenProviderAccounts: (() -> Void)?
     /// Set when this chat is its agent's Bot Chat: starts a new one (This chat › New Bot Chat).
     let onNewBotChat: (() -> Void)?
     /// Hermes refused a message because another Hermes process holds this chat: go on in a branch.
@@ -219,6 +221,7 @@ struct ChatView: View {
         onChatFilesTap: (() -> Void)? = nil,
         onChatAppearanceTap: (() -> Void)? = nil,
         onNewChatTap: @escaping () -> Void = {},
+        onOpenProviderAccounts: (() -> Void)? = nil,
         onNewBotChat: (() -> Void)? = nil,
         onContinueInBranch: ((ChatBranchContinuation) -> Void)? = nil,
         consumesSendOnOpen: ((String) -> Bool)? = nil,
@@ -261,6 +264,7 @@ struct ChatView: View {
         self.onChatFilesTap = onChatFilesTap
         self.onChatAppearanceTap = onChatAppearanceTap
         self.onNewChatTap = onNewChatTap
+        self.onOpenProviderAccounts = onOpenProviderAccounts
         self.onNewBotChat = onNewBotChat
         self.onContinueInBranch = onContinueInBranch
         self.consumesSendOnOpen = consumesSendOnOpen
@@ -300,6 +304,7 @@ struct ChatView: View {
         .environment(\.bighelpUIV3Enabled, true)
         .environment(\.bighelpUIV2Enabled, true)
         .environment(\.chatActivityDisclosureStore, model.activityDisclosures)
+        .modifier(ChatScheduledRetryLifecycle(model: model))
         .onAppear {
             isChatVisible = true
             BighelpVisibleChats.shared.appeared(model)

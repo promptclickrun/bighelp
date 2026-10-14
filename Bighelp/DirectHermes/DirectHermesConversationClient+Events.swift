@@ -155,6 +155,9 @@ extension DirectHermesConversationClient {
         if event.type.hasPrefix("subagent.") {
             model?.acceptSubagentEvent(type: event.type, payload: event.payload, from: self)
         }
+        // A turn Hermes refused before it started ends the send that asked for it.
+        if change.failedBeforeStart, pendingID != nil, submissionTurns.isEmpty { submissionTurns.append(projection.turnID) }
+        if let failure = change.turnFailure { model?.acceptNativeTurnFailure(failure, from: self) }
         if change.terminal {
             latestSpinnerActivity = nil
             if let observedDurationItem {

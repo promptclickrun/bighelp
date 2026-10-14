@@ -365,6 +365,15 @@ struct BighelpApp: App {
         #endif
     }
 
+    private var turnFailureFixtureEnabled: Bool {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains("-use-demo-fixtures")
+            && ProcessInfo.processInfo.arguments.contains(ChatTurnFailureFixtureView.launchArgument)
+        #else
+        false
+        #endif
+    }
+
     private var nativeClarificationFixtureEnabled: Bool {
         #if DEBUG
         ProcessInfo.processInfo.arguments.contains("-use-demo-fixtures")
@@ -456,6 +465,10 @@ struct BighelpApp: App {
                 } else if subagentCanvasFixtureEnabled {
                     #if DEBUG
                     SubagentCanvasFixtureView()
+                    #endif
+                } else if turnFailureFixtureEnabled {
+                    #if DEBUG
+                    ChatTurnFailureFixtureView()
                     #endif
                 } else if let cardCatalogFixtureURL {
                     BighelpCardCatalogView.fixture(

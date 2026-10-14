@@ -113,6 +113,7 @@ final class ChatModel {
                 hasLocallyPendingPrimaryTurn = false
                 hasExternallyOwnedPrimaryTurn = false
                 hasRestoredPrimaryTurn = false
+                lastSubmittedMessage = nil
                 if oldValue {
                     lastTurnEndedAt = Date()
                     flushPersistence()
@@ -123,6 +124,14 @@ final class ChatModel {
     var isStopping = false
     var pendingMidSessionSubmissions: [PendingMidSessionSubmission] = []
     var failureMessage: String?
+    /// The last turn Hermes reported failed, with its fixes, until another turn starts.
+    var failedTurn: FailedTurn?
+    /// "Try again at 3:00 PM", kept only while this chat is open.
+    var scheduledRetry: ChatScheduledRetry?
+    @ObservationIgnored var scheduledRetryTask: Task<Void, Never>?
+    @ObservationIgnored var retryScheduling = ChatRetryScheduling()
+    /// What this chat's own send handed Hermes, so a failed turn can send it again.
+    @ObservationIgnored var lastSubmittedMessage: (text: String, attachments: [ChatAttachment])?
     /// A message Hermes refused because another Hermes process holds this chat: it goes on
     /// in a branch with the same history, where the message is sent (`continueInBranch`).
     var branchContinuation: ChatBranchContinuation?
@@ -659,6 +668,7 @@ final class ChatModel {
             isSending = true
             failureMessage = nil
             retryRequest = nil
+            clearFailedTurn()
         } else {
             // A finished turn normally matches the adopted ID. If the IDs drift
             // (replayed message.start, reconnect), an authoritative idle owner with

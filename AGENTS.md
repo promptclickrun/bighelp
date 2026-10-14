@@ -79,6 +79,8 @@ change in both repos.
 | `Bighelp/Agents/`, `Board/`, `Companion/` | Agents, Feed/Ideas/Goals, the avatar kit renderer |
 | `Bighelp/Kanban/` | Kanban on Hermes' Kanban plugin: board model, lanes, cards, Vision Pro window and pinch-drag |
 | `Bighelp/Code/` | Bighelp IDE (Settings › Bighelp IDE): its home (`CodeHomeView`), the message box's chips (project, new worktree or local, branch), `CodeLauncher`, Changes and Ship |
+| `Bighelp/Connectors/` | Hermes' connectors: the inline connect cards in chat (`connection.request`, `ConnectorCardStore`) and Settings › Apps (`ConnectorAppsModel`) |
+| `Bighelp/BotScreen/` | Bot Screen: an agent's Linux screen (Hermes `display.*`) in its profile's Screen tab, a native RFB client (`RFB/`) and the full-screen viewer with take control and hand back |
 | `Bighelp/Usage/` | The Usage page (☰ › Usage): plans and limits (`ProviderUsageStore`), Hermes' own analytics per agent and computer (`UsageStore`, `HostUsageLoader`), charts |
 | `Bighelp/Voice/` | Turn-based and live voice |
 | `Bighelp/Spatial/` | Vision Pro: the agent in the room (`SpatialAvatarModel`, its volume and voice panel, its Settings section) |

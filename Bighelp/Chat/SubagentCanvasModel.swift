@@ -63,6 +63,9 @@ struct SubagentCanvasState: Identifiable, Equatable, Sendable {
     private(set) var history: SubagentCanvasHistory?
     /// The saved record was read after the helper finished, so it's complete.
     private(set) var historyIsFinal = false
+    /// Hermes takes a message for it now (`subagent.list`'s `accepting_steer`);
+    /// nil until the chat asks.
+    var acceptsSteering: Bool?
     /// When the ledger first heard of this helper; orders the list.
     let arrival: Int
     private var stepArrivals = 0
@@ -400,6 +403,16 @@ struct SubagentCanvasLedger: Equatable, Sendable {
         }
         states[id] = state
         return true
+    }
+
+    /// The live roster's answer to "who takes a message now": a helper it
+    /// leaves out doesn't.
+    mutating func adoptSteering(_ steering: [String: Bool]) {
+        for id in states.keys { states[id]?.acceptsSteering = steering[id] ?? false }
+    }
+
+    mutating func setAcceptsSteering(_ value: Bool, for id: String) {
+        states[id]?.acceptsSteering = value
     }
 
     mutating func removeAll() {

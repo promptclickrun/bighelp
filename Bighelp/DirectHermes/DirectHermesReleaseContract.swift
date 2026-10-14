@@ -31,7 +31,7 @@ enum DirectHermesReleaseContract {
     static let nonSubmissionSessionOperations: Set<WorkspaceCapability> = [
         .canonicalAgentChat, .sessionsCreate, .sessionsEdit, .chatStop,
         .chatSteer, .approvalsRead, .approvalsRespond,
-        .clarificationRespond, .subagentsRead, .subagentTail, .attachmentsUpload,
+        .clarificationRespond, .subagentsRead, .subagentTail, .subagentStop, .subagentSteer, .attachmentsUpload,
         .sessionModelEdit, .reasoningEdit, .sessionsFork,
     ]
 

@@ -277,6 +277,11 @@ extension NativeWorkspaceSessionBridge {
             )
         }
         adapter.speakerNote = speakerNote
+        let profileID = resolved.coordinate.profileID
+        adapter.supportsCapability = { [weak self] capability in
+            guard let self, !self.retired else { return false }
+            return self.connections.capabilities.supports(capability, owner: owner, profileID: profileID)
+        }
         adapter.onSessionContextChange = { [weak self] snapshot in
             guard let self, !self.retired,
                   self.connections.owner == owner,

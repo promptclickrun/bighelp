@@ -77,6 +77,55 @@ final class SubagentCanvasUITests: BighelpUITestCase {
     }
 
     @MainActor
+    func testSteeringAndStoppingAHelperWhileItWorks() throws {
+        try steerAndStop(appearance: "light")
+    }
+
+    @MainActor
+    func testSteeringAndStoppingAHelperInDarkMode() throws {
+        try steerAndStop(appearance: "dark")
+    }
+
+    /// The trains helper keeps working in the demo: send it a message, then stop it.
+    @MainActor
+    private func steerAndStop(appearance: String) throws {
+        continueAfterFailure = false
+        let app = makeApp()
+        app.launchArguments += ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
+                                "-test-subagent-canvas", "-loopdy.demo.appearance", appearance]
+        app.launch()
+        let rail = app.buttons["chat.session-status.subagents"]
+        XCTAssertTrue(rail.waitForExistence(timeout: 20))
+        rail.tap()
+        let trains = app.buttons["subagent.native.roster.sa-trains"]
+        XCTAssertTrue(trains.waitForExistence(timeout: 5))
+        trains.tap()
+
+        let field = app.textFields["subagent.canvas.steer.field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 10), "A helper that takes messages offers the message box.")
+        let stop = app.buttons["subagent.canvas.stop"]
+        XCTAssertTrue(stop.exists, "A running helper can be stopped.")
+        capture(app, "\(appearance)-6-controls")
+
+        field.tap()
+        field.typeText("Prefer the JR line over the tram.")
+        app.buttons["subagent.canvas.steer.send"].tap()
+        let result = app.staticTexts["subagent.canvas.control-result"]
+        XCTAssertTrue(result.waitForExistence(timeout: 5))
+        XCTAssertEqual(result.label, "Sent. It reads your message before its next step.")
+        XCTAssertTrue(["", "Tell it something"].contains(field.value as? String ?? ""), "A sent message leaves the box.")
+        capture(app, "\(appearance)-7-steered")
+
+        stop.tap()
+        let status = app.staticTexts["subagent.canvas.status"]
+        let stopped = NSPredicate(format: "label == %@", "Stopped")
+        expectation(for: stopped, evaluatedWith: status)
+        waitForExpectations(timeout: 10)
+        XCTAssertFalse(app.buttons["subagent.canvas.stop"].exists, "A stopped helper has no controls.")
+        capture(app, "\(appearance)-8-stopped")
+    }
+
+    @MainActor
     private func element(_ app: XCUIApplication, labelContaining text: String) -> XCUIElement {
         app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch
     }

@@ -9,6 +9,11 @@ struct SubagentCanvasView: View {
 
     @State private var recordNote: String?
     @State private var showsWholeTask = false
+    @State private var steerText = ""
+    @State private var controlOutcome: ChatModel.SubagentControlOutcome?
+    @State private var isSendingControl = false
+    /// The Stop or Steer in flight; leaving the page drops its answer.
+    @State private var controlTask: Task<Void, Never>?
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var state: SubagentCanvasState? { model.subagentCanvases[subagentID] }
@@ -18,6 +23,7 @@ struct SubagentCanvasView: View {
             VStack(alignment: .leading, spacing: BighelpTokens.space16) {
                 if let state {
                     header(state)
+                    if showsControls(state) { controls(state) }
                     steps(state)
                     if state.isFinished { result(state) }
                 } else {
@@ -45,6 +51,8 @@ struct SubagentCanvasView: View {
         .navigationTitle("Subagent")
         .navigationBarTitleDisplayMode(.inline)
         .task(id: refreshKey) { await keepRecordFresh() }
+        .task(id: steeringKey) { await keepSteeringFresh() }
+        .onDisappear { controlTask?.cancel() }
     }
 
     // MARK: Header
@@ -93,6 +101,118 @@ struct SubagentCanvasView: View {
         .bighelpSurface(.card)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("subagent.canvas.header")
+    }
+
+    // MARK: Stop and Steer
+
+    private func isRunning(_ state: SubagentCanvasState) -> Bool {
+        state.phase == .working || state.phase == .waiting
+    }
+
+    private func showsControls(_ state: SubagentCanvasState) -> Bool {
+        isRunning(state) && (model.canStopSubagents || canSteer(state))
+    }
+
+    private func canSteer(_ state: SubagentCanvasState) -> Bool {
+        model.canSteerSubagents && state.acceptsSteering == true
+    }
+
+    /// A message box (only while Hermes says it takes messages) and Stop.
+    private func controls(_ state: SubagentCanvasState) -> some View {
+        VStack(alignment: .leading, spacing: BighelpTokens.space12) {
+            if canSteer(state) {
+                HStack(alignment: .center, spacing: BighelpTokens.space8) {
+                    TextField("Tell it something", text: $steerText,
+                              prompt: Text("Tell it something").bighelpFieldHint(theme))
+                        .font(.bighelp(.body))
+                        .submitLabel(.send)
+                        .onSubmit(steer)
+                        .disabled(isSendingControl)
+                        .padding(.horizontal, BighelpTokens.space12)
+                        .frame(minHeight: BighelpTokens.hitTarget)
+                        .background(theme.raisedSurface, in: .rect(cornerRadius: BighelpTokens.radius12))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: BighelpTokens.radius12)
+                                .stroke(theme.border, lineWidth: BighelpTokens.hairline)
+                        }
+                        .accessibilityIdentifier("subagent.canvas.steer.field")
+                    Button(action: steer) {
+                        Image(systemName: "arrow.up")
+                            .font(.system(size: 17, weight: .bold))
+                            .foregroundStyle(theme.actionForeground)
+                            .frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
+                            .background(theme.action, in: .circle)
+                            .contentShape(.circle)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isSendingControl || steerText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .opacity(steerText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.45 : 1)
+                    .accessibilityLabel("Send to this helper")
+                    .accessibilityIdentifier("subagent.canvas.steer.send")
+                }
+            }
+            if model.canStopSubagents {
+                Button(role: .destructive, action: stop) {
+                    Label("Stop this helper", systemImage: "stop.circle")
+                }
+                .buttonStyle(BighelpV2ButtonStyle(emphasis: .secondary))
+                .disabled(isSendingControl || controlOutcome == .stopping)
+                .accessibilityIdentifier("subagent.canvas.stop")
+            }
+            if let controlOutcome {
+                Text(controlOutcome.message)
+                    .font(.bighelp(.subheadline))
+                    .foregroundStyle(controlOutcome.isProblem ? theme.danger : theme.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("subagent.canvas.control-result")
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(BighelpTokens.space16)
+        .bighelpSurface(.card)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("subagent.canvas.controls")
+    }
+
+    private func steer() {
+        let text = steerText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, !isSendingControl else { return }
+        isSendingControl = true
+        controlTask = Task {
+            let outcome = await model.steerSubagent(id: subagentID, text: text)
+            guard !Task.isCancelled else { return }
+            isSendingControl = false
+            controlOutcome = outcome
+            // Kept to edit or send again when it didn't go through.
+            if outcome == .steerQueued, steerText.trimmingCharacters(in: .whitespacesAndNewlines) == text {
+                steerText = ""
+            }
+        }
+    }
+
+    private func stop() {
+        guard !isSendingControl else { return }
+        isSendingControl = true
+        controlTask = Task {
+            let outcome = await model.stopSubagent(id: subagentID)
+            guard !Task.isCancelled else { return }
+            controlOutcome = outcome
+            isSendingControl = false
+        }
+    }
+
+    /// While it works and this page is open, ask every few seconds whether it
+    /// takes messages; Hermes stops taking them near the end.
+    private var steeringKey: String {
+        "\(subagentID):\(state.map(isRunning) ?? false):\(model.canSteerSubagents)"
+    }
+
+    private func keepSteeringFresh() async {
+        guard let state, isRunning(state), model.canSteerSubagents else { return }
+        while !Task.isCancelled {
+            await model.refreshSubagentSteering()
+            try? await Task.sleep(for: .seconds(4))
+        }
     }
 
     // MARK: Steps

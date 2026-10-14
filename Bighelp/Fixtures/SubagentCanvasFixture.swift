@@ -61,7 +61,15 @@ private final class SubagentCanvasFixture {
         )
         let model = ChatModel(conversationID: client.conversationID, client: client, initialItems: [])
         client.model = model
+        // A host that lets a chat stop and steer its helpers.
+        client.supportsCapability = { $0 == .subagentStop || $0 == .subagentSteer }
         chat = DirectHermesChat(id: client.conversationID, client: client, model: model)
+        rpc.onInterrupt = { [weak self] id in
+            guard let self, let helper = Helper.allCases.first(where: { $0.id == id }) else { return }
+            self.emit("subagent.complete", helper.identity.merging([
+                "status": .string("interrupted"), "summary": .string("Stopped before it finished."),
+            ]) { $1 })
+        }
     }
 
     func start() {
@@ -92,6 +100,7 @@ private final class SubagentCanvasFixture {
                 { $0.emit("subagent.tool", Helper.ryokan.tool(3, "write_file", "notes/ryokan-pick.md"))
                   $0.rpc.savedSteps[Helper.ryokan.child] = 3 },
                 { $0.rpc.savedSteps[Helper.ryokan.child] = 4
+                  $0.rpc.ended.insert(Helper.ryokan.id)
                   $0.emit("subagent.complete", Helper.ryokan.identity.merging([
                       "tool_count": .integer(3), "status": .string("completed"),
                       "summary": .string(SubagentCanvasFixtureRPC.ryokanReply),
@@ -160,6 +169,11 @@ private final class SubagentCanvasFixtureRPC: DirectHermesRPC, DirectHermesAuthe
     /// How many of each helper's steps it has saved so far.
     var savedSteps: [String: Int] = [:]
     private(set) var didReadRyokanRecord = false
+    /// Helpers that finished or were stopped; Hermes no longer lists them.
+    var ended: Set<String> = []
+    /// What the person told each helper.
+    private(set) var steered: [String: [String]] = [:]
+    var onInterrupt: ((String) -> Void)?
 
     func request(_ method: String, params: [String: BighelpJSONValue]) async throws -> BighelpJSONValue {
         guard params["session_id"]?.string == "fixture-runtime" else { throw DirectHermesError.identityChanged }
@@ -181,7 +195,29 @@ private final class SubagentCanvasFixtureRPC: DirectHermesRPC, DirectHermesAuthe
             return .object(["control": .object(["goal": .null, "loop": .null, "heartbeat": .null,
                                                 "revision": .string("fixture"), "updated_at": .integer(0)])])
         case "subagent.list":
-            return .object(["subagents": .array([])])
+            let live = SubagentCanvasFixture.Helper.allCases.filter { !ended.contains($0.id) }
+            return .object(["subagents": .array(live.map { helper in
+                .object(["subagent_id": .string(helper.id), "goal": .string(helper.goal), "status": .string("running"),
+                         "model": .string("demo-model"), "accepting_steer": .boolean(true)])
+            })])
+        case "subagent.steer":
+            guard let id = params["subagent_id"]?.string, let text = params["text"]?.string else {
+                throw DirectHermesError.invalidResponse
+            }
+            guard !ended.contains(id) else { return .object(["status": .string("rejected"), "subagent_id": .string(id)]) }
+            steered[id, default: []].append(text)
+            return .object(["status": .string("queued"), "subagent_id": .string(id), "text": .string(text)])
+        case "subagent.interrupt":
+            guard let id = params["subagent_id"]?.string else { throw DirectHermesError.invalidResponse }
+            let found = !ended.contains(id)
+            if found {
+                ended.insert(id)
+                Task { [weak self] in
+                    try? await Task.sleep(for: .milliseconds(400))
+                    self?.onInterrupt?(id)
+                }
+            }
+            return .object(["found": .boolean(found), "subagent_id": .string(id)])
         default:
             throw DirectHermesError.invalidResponse
         }

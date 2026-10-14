@@ -35,3 +35,92 @@ extension ChatModel {
         }
     }
 }
+
+/// Stop and Steer for a running helper, over this chat's own connection.
+extension ChatModel {
+    /// What came of a Stop or a Steer, in the person's words.
+    enum SubagentControlOutcome: Equatable, Sendable {
+        case steerQueued
+        case steerRejected
+        case stopping
+        /// Hermes has no such helper running for this chat: it already ended.
+        case alreadyEnded
+        /// This chat's connection isn't the one the helper answers to (it reconnected).
+        case unreachable
+        case unsupported
+        case failed
+
+        var message: String {
+            switch self {
+            case .steerQueued: "Sent. It reads your message before its next step."
+            case .steerRejected: "It isn't taking messages right now."
+            case .stopping: "Stopping…"
+            case .alreadyEnded: "It had already finished."
+            case .unreachable: "This chat can't reach that helper anymore."
+            case .unsupported: "Hermes on this computer can't do that."
+            case .failed: "Couldn't reach it. Try again."
+            }
+        }
+
+        var isProblem: Bool {
+            switch self {
+            case .steerQueued, .stopping: false
+            default: true
+            }
+        }
+    }
+
+    static let maximumSteerLength = 4_000
+
+    var canStopSubagents: Bool { supportsSubagentControl(.subagentStop) }
+    var canSteerSubagents: Bool { supportsSubagentControl(.subagentSteer) }
+
+    private func supportsSubagentControl(_ capability: WorkspaceCapability) -> Bool {
+        guard !referenceOwnerRetired, !isBotMode, let native = nativeConversationClient else { return false }
+        return native.supportsCapability?(capability) ?? false
+    }
+
+    /// Asks Hermes which helpers take a message now. A failed read keeps what
+    /// the chat knew.
+    func refreshSubagentSteering() async {
+        guard canSteerSubagents, let native = nativeConversationClient else { return }
+        guard let steering = try? await native.subagentSteering(),
+              !referenceOwnerRetired, nativeConversationClient === native else { return }
+        subagentCanvases.adoptSteering(steering)
+    }
+
+    func steerSubagent(id: String, text: String) async -> SubagentControlOutcome {
+        let message = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !message.isEmpty, message.count <= Self.maximumSteerLength else { return .failed }
+        guard canSteerSubagents, let native = nativeConversationClient else { return .unsupported }
+        do {
+            let queued = try await native.steerSubagent(id: id, text: message)
+            guard nativeConversationClient === native else { return .unreachable }
+            // A refused message means it stopped taking them.
+            if !queued { subagentCanvases.setAcceptsSteering(false, for: id) }
+            return queued ? .steerQueued : .steerRejected
+        } catch {
+            return Self.subagentControlOutcome(for: error)
+        }
+    }
+
+    func stopSubagent(id: String) async -> SubagentControlOutcome {
+        guard canStopSubagents, let native = nativeConversationClient else { return .unsupported }
+        do {
+            let found = try await native.interruptSubagent(id: id)
+            guard nativeConversationClient === native else { return .unreachable }
+            return found ? .stopping : .alreadyEnded
+        } catch {
+            return Self.subagentControlOutcome(for: error)
+        }
+    }
+
+    static func subagentControlOutcome(for error: any Error) -> SubagentControlOutcome {
+        guard case .rpcRejected(let code, _)? = error as? DirectHermesError else { return .failed }
+        switch code {
+        case -32601: return .unsupported
+        case 4001: return .unreachable
+        default: return .failed
+        }
+    }
+}

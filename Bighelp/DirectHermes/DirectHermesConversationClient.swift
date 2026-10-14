@@ -144,6 +144,9 @@ final class DirectHermesConversationClient: StreamingConversationClient, Stoppab
     @ObservationIgnored let attachmentResolver: (any AgentAttachmentResolving)?
     /// Says who is sending before each new turn (hosts several people share).
     @ObservationIgnored var speakerNote: (any ChatSpeakerNoting)?
+    /// What the host supports for this chat's profile (helper Stop and Steer).
+    /// Set by the workspace bridge for each connection; nil supports nothing.
+    @ObservationIgnored var supportsCapability: (@MainActor (WorkspaceCapability) -> Bool)?
     @ObservationIgnored var attachmentTasks: [String: Task<Void, Never>] = [:]
     @ObservationIgnored var attachmentAttempts: [String: String] = [:]
     /// Waits before asking again for a finished message's files. A first read

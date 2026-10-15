@@ -14,9 +14,9 @@ struct ChatActivityPresentationTests {
     }
 
     private func thought(_ id: String, lifecycle: ChatActivityLifecycle = .succeeded, ms: Int? = 2_000,
-                         turn: String = "turn", order: Int? = nil) -> ChatActivityEvent {
+                         turn: String = "turn", order: Int? = nil, detail: String? = nil) -> ChatActivityEvent {
         ChatActivityEvent(eventID: id, sessionID: "session", turnID: turn, kind: .reasoning, lifecycle: lifecycle,
-                          title: "Reasoning", summary: nil, detail: "Thinking about \(id)", occurredAt: 1,
+                          title: "Reasoning", summary: nil, detail: detail ?? "Thinking about \(id)", occurredAt: 1,
                           durationMilliseconds: ms, sourceOrder: order)
     }
 
@@ -99,6 +99,20 @@ struct ChatActivityPresentationTests {
                 == "Thought for 1m 35s")
         #expect(ChatActivityPresentation.thinkingNote(for: [thought("a"), thought("b")])
                 == "Thinking about a\n\nThinking about b")
+    }
+
+    @Test func aThoughtIsNamedByItsNewestHeading() {
+        let reading = thought("a", detail: "**Loading Skills and Reading PDF**\n\nI'm loading the skills.")
+        #expect(ChatActivityPresentation.thinkingTitle(for: [reading]) == "Loading Skills and Reading PDF")
+        // Back-to-back thoughts with several headings: the newest says what it's doing now.
+        let drafting = thought("b", lifecycle: .running,
+                               detail: "**Reviewing the PDF**\n\nFirst.\n\n**Drafting the `index.html`**\n\nNext.")
+        #expect(ChatActivityPresentation.thinkingTitle(for: [reading, drafting]) == "Drafting the index.html")
+        // A heading still streaming in, or bold inside a sentence, isn't one.
+        #expect(ChatActivityPresentation.thinkingTitle(for: [thought("c", lifecycle: .running, detail: "**Checking the te")]) == nil)
+        #expect(ChatActivityPresentation.thinkingTitle(for: [thought("d", detail: "This is **really** odd.")]) == nil)
+        // A thought that failed or was stopped keeps saying so.
+        #expect(ChatActivityPresentation.thinkingTitle(for: [thought("e", lifecycle: .failed, detail: "**Reading**")]) == nil)
     }
 
     @Test func theWatchHearsTheNewestRunningWorkInPlainWords() {

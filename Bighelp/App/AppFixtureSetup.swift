@@ -127,21 +127,35 @@ enum AppFixtureSetup {
                 conversationID: "demo-finance", profile: "finance", storedID: "thinking-fixture", epoch: "thinking-ui"
             )
             projection.reserveOrder(1)
-            _ = projection.accept(.init(type: "message.start", sessionID: "thinking-fixture", payload: [:], sequence: 1))
-            _ = projection.accept(.init(type: "reasoning.delta", sessionID: "thinking-fixture",
-                                        payload: ["text": .string("Visible ")], sequence: 2))
-            _ = projection.accept(.init(type: "reasoning.delta", sessionID: "thinking-fixture",
-                                        payload: ["text": .string("reasoning token")], sequence: 3))
-            _ = projection.accept(.init(type: "tool.start", sessionID: "thinking-fixture",
-                                        payload: ["tool_id": .string("tool-1"), "name": .string("read_file")], sequence: 4))
+            // Thoughts with the headings models give them; -test-reasoning-completed adds the answer.
+            let completed = arguments.contains("-test-reasoning-completed")
+            var events: [(String, [String: BighelpJSONValue])] = [
+                ("message.start", [:]),
+                ("reasoning.delta", ["text": .string("**Reading the budget sheet**\n\nOpening the sheet to see this month's numbers.")]),
+                ("tool.start", ["tool_id": .string("tool-1"), "name": .string("read_file")]),
+                ("tool.complete", ["tool_id": .string("tool-1"), "name": .string("read_file")]),
+                ("reasoning.delta", ["text": .string("**Checking the savings goal**\n\nComparing what's left with the goal.")]),
+            ]
+            if completed {
+                events += [
+                    ("tool.start", ["tool_id": .string("tool-2"), "name": .string("execute_code")]),
+                    ("tool.complete", ["tool_id": .string("tool-2"), "name": .string("execute_code")]),
+                    ("message.delta", ["text": .string("You're on track: 420 left after bills, 300 of it can go to savings.")]),
+                    ("message.complete", [:]),
+                ]
+            }
+            for (sequence, event) in events.enumerated() {
+                _ = projection.accept(.init(type: event.0, sessionID: "thinking-fixture", payload: event.1,
+                                            sequence: sequence + 1))
+            }
             initialSessions[index] = SessionRecord(
                 id: "demo-finance", kind: .direct, agentIDs: ["finance"], title: "Thinking preview",
                 items: [TimelineItem(id: "thinking-question", role: .human,
-                    sender: .user(snapshot: .init(name: "You")), content: .message("Review the source"),
-                    metadata: .init(sourceOrder: 1))],
+                    sender: .user(snapshot: .init(name: "You")), content: .message("How is my budget this month?"),
+                    metadata: .init(sourceOrder: 1))] + projection.items,
                 activityEvents: projection.activities,
                 activityVisibility: .init(showReasoning: true, showToolCalls: true),
-                isActive: true, hasAcceptedMessage: true
+                isActive: !completed, hasAcceptedMessage: true
             )
         }
         #endif

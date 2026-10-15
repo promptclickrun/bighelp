@@ -206,6 +206,8 @@ enum BighelpActivitySummary {
 /// moves the conversation.
 struct BighelpActivityRow: View {
     let phase: BighelpActivityPhase
+    /// Words in place of the phase's own, like a thought's heading ("Reading the PDF").
+    var title: String?
     var steps: [BighelpActivityStep] = []
     /// The real number of steps when not all of them are passed in.
     var stepCount: Int?
@@ -225,11 +227,12 @@ struct BighelpActivityRow: View {
     private let expansion: Binding<Bool>?
     @State private var localExpanded: Bool
 
-    init(phase: BighelpActivityPhase, steps: [BighelpActivityStep] = [], stepCount: Int? = nil,
-         note: String? = nil, detailsBelow: Bool = false, isExpanded: Binding<Bool>,
+    init(phase: BighelpActivityPhase, title: String? = nil, steps: [BighelpActivityStep] = [],
+         stepCount: Int? = nil, note: String? = nil, detailsBelow: Bool = false, isExpanded: Binding<Bool>,
          onDisclosureChange: @escaping () -> Void = {}, accessibilityIdentifier: String? = nil,
          loaderID: String? = nil, loaderMotion: BighelpNoodleMotion? = nil) {
         self.phase = phase
+        self.title = title
         self.steps = steps
         self.stepCount = stepCount
         self.note = note
@@ -268,7 +271,7 @@ struct BighelpActivityRow: View {
     private var isExpanded: Bool { expansion?.wrappedValue ?? localExpanded }
     private var hasDetails: Bool { detailsBelow || !steps.isEmpty || note?.isEmpty == false }
     private var count: Int { max(stepCount ?? 0, steps.count) }
-    private var label: String { BighelpActivitySummary.label(for: phase) }
+    private var label: String { title ?? BighelpActivitySummary.label(for: phase) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {

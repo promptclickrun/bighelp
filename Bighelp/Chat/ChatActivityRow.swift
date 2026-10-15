@@ -181,7 +181,8 @@ struct ChatActivityRow: View {
     @BighelpThemeReader private var theme: BighelpTheme
 }
 
-/// Back-to-back thinking as one row: "Thinking" while it runs, then "Thought
+/// Back-to-back thinking as one row, named by the model's newest heading
+/// ("Reading the PDF"); without one, "Thinking" while it runs, then "Thought
 /// for 6s". The agent's thinking text unfolds under it; it's open while the
 /// agent thinks unless the reader chose otherwise.
 struct ChatThinkingRow: View {
@@ -198,6 +199,7 @@ struct ChatThinkingRow: View {
     var body: some View {
         BighelpActivityRow(
             phase: ChatActivityPresentation.thinkingPhase(for: events),
+            title: ChatActivityPresentation.thinkingTitle(for: events),
             note: ChatActivityPresentation.thinkingNote(for: events),
             isExpanded: Binding(get: { isExpanded }, set: { expanded in
                 if let disclosures { disclosures.setExpanded(expanded, reasoning: events) }

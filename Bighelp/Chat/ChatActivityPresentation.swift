@@ -108,6 +108,32 @@ enum ChatActivityPresentation {
         return lines.isEmpty ? nil : lines.joined(separator: "\n\n")
     }
 
+    /// The newest heading the model gave its thinking (`**Reading the PDF**` on a line of its
+    /// own), so the folder says what the thinking was about. Nil without one, and for thinking
+    /// that failed or was stopped.
+    static func thinkingTitle(for events: [ChatActivityEvent]) -> String? {
+        switch thinkingPhase(for: events) {
+        case .thinking, .thought: break
+        default: return nil
+        }
+        for text in events.reversed().compactMap(\.reasoningText) {
+            for line in text.split(whereSeparator: \.isNewline).reversed() {
+                if let heading = heading(in: line) { return heading }
+            }
+        }
+        return nil
+    }
+
+    private static func heading(in line: Substring) -> String? {
+        let line = line.trimmingCharacters(in: .whitespaces)
+        guard let marker = ["**", "__"].first(where: { line.hasPrefix($0) && line.hasSuffix($0) }),
+              line.count > 4 else { return nil }
+        let words = line.dropFirst(2).dropLast(2)
+            .replacingOccurrences(of: "`", with: "").trimmingCharacters(in: .whitespaces)
+        guard !words.isEmpty, words.count <= 120, !words.contains(marker) else { return nil }
+        return words
+    }
+
     /// The steps work counts: tool calls and helper agents, not thinking.
     static func stepCount(of events: [ChatActivityEvent]) -> Int {
         events.count { $0.kind == .tool || $0.kind == .subagent }

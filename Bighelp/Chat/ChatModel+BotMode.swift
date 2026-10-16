@@ -101,8 +101,10 @@ extension ChatModel {
         } else {
             members = room.members.map(HermesBotModeRoomMember.init(member:))
         }
+        let peerHosts = botModeRoomStore?.peerHosts
         return members.map {
-            HermesBotModeParticipant(member: $0, profiles: agentDirectory?.profiles ?? [])
+            HermesBotModeParticipant(member: $0, profiles: agentDirectory?.profiles ?? [],
+                                     computerNamed: { peerHosts?.hostName(peerID: $0) })
         }
     }
 

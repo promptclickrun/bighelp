@@ -74,8 +74,12 @@ extension BotModeRoomStore {
         nativeDriverWorkingByRoom[roomID] == true || room(id: roomID)?.isRunning == true
     }
 
+    /// Creates a room on this computer. `peers` are agents on other saved
+    /// computers: each joins through its own computer's RoomLink, linked
+    /// right after Hermes creates the room.
     @discardableResult
-    func createNativeRoom(roomID: String, name: String, profiles: [AgentProfile]) async throws -> BotModeRoom {
+    func createNativeRoom(roomID: String, name: String, profiles: [AgentProfile],
+                          peers: [HermesBotModePeerCandidate] = []) async throws -> BotModeRoom {
         try loadNativeStorageIfNeeded()
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let nativeClient else { throw BotModeRoomError.executionUnavailable }
@@ -85,7 +89,7 @@ extension BotModeRoomStore {
         guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               name.count <= 200,
               !name.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains),
-              (2...BotModeRoom.maximumMembers).contains(profiles.count),
+              (2...BotModeRoom.maximumMembers).contains(profiles.count + peers.count),
               Set(profiles.map(\.id)).count == profiles.count else {
             throw WorkspaceClientError.invalidRequest
         }
@@ -94,7 +98,7 @@ extension BotModeRoomStore {
         }
         if room(id: roomID) == nil {
             let handles = NativeBotModeHandles.directory(for: profiles)
-            let members = try profiles.map { profile in
+            var members = try profiles.map { profile in
                 guard let handle = handles.first(where: { $0.profileID == profile.id })?.handle else {
                     throw WorkspaceClientError.invalidRequest
                 }
@@ -104,12 +108,33 @@ extension BotModeRoomStore {
                     target: ["kind": .string("local"), "profile": .string(profile.id)]
                 )
             }
+            var links: [HermesBotModePeerLink] = []
+            if !peers.isEmpty {
+                guard let peerHosts, nativeClient is any HermesBotModePeerRegistering else {
+                    throw BotModeRoomError.executionUnavailable
+                }
+                var offers: [(candidate: HermesBotModePeerCandidate, link: HermesBotModeRoomLink)] = []
+                for peer in peers {
+                    do {
+                        offers.append((peer, try await peerHosts.roomLink(hostID: peer.hostID, profile: peer.profileID)))
+                    } catch let problem as HermesBotModeRoomLink.Problem {
+                        throw BotModePeerLinkError(candidate: peer, problem: problem)
+                    }
+                    try requireNativeBoundary(boundary)
+                }
+                for peer in HermesBotModePeerMembers.members(for: offers, taken: members) {
+                    members.append(peer.member)
+                    links.append(peer.link)
+                }
+            }
             guard members.allSatisfy(HermesBotModeWireCodec.member) else { throw WorkspaceClientError.invalidRequest }
             let intent = HermesBotModeCreationIntent(roomID: roomID, name: name, members: members, wasDispatched: false)
             try persist(room: BotModeRoom(
                 id: roomID,
-                members: members.map { BotModeMember(profileID: $0.profile, handle: $0.handle, sessionID: "") },
-                visibleEvents: [], nativePendingCreation: intent
+                members: members.map {
+                    BotModeMember(profileID: $0.profile, handle: $0.handle, sessionID: "", nativeMemberID: $0.memberID)
+                },
+                visibleEvents: [], nativePendingCreation: intent, nativePendingPeerLinks: links
             ))
         }
         guard var current = room(id: roomID), var intent = current.nativePendingCreation else {
@@ -138,9 +163,10 @@ extension BotModeRoomStore {
         latest.markNativeRoom(state)
         latest.setNativeCreationIntent(nil)
         try persist(room: latest)
+        await linkPendingPeers(roomID: roomID)
         await refreshNativeRoomCatalog()
         try requireNativeBoundary(boundary)
-        return latest
+        return room(id: roomID) ?? latest
     }
 
     @discardableResult
@@ -183,6 +209,7 @@ extension BotModeRoomStore {
             try persist(room: created)
         }
         try await syncNativeRoom(roomID: roomID, boundary: boundary, initialState: state)
+        await linkPendingPeers(roomID: roomID)
         guard let room = room(id: roomID) else { throw BotModeRoomError.roomNotFound }
         return room
     }
@@ -334,6 +361,7 @@ extension BotModeRoomStore {
         activity.configure(nil)
         terminalNativeAttempts = [:]
         nativeRoomSyncErrors = [:]
+        nativePeerLinkProblems = [:]
         nativeObservations.values.forEach { $0.cancel() }
         nativeObservations.removeAll()
         nativeObservationTokens.removeAll()

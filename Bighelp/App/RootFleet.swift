@@ -228,9 +228,15 @@ extension RootShellView {
 
     /// A group chat with the agents picked in New chat. They're all on one
     /// host; that host becomes the selected one first.
+    /// The first agent's computer is the group's home; agents on other
+    /// computers join it through their own computers.
     func startFleetGroupChat(with agents: [FleetAgent]) {
-        guard let hostID = agents.first?.hostID, agents.allSatisfy({ $0.hostID == hostID }) else { return }
-        openFleet(.newGroup(profileIDs: agents.map(\.profileID)), on: hostID)
+        guard let hostID = agents.first?.hostID, let fleet else { return }
+        let peers = agents.filter { $0.hostID != hostID }.map {
+            HermesBotModePeerCandidate(hostID: $0.hostID.uuidString, hostName: fleet.hostName($0.hostID),
+                                       profileID: $0.profileID, name: $0.name)
+        }
+        openFleet(.newGroup(profileIDs: agents.filter { $0.hostID == hostID }.map(\.profileID), peers: peers), on: hostID)
     }
 
     func fleetHome(_ fleet: FleetStore) -> FleetHomeView {
@@ -415,8 +421,8 @@ extension RootShellView {
         case .group(let roomID):
             guard let owner = currentWorkspaceOwner else { return }
             handleAgentWorkspaceAction(.init(owner: owner, action: .openGroup(roomID: roomID)))
-        case .newGroup(let profileIDs):
-            createGroupChat(with: profileIDs)
+        case .newGroup(let profileIDs, let peers):
+            createGroupChat(with: profileIDs, peers: peers)
         case .routines(let profileID):
             openScheduledTasks(filteredTo: profileID)
         case .task(let jobID, let profileID):

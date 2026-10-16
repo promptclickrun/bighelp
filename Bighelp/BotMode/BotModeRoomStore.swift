@@ -85,6 +85,10 @@ final class BotModeRoomStore {
     var nativePendingApprovalsByRoom: [String: [String: HermesBotModePendingApproval]] = [:]
     var nativePendingRetryTaskIDsByRoom: [String: Set<String>] = [:]
     var nativeDriverWorkingByRoom: [String: Bool] = [:]
+    /// Other saved computers, for group chats with their agents (RoomLink).
+    var peerHosts: (any HermesBotModePeerHosts)?
+    /// Why an agent on another computer isn't linked to its room yet, by room.
+    var nativePeerLinkProblems: [String: String] = [:]
     let client: any BotModeMemberTurnClient
     var nativeClient: (any HermesBotModeClient)?
     let persistence: (any BotModeRoomPersistence)?

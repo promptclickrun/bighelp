@@ -361,10 +361,15 @@ struct ChatSessionSettingsView: View {
     private var participants: [ChatSessionDetailsParticipant] {
         if model.botModeRoom?.hasNativeRoom == true {
             return model.nativeRoomParticipants.map { participant in
-                ChatSessionDetailsParticipant(
+                let detail = switch participant.availability {
+                case .available: "@\(participant.handle)"
+                case .otherComputer: "@\(participant.handle) · on \(participant.computerName ?? "another computer")"
+                case .profileUnavailable, .unsupportedTarget: "Unavailable"
+                }
+                return ChatSessionDetailsParticipant(
                     id: participant.id,
                     name: participant.displayName,
-                    detail: participant.availability == .available ? "@\(participant.handle)" : "Unavailable",
+                    detail: detail,
                     imageURL: participant.profile.flatMap { agents.avatarURL(for: $0) }
                 )
             }

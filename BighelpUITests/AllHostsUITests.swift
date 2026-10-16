@@ -282,8 +282,8 @@ final class AllHostsUITests: BighelpUITestCase {
     }
 
     /// New chat picks one agent and opens its chat. Its Group chat button
-    /// picks several agents on one host instead, and Create chat makes the
-    /// group and opens it. Organize no longer starts group chats.
+    /// picks several agents, from any hosts, and Create chat makes the group
+    /// on the first one's host and opens it. Organize no longer starts group chats.
     @MainActor
     func testNewChatPicksOneAgentOrSeveralForAGroup() throws {
         for appearance in ["light", "dark"] { newChatPicksOneAgentOrSeveralForAGroup(appearance) }
@@ -330,15 +330,19 @@ final class AllHostsUITests: BighelpUITestCase {
         mina.tap()
         XCTAssertEqual(mina.value as? String, "Selected")
         XCTAssertFalse(create.isEnabled, "One agent isn't a group")
-        XCTAssertFalse(app.buttons["fleet.new-chat.Sage Ortiz"].isEnabled, "Another host's agents can't join this group")
         app.buttons["fleet.new-chat.Avery Park"].tap()
         XCTAssertTrue(create.isEnabled)
+        let sage = app.buttons["fleet.new-chat.Sage Ortiz"]
+        XCTAssertTrue(sage.isEnabled, "Another host's agents can join too")
+        sage.tap()
+        XCTAssertEqual(sage.value as? String, "Selected")
+        XCTAssertTrue(app.descendants(matching: .any)["fleet.new-chat.group-note"].label.contains("The group lives on"))
         shot("new-group-picked-\(appearance)", app)
         create.tap()
         XCTAssertTrue(app.buttons["chat.people"].waitForExistence(timeout: 10), "The new group chat opens")
         XCTAssertTrue(app.descendants(matching: .any)
-            .matching(NSPredicate(format: "label CONTAINS %@", "Mina Shah & Avery Park")).firstMatch.exists,
-                      "It's named after its agents")
+            .matching(NSPredicate(format: "label CONTAINS %@", "Mina Shah, Avery Park")).firstMatch.exists,
+                      "It's named after its agents, wherever they live")
         shot("new-group-chat-\(appearance)", app)
         app.terminate()
     }

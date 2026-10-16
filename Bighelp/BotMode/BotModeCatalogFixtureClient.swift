@@ -2,7 +2,7 @@
 import Foundation
 
 @MainActor
-class BotModeCatalogFixtureClient: HermesBotModeCatalogClient {
+class BotModeCatalogFixtureClient: HermesBotModeCatalogClient, HermesBotModePeerRegistering {
     /// Demo group chats can be created (and then sit quiet, with no replies).
     static let createsGroupsArgument = "-preview-group-create"
 
@@ -97,6 +97,13 @@ class BotModeCatalogFixtureClient: HermesBotModeCatalogClient {
         _ = try await groupsState(roomID: roomID, includeDisbanded: false)
         states.removeAll { $0.roomID == roomID }
     }
+    /// Demo rooms link agents on the demo's other computers at once.
+    func groupsPeerRegister(roomID: String, memberID: String, invite: HermesBotModePeerInvite) async throws {
+        guard createsGroups, states.contains(where: { $0.roomID == roomID }) else {
+            throw BotModeRoomError.executionUnavailable
+        }
+    }
+
     func groupsSend(roomID: String, eventID: String, payload: HermesBotModeUserPayload) async throws -> HermesBotModeSendResult {
         throw BotModeRoomError.executionUnavailable
     }

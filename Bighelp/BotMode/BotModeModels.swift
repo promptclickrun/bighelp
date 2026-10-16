@@ -523,6 +523,7 @@ struct BotModeRoom: Identifiable, Codable, Equatable, Sendable {
         case nativeRetryJournal
         case nativePendingCancelID
         case nativeFollowUps
+        case nativePendingPeerLinks
     }
 
     let id: String
@@ -570,6 +571,9 @@ struct BotModeRoom: Identifiable, Codable, Equatable, Sendable {
     /// behind the active drive; each keeps its own idempotency key until its
     /// discussion settles.
     private(set) var nativeFollowUps: [HermesBotModeFollowUp]
+    /// Agents on other computers this room still has to link (RoomLink). Kept
+    /// until each is registered, so setup can continue after a relaunch.
+    private(set) var nativePendingPeerLinks: [HermesBotModePeerLink]
 
     init(
         id: String,
@@ -599,7 +603,8 @@ struct BotModeRoom: Identifiable, Codable, Equatable, Sendable {
         nativePendingCreation: HermesBotModeCreationIntent? = nil,
         nativeRetryJournal: HermesBotModeRetryJournal? = nil,
         nativePendingCancelID: String? = nil,
-        nativeFollowUps: [HermesBotModeFollowUp] = []
+        nativeFollowUps: [HermesBotModeFollowUp] = [],
+        nativePendingPeerLinks: [HermesBotModePeerLink] = []
     ) throws {
         let memberIDs = members.map(\.id)
         guard !id.isEmpty, !memberIDs.isEmpty,
@@ -665,6 +670,7 @@ struct BotModeRoom: Identifiable, Codable, Equatable, Sendable {
         self.nativeRetryJournal = nativeRetryJournal
         self.nativePendingCancelID = nativePendingCancelID
         self.nativeFollowUps = nativeRoomID == nil ? [] : Array(nativeFollowUps.prefix(HermesBotModeFollowUp.maximumPending))
+        self.nativePendingPeerLinks = Array(nativePendingPeerLinks.prefix(Self.maximumMembers))
     }
 
     init(from decoder: any Decoder) throws {
@@ -718,7 +724,10 @@ struct BotModeRoom: Identifiable, Codable, Equatable, Sendable {
             nativePendingCreation: try container.decodeIfPresent(HermesBotModeCreationIntent.self, forKey: .nativePendingCreation),
             nativeRetryJournal: try container.decodeIfPresent(HermesBotModeRetryJournal.self, forKey: .nativeRetryJournal),
             nativePendingCancelID: try container.decodeIfPresent(String.self, forKey: .nativePendingCancelID),
-            nativeFollowUps: try container.decodeIfPresent([HermesBotModeFollowUp].self, forKey: .nativeFollowUps) ?? []
+            nativeFollowUps: try container.decodeIfPresent([HermesBotModeFollowUp].self, forKey: .nativeFollowUps) ?? [],
+            nativePendingPeerLinks: try container.decodeIfPresent(
+                [HermesBotModePeerLink].self, forKey: .nativePendingPeerLinks
+            ) ?? []
         )
     }
 
@@ -746,6 +755,10 @@ struct BotModeRoom: Identifiable, Codable, Equatable, Sendable {
 
     mutating func setNativeCreationIntent(_ intent: HermesBotModeCreationIntent?) {
         nativePendingCreation = intent
+    }
+
+    mutating func setNativePendingPeerLinks(_ links: [HermesBotModePeerLink]) {
+        nativePendingPeerLinks = Array(links.prefix(Self.maximumMembers))
     }
 
     mutating func setNativeRetryJournal(_ journal: HermesBotModeRetryJournal?) {

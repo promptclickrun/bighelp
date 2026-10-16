@@ -963,7 +963,7 @@ struct FleetHostPicker: View {
 }
 
 /// New chat in the all-hosts view: pick any agent on any host. Group chat
-/// turns it into picking several agents from one host.
+/// turns it into picking several agents, from any hosts.
 struct FleetAgentPicker: View {
     let fleet: FleetStore
     let onPick: (FleetAgent) -> Void
@@ -1052,15 +1052,15 @@ struct FleetAgentPicker: View {
         .accessibilityIdentifier("fleet.new-chat.\(agent.name)")
     }
 
-    /// How many are picked, and why another host's agents can't join.
+    /// How many are picked, and which computer the group lives on.
     private var groupHeader: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(picked.count < 2 ? "Pick 2 to \(BotModeRoom.maximumMembers) agents"
                  : "\(picked.count) of \(BotModeRoom.maximumMembers) picked")
                 .monospacedDigit()
             if fleet.showsHostNames {
-                Text(picked.first.map { "Agents on \(fleet.hostName($0.hostID)) can join." }
-                     ?? "Everyone in a group chat is on the same host.")
+                Text(picked.first.map { "The group lives on \(fleet.hostName($0.hostID)). Agents on other hosts join it there." }
+                     ?? "Agents can come from any of your hosts.")
             }
         }
         .font(.bighelp(.footnote))
@@ -1070,10 +1070,9 @@ struct FleetAgentPicker: View {
         .accessibilityIdentifier("fleet.new-chat.group-note")
     }
 
-    /// A group chat lives on one host, and holds a few agents at most.
+    /// A group chat holds a few agents at most, from any hosts.
     private func canAdd(_ agent: FleetAgent) -> Bool {
-        guard picked.count < BotModeRoom.maximumMembers else { return false }
-        return picked.first.map { $0.hostID == agent.hostID } ?? true
+        picked.count < BotModeRoom.maximumMembers
     }
 
     private func tap(_ agent: FleetAgent) {

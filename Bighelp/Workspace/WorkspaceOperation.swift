@@ -94,6 +94,11 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     case groupsStop = "groups.stop"
     case groupsRetry = "groups.retry"
     case groupsApprove = "groups.approve"
+    /// RoomLink, sent to the computer an agent lives on: a grant for that agent
+    /// to join a room whose home is another computer.
+    case groupsPeerInvite = "groups.peer.invite"
+    /// RoomLink, sent to the room's home: register (and probe) one such grant.
+    case groupsPeerRegister = "groups.peer.register"
     case dashboardLoad = "dashboard.load"
     case dashboardSetEventState = "dashboard.set_event_state"
     case dashboardDismissEvent = "dashboard.dismiss_event"

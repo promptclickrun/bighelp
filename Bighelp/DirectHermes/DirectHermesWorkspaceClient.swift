@@ -185,7 +185,18 @@ final class DirectHermesWorkspaceClient: WorkspaceOperationPerforming {
             guard payload.isEmpty else { throw WorkspaceClientError.invalidRequest }
             return .http(.init(path: "/api/health", method: .get, maximumResponseBytes: 16_384))
         case .groupsCapabilities:
-            return try rpc(operation, payload, allowed: [])
+            // `profile` asks for that agent's RoomLink catalog on this computer.
+            return try rpc(operation, payload, allowed: ["profile"])
+        case .groupsPeerInvite:
+            return try rpc(operation, payload,
+                           allowed: ["profile", "room_id", "home_install_id", "authority_gateway_id",
+                                     "authority_epoch", "member_id", "ttl_seconds"],
+                           required: ["profile", "room_id", "home_install_id", "authority_gateway_id",
+                                      "authority_epoch", "member_id"])
+        case .groupsPeerRegister:
+            return try rpc(operation, payload,
+                           allowed: ["room_id", "member_id", "target_url", "catalog", "target_profile", "grant"],
+                           required: ["room_id", "member_id", "target_url", "catalog", "target_profile", "grant"])
         case .groupsList:
             return try rpc(operation, payload, allowed: ["limit", "offset", "include_disbanded"])
         case .groupsCreate:

@@ -74,7 +74,9 @@ enum AgentDirectoryPresentation {
     ) -> [HermesBotModeRoomSummary] {
         groups.filter { room in
             guard !room.isDisbanded,
-                  profileID == nil || room.members.contains(where: { $0.profile == profileID })
+                  profileID == nil || room.members.contains(where: {
+                      $0.profile == profileID && $0.target["kind"]?.string == "local"
+                  })
             else { return false }
             let members = room.participants(profiles: profiles)
             return matches(query, fields: [room.name] + members.flatMap {

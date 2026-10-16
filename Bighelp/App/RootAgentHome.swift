@@ -350,13 +350,14 @@ extension RootShellView {
     /// A group chat with these agents right away, named after them, then
     /// opened: what New group chat's Create does, minus the form (All agents'
     /// New chat › Group chat already picked who's in it).
-    func createGroupChat(with profileIDs: [String]) {
+    func createGroupChat(with profileIDs: [String], peers: [HermesBotModePeerCandidate] = []) {
         guard let owner = groupCreationReadyOwner else {
             actionErrorMessage = "Group chats need a connected Hermes host."
             return
         }
         let profiles = profileIDs.compactMap { id in agents.profiles.first { $0.id == id } }
-        guard profiles.count == profileIDs.count, (2...BotModeRoom.maximumMembers).contains(profiles.count) else {
+        guard profiles.count == profileIDs.count,
+              (2...BotModeRoom.maximumMembers).contains(profiles.count + peers.count) else {
             actionErrorMessage = "Those agents aren't all on this host anymore. Pick them again from New chat."
             return
         }
@@ -364,11 +365,15 @@ extension RootShellView {
             do {
                 let room = try await botModeRooms.createNativeRoom(
                     roomID: "room-\(UUID().uuidString)",
-                    name: BotModeCreateRoomView.automaticName(profiles.map(\.name)), profiles: profiles)
+                    name: BotModeCreateRoomView.automaticName(profiles.map(\.name) + peers.map(\.name)),
+                    profiles: profiles, peers: peers)
                 // A reconnect meanwhile is still this computer.
                 guard isCurrentSignIn(owner), let current = currentWorkspaceOwner else { return }
                 openHostedGroup(room.id, owner: current, settings: false)
             } catch is CancellationError {
+            } catch let error as BotModePeerLinkError {
+                guard isCurrentSignIn(owner) else { return }
+                actionErrorMessage = error.message
             } catch {
                 guard isCurrentSignIn(owner) else { return }
                 actionErrorMessage = "The group chat couldn't be created. Check the host, then try again."

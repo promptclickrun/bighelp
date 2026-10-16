@@ -115,11 +115,13 @@ struct BighelpApp: App {
         hostRegistry.useIndependentWorkspace()
         _hostRegistry = State(initialValue: hostRegistry)
         var fleet = FleetStore(reader: RegistryFleetReader(registry: hostRegistry))
+        composition.botModeRooms.peerHosts = RegistryRoomPeerHosts(registry: hostRegistry)
         #if DEBUG
         // Real-host UI tests add real hosts to the demo shell; they read those.
         if arguments.contains("-use-demo-fixtures"), !arguments.contains("-test-no-configured-hosts") {
             fleet = FleetStore(reader: FleetFixtureReader(), directory: FileManager.default.temporaryDirectory
                 .appending(path: "bighelp-fleet-demo-\(ProcessInfo.processInfo.processIdentifier)"))
+            composition.botModeRooms.peerHosts = DemoRoomPeerHosts()
         }
         #endif
         _fleet = State(initialValue: fleet)

@@ -70,6 +70,8 @@ struct HermesBotModeParticipant: Identifiable, Equatable, Sendable {
     enum Availability: Equatable, Sendable {
         case available
         case profileUnavailable
+        /// Lives on another computer, which runs its turns (RoomLink).
+        case otherComputer
         case unsupportedTarget
     }
 
@@ -79,20 +81,28 @@ struct HermesBotModeParticipant: Identifiable, Equatable, Sendable {
     let displayName: String
     let profile: AgentProfile?
     let availability: Availability
+    /// The computer an agent from elsewhere lives on.
+    let computerName: String?
 
     var id: String { memberID }
     var canOpenAgentChat: Bool { availability == .available }
 
-    init(member: HermesBotModeRoomMember, profiles: [AgentProfile]) {
+    /// `computerNamed` names a peer member's computer from its `peer_id`. A
+    /// peer never borrows a local profile, even one with the same ID.
+    init(member: HermesBotModeRoomMember, profiles: [AgentProfile],
+         computerNamed: (String) -> String? = { _ in nil }) {
         memberID = member.memberID
         profileID = member.profile
         handle = member.handle
         let isLocal = member.target["kind"]?.string == "local"
             && member.target["profile"]?.string == member.profile
+        let peerID = member.target["kind"]?.string == "peer" ? member.target["peer_id"]?.string : nil
         let matches = isLocal ? profiles.filter { $0.id == member.profile } : []
         profile = matches.count == 1 ? matches.first : nil
         displayName = profile?.name ?? member.displayName ?? member.handle
-        availability = !isLocal ? .unsupportedTarget
+        computerName = peerID.map { computerNamed($0) ?? $0 }
+        availability = peerID != nil ? .otherComputer
+            : !isLocal ? .unsupportedTarget
             : profile == nil ? .profileUnavailable : .available
     }
 }
@@ -126,12 +136,14 @@ struct HermesBotModeRoomSummary: Identifiable, Equatable, Sendable {
             && room.authorityGatewayID == capabilities?.authorityGatewayID
             && (2...BotModeRoom.maximumMembers).contains(room.members.count)
             && room.members.allSatisfy {
-                $0.target["kind"]?.string == "local"
-                    && $0.target["profile"]?.string == $0.profile
+                // Hermes runs an agent on another computer through its RoomLink.
+                $0.target["kind"]?.string == "peer"
+                    || ($0.target["kind"]?.string == "local" && $0.target["profile"]?.string == $0.profile)
             }
     }
 
-    func participants(profiles: [AgentProfile]) -> [HermesBotModeParticipant] {
-        members.map { HermesBotModeParticipant(member: $0, profiles: profiles) }
+    func participants(profiles: [AgentProfile],
+                      computerNamed: (String) -> String? = { _ in nil }) -> [HermesBotModeParticipant] {
+        members.map { HermesBotModeParticipant(member: $0, profiles: profiles, computerNamed: computerNamed) }
     }
 }

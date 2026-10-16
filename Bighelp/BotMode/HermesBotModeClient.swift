@@ -20,7 +20,7 @@ enum BighelpLinkHermesBotModeClientError: Error, Equatable {
 /// state, idempotency, fencing, and task lifecycle; bighelp only encodes the
 /// official `groups.*` payloads and validates the typed responses.
 @MainActor
-final class BighelpLinkHermesBotModeClient: HermesBotModeCatalogClient {
+final class BighelpLinkHermesBotModeClient: HermesBotModeCatalogClient, HermesBotModePeerRegistering {
     private let workspace: HermesBotModeOperationTransport
     private let validateOwner: @MainActor () throws -> Void
 
@@ -62,6 +62,69 @@ final class BighelpLinkHermesBotModeClient: HermesBotModeCatalogClient {
             return result
         }
 
+    }
+
+    /// One agent's RoomLink offer on this computer, for a room homed on another.
+    func groupsRoomLink(profile: String) async throws -> HermesBotModeRoomLink {
+        try requireNonEmpty(profile)
+        return try await owned {
+            let payload = try await workspace.perform(.groupsCapabilities, payload: ["profile": .string(profile)])
+            let result = try decode(HermesBotModeCapabilities.self, from: payload, exactKeys: [
+                "protocol_version", "driver", "persistent_process", "authority_gateway_id",
+                "room_link", "features", "methods", "max_log_limit",
+            ])
+            try HermesBotModeWireCodec.capabilities(result)
+            guard result.protocolVersion == 2, result.supports("groups.peer.invite") else {
+                throw HermesBotModeRoomLink.Problem.unavailable("unsupported")
+            }
+            return try HermesBotModeRoomLink.parse(roomLink: result.roomLink, profile: profile)
+        }
+    }
+
+    /// Asks this computer for a grant letting one of its agents join a room
+    /// homed on another computer.
+    func groupsPeerInvite(
+        profile: String, roomID: String, homeInstallID: String,
+        authorityGatewayID: String, authorityEpoch: Int, memberID: String
+    ) async throws -> HermesBotModePeerInvite {
+        for value in [profile, roomID, homeInstallID, authorityGatewayID, memberID] { try requireNonEmpty(value) }
+        guard authorityEpoch > 0 else { throw BighelpLinkWorkspaceClientError.invalidRequest }
+        return try await owned {
+            let payload = try await workspace.perform(.groupsPeerInvite, payload: [
+                "profile": .string(profile), "room_id": .string(roomID),
+                "home_install_id": .string(homeInstallID), "authority_gateway_id": .string(authorityGatewayID),
+                "authority_epoch": .integer(authorityEpoch), "member_id": .string(memberID),
+            ])
+            guard Set(payload.keys) == ["grant", "target_profile", "catalog", "endpoint"],
+                  let grant = payload["grant"]?.string, !grant.isEmpty, grant.utf8.count <= 8_192,
+                  !grant.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains),
+                  payload["target_profile"]?.string == profile,
+                  let catalog = payload["catalog"]?.object else {
+                throw BighelpLinkWorkspaceClientError.invalidResponse
+            }
+            return HermesBotModePeerInvite(grant: grant,
+                                           link: try HermesBotModeRoomLink.parse(catalog: catalog, profile: profile))
+        }
+    }
+
+    /// Registers a grant on this computer, the room's home. Hermes probes the
+    /// other computer before it answers, so success means the two can talk.
+    func groupsPeerRegister(roomID: String, memberID: String, invite: HermesBotModePeerInvite) async throws {
+        try requireNonEmpty(roomID)
+        try requireNonEmpty(memberID)
+        _ = try await owned {
+            let payload = try await workspace.perform(.groupsPeerRegister, payload: [
+                "room_id": .string(roomID), "member_id": .string(memberID),
+                "target_url": .string(invite.link.endpointURL), "catalog": .object(invite.link.catalog),
+                "target_profile": .string(invite.link.profile), "grant": .string(invite.grant),
+            ])
+            guard payload["registered"]?.boolean == true,
+                  payload["target_install_id"]?.string == invite.link.installationID,
+                  payload["target_profile"]?.string == invite.link.profile else {
+                throw BighelpLinkWorkspaceClientError.invalidResponse
+            }
+            return payload
+        }
     }
 
     func groupsList(offset: Int, limit: Int) async throws -> HermesBotModeRoomListPage {

@@ -112,6 +112,10 @@ Persist server actor provenance. Only an exact locally persisted send intent
 and canonical receipt can associate a message with its local display snapshot.
 Other generic human events must not be attributed to whichever person is using
 this phone now. Display identity never grants access to a person's data.
+Hermes Desktop groups can add and remove members while the room keeps its
+history, so a member message's author may no longer be in the roster. Keep it
+in the cache (the cursor is past it) and show it under the actor's
+`display_name`, or "Former member"; never attribute it to a current agent.
 
 The existing plugin supplies device-bound person context on normal bighelp
 platform turns through its public pre-LLM hook. Native hosted groups do not

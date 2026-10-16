@@ -310,21 +310,28 @@ extension ChatModel {
                     )
                 )
             case .agent:
-                guard let memberID = event.memberID,
-                      botModeRoom?.memberIDs.contains(memberID) == true else { return nil }
-                let nativeMember = botModeRoom?.nativeState?.members.first { $0.memberID == memberID }
-                let profileID = nativeMember?.profile ?? memberID
-                let profile = agentDirectory?.profiles.first { $0.id == profileID }
+                guard let memberID = event.memberID else { return nil }
+                let snapshot: TimelineSenderSnapshot
+                if botModeRoom?.memberIDs.contains(memberID) == true {
+                    let nativeMember = botModeRoom?.nativeState?.members.first { $0.memberID == memberID }
+                    let profileID = nativeMember?.profile ?? memberID
+                    let profile = agentDirectory?.profiles.first { $0.id == profileID }
+                    snapshot = .init(
+                        name: profile?.name ?? nativeMember?.displayName ?? nativeMember?.handle ?? "Unavailable agent",
+                        avatarFileName: profile?.avatarFileName
+                    )
+                } else if let nativeEvent = event.nativeEvent {
+                    // Hermes keeps a removed member's messages in the room. Name
+                    // them as Hermes recorded them, never as a current agent who
+                    // happens to share the name.
+                    snapshot = .init(name: nativeEvent.actor["display_name"]?.string ?? "Former member")
+                } else {
+                    return nil
+                }
                 return TimelineItem(
                     id: event.id,
                     role: .assistant,
-                    sender: .agent(
-                        id: memberID,
-                        snapshot: .init(
-                            name: profile?.name ?? nativeMember?.displayName ?? nativeMember?.handle ?? "Unavailable agent",
-                            avatarFileName: profile?.avatarFileName
-                        )
-                    ),
+                    sender: .agent(id: memberID, snapshot: snapshot),
                     content: .message(text),
                     metadata: TimelineMetadata(
                         delivery: "Delivered",

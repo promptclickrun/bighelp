@@ -617,13 +617,14 @@ struct BotModeRoom: Identifiable, Codable, Equatable, Sendable {
         self.members = members
         self.privateHistory = privateHistory
         let validMemberIDs = Set(memberIDs)
-        let safeEvents = visibleEvents.filter { event in
-            event.kind != .agent || (event.memberID.map(validMemberIDs.contains) ?? false)
-        }
         // Hermes owns the complete native log. Keep the decoded cache intact so
-        // a persisted cursor can still replay and render older native messages;
-        // the local fixture harness retains its bounded transcript contract.
-        self.visibleEvents = nativeRoomID == nil ? Self.boundedVisibleEvents(safeEvents) : safeEvents
+        // a persisted cursor can still replay and render older native messages,
+        // including those of members who have since left the room: the cursor
+        // is already past them, so a dropped one never comes back. The local
+        // fixture harness retains its roster-bound, bounded transcript contract.
+        self.visibleEvents = nativeRoomID != nil ? visibleEvents : Self.boundedVisibleEvents(visibleEvents.filter { event in
+            event.kind != .agent || (event.memberID.map(validMemberIDs.contains) ?? false)
+        })
         let contexts = memberContexts ?? Dictionary(
             uniqueKeysWithValues: members.map { ($0.id, BotModeMemberContext(sessionID: $0.sessionID, messages: [])) }
         )

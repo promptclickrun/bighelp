@@ -124,6 +124,38 @@ struct HermesBotModeContractTests {
         #expect(restored.visibleEvents.first(where: { $0.id == "server-other" })?.nativeEvent?.actor["id"] == .string("desktop"))
     }
 
+    @Test func nativeMessagesFromFormerMembersSurviveReloadAndShow() throws {
+        // Hermes keeps a removed member's messages in the room's history. The
+        // replay cursor is already past them, so a dropped one never returns.
+        let source = BotModeRoom.fixture(id: "room-former", memberIDs: ["finance", "research"])
+        var room = try BotModeRoom(id: source.id, members: source.members, nativeRoomID: source.id)
+        let actors: [(String, [String: BighelpJSONValue])] = [
+            ("named", ["kind": .string("member"), "id": .string("former-1"), "display_name": .string("Old helper")]),
+            ("unnamed", ["kind": .string("member"), "id": .string("former-2")]),
+        ]
+        for (index, (id, actor)) in actors.enumerated() {
+            let event = HermesBotModeEvent(
+                roomID: room.id, sequence: index + 1, eventID: id, kind: "message.member",
+                actor: actor, authorityEpoch: 1,
+                payload: ["text": .string("Earlier answer"), "thread_id": .string("thread"),
+                          "member_id": try #require(actor["id"])],
+                createdAt: 1
+            )
+            room.appendNativeShared(try #require(event.botModeEvent(sourceOrder: index)))
+        }
+        let restored = try JSONDecoder().decode(BotModeRoom.self, from: JSONEncoder().encode(room))
+        let store = BotModeRoomStore(client: BotModeFixtureClient(), rooms: [restored], executionEnabled: false)
+        let model = ChatModel(
+            conversationID: room.id, client: ConversationFixtureClient(),
+            userIdentity: .init(name: "Current display", avatarFileName: nil),
+            initialItems: [], botModeRoomStore: store, botModeRoomID: room.id
+        )
+
+        #expect(restored.visibleEvents.map(\.id).filter { ["named", "unnamed"].contains($0) } == ["named", "unnamed"])
+        #expect(model.botModeTimelineItems.map(\.sender.snapshot.name) == ["Old helper", "Former member"])
+        #expect(model.botModeTimelineItems.allSatisfy { $0.sender.snapshot.avatarFileName == nil })
+    }
+
     @Test func nativeMetadataPreservesMemberIdentityWithoutPersistingApprovalOffers() throws {
         var room = BotModeRoom.fixture(id: "room-metadata", memberIDs: ["finance", "research"])
         let state = HermesBotModeRoomState(

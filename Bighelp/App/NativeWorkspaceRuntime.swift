@@ -620,6 +620,22 @@ final class NativeWorkspaceRuntime {
         guard connections.owner == expectedOwner, !retired else { return }
     }
 
+    /// Group chats' live activity (who is typing) comes from the plugin's
+    /// room feed; without it a room shows only that Hermes is working.
+    private func configureRoomActivity(workspace: any WorkspaceOperationPerforming, owner: WorkspaceOwner,
+                                       features: Set<String>) {
+        guard features.contains("native-room-activity-v1") else {
+            rooms.configureNativeActivityClient(nil)
+            return
+        }
+        rooms.configureNativeActivityClient(NativeHermesBotModeActivityClient(
+            owner: owner, currentOwner: { [weak connections] in connections?.owner },
+            includesResponding: features.contains("native-room-typing-v1")
+        ) { operation, body in
+            try await workspace.perform(operation.workspaceOperation, payload: body, owner: owner)
+        })
+    }
+
     private func performRefresh() async {
         guard !retired, let owner = connections.owner, owner.authority == authority,
               let workspace = connections.workspace else { suspend(); return }
@@ -702,6 +718,7 @@ final class NativeWorkspaceRuntime {
                 if context.features.contains("native-agent-board-files-v1") { supported.insert(.agentBoardFiles) }
                 if context.features.contains("native-agent-board-answers-v1") { supported.insert(.agentBoardAnswers) }
             }
+            configureRoomActivity(workspace: workspace, owner: owner, features: workspace.nativeContext?.features ?? [])
             pluginFeaturesKnown = true
             try publishCapabilities()
             try await agents.load()

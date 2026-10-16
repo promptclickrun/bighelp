@@ -3,6 +3,14 @@ import Foundation
 enum HermesBotModeActivityOperation: String, Sendable {
     case open, poll, close
     var path: String { "/api/plugins/loopdy/native/groups/activity/\(rawValue)" }
+
+    var workspaceOperation: WorkspaceOperation {
+        switch self {
+        case .open: .groupActivityOpen
+        case .poll: .groupActivityPoll
+        case .close: .groupActivityClose
+        }
+    }
 }
 
 struct HermesBotModeActivityDetail: Codable, Equatable, Sendable {
@@ -45,6 +53,35 @@ struct HermesBotModeToolObservation: Codable, Equatable, Sendable {
     }
 }
 
+protocol HermesBotModeObservationCoordinates {
+    var observationSequence: Int { get }
+    var observedAt: Int { get }
+    var roomId: String { get }
+    var memberId: String { get }
+    var threadId: String { get }
+    var turnId: String { get }
+    var taskId: String { get }
+    var executionGeneration: Int { get }
+    var sourceSequence: Int? { get }
+}
+
+extension HermesBotModeToolObservation: HermesBotModeObservationCoordinates {}
+extension HermesBotModeRespondingObservation: HermesBotModeObservationCoordinates {}
+
+/// A member is writing in its current turn (plugin `native-room-typing-v1`).
+/// Only coordinates: never the text, and never stored.
+struct HermesBotModeRespondingObservation: Codable, Equatable, Sendable {
+    let observationSequence: Int
+    let observedAt: Int
+    let roomId: String
+    let memberId: String
+    let threadId: String
+    let turnId: String
+    let taskId: String
+    let executionGeneration: Int
+    let sourceSequence: Int?
+}
+
 struct HermesBotModeActivityPage: Codable, Equatable, Sendable {
     enum SourceState: String, Codable, Sendable {
         case registeredUnobserved = "registered_unobserved"
@@ -71,6 +108,12 @@ struct HermesBotModeActivityPage: Codable, Equatable, Sendable {
     let droppedTotal: Int
     let projectionDrops: Int
     let events: [HermesBotModeToolObservation]
+    var responding: [HermesBotModeRespondingObservation] = []
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion, runtimeId, roomId, streamId, sourceState, upstreamLoss, openedAt, expiresAt
+        case cursor, highWater, hasMore, resetRequired, resetReason, droppedTotal, projectionDrops, events
+    }
 }
 
 @MainActor
@@ -91,16 +134,22 @@ final class NativeHermesBotModeActivityClient: HermesBotModeActivityClient {
     private let owner: WorkspaceOwner
     private let currentOwner: @MainActor () -> WorkspaceOwner?
     private let request: Request
+    private let includesResponding: Bool
 
+    /// `includesResponding` asks for `member.responding` events; pass it only
+    /// when native context lists `native-room-typing-v1`.
     init(owner: WorkspaceOwner, currentOwner: @escaping @MainActor () -> WorkspaceOwner?,
-         request: @escaping Request) {
+         includesResponding: Bool = false, request: @escaping Request) {
         self.owner = owner
         self.currentOwner = currentOwner
+        self.includesResponding = includesResponding
         self.request = request
     }
 
     func open(roomID: String) async throws -> HermesBotModeActivityPage {
-        let value = try await perform(.open, roomID: roomID, body: ["roomId": .string(roomID)])
+        var body: [String: BighelpJSONValue] = ["roomId": .string(roomID)]
+        if includesResponding { body["include"] = .array([.string("member.responding")]) }
+        let value = try await perform(.open, roomID: roomID, body: body)
         let page = try Self.decodePage(value, roomID: roomID, streamID: nil, after: 0, limit: 8)
         guard page.events.isEmpty, page.cursor == 0, page.highWater == 0, !page.resetRequired else {
             throw WorkspaceClientError.invalidResponse
@@ -150,14 +199,24 @@ final class NativeHermesBotModeActivityClient: HermesBotModeActivityClient {
             "droppedTotal", "projectionDrops", "events",
         ] else { throw WorkspaceClientError.invalidResponse }
         guard let rawEvents = value["events"]?.array else { throw WorkspaceClientError.invalidResponse }
+        let coordinates: Set<String> = [
+            "observationSequence", "observedAt", "roomId", "memberId", "threadId", "turnId",
+            "taskId", "executionGeneration", "sourceSequence", "kind",
+        ]
+        var toolEvents: [BighelpJSONValue] = []
+        var respondingEvents: [BighelpJSONValue] = []
         for raw in rawEvents {
             guard try JSONEncoder().encode(raw).count <= 20_480 else {
                 throw WorkspaceClientError.capacityExceeded
             }
-            guard let event = raw.object, Set(event.keys) == [
-                "observationSequence", "observedAt", "roomId", "memberId", "threadId", "turnId",
-                "taskId", "executionGeneration", "sourceSequence", "kind", "tool", "arguments", "result",
-            ], let tool = event["tool"]?.object, Set(tool.keys) == ["id", "name", "durationMs"] else {
+            guard let event = raw.object else { throw WorkspaceClientError.invalidResponse }
+            if event["kind"] == .string("member.responding") {
+                guard Set(event.keys) == coordinates else { throw WorkspaceClientError.invalidResponse }
+                respondingEvents.append(raw)
+                continue
+            }
+            guard Set(event.keys) == coordinates.union(["tool", "arguments", "result"]),
+                  let tool = event["tool"]?.object, Set(tool.keys) == ["id", "name", "durationMs"] else {
                 throw WorkspaceClientError.invalidResponse
             }
             for field in ["arguments", "result"] {
@@ -165,12 +224,19 @@ final class NativeHermesBotModeActivityClient: HermesBotModeActivityClient {
                     throw WorkspaceClientError.invalidResponse
                 }
             }
+            toolEvents.append(raw)
         }
         let data = try JSONEncoder().encode(BighelpJSONValue.object(value))
         guard data.count <= 196_608 else { throw WorkspaceClientError.capacityExceeded }
-        let page: HermesBotModeActivityPage
-        do { page = try JSONDecoder().decode(HermesBotModeActivityPage.self, from: data) }
-        catch { throw WorkspaceClientError.invalidResponse }
+        var page: HermesBotModeActivityPage
+        do {
+            var tools = value
+            tools["events"] = .array(toolEvents)
+            page = try JSONDecoder().decode(HermesBotModeActivityPage.self,
+                                            from: JSONEncoder().encode(BighelpJSONValue.object(tools)))
+            page.responding = try JSONDecoder().decode([HermesBotModeRespondingObservation].self,
+                                                       from: JSONEncoder().encode(BighelpJSONValue.array(respondingEvents)))
+        } catch { throw WorkspaceClientError.invalidResponse }
         guard page.schemaVersion == 1, page.roomId == roomID,
               streamID.map({ $0 == page.streamId }) ?? true,
               HermesBotModeWireCodec.identifier(page.runtimeId),
@@ -183,15 +249,26 @@ final class NativeHermesBotModeActivityClient: HermesBotModeActivityClient {
               page.hasMore == (page.cursor < page.highWater),
               page.droppedTotal >= 0, page.projectionDrops >= 0,
               page.droppedTotal <= 9_007_199_254_740_991, page.projectionDrops <= 9_007_199_254_740_991,
-              page.events.count <= limit else { throw WorkspaceClientError.invalidResponse }
+              rawEvents.count <= limit else { throw WorkspaceClientError.invalidResponse }
         if page.resetRequired {
-            guard page.resetReason != nil, page.events.isEmpty,
+            guard page.resetReason != nil, rawEvents.isEmpty,
                   page.cursor == page.highWater else { throw WorkspaceClientError.invalidResponse }
             return page
         }
         guard page.resetReason == nil else { throw WorkspaceClientError.invalidResponse }
-        var sequence = after
         for observation in page.events {
+            guard safeText(observation.tool.id, maximumBytes: 512),
+                  safeText(observation.tool.name, maximumBytes: 128),
+                  observation.tool.durationMs.map({ (0...9_007_199_254_740_991).contains($0) }) ?? true,
+                  detailIsValid(observation.arguments), detailIsValid(observation.result) else {
+                throw WorkspaceClientError.invalidResponse
+            }
+        }
+        // Both kinds share one observation sequence.
+        let observations = ((page.events as [any HermesBotModeObservationCoordinates]) + page.responding)
+            .sorted { $0.observationSequence < $1.observationSequence }
+        var sequence = after
+        for observation in observations {
             let next = sequence.addingReportingOverflow(1)
             guard !next.overflow, observation.observationSequence == next.partialValue,
                   observation.roomId == roomID,
@@ -199,16 +276,12 @@ final class NativeHermesBotModeActivityClient: HermesBotModeActivityClient {
                     .allSatisfy(HermesBotModeWireCodec.identifier),
                   observation.executionGeneration > 0, observation.observedAt >= page.openedAt,
                   observation.observedAt <= page.expiresAt,
-                  observation.sourceSequence.map({ $0 >= 0 }) ?? true,
-                  safeText(observation.tool.id, maximumBytes: 512),
-                  safeText(observation.tool.name, maximumBytes: 128),
-                  observation.tool.durationMs.map({ (0...9_007_199_254_740_991).contains($0) }) ?? true,
-                  detailIsValid(observation.arguments), detailIsValid(observation.result) else {
+                  observation.sourceSequence.map({ $0 >= 0 }) ?? true else {
                 throw WorkspaceClientError.invalidResponse
             }
             sequence = observation.observationSequence
         }
-        guard page.cursor == sequence, !page.hasMore || !page.events.isEmpty else {
+        guard page.cursor == sequence, !page.hasMore || !rawEvents.isEmpty else {
             throw WorkspaceClientError.invalidResponse
         }
         return page

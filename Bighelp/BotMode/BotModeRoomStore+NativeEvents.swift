@@ -41,6 +41,10 @@ extension BotModeRoomStore {
                 }
                 terminalNativeAttempts[roomID] = attempts
             }
+            if ["message.member", "turn.settled", "turn.failed", "turn.cancelled", "turn.deferred"].contains(event.kind),
+               let memberID = event.memberID {
+                activity.finishTyping(roomID: roomID, memberID: memberID, taskID: event.taskID)
+            }
             let isNewEvent = !room.visibleEvents.contains(where: { $0.id == event.eventID })
             if isNewEvent,
                let mapped = event.botModeEvent(sourceOrder: takePresentationOrder()) {

@@ -404,20 +404,58 @@ struct PendingMessageView: View {
                 // Line up with the perched avatars of group-chat bubbles.
                 Color.clear.frame(width: ChatMessageGrouping.perchedAvatarSize, height: 1)
             }
-            typingDots
-                .padding(.horizontal, BighelpV3MessagePresentation.horizontalContentPadding)
-                .padding(.vertical, BighelpTokens.space12)
-                .background(bubbleShape.fill(theme.incomingMessageBackground))
-                .overlay {
-                    if colorSchemeContrast == .increased {
-                        bubbleShape.strokeBorder(theme.primaryText, lineWidth: 2)
-                    }
-                }
+            TypingBubble()
         }
         .padding(.vertical, BighelpTokens.space4)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(presentation.accessibilityLabel)
+    }
+}
+
+/// A group member Hermes reports writing: "Name is typing…" in the words of a
+/// tool step, over a typing bubble with the member's avatar perched beside it.
+struct GroupTypingView: View {
+    let stableID: String
+    let sender: TimelineSenderDisplay
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: BighelpTokens.space4) {
+            Text("\(sender.name) is typing…")
+                .font(.bighelp(.footnote))
+                .foregroundStyle(theme.secondaryText)
+                .lineLimit(1)
+                .padding(.leading, ChatMessageGrouping.perchedAvatarSize + BighelpTokens.space8
+                    + BighelpV3MessagePresentation.horizontalContentPadding)
+            HStack(alignment: .bottom, spacing: BighelpTokens.space8) {
+                AvatarView(stableID: stableID, displayName: sender.name, imageURL: sender.imageURL,
+                           size: ChatMessageGrouping.perchedAvatarSize, kind: .agent)
+                    .frame(width: ChatMessageGrouping.perchedAvatarSize, height: ChatMessageGrouping.perchedAvatarSize)
+                TypingBubble()
+            }
+        }
+        .padding(.vertical, BighelpTokens.space4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(sender.name) is typing")
+        .accessibilityIdentifier("chat.bot-typing")
+    }
+
+    @BighelpThemeReader private var theme: BighelpTheme
+}
+
+/// Three dots on the incoming bubble surface.
+struct TypingBubble: View {
+    var body: some View {
+        typingDots
+            .padding(.horizontal, BighelpV3MessagePresentation.horizontalContentPadding)
+            .padding(.vertical, BighelpTokens.space12)
+            .background(bubbleShape.fill(theme.incomingMessageBackground))
+            .overlay {
+                if colorSchemeContrast == .increased {
+                    bubbleShape.strokeBorder(theme.primaryText, lineWidth: 2)
+                }
+            }
     }
 
     /// The dots rise in turn on the shared loader clock, so every waiting bubble

@@ -24,6 +24,8 @@ enum ChatCanvasRow: Identifiable, Equatable {
     /// Hermes asks to connect apps or tools for this chat (`manage_connections`).
     case connector(ConnectorCardStore.Card)
     case pending(String, Bool)
+    /// A group member Hermes reports writing right now.
+    case botTyping(TimelineSender)
     case failure(String)
     /// A turn Hermes reported failed, with its fixes and any timed retry.
     case turnFailure(ChatModel.FailedTurn, ChatScheduledRetry?)
@@ -50,6 +52,7 @@ enum ChatCanvasRow: Identifiable, Equatable {
         case .directClarification(let prompt): "chat.direct-clarification.\(prompt.id)"
         case .connector(let card): "chat.connector.\(card.id)"
         case .pending: "chat-pending"
+        case .botTyping(let sender): "chat.bot-typing:\(sender.id)"
         case .failure: "chat.failure"
         case .turnFailure: "chat.turn-failure"
         }
@@ -76,6 +79,7 @@ enum ChatCanvasRow: Identifiable, Equatable {
         case (.directClarification(let a), .directClarification(let b)): a == b
         case (.connector(let a), .connector(let b)): a == b
         case (.pending(let a, let b), .pending(let c, let d)): a == c && b == d
+        case (.botTyping(let a), .botTyping(let b)): a == b
         case (.turnFailure(let a, let b), .turnFailure(let c, let d)): a == c && b == d
         case (.welcome, .welcome), (.quickActions, .quickActions), (.bottom, .bottom), (.botRetry, .botRetry): true
         default: false

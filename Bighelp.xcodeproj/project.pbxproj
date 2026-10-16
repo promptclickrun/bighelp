@@ -492,6 +492,7 @@
 		516E75BCCFB1BA2F2DEBA372 /* list-v2.json in Resources */ = {isa = PBXBuildFile; fileRef = 915C086D7CA2F5607F60D5FA /* list-v2.json */; };
 		51821B1591D95F9E6704906B /* NativeManagementInvalidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A42272BA6790C0A7BFC99E /* NativeManagementInvalidationTests.swift */; };
 		51DA4E0343897F10E3048302 /* WorkflowRunView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 696582E23F3BDB6987E19C78 /* WorkflowRunView.swift */; };
+		5222C95B449746172625A6B2 /* BotModeActivityFixtureClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C28FC793B551D3283801E600 /* BotModeActivityFixtureClient.swift */; };
 		523769209DFC189C9D2CCBC2 /* AgentRuntimeDefaultsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6887CF181F29248E7BEA6CC6 /* AgentRuntimeDefaultsSection.swift */; };
 		524DA40768FDE508AE664C1A /* VoiceConfigurationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80088FB04D05EDBFE994777D /* VoiceConfigurationView.swift */; };
 		52D6FC1698500D2855669D78 /* bighelp-listening.json in Resources */ = {isa = PBXBuildFile; fileRef = 3CE4498ABE2981E7AB6B2091 /* bighelp-listening.json */; };
@@ -2818,6 +2819,7 @@
 		C26435683839D8AED57DC34F /* ReferenceHubProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReferenceHubProvider.swift; sourceTree = "<group>"; };
 		C271290F18E5D080853ABFAF /* BighelpPullToRefresh.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpPullToRefresh.swift; sourceTree = "<group>"; };
 		C2736E14A6C1285C6665669A /* SkippedPartsNote.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkippedPartsNote.swift; sourceTree = "<group>"; };
+		C28FC793B551D3283801E600 /* BotModeActivityFixtureClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BotModeActivityFixtureClient.swift; sourceTree = "<group>"; };
 		C340AD81178E4864E29F460B /* WebRTC-LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "WebRTC-LICENSE.txt"; sourceTree = "<group>"; };
 		C380E34BD7BE880470DB9EEB /* HostNotificationSetup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostNotificationSetup.swift; sourceTree = "<group>"; };
 		C391D786C632E57338EFE988 /* SpatialAvatarPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpatialAvatarPreview.swift; sourceTree = "<group>"; };
@@ -3662,6 +3664,7 @@
 		67554556439614FD4FE35690 /* BotMode */ = {
 			isa = PBXGroup;
 			children = (
+				C28FC793B551D3283801E600 /* BotModeActivityFixtureClient.swift */,
 				E79E21E199A5499FA817AA0F /* BotModeActivityStore.swift */,
 				B0DE05E6C5C380E5B3B7D1C9 /* BotModeApprovalCard.swift */,
 				52F5FEDC372FADF6E0C549AD /* BotModeCatalogFixtureClient.swift */,
@@ -6170,6 +6173,7 @@
 				371BB39D4A8F91DC1BBCCCBF /* BighelpWidgetStyle.swift in Sources */,
 				90F00CF9F27AE0762CF15B34 /* BighelpWorkflowsWidget.swift in Sources */,
 				18220DBE95765EF22BEFF997 /* BoardBlueprints.swift in Sources */,
+				5222C95B449746172625A6B2 /* BotModeActivityFixtureClient.swift in Sources */,
 				80287CC55FF68023A99B3CF4 /* BotModeActivityStore.swift in Sources */,
 				BBB4B5382B941F7779CF9548 /* BotModeApprovalCard.swift in Sources */,
 				AE61062391F2AF1D5431F7FE /* BotModeCatalogFixtureClient.swift in Sources */,

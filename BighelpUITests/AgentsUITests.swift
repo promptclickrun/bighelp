@@ -79,6 +79,44 @@ final class AgentsUITests: BighelpUITestCase {
         XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 10))
     }
 
+    /// Each member Hermes reports writing gets its own "is typing" row; the
+    /// old "Agents are collaborating" line is gone.
+    @MainActor
+    func testGroupShowsWhoIsTyping() {
+        for appearance in ["light", "dark"] { checkGroupShowsWhoIsTyping(appearance: appearance) }
+    }
+
+    @MainActor
+    private func checkGroupShowsWhoIsTyping(appearance: String) {
+        XCUIDevice.shared.orientation = .portrait
+        let app = makeApp()
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-test-agents-directory",
+                               "-preview-group-typing", "-loopdy.demo.appearance", appearance]
+        app.launch()
+        openAgents(in: app)
+        XCTAssertTrue(revealSearchField(agentSearch(in: app), in: app))
+        let search = agentSearch(in: app)
+        search.tap()
+        search.typeText("Field Notes\n")
+        let group = app.buttons["agents.group.research-circle"]
+        XCTAssertTrue(group.waitForExistence(timeout: 5))
+        group.tap()
+        XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 10))
+        let typing = app.descendants(matching: .any).matching(identifier: "chat.bot-typing")
+        let two = NSPredicate(format: "count == 2")
+        expectation(for: two, evaluatedWith: typing)
+        waitForExpectations(timeout: 10)
+        for index in 0..<2 {
+            XCTAssertTrue(typing.element(boundBy: index).label.hasSuffix(" is typing"),
+                          typing.element(boundBy: index).label)
+        }
+        XCTAssertFalse(app.staticTexts["Agents are collaborating"].exists)
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "group-typing-\(appearance)"
+        shot.lifetime = .keepAlways
+        add(shot)
+    }
+
     /// On one computer every chat keeps the bottom bar, however Agents opened
     /// it: the pinned avatar, a new chat from the agent's row, or one of its
     /// existing chats. Every chat has ☰ (which goes back to Agents). Tapping an

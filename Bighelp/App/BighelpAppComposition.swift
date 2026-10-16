@@ -277,6 +277,9 @@ struct BighelpAppComposition {
             if arguments.contains(BotModeCatalogFixtureClient.createsGroupsArgument) {
                 Task { await botModeRooms.refreshNativeRoomCatalog() }
             }
+            if arguments.contains(BotModeActivityFixtureClient.launchArgument) {
+                botModeRooms.configureNativeActivityClient(BotModeActivityFixtureClient())
+            }
         }
         if usesFixtures, arguments.contains(TeamCallDemoGroupsClient.launchArgument) {
             botModeRooms.configureNativeClient(TeamCallDemoGroupsClient())

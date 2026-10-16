@@ -156,8 +156,34 @@ extension ChatModel {
         if botModeRoom?.nativePendingCancelID != nil {
             return "The stop request is unconfirmed. Check this room before continuing."
         }
-        return isSending || botModeRoom?.isRunning == true || botModeRoom?.nativeFollowUps.isEmpty == false
-            ? "Agents are collaborating" : nil
+        return nil
+    }
+
+    /// The room's agents are still answering: a send is out, the room runs, or
+    /// a later message waits its turn.
+    var isBotModeWorking: Bool {
+        isSending || botModeRoom?.isRunning == true || botModeRoom?.nativeFollowUps.isEmpty == false
+    }
+
+    /// Members Hermes reports writing right now, oldest first, named as their
+    /// messages are. Live only: they leave when the reply lands and are never stored.
+    var botModeTypingSenders: [TimelineSender] {
+        guard !referenceOwnerRetired, let botModeRoomID, let botModeRoomStore else { return [] }
+        let participants = nativeRoomParticipants
+        return botModeRoomStore.activity.typingMemberIDs(roomID: botModeRoomID).compactMap { memberID in
+            guard let participant = participants.first(where: { $0.memberID == memberID }) else { return nil }
+            return .agent(id: memberID, snapshot: .init(name: participant.displayName,
+                                                        avatarFileName: participant.profile?.avatarFileName))
+        }
+    }
+
+    /// Keeps the room's live activity feed open while this chat is on screen.
+    func observeBotModeActivity() async {
+        guard !botModeActivityScope.isEmpty, let botModeRoomID, let botModeRoomStore else { return }
+        let viewerID = UUID()
+        botModeRoomStore.beginNativeActivity(roomID: botModeRoomID, viewerID: viewerID)
+        while !Task.isCancelled { try? await Task.sleep(for: .seconds(3600)) }
+        botModeRoomStore.activity.end(roomID: botModeRoomID, viewerID: viewerID)
     }
 
     var pendingBotModeApprovals: [HermesBotModePendingApproval] {

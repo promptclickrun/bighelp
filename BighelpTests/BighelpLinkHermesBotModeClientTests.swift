@@ -717,6 +717,82 @@ struct BighelpLinkHermesBotModeClientTests {
         #expect(state.driverStatus == driverStatus)
     }
 
+    @Test
+    func roomMembersWithoutATargetReadAsLocalToTheirProfile() async throws {
+        // Hermes reads a member without a target as local to its profile, and
+        // rooms saved before targets were stored come back without one.
+        let owner = BighelpLinkHermesBotModeOwner(accountID: "account", hostID: "host", connectionID: "connection")
+        var room = try #require(Self.room(roomID: "room-1").object)
+        room["members"] = .array(try #require(room["members"]?.array).compactMap(\.object).map { member in
+            .object(member.filter { $0.key != "target" })
+        })
+        let olderRoom = BighelpJSONValue.object(room)
+        let messaging = HermesBotModeMessagingStub { request in
+            if request.operation == .groupsList {
+                return try Self.result(for: request, payload: ["rooms": .array([olderRoom]), "next_offset": .null])
+            }
+            return try Self.result(for: request, payload: ["room": olderRoom])
+        }
+        let client = HermesHostedRoomClient(workspace: BighelpLinkWorkspaceClient(messaging: messaging),
+                                            owner: owner, currentOwner: { owner })
+
+        let listed = try await client.groupsList(offset: 0, limit: 50)
+        let state = try await client.groupsState(roomID: "room-1", includeDisbanded: false)
+
+        let local: [[String: BighelpJSONValue]] = [
+            ["kind": .string("local"), "profile": .string("default")],
+            ["kind": .string("local"), "profile": .string("research")],
+        ]
+        #expect(listed.rooms.first?.members.map(\.target) == local)
+        #expect(state.members.map(\.target) == local)
+    }
+
+    @Test
+    func groupsLogIgnoresPageFieldsItDoesNotUse() async throws {
+        let owner = BighelpLinkHermesBotModeOwner(accountID: "account", hostID: "host", connectionID: "connection")
+        let messaging = HermesBotModeMessagingStub { request in
+            try Self.result(for: request, payload: [
+                "events": .array([Self.event(roomID: "room-1", eventID: "event-1")]),
+                "cursor": .integer(1),
+                "latest_seq": .integer(1),
+                "has_more": .boolean(false),
+                "authority": Self.authority,
+                "earliest_seq": .integer(1),
+                "history_scope": .string("retained"),
+            ])
+        }
+        let client = HermesHostedRoomClient(workspace: BighelpLinkWorkspaceClient(messaging: messaging),
+                                            owner: owner, currentOwner: { owner })
+
+        let page = try await client.groupsLog(roomID: "room-1", sinceSequence: 0, limit: 20, includeDisbanded: false)
+
+        #expect(page.events.map(\.eventID) == ["event-1"])
+        #expect(page.cursor == 1)
+    }
+
+    @Test
+    func groupsSendRejectsAReceiptWithFieldsItCannotRead() async throws {
+        // A receipt field the app doesn't know may change what the receipt
+        // means (a delivery Hermes isn't sure of), so it never counts as sent.
+        let owner = BighelpLinkHermesBotModeOwner(accountID: "account", hostID: "host", connectionID: "connection")
+        let messaging = HermesBotModeMessagingStub { request in
+            try Self.result(for: request, payload: [
+                "event": Self.event(roomID: "room-1", eventID: "event-1"),
+                "client_event_id": .string("event-1"),
+                "accepted": .boolean(true),
+                "driver_started": .boolean(true),
+                "delivery_state": .string("uncertain"),
+            ])
+        }
+        let client = HermesHostedRoomClient(workspace: BighelpLinkWorkspaceClient(messaging: messaging),
+                                            owner: owner, currentOwner: { owner })
+
+        await #expect(throws: BighelpLinkWorkspaceClientError.invalidResponse) {
+            try await client.groupsSend(roomID: "room-1", eventID: "event-1",
+                                        payload: HermesBotModeUserPayload(text: "Hello", threadID: "thread-1"))
+        }
+    }
+
     @Test(arguments: ["rename-1", "wrong-event"])
     func groupsRenameVerifiesOriginalEventAfterAnotherRename(returnedEventID: String) async throws {
         let owner = BighelpLinkHermesBotModeOwner(accountID: "account", hostID: "host", connectionID: "connection")

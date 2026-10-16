@@ -34,7 +34,9 @@ fixtures and future separately qualified runtimes.
 
 Native room discovery uses every bounded `groups.list` page. Room names,
 member IDs, profile IDs, targets and revisions remain distinct server facts.
-Unavailable profiles stay in the roster and its count. Hidden member session
+Unavailable profiles stay in the roster and its count. A member without a
+`target` is local to its profile, as Hermes reads it (`_validate_member_target`);
+rooms Hermes saved before it stored targets have none. Hidden member session
 IDs are not present in the normal room contract and must not be fabricated.
 Rename uses `groups.rename`, not ordinary session-title mutation. Show tool
 calls is a device-local presentation preference, not a host logging setting.
@@ -66,7 +68,10 @@ arbitrary workspace payloads. Event bytes are never truncated to fit transport.
   uncertain retry reuses that identity. Do not generate a second event merely
   because the phone lost a response.
 - Preserve the server's user-event identity. Replay contiguous `groups.log`
-  pages from the last persisted cursor, including all pages. A room snapshot's
+  pages from the last persisted cursor, including all pages, never asking for
+  more than the advertised `max_log_limit`. A log page ignores fields the app
+  doesn't use; send, retry and approval receipts must match exactly, so an
+  unknown receipt field never reads as a confirmed send. A room snapshot's
   latest sequence and a send receipt do not establish that earlier log entries
   have been consumed.
 - Validate room, cursor, sequence and authority before publishing a page.

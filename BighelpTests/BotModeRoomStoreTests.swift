@@ -461,6 +461,29 @@ struct BotModeRoomStoreTests {
         #expect(store.room(id: room.id)?.visibleEvents.contains(where: { $0.text == "Recovered" }) == true)
     }
 
+    @Test func nativeReplayAsksForNoMoreThanTheHostsLogLimit() async throws {
+        let source = BotModeRoom.fixture(id: "bot-native-limit", memberIDs: ["finance", "research"])
+        let room = try BotModeRoom(
+            id: source.id,
+            members: source.members,
+            visibleEvents: source.visibleEvents,
+            nativeRoomID: source.id,
+            nativeLogCursor: 0
+        )
+        // Hermes refuses a page larger than the limit it advertises.
+        let client = NativeBotModeTestClient(capabilities: .fixture(maxLogLimit: 100))
+        client.logPages = [[
+            .fixture(roomID: room.id, sequence: 1, eventID: "limit-user", kind: "message.user", payload: [
+                "text": .string("Hello"), "thread_id": .string("thread")
+            ])
+        ]]
+        let store = BotModeRoomStore(client: BotModeFixtureClient(), rooms: [room], nativeClient: client)
+
+        try await store.syncNativeRoom(roomID: room.id)
+
+        #expect(client.loggedLimits == [100])
+    }
+
     @Test func nativeRoomRetainsFullTypedTranscriptAcrossReload() throws {
         let members = [
             BotModeMember(profileID: "finance", handle: "finance", sessionID: "finance-session"),
@@ -1235,6 +1258,7 @@ final class NativeBotModeTestClient: HermesBotModeClient, HermesBotModeApprovalC
     var sentPayloads: [HermesBotModeUserPayload] = []
     var logPages: [[HermesBotModeEvent]] = []
     var loggedSinceSequences: [Int] = []
+    var loggedLimits: [Int] = []
     var stateLatestSequence: Int = 0
     var stateResponse: HermesBotModeRoomState?
     var stateResponses: [HermesBotModeRoomState] = []
@@ -1356,10 +1380,11 @@ final class NativeBotModeTestClient: HermesBotModeClient, HermesBotModeApprovalC
     func groupsLog(
         roomID _: String,
         sinceSequence: Int,
-        limit _: Int,
+        limit: Int,
         includeDisbanded _: Bool
     ) async throws -> HermesBotModeLogPage {
         loggedSinceSequences.append(sinceSequence)
+        loggedLimits.append(limit)
         if logFailuresRemaining > 0 {
             logFailuresRemaining -= 1
             throw NativeBotModeTestError.transport
@@ -1433,7 +1458,7 @@ final class NativeBotModeTestClient: HermesBotModeClient, HermesBotModeApprovalC
 }
 
 extension HermesBotModeCapabilities {
-    static func fixture(driver: Bool = true) -> Self {
+    static func fixture(driver: Bool = true, maxLogLimit: Int = 500) -> Self {
         Self(
             protocolVersion: 2,
             driver: driver,
@@ -1442,7 +1467,7 @@ extension HermesBotModeCapabilities {
             roomLink: [:],
             features: Self.requiredFeatures,
             methods: Self.requiredOperations,
-            maxLogLimit: 500
+            maxLogLimit: maxLogLimit
         )
     }
 }

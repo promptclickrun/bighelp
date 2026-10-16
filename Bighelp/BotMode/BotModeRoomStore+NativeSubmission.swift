@@ -86,7 +86,7 @@ extension BotModeRoomStore {
                 let page = try await nativeClient.groupsLog(
                     roomID: room.id,
                     sinceSequence: cursor,
-                    limit: Self.nativeLogLimit,
+                    limit: nativeLogPageLimit,
                     includeDisbanded: false
                 )
                 try requireNativeBoundary(boundary)
@@ -193,7 +193,7 @@ extension BotModeRoomStore {
                 let page = try await nativeClient.groupsLog(
                     roomID: roomID,
                     sinceSequence: cursor,
-                    limit: Self.nativeLogLimit,
+                    limit: nativeLogPageLimit,
                     includeDisbanded: false
                 )
                 try requireNativeBoundary(boundary)
@@ -449,7 +449,7 @@ extension BotModeRoomStore {
                 let page = try await nativeClient.groupsLog(
                     roomID: roomID,
                     sinceSequence: cursor,
-                    limit: Self.nativeLogLimit,
+                    limit: nativeLogPageLimit,
                     includeDisbanded: false
                 )
                 try requireNativeBoundary(boundary)

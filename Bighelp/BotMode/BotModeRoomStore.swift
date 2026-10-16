@@ -100,6 +100,10 @@ final class BotModeRoomStore {
     var roomObservers: [UUID: RoomObserver] = [:]
 
     static let nativeLogLimit = 500
+    /// Hermes refuses a log page larger than the limit it advertises.
+    var nativeLogPageLimit: Int {
+        min(Self.nativeLogLimit, nativeCapabilities?.maxLogLimit ?? Self.nativeLogLimit)
+    }
     static let nativePollNanoseconds: UInt64 = 500_000_000
     static let nativeTransportRetryNanoseconds: UInt64 = 1_000_000_000
 

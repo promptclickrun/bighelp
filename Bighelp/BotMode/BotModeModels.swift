@@ -70,6 +70,19 @@ struct HermesBotModeRoomMember: Codable, Equatable, Sendable {
         case target
     }
 
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        memberID = try container.decode(String.self, forKey: .memberID)
+        profile = try container.decode(String.self, forKey: .profile)
+        handle = try container.decode(String.self, forKey: .handle)
+        displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
+        // Hermes reads a member without a target as local to its profile
+        // (`_validate_member_target`); rooms saved before it stored targets
+        // have none, and one such room must not fail the whole catalog.
+        target = try container.decodeIfPresent([String: BighelpJSONValue].self, forKey: .target)
+            ?? ["kind": .string("local"), "profile": .string(profile)]
+    }
+
     init(member: BotModeMember) {
         memberID = member.id
         profile = member.profileID

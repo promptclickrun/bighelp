@@ -214,9 +214,9 @@ final class BighelpLinkHermesBotModeClient: HermesBotModeCatalogClient {
                 "limit": .integer(limit),
                 "include_disbanded": .boolean(includeDisbanded),
             ])
-            let page = try decode(HermesBotModeLogPage.self, from: payload, exactKeys: [
-                "events", "cursor", "latest_seq", "has_more", "authority",
-            ])
+            // A read-only page ignores fields it doesn't use; every field it
+            // does use is still required and checked below.
+            let page = try decode(HermesBotModeLogPage.self, from: payload)
             guard page.events.count <= limit else { throw BighelpLinkWorkspaceClientError.invalidResponse }
             try page.events.forEach(HermesBotModeWireCodec.event)
             guard !page.authority.gatewayID.isEmpty,
@@ -375,9 +375,9 @@ final class BighelpLinkHermesBotModeClient: HermesBotModeCatalogClient {
     private func decode<T: Decodable>(
         _ type: T.Type,
         from payload: [String: BighelpJSONValue],
-        exactKeys: Set<String>
+        exactKeys: Set<String>? = nil
     ) throws -> T {
-        guard Set(payload.keys) == exactKeys else {
+        if let exactKeys, Set(payload.keys) != exactKeys {
             throw BighelpLinkWorkspaceClientError.invalidResponse
         }
         do {

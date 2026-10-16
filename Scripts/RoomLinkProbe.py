@@ -11,6 +11,11 @@ message to the room, and both agents answer through a scripted model.
 
   /tmp/hermes/.venv/bin/python Scripts/RoomLinkProbe.py --hermes /tmp/hermes/.venv/bin/hermes
 
+With --plugin <bighelp plugin folder> both hosts run the plugin, and the
+probe also opens its "who is writing" feeds during the reply: on the home for
+the home's agent, and on the second host for its agent in a room homed
+elsewhere (native-room-peer-typing-v1).
+
 With --simulator-id it runs the app's own UI test instead
 (AllHostsHostUITests/testGroupChatWithAnAgentFromEachHostAnswers): the app adds
 both hosts, starts the group from All agents and gets both answers. Then the
@@ -38,6 +43,8 @@ import sys
 import tempfile
 import threading
 import time
+import urllib.error
+import urllib.request
 import uuid
 
 import websockets
@@ -46,6 +53,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from DirectHermesProtocolProbe import read_messages, request_status  # noqa: E402
 
 REPLY = "Hello from this agent."
+NATIVE = "/api/plugins/loopdy/native"
 
 
 class ScriptedModel(BaseHTTPRequestHandler):
@@ -68,11 +76,15 @@ class ScriptedModel(BaseHTTPRequestHandler):
                 "choices": [{"index": 0, "message": message, "finish_reason": "stop"}],
                 "usage": {"prompt_tokens": 10, "completion_tokens": 10, "total_tokens": 20}}).encode())
             return
-        for delta in [{"role": "assistant", "content": REPLY}, {}]:
+        # Written over a few seconds, like a real model, so "is writing" can show.
+        words = [word + " " for word in REPLY.split()]
+        for delta in [{"role": "assistant", "content": words[0]}, *({"content": w} for w in words[1:]), {}]:
             data = {"id": "fixture", "object": "chat.completion.chunk", "created": 1, "model": "fixture-model",
                     "choices": [{"index": 0, "delta": delta, "finish_reason": None if delta else "stop"}]}
             self.wfile.write(("data: " + json.dumps(data) + "\n\n").encode())
             self.wfile.flush()
+            if delta:
+                time.sleep(0.8)
         self.wfile.write(b"data: [DONE]\n\n")
         self.wfile.flush()
 
@@ -86,7 +98,8 @@ def free_port() -> int:
 class Host:
     """One isolated Hermes: dashboard and gateway sharing a throwaway home."""
 
-    def __init__(self, label: str, root: Path, hermes: str, model_port: int, logs: Path, display: str | None = None):
+    def __init__(self, label: str, root: Path, hermes: str, model_port: int, logs: Path, display: str | None = None,
+                 plugin: Path | None = None):
         self.label = label
         self.home = root / label / "home"
         self.project = root / label / "project"
@@ -99,7 +112,17 @@ class Host:
                   "model": {"default": "fixture-model", "provider": "custom",
                             "base_url": f"http://127.0.0.1:{model_port}/v1", "api_key": "local-synthetic-no-auth"},
                   "agent": {"max_turns": 3}, "terminal": {"backend": "local", "cwd": str(self.project)},
-                  "memory": {"memory_enabled": False, "user_profile_enabled": False}}
+                  "memory": {"memory_enabled": False, "user_profile_enabled": False},
+                  # Each computer has its own voice; Team Call speaks an agent with its computer's.
+                  # macOS `say` keeps it local (no online voice service).
+                  "tts": {"provider": "say", "providers": {"say": {
+                      "type": "command", "output_format": "wav",
+                      "command": f"say -v {'Daniel' if label == 'desk' else 'Samantha'} --file-format=WAVE "
+                                 "--data-format=LEI16@22050 -o {output_path} -f {input_path}"}}}}
+        if plugin:
+            shutil.copytree(plugin, self.home / "plugins" / "loopdy",
+                            ignore=shutil.ignore_patterns("tests", "__pycache__", ".git"))
+            config["plugins"] = {"enabled": ["loopdy"]}
         (self.home / "config.yaml").write_text(json.dumps(config))
         self.env = {k: os.environ[k] for k in ("PATH", "LANG", "TMPDIR") if k in os.environ}
         self.env.update(
@@ -150,6 +173,61 @@ class Host:
             shutil.copytree(self.home / "logs", keep_logs / f"{self.label}-hermes-logs", dirs_exist_ok=True)
 
 
+class Native:
+    """The bighelp plugin's routes, with its context ETag and request IDs."""
+
+    def __init__(self, host: Host):
+        self.host = host
+        context, headers = self._call("/context")
+        self.features = set(context.get("features", []))
+        self.etag = headers["ETag"]
+
+    def _call(self, path: str, body: dict | None = None):
+        headers = {"X-Hermes-Session-Token": self.host.token, "Content-Type": "application/json"}
+        if body is not None:
+            headers.update({"If-Match": self.etag, "X-Loopdy-Request-ID": str(uuid.uuid4())})
+        request = urllib.request.Request(self.host.origin + NATIVE + path, method="GET" if body is None else "POST",
+                                         data=None if body is None else json.dumps(body).encode(), headers=headers)
+        try:
+            with urllib.request.urlopen(request, timeout=10) as response:
+                return json.load(response), response.headers
+        except urllib.error.HTTPError as error:
+            # The plugin's error code and words, never a credential.
+            raise AssertionError(f"{self.host.label} {path}: {error.code} {error.read()[:300]!r}") from None
+
+    def post(self, path: str, body: dict) -> dict:
+        return self._call(path, body)[0]
+
+
+class Feed:
+    """One "who is writing" feed, polled in a thread so the room's RPC keeps going."""
+
+    def __init__(self, native: Native, body: dict):
+        self.native, self.room_id = native, body["roomId"]
+        page = native.post("/groups/activity/open", body)
+        self.stream, self.cursor, self.writing = page["streamId"], page["cursor"], []
+
+    async def poll(self) -> None:
+        page = await asyncio.to_thread(self.native.post, "/groups/activity/poll", {
+            "roomId": self.room_id, "streamId": self.stream, "after": self.cursor, "limit": 8})
+        self.cursor = page["cursor"]
+        self.writing += [event["memberId"] for event in page["events"] if event["kind"] == "member.responding"]
+
+
+def speak(host: Host, text: str) -> dict:
+    """What Team Call asks a computer for its agent's voice (`/api/audio/speak`)."""
+    request = urllib.request.Request(host.origin + "/api/audio/speak?profile=default", method="POST",
+                                     data=json.dumps({"text": text}).encode(),
+                                     headers={"X-Hermes-Session-Token": host.token, "Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            body = json.load(response)
+    except urllib.error.HTTPError as error:
+        return {"status": error.code, "detail": error.read()[:200].decode(errors="replace")}
+    audio = str(body.get("audio") or body.get("data_url") or body.get("url") or "")
+    return {"status": 200, "keys": sorted(body), "audio_prefix": audio[:24], "audio_chars": len(audio)}
+
+
 class RPC:
     def __init__(self, host: Host):
         self.host = host
@@ -178,7 +256,7 @@ class RPC:
         raise AssertionError(f"{self.host.label} {method}: no answer")
 
 
-async def exercise(home_host: Host, peer_host: Host, reply_timeout: float) -> dict:
+async def exercise(home_host: Host, peer_host: Host, reply_timeout: float, plugin: bool = False) -> dict:
     evidence: dict = {}
     async with RPC(home_host) as home, RPC(peer_host) as peer:
         home_caps = await home("groups.capabilities", {})
@@ -215,6 +293,15 @@ async def exercise(home_host: Host, peer_host: Host, reply_timeout: float) -> di
         state = await home("groups.state", {"room_id": room_id})
         evidence["peer_routes"] = state.get("driver_status", {}).get("peer_routes")
 
+        feeds = []
+        if plugin:
+            home_native, peer_native = Native(home_host), Native(peer_host)
+            evidence["peer_typing_feature"] = "native-room-peer-typing-v1" in peer_native.features
+            evidence["home_room_features"] = sorted(f for f in home_native.features if "room" in f)
+            feeds = [Feed(home_native, {"roomId": room_id, "include": ["member.responding"]}),
+                     Feed(peer_native, {"roomId": room_id, "include": ["member.responding"], "peer": {
+                         "homeInstallId": home_caps["authority_gateway_id"],
+                         "members": [{"memberId": "default-lab", "profile": "default"}]}})]
         thread = f"thread-{uuid.uuid4().hex[:12]}"
         await home("groups.send", {"room_id": room_id, "event_id": f"probe-{uuid.uuid4()}",
                                    "payload": {"text": "@all say hello", "thread_id": thread}})
@@ -228,8 +315,14 @@ async def exercise(home_host: Host, peer_host: Host, reply_timeout: float) -> di
                 if event["kind"] == "message.member":
                     replies[event["payload"]["member_id"]] = event["payload"]["text"]
             cursor = page["cursor"]
-            await asyncio.sleep(1)
+            for feed in feeds:
+                await feed.poll()
+            await asyncio.sleep(0.5)
+        if feeds:
+            evidence["home_feed_writing"] = sorted(set(feeds[0].writing))
+            evidence["peer_feed_writing"] = sorted(set(feeds[1].writing))
         evidence["log_kinds"] = kinds
+        evidence["peer_speech"] = await asyncio.to_thread(speak, peer_host, "Hello from the other computer.")
         evidence["replies_by_member"] = replies
         evidence["both_answered"] = set(replies) == {"default", "default-lab"}
     return evidence
@@ -254,7 +347,8 @@ def run_ui(args, hosts: list[Host], root: Path) -> int:
     repo = Path(__file__).resolve().parent.parent
     probe = root / "probe.json"
     probe.write_text(json.dumps({"mode": "roomlink", "address_a": hosts[0].origin.removeprefix("http://"),
-                                 "address_b": hosts[1].origin.removeprefix("http://")}))
+                                 "address_b": hosts[1].origin.removeprefix("http://"),
+                                 "plugin": "yes" if args.plugin else "no"}))
     probe.chmod(0o600)
     args.results.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ, TEST_RUNNER_BIGHELP_SIGNIN_PROBE=str(probe),
@@ -277,6 +371,7 @@ def main() -> int:
     parser.add_argument("--hermes", required=True, help="the separate Hermes checkout's hermes launcher")
     parser.add_argument("--logs", type=Path, help="keep both hosts' logs in this folder")
     parser.add_argument("--reply-timeout", type=float, default=240)
+    parser.add_argument("--plugin", type=Path, help="the bighelp plugin folder to run on both hosts")
     parser.add_argument("--simulator-id", help="run the app's UI test on this simulator instead of the RPC calls")
     parser.add_argument("--derived-data", type=Path, help="where the app was built for testing")
     parser.add_argument("--results", type=Path, default=Path("/private/tmp/roomlink-results"))
@@ -293,12 +388,12 @@ def main() -> int:
         try:
             for label, display in (("desk", "Desk agent"), ("lab", "Lab agent")):
                 hosts.append(Host(label, root, args.hermes, model.server_port, logs,
-                                  display=display if args.simulator_id else None))
+                                  display=display if args.simulator_id else None, plugin=args.plugin))
             for host in hosts:
                 host.wait_ready()
             if args.simulator_id:
                 return run_ui(args, hosts, root)
-            evidence = asyncio.run(exercise(hosts[0], hosts[1], args.reply_timeout))
+            evidence = asyncio.run(exercise(hosts[0], hosts[1], args.reply_timeout, plugin=args.plugin is not None))
             evidence["model_calls"] = ScriptedModel.calls
             print(json.dumps(evidence, indent=2))
             return 0 if evidence["both_answered"] else 1

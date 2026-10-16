@@ -872,6 +872,7 @@
 		8EB78A53654E6FEBBABAB1A6 /* UsageWidgetPublisher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08E42C46A7A7B2810717690E /* UsageWidgetPublisher.swift */; };
 		8EC0C02825325E07EA9EEBF0 /* FleetMaintenanceFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DEFD4D636FF2FEF2A27C94C /* FleetMaintenanceFixture.swift */; };
 		8ED2A66643398B9117CBFE70 /* HermesBlobFace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30A7FCA6EE6A4650F7F6C864 /* HermesBlobFace.swift */; };
+		8EEDE1E09B89FEB00B07231C /* TeamCallPeerVoices.swift in Sources */ = {isa = PBXBuildFile; fileRef = 772B62E94E51E55D5ADA4DBF /* TeamCallPeerVoices.swift */; };
 		8F1E50565D41591CA1A187A2 /* RootCode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6787F09E4FAAC9A79C987333 /* RootCode.swift */; };
 		8FA6897A2DC825D85B427D82 /* SessionCatalogStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F884DEFD2F7102F5E457009 /* SessionCatalogStore.swift */; };
 		8FA9B52A0DA35A4E89B3A884 /* SessionRuntimeControlSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3224A99734E1A96A44D3595E /* SessionRuntimeControlSupport.swift */; };
@@ -2376,6 +2377,7 @@
 		76E7A796DFE3645505F61E05 /* AgentsUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentsUITests.swift; sourceTree = "<group>"; };
 		770694CEC0F76E441B7E8431 /* ShortcutGatewaySwitchHostUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutGatewaySwitchHostUITests.swift; sourceTree = "<group>"; };
 		7717E4DECC27FF02102FEFEE /* LinkPreviewLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkPreviewLoader.swift; sourceTree = "<group>"; };
+		772B62E94E51E55D5ADA4DBF /* TeamCallPeerVoices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamCallPeerVoices.swift; sourceTree = "<group>"; };
 		773405F733B0ED0C24BEBB0F /* DashboardWorkProjection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardWorkProjection.swift; sourceTree = "<group>"; };
 		775FC5D9A3E4A403ED64FF6C /* BighelpLinkAccountRetirement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpLinkAccountRetirement.swift; sourceTree = "<group>"; };
 		7773C53167EE878A8E8CF470 /* BotModeRoomStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BotModeRoomStoreTests.swift; sourceTree = "<group>"; };
@@ -5473,6 +5475,7 @@
 				05423F0CCD093BC481067692 /* TeamCallBargeIn.swift */,
 				C4CD5F8FB20FADD80B3987E5 /* TeamCallDemo.swift */,
 				2EC842A92E069219C4BFDBC9 /* TeamCallModel.swift */,
+				772B62E94E51E55D5ADA4DBF /* TeamCallPeerVoices.swift */,
 				8096A79EA7E8748DBD597A9B /* TeamCallRoomLink.swift */,
 				7F4E52943EFB57E078B4215E /* TeamCallServices.swift */,
 				484E53C27068FCF34053CD2F /* TeamCallSpeech.swift */,
@@ -6789,6 +6792,7 @@
 				9B0BD91B6F3C44646FC9E7B4 /* TeamCallBargeIn.swift in Sources */,
 				D48AB0EC6C19B34F9C7FD852 /* TeamCallDemo.swift in Sources */,
 				81B006E8BEBEC3F398368DC7 /* TeamCallModel.swift in Sources */,
+				8EEDE1E09B89FEB00B07231C /* TeamCallPeerVoices.swift in Sources */,
 				12D24476B9E7781311875ED7 /* TeamCallRoomLink.swift in Sources */,
 				A191072B52B60E8BA9F8385A /* TeamCallServices.swift in Sources */,
 				E1883B0E26D9DBB14D25CEFE /* TeamCallSpeech.swift in Sources */,

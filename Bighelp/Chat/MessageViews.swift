@@ -34,7 +34,7 @@ struct TimelineSenderResolver {
         }
         return TimelineSenderDisplay(
             name: sender.snapshot.name,
-            imageURL: AvatarFileURL.resolve(
+            imageURL: sender.snapshot.imageURL ?? AvatarFileURL.resolve(
                 fileName: sender.snapshot.avatarFileName,
                 in: agents?.avatarDirectory
             )

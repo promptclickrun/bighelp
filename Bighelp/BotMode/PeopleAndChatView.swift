@@ -69,7 +69,7 @@ struct PeopleAndChatView: View {
                     HStack(spacing: BighelpTokens.space12) {
                         AvatarView(
                             stableID: participant.profileID, displayName: participant.displayName,
-                            imageURL: participant.profile.flatMap { agents.avatarURL(for: $0) }, size: 44
+                            imageURL: participant.peerImageURL ?? participant.profile.flatMap { agents.avatarURL(for: $0) }, size: 44
                         )
                         .opacity(participant.availability == .available ? 1 : 0.5)
                         .accessibilityHidden(true)

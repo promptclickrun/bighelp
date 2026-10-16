@@ -13,6 +13,17 @@ final class TeamCallModel: Identifiable {
         let profileID: String
         let name: String
         let imageURL: URL?
+        /// Whose voice it speaks with: its profile here, or `peerID/profile`
+        /// for an agent on another computer, so the two never share one.
+        let voiceKey: String
+
+        init(id: String, profileID: String, name: String, imageURL: URL?, voiceKey: String? = nil) {
+            self.id = id
+            self.profileID = profileID
+            self.name = name
+            self.imageURL = imageURL
+            self.voiceKey = voiceKey ?? profileID
+        }
     }
 
     struct Line: Identifiable, Equatable, Sendable {
@@ -126,13 +137,13 @@ final class TeamCallModel: Identifiable {
         self.loadSettings = loadSettings
         self.onEnded = onEnded
         bargeIn = TeamCallBargeIn(settings: settings, now: now)
-        let profiles = Dictionary(members.map { ($0.id, $0.profileID) }, uniquingKeysWith: { first, _ in first })
+        let voiceKeys = Dictionary(members.map { ($0.id, $0.voiceKey) }, uniquingKeysWith: { first, _ in first })
         var voices: [String: any TeamCallVoice] = [:]
         pipeline = TeamCallSpeechPipeline(player: player) { memberID in
-            guard let profileID = profiles[memberID] else { return nil }
-            if let cached = voices[profileID] { return cached }
-            let made = voice(profileID)
-            voices[profileID] = made
+            guard let key = voiceKeys[memberID] else { return nil }
+            if let cached = voices[key] { return cached }
+            let made = voice(key)
+            voices[key] = made
             return made
         }
         pipeline.onStart = { [weak self] segment in self?.segmentStarted(segment) }
@@ -285,7 +296,7 @@ final class TeamCallModel: Identifiable {
         let member = member(memberID)
         lines.append(Line(id: event.id, memberID: memberID, speaker: member?.name ?? "Agent", text: text))
         trimLines()
-        let minimum = member.map { settings.firstSentenceMinimum(for: $0.profileID) }
+        let minimum = member.map { settings.firstSentenceMinimum(for: $0.voiceKey) }
             ?? TeamCallVoiceSettings.defaultFirstSentenceMinimum
         pipeline.enqueue(replyID: event.id, memberID: memberID,
                          chunks: TeamCallSpeechSplitter.chunks(text, firstSentenceMinimum: minimum))

@@ -107,7 +107,8 @@ final class RegistryFleetReader: FleetHostReading {
         // Let the connection go again unless the app switched to this host meanwhile,
         // or the all-hosts view keeps it for the next switch.
         defer {
-            if connectsHere, registry.selectedHostID != hostID, !registry.keepsOtherHostsConnected {
+            if connectsHere, registry.selectedHostID != hostID, !registry.keepsOtherHostsConnected,
+               !registry.isConnectionHeld(hostID) {
                 store.suspendForPresentationExit()
             }
         }
@@ -133,6 +134,49 @@ final class RegistryFleetReader: FleetHostReading {
         }
         try workspace.installCapabilities(WorkspaceCapabilities(owner: owner, values: availability))
         return try await body(workspace, owner, current, client)
+    }
+
+    /// Another host's connection kept open until `release`: for a group chat
+    /// with its agents on screen, or a Team Call they speak in.
+    func holdWorkspace(_ hostID: UUID) async throws -> HeldWorkspace {
+        registry.holdConnection(hostID)
+        do {
+            return try await withWorkspace(hostID) { workspace, owner, current, client in
+                HeldWorkspace(workspace: workspace, owner: owner, currentOwner: current, client: client) {
+                    [weak registry] in registry?.releaseConnection(hostID)
+                }
+            }
+        } catch {
+            registry.releaseConnection(hostID)
+            throw error
+        }
+    }
+
+    @MainActor
+    final class HeldWorkspace: HermesBotModePeerConnection {
+        let directWorkspace: DirectHermesWorkspaceClient
+        let owner: WorkspaceOwner
+        let currentOwner: @MainActor () -> WorkspaceOwner?
+        let client: DirectHermesClient
+        var pluginFeatures: Set<String> = []
+        private var onRelease: (@MainActor () -> Void)?
+
+        var workspace: any WorkspaceOperationPerforming { directWorkspace }
+
+        init(workspace: DirectHermesWorkspaceClient, owner: WorkspaceOwner,
+             currentOwner: @escaping @MainActor () -> WorkspaceOwner?, client: DirectHermesClient,
+             onRelease: @escaping @MainActor () -> Void) {
+            directWorkspace = workspace
+            self.owner = owner
+            self.currentOwner = currentOwner
+            self.client = client
+            self.onRelease = onRelease
+        }
+
+        func release() {
+            onRelease?()
+            onRelease = nil
+        }
     }
 
     private static func snapshot(

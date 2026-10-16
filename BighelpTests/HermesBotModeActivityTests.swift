@@ -128,6 +128,48 @@ struct HermesBotModeActivityTests {
         }
     }
 
+    @Test func aFeedOnAnotherComputerAsksOnlyForItsAgentsWriting() async throws {
+        let owner = WorkspaceOwner(authority: try .fixture(id: "activity-owner"),
+                                   authenticationGeneration: UUID(), connectionGeneration: UUID())
+        var opened: [String: BighelpJSONValue] = [:]
+        let client = NativeHermesBotModeActivityClient(
+            owner: owner, currentOwner: { owner },
+            peer: .init(homeInstallID: "install:home", members: [.init(memberID: "rio-desk", profile: "research")])
+        ) { _, payload in
+            opened = payload
+            return Self.page()
+        }
+        _ = try await client.open(roomID: "room")
+        #expect(opened["include"] == .array([.string("member.responding")]))
+        #expect(opened["peer"] == .object([
+            "homeInstallId": .string("install:home"),
+            "members": .array([.object(["memberId": .string("rio-desk"), "profile": .string("research")])]),
+        ]))
+    }
+
+    @Test func anAgentOnAnotherComputerTypesUntilItsReplyLandsAndALateReportStaysAway() async throws {
+        let clock = TypingClock()
+        let peerFeed = GatedActivityClient()
+        let store = BotModeActivityStore(pollInterval: .zero, typingTimeout: 6, now: { clock.now })
+        let token = store.beginPeerFeed(roomID: "room", client: peerFeed, memberIDs: ["rio-desk"])
+        // Its computer knows its own session, not the home's task.
+        var report = try #require(Self.responding(sequence: 1, member: "rio-desk").object)
+        report["taskId"] = .string("room_0123456789abcdef0123456789abcdef")
+        peerFeed.send(try Self.decoded([.object(report)]))
+        for _ in 0..<200 where store.typingMemberIDs(roomID: "room").isEmpty {
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(store.typingMemberIDs(roomID: "room") == ["rio-desk"])
+        store.finishTyping(roomID: "room", memberID: "rio-desk", taskID: "home-task")
+        #expect(store.typingMemberIDs(roomID: "room").isEmpty, "Its reply clears it whatever the task")
+        // A report written just before the reply arrives after it: still gone.
+        report["observationSequence"] = .integer(2)
+        peerFeed.send(try Self.decoded([.object(report)], cursor: nil))
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(store.typingMemberIDs(roomID: "room").isEmpty)
+        store.endPeerFeed(token)
+    }
+
     @Test func writingReportsDecodeBesideToolsAndNeverCarryText() throws {
         let page = try NativeHermesBotModeActivityClient.decodePage(
             Self.page(events: [Self.event(sequence: 1), Self.responding(sequence: 2, member: "bob")]),

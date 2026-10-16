@@ -85,6 +85,17 @@ sign-ins (`RegistryRoomPeerHosts`). A peer member never takes a local
 profile's name or picture, even one with the same profile ID.
 `Scripts/RoomLinkProbe.py` checks the whole flow on two isolated real hosts.
 
+A peer member shows its own computer's current name and picture: the
+all-computers view keeps a copy of each computer's agents
+(`FleetStore.peerAgent`, found by `peer_id`), and a room with peers on screen
+reads those computers again when the copy is old. While such a room is on
+screen, the app holds a connection to each of those computers
+(`BighelpHostRegistry.holdConnection`) and opens that computer's plugin feed
+for its agents (`native-room-peer-typing-v1`), so they show "is typing" too.
+A Team Call includes peer members; each speaks with its own computer's voice
+(`TeamCallPeerVoices`, `voice.speak` on that computer, keyed `peer_id/profile`
+so a local and a peer `default` never share a voice).
+
 ## Durable interaction contract
 
 - Create one stable room with selected profile members. Hermes' `groups.*` has

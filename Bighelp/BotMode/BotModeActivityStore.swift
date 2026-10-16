@@ -14,6 +14,9 @@ struct BotModeTypingMember: Equatable, Sendable {
     let taskID: String
     let executionGeneration: Int
     var lastSeen: Date
+    /// Reported by the agent's own computer (RoomLink), which doesn't know the
+    /// home's task: its reply clears it by member alone.
+    var isPeer = false
 }
 
 struct BotModeActivitySnapshot: Equatable, Sendable {
@@ -32,6 +35,12 @@ final class BotModeActivityStore {
     private(set) var typing: [String: [BotModeTypingMember]] = [:]
     private var client: (any HermesBotModeActivityClient)?
     private var tasks: [String: Task<Void, Never>] = [:]
+    /// Feeds on other computers for their agents in a room, by token.
+    private var peerTasks: [UUID: (roomID: String, task: Task<Void, Never>)] = [:]
+    /// When each member's reply or turn end last reached the log, by room. A
+    /// writing report from just before it can still arrive after; it's ignored.
+    private var finishedAt: [String: [String: Date]] = [:]
+    private let finishCooldown: TimeInterval = 3
     private var tokens: [String: UUID] = [:]
     private var viewers: [String: Set<UUID>] = [:]
     private let pollInterval: Duration
@@ -50,6 +59,9 @@ final class BotModeActivityStore {
     func configure(_ client: (any HermesBotModeActivityClient)?) {
         tasks.values.forEach { $0.cancel() }
         tasks = [:]
+        peerTasks.values.forEach { $0.task.cancel() }
+        peerTasks = [:]
+        finishedAt = [:]
         tokens = [:]
         viewers = [:]
         snapshots = [:]
@@ -192,18 +204,69 @@ final class BotModeActivityStore {
 
     /// The room log has the member's message or the end of its turn.
     func finishTyping(roomID: String, memberID: String, taskID: String?) {
+        finishedAt[roomID, default: [:]][memberID] = now()
         guard let members = typing[roomID] else { return }
         let remaining = members.filter { member in
-            member.memberID != memberID || (taskID != nil && member.taskID != taskID)
+            member.memberID != memberID || (!member.isPeer && taskID != nil && member.taskID != taskID)
         }
         if remaining != members { typing[roomID] = remaining.isEmpty ? nil : remaining }
     }
 
-    private func noteTyping(roomID: String, observation: HermesBotModeRespondingObservation) {
+    /// Reads who is writing from another computer's feed for its agents in
+    /// this room, until `endPeerFeed`. Only writing: tool details stay there.
+    func beginPeerFeed(roomID: String, client: any HermesBotModeActivityClient, memberIDs: Set<String>) -> UUID {
+        let token = UUID()
+        let generation = configurationGeneration
+        let task = Task { @MainActor [weak self] in
+            var opened: HermesBotModeActivityPage?
+            defer {
+                if let opened {
+                    Task { @MainActor in try? await client.close(roomID: roomID, streamID: opened.streamId) }
+                }
+            }
+            do {
+                var page = try await client.open(roomID: roomID)
+                opened = page
+                while !Task.isCancelled {
+                    let next = try await client.poll(roomID: roomID, streamID: page.streamId, after: page.cursor, limit: 8)
+                    guard let self, self.configurationGeneration == generation, self.peerTasks[token] != nil else { return }
+                    guard next.runtimeId == page.runtimeId, next.streamId == page.streamId, !next.resetRequired else {
+                        return
+                    }
+                    for observation in next.responding where memberIDs.contains(observation.memberId) {
+                        self.noteTyping(roomID: roomID, observation: observation, isPeer: true)
+                    }
+                    self.expireTyping(roomID: roomID)
+                    page = next
+                    if !next.hasMore { try await Task.sleep(for: self.pollInterval) }
+                }
+            } catch {
+                // A computer that can't say who is writing leaves the unnamed bubble.
+                return
+            }
+        }
+        peerTasks[token] = (roomID, task)
+        return token
+    }
+
+    func endPeerFeed(_ token: UUID) {
+        guard let entry = peerTasks.removeValue(forKey: token) else { return }
+        entry.task.cancel()
+        if !peerTasks.values.contains(where: { $0.roomID == entry.roomID }),
+           let members = typing[entry.roomID]?.filter({ !$0.isPeer }) {
+            typing[entry.roomID] = members.isEmpty ? nil : members
+        }
+    }
+
+    private func noteTyping(roomID: String, observation: HermesBotModeRespondingObservation, isPeer: Bool = false) {
+        if let finished = finishedAt[roomID]?[observation.memberId],
+           now().timeIntervalSince(finished) < finishCooldown {
+            return
+        }
         var members = typing[roomID] ?? []
         let member = BotModeTypingMember(
             memberID: observation.memberId, taskID: observation.taskId,
-            executionGeneration: observation.executionGeneration, lastSeen: now()
+            executionGeneration: observation.executionGeneration, lastSeen: now(), isPeer: isPeer
         )
         if let index = members.firstIndex(where: { $0.memberID == observation.memberId }) {
             members[index] = member

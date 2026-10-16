@@ -59,14 +59,26 @@ struct TeamCallEntry: ViewModifier {
             }
     }
 
+    /// Agents here and on other computers; each speaks in its own computer's voice.
     private var participants: [HermesBotModeParticipant] {
-        chat.nativeRoomParticipants.filter { $0.availability == .available }
+        chat.nativeRoomParticipants.filter { $0.availability == .available || $0.availability == .otherComputer }
+    }
+
+    private var localProfileIDs: [String] {
+        var profileIDs: [String] = []
+        for participant in participants where participant.peerID == nil && !profileIDs.contains(participant.profileID) {
+            profileIDs.append(participant.profileID)
+        }
+        return profileIDs
     }
 
     private var action: TeamCallAction? {
+        let peerHosts = rooms.peerHosts
         guard let services, chat.canInteractWithBotMode, chat.botModeRoomID != nil,
               participants.count >= 2,
-              services.supportsVoice(profileIDs: participants.map(\.profileID)) else { return nil }
+              // Agents on other computers need a way there; this computer's need its voice.
+              participants.allSatisfy({ $0.peerID == nil || peerHosts != nil }),
+              localProfileIDs.isEmpty || services.supportsVoice(profileIDs: localProfileIDs) else { return nil }
         return TeamCallAction { start(services) }
     }
 
@@ -75,11 +87,12 @@ struct TeamCallEntry: ViewModifier {
         let members = participants.map { participant in
             TeamCallModel.Member(
                 id: participant.memberID, profileID: participant.profileID, name: participant.displayName,
-                imageURL: participant.profile.flatMap { agents.avatarURL(for: $0) }
+                imageURL: participant.peerImageURL ?? participant.profile.flatMap { agents.avatarURL(for: $0) },
+                voiceKey: participant.peerID.map { TeamCallPeerVoices.key(peerID: $0, profileID: participant.profileID) }
             )
         }
-        var profileIDs: [String] = []
-        for member in members where !profileIDs.contains(member.profileID) { profileIDs.append(member.profileID) }
+        let profileIDs = localProfileIDs
+        let peerVoices = rooms.peerHosts.map(TeamCallPeerVoices.init(peers:))
         let permissionCenter = permissionCenter
         let usesDeviceMicrophone = services.usesDeviceMicrophone
         call = TeamCallModel(
@@ -93,7 +106,7 @@ struct TeamCallEntry: ViewModifier {
                 senderSnapshot: { [weak chat] in chat?.currentUserSnapshot },
                 activitySink: { [weak chat] activity in chat?.acceptBotModeActivity(activity) }
             ),
-            voice: { services.makeVoice(profileID: $0) },
+            voice: { key in peerVoices?.voice(for: key) ?? services.makeVoice(profileID: key) },
             player: services.makePlayer(),
             input: services.makeInput(),
             transcription: transcription,
@@ -104,7 +117,10 @@ struct TeamCallEntry: ViewModifier {
                 !usesDeviceMicrophone || permissionCenter.status(for: .speech).authorization == .authorized
             },
             loadSettings: { await services.loadSettings(profileIDs: profileIDs) },
-            onEnded: { call = nil }
+            onEnded: {
+                peerVoices?.releaseAll()
+                call = nil
+            }
         )
     }
 }
@@ -245,7 +261,7 @@ struct TeamCallView: View {
             detail: isSpeaking ? "Talking" : nil
         )
         .accessibilityLabel(isSpeaking ? "\(member.name), talking" : member.name)
-        .accessibilityIdentifier("team-call.member.\(member.profileID)")
+        .accessibilityIdentifier("team-call.member.\(member.id)")
         .accessibilityAddTraits(isSpeaking ? .isSelected : [])
     }
 

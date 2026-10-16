@@ -7,9 +7,11 @@ import Foundation
 @MainActor
 final class DemoRoomPeerHosts: HermesBotModePeerHosts {
     private let hostNames: [String]
+    private weak var fleet: FleetStore?
 
-    init(hostNames: [String] = FleetFixtureReader().hosts.map(\.name)) {
+    init(hostNames: [String] = FleetFixtureReader().hosts.map(\.name), fleet: FleetStore? = nil) {
         self.hostNames = hostNames
+        self.fleet = fleet
     }
 
     func roomLink(hostID: String, profile: String) async throws -> HermesBotModeRoomLink {
@@ -30,6 +32,19 @@ final class DemoRoomPeerHosts: HermesBotModePeerHosts {
 
     func hostName(peerID: String) -> String? {
         hostNames.first { HermesBotModePeerMembers.slug($0) == peerID }
+    }
+
+    func agent(peerID: String, profile: String) -> HermesBotModePeerAgent? {
+        fleet?.peerAgent(peerID: peerID, profile: profile)
+    }
+
+    func refreshAgents() {
+        fleet?.refresh()
+    }
+
+    /// The demo's other computers can't be reached.
+    func connect(peerID: String) async throws -> any HermesBotModePeerConnection {
+        throw WorkspaceClientError.unavailable(.unsupportedHost)
     }
 }
 #endif

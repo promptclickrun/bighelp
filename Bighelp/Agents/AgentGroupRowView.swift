@@ -7,6 +7,8 @@ struct AgentGroupRowView: View {
     let group: HermesBotModeRoomSummary
     let profiles: [AgentProfile]
     let avatarDirectory: URL?
+    /// Agents on other computers: their own names and pictures.
+    var peers: (any HermesBotModePeerHosts)? = nil
     var isPinned = false
     var liveState: AgentLiveState? = nil
     let onSelect: () -> Void
@@ -62,13 +64,13 @@ struct AgentGroupRowView: View {
         .accessibilityIdentifier("agents.group.\(group.roomID)")
     }
 
-    private var participants: [HermesBotModeParticipant] { group.participants(profiles: profiles) }
+    private var participants: [HermesBotModeParticipant] { group.participants(profiles: profiles, peers: peers) }
 
     private var clusterAvatars: [AvatarStack.Avatar] {
         participants.prefix(2).map {
             AvatarStack.Avatar(
                 stableID: $0.memberID, displayName: $0.displayName,
-                imageURL: AvatarFileURL.resolve(fileName: $0.profile?.avatarFileName, in: avatarDirectory)
+                imageURL: $0.peerImageURL ?? AvatarFileURL.resolve(fileName: $0.profile?.avatarFileName, in: avatarDirectory)
             )
         }
     }

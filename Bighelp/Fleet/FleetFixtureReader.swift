@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(UIKit)
+import UIKit
+#endif
 
 #if DEBUG
 /// Demo hosts for the all-hosts view. "Home Hermes" is the demo's own agents
@@ -59,6 +62,7 @@ final class FleetFixtureReader: FleetHostReading {
                 FleetAgent(hostID: id, profileID: "research", name: "Rio Tanaka", role: "Research agent",
                            isPinned: true, isDefault: true, placement: placements["research"]),
                 FleetAgent(hostID: id, profileID: "reviewer", name: "Sage Ortiz", role: "Code reviewer",
+                           avatarFile: Self.demoPicture(in: avatars),
                            isPinned: false, isDefault: false, activity: .working, placement: placements["reviewer"]),
             ],
             chats: [
@@ -98,6 +102,21 @@ final class FleetFixtureReader: FleetHostReading {
                     turnCount: 5, excerpt: "Three short paragraphs")),
             ]
         )
+    }
+
+    /// Sage's own picture on Studio Mac, as a chosen avatar is saved on its host.
+    private static func demoPicture(in avatars: FleetAvatarFolder) -> String? {
+        #if canImport(UIKit)
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 96, height: 96)).image { context in
+            UIColor(red: 0.95, green: 0.62, blue: 0.16, alpha: 1).setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 96, height: 96))
+            UIColor(red: 0.13, green: 0.35, blue: 0.62, alpha: 1).setFill()
+            context.cgContext.fillEllipse(in: CGRect(x: 18, y: 18, width: 60, height: 60))
+        }
+        return image.pngData().flatMap { try? avatars.store($0, fileExtension: "png") }
+        #else
+        return nil
+        #endif
     }
 }
 #endif

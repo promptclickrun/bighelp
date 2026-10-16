@@ -102,6 +102,9 @@ final class BighelpHostRegistry {
     @ObservationIgnored private var vaults: [UUID: DirectHermesKeychainVault] = [:]
     @ObservationIgnored private var draftStores: [UUID: DirectHermesDraftStore] = [:]
     @ObservationIgnored private var pendingIDs: Set<UUID> = []
+    /// Other hosts kept connected while something on screen needs them (a
+    /// group chat with their agents, a Team Call), counted per host.
+    @ObservationIgnored private var connectionHolds: [UUID: Int] = [:]
     @ObservationIgnored private var pluginManagementOwners: [UUID: UUID] = [:]
     @ObservationIgnored private var pluginFeatureReadiness: [HostPluginFeature: HostPluginFeatureReadiness] = [:]
     private struct PendingSetupCleanup {
@@ -361,7 +364,9 @@ final class BighelpHostRegistry {
         do {
             try persist(hosts: hosts, selected: id)
             generation = UUID()
-            if !keepsOtherHostsConnected { selectedWorkspace?.suspendForPresentationExit() }
+            if !keepsOtherHostsConnected, !isConnectionHeld(selectedHostID) {
+                selectedWorkspace?.suspendForPresentationExit()
+            }
             selectedHostID = id
             selectedWorkspace = selectedHost.map { workspace(for: $0) }
             errorMessage = nil
@@ -411,12 +416,36 @@ final class BighelpHostRegistry {
         generation = UUID()
     }
 
-    /// Every host's connection but the selected one's.
+    /// Every host's connection but the selected one's and those held.
     func closeUnselectedConnections() {
         for (id, store) in workspaces where id != selectedHostID && !pendingIDs.contains(id)
-            && (store.isConnected || store.isConnecting) {
+            && connectionHolds[id] == nil && (store.isConnected || store.isConnecting) {
             store.suspendForPresentationExit()
         }
+    }
+
+    /// Keeps another host's connection open until the matching release.
+    func holdConnection(_ hostID: UUID) {
+        connectionHolds[hostID, default: 0] += 1
+    }
+
+    /// Lets the connection close when nothing else holds it and nothing keeps
+    /// other hosts connected.
+    func releaseConnection(_ hostID: UUID) {
+        guard let count = connectionHolds[hostID] else { return }
+        guard count <= 1 else {
+            connectionHolds[hostID] = count - 1
+            return
+        }
+        connectionHolds[hostID] = nil
+        if hostID != selectedHostID, !keepsOtherHostsConnected, let store = workspaces[hostID],
+           store.isConnected || store.isConnecting {
+            store.suspendForPresentationExit()
+        }
+    }
+
+    func isConnectionHeld(_ hostID: UUID?) -> Bool {
+        hostID.map { connectionHolds[$0] != nil } ?? false
     }
 
     func beginPluginManagement(hostID: UUID) -> UUID? {

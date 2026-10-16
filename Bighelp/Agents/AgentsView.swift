@@ -284,6 +284,7 @@ struct AgentsView: View {
                 ForEach(groups) { group in
                     AgentGroupRowView(
                         group: group, profiles: store.profiles, avatarDirectory: store.avatarDirectory,
+                        peers: botModeRooms?.peerHosts,
                         isPinned: preference(group).pinned, liveState: groupLiveState(group)
                     ) { dispatch(.openGroup(roomID: group.roomID)) }
                     .listRowInsets(Self.rowInsets)

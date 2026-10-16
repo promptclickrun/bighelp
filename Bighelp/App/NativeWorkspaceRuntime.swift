@@ -91,7 +91,8 @@ final class NativeWorkspaceRuntime {
     @ObservationIgnored private let promptObserverID = UUID()
 
     init(connections: WorkspaceConnectionStore, authority: WorkspaceAuthority,
-         settings: SettingsStore, userIdentity: UserIdentityStore, directory: URL) throws {
+         settings: SettingsStore, userIdentity: UserIdentityStore, directory: URL,
+         peerHosts: (any HermesBotModePeerHosts)? = nil) throws {
         guard authority.kind == .direct else { throw WorkspaceClientError.ownerChanged }
         self.connections = connections
         self.authority = authority
@@ -185,7 +186,7 @@ final class NativeWorkspaceRuntime {
         )
         let rooms = BotModeRoomStore(client: unavailable, repository: roomRepository, executionEnabled: false)
         // Group chats with agents on the person's other computers reach them with their own sign-ins.
-        rooms.peerHosts = RegistryRoomPeerHosts(registry: connections.hosts)
+        rooms.peerHosts = peerHosts ?? RegistryRoomPeerHosts(registry: connections.hosts)
         self.rooms = rooms
         let repository = SessionContentRepository(directory: root, name: "native-sessions-v2", currentSchemaVersion: 2)
         let sessions = SessionCatalogStore(

@@ -115,19 +115,21 @@ struct BighelpApp: App {
         hostRegistry.useIndependentWorkspace()
         _hostRegistry = State(initialValue: hostRegistry)
         var fleet = FleetStore(reader: RegistryFleetReader(registry: hostRegistry))
-        composition.botModeRooms.peerHosts = RegistryRoomPeerHosts(registry: hostRegistry)
+        var peerHosts: any HermesBotModePeerHosts = RegistryRoomPeerHosts(registry: hostRegistry, fleet: fleet)
         #if DEBUG
         // Real-host UI tests add real hosts to the demo shell; they read those.
         if arguments.contains("-use-demo-fixtures"), !arguments.contains("-test-no-configured-hosts") {
             fleet = FleetStore(reader: FleetFixtureReader(), directory: FileManager.default.temporaryDirectory
                 .appending(path: "bighelp-fleet-demo-\(ProcessInfo.processInfo.processIdentifier)"))
-            composition.botModeRooms.peerHosts = DemoRoomPeerHosts()
+            peerHosts = DemoRoomPeerHosts(fleet: fleet)
         }
         #endif
+        // One way to the person's other computers, for every computer's group chats.
+        composition.botModeRooms.peerHosts = peerHosts
         _fleet = State(initialValue: fleet)
         let connections = WorkspaceConnectionStore(hosts: hostRegistry)
         _workspaceConnections = State(initialValue: connections)
-        let nativeWorkspaces = composition.makeNativeWorkspaceSelection(connections: connections)
+        let nativeWorkspaces = composition.makeNativeWorkspaceSelection(connections: connections, peerHosts: peerHosts)
         _nativeWorkspaces = State(initialValue: nativeWorkspaces)
         // Demo runs without a real host use the demo stores, as the shell does.
         let usesDemoWorkspace = arguments.contains("-use-demo-fixtures") || arguments.contains("-disable-demo-delays")

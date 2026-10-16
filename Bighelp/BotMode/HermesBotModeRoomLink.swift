@@ -102,6 +102,32 @@ protocol HermesBotModePeerHosts: AnyObject {
                 authorityGatewayID: String, authorityEpoch: Int, memberID: String) async throws -> HermesBotModePeerInvite
     /// The saved computer a room member's `peer_id` names, for its label.
     func hostName(peerID: String) -> String?
+    /// That computer's agent as this device last read it: its current name
+    /// and its own picture.
+    func agent(peerID: String, profile: String) -> HermesBotModePeerAgent?
+    /// Reads the other computers again if they haven't been lately, so their
+    /// agents' names and pictures are there.
+    func refreshAgents()
+    /// Opens the computer a member's `peer_id` names and keeps its connection
+    /// until `release`: for a group chat on screen or a Team Call.
+    func connect(peerID: String) async throws -> any HermesBotModePeerConnection
+}
+
+/// Another computer's connection, held open for as long as it's needed.
+@MainActor
+protocol HermesBotModePeerConnection: AnyObject, Sendable {
+    var workspace: any WorkspaceOperationPerforming { get }
+    var owner: WorkspaceOwner { get }
+    var currentOwner: @MainActor () -> WorkspaceOwner? { get }
+    /// The bighelp plugin's features there (`native-room-peer-typing-v1`).
+    var pluginFeatures: Set<String> { get }
+    func release()
+}
+
+/// An agent on another computer, as the all-computers view last read it.
+struct HermesBotModePeerAgent: Equatable, Sendable {
+    let name: String
+    let imageURL: URL?
 }
 
 /// The home computer's side of RoomLink setup.

@@ -140,6 +140,13 @@ final class AllHostsHostUITests: BighelpUITestCase {
         let deadline = Date().addingTimeInterval(30)
         while !send.isEnabled, Date() < deadline { Thread.sleep(forTimeInterval: 0.3) }
         send.tap()
+        if probe["plugin"] == "yes" {
+            // Desk agent writes on its own computer; that computer's plugin says so.
+            let typing = app.descendants(matching: .any).matching(NSPredicate(
+                format: "identifier == 'chat.bot-typing' AND label == %@", "Desk agent is typing"))
+            XCTAssertTrue(typing.firstMatch.waitForExistence(timeout: 120), "The other computer's agent shows typing")
+            save("roomlink-1b-typing", app)
+        }
         let replies = app.textViews.matching(NSPredicate(format: "value CONTAINS %@", "Hello from this agent."))
         expectation(for: NSPredicate(format: "count >= 2"), evaluatedWith: replies)
         waitForExpectations(timeout: 240)

@@ -161,6 +161,25 @@ struct TeamCallTests {
         #expect(rig.model.lines.map(\.speaker) == ["Avery", "Jordan"])
     }
 
+    @Test func anAgentOnAnotherComputerSpeaksWithItsOwnVoiceNotTheLocalSameProfiles() async {
+        // Both are each computer's "default" profile.
+        let rig = CallRig(members: [
+            .init(id: "default", profileID: "default", name: "Lab agent", imageURL: nil),
+            .init(id: "default-desk", profileID: "default", name: "Desk agent", imageURL: nil,
+                  voiceKey: TeamCallPeerVoices.key(peerID: "desk", profileID: "default")),
+        ])
+        rig.model.start()
+        rig.model.setMicrophoneAllowed(true)
+        rig.link.reply(from: "default", "Hello from the lab.")
+        rig.link.reply(from: "default-desk", "Hello from the desk.")
+        await eventually { rig.player.played.count == 1 }
+        rig.player.finishCurrent()
+        await eventually { rig.player.played.count == 2 }
+        rig.player.finishCurrent()
+        #expect(rig.synthesized == ["default:Hello from the lab.", "desk/default:Hello from the desk."])
+        #expect(rig.model.lines.map(\.speaker) == ["Lab agent", "Desk agent"])
+    }
+
     @Test func repliesFromBeforeTheCallAreNotReadOut() async {
         let rig = CallRig()
         rig.link.reply(from: "member-a", "Old news.", notify: false)
@@ -630,6 +649,10 @@ private final class CallRig {
     var model: TeamCallModel!
 
     init(
+        members: [TeamCallModel.Member] = [
+            .init(id: "member-a", profileID: "alpha", name: "Avery", imageURL: nil),
+            .init(id: "member-b", profileID: "beta", name: "Jordan", imageURL: nil),
+        ],
         settings: TeamCallVoiceSettings = .init(),
         loadSettings: @escaping @MainActor () async -> TeamCallVoiceSettings? = { nil },
         onEnded: @escaping @MainActor () -> Void = {}
@@ -637,10 +660,7 @@ private final class CallRig {
         let clock = clock
         model = TeamCallModel(
             title: "Weekend planners",
-            members: [
-                .init(id: "member-a", profileID: "alpha", name: "Avery", imageURL: nil),
-                .init(id: "member-b", profileID: "beta", name: "Jordan", imageURL: nil),
-            ],
+            members: members,
             link: link,
             voice: { [unowned self] profileID in
                 FakeVoice(name: profileID) { [unowned self] in self.synthesized.append($0) }

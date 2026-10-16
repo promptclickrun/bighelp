@@ -116,6 +116,17 @@ struct HermesBotModeActivityPage: Codable, Equatable, Sendable {
     }
 }
 
+/// Agents on the plugin's computer in a room homed on another computer
+/// (`native-room-peer-typing-v1`): only who is writing.
+struct HermesBotModePeerFeedScope: Equatable, Sendable {
+    struct Member: Equatable, Sendable {
+        let memberID: String
+        let profile: String
+    }
+    let homeInstallID: String
+    let members: [Member]
+}
+
 @MainActor
 protocol HermesBotModeActivityClient: AnyObject {
     func open(roomID: String) async throws -> HermesBotModeActivityPage
@@ -135,20 +146,32 @@ final class NativeHermesBotModeActivityClient: HermesBotModeActivityClient {
     private let currentOwner: @MainActor () -> WorkspaceOwner?
     private let request: Request
     private let includesResponding: Bool
+    private let peer: HermesBotModePeerFeedScope?
 
     /// `includesResponding` asks for `member.responding` events; pass it only
-    /// when native context lists `native-room-typing-v1`.
+    /// when native context lists `native-room-typing-v1`. `peer` opens the feed
+    /// on another computer for its agents in this room (needs
+    /// `native-room-peer-typing-v1` there).
     init(owner: WorkspaceOwner, currentOwner: @escaping @MainActor () -> WorkspaceOwner?,
-         includesResponding: Bool = false, request: @escaping Request) {
+         includesResponding: Bool = false, peer: HermesBotModePeerFeedScope? = nil, request: @escaping Request) {
         self.owner = owner
         self.currentOwner = currentOwner
-        self.includesResponding = includesResponding
+        self.includesResponding = includesResponding || peer != nil
+        self.peer = peer
         self.request = request
     }
 
     func open(roomID: String) async throws -> HermesBotModeActivityPage {
         var body: [String: BighelpJSONValue] = ["roomId": .string(roomID)]
         if includesResponding { body["include"] = .array([.string("member.responding")]) }
+        if let peer {
+            body["peer"] = .object([
+                "homeInstallId": .string(peer.homeInstallID),
+                "members": .array(peer.members.map {
+                    .object(["memberId": .string($0.memberID), "profile": .string($0.profile)])
+                }),
+            ])
+        }
         let value = try await perform(.open, roomID: roomID, body: body)
         let page = try Self.decodePage(value, roomID: roomID, streamID: nil, after: 0, limit: 8)
         guard page.events.isEmpty, page.cursor == 0, page.highWater == 0, !page.resetRequired else {

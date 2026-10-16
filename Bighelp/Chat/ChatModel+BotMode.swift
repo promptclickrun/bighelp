@@ -101,10 +101,9 @@ extension ChatModel {
         } else {
             members = room.members.map(HermesBotModeRoomMember.init(member:))
         }
-        let peerHosts = botModeRoomStore?.peerHosts
         return members.map {
             HermesBotModeParticipant(member: $0, profiles: agentDirectory?.profiles ?? [],
-                                     computerNamed: { peerHosts?.hostName(peerID: $0) })
+                                     peers: botModeRoomStore?.peerHosts)
         }
     }
 
@@ -175,16 +174,46 @@ extension ChatModel {
         return botModeRoomStore.activity.typingMemberIDs(roomID: botModeRoomID).compactMap { memberID in
             guard let participant = participants.first(where: { $0.memberID == memberID }) else { return nil }
             return .agent(id: memberID, snapshot: .init(name: participant.displayName,
-                                                        avatarFileName: participant.profile?.avatarFileName))
+                                                        avatarFileName: participant.profile?.avatarFileName,
+                                                        imageURL: participant.peerImageURL))
         }
     }
 
-    /// Keeps the room's live activity feed open while this chat is on screen.
+    /// Keeps the room's live activity feeds open while this chat is on screen:
+    /// this computer's, and for agents on other computers, their computers'.
     func observeBotModeActivity() async {
         guard !botModeActivityScope.isEmpty, let botModeRoomID, let botModeRoomStore else { return }
         let viewerID = UUID()
+        let peerMembers = botModeRoom?.nativeState?.members.filter { $0.target["kind"]?.string == "peer" } ?? []
+        // Read those computers again if it's been a while, so their agents'
+        // names and pictures are current.
+        if !peerMembers.isEmpty { botModeRoomStore.peerHosts?.refreshAgents() }
         botModeRoomStore.beginNativeActivity(roomID: botModeRoomID, viewerID: viewerID)
+        var connections: [any HermesBotModePeerConnection] = []
+        var feeds: [UUID] = []
+        if let peers = botModeRoomStore.peerHosts, let home = botModeRoom?.nativeState?.authorityGatewayID {
+            let byComputer = Dictionary(grouping: peerMembers) { $0.target["peer_id"]?.string ?? "" }
+            for (peerID, members) in byComputer where !peerID.isEmpty {
+                guard !Task.isCancelled, let connection = try? await peers.connect(peerID: peerID) else { continue }
+                connections.append(connection)
+                guard connection.pluginFeatures.contains("native-room-peer-typing-v1") else { continue }
+                let scope = HermesBotModePeerFeedScope(homeInstallID: home, members: members.map {
+                    .init(memberID: $0.memberID, profile: $0.profile)
+                })
+                let client = NativeHermesBotModeActivityClient(
+                    owner: connection.owner, currentOwner: connection.currentOwner, peer: scope
+                ) { operation, body in
+                    try await connection.workspace.perform(operation.workspaceOperation, payload: body,
+                                                           owner: connection.owner)
+                }
+                feeds.append(botModeRoomStore.activity.beginPeerFeed(
+                    roomID: botModeRoomID, client: client, memberIDs: Set(members.map(\.memberID))
+                ))
+            }
+        }
         while !Task.isCancelled { try? await Task.sleep(for: .seconds(3600)) }
+        feeds.forEach(botModeRoomStore.activity.endPeerFeed)
+        connections.forEach { $0.release() }
         botModeRoomStore.activity.end(roomID: botModeRoomID, viewerID: viewerID)
     }
 
@@ -347,9 +376,16 @@ extension ChatModel {
                     let isLocal = nativeMember.map { $0.target["kind"]?.string == "local" } ?? true
                     let profileID = nativeMember?.profile ?? memberID
                     let profile = isLocal ? agentDirectory?.profiles.first { $0.id == profileID } : nil
+                    let peerAgent = isLocal ? nil : nativeMember.flatMap { member in
+                        member.target["peer_id"]?.string.flatMap {
+                            botModeRoomStore?.peerHosts?.agent(peerID: $0, profile: member.profile)
+                        }
+                    }
                     snapshot = .init(
-                        name: profile?.name ?? nativeMember?.displayName ?? nativeMember?.handle ?? "Unavailable agent",
-                        avatarFileName: profile?.avatarFileName
+                        name: profile?.name ?? peerAgent?.name ?? nativeMember?.displayName ?? nativeMember?.handle
+                            ?? "Unavailable agent",
+                        avatarFileName: profile?.avatarFileName,
+                        imageURL: peerAgent?.imageURL
                     )
                 } else if let nativeEvent = event.nativeEvent {
                     // Hermes keeps a removed member's messages in the room. Name

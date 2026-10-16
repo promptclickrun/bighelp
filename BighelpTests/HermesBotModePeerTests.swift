@@ -65,12 +65,20 @@ struct HermesBotModePeerTests {
                      "profile": .string("research"), "capability_digest": .string(Self.digest)]
         )
         let localProfile = Self.profile("research", "Local Research")
-        let participant = HermesBotModeParticipant(member: peer, profiles: [localProfile],
-                                                   computerNamed: { $0 == "studio-mac" ? "Studio Mac" : nil })
+        let peers = PeerHostsFake()
+        peers.computers = ["studio-mac": "Studio Mac"]
+        let participant = HermesBotModeParticipant(member: peer, profiles: [localProfile], peers: peers)
         #expect(participant.profile == nil)
         #expect(participant.displayName == "Rio")
         #expect(participant.availability == .otherComputer)
         #expect(participant.computerName == "Studio Mac")
+        #expect(participant.peerImageURL == nil)
+        // Its computer's own list gives its current name and picture.
+        let picture = URL(fileURLWithPath: "/tmp/fleet/avatars/rio.png")
+        peers.agents["studio-mac/research"] = HermesBotModePeerAgent(name: "Rio Tanaka", imageURL: picture)
+        let current = HermesBotModeParticipant(member: peer, profiles: [localProfile], peers: peers)
+        #expect(current.displayName == "Rio Tanaka")
+        #expect(current.peerImageURL == picture)
         let local = HermesBotModeRoomMember(memberID: "default", profile: "default", handle: "juno",
                                             target: ["kind": .string("local"), "profile": .string("default")])
         let state = HermesBotModeRoomState(
@@ -125,6 +133,14 @@ struct HermesBotModePeerTests {
         )
         #expect(model.botModeTimelineItems.map(\.sender.snapshot.name) == ["Lab agent", "Desk agent"])
         #expect(model.botModeTimelineItems.map(\.sender.snapshot.avatarFileName) == ["lab.png", nil])
+        // With Desk's own picture from its computer, its replies show that picture.
+        let peers = PeerHostsFake()
+        let deskPicture = URL(fileURLWithPath: "/tmp/fleet/avatars/desk.png")
+        peers.agents["desk/default"] = HermesBotModePeerAgent(name: "Desk agent", imageURL: deskPicture)
+        store.peerHosts = peers
+        #expect(model.botModeTimelineItems.map(\.sender.snapshot.imageURL) == [nil, deskPicture])
+        let resolver = TimelineSenderResolver(agents: directory)
+        #expect(model.botModeTimelineItems.last.map { resolver.display(for: $0.sender).imageURL } == deskPicture)
     }
 
     @Test func clientCarriesTheGrantFromTheAgentsComputerToTheHome() async throws {
@@ -240,6 +256,9 @@ private final class PeerWorkspace: WorkspaceOperationPerforming {
 @MainActor
 private final class PeerHostsFake: HermesBotModePeerHosts {
     var problem: HermesBotModeRoomLink.Problem?
+    var computers: [String: String] = [:]
+    /// By "peerID/profile".
+    var agents: [String: HermesBotModePeerAgent] = [:]
     private(set) var invites: [(memberID: String, homeInstallID: String)] = []
 
     func roomLink(hostID: String, profile: String) async throws -> HermesBotModeRoomLink {
@@ -254,7 +273,12 @@ private final class PeerHostsFake: HermesBotModePeerHosts {
                                        link: try await roomLink(hostID: hostID, profile: profile))
     }
 
-    func hostName(peerID: String) -> String? { nil }
+    func hostName(peerID: String) -> String? { computers[peerID] }
+    func agent(peerID: String, profile: String) -> HermesBotModePeerAgent? { agents["\(peerID)/\(profile)"] }
+    func refreshAgents() {}
+    func connect(peerID: String) async throws -> any HermesBotModePeerConnection {
+        throw WorkspaceClientError.unavailable(.unsupportedHost)
+    }
 }
 
 /// The home computer: creates rooms with exactly the members it was given,

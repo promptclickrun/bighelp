@@ -2,10 +2,11 @@ import Foundation
 import Observation
 
 extension BighelpAppComposition {
-    func makeNativeWorkspaceSelection(connections: WorkspaceConnectionStore) -> NativeWorkspaceSelectionStore {
+    func makeNativeWorkspaceSelection(connections: WorkspaceConnectionStore,
+                                      peerHosts: (any HermesBotModePeerHosts)? = nil) -> NativeWorkspaceSelectionStore {
         NativeWorkspaceSelectionStore(
             connections: connections, settings: settings, userIdentity: userIdentity,
-            directory: DirectHermesApplicationFactory.workspaceStorageRoot
+            directory: DirectHermesApplicationFactory.workspaceStorageRoot, peerHosts: peerHosts
         )
     }
 }
@@ -32,6 +33,7 @@ final class NativeWorkspaceSelectionStore {
     private let settings: SettingsStore
     private let userIdentity: UserIdentityStore
     private let directory: URL
+    private let peerHosts: (any HermesBotModePeerHosts)?
 
     var current: NativeWorkspaceRuntime? {
         guard hostID == connections.hosts.selectedHostID, connections.isDirectSelected else { return nil }
@@ -43,11 +45,12 @@ final class NativeWorkspaceSelectionStore {
     }
 
     init(connections: WorkspaceConnectionStore, settings: SettingsStore,
-         userIdentity: UserIdentityStore, directory: URL) {
+         userIdentity: UserIdentityStore, directory: URL, peerHosts: (any HermesBotModePeerHosts)? = nil) {
         self.connections = connections
         self.settings = settings
         self.userIdentity = userIdentity
         self.directory = directory
+        self.peerHosts = peerHosts
     }
 
     func synchronize() async {
@@ -109,7 +112,7 @@ final class NativeWorkspaceSelectionStore {
             do {
                 runtime = try NativeWorkspaceRuntime(
                     connections: connections, authority: owner.authority,
-                    settings: settings, userIdentity: userIdentity, directory: directory
+                    settings: settings, userIdentity: userIdentity, directory: directory, peerHosts: peerHosts
                 )
                 errorMessage = nil
             } catch {

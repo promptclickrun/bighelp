@@ -370,7 +370,7 @@ struct ChatSessionSettingsView: View {
                     id: participant.id,
                     name: participant.displayName,
                     detail: detail,
-                    imageURL: participant.profile.flatMap { agents.avatarURL(for: $0) }
+                    imageURL: participant.peerImageURL ?? participant.profile.flatMap { agents.avatarURL(for: $0) }
                 )
             }
         }

@@ -66,10 +66,18 @@ struct NativeAffectionReactionSignal: Equatable, Sendable {
 struct TimelineSenderSnapshot: Codable, Equatable, Sendable {
     let name: String
     let avatarFileName: String?
+    /// A picture kept outside this computer's agents folder: an agent on
+    /// another computer. Live only and never saved, since the path is this device's.
+    var imageURL: URL? = nil
 
-    init(name: String, avatarFileName: String? = nil) {
+    private enum CodingKeys: String, CodingKey {
+        case name, avatarFileName
+    }
+
+    init(name: String, avatarFileName: String? = nil, imageURL: URL? = nil) {
         self.name = name
         self.avatarFileName = avatarFileName
+        self.imageURL = imageURL
     }
 }
 

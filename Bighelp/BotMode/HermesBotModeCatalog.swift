@@ -81,26 +81,45 @@ struct HermesBotModeParticipant: Identifiable, Equatable, Sendable {
     let displayName: String
     let profile: AgentProfile?
     let availability: Availability
-    /// The computer an agent from elsewhere lives on.
+    /// The computer an agent from elsewhere lives on, and its `peer_id`.
     let computerName: String?
+    let peerID: String?
+    /// An agent from elsewhere: its own picture, as this device last read
+    /// its computer. A local agent's picture comes from `profile`.
+    let peerImageURL: URL?
 
     var id: String { memberID }
     var canOpenAgentChat: Bool { availability == .available }
 
-    /// `computerNamed` names a peer member's computer from its `peer_id`. A
-    /// peer never borrows a local profile, even one with the same ID.
+    /// The `peer_id` of an agent from another computer.
+    static func peerID(of member: HermesBotModeRoomMember) -> String? {
+        member.target["kind"]?.string == "peer" ? member.target["peer_id"]?.string : nil
+    }
+
+    /// `peers` names a peer member's computer and gives its current name and picture.
+    @MainActor
+    init(member: HermesBotModeRoomMember, profiles: [AgentProfile], peers: (any HermesBotModePeerHosts)?) {
+        let peerID = Self.peerID(of: member)
+        self.init(member: member, profiles: profiles,
+                  peerComputer: peerID.flatMap { peers?.hostName(peerID: $0) },
+                  peerAgent: peerID.flatMap { peers?.agent(peerID: $0, profile: member.profile) })
+    }
+
+    /// A peer never borrows a local profile, even one with the same ID.
     init(member: HermesBotModeRoomMember, profiles: [AgentProfile],
-         computerNamed: (String) -> String? = { _ in nil }) {
+         peerComputer: String? = nil, peerAgent: HermesBotModePeerAgent? = nil) {
         memberID = member.memberID
         profileID = member.profile
         handle = member.handle
         let isLocal = member.target["kind"]?.string == "local"
             && member.target["profile"]?.string == member.profile
-        let peerID = member.target["kind"]?.string == "peer" ? member.target["peer_id"]?.string : nil
+        let peerID = Self.peerID(of: member)
         let matches = isLocal ? profiles.filter { $0.id == member.profile } : []
         profile = matches.count == 1 ? matches.first : nil
-        displayName = profile?.name ?? member.displayName ?? member.handle
-        computerName = peerID.map { computerNamed($0) ?? $0 }
+        displayName = profile?.name ?? peerAgent?.name ?? member.displayName ?? member.handle
+        computerName = peerID.map { peerComputer ?? $0 }
+        self.peerID = peerID
+        peerImageURL = peerAgent?.imageURL
         availability = peerID != nil ? .otherComputer
             : !isLocal ? .unsupportedTarget
             : profile == nil ? .profileUnavailable : .available
@@ -142,8 +161,12 @@ struct HermesBotModeRoomSummary: Identifiable, Equatable, Sendable {
             }
     }
 
-    func participants(profiles: [AgentProfile],
-                      computerNamed: (String) -> String? = { _ in nil }) -> [HermesBotModeParticipant] {
-        members.map { HermesBotModeParticipant(member: $0, profiles: profiles, computerNamed: computerNamed) }
+    func participants(profiles: [AgentProfile]) -> [HermesBotModeParticipant] {
+        members.map { HermesBotModeParticipant(member: $0, profiles: profiles) }
+    }
+
+    @MainActor
+    func participants(profiles: [AgentProfile], peers: (any HermesBotModePeerHosts)?) -> [HermesBotModeParticipant] {
+        members.map { HermesBotModeParticipant(member: $0, profiles: profiles, peers: peers) }
     }
 }

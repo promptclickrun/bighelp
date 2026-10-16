@@ -93,6 +93,25 @@ struct FleetStoreTests {
                                sections: fleet.sections, groupSections: fleet.groupSectionIDs)
     }
 
+    /// A group member from another computer takes that computer's current
+    /// name and picture for the agent, found by the computer's `peer_id`.
+    @Test func aGroupMemberFromAnotherComputerUsesItsComputersAgent() async throws {
+        let reader = reader()
+        var rio = agent(studio, "default", "Rio Tanaka")
+        rio.avatarFile = "rio.png"
+        reader.snapshots[studio] = FleetSnapshot(agents: [rio], refreshedAt: Date())
+        let folder = directory()
+        let fleet = FleetStore(reader: reader, directory: folder, saveDelay: .zero)
+        fleet.refresh()
+        await fleet.waitForReads()
+        let found = try #require(fleet.peerAgent(peerID: HermesBotModePeerMembers.slug("Studio"), profile: "default"))
+        #expect(found.name == "Rio Tanaka")
+        #expect(found.imageURL != nil)
+        #expect(found.imageURL == fleet.avatars.url(for: "rio.png"))
+        #expect(fleet.peerAgent(peerID: "office", profile: "default") == nil)
+        #expect(fleet.peerAgent(peerID: "studio", profile: "research") == nil)
+    }
+
     // MARK: Hidden agents and sections
 
     /// Hiding only changes the list, and it's saved on the agent's own host.

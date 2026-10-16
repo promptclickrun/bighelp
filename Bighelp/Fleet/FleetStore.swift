@@ -287,6 +287,16 @@ final class FleetStore {
         snapshots[hostID]?.agents.first { $0.profileID == profileID }
     }
 
+    /// A group member on another computer, named by its `peer_id` (that
+    /// computer's name as an identifier) and profile.
+    func peerAgent(peerID: String, profile: String) -> HermesBotModePeerAgent? {
+        let candidates = hosts.filter { HermesBotModePeerMembers.slug($0.name) == peerID }
+        guard let agent = candidates.lazy.compactMap({ self.agent(hostID: $0.id, profileID: profile) }).first else {
+            return nil
+        }
+        return HermesBotModePeerAgent(name: agent.name, imageURL: avatars.url(for: agent.avatarFile))
+    }
+
     func latestChat(for agent: FleetAgent) -> FleetChat? {
         snapshots[agent.hostID]?.chats
             .filter { $0.profileID == agent.profileID }

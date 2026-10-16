@@ -1344,7 +1344,7 @@ struct ChatView: View {
                 ChatIdentityParticipant(
                     stableID: participant.id,
                     displayName: participant.displayName,
-                    imageURL: participant.profile.flatMap { agents?.avatarURL(for: $0) }
+                    imageURL: participant.peerImageURL ?? participant.profile.flatMap { agents?.avatarURL(for: $0) }
                 )
             }
         }

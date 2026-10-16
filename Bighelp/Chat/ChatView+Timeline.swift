@@ -481,7 +481,8 @@ extension ChatView {
         }
     }
     private func memberFailure(_ failure: BotModeMemberFailure) -> some View {
-        let name = model.memberProfiles.first(where: { $0.id == failure.memberID })?.name ?? failure.memberID
+        let name = model.nativeRoomParticipants.first(where: { $0.memberID == failure.memberID })?.displayName
+            ?? model.memberProfiles.first(where: { $0.id == failure.memberID })?.name ?? failure.memberID
         return BighelpCard {
             HStack(alignment: .top, spacing: BighelpTokens.space12) {
                 Label("\(name) could not respond: \(failure.message)", systemImage: "exclamationmark.triangle.fill")

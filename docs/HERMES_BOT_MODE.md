@@ -140,6 +140,15 @@ discloses that source loss is unobservable. Measurable plugin drops or reset
 responses clear transient rows and reconcile room history. They do not fabricate
 missing tool activity.
 
+With `native-room-typing-v1` the app opens the feed with
+`include: ["member.responding"]`. Each report says a member is writing (no
+text), at most every 2 seconds per member turn. The chat shows one
+"{name} is typing…" row per such member, stacked, and drops it when that
+member's message or terminal turn event reaches the room log, or after 6
+seconds without a report. These rows are never stored. Without reports (an
+older plugin, or a member in a long tool call) one unnamed typing bubble shows
+while the room works; there is no "Agents are collaborating" line.
+
 Observed tool rows use native tool/member/task/generation coordinates and remain
 separately recyclable in the existing canvas. Started is an observation, not a
 claim that the tool is still running; Finished does not assert success. Optional

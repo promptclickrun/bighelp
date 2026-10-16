@@ -1145,6 +1145,7 @@
 		BE510C2494A7FF7F188CE324 /* FastMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = E22A700048E2AD3F003CBAC3 /* FastMode.swift */; };
 		BE6607C29262952E54ED5E5C /* PetdexAnimation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D4F0775A087437288D32E0B /* PetdexAnimation.swift */; };
 		BE6B141A6D6F5EEB5DC80129 /* VoicePresentationContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 718F4BBB915B1955A6CE39AF /* VoicePresentationContainer.swift */; };
+		BE76EAE4EF61CF095476A7E2 /* SkillsAndPluginsHostShapeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 034E5A8037D7BE0AEA14BFC0 /* SkillsAndPluginsHostShapeTests.swift */; };
 		BE9B9B110A2CC1139ADA82D0 /* DirectHermesLiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DC504673A324928FAA89034 /* DirectHermesLiveTests.swift */; };
 		BEA6D6B6E535610FB7620C6A /* BighelpThemeReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D0F163EDAE473786869F8B9 /* BighelpThemeReader.swift */; };
 		BEEADC4963E5C4C57046FA8D /* SkippedPartsNote.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2736E14A6C1285C6665669A /* SkippedPartsNote.swift */; };
@@ -1656,6 +1657,7 @@
 		0318698CC3A670AF7FEFCC87 /* DirectHermesWorkspaceClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectHermesWorkspaceClient.swift; sourceTree = "<group>"; };
 		031905AB88C75597494BC306 /* ConnectorOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectorOperation.swift; sourceTree = "<group>"; };
 		033B2BFE02C6DE80789B8372 /* SkillsAndToolsCatalogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkillsAndToolsCatalogView.swift; sourceTree = "<group>"; };
+		034E5A8037D7BE0AEA14BFC0 /* SkillsAndPluginsHostShapeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkillsAndPluginsHostShapeTests.swift; sourceTree = "<group>"; };
 		0351D670C0D17A932C97532C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		03575CB24B16E0FD4C3E36CC /* WorkspaceManagementStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceManagementStore.swift; sourceTree = "<group>"; };
 		039739C8DDFB5BC34A4A9DF0 /* WikiCreationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WikiCreationState.swift; sourceTree = "<group>"; };
@@ -4410,6 +4412,7 @@
 				EE5134A075FCBAC9ED508EB4 /* ShellFeatureStoreTests.swift */,
 				BD236D3F2FCE5C233ACAFBFD /* SkillDocumentMutationTests.swift */,
 				34EF80804B4ED118D93BBBD0 /* SkillMutationLifecycleTests.swift */,
+				034E5A8037D7BE0AEA14BFC0 /* SkillsAndPluginsHostShapeTests.swift */,
 				D9853597BF6721C1FFA38C43 /* SubagentCanvasTests.swift */,
 				72B7397F7D4D61EB688CC8B4 /* SubagentControlTests.swift */,
 				CE55F4616453540B7AC56768 /* TeamCallTests.swift */,
@@ -7292,6 +7295,7 @@
 				F92F1AC1D26135F63D3B5317 /* ShellFeatureStoreTests.swift in Sources */,
 				1AB516FA3EAED04152EDE089 /* SkillDocumentMutationTests.swift in Sources */,
 				9A762D8156FF1063F2B5BD58 /* SkillMutationLifecycleTests.swift in Sources */,
+				BE76EAE4EF61CF095476A7E2 /* SkillsAndPluginsHostShapeTests.swift in Sources */,
 				879F26B5861D37C7F19A5099 /* SubagentCanvasTests.swift in Sources */,
 				B3EC5789602FB904AEA7AF78 /* SubagentControlTests.swift in Sources */,
 				26DACF622E681A594FD09C8B /* TeamCallTests.swift in Sources */,

@@ -39,18 +39,14 @@ final class DirectHermesSkillsHubClient: SkillsHubManagementClient {
         try requireOwner()
 
         let installed = try decodeInstalled(sources["installed"])
-        let activeSkills = try CapabilitiesPayload.array(installedPayload).map(decodeInstalledSkill)
+        let activeSkills = try CapabilitiesPayload.rows(installedPayload, decodeInstalledSkill)
         for skill in activeSkills { knownSkills[skill.name] = skill }
         let activeNames = Set(activeSkills.map(\.name))
         let retainedDisabled = knownSkills.values.filter { !$0.isEnabled && !activeNames.contains($0.name) }
         let installedSkills = (activeSkills + retainedDisabled).sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
-        let sourceRows = try CapabilitiesPayload.array(sources["sources"]).map(decodeSource)
-        let featured = try CapabilitiesPayload.array(sources["featured"]).map {
-            try decodeItem($0, installed: installed)
-        }
-        let officialRows = try CapabilitiesPayload.array(official["skills"]).map {
-            try decodeItem($0, installed: installed)
-        }
+        let sourceRows = try CapabilitiesPayload.rows(sources["sources"], decodeSource)
+        let featured = try CapabilitiesPayload.rows(sources["featured"]) { try decodeItem($0, installed: installed) }
+        let officialRows = try CapabilitiesPayload.rows(official["skills"]) { try decodeItem($0, installed: installed) }
         return SkillHubSnapshot(
             sources: sourceRows,
             featured: featured,
@@ -68,9 +64,7 @@ final class DirectHermesSkillsHubClient: SkillsHubManagementClient {
         let source = try source.validatedHubText(maximumBytes: 80)
         let payload = try await request(.search(query: query, source: source.isEmpty ? "all" : source, profile: profile))
         let installed = try decodeInstalled(payload["installed"])
-        let items = try CapabilitiesPayload.array(payload["results"]).map {
-            try decodeItem($0, installed: installed)
-        }
+        let items = try CapabilitiesPayload.rows(payload["results"]) { try decodeItem($0, installed: installed) }
         let countsObject = try CapabilitiesPayload.object(payload["source_counts"])
         var counts: [String: Int] = [:]
         for (key, value) in countsObject {
@@ -137,9 +131,9 @@ final class DirectHermesSkillsHubClient: SkillsHubManagementClient {
     func setEnabled(_ enabled: Bool, skillName: String) async throws -> InstalledSkill {
         let profile = try checkedProfile()
         let name = try CapabilitiesPayload.identifier(skillName, maximumBytes: 128)
-        let activeBefore = try CapabilitiesPayload.array(
-            try await requestValue(.installed(profile: profile))
-        ).map(decodeInstalledSkill)
+        let activeBefore = try CapabilitiesPayload.rows(
+            try await requestValue(.installed(profile: profile)), decodeInstalledSkill
+        )
         guard let existing = activeBefore.first(where: { $0.name == name }) ?? knownSkills[name] else {
             throw CapabilitiesManagementError.invalidRequest
         }
@@ -148,11 +142,10 @@ final class DirectHermesSkillsHubClient: SkillsHubManagementClient {
               payload["enabled"]?.boolean == enabled else {
             throw CapabilitiesManagementError.invalidResponse
         }
-        let readback = try CapabilitiesPayload.array(
-            try await requestValue(.installed(profile: profile))
-        ).map(decodeInstalledSkill)
+        let readback = try await requestValue(.installed(profile: profile))
         if enabled {
-            guard let skill = readback.first(where: { $0.name == name }), skill.isEnabled else {
+            guard let skill = try CapabilitiesPayload.rows(readback, decodeInstalledSkill).first(where: { $0.name == name }),
+                  skill.isEnabled else {
                 throw CapabilitiesManagementError.readbackFailed
             }
             knownSkills[name] = skill
@@ -160,7 +153,7 @@ final class DirectHermesSkillsHubClient: SkillsHubManagementClient {
         }
         // Hermes' GET /api/skills filters disabled rows. Absence after an
         // acknowledged disable is therefore the public readback contract.
-        guard readback.allSatisfy({ $0.name != name }) else {
+        guard try !CapabilitiesPayload.listsName(name, in: readback) else {
             throw CapabilitiesManagementError.readbackFailed
         }
         let disabled = InstalledSkill(
@@ -309,8 +302,9 @@ final class DirectHermesSkillsHubClient: SkillsHubManagementClient {
         guard (0...10_000_000).contains(usage) else { throw CapabilitiesManagementError.invalidResponse }
         return InstalledSkill(
             name: try CapabilitiesPayload.text(row["name"], maximumBytes: 128),
-            summary: try CapabilitiesPayload.text(row["description"], maximumBytes: 8_192, required: false),
-            category: try CapabilitiesPayload.text(row["category"] ?? .string(""), maximumBytes: 256, required: false),
+            summary: try CapabilitiesPayload.summary(row["description"]),
+            // Hermes sends `null` for a skill outside any category folder.
+            category: try CapabilitiesPayload.optionalText(row["category"], maximumBytes: 256) ?? "",
             isEnabled: try CapabilitiesPayload.boolean(row["enabled"]),
             provenance: try CapabilitiesPayload.text(row["provenance"], maximumBytes: 32),
             usageCount: usage
@@ -324,7 +318,7 @@ final class DirectHermesSkillsHubClient: SkillsHubManagementClient {
         return SkillHubItem(
             id: identifier,
             name: try CapabilitiesPayload.text(row["name"], maximumBytes: 256),
-            summary: try CapabilitiesPayload.text(row["description"], maximumBytes: 8_192, required: false),
+            summary: try CapabilitiesPayload.summary(row["description"]),
             source: try CapabilitiesPayload.text(row["source"], maximumBytes: 2_048, required: false),
             trustLevel: try CapabilitiesPayload.text(row["trust_level"], maximumBytes: 64),
             repository: try CapabilitiesPayload.optionalText(row["repo"], maximumBytes: 2_048),

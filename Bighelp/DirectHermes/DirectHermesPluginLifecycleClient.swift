@@ -24,9 +24,9 @@ final class DirectHermesPluginLifecycleClient: PluginLifecycleManagementClient {
         async let catalogValue = request(.catalog)
         let hub = try await hubValue
         let catalog = try await catalogValue
-        let installed = try CapabilitiesPayload.array(hub["plugins"]).map(decodeInstalled)
-        let entries = try CapabilitiesPayload.array(catalog["entries"]).map(decodeCatalog)
-        let removed = try CapabilitiesPayload.array(catalog["removed"]).map { value -> String in
+        let installed = try CapabilitiesPayload.rows(hub["plugins"], decodeInstalled)
+        let entries = try CapabilitiesPayload.rows(catalog["entries"], decodeCatalog)
+        let removed = try CapabilitiesPayload.rows(catalog["removed"]) { value -> String in
             let row = try CapabilitiesPayload.object(value)
             let name = try CapabilitiesPayload.text(row["name"], maximumBytes: 160)
             let reason = try CapabilitiesPayload.text(row["reason"], maximumBytes: 2_048, required: false)
@@ -106,7 +106,8 @@ final class DirectHermesPluginLifecycleClient: PluginLifecycleManagementClient {
         }
         let payload = try await request(.remove(name: name))
         guard payload["ok"]?.boolean == true else { throw CapabilitiesManagementError.invalidResponse }
-        guard try await load().installed.allSatisfy({ $0.name != name }) else {
+        let readback = try await request(.hub)
+        guard try !CapabilitiesPayload.listsName(name, in: readback["plugins"]) else {
             throw CapabilitiesManagementError.readbackFailed
         }
     }
@@ -123,14 +124,17 @@ final class DirectHermesPluginLifecycleClient: PluginLifecycleManagementClient {
             }
         }
 
-        var request: DirectHermesHTTPRequest {
+        @MainActor var request: DirectHermesHTTPRequest {
+            // Hermes rebuilds the plugin list when it's read; a busy host took 26
+            // seconds, past an ordinary request's wait.
+            let listTimeout = DirectHermesHTTP.longestRequestSeconds
             switch self {
             case .hub:
-                return DirectHermesHTTPRequest(path: "/api/dashboard/plugins/hub", method: .get)
+                return DirectHermesHTTPRequest(path: "/api/dashboard/plugins/hub", method: .get, timeout: listTimeout)
             case .catalog:
-                return DirectHermesHTTPRequest(path: "/api/dashboard/plugins/catalog", method: .get)
+                return DirectHermesHTTPRequest(path: "/api/dashboard/plugins/catalog", method: .get, timeout: listTimeout)
             case .rescan:
-                return DirectHermesHTTPRequest(path: "/api/dashboard/plugins/rescan", method: .get)
+                return DirectHermesHTTPRequest(path: "/api/dashboard/plugins/rescan", method: .get, timeout: listTimeout)
             case .install(let body):
                 return DirectHermesHTTPRequest(path: "/api/dashboard/agent-plugins/install", method: .post, body: body)
             case .enable(let name):
@@ -184,7 +188,7 @@ final class DirectHermesPluginLifecycleClient: PluginLifecycleManagementClient {
         return InstalledPlugin(
             name: try CapabilitiesPayload.text(row["name"], maximumBytes: 320),
             version: try CapabilitiesPayload.text(row["version"], maximumBytes: 128, required: false),
-            summary: try CapabilitiesPayload.text(row["description"], maximumBytes: 8_192, required: false),
+            summary: try CapabilitiesPayload.summary(row["description"]),
             source: try CapabilitiesPayload.text(row["source"], maximumBytes: 80),
             runtimeStatus: runtime,
             canRemove: try CapabilitiesPayload.boolean(row["can_remove"]),
@@ -215,7 +219,7 @@ final class DirectHermesPluginLifecycleClient: PluginLifecycleManagementClient {
             name: try CapabilitiesPayload.text(row["name"], maximumBytes: 64),
             repository: try CapabilitiesPayload.text(row["repo"], maximumBytes: 4_096),
             commitSHA: sha.lowercased(),
-            summary: try CapabilitiesPayload.text(row["description"], maximumBytes: 8_192, required: false),
+            summary: try CapabilitiesPayload.summary(row["description"]),
             maintainer: try CapabilitiesPayload.text(row["maintainer"], maximumBytes: 256),
             tier: try CapabilitiesPayload.text(row["tier"], maximumBytes: 64),
             requiredHermesVersion: try CapabilitiesPayload.text(row["requires_hermes"], maximumBytes: 128, required: false),

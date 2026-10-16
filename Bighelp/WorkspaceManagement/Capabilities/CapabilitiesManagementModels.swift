@@ -507,6 +507,8 @@ struct CapabilitiesManagementDependencies {
 enum CapabilitiesPayload {
     static let maximumTextBytes = 32_768
     static let maximumDocumentBytes = 256_000
+    /// Longer descriptions are shortened (`summary`); a curated plugin's ran past 10 KB.
+    static let summaryCharacterLimit = 8_192
 
     static func object(_ value: BighelpJSONValue?) throws -> [String: BighelpJSONValue] {
         guard let value, let object = value.object else { throw CapabilitiesManagementError.invalidResponse }
@@ -518,6 +520,26 @@ enum CapabilitiesPayload {
     static func array(_ value: BighelpJSONValue?) throws -> [BighelpJSONValue] {
         guard let rows = value?.array else { throw CapabilitiesManagementError.invalidResponse }
         return rows
+    }
+
+    /// A host list's rows. A row that doesn't decode is left out, so one odd row
+    /// hides itself instead of the whole page. Checks that confirm by absence use
+    /// `listsName`, which still sees it.
+    static func rows<Row>(_ value: BighelpJSONValue?, _ decode: (BighelpJSONValue) throws -> Row) throws -> [Row] {
+        try array(value).compactMap { try? decode($0) }
+    }
+
+    /// Whether a host list has a row with this name, readable or not.
+    static func listsName(_ name: String, in value: BighelpJSONValue?) throws -> Bool {
+        try array(value).contains { $0.object?["name"]?.string == name }
+    }
+
+    /// Display-only host text such as a description: missing or null is empty,
+    /// and a long one is shortened rather than refused.
+    static func summary(_ value: BighelpJSONValue?) throws -> String {
+        guard let value, value != .null else { return "" }
+        let summary = try text(value, maximumBytes: .max, required: false)
+        return summary.count > summaryCharacterLimit ? String(summary.prefix(summaryCharacterLimit)) + "…" : summary
     }
 
     static func text(

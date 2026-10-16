@@ -1,3 +1,4 @@
+import OSLog
 import SwiftUI
 
 /// The agent home: the Chat tab opens the selected agent's chat, and Feed,
@@ -375,6 +376,9 @@ extension RootShellView {
                 guard isCurrentSignIn(owner) else { return }
                 actionErrorMessage = error.message
             } catch {
+                // The kind of failure only; never host data.
+                Logger(subsystem: "app.loopdy.mobile", category: "BotMode")
+                    .error("Group chat create failed: \(String(reflecting: error), privacy: .public)")
                 guard isCurrentSignIn(owner) else { return }
                 actionErrorMessage = "The group chat couldn't be created. Check the host, then try again."
             }

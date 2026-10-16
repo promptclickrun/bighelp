@@ -83,6 +83,75 @@ final class AllHostsHostUITests: BighelpUITestCase {
     /// Provider usage opened from a chat on the host the all-hosts list just
     /// switched to. The usage panel used to keep the first host's connection and
     /// said "Usage couldn't be loaded" until the chat closed.
+    /// A group chat with an agent from each host (Hermes RoomLink), against
+    /// `Scripts/RoomLinkProbe.py --simulator-id …`: Lab Hermes, the selected
+    /// host, is the home and links Desk Hermes' agent; one message gets both
+    /// agents' answers. Skipped without that probe.
+    @MainActor func testGroupChatWithAnAgentFromEachHostAnswers() throws {
+        guard let path = ProcessInfo.processInfo.environment["BIGHELP_SIGNIN_PROBE"] else {
+            throw XCTSkip("Run through Scripts/RoomLinkProbe.py --simulator-id")
+        }
+        probe = try JSONDecoder().decode([String: String].self, from: Data(contentsOf: URL(fileURLWithPath: path)))
+        guard probe["mode"] == "roomlink" else { throw XCTSkip("This host runs the \(probe["mode"] ?? "?") mode") }
+        addUIInterruptionMonitor(withDescription: "Password prompts") { dialog in
+            for label in ["Continue", "Not Now"] where dialog.buttons[label].exists {
+                dialog.buttons[label].tap()
+                return true
+            }
+            return false
+        }
+        let app = makeApp()
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-test-no-configured-hosts",
+                               "-bighelp.hosts.all-hosts", "NO"]
+        app.launch()
+        try addHost(app, address: try XCTUnwrap(probe["address_a"]), name: "Desk Hermes")
+        let menu = app.buttons["home.drawer.open"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 20))
+        menu.tap()
+        app.buttons["menu.hosts"].tap()
+        app.buttons["menu.host.add"].tap()
+        try addHost(app, address: try XCTUnwrap(probe["address_b"]), name: "Lab Hermes")
+
+        XCTAssertTrue(menu.waitForExistence(timeout: 20))
+        menu.tap()
+        app.buttons["menu.all-hosts"].tap()
+        XCTAssertTrue(agent(on: "Desk Hermes", in: app).waitForExistence(timeout: 45))
+        XCTAssertTrue(agent(on: "Lab Hermes", in: app).waitForExistence(timeout: 20))
+        let newChat = app.buttons["fleet.new-chat"]
+        XCTAssertTrue(newChat.waitForExistence(timeout: 10))
+        newChat.tap()
+        let group = app.buttons["fleet.new-chat.group"]
+        XCTAssertTrue(group.waitForExistence(timeout: 20), "Group chat is offered on a host that can run them")
+        group.tap()
+        // The first pick's host is the group's home.
+        app.buttons["fleet.new-chat.Lab agent"].tap()
+        app.buttons["fleet.new-chat.Desk agent"].tap()
+        save("roomlink-1-picked", app)
+        app.buttons["fleet.new-chat.create-group"].tap()
+        XCTAssertTrue(app.buttons["chat.people"].waitForExistence(timeout: 60), "The group chat opens")
+        let status = app.descendants(matching: .any)["chat.bot-mode-status"]
+        XCTAssertFalse(status.exists && status.label.contains("isn't linked"), status.label)
+
+        let composer = app.textViews["chat.composer.text"]
+        XCTAssertTrue(composer.waitForExistence(timeout: 20))
+        composer.tap()
+        composer.typeText("Everyone, say hello")
+        let send = app.buttons["chat.send"]
+        let deadline = Date().addingTimeInterval(30)
+        while !send.isEnabled, Date() < deadline { Thread.sleep(forTimeInterval: 0.3) }
+        send.tap()
+        let replies = app.textViews.matching(NSPredicate(format: "value CONTAINS %@", "Hello from this agent."))
+        expectation(for: NSPredicate(format: "count >= 2"), evaluatedWith: replies)
+        waitForExpectations(timeout: 240)
+        // Both agents are each host's "default" profile; each reply keeps its own name.
+        for name in ["Lab agent", "Desk agent"] {
+            let row = app.descendants(matching: .any)
+                .matching(NSPredicate(format: "label == %@", "\(name): Hello from this agent.")).firstMatch
+            XCTAssertTrue(row.exists, "\(name)'s reply carries its own name")
+        }
+        save("roomlink-2-both-answered", app)
+    }
+
     @MainActor func testProviderUsageLoadsInAChatOnTheOtherHost() throws {
         guard let path = ProcessInfo.processInfo.environment["BIGHELP_SIGNIN_PROBE"] else {
             throw XCTSkip("Run through Scripts/HostSignInMatrixProbe.py --modes fleet")

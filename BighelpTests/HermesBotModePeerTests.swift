@@ -81,6 +81,52 @@ struct HermesBotModePeerTests {
         #expect(HermesBotModeRoomSummary(room: state, capabilities: .fixture()).canExecute)
     }
 
+    @Test func aPeersMessagesKeepItsOwnNameBesideALocalAgentWithTheSameProfileID() throws {
+        // Found on two real hosts: both agents were the "default" profile, and
+        // the remote one's reply showed the local agent's name.
+        let local = HermesBotModeRoomMember(memberID: "default", profile: "default", handle: "lab-agent",
+                                            displayName: "Lab agent",
+                                            target: ["kind": .string("local"), "profile": .string("default")])
+        let peer = HermesBotModeRoomMember(
+            memberID: "default-desk", profile: "default", handle: "desk-agent-desk", displayName: "Desk agent",
+            target: ["kind": .string("peer"), "peer_id": .string("desk"), "installation_id": .string("install-desk"),
+                     "profile": .string("default"), "capability_digest": .string(Self.digest)]
+        )
+        let state = HermesBotModeRoomState(
+            roomID: "room-names", name: "Names", members: [local, peer], authorityGatewayID: "gateway",
+            authorityEpoch: 1, revision: 1, createdAt: 1, updatedAt: 1, latestSequence: 0,
+            disbandedAt: nil, driverStatus: nil
+        )
+        var room = try BotModeRoom(
+            id: state.roomID,
+            members: [local, peer].map {
+                BotModeMember(profileID: $0.profile, handle: $0.handle, sessionID: "", nativeMemberID: $0.memberID)
+            },
+            visibleEvents: [], nativeRoomID: state.roomID, nativeState: state
+        )
+        for (index, member) in [local, peer].enumerated() {
+            let event = HermesBotModeEvent(
+                roomID: room.id, sequence: index + 1, eventID: "reply-\(member.memberID)", kind: "message.member",
+                actor: ["kind": .string("member"), "id": .string(member.memberID)], authorityEpoch: 1,
+                payload: ["text": .string("Hello"), "thread_id": .string("thread"), "member_id": .string(member.memberID)],
+                createdAt: 1
+            )
+            room.appendNativeShared(try #require(event.botModeEvent(sourceOrder: index)))
+        }
+        var lab = Self.profile("default", "Lab agent")
+        lab.avatarFileName = "lab.png"
+        let directory = AgentDirectoryStore(client: AgentDirectoryFixtureClient(profiles: [lab]),
+                                            defaults: isolatedDefaults(), profiles: [lab])
+        let store = BotModeRoomStore(client: BotModeFixtureClient(), rooms: [room], executionEnabled: false)
+        let model = ChatModel(
+            conversationID: room.id, client: ConversationFixtureClient(),
+            userIdentity: .init(name: "Me", avatarFileName: nil),
+            initialItems: [], botModeRoomStore: store, agentDirectory: directory, botModeRoomID: room.id
+        )
+        #expect(model.botModeTimelineItems.map(\.sender.snapshot.name) == ["Lab agent", "Desk agent"])
+        #expect(model.botModeTimelineItems.map(\.sender.snapshot.avatarFileName) == ["lab.png", nil])
+    }
+
     @Test func clientCarriesTheGrantFromTheAgentsComputerToTheHome() async throws {
         let owner = WorkspaceOwner(authority: try .fixture(id: "peer-owner"),
                                    authenticationGeneration: UUID(), connectionGeneration: UUID())

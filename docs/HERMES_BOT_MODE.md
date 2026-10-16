@@ -58,10 +58,37 @@ Legacy envelopes and limits remain unchanged. Native log authority is validated
 at its exact schema path; this never permits gateway or secret-bearing keys in
 arbitrary workspace payloads. Event bytes are never truncated to fit transport.
 
+## Agents on other computers
+
+A room can hold agents from any number of the person's computers (Hermes
+RoomLink). Cross-gateway links are direct gateway-to-gateway connections; the
+app only carries the setup. New chat › Group chat in the all-computers view
+takes agents from any computer, and the first agent's computer is the room's
+home. For each agent on another computer:
+
+1. That computer: `groups.capabilities {profile}` gives `room_link.catalog`
+   (installation ID, catalog digest, `endpoint`). No `room_link_url` there
+   means `endpoint.available: false`; the app says so before anything is made.
+2. The home: `groups.create` with that member's
+   `target: {kind: "peer", peer_id, installation_id, profile, capability_digest}`.
+   `peer_id` is the computer's name as an identifier, and the member's handle
+   is device-qualified (`@rio-studio-mac`), as in Hermes Desktop.
+3. That computer: `groups.peer.invite` for the room, home and member.
+4. The home: `groups.peer.register` with the grant, the catalog unchanged and
+   the endpoint URL. Hermes probes the other computer before it answers.
+
+A grant is a credential: it stays in memory between steps 3 and 4 and is never
+logged or saved. Links still to make are saved with the room
+(`nativePendingPeerLinks`) and retried when it opens; `driver_status.peer_routes`
+reports each link's health. Other computers are reached with their own saved
+sign-ins (`RegistryRoomPeerHosts`). A peer member never takes a local
+profile's name or picture, even one with the same profile ID.
+`Scripts/RoomLinkProbe.py` checks the whole flow on two isolated real hosts.
+
 ## Durable interaction contract
 
-- Create one stable room with selected profile members. Hermes has no supported
-  operation to edit that roster after creation; the app must reflect that limit.
+- Create one stable room with selected profile members. Hermes' `groups.*` has
+  no operation to edit that roster after creation; the app must reflect that limit.
   Persist the create intent before dispatch. Recover a lost receipt by room ID:
   reissuing an old create name can conflict after another client renames the room.
 - Persist the client event ID, exact text and thread ID before sending. An

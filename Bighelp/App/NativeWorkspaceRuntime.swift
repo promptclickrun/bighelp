@@ -184,6 +184,8 @@ final class NativeWorkspaceRuntime {
             migrations: BotModeRoomCacheSchema.migrations, currentSchemaVersion: BotModeRoomCacheSchema.currentVersion
         )
         let rooms = BotModeRoomStore(client: unavailable, repository: roomRepository, executionEnabled: false)
+        // Group chats with agents on the person's other computers reach them with their own sign-ins.
+        rooms.peerHosts = RegistryRoomPeerHosts(registry: connections.hosts)
         self.rooms = rooms
         let repository = SessionContentRepository(directory: root, name: "native-sessions-v2", currentSchemaVersion: 2)
         let sessions = SessionCatalogStore(

@@ -342,8 +342,11 @@ extension ChatModel {
                 let snapshot: TimelineSenderSnapshot
                 if botModeRoom?.memberIDs.contains(memberID) == true {
                     let nativeMember = botModeRoom?.nativeState?.members.first { $0.memberID == memberID }
+                    // Only an agent on this computer is one of its profiles. One from
+                    // another computer may share the profile ID and keeps its own name.
+                    let isLocal = nativeMember.map { $0.target["kind"]?.string == "local" } ?? true
                     let profileID = nativeMember?.profile ?? memberID
-                    let profile = agentDirectory?.profiles.first { $0.id == profileID }
+                    let profile = isLocal ? agentDirectory?.profiles.first { $0.id == profileID } : nil
                     snapshot = .init(
                         name: profile?.name ?? nativeMember?.displayName ?? nativeMember?.handle ?? "Unavailable agent",
                         avatarFileName: profile?.avatarFileName

@@ -48,14 +48,18 @@ final class ComposioAppsModel {
     @ObservationIgnored private let connect: any ComposioConnecting
     @ObservationIgnored private let catalogStore: any ComposioCatalogLoading
     @ObservationIgnored private let agentHost: (any ComposioAgentHost)?
-    @ObservationIgnored private let signInFlow: (ComposioAccount) async throws -> Void
+    @ObservationIgnored private let signInFlow: @MainActor (ComposioAccount) async throws -> Void
     @ObservationIgnored private let sleep: (Duration) async throws -> Void
 
     init(account: ComposioAccount,
          connect: (any ComposioConnecting)? = nil,
          catalog: any ComposioCatalogLoading = ComposioCatalogStore(),
          agentHost: (any ComposioAgentHost)?,
-         signIn: @escaping (ComposioAccount) async throws -> Void = { try await ComposioSignInBrowser().signIn(account: $0) },
+         // Main actor: a plain async closure runs on a background thread, and the sign-in sheet's
+         // helper traps when it's made there (2.5.0 (125) crashed on Sign in to Composio).
+         signIn: @escaping @MainActor (ComposioAccount) async throws -> Void = { @MainActor account in
+             try await ComposioSignInBrowser().signIn(account: account)
+         },
          sleep: @escaping (Duration) async throws -> Void = { try await Task.sleep(for: $0) }) {
         self.account = account
         self.connect = connect ?? ComposioConnectClient(account: account)

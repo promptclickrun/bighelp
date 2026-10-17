@@ -63,6 +63,25 @@ final class DemoProviderKeysTransport: DirectHermesRPC, DirectHermesAuthenticate
 
     var hasCopilotToken: Bool { savedKeys.contains("COPILOT_GITHUB_TOKEN") }
 
+    /// Hermes 0.22's status cards: Nous sends its expiry as ISO 8601 text,
+    /// a ChatGPT sign-in from the credential pool sends none.
+    private static func status(_ id: String, signedIn: Bool) -> [String: BighelpJSONValue] {
+        guard signedIn else { return ["logged_in": .boolean(false), "source": .null, "expires_at": .null] }
+        switch id {
+        case "nous":
+            return ["logged_in": .boolean(true), "source": .string("nous_portal"),
+                    "source_label": .string("https://portal.nousresearch.com"), "token_preview": .string("…demo"),
+                    "expires_at": .string("2026-10-17T03:20:42+00:00"), "has_refresh_token": .boolean(true),
+                    "free_tier": .boolean(true), "account_tier": .null]
+        case "openai-codex":
+            return ["logged_in": .boolean(true), "source": .string("pool:device_code"),
+                    "source_label": .string("device_code"), "token_preview": .string("…demo"), "expires_at": .null,
+                    "has_refresh_token": .boolean(true), "last_refresh": .string("2026-10-16T20:01:12+00:00")]
+        default:
+            return ["logged_in": .boolean(true), "source": .string(id), "expires_at": .null]
+        }
+    }
+
     func request(_ request: DirectHermesHTTPRequest) async throws -> BighelpJSONValue {
         let path = request.path
         switch (request.method, path) {
@@ -100,8 +119,7 @@ final class DemoProviderKeysTransport: DirectHermesRPC, DirectHermesAuthenticate
                     "id": .string(account.id), "name": .string(account.name), "flow": .string(account.flow),
                     "cli_command": .string(account.command), "docs_url": .string("https://example.com/\(account.id)"),
                     "disconnectable": .boolean(account.flow != "external"),
-                    "status": .object(["logged_in": .boolean(isSignedIn),
-                                       "free_tier": .boolean(account.id == "nous" && isSignedIn)]),
+                    "status": .object(Self.status(account.id, signedIn: isSignedIn)),
                 ])
             })])
         case (.get, "/api/providers/custom-endpoints"):

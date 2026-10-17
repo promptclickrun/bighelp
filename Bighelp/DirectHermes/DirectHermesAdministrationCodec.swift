@@ -31,10 +31,19 @@ enum DirectHermesAdministrationCodec: DirectHermesPayloadDecoding {
         try optionalInteger(value, range: (minimum ?? Int.min)...Int.max)
     }
 
+    /// Hermes sends times as seconds, milliseconds or ISO 8601 text, depending on the
+    /// provider. Text that isn't a time is no time, not a broken response.
     static func optionalDate(_ value: BighelpJSONValue?) throws -> Date? {
-        guard let timestamp = try optionalNumber(value) else { return nil }
-        guard timestamp > 0 else { return nil }
-        return Date(timeIntervalSince1970: timestamp)
+        if case .string(let text)? = value {
+            guard text.utf8.count <= 64 else { return nil }
+            let iso = ISO8601DateFormatter()
+            if let date = iso.date(from: text) { return date }
+            iso.formatOptions.insert(.withFractionalSeconds)
+            return iso.date(from: text)
+        }
+        guard let timestamp = try optionalNumber(value), timestamp > 0 else { return nil }
+        // Seconds since 1970 stay below 1e11 until the year 5138.
+        return Date(timeIntervalSince1970: timestamp >= 100_000_000_000 ? timestamp / 1_000 : timestamp)
     }
 
     static func stringArray(

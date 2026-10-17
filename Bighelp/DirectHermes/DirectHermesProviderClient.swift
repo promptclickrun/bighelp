@@ -454,33 +454,39 @@ final class DirectHermesProviderClient {
         let object = try DirectHermesAdministrationCodec.object(response)
         let rows = try DirectHermesAdministrationCodec.array(object["providers"], maximum: 128)
         var seen = Set<String>()
-        return try rows.map { value in
-            let row = try DirectHermesAdministrationCodec.object(value)
-            let id = try Self.pathIdentifier(DirectHermesAdministrationCodec.string(row["id"], maximum: 128))
-            guard seen.insert(id).inserted else { throw WorkspaceClientError.invalidResponse }
-            let status = try DirectHermesAdministrationCodec.object(row["status"])
-            let rawFlow = try DirectHermesAdministrationCodec.string(row["flow"], maximum: 64)
-            return .init(
-                id: id,
-                name: try DirectHermesAdministrationCodec.string(row["name"], maximum: 800),
-                flow: DirectHermesOAuthProvider.Flow(rawValue: rawFlow) ?? .unsupported,
-                documentationURL: try DirectHermesAdministrationCodec.optionalHTTPSURL(row["docs_url"]),
-                canDisconnect: try DirectHermesAdministrationCodec.bool(row["disconnectable"]),
-                disconnectHint: try DirectHermesAdministrationCodec.optionalString(row["disconnect_hint"], maximum: 2_000),
-                cliCommand: (try? DirectHermesAdministrationCodec.optionalString(row["cli_command"], maximum: 512))
-                    .flatMap(Self.terminalCommand),
-                status: .init(
-                    isLoggedIn: try DirectHermesAdministrationCodec.bool(status["logged_in"]),
-                    source: try DirectHermesAdministrationCodec.optionalString(status["source"], maximum: 256),
-                    sourceLabel: try DirectHermesAdministrationCodec.optionalString(status["source_label"], maximum: 1_024),
-                    expiresAt: try DirectHermesAdministrationCodec.optionalDate(status["expires_at"]),
-                    hasRefreshToken: try DirectHermesAdministrationCodec.optionalBool(status["has_refresh_token"]) ?? false,
-                    isFreeTier: try DirectHermesAdministrationCodec.optionalBool(status["free_tier"]),
-                    accountTier: try DirectHermesAdministrationCodec.optionalString(status["account_tier"], maximum: 256),
-                    errorMessage: try DirectHermesAdministrationCodec.optionalString(status["error"], maximum: 2_000)
-                )
+        // One account Hermes describes in a way bighelp can't read hides that
+        // account, not every other sign-in.
+        return rows.compactMap { value in try? Self.oauthProvider(value, seen: &seen) }
+    }
+
+    private nonisolated static func oauthProvider(
+        _ value: BighelpJSONValue, seen: inout Set<String>
+    ) throws -> DirectHermesOAuthProvider {
+        let row = try DirectHermesAdministrationCodec.object(value)
+        let id = try Self.pathIdentifier(DirectHermesAdministrationCodec.string(row["id"], maximum: 128))
+        guard seen.insert(id).inserted else { throw WorkspaceClientError.invalidResponse }
+        let status = try DirectHermesAdministrationCodec.object(row["status"])
+        let rawFlow = try DirectHermesAdministrationCodec.string(row["flow"], maximum: 64)
+        return .init(
+            id: id,
+            name: try DirectHermesAdministrationCodec.string(row["name"], maximum: 800),
+            flow: DirectHermesOAuthProvider.Flow(rawValue: rawFlow) ?? .unsupported,
+            documentationURL: try DirectHermesAdministrationCodec.optionalHTTPSURL(row["docs_url"]),
+            canDisconnect: try DirectHermesAdministrationCodec.bool(row["disconnectable"]),
+            disconnectHint: try DirectHermesAdministrationCodec.optionalString(row["disconnect_hint"], maximum: 2_000),
+            cliCommand: (try? DirectHermesAdministrationCodec.optionalString(row["cli_command"], maximum: 512))
+                .flatMap(Self.terminalCommand),
+            status: .init(
+                isLoggedIn: try DirectHermesAdministrationCodec.bool(status["logged_in"]),
+                source: try DirectHermesAdministrationCodec.optionalString(status["source"], maximum: 256),
+                sourceLabel: try DirectHermesAdministrationCodec.optionalString(status["source_label"], maximum: 1_024),
+                expiresAt: try DirectHermesAdministrationCodec.optionalDate(status["expires_at"]),
+                hasRefreshToken: try DirectHermesAdministrationCodec.optionalBool(status["has_refresh_token"]) ?? false,
+                isFreeTier: try DirectHermesAdministrationCodec.optionalBool(status["free_tier"]),
+                accountTier: try DirectHermesAdministrationCodec.optionalString(status["account_tier"], maximum: 256),
+                errorMessage: try DirectHermesAdministrationCodec.optionalString(status["error"], maximum: 2_000)
             )
-        }
+        )
     }
 
     /// A one-line command to show and copy: printable, no line breaks.

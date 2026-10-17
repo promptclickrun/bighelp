@@ -22,6 +22,38 @@ struct ProviderKeysOverviewTests {
         #expect(store.errorMessage == nil && !store.isBusy)
     }
 
+    /// Hermes sends Nous' expiry as ISO 8601 text. That one field used to fail the whole
+    /// sign-in list, so no signed-in account showed, not even ChatGPT.
+    @Test func signedInAccountsShowWhenHermesSendsTheirExpiryAsText() async throws {
+        let authority = try WorkspaceAuthority.direct(endpointIdentity: "https://demo-mac.example", providerID: "demo", userID: "demo")
+        let owner = WorkspaceOwner(authority: authority, authenticationGeneration: UUID(), connectionGeneration: UUID())
+        let transport = DemoProviderKeysTransport()
+        transport.markSignedIn("openai-codex")
+        let store = ProviderAccountsStore(hostName: "Demo Mac", profileID: "default", servingProfileID: "default",
+            client: DirectHermesProviderClient(rpc: transport, http: transport, owner: owner, currentOwner: { owner }))
+        await store.load()
+        let snapshot = try #require(store.snapshot)
+        #expect(snapshot.skippedParts.isEmpty)
+        let connected = ProviderKeysOverview(snapshot: snapshot).connected.map(\.id)
+        #expect(connected.contains("account:nous"))
+        #expect(connected.contains("account:openai-codex"))
+        let nous = try #require(snapshot.oauthProviders.first { $0.id == "nous" })
+        #expect(nous.status.expiresAt == ISO8601DateFormatter().date(from: "2026-10-17T03:20:42Z"))
+    }
+
+    /// Hosts send times as seconds, milliseconds or ISO 8601 text. Text that isn't a
+    /// time only drops that time.
+    @Test func providerTimesReadEveryShapeHermesSends() throws {
+        let expected = Date(timeIntervalSince1970: 1_792_210_156)
+        #expect(try DirectHermesAdministrationCodec.optionalDate(.integer(1_792_210_156)) == expected)
+        #expect(try DirectHermesAdministrationCodec.optionalDate(.integer(1_792_210_156_000)) == expected)
+        #expect(try DirectHermesAdministrationCodec.optionalDate(.string("2026-10-17T03:20:42+00:00"))
+            == ISO8601DateFormatter().date(from: "2026-10-17T03:20:42Z"))
+        #expect(try DirectHermesAdministrationCodec.optionalDate(.string("2026-10-17T03:20:42.250Z")) != nil)
+        #expect(try DirectHermesAdministrationCodec.optionalDate(.string("soon")) == nil)
+        #expect(try DirectHermesAdministrationCodec.optionalDate(.null) == nil)
+    }
+
     private func account(_ id: String, _ name: String, flow: DirectHermesOAuthProvider.Flow, loggedIn: Bool = false,
                          freeTier: Bool? = nil, tier: String? = nil, command: String? = nil,
                          canDisconnect: Bool = true, error: String? = nil) -> DirectHermesOAuthProvider {

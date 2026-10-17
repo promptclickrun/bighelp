@@ -403,11 +403,13 @@ struct BighelpAppComposition {
                         agentAvatarFileName: agent?.avatarFileName
                     )
                 }
-                return ConversationFixtureClient(
+                let client = ConversationFixtureClient(
                     canonicalAgentID: agentID,
                     agentDisplayName: agent?.name ?? "Assistant",
                     agentAvatarFileName: agent?.avatarFileName
                 )
+                if arguments.contains("-test-agent-talk") { client.agentTalk = DemoAgentTalkReader() }
+                return client
             }
             : { _, _ in unavailable }
         var dashboardSource: any DashboardDataSource = usesFixtures

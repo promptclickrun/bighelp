@@ -402,6 +402,8 @@ struct ChatView: View {
         .task(id: model.conversationID) { await sendDraftOnOpenIfAsked() }
         // A group's live activity (who is typing) is read only while it's on screen.
         .task(id: model.botModeActivityScope) { await model.observeBotModeActivity() }
+        // What other agents this agent asked are doing, while they're on it.
+        .task(id: model.agentTalkFollowKey) { await model.followAgentTalk() }
         .alert("Couldn't compact", isPresented: Binding(get: { compactError != nil }, set: { if !$0 { compactError = nil } })) {
             Button("OK") { compactError = nil }
         } message: { Text(compactError ?? "") }

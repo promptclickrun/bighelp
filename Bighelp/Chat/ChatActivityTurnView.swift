@@ -19,6 +19,8 @@ enum ChatCollaborationTranscriptPresentation {
 @MainActor
 struct ChatActivityTurnPresentation {
     enum Segment: Identifiable {
+        /// One agent messaging another: its own rail, never in a folder.
+        case agentTalk(ChatActivityEvent)
         case collaboration(ChatActivityEvent)
         case generatedMedia(ChatActivityEvent)
         /// Back-to-back reasoning shares one Thinking/Thought process row.
@@ -27,6 +29,7 @@ struct ChatActivityTurnPresentation {
 
         var id: String {
             switch self {
+            case .agentTalk(let event): "agent-talk:\(event.id)"
             case .collaboration(let event): "collaboration:\(event.id)"
             case .generatedMedia(let event): "generated-media:\(event.id)"
             case .thinking(let events): "thinking:\(events.first?.id ?? "")"
@@ -43,6 +46,7 @@ struct ChatActivityTurnPresentation {
         collaborations = turn.events.filter { $0.kind == .botHandoff }
         let ordinaryEvents = turn.events.filter {
             $0.kind != .botHandoff && $0.kind != .reasoning && GeneratedMediaProjection.kind(for: $0) == nil
+                && $0.agentTalkCall == nil
         }
         workTrail = ordinaryEvents.isEmpty
             ? nil
@@ -67,6 +71,9 @@ struct ChatActivityTurnPresentation {
             if event.kind == .botHandoff {
                 flushWork()
                 projected.append(.collaboration(event))
+            } else if event.agentTalkCall != nil {
+                flushWork()
+                projected.append(.agentTalk(event))
             } else if GeneratedMediaProjection.kind(for: event) != nil {
                 flushWork()
                 projected.append(.generatedMedia(event))
@@ -90,6 +97,8 @@ struct ChatActivityTurnPresentation {
 struct ChatActivityTurnView: View {
     let turn: ChatActivityTurn
     let senderResolver: TimelineSenderResolver
+    /// The agent whose work this is, for its messages to other agents.
+    let agentID: String?
     /// This is the newest work of a turn still running: its last folder is live.
     let isLive: Bool
     let onDisclosureChange: () -> Void
@@ -99,11 +108,13 @@ struct ChatActivityTurnView: View {
     init(
         turn: ChatActivityTurn,
         senderResolver: TimelineSenderResolver = TimelineSenderResolver(),
+        agentID: String? = nil,
         isLive: Bool = false,
         onDisclosureChange: @escaping () -> Void = {}
     ) {
         self.turn = turn
         self.senderResolver = senderResolver
+        self.agentID = agentID
         self.isLive = isLive
         self.onDisclosureChange = onDisclosureChange
     }
@@ -113,6 +124,9 @@ struct ChatActivityTurnView: View {
         VStack(alignment: .leading, spacing: BighelpTokens.space12) {
             ForEach(presentation.segments) { segment in
                 switch segment {
+                case .agentTalk(let event):
+                    ChatAgentTalkRail(talk: ChatAgentTalk(.call(event, delivery: nil)),
+                                      chatAgentID: agentID ?? "default", senderResolver: senderResolver)
                 case .collaboration(let event):
                     AgentCollaborationCard(
                         event: event,

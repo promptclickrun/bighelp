@@ -18,7 +18,7 @@ extension ChatView {
                 rows.append(.divider("Group chat started"))
             }
             rows += ChatCanvasTranscriptProjection.rows(from: displayedTranscriptRows, disclosures: model.activityDisclosures,
-                                                        isSending: model.isSending)
+                                                        isSending: model.isSending, readsAgentMessages: !model.isBotMode)
         }
         if let status = model.botModeStatus { rows.append(.botStatus(status)) }
         rows += model.pendingBotModeApprovals.map(ChatCanvasRow.botApproval)
@@ -135,6 +135,9 @@ extension ChatView {
                 .modifier(ChatToolDetailStyle())
         case .workTrailEnd:
             Color.clear.frame(height: BighelpTokens.space4)
+        case .agentTalk(let talk):
+            ChatAgentTalkRail(talk: talk, chatAgentID: model.agentID, senderResolver: senderResolver,
+                              live: model.agentTalkLive.activities, loadSteps: model.agentTalkStepsLoader)
         case .earlierMessage(let item):
             TimelineItemView(item: item, onApprovalTap: onApprovalTap,
                              pendingMidSessionBehavior: model.pendingMidSessionBehavior(for: item.id),
@@ -320,6 +323,7 @@ extension ChatView {
             ChatActivityTurnView(
                 turn: turn,
                 senderResolver: senderResolver,
+                agentID: model.agentID,
                 onDisclosureChange: beginDisclosureReview
             )
             .id(entry.id)

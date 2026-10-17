@@ -11,6 +11,8 @@ enum ConversationFixtureError: Error {
 class ConversationFixtureClient: AttachmentConversationClient, CompactingConversationClient {
     /// The demo chat this client answers, set by `ChatModel`.
     weak var model: ChatModel?
+    /// The demo's agent-talk feed (`-test-agent-talk`).
+    var agentTalk: (any AgentTalkReading)?
     private(set) var receivedAttachments: [ChatAttachment] = []
     private var responseSequence = 1
     private let shouldFail: Bool

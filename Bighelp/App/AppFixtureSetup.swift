@@ -61,6 +61,13 @@ enum AppFixtureSetup {
            let index = initialSessions.firstIndex(where: { $0.id == "demo-finance" }) {
             initialSessions[index] = ConversationFixtures.imageStackPreview
         }
+        if usesFixtures, arguments.contains("-test-agent-talk"),
+           let index = initialSessions.firstIndex(where: { $0.id == "demo-finance" }) {
+            initialSessions[index] = ConversationFixtures.agentTalkPreview
+            if arguments.contains("-test-hide-tool-calls") {
+                initialSessions[index].activityVisibility?.showToolCalls = false
+            }
+        }
         if usesFixtures, arguments.contains("-test-tool-folders"),
            let index = initialSessions.firstIndex(where: { $0.id == "demo-finance" }) {
             initialSessions[index] = ConversationFixtures.toolFoldersPreview

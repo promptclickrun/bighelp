@@ -262,7 +262,8 @@ struct ChatActivityEvent: Identifiable, Codable, Equatable, Sendable {
         guard isPresentable else { return false }
         return switch kind {
         case .reasoning: visibility.showReasoning
-        case .tool: visibility.showToolCalls
+        // Agents messaging each other is conversation, not work (`ChatAgentTalk`).
+        case .tool: visibility.showToolCalls || agentTalkCall != nil
         case .subagent, .botHandoff: true
         }
     }

@@ -304,6 +304,7 @@ final class NativeWorkspaceRuntime {
             currentWorkspace: { [weak connections] in connections?.workspace },
             name: { [weak userIdentity] in userIdentity?.identity.name ?? "" }
         )
+        bridge.agentTalk = DirectHermesAgentTalkReader(currentWorkspace: { [weak connections] in connections?.workspace })
         let features = ShellFeatureStore(
             timing: .immediate, catalog: sessions, agents: agents, agentRuntimeDefaults: defaults,
             allowsNewChatAgentDefaults: false,

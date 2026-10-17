@@ -168,6 +168,8 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     /// Hours of the day, messages and models per day for the Usage page (plugin, `native-usage-activity-v1`).
     case usageActivity = "usage.activity"
     case peopleSpeaking = "people.speaking"
+    /// Other agents' runs a chat started, and what they're doing (plugin, `native-agent-talk-v1`).
+    case agentTalkRuns = "agents.talk"
     /// Composio Connect in Hermes, for Settings › Apps › Composio Apps (plugin `native-composio-v1`).
     case composioStatus = "composio.status"
     case composioInstall = "composio.install"

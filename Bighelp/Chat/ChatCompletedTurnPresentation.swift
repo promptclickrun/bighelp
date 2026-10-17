@@ -115,6 +115,28 @@ enum ChatCompletedTurnProjection {
                     // animation is replaced, including after a reopen.
                     if turn.events.contains(where: { GeneratedMediaProjection.kind(for: $0) != nil }) {
                         turnRows.append(.entry(entry))
+                    } else if turn.events.contains(where: { $0.agentTalkCall != nil }) {
+                        // Agents messaging each other is conversation too: each
+                        // message stays out where it happened, the work around it folds.
+                        var work: [ChatActivityEvent] = []
+                        func foldWork() {
+                            guard let first = work.first else { return }
+                            if foldPosition == nil { foldPosition = turnRows.count }
+                            folded.append(.activity(ChatActivityTurn(
+                                id: first.id == turn.events.first?.id ? turn.id : "\(turn.id):work:\(first.id)",
+                                events: work)))
+                            work.removeAll()
+                        }
+                        for event in turn.events {
+                            if event.agentTalkCall != nil {
+                                foldWork()
+                                turnRows.append(.entry(.activity(ChatActivityTurn(
+                                    id: "agent-talk:\(event.id)", events: [event]))))
+                            } else {
+                                work.append(event)
+                            }
+                        }
+                        foldWork()
                     } else {
                         if foldPosition == nil { foldPosition = turnRows.count }
                         folded.append(entry)
@@ -164,13 +186,14 @@ enum ChatCompletedTurnProjection {
 
     /// Steps the fold stands for, in order: its own tool calls and helper
     /// agents, plus the turn's work the chat hides (Show tool calls off), from
-    /// the ledger by turn or by order. Generated pictures stay outside the
-    /// fold and the count.
+    /// the ledger by turn or by order. Generated pictures and messages to
+    /// other agents stay outside the fold and the count.
     private static func steps(
         _ folded: [ChatTranscriptEntry], startOrder: Int?, endOrder: Int?, activityEvents: [ChatActivityEvent]
     ) -> [ChatActivityEvent] {
         func isStep(_ event: ChatActivityEvent) -> Bool {
             (event.kind == .tool || event.kind == .subagent) && GeneratedMediaProjection.kind(for: event) == nil
+                && event.agentTalkCall == nil
         }
         var steps: [ChatActivityEvent] = []
         var seen = Set<String>()

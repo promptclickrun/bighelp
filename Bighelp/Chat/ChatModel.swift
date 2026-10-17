@@ -12,6 +12,8 @@ final class ChatModel {
     /// The one folder whose loader plays (`ChatCanvasTranscriptProjection.activeLoaderID`).
     let loaderFocus = BighelpActivityLoaderFocus()
     let nativeSessionResumeProgress = NativeSessionResumeProgressPresentation()
+    /// What the other agents this chat's agent talks to are doing (`ChatAgentTalkRail`).
+    let agentTalkLive = ChatAgentTalkLive()
 
     @ObservationIgnored let responseTextGrowthSubject = PassthroughSubject<ResponseTextGrowth, Never>()
     var responseTextGrowth: AnyPublisher<ResponseTextGrowth, Never> {

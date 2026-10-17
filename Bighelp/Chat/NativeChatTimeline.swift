@@ -10,6 +10,8 @@ enum ChatCanvasRow: Identifiable, Equatable {
     case workTrailHeader(ChatActivityTurn, isLive: Bool)
     case activityDetail(ChatActivityEvent)
     case workTrailEnd(String)
+    /// Agents messaging each other, back-to-back messages as one rail.
+    case agentTalk(ChatAgentTalk)
     case earlierMessage(TimelineItem)
     case divider(String)
     case previousHistory(Bool, String?)
@@ -36,6 +38,7 @@ enum ChatCanvasRow: Identifiable, Equatable {
         case .workTrailHeader(let turn, _): "work-trail:\(turn.id)"
         case .activityDetail(let event): "activity-detail:\(event.id)"
         case .workTrailEnd(let id): "work-trail-end:\(id)"
+        case .agentTalk(let talk): "agent-talk:\(talk.id)"
         case .earlierMessage(let item): "earlier:\(item.id)"
         case .divider(let label): "divider:\(label)"
         case .previousHistory: "chat.previous-history"
@@ -67,6 +70,7 @@ enum ChatCanvasRow: Identifiable, Equatable {
         case (.workTrailHeader(let a, let liveA), .workTrailHeader(let b, let liveB)): a == b && liveA == liveB
         case (.activityDetail(let a), .activityDetail(let b)): a == b
         case (.workTrailEnd(let a), .workTrailEnd(let b)): a == b
+        case (.agentTalk(let a), .agentTalk(let b)): a == b
         case (.earlierMessage(let a), .earlierMessage(let b)): a == b
         case (.divider(let a), .divider(let b)), (.botStatus(let a), .botStatus(let b)), (.failure(let a), .failure(let b)): a == b
         case (.previousHistory(let a, let b), .previousHistory(let c, let d)): a == c && b == d
@@ -92,20 +96,36 @@ enum ChatCanvasRow: Identifiable, Equatable {
 @MainActor
 enum ChatCanvasTranscriptProjection {
     static func rows(from displayRows: [ChatTurnDisplayRow], disclosures: ChatActivityDisclosureStore,
-                     isSending: Bool = false) -> [ChatCanvasRow] {
+                     isSending: Bool = false, readsAgentMessages: Bool = true) -> [ChatCanvasRow] {
         var result: [ChatCanvasRow] = []
         // While a turn runs, the folder at its tail is the work in progress:
         // the agent hasn't moved on to text, thinking or another folder yet.
         var tailEntryID: String?
         if isSending, case .entry(let entry)? = displayRows.last, case .activity = entry { tailEntryID = entry.id }
+        let talk = ChatAgentTalkIndex(displayRows, readsAgentMessages: readsAgentMessages)
+        func appendTalk(_ piece: ChatAgentTalk.Piece) {
+            // Messages back to back read as one exchange.
+            if case .agentTalk(var previous)? = result.last {
+                previous.append(ChatAgentTalk(piece))
+                result[result.count - 1] = .agentTalk(previous)
+            } else {
+                result.append(.agentTalk(ChatAgentTalk(piece)))
+            }
+        }
         func append(_ entry: ChatTranscriptEntry) {
             guard case .activity(let turn) = entry else {
-                result.append(.transcript(.entry(entry)))
+                if case .message(let item) = entry, let piece = talk.piece(for: item) {
+                    appendTalk(piece)
+                } else {
+                    result.append(.transcript(.entry(entry)))
+                }
                 return
             }
             let segments = ChatActivityTurnPresentation(turn: turn).segments
             for (index, segment) in segments.enumerated() {
                 switch segment {
+                case .agentTalk(let event):
+                    appendTalk(.call(event, delivery: talk.delivery(for: event)))
                 case .workTrail(let trail):
                     let isTail = entry.id == tailEntryID && index == segments.count - 1
                     let isLive = isSending && (isTail || trail.events.contains { $0.lifecycle == .running })
@@ -156,6 +176,8 @@ enum ChatCanvasTranscriptProjection {
                    turn.events.contains(where: { $0.lifecycle == .running }) {
                     return ChatLoaderID.thinking(turn.events)
                 }
+            case .agentTalk(let talk) where talk.isLive:
+                return ChatAgentTalkRail.loaderID(talk)
             default: continue
             }
         }
@@ -376,6 +398,8 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             let reflectiveVisionEnabled: Bool
             let cameraID: ObjectIdentifier?
             let providerStoreID: ObjectIdentifier?
+            let companionStoreID: ObjectIdentifier?
+            let companionAgentScope: String
             let disclosureStoreID: ObjectIdentifier?
             let loaderFocusID: ObjectIdentifier?
             let cardInteractionScope: ChatCardInteractionScope?
@@ -398,6 +422,8 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
                 reflectiveVisionEnabled = environment.reflectiveVisionEnabled
                 cameraID = environment.reflectiveVisionCamera.map(ObjectIdentifier.init)
                 providerStoreID = environment.providerLogoStore.map(ObjectIdentifier.init)
+                companionStoreID = environment.companionStore.map(ObjectIdentifier.init)
+                companionAgentScope = environment.companionAgentScope
                 disclosureStoreID = environment.chatActivityDisclosureStore.map(ObjectIdentifier.init)
                 loaderFocusID = environment.bighelpActivityLoaderFocus.map(ObjectIdentifier.init)
                 cardInteractionScope = environment.chatCardInteractions?.scope
@@ -476,7 +502,7 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             // An unfolded trail's steps must sit flush so their line is unbroken.
             switch row {
             case .bottom, .workTrailEnd, .workTrailHeader, .activityDetail, .transcript(.completed),
-                 .transcript(.entry(.activity)):
+                 .transcript(.entry(.activity)), .agentTalk:
                 cell.contentConfiguration = configuration.minSize(height: 0)
             default: cell.contentConfiguration = configuration
             }
@@ -579,6 +605,9 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             values.bighelpCardDataClient = source.bighelpCardDataClient
             values.bighelpSessionContentReader = source.bighelpSessionContentReader
             values.providerLogoStore = source.providerLogoStore
+            // Agents' faces in rows (`AgentLiveAvatar`) draw their saved characters and pets.
+            values.companionStore = source.companionStore
+            values.companionAgentScope = source.companionAgentScope
             values.reflectiveVisionEnabled = source.reflectiveVisionEnabled
             values.reflectiveVisionCamera = source.reflectiveVisionCamera
             values.scenePhase = source.scenePhase
@@ -595,7 +624,7 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             switch rowsByID[id] {
             case .bottom: return ChatBottomAnchorVisibility.contentBottomPadding + ChatBottomAnchorVisibility.anchorHeight
             case .workTrailEnd: return BighelpTokens.space4
-            case .workTrailHeader: return BighelpTokens.hitTarget + BighelpTokens.space8
+            case .workTrailHeader, .agentTalk: return BighelpTokens.hitTarget + BighelpTokens.space8
             case .activityDetail: return 180
             case .transcript(.completed): return BighelpTokens.hitTarget + BighelpTokens.space16
             case .transcript(.entry(.message(let item))), .earlierMessage(let item):

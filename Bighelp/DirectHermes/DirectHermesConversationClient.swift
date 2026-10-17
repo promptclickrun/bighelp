@@ -144,6 +144,8 @@ final class DirectHermesConversationClient: StreamingConversationClient, Stoppab
     @ObservationIgnored let attachmentResolver: (any AgentAttachmentResolving)?
     /// Says who is sending before each new turn (hosts several people share).
     @ObservationIgnored var speakerNote: (any ChatSpeakerNoting)?
+    /// Other agents this chat's agent talks to (`ChatAgentTalkRail`).
+    @ObservationIgnored var agentTalk: (any AgentTalkReading)?
     /// What the host supports for this chat's profile (helper Stop and Steer).
     /// Set by the workspace bridge for each connection; nil supports nothing.
     @ObservationIgnored var supportsCapability: (@MainActor (WorkspaceCapability) -> Bool)?

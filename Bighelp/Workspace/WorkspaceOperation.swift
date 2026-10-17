@@ -168,6 +168,9 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     /// Hours of the day, messages and models per day for the Usage page (plugin, `native-usage-activity-v1`).
     case usageActivity = "usage.activity"
     case peopleSpeaking = "people.speaking"
+    /// Composio Connect in Hermes, for Settings › Apps › Composio Apps (plugin `native-composio-v1`).
+    case composioStatus = "composio.status"
+    case composioInstall = "composio.install"
     /// Instant alerts while bighelp is open (plugin, `native-live-alerts-v1`).
     case liveAlertsListen = "alerts.listen"
     case liveAlertsAck = "alerts.ack"

@@ -21,7 +21,16 @@ extension SettingsView {
                     onOpenWorkspaceDestination(.keys)
                 }
             }
-            if let connectorApps, let apps = connectorApps() {
+            if let composio = composioApps?() {
+                NavigationLink {
+                    settingsDone(AppsHubView(native: connectorApps?() ?? nil, composio: composio))
+                } label: {
+                    rowLabel("Apps", detail: "Let agents use your email, notes and more",
+                             symbol: "app.connected.to.app.below.fill", tint: Color(hex: "3A7BD5"))
+                }
+                .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+                .accessibilityIdentifier("settings.apps")
+            } else if let connectorApps, let apps = connectorApps() {
                 NavigationLink {
                     settingsDone(ConnectorAppsView(model: apps))
                 } label: {

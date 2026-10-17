@@ -371,6 +371,12 @@ final class DirectHermesNativePluginClient {
             // Reads the agent's own sessions; a 90-day range of a busy agent is a few thousand rows.
             return Route(path: "usage/activity", feature: "native-usage-activity-v1", isMutation: false,
                          maximumResponseBytes: 1_048_576, timeout: 30)
+        case .composioStatus:
+            return Route(path: "composio/status", feature: "native-composio-v1", isMutation: false,
+                         maximumResponseBytes: 32_768)
+        case .composioInstall:
+            return Route(path: "composio/install", feature: "native-composio-v1", isMutation: true,
+                         maximumResponseBytes: 32_768)
         case .peopleSpeaking:
             // Sent before each message; a slow host never holds a message for long.
             return Route(path: "people/speaking", feature: "native-people-v1", isMutation: true,

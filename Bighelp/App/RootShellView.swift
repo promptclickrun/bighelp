@@ -1083,8 +1083,33 @@ struct RootShellView: View {
             onOpenRoute: { route in
                 leaveSettings { openPrepared(route) }
             },
-            connectorApps: { connectorAppsModel() }
+            connectorApps: { connectorAppsModel() },
+            composioApps: { composioAppsModel() }
         )
+    }
+
+    /// Settings › Apps › Composio Apps: your Composio sign-in, and the agent in use on the
+    /// computer in use; made-up apps in demo mode.
+    func composioAppsModel() -> ComposioAppsModel? {
+        if usesWorkspaceFixtures {
+            #if DEBUG
+            return DemoComposio.model()
+            #else
+            return nil
+            #endif
+        }
+        var agentHost: (any ComposioAgentHost)?
+        if let workspace = workspaceConnections?.workspace, let owner = currentWorkspaceOwner,
+           let direct = workspaceConnections?.hosts.selectedWorkspace?.nativeClient {
+            let profileID = workspaceAgentID
+            let current: @MainActor () -> WorkspaceOwner? = { [weak workspace] in workspace?.owner }
+            agentHost = DirectHermesComposioAgentHost(
+                hostName: workspaceHostName, agentName: workspaceProfileName, profileID: profileID,
+                workspace: workspace,
+                mcp: DirectHermesMCPClient(http: direct, rpc: direct, owner: owner, profileID: profileID,
+                                           currentOwner: current, actionStatusClient: nil))
+        }
+        return ComposioAppsModel(account: .shared, agentHost: agentHost)
     }
 
     /// Settings › Apps for the computer in use, while it's connected; made-up apps in demo mode.

@@ -93,16 +93,89 @@ final class DefaultModelUITests: BighelpUITestCase {
                 .firstMatch.waitForExistence(timeout: 60)
             openSettings(in: app)
             settingsRow("settings.providers", in: app).tap()
-            XCTAssertTrue(app.navigationBars["Provider Keys"].waitForExistence(timeout: 8))
-            let refresh = app.buttons["providers.refresh-model-catalogs"]
-            XCTAssertTrue(refresh.waitForExistence(timeout: 10), "Under Your providers")
+            XCTAssertTrue(app.navigationBars["AI providers"].waitForExistence(timeout: 8))
+            let more = app.buttons["providers.more"]
+            XCTAssertTrue(more.waitForExistence(timeout: 10), "In the top bar, beside Your providers")
             evidence("provider-keys-\(appearance)", app)
+            more.tap()
+            let refresh = app.buttons["Refresh model lists"]
+            XCTAssertTrue(refresh.waitForExistence(timeout: 5))
             refresh.tap()
             XCTAssertTrue(app.descendants(matching: .any)["providers.confirmed"].waitForExistence(timeout: 10),
                           "Hermes refreshed the catalogs")
             evidence("provider-keys-refreshed-\(appearance)", app)
             app.terminate()
         }
+    }
+
+    /// Settings › AI providers: your providers, each with Sign in again and Remove, and one
+    /// Connect a provider button for the rest.
+    @MainActor
+    func testAIProvidersListsYoursAndConnectsNewOnes() {
+        for appearance in ["light", "dark"] {
+            let app = makeApp()
+            app.launchArguments += ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.demo.appearance", appearance]
+            app.launch()
+            _ = app.buttons.matching(NSPredicate(format: "identifier IN %@", ["home.drawer.open", "chat.menu", "tab.profile"]))
+                .firstMatch.waitForExistence(timeout: 60)
+            openSettings(in: app)
+            settingsRow("settings.providers", in: app).tap()
+            XCTAssertTrue(app.navigationBars["AI providers"].waitForExistence(timeout: 8))
+            let nous = app.buttons["providers.connected.account:nous"]
+            XCTAssertTrue(nous.waitForExistence(timeout: 10), "The demo host is signed in to Nous Portal")
+            XCTAssertTrue(app.buttons["providers.connected.key:OPENROUTER_API_KEY"].exists, "and has an OpenRouter key")
+            XCTAssertFalse(app.buttons["providers.sign-in.openai-codex"].exists, "Sign-ins wait under Connect a provider")
+            evidence("ai-providers-\(appearance)", app)
+
+            nous.tap()
+            XCTAssertTrue(app.buttons["Sign in again"].waitForExistence(timeout: 5))
+            XCTAssertTrue(app.buttons["Remove"].exists)
+            evidence("ai-providers-menu-\(appearance)", app)
+            app.buttons["Sign in again"].tap()
+            // The demo host approves at once, so the code may already be gone.
+            let signedIn = app.descendants(matching: .any).matching(NSPredicate(
+                format: "identifier == %@ OR label == %@", "providers.confirmed", "WDJB-MJHT")).firstMatch
+            XCTAssertTrue(signedIn.waitForExistence(timeout: 10), "Signing in again runs the sign-in")
+            evidence("ai-providers-sign-in-again-\(appearance)", app)
+            if app.staticTexts["WDJB-MJHT"].exists { app.swipeDown(velocity: .fast) }
+
+            let connect = app.buttons["providers.connect"]
+            XCTAssertTrue(connect.waitForExistence(timeout: 10))
+            connect.tap()
+            XCTAssertTrue(app.buttons["providers.sign-in.openai-codex"].waitForExistence(timeout: 10),
+                          "ChatGPT signs in here")
+            XCTAssertFalse(app.buttons["providers.sign-in.nous"].exists, "Nous is already connected")
+            evidence("ai-providers-connect-\(appearance)", app)
+            let deepSeek = app.buttons["providers.key-choice.DEEPSEEK_API_KEY"]
+            for _ in 0..<6 where !deepSeek.isHittable { app.swipeUp() }
+            XCTAssertTrue(deepSeek.isHittable, "Providers with keys are here too")
+            XCTAssertFalse(app.buttons["providers.key-choice.OPENROUTER_API_KEY"].exists, "OpenRouter's key is saved")
+            evidence("ai-providers-connect-keys-\(appearance)", app)
+            app.terminate()
+        }
+    }
+
+    /// A real host's signed-in accounts show under Your providers. Set BIGHELP_PROVIDERS_HOST
+    /// (TEST_RUNNER_…) to an open host's address and BIGHELP_PROVIDERS_EXPECT to the provider IDs
+    /// it is signed in to, comma-separated. Uninstall bighelp from the simulator first.
+    @MainActor
+    func testAIProvidersShowsARealHostsSignedInAccounts() throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard let address = environment["BIGHELP_PROVIDERS_HOST"] else {
+            throw XCTSkip("Set BIGHELP_PROVIDERS_HOST to an open Hermes host's address")
+        }
+        let expected = (environment["BIGHELP_PROVIDERS_EXPECT"] ?? "").split(separator: ",").map(String.init)
+        let app = makeApp()
+        app.launch()
+        try onboardOpenHost(app, address: address)
+        openSettings(in: app)
+        settingsRow("settings.providers", in: app).tap()
+        XCTAssertTrue(app.navigationBars["AI providers"].waitForExistence(timeout: 15))
+        for id in expected {
+            XCTAssertTrue(app.buttons["providers.connected.account:\(id)"].waitForExistence(timeout: 30),
+                          "\(id) is signed in on the host")
+        }
+        evidence("ai-providers-real-host", app)
     }
 
     // MARK: - Steps

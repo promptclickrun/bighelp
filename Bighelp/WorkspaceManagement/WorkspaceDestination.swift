@@ -51,7 +51,7 @@ enum WorkspaceDestination: String, CaseIterable, Identifiable, Hashable, Sendabl
         case .messaging: "Messaging"
         case .voice: "Voice"
         case .webhooks: "Webhooks"
-        case .keys: "Provider Keys"
+        case .keys: "AI providers"
         case .usage: "Usage"
         case .logs: "Logs"
         case .profiles: "Profiles"

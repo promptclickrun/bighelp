@@ -20,6 +20,8 @@ struct ProviderKeysOverview: Equatable {
         let name: String
         let detail: String
         let kind: Kind
+        /// How to sign in to this account again (a new sign-in replaces the old one).
+        var signInAgain: SignIn.Method? = nil
     }
 
     struct SignIn: Identifiable, Equatable {
@@ -75,21 +77,6 @@ struct ProviderKeysOverview: Equatable {
             // (Hermes counts a Claude Code install as signed in).
             var signedIn = provider.status.isLoggedIn
             if case .ready(let verified?)? = host?.state { signedIn = verified }
-            if signedIn {
-                let tier = provider.status.accountTier
-                    ?? (provider.status.isFreeTier == true ? "Free tier" : nil)
-                let hermesKnows = provider.status.isLoggedIn
-                connected.append(.init(
-                    id: "account:\(provider.id)", logoID: logo, name: provider.name,
-                    detail: hermesKnows || host == nil
-                        ? ["Signed in", tier].compactMap { $0 }.joined(separator: " · ")
-                        : "Signed in with \(host?.client ?? "its own tool")",
-                    kind: .account(providerID: provider.id, canDisconnect: provider.canDisconnect && hermesKnows,
-                                   hint: provider.disconnectHint
-                                       ?? host.map { "Sign out with \($0.client) on the computer." })
-                ))
-                continue
-            }
             let method: SignIn.Method
             if provider.flow == .deviceCode || provider.flow == .pkce {
                 method = .onPhone
@@ -102,6 +89,22 @@ struct ProviderKeysOverview: Equatable {
                 }
             } else {
                 method = .onComputer(command: provider.cliCommand)
+            }
+            if signedIn {
+                let tier = provider.status.accountTier
+                    ?? (provider.status.isFreeTier == true ? "Free tier" : nil)
+                let hermesKnows = provider.status.isLoggedIn
+                connected.append(.init(
+                    id: "account:\(provider.id)", logoID: logo, name: provider.name,
+                    detail: hermesKnows || host == nil
+                        ? ["Signed in", tier].compactMap { $0 }.joined(separator: " · ")
+                        : "Signed in with \(host?.client ?? "its own tool")",
+                    kind: .account(providerID: provider.id, canDisconnect: provider.canDisconnect && hermesKnows,
+                                   hint: provider.disconnectHint
+                                       ?? host.map { "Sign out with \($0.client) on the computer." }),
+                    signInAgain: { if case .retired = method { return nil } else { return method } }()
+                ))
+                continue
             }
             let row = SignIn(
                 id: provider.id, logoID: logo, name: provider.name, method: method,
@@ -151,7 +154,8 @@ struct ProviderKeysOverview: Equatable {
             connected.append(.init(
                 id: "account:\(host.providerID)", logoID: Self.logoID(host.providerID), name: host.name,
                 detail: "Signed in",
-                kind: .account(providerID: host.providerID, canDisconnect: false, hint: nil)
+                kind: .account(providerID: host.providerID, canDisconnect: false, hint: nil),
+                signInAgain: .withHostTool(client: host.client, flow: host.flow)
             ))
         }
 
@@ -199,11 +203,12 @@ struct ProviderKeysOverview: Equatable {
                      keyChoices: keyChoices.filter { matches($0.providerName, $0.title, $0.id) })
     }
 
-    /// A secret that stands for a provider: API keys, tokens and secrets, not
-    /// base URLs, regions or messaging channels (those stay under Advanced).
+    /// A secret that stands for an AI model provider: API keys, tokens and secrets, not
+    /// base URLs, regions, messaging channels, tool keys or your own custom settings
+    /// (those stay under Advanced).
     static func isProviderKey(_ credential: DirectHermesProviderCredential) -> Bool {
-        guard credential.isSecret, !credential.isChannelManaged,
-              credential.category == "provider" || credential.providerID != nil || credential.isCustom else {
+        guard credential.isSecret, !credential.isChannelManaged, !credential.isCustom,
+              credential.category == "provider" || credential.providerID != nil else {
             return false
         }
         return ["API key", "token", "secret", "key", "sign-in token"]

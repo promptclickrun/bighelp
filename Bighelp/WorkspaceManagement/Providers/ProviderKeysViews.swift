@@ -328,37 +328,127 @@ final class ProviderSignInBrowser: NSObject, ASWebAuthenticationPresentationCont
     }
 }
 
-/// Adding a key for a provider that uses one: search, pick, paste.
-struct ProviderKeyPickerView: View {
+/// Connect a provider: accounts to sign in to and providers that take an API
+/// key, without the ones already connected. A finished sign-in goes back to
+/// the list, where the new provider now shows.
+struct ProviderConnectView: View {
     let store: ProviderAccountsStore
-    let choices: [ProviderKeysOverview.KeyChoice]
     @State private var search = ""
-
-    private var shown: [ProviderKeysOverview.KeyChoice] {
-        let query = search.trimmingCharacters(in: .whitespaces)
-        guard !query.isEmpty else { return choices }
-        return choices.filter { $0.title.localizedCaseInsensitiveContains(query) || $0.id.localizedCaseInsensitiveContains(query) }
-    }
+    @State private var signingIn: ProviderSignInTarget?
+    /// The sheet's account, kept past dismissal so closing can stop its sign-in.
+    @State private var lastSignIn: ProviderSignInTarget?
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         List {
-            if choices.isEmpty {
-                Text("Every provider key this host knows about is already saved.")
-                    .foregroundStyle(.secondary)
-            }
-            ForEach(shown) { choice in
-                NavigationLink {
-                    ProviderCredentialEditorView(store: store, credentialID: choice.id)
-                } label: {
-                    ProviderRowLabel(logoID: choice.logoID, name: choice.providerName, detail: choice.title)
+            BighelpSearchField(text: $search, prompt: "Search providers",
+                               accessibilityIdentifier: "providers.connect.search")
+                .bighelpListSearchRow()
+            if let overview = store.overview?.matching(search) {
+                // A sign-in the provider stopped offering can't be connected; its replacement key is below.
+                let signIns = overview.signIns.filter { if case .retired = $0.method { false } else { true } }
+                if signIns.isEmpty && overview.keyChoices.isEmpty {
+                    if search.trimmingCharacters(in: .whitespaces).isEmpty {
+                        Text("Every provider \(store.hostName) knows about is already connected.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ContentUnavailableView.search(text: search)
+                    }
                 }
-                .accessibilityIdentifier("providers.key-choice.\(choice.id)")
+                if !signIns.isEmpty {
+                    Section {
+                        ForEach(signIns) { row in signInRow(row) }
+                    } header: {
+                        Text("Sign in with an account")
+                    } footer: {
+                        Text("You approve on the provider's own page. bighelp never sees your password.")
+                    }
+                }
+                if !overview.keyChoices.isEmpty {
+                    Section("Use an API key") {
+                        ForEach(overview.keyChoices) { choice in
+                            NavigationLink {
+                                ProviderCredentialEditorView(store: store, credentialID: choice.id)
+                            } label: {
+                                ProviderRowLabel(logoID: choice.logoID, name: choice.providerName, detail: choice.title)
+                            }
+                            .accessibilityIdentifier("providers.key-choice.\(choice.id)")
+                        }
+                    }
+                }
+            } else {
+                ProgressView()
             }
         }
-        .searchable(text: $search, prompt: "Search providers")
-        .navigationTitle("Add an API key")
+        .navigationTitle("Connect a provider")
         .navigationBarTitleDisplayMode(.inline)
-        .accessibilityIdentifier("providers.key-picker")
+        .bighelpSheet(item: $signingIn, onDismiss: {
+            guard let target = lastSignIn else { return }
+            Task {
+                await store.closeSignIn(target)
+                if store.overview?.connected.contains(where: { $0.id == "account:\(target.id)" }) == true { dismiss() }
+            }
+        }) { provider in
+            ProviderSignInSheet(store: store, provider: provider)
+                .bighelpSheetSize(.standard)
+        }
+        .accessibilityIdentifier("providers.connect.screen")
+    }
+
+    @ViewBuilder
+    private func signInRow(_ row: ProviderKeysOverview.SignIn) -> some View {
+        switch row.method {
+        case .onPhone:
+            signInButtonRow(row, detail: row.problem ?? "Sign in here", client: nil)
+        case .withHostTool(let client, _):
+            signInButtonRow(row, detail: row.problem
+                                ?? (client == "Hermes" ? "Sign in here" : "Uses \(client) on \(store.hostName)"),
+                            client: client)
+        case .needsTool(let client, let install, let command):
+            NavigationLink {
+                ProviderComputerSignInView(hostName: store.hostName, name: row.name, logoID: row.logoID,
+                                           command: command, documentationURL: row.documentationURL,
+                                           reason: .needsTool(client: client, install: install))
+            } label: {
+                ProviderRowLabel(logoID: row.logoID, name: row.name, detail: "Needs \(client) on \(store.hostName)")
+            }
+            .accessibilityIdentifier("providers.signin-row.\(row.id)")
+        case .onComputer(let command):
+            NavigationLink {
+                ProviderComputerSignInView(hostName: store.hostName, name: row.name, logoID: row.logoID,
+                                           command: command, documentationURL: row.documentationURL,
+                                           reason: store.hostSignIn?.isSupported == true ? .terminalOnly : .pluginUpdate)
+            } label: {
+                ProviderRowLabel(logoID: row.logoID, name: row.name, detail: row.problem ?? "Sign in on \(store.hostName)")
+            }
+            .accessibilityIdentifier("providers.signin-row.\(row.id)")
+        case .retired(let message, let replacementKey):
+            NavigationLink {
+                ProviderRetiredSignInView(store: store, name: row.name, logoID: row.logoID, message: message,
+                                          replacementKey: replacementKey)
+            } label: {
+                ProviderRowLabel(logoID: row.logoID, name: row.name, detail: "No longer offered")
+            }
+            .accessibilityIdentifier("providers.signin-row.\(row.id)")
+        }
+    }
+
+    private func signInButtonRow(_ row: ProviderKeysOverview.SignIn, detail: String, client: String?) -> some View {
+        HStack {
+            ProviderRowLabel(logoID: row.logoID, name: row.name, detail: detail)
+            Spacer(minLength: 0)
+            Button("Sign in") {
+                let target = ProviderSignInTarget(id: row.id, name: row.name, logoID: row.logoID, client: client)
+                lastSignIn = target
+                signingIn = target
+            }
+            .bighelpProminentButtonStyle()
+            .controlSize(.small)
+            .disabled(store.isBusy || store.isSigningIn)
+            .accessibilityIdentifier("providers.sign-in.\(row.id)")
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("providers.signin-row.\(row.id)")
     }
 }
 

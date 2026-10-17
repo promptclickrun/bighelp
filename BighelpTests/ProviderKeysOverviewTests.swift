@@ -89,6 +89,21 @@ struct ProviderKeysOverviewTests {
         #expect(overview.connected.last?.kind == .key(credentialID: "OPENROUTER_API_KEY"))
     }
 
+    /// Each account on the list can be signed in to again, the same way it was first:
+    /// on the phone, or with the command on the computer.
+    @Test func connectedAccountsSignInAgainTheWayTheyFirstDid() {
+        let overview = ProviderKeysOverview(snapshot: snapshot(oauth: [
+            account("nous", "Nous Portal", flow: .deviceCode, loggedIn: true),
+            account("qwen-oauth", "Qwen (via Qwen CLI)", flow: .external, loggedIn: true,
+                    command: "hermes auth add qwen-oauth", canDisconnect: false),
+        ], keys: [key("OPENROUTER_API_KEY", provider: "openrouter", label: "OpenRouter", set: true)]))
+        let byID = Dictionary(uniqueKeysWithValues: overview.connected.map { ($0.id, $0) })
+        #expect(byID["account:nous"]?.signInAgain == .onPhone)
+        #expect(byID["account:qwen-oauth"]?.signInAgain == .onComputer(command: "hermes auth add qwen-oauth"))
+        #expect(byID["key:OPENROUTER_API_KEY"]?.signInAgain == nil, "A key is replaced, not signed in to")
+        #expect(overview.signIns.isEmpty, "Connected accounts aren't offered again under Connect a provider")
+    }
+
     @Test func accountsYouCanSignInToOnThePhoneComeBeforeTerminalOnes() {
         let overview = ProviderKeysOverview(snapshot: snapshot(oauth: [
             account("nous", "Nous Portal", flow: .deviceCode),
@@ -115,6 +130,18 @@ struct ProviderKeysOverviewTests {
         ]))
         #expect(overview.keyChoices.map(\.id) == ["ANTHROPIC_API_KEY", "GITHUB_TOKEN", "OPENAI_API_KEY"])
         #expect(overview.keyChoices.map(\.title) == ["Anthropic API key", "GitHub Copilot token", "OpenAI API key"])
+    }
+
+    /// Keys you saved for speech, home automation or your own scripts aren't AI providers.
+    @Test func yourProvidersHoldsOnlyAIProviders() {
+        let overview = ProviderKeysOverview(snapshot: snapshot(keys: [
+            key("OPENROUTER_API_KEY", provider: "openrouter", label: "OpenRouter", set: true),
+            key("ELEVENLABS_API_KEY", set: true, category: "tool"),
+            .init(id: "HOME_AUTOMATION_TOKEN", providerID: nil, providerName: nil, description: "", category: "custom",
+                  isSet: true, isSecret: true, isAdvanced: false, isCustom: true, isChannelManaged: false),
+        ]))
+        #expect(overview.connected.map(\.id) == ["key:OPENROUTER_API_KEY"])
+        #expect(overview.keyChoices.isEmpty)
     }
 
     @Test func searchKeepsOnlyTheProvidersItNames() {

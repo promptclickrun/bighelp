@@ -583,12 +583,15 @@ struct ProviderAccountsView: View {
     let store: ProviderAccountsStore
     @State private var addingEndpoint = false
     @State private var addingPoolCredential = false
-    @State private var disconnectOAuthID: String?
+    @State private var removing: ProviderKeysOverview.Connected?
     @State private var poolRemoval: PoolRemoval?
     @State private var signingIn: ProviderSignInTarget?
     /// The sheet's account, kept past dismissal so closing can stop its sign-in.
     @State private var lastSignIn: ProviderSignInTarget?
-    @State private var search = ""
+    @State private var replacingKey: String?
+    /// The connected account whose sign-in runs on the computer, by row ID.
+    @State private var computerSignIn: String?
+    @State private var showsAdvanced = false
     @Environment(\.openURL) private var openURL
 
     var body: some View {
@@ -597,45 +600,52 @@ struct ProviderAccountsView: View {
                 Form {
                     statusSections
                     if let snapshot = store.snapshot, let overview = store.overview {
-                        if !search.trimmingCharacters(in: .whitespaces).isEmpty {
-                            searchResults(overview.matching(search), portal: snapshot.portal)
-                        } else {
-                            yourProvidersSection(overview.connected, portal: snapshot.portal)
-                            refreshCatalogsSection
-                            signInSection(overview.signIns)
-                            Section {
-                                NavigationLink {
-                                    ProviderKeyPickerView(store: store, choices: overview.keyChoices)
-                                } label: {
-                                    Label("Add an API key", systemImage: "key")
-                                }
-                                .accessibilityIdentifier("providers.add-key")
-                            } footer: {
-                                Text("For providers that use a key instead of an account. Keys are saved on \(store.hostName) and never shown again.")
+                        yourProvidersSection(overview.connected, portal: snapshot.portal)
+                        Section {
+                            NavigationLink {
+                                ProviderConnectView(store: store)
+                            } label: {
+                                Label("Connect a provider", systemImage: "plus.circle.fill")
                             }
-                            Section {
-                                NavigationLink {
-                                    advancedForm
-                                } label: {
-                                    Label("Advanced", systemImage: "gearshape.2")
-                                }
-                                .accessibilityIdentifier("providers.advanced")
-                            } footer: {
-                                Text("Custom endpoints, extra accounts, every key setting, and which provider new chats use.")
-                            }
+                            .accessibilityIdentifier("providers.connect")
+                        } footer: {
+                            Text("Sign-ins and keys stay on \(store.hostName). bighelp never sees your passwords.")
                         }
                     }
                 }
-                .searchable(text: $search, prompt: "Search providers")
                 .bighelpRefreshable { await store.refresh() }
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Menu {
+                            Button("Refresh model lists", systemImage: "arrow.clockwise") {
+                                Task { await store.refreshModelCatalogs() }
+                            }
+                            .disabled(store.isBusy)
+                            .accessibilityIdentifier("providers.refresh-model-catalogs")
+                            Button("Advanced", systemImage: "gearshape.2") { showsAdvanced = true }
+                                .accessibilityIdentifier("providers.advanced")
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                        }
+                        .accessibilityLabel("More")
+                        .accessibilityIdentifier("providers.more")
+                    }
+                }
+                .navigationDestination(isPresented: $showsAdvanced) { advancedForm }
+                .navigationDestination(item: $replacingKey) { key in
+                    ProviderCredentialEditorView(store: store, credentialID: key)
+                }
+                .navigationDestination(item: $computerSignIn) { id in
+                    if let row = store.overview?.connected.first(where: { $0.id == id }) { computerSignInView(row) }
+                }
             } else {
                 ContentUnavailableView(
-                    "Provider keys unavailable", systemImage: "person.crop.circle.badge.exclamationmark",
-                    description: Text("The selected host changed. Reopen Provider Keys from the current workspace.")
+                    "AI providers unavailable", systemImage: "person.crop.circle.badge.exclamationmark",
+                    description: Text("The selected host changed. Open AI providers again from Settings.")
                 )
             }
         }
-        .navigationTitle("Provider Keys")
+        .navigationTitle("AI providers")
         .navigationBarTitleDisplayMode(.inline)
         .task { if store.snapshot == nil { await store.load() } }
         .bighelpSheet(item: $signingIn, onDismiss: {
@@ -645,178 +655,117 @@ struct ProviderAccountsView: View {
                 .bighelpSheetSize(.standard)
         }
         .confirmationDialog(
-            "Disconnect this account?", isPresented: Binding(
-                get: { disconnectOAuthID != nil },
-                set: { if !$0 { disconnectOAuthID = nil } }
+            removing.map { "Remove \($0.name)?" } ?? "", isPresented: Binding(
+                get: { removing != nil },
+                set: { if !$0 { removing = nil } }
             ), titleVisibility: .visible
         ) {
-            if let id = disconnectOAuthID {
-                Button("Disconnect", role: .destructive) {
-                    disconnectOAuthID = nil
-                    Task { await store.disconnectOAuth(providerID: id) }
+            if let row = removing {
+                Button("Remove", role: .destructive) {
+                    removing = nil
+                    Task { await remove(row) }
                 }
             }
-            Button("Cancel", role: .cancel) { disconnectOAuthID = nil }
+            Button("Cancel", role: .cancel) { removing = nil }
         } message: {
-            Text("Hermes removes its saved sign-in for this profile. Chats already running keep going.")
+            Text("New chats can't use it until you connect it again. Chats already running keep going.")
         }
         .accessibilityIdentifier("providers.accounts")
     }
 
-    // MARK: Overview
-
-    @ViewBuilder
-    private func searchResults(_ overview: ProviderKeysOverview, portal: DirectHermesPortalStatus?) -> some View {
-        if overview.isEmpty {
-            ContentUnavailableView.search(text: search)
-        } else {
-            if !overview.connected.isEmpty { yourProvidersSection(overview.connected, portal: portal) }
-            signInSection(overview.signIns)
-            if !overview.keyChoices.isEmpty {
-                Section("Add an API key") {
-                    ForEach(overview.keyChoices) { choice in
-                        NavigationLink {
-                            ProviderCredentialEditorView(store: store, credentialID: choice.id)
-                        } label: {
-                            ProviderRowLabel(logoID: choice.logoID, name: choice.providerName, detail: choice.title)
-                        }
-                        .accessibilityIdentifier("providers.key-choice.\(choice.id)")
-                    }
-                }
-            }
-        }
-    }
+    // MARK: Your providers
 
     @ViewBuilder
     private func yourProvidersSection(_ rows: [ProviderKeysOverview.Connected],
                                       portal: DirectHermesPortalStatus?) -> some View {
         Section {
             if rows.isEmpty {
-                Text("None yet. Sign in to an account or add an API key below.")
+                Text("None yet. Connect a provider to start chatting.")
                     .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("providers.none")
             }
             ForEach(rows) { row in
-                switch row.kind {
-                case .key(let credentialID):
-                    NavigationLink {
-                        ProviderCredentialEditorView(store: store, credentialID: credentialID)
-                    } label: {
-                        ProviderRowLabel(logoID: row.logoID, name: row.name, detail: row.detail)
-                    }
-                    .accessibilityIdentifier("providers.connected.\(row.id)")
-                case .account(let providerID, let canDisconnect, let hint):
+                Menu {
+                    rowActions(row, portal: portal)
+                } label: {
                     HStack {
                         ProviderRowLabel(logoID: row.logoID, name: row.name, detail: row.detail)
                         Spacer(minLength: 0)
-                        Menu {
-                            if providerID == portal?.providerID, let url = portal?.subscriptionURL {
-                                Button("Manage subscription", systemImage: "arrow.up.right.square") { openURL(url) }
-                            }
-                            if canDisconnect {
-                                Button("Disconnect", systemImage: "rectangle.portrait.and.arrow.right", role: .destructive) {
-                                    disconnectOAuthID = providerID
-                                }
-                            } else if let hint {
-                                Text(hint)
-                            }
-                        } label: {
-                            Image(systemName: "ellipsis.circle")
-                                .font(.bighelp(.title3))
-                                .frame(minWidth: BighelpTokens.hitTarget, minHeight: BighelpTokens.hitTarget)
-                                .contentShape(.rect)
-                        }
-                        .disabled(store.isBusy)
-                        .accessibilityLabel("\(row.name) options")
-                        .accessibilityIdentifier("providers.account-menu.\(providerID)")
+                        Image(systemName: "ellipsis.circle")
+                            .font(.bighelp(.title3))
+                            .foregroundStyle(.secondary)
+                            .frame(minWidth: BighelpTokens.hitTarget, minHeight: BighelpTokens.hitTarget)
                     }
-                    .accessibilityElement(children: .contain)
-                    .accessibilityIdentifier("providers.connected.\(row.id)")
+                    .contentShape(.rect)
                 }
+                .buttonStyle(.plain)
+                .disabled(store.isBusy)
+                .accessibilityLabel("\(row.name), \(row.detail)")
+                .accessibilityHint("Sign in again or remove")
+                .accessibilityIdentifier("providers.connected.\(row.id)")
             }
         } header: {
             Text("Your providers")
         }
     }
 
-    private var refreshCatalogsSection: some View {
-        Section {
-            Button("Refresh model catalogs", systemImage: "arrow.clockwise") {
-                Task { await store.refreshModelCatalogs() }
+    @ViewBuilder
+    private func rowActions(_ row: ProviderKeysOverview.Connected, portal: DirectHermesPortalStatus?) -> some View {
+        switch row.kind {
+        case .key(let credentialID):
+            Button("Replace key", systemImage: "key") { replacingKey = credentialID }
+            Button("Remove", systemImage: "trash", role: .destructive) { removing = row }
+        case .account(let providerID, let canDisconnect, let hint):
+            if let method = row.signInAgain {
+                Button("Sign in again", systemImage: "arrow.triangle.2.circlepath") { signInAgain(row, method: method) }
+                    .disabled(store.isSigningIn)
             }
-            .disabled(store.isBusy)
-            .accessibilityIdentifier("providers.refresh-model-catalogs")
-        } footer: {
-            Text("Asks each provider for its newest models, for the model pickers.")
+            if providerID == portal?.providerID, let url = portal?.subscriptionURL {
+                Button("Manage subscription", systemImage: "arrow.up.right.square") { openURL(url) }
+            }
+            if canDisconnect {
+                Button("Remove", systemImage: "trash", role: .destructive) { removing = row }
+            } else if let hint {
+                Text(hint)
+            }
+        }
+    }
+
+    private func signInAgain(_ row: ProviderKeysOverview.Connected, method: ProviderKeysOverview.SignIn.Method) {
+        guard case .account(let providerID, _, _) = row.kind else { return }
+        switch method {
+        case .onPhone, .withHostTool:
+            let client: String? = if case .withHostTool(let client, _) = method { client } else { nil }
+            let target = ProviderSignInTarget(id: providerID, name: row.name, logoID: row.logoID, client: client)
+            lastSignIn = target
+            signingIn = target
+        case .needsTool, .onComputer:
+            computerSignIn = row.id
+        case .retired:
+            break
         }
     }
 
     @ViewBuilder
-    private func signInSection(_ rows: [ProviderKeysOverview.SignIn]) -> some View {
-        if !rows.isEmpty {
-            Section {
-                ForEach(rows) { row in
-                    switch row.method {
-                    case .onPhone:
-                        signInRow(row, detail: row.problem ?? "Sign in here", client: nil)
-                    case .withHostTool(let client, _):
-                        signInRow(row, detail: row.problem
-                                      ?? (client == "Hermes" ? "Sign in here" : "Uses \(client) on \(store.hostName)"),
-                                  client: client)
-                    case .needsTool(let client, let install, let command):
-                        NavigationLink {
-                            ProviderComputerSignInView(hostName: store.hostName, name: row.name, logoID: row.logoID,
-                                                       command: command, documentationURL: row.documentationURL,
-                                                       reason: .needsTool(client: client, install: install))
-                        } label: {
-                            ProviderRowLabel(logoID: row.logoID, name: row.name,
-                                             detail: "Needs \(client) on \(store.hostName)")
-                        }
-                        .accessibilityIdentifier("providers.signin-row.\(row.id)")
-                    case .onComputer(let command):
-                        NavigationLink {
-                            ProviderComputerSignInView(hostName: store.hostName, name: row.name, logoID: row.logoID,
-                                                       command: command, documentationURL: row.documentationURL,
-                                                       reason: store.hostSignIn?.isSupported == true
-                                                           ? .terminalOnly : .pluginUpdate)
-                        } label: {
-                            ProviderRowLabel(logoID: row.logoID, name: row.name,
-                                             detail: row.problem ?? "Sign in on \(store.hostName)")
-                        }
-                        .accessibilityIdentifier("providers.signin-row.\(row.id)")
-                    case .retired(let message, let replacementKey):
-                        NavigationLink {
-                            ProviderRetiredSignInView(store: store, name: row.name, logoID: row.logoID, message: message,
-                                                      replacementKey: replacementKey)
-                        } label: {
-                            ProviderRowLabel(logoID: row.logoID, name: row.name, detail: "No longer offered")
-                        }
-                        .accessibilityIdentifier("providers.signin-row.\(row.id)")
-                    }
-                }
-            } header: {
-                Text("Sign in with your account")
-            } footer: {
-                Text("Subscriptions and accounts like Nous Portal, ChatGPT, GitHub Copilot or Claude. You approve on the provider's own page; bighelp never sees your password.")
-            }
+    private func computerSignInView(_ row: ProviderKeysOverview.Connected) -> some View {
+        switch row.signInAgain {
+        case .needsTool(let client, let install, let command)?:
+            ProviderComputerSignInView(hostName: store.hostName, name: row.name, logoID: row.logoID, command: command,
+                                       documentationURL: nil, reason: .needsTool(client: client, install: install))
+        case .onComputer(let command)?:
+            ProviderComputerSignInView(hostName: store.hostName, name: row.name, logoID: row.logoID, command: command,
+                                       documentationURL: nil,
+                                       reason: store.hostSignIn?.isSupported == true ? .terminalOnly : .pluginUpdate)
+        default:
+            EmptyView()
         }
     }
 
-    private func signInRow(_ row: ProviderKeysOverview.SignIn, detail: String, client: String?) -> some View {
-        HStack {
-            ProviderRowLabel(logoID: row.logoID, name: row.name, detail: detail)
-            Spacer(minLength: 0)
-            Button("Sign in") {
-                let target = ProviderSignInTarget(id: row.id, name: row.name, logoID: row.logoID, client: client)
-                lastSignIn = target
-                signingIn = target
-            }
-            .bighelpProminentButtonStyle()
-            .controlSize(.small)
-            .disabled(store.isBusy || store.isSigningIn)
-            .accessibilityIdentifier("providers.sign-in.\(row.id)")
+    private func remove(_ row: ProviderKeysOverview.Connected) async {
+        switch row.kind {
+        case .key(let credentialID): _ = await store.deleteCredential(key: credentialID)
+        case .account(let providerID, _, _): await store.disconnectOAuth(providerID: providerID)
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("providers.signin-row.\(row.id)")
     }
 
     // MARK: Advanced

@@ -51,6 +51,13 @@ const MAX_DESCRIPTION = 280;
 const MAX_LOGO_URL = 512;
 const MAX_CATEGORY_NAME = 60;
 const MAX_CATEGORIES_PER_TOOLKIT = 8;
+/** Smaller categories are noise in a browse list; their apps keep their other categories and stay searchable. */
+const MIN_APPS_PER_CATEGORY = 3;
+/** Composio's test tags and badges, not categories. */
+const JUNK_CATEGORY = /^(tag\d*|popular|featured|new)$/;
+const ACRONYMS = new Set(["ai", "api", "b2b", "bi", "cms", "crm", "erp", "hr", "iot", "it", "llm", "mcp", "ocr", "pdf", "seo",
+  "sms", "sql", "ui", "url", "ux"]);
+const SMALL_WORDS = new Set(["a", "an", "and", "as", "at", "by", "for", "in", "of", "on", "or", "the", "to", "with"]);
 /** One Composio answer; far above a full page of 1000 toolkits. */
 const MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
 /** D1 refuses rows over 2 MB. */
@@ -58,8 +65,14 @@ const MAX_DOCUMENT_BYTES = 1_900_000;
 const SLUG = /^[a-z0-9_]{1,64}$/;
 const CATEGORY_ID = /^[a-z0-9-]{1,48}$/;
 
-/** A toolkit before category names are known. */
-type ParsedToolkit = Omit<ComposioToolkit, "categories"> & { categories: { id: string; name: string | null }[] };
+/**
+ * One of a toolkit's categories. Composio spells the same category several ways ("E-commerce", "ecommerce",
+ * "AI Agents", "ai agents") and puts `&` and `/` in ids, so `key` (letters and digits only) groups the spellings.
+ */
+type ParsedCategory = { key: string; id: string; name: string };
+
+/** A toolkit before its categories are merged across the catalog. */
+type ParsedToolkit = Omit<ComposioToolkit, "categories"> & { categories: ParsedCategory[] };
 
 class RefreshError extends Error {
   constructor(readonly reason: string) {
@@ -128,11 +141,9 @@ async function refresh(
   }
   if (toolkits.length < MIN_TOOLKITS) throw new RefreshError(`only ${toolkits.length} usable apps`);
 
-  const categoryBody = await getJson(send, `${COMPOSIO_API}/toolkits/categories`, headers, "categories");
-  if (!isRecord(categoryBody) || !Array.isArray(categoryBody.items)) {
-    throw new RefreshError("categories in an unknown shape");
-  }
-  const content = assemble(toolkits, categoryBody.items);
+  // Categories come from the toolkits themselves. Composio's `/toolkits/categories` lists every toolkit's tags
+  // (tens of thousands of rows), which costs far more CPU to read than it adds.
+  const content = assemble(toolkits);
   const revision = await sha256(JSON.stringify(content));
 
   try {
@@ -174,11 +185,10 @@ function parseToolkit(raw: unknown): ParsedToolkit | null {
   const meta = isRecord(raw.meta) ? raw.meta : {};
   const description = truncate(cleanText(meta.description), MAX_DESCRIPTION);
   const logo = httpsURL(meta.logo);
-  const categories: ParsedToolkit["categories"] = [];
+  const categories: ParsedCategory[] = [];
   for (const entry of Array.isArray(meta.categories) ? meta.categories.slice(0, 32) : []) {
-    if (!isRecord(entry) || typeof entry.id !== "string" || !CATEGORY_ID.test(entry.id)) continue;
-    if (categories.some((category) => category.id === entry.id)) continue;
-    categories.push({ id: entry.id, name: categoryName(entry.name) });
+    const category = parseCategory(entry);
+    if (category && !categories.some((other) => other.key === category.key)) categories.push(category);
   }
   return {
     slug: raw.slug,
@@ -190,35 +200,69 @@ function parseToolkit(raw: unknown): ParsedToolkit | null {
   };
 }
 
-/** Names each toolkit's categories and lists just the categories kept toolkits use, sorted by name. */
-function assemble(toolkits: ParsedToolkit[], rawCategories: unknown[]): Pick<ComposioCatalog, "categories" | "toolkits"> {
-  const names = new Map<string, string>();
-  for (const entry of rawCategories.slice(0, 1000)) {
-    if (!isRecord(entry) || typeof entry.id !== "string" || !CATEGORY_ID.test(entry.id)) continue;
-    const name = categoryName(entry.name);
-    if (name && !names.has(entry.id)) names.set(entry.id, name);
-  }
-  // A category the list doesn't have yet keeps the name its toolkit gives it.
+/** One category from a toolkit, keyed by its letters and digits, with a clean id and name; null for noise. */
+function parseCategory(entry: unknown): ParsedCategory | null {
+  if (!isRecord(entry)) return null;
+  const named = cleanText(entry.name);
+  // An id standing in for a missing name reads as words: "project-management" → "project management".
+  const label = named || cleanText(entry.id).replace(/-/g, " ");
+  if (!label || [...label].length > MAX_CATEGORY_NAME) return null;
+  const lower = label.toLowerCase();
+  const key = lower.replace(/[^a-z0-9]+/g, "");
+  if (!key || JUNK_CATEGORY.test(key)) return null;
+  const id = lower.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48).replace(/-+$/, "");
+  return CATEGORY_ID.test(id) ? { key, id, name: displayName(label) } : null;
+}
+
+/** Title case with known acronyms: "ai agents" → "AI Agents", "crm" → "CRM", "scheduling & booking" → "Scheduling & Booking". */
+function displayName(label: string): string {
+  return label.split(" ").map((word, index) => {
+    const lower = word.toLowerCase();
+    if (ACRONYMS.has(lower)) return lower.toUpperCase();
+    if (index > 0 && SMALL_WORDS.has(lower)) return lower;
+    if (word !== lower) return word;
+    return lower.charAt(0).toUpperCase() + lower.slice(1);
+  }).join(" ");
+}
+
+/**
+ * Merges each category's spellings (the most used spelling names it), drops categories with fewer than
+ * `MIN_APPS_PER_CATEGORY` apps, and lists the categories kept toolkits use, sorted by name.
+ */
+function assemble(toolkits: ParsedToolkit[]): Pick<ComposioCatalog, "categories" | "toolkits"> {
+  const spellings = new Map<string, Map<string, { id: string; name: string; count: number }>>();
   for (const toolkit of toolkits) {
     for (const category of toolkit.categories) {
-      if (category.name && !names.has(category.id)) names.set(category.id, category.name);
+      const byName = spellings.get(category.key) ?? new Map();
+      spellings.set(category.key, byName);
+      const seen = byName.get(category.name);
+      if (seen) seen.count += 1;
+      else byName.set(category.name, { id: category.id, name: category.name, count: 1 });
     }
+  }
+  const chosen = new Map<string, { id: string; name: string }>();
+  const ids = new Set<string>();
+  for (const [key, byName] of spellings) {
+    const variants = [...byName.values()];
+    if (variants.reduce((total, variant) => total + variant.count, 0) < MIN_APPS_PER_CATEGORY) continue;
+    const best = variants.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "en"))[0]!;
+    // Two keys can cut to the same 48-character id; the first keeps it.
+    if (ids.has(best.id)) continue;
+    ids.add(best.id);
+    chosen.set(key, { id: best.id, name: best.name });
   }
   const used = new Set<string>();
   const kept = toolkits.map((toolkit) => {
-    const ids = toolkit.categories.map((category) => category.id).filter((id) => names.has(id))
-      .slice(0, MAX_CATEGORIES_PER_TOOLKIT);
-    for (const id of ids) used.add(id);
-    return { ...toolkit, categories: ids };
+    const categoryIDs = [...new Set(toolkit.categories.flatMap((category) => {
+      const kept = chosen.get(category.key);
+      return kept ? [kept.id] : [];
+    }))].slice(0, MAX_CATEGORIES_PER_TOOLKIT);
+    for (const id of categoryIDs) used.add(id);
+    return { ...toolkit, categories: categoryIDs };
   });
-  const categories = [...used].map((id) => ({ id, name: names.get(id)! }))
+  const categories = [...chosen.values()].filter((category) => used.has(category.id))
     .sort((a, b) => a.name.localeCompare(b.name, "en") || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   return { categories, toolkits: kept };
-}
-
-function categoryName(value: unknown): string | null {
-  const name = cleanText(value);
-  return name && [...name].length <= MAX_CATEGORY_NAME ? name : null;
 }
 
 /** One line of plain text: control characters and runs of whitespace become one space. */

@@ -114,13 +114,20 @@ and stores a normalized copy in D1. Only catalog metadata uses that key: never p
 - `logo` is optional: an `https:` URL of at most 512 characters.
 - A toolkit's `categories` holds up to 8 ids (`^[a-z0-9-]{1,48}$`), each listed in the top-level
   `categories`. That list holds only the categories some toolkit uses, sorted by name (1–60 characters).
+- Categories come from each toolkit's own `meta.categories`. Composio spells one category several ways
+  ("E-commerce", "ecommerce") and puts `&` or `/` in ids, so the Worker groups them by their letters and
+  digits, names each with its most used spelling in title case ("AI Agents", "CRM", "Scheduling & Booking"),
+  makes the id from that name (`scheduling-booking`), and drops test tags (`tag1`, `popular`) and categories
+  with fewer than 3 apps.
 - `revision` is the SHA-256 (hex) of `JSON.stringify({ categories, toolkits })`, and it is the ETag.
   `fetchedAt` is when the Worker first read that revision. A refresh that finds the same content changes
   nothing.
 
 The cron reads every page of `GET /toolkits?type=native&sort_by=usage&include_deprecated=false&limit=1000`
-(10 pages at most, following `next_cursor`) and `GET /toolkits/categories` from
-`https://backend.composio.dev/api/v3.1`, with 20 seconds for each request. One toolkit that fails a check is
+(10 pages at most, following `next_cursor`) from `https://backend.composio.dev/api/v3.1`, with 20 seconds
+for each request. It doesn't read `GET /toolkits/categories`: that lists every toolkit's tags (about 58,000
+rows), far more CPU than it adds. With Composio's real list (1,609 apps, October 2026) a refresh reads about
+1.2 MB and uses about 25 ms of CPU, under the Worker's 200 ms limit. One toolkit that fails a check is
 dropped; the run goes on. The run keeps the stored copy, and logs a short reason such as
 `composio catalog: kept the stored copy (toolkits answered 401)`, when:
 

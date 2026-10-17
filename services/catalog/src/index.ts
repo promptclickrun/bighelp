@@ -6,11 +6,13 @@
 //   /agent/*     the bighelp plugin trades a GitHub sign-in for an install token, or gives one back
 //   /submit/agent/templates   agents submit with that install token; limits count per GitHub account
 //   /review/*    behind Cloudflare Access (maintainer email or an agent's service token): review queue
+//   cron         daily: refresh Composio's app list for `/v1/composio/catalog.json` (src/composio.ts)
 
 import { type AccessConfig, type KeySource, type Principal, fetchAccessKeys, verifyAccess } from "./access.js";
 import {
   type GitHubLookup, addInstall, ban, githubUser, installFor, isBanned, removeInstall, unban,
 } from "./agents.js";
+import { refreshComposioCatalog, storedComposioCatalog } from "./composio.js";
 import {
   type TemplateRow, approved, byStatusTokens, find, githubLoad, insert, list, pendingCommunityCount, publicView,
   remove, review, reviewView, submitterLoad, submitterView, toTemplate,
@@ -26,6 +28,8 @@ export interface Env {
   ACCESS_AUD_REVIEW: string;
   /** Turnstile widget secret (a Worker secret). Also keys the network hash used for rate limits. */
   TURNSTILE_SECRET: string;
+  /** Composio developer key (a Worker secret). Only the daily refresh uses it, to read catalog metadata. */
+  COMPOSIO_API_KEY: string;
 }
 
 /** Checks a Turnstile token. Injectable so tests don't call Cloudflare. */
@@ -49,6 +53,8 @@ const MAX_AGENT_SUBMISSIONS_PER_DAY = 5;
 const MIN_GITHUB_ACCOUNT_AGE_DAYS = 30;
 /** Backstop on review load: past this many community templates waiting, every submit route says try later. */
 const MAX_PENDING_COMMUNITY = 200;
+/** Composio's list changes at most once a day (the cron), so it may be cached longer than templates. */
+const COMPOSIO_MAX_AGE_SECONDS = 3600;
 const GROUP_TITLES: Record<(typeof BLUEPRINT_CATEGORIES)[number], string> = {
   productivity: "Productivity",
   marketing: "Marketing",
@@ -60,6 +66,10 @@ const GROUP_TITLES: Record<(typeof BLUEPRINT_CATEGORIES)[number], string> = {
 export default {
   fetch(request: Request, env: Env): Promise<Response> {
     return handle(request, env);
+  },
+  // The daily cron (wrangler.jsonc `triggers`). A failed refresh keeps the stored copy.
+  async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
+    await refreshComposioCatalog(env);
   },
 } satisfies ExportedHandler<Env>;
 
@@ -111,6 +121,7 @@ export async function handle(request: Request, env: Env, deps: Dependencies = {}
 
 async function publicRoute(request: Request, env: Env, path: string): Promise<Response> {
   if (request.method !== "GET" && request.method !== "HEAD") return error(405, "Read only.");
+  if (path === "/v1/composio/catalog.json") return composioCatalogRoute(request, env);
   if (!["/v1/catalog.json", "/v1/board-blueprints.json", "/v1/agent-templates.json"].includes(path)) {
     return error(404, "Not found.");
   }
@@ -165,6 +176,21 @@ function boardBlueprintsFile(rows: TemplateRow[], revision: string) {
   return { source: "https://catalog.bighelp.app/v1/board-blueprints.json", schemaVersion: 1, revision, pages };
 }
 
+/** Composio's app list as the daily refresh last stored it. Composio is never called on the request path. */
+async function composioCatalogRoute(request: Request, env: Env): Promise<Response> {
+  const stored = await storedComposioCatalog(env.DB);
+  if (!stored) return json({ error: "catalog_unavailable" }, 503);
+  const headers = publicCacheHeaders(stored.revision, COMPOSIO_MAX_AGE_SECONDS);
+  if (matchesIfNoneMatch(request.headers.get("If-None-Match"), `"${stored.revision}"`)) {
+    return new Response(null, { status: 304, headers });
+  }
+  // Stored already serialized, so it goes out as is.
+  const response = new Response(stored.document, { headers });
+  response.headers.set("Content-Type", "application/json");
+  response.headers.set("X-Content-Type-Options", "nosniff");
+  return response;
+}
+
 async function revisionOf(rows: TemplateRow[]): Promise<string> {
   const basis = rows.map((row) => `${row.id}:${row.updated_at}`).join("\n");
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(basis));
@@ -191,9 +217,9 @@ function matchesIfNoneMatch(header: string | null, etag: string): boolean {
   return matched;
 }
 
-function publicCacheHeaders(revision: string): HeadersInit {
+function publicCacheHeaders(revision: string, maxAge = 300): HeadersInit {
   return {
-    "Cache-Control": "public, max-age=300, stale-while-revalidate=86400",
+    "Cache-Control": `public, max-age=${maxAge}, stale-while-revalidate=86400`,
     ETag: `"${revision}"`,
   };
 }

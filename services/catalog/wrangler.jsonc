@@ -11,8 +11,10 @@
   "limits": { "cpu_ms": 200 },
   // Secrets, set with `wrangler secret put <NAME>` (see README › Develop and deploy):
   // TURNSTILE_SECRET (the "bighelp Template Catalog submit" widget), ACCESS_TEAM_DOMAIN and
-  // ACCESS_AUD_REVIEW (the review Access app). The team domain names the account owner, so it stays
-  // out of this public repo.
+  // ACCESS_AUD_REVIEW (the review Access app), COMPOSIO_API_KEY (the Composio developer key that reads
+  // Composio's app list). The team domain names the account owner, so it stays out of this public repo.
+  // Daily at 07:41 UTC, off the top of the hour: refresh Composio's app list (src/composio.ts).
+  "triggers": { "crons": ["41 7 * * *"] },
   "d1_databases": [
     {
       "binding": "DB",

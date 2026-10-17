@@ -1,12 +1,14 @@
 # Template Catalog (`catalog.bighelp.app`)
 
 A Cloudflare Worker plus D1 that serves Feed/Ideas/Goals blueprints and agent templates to the app and
-bighelp.app, and holds community submissions for review. New templates go live without an app build.
+bighelp.app, and holds community submissions for review. New templates go live without an app build. It also
+serves Composio's app list for the app's Composio Apps section.
 
 | Piece | Name |
 |---|---|
 | Worker | `bighelp-catalog`, custom domain `catalog.bighelp.app` |
-| D1 | `bighelp-catalog` (one table, `templates`; `migrations/`) |
+| D1 | `bighelp-catalog` (`templates`, agent sign-ins, `composio_catalog`; `migrations/`) |
+| Cron | daily at 07:41 UTC (`41 7 * * *`): refresh Composio's app list |
 | Turnstile widget | "bighelp Template Catalog submit" (bighelp.app, www, bighelp.pages.dev); secret is the Worker secret `TURNSTILE_SECRET` |
 | Access app "review" | path `catalog.bighelp.app/review`, the maintainer's email, or the `bighelp-catalog-reviewer` service token |
 | Site page | `bighelp.app/templates` (bighelp-site `src/templates.html`) |
@@ -25,6 +27,8 @@ that Access JWT itself (signature, audience, issuer, expiry), so a misconfigured
   (`pages[].groups[].prompts[]` with `id`, `text`, optional `goalCategory`, plus optional `credit`), so
   `BoardBlueprintCatalog(data:)` parses it unchanged.
 - `GET /v1/agent-templates.json`: `{ schemaVersion: 1, revision, templates: [...] }`
+- `GET /v1/composio/catalog.json`: Composio's app list, with `Cache-Control: max-age=3600`. See
+  [Composio's app list](#composios-app-list).
 
 Only approved templates appear. Submitter emails and review notes never do.
 
@@ -81,6 +85,52 @@ the plugin or adding hosts doesn't add any.
 - `POST /review/accounts/:githubId/ban` `{ note }` / `unban`: a ban signs out every install of that GitHub
   account and blocks it from signing in again
 
+## Composio's app list
+
+People sign in to their own Composio account in the app, but that sign-in can't read Composio's toolkit
+catalog. So a daily cron reads it with a bighelp-owned developer key (the Worker secret `COMPOSIO_API_KEY`)
+and stores a normalized copy in D1. Only catalog metadata uses that key: never people, connections or tool runs.
+
+`GET /v1/composio/catalog.json` serves the stored copy (public, no auth, CORS `*`, `ETag`/`If-None-Match`,
+`Cache-Control: max-age=3600`). It never calls Composio. Until the first good refresh it answers 503
+`{"error":"catalog_unavailable"}`.
+
+```json
+{
+  "schemaVersion": 1,
+  "revision": "<sha-256 hex of {categories, toolkits}>",
+  "fetchedAt": "2026-10-01T07:41:00.000Z",
+  "categories": [{ "id": "productivity", "name": "Productivity" }],
+  "toolkits": [
+    { "slug": "gmail", "name": "Gmail", "description": "…", "logo": "https://…",
+      "categories": ["productivity"], "noAuth": false }
+  ]
+}
+```
+
+- `toolkits` keep Composio's usage order (most used first), at most 4000.
+- `slug` matches `^[a-z0-9_]{1,64}$`. `name` is 1–80 characters.
+- `description` is optional: one line, at most 280 characters (a cut one ends with `…`).
+- `logo` is optional: an `https:` URL of at most 512 characters.
+- A toolkit's `categories` holds up to 8 ids (`^[a-z0-9-]{1,48}$`), each listed in the top-level
+  `categories`. That list holds only the categories some toolkit uses, sorted by name (1–60 characters).
+- `revision` is the SHA-256 (hex) of `JSON.stringify({ categories, toolkits })`, and it is the ETag.
+  `fetchedAt` is when the Worker first read that revision. A refresh that finds the same content changes
+  nothing.
+
+The cron reads every page of `GET /toolkits?type=native&sort_by=usage&include_deprecated=false&limit=1000`
+(10 pages at most, following `next_cursor`) and `GET /toolkits/categories` from
+`https://backend.composio.dev/api/v3.1`, with 20 seconds for each request. One toolkit that fails a check is
+dropped; the run goes on. The run keeps the stored copy, and logs a short reason such as
+`composio catalog: kept the stored copy (toolkits answered 401)`, when:
+
+- the key is missing, or a request fails or times out
+- an answer isn't in the expected shape
+- fewer than 50 toolkits are left
+- the document is too big for one D1 row (1.9 MB)
+
+The log never holds the key or what Composio sent back.
+
 ## Reviewing
 
 `scripts/catalog-review.py` wraps the review API. It reads `CF_ACCESS_CLIENT_ID` and
@@ -122,19 +172,23 @@ Community text is untrusted: render it as plain text, never Markdown links or HT
 ```sh
 npm install
 npm run typecheck      # wrangler types && tsc
-npm test               # vitest in workerd: Access gating, review flow, public feed, CORS
+npm test               # vitest in workerd: Access gating, review flow, public feed, CORS, Composio refresh
 npx wrangler d1 migrations apply bighelp-catalog --remote
 npx wrangler deploy
 ```
 
-The Worker reads three secrets. Set each one once with `npx wrangler secret put <NAME>`:
+The Worker reads four secrets. Set each one once with `npx wrangler secret put <NAME>`:
 
 - `TURNSTILE_SECRET`: the secret key of the "bighelp Template Catalog submit" Turnstile widget.
 - `ACCESS_TEAM_DOMAIN`: the Zero Trust team domain, for example `team.cloudflareaccess.com`.
 - `ACCESS_AUD_REVIEW`: the Application Audience (AUD) tag of the "review" Access app.
+- `COMPOSIO_API_KEY`: a developer (project) API key from bighelp's own Composio account. The maintainer
+  sets it with `npx wrangler secret put COMPOSIO_API_KEY`. Only catalog metadata uses it.
 
 The team domain contains the account owner's name, so it stays out of this public repo. If a secret is
-missing, the review routes answer 503 and the public routes keep working.
+missing, the review routes answer 503 and the public routes keep working. Without `COMPOSIO_API_KEY` the cron
+stores nothing, and `/v1/composio/catalog.json` keeps the last stored copy (503 if there never was one).
+The first copy comes with the first cron run after the key, the `0004` migration and a deploy are in place.
 
 A deploy from an older checkout set the two Access values as plain variables. Cloudflare refuses a secret
 with the same name as a variable. So, the first time, deploy this version first, then put the two secrets.

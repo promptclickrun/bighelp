@@ -7,7 +7,8 @@
   "vars": {
     "ACCESS_TEAM_DOMAIN": "team.example.cloudflareaccess.com",
     "ACCESS_AUD_REVIEW": "aud-review",
-    "TURNSTILE_SECRET": "test-secret"
+    "TURNSTILE_SECRET": "test-secret",
+    "COMPOSIO_API_KEY": "test-composio-key"
   },
   "d1_databases": [{ "binding": "DB", "database_name": "bighelp-catalog-test", "migrations_dir": "./migrations" }]
 }

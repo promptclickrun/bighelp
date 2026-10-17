@@ -155,17 +155,52 @@ struct ComposioAppsTests {
 
     // MARK: The screen's model, on the demo
 
-    @Test func connectingAnAppShowsItConnectedOnceItsPageCloses() async throws {
+    @Test func connectingAnAppWaitsForTheNewAccountThenClosesThePage() async throws {
         let model = DemoComposio.model()
         await model.appear()
         #expect(model.connectedApps.map(\.slug) == ["github", "gmail"])
-        #expect(try #require(await model.connectLink("slack")).host == "example.com")
-        await model.confirm("slack")
-        #expect(model.isConnected("slack"))
+        #expect(try #require(await model.startConnect("slack")).host == "example.com")
+        #expect(model.openSignIn?.slug == "slack", "The page stays open while Composio waits")
+        await model.checkSignIn()
+        #expect(model.openSignIn != nil, "Coming back to bighelp only looks; it doesn't end the sign-in")
+        #expect(await model.waitForSignIn(), "The new account closes the page")
+        #expect(model.isConnected("slack") && model.openSignIn == nil)
         #expect(model.connectedApps.first?.slug == "slack")
         let account = try #require(model.connections["gmail"]?.accounts.first)
         await model.remove("gmail", account: account.id)
         #expect(!model.isConnected("gmail"))
+    }
+
+    /// Closing the page before the sign-in finishes removes the pending account Composio made,
+    /// so unfinished tries don't pile up in the person's Composio account.
+    @Test func closingThePageEarlyRemovesThePendingAccount() async throws {
+        let connect = DemoComposioConnect()
+        let model = DemoComposio.model(connect: connect)
+        await model.appear()
+        _ = try #require(await model.startConnect("calendly"))
+        let pending = try #require(model.openSignIn?.pendingAccountID)
+        await model.signInPageClosed()
+        #expect(connect.removed == [pending])
+        #expect(!model.isConnected("calendly") && model.openSignIn == nil)
+        #expect(model.connections["calendly"]?.accounts.isEmpty ?? true)
+    }
+
+    /// Composio's `add` answer: the page, the account that waits on it, or Composio's reason.
+    @Test func connectAnswersGiveThePageAndPendingAccountOrComposiosReason() throws {
+        let started = try ComposioConnectClient.connectStart(in: ["results": ["one_drive": [
+            "toolkit": "one_drive", "status": "initiated", "redirect_url": "https://connect.composio.dev/link/lk_example",
+            "accounts": [["id": "one_drive_old", "status": "active"], ["id": "one_drive_new", "status": "initiated"]],
+        ]]], toolkit: "one_drive")
+        #expect(started.url.absoluteString == "https://connect.composio.dev/link/lk_example")
+        #expect(started.pendingAccountID == "one_drive_new")
+        #expect(throws: ComposioError.refused("This app needs a paid plan.")) {
+            try ComposioConnectClient.connectStart(in: ["results": ["one_drive": [
+                "toolkit": "one_drive", "status": "failed", "instruction": "This app needs a paid plan.",
+            ]]], toolkit: "one_drive")
+        }
+        #expect(ComposioConnectClient.errorText(#"{"successful":false,"error":"Toolkit one_drive is not enabled"}"#)
+            == "Toolkit one_drive is not enabled")
+        #expect(ComposioConnectClient.errorText("Rate limited") == "Rate limited")
     }
 
     @Test func signingInAndTurningOnForTheAgent() async throws {

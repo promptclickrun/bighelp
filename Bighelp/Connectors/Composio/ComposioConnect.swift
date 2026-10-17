@@ -17,6 +17,13 @@ struct ComposioConnection: Equatable, Sendable {
     var isConnected: Bool { accounts.contains(where: \.isActive) }
 }
 
+/// A new account's sign-in: Composio's page, and the account it waits on (removed if the page is
+/// closed before the sign-in finishes, so unfinished tries don't pile up in the person's account).
+struct ComposioConnectStart: Equatable, Sendable {
+    let url: URL
+    let pendingAccountID: String?
+}
+
 /// What Settings › Apps › Composio asks of Composio Connect.
 @MainActor
 protocol ComposioConnecting: AnyObject {
@@ -24,8 +31,8 @@ protocol ComposioConnecting: AnyObject {
     func connectedToolkits() async throws -> [String]
     /// Accounts per app, for the apps asked about.
     func connections(_ toolkits: [String]) async throws -> [String: ComposioConnection]
-    /// Composio's sign-in page for a new account in an app.
-    func connect(_ toolkit: String) async throws -> URL
+    /// Composio's sign-in page for a new account in an app, and the pending account it made.
+    func connect(_ toolkit: String) async throws -> ComposioConnectStart
     func remove(_ toolkit: String, accountID: String) async throws
 }
 
@@ -67,13 +74,10 @@ final class ComposioConnectClient: ComposioConnecting {
         return found
     }
 
-    func connect(_ toolkit: String) async throws -> URL {
+    func connect(_ toolkit: String) async throws -> ComposioConnectStart {
         guard Self.isSlug(toolkit) else { throw ComposioError.invalidResponse }
         let data = try await manage([["name": toolkit, "action": "add"]])
-        guard let results = data["results"] as? [String: Any], let entry = results[toolkit] as? [String: Any],
-              let link = entry["redirect_url"] as? String, let url = URL(string: link), url.scheme == "https",
-              url.user == nil, url.password == nil, link.utf8.count <= 2_048 else { throw ComposioError.invalidResponse }
-        return url
+        return try Self.connectStart(in: data, toolkit: toolkit)
     }
 
     func remove(_ toolkit: String, accountID: String) async throws {
@@ -110,10 +114,39 @@ final class ComposioConnectClient: ComposioConnecting {
         return found
     }
 
+    /// Composio's answer to `add`: the page, and the account that waits on it (`initiated`).
+    nonisolated static func connectStart(in data: [String: Any], toolkit: String) throws -> ComposioConnectStart {
+        guard let results = data["results"] as? [String: Any], let entry = results[toolkit] as? [String: Any] else {
+            throw ComposioError.invalidResponse
+        }
+        guard let link = entry["redirect_url"] as? String, let url = URL(string: link), url.scheme == "https",
+              url.host != nil, url.user == nil, url.password == nil, link.utf8.count <= 4_096 else {
+            // No page: Composio says why in the entry (`error`, `message` or `instruction`).
+            let reason = ["error", "message", "instruction"].lazy.compactMap { entry[$0] as? String }
+                .first { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            throw ComposioError.refused(reason.map { String($0.prefix(300)) } ?? "Composio didn't give a sign-in page.")
+        }
+        let pending = (entry["accounts"] as? [[String: Any]] ?? []).last { row in
+            ["initiated", "initializing"].contains((row["status"] as? String)?.lowercased() ?? "")
+        }?["id"] as? String
+        return ComposioConnectStart(url: url, pendingAccountID: pending.flatMap { ComposioOAuth.isToken($0, maximum: 200) ? $0 : nil })
+    }
+
     /// A Composio toolkit slug: lowercase letters, digits and underscores.
     nonisolated static func isSlug(_ value: String) -> Bool {
         !value.isEmpty && value.utf8.count <= 64
             && value.utf8.allSatisfy { (0x61...0x7a).contains($0) || (0x30...0x39).contains($0) || $0 == 0x5f }
+    }
+
+    /// A tool error's text: the `error` of a JSON answer, or the text itself, kept short.
+    nonisolated static func errorText(_ text: String) -> String? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        if let object = try? JSONSerialization.jsonObject(with: Data(trimmed.utf8)) as? [String: Any],
+           let error = object["error"] as? String, !error.isEmpty {
+            return String(error.prefix(300))
+        }
+        return String(trimmed.prefix(300))
     }
 
     /// The tool's JSON answer from an MCP `tools/call` result: `{successful, data, error}`.
@@ -157,7 +190,12 @@ final class ComposioConnectClient: ComposioConnecting {
 
     private func manage(_ toolkits: [[String: String]]) async throws -> [String: Any] {
         let result = try await rpc("tools/call", ["name": "COMPOSIO_MANAGE_CONNECTIONS", "arguments": ["toolkits": toolkits]])
-        if result["isError"] as? Bool == true { throw ComposioError.refused("Composio couldn't do that.") }
+        if result["isError"] as? Bool == true {
+            // Composio's own words, so a refusal says why (not a bare "couldn't").
+            let text = (result["content"] as? [[String: Any]])?.compactMap { $0["text"] as? String }.joined(separator: " ")
+            let reason = text.flatMap { Self.errorText($0) } ?? "Composio couldn't do that."
+            throw ComposioError.refused(reason)
+        }
         return try Self.toolData(result)
     }
 

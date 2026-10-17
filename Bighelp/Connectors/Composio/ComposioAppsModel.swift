@@ -144,30 +144,81 @@ final class ComposioAppsModel {
         }
     }
 
-    /// Composio's sign-in page for the app; after it, `confirm(_:)` checks the result.
-    func connectLink(_ slug: String) async -> URL? {
+    /// An app's sign-in page that is open: the active accounts it had before, and the account
+    /// Composio made for this sign-in.
+    struct OpenSignIn: Equatable {
+        let id = UUID()
+        let slug: String
+        let accountsBefore: Set<String>
+        let pendingAccountID: String?
+    }
+
+    private(set) var openSignIn: OpenSignIn?
+
+    /// Composio's sign-in page for a new account in the app. The page stays open until
+    /// `waitForSignIn()` sees the new account or the person closes it (`signInPageClosed()`).
+    func startConnect(_ slug: String) async -> URL? {
         busySlug = slug
         defer { busySlug = nil }
+        let before = Set(connections[slug]?.accounts.filter(\.isActive).map(\.id) ?? [])
         do {
-            return try await connect.connect(slug)
+            let start = try await connect.connect(slug)
+            openSignIn = OpenSignIn(slug: slug, accountsBefore: before, pendingAccountID: start.pendingAccountID)
+            return start.url
         } catch {
             handle(error, fallback: "Composio couldn't start that sign-in. Try again.")
             return nil
         }
     }
 
-    /// After the app's sign-in page closes: Composio may take a moment to mark the account active.
-    func confirm(_ slug: String) async {
-        for attempt in 0..<4 {
-            guard let found = try? await connect.connections([slug])[slug] else { break }
-            connections[slug] = found
-            if found.isConnected {
-                if !connectedSlugs.contains(slug) { connectedSlugs.insert(slug, at: 0) }
-                return
+    /// Checks while the page is open, every 3 seconds for a minute, then every 10 seconds for
+    /// up to 10 minutes. True once a new account is active: the caller closes the page then.
+    func waitForSignIn() async -> Bool {
+        guard let current = openSignIn else { return false }
+        for attempt in 0..<74 {
+            try? await sleep(.seconds(attempt < 20 ? 3 : 10))
+            guard openSignIn == current else { return false }
+            if await signedIn(current) {
+                openSignIn = nil
+                return true
             }
-            if attempt < 3 { try? await sleep(.seconds(2)) }
         }
-        // A sign-in left open or cancelled leaves a pending account; Composio drops it on its own.
+        return false
+    }
+
+    /// Coming back to bighelp (on the Mac the page opens in the browser): look now, but leave
+    /// the page alone; `waitForSignIn()` closes it once the account is there.
+    func checkSignIn() async {
+        guard let current = openSignIn else { return }
+        _ = await signedIn(current)
+    }
+
+    /// The person closed the page. Without a new account, the pending one Composio made for
+    /// this try is removed, so unfinished tries don't pile up in their Composio account.
+    func signInPageClosed() async {
+        guard let current = openSignIn else { return }
+        openSignIn = nil
+        if await signedIn(current) { return }
+        guard let pending = current.pendingAccountID else { return }
+        try? await connect.remove(current.slug, accountID: pending)
+        if let known = connections[current.slug] {
+            connections[current.slug] = ComposioConnection(toolkit: current.slug,
+                                                           accounts: known.accounts.filter { $0.id != pending })
+        }
+    }
+
+    /// Whether the app now has an active account it didn't have when the page opened.
+    private func signedIn(_ signIn: OpenSignIn) async -> Bool {
+        if let known = connections[signIn.slug], isNew(known, signIn) { return true }
+        guard let found = try? await connect.connections([signIn.slug])[signIn.slug] else { return false }
+        connections[signIn.slug] = found
+        guard isNew(found, signIn) else { return false }
+        if !connectedSlugs.contains(signIn.slug) { connectedSlugs.insert(signIn.slug, at: 0) }
+        return true
+    }
+
+    private func isNew(_ connection: ComposioConnection, _ signIn: OpenSignIn) -> Bool {
+        connection.accounts.contains { $0.isActive && !signIn.accountsBefore.contains($0.id) }
     }
 
     func remove(_ slug: String, account accountID: String) async {

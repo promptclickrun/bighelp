@@ -2,16 +2,16 @@
 import Foundation
 
 /// Demo runs: Composio Apps with a made-up catalog and account, and no network. Gmail and
-/// GitHub start connected; a new app's sign-in page "finishes" when it closes. The demo
+/// GitHub start connected; a new app's sign-in "finishes" at once, except Calendly's. The demo
 /// computer has no Composio until Turn on for my agent, and its sign-in approves at once.
 @MainActor
 enum DemoComposio {
-    static func model(signedIn: Bool = true) -> ComposioAppsModel {
+    static func model(signedIn: Bool = true, connect: DemoComposioConnect = DemoComposioConnect()) -> ComposioAppsModel {
         let vault = DemoComposioVault()
         if signedIn { try? vault.save(credential) }
         let account = ComposioAccount(vault: vault)
         return ComposioAppsModel(
-            account: account, connect: DemoComposioConnect(), catalog: DemoComposioCatalog(),
+            account: account, connect: connect, catalog: DemoComposioCatalog(),
             agentHost: DemoComposioAgentHost(),
             signIn: { account in try await account.finishSignInForDemo() },
             sleep: { _ in }
@@ -72,30 +72,39 @@ final class DemoComposioCatalog: ComposioCatalogLoading {
 
 @MainActor
 final class DemoComposioConnect: ComposioConnecting {
-    private var active: [String: [ComposioConnection.Account]] = [
+    /// Calendly's sign-in never finishes, so its page stays open until it's closed.
+    static let neverFinishes: Set<String> = ["calendly"]
+
+    private var accounts: [String: [ComposioConnection.Account]] = [
         "gmail": [.init(id: "gmail_demo-1", status: "active", email: "alex@example.com")],
         "github": [.init(id: "github_demo-1", status: "active", email: nil)],
     ]
-    private var pending: Set<String> = []
+    private var made = 0
+    private(set) var removed: [String] = []
 
-    func connectedToolkits() async throws -> [String] { active.keys.sorted() }
-
-    func connections(_ toolkits: [String]) async throws -> [String: ComposioConnection] {
-        for slug in toolkits where pending.remove(slug) != nil {
-            active[slug, default: []].append(.init(id: "\(slug)_demo-\(active[slug, default: []].count + 1)",
-                                                   status: "active", email: nil))
-        }
-        return Dictionary(uniqueKeysWithValues: toolkits.map { ($0, ComposioConnection(toolkit: $0, accounts: active[$0] ?? [])) })
+    func connectedToolkits() async throws -> [String] {
+        accounts.filter { $0.value.contains(where: \.isActive) }.keys.sorted()
     }
 
-    func connect(_ toolkit: String) async throws -> URL {
-        pending.insert(toolkit)
-        return URL(string: "https://example.com/composio/connect/\(toolkit)")!
+    /// A pending account turns active the first time it's checked (the demo's page "finishes" at once).
+    func connections(_ toolkits: [String]) async throws -> [String: ComposioConnection] {
+        for slug in toolkits where !Self.neverFinishes.contains(slug) {
+            accounts[slug] = accounts[slug]?.map { $0.isActive ? $0 : .init(id: $0.id, status: "active", email: nil) }
+        }
+        return Dictionary(uniqueKeysWithValues: toolkits.map { ($0, ComposioConnection(toolkit: $0, accounts: accounts[$0] ?? [])) })
+    }
+
+    func connect(_ toolkit: String) async throws -> ComposioConnectStart {
+        made += 1
+        let id = "\(toolkit)_demo-\(made)"
+        accounts[toolkit, default: []].append(.init(id: id, status: "initiated", email: nil))
+        return ComposioConnectStart(url: URL(string: "https://example.com/composio/connect/\(toolkit)")!, pendingAccountID: id)
     }
 
     func remove(_ toolkit: String, accountID: String) async throws {
-        active[toolkit]?.removeAll { $0.id == accountID }
-        if active[toolkit]?.isEmpty == true { active[toolkit] = nil }
+        removed.append(accountID)
+        accounts[toolkit]?.removeAll { $0.id == accountID }
+        if accounts[toolkit]?.isEmpty == true { accounts[toolkit] = nil }
     }
 }
 

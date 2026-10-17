@@ -29,6 +29,35 @@ final class ComposioAppsUITests: BighelpUITestCase {
             XCTAssertTrue(app.descendants(matching: .any)["composio.agent.ready"].waitForExistence(timeout: 15),
                           "Installed, signed in, ready for the agent")
 
+            // Calendly's demo sign-in never finishes: its page must stay open until it's closed, also
+            // when bighelp becomes active again (on iPhone, iOS's "wants to use … to sign in" prompt
+            // does that; build 126 closed the page then).
+            let scheduling = app.buttons["composio.category.scheduling-booking"]
+            for _ in 0..<4 where !scheduling.isHittable { app.swipeUp() }
+            scheduling.tap()
+            let calendly = app.buttons["composio.app.calendly"]
+            XCTAssertTrue(calendly.waitForExistence(timeout: 10))
+            calendly.tap()
+            let connect = app.buttons["composio.app.connect"]
+            XCTAssertTrue(connect.waitForExistence(timeout: 10))
+            connect.tap()
+            allowSignInPage()
+            XCTAssertTrue(signInPageCancel(in: app).exists, "The sign-in page opens")
+            XCUIDevice.shared.press(.home)
+            sleep(2)
+            app.activate()
+            sleep(4)
+            let pageCancel = signInPageCancel(in: app)
+            XCTAssertTrue(pageCancel.exists, "Coming back to bighelp doesn't close the page")
+            evidence("composio-page-open-\(appearance)", app)
+            if pageCancel.exists { pageCancel.tap() }
+            XCTAssertTrue(connect.waitForExistence(timeout: 10))
+            XCTAssertFalse(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "composio.app.remove.calendly"))
+                .firstMatch.exists, "Closing the page early leaves no account")
+
+            // Notion's demo sign-in finishes: the page closes by itself and the account shows.
+            app.navigationBars.buttons.element(boundBy: 0).tap()  // back to the category
+            app.navigationBars.buttons.element(boundBy: 0).tap()  // back to Composio Apps
             let productivity = app.buttons["composio.category.productivity"]
             for _ in 0..<4 where !productivity.isHittable { app.swipeUp() }
             productivity.tap()
@@ -36,19 +65,35 @@ final class ComposioAppsUITests: BighelpUITestCase {
             XCTAssertTrue(notion.waitForExistence(timeout: 10))
             evidence("composio-category-\(appearance)", app)
             notion.tap()
-            let connect = app.buttons["composio.app.connect"]
             XCTAssertTrue(connect.waitForExistence(timeout: 10))
             connect.tap()
-            // iOS asks before a sign-in page opens; closing it ends the demo's sign-in.
-            let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-            if springboard.alerts.buttons["Cancel"].waitForExistence(timeout: 8) {
-                springboard.alerts.buttons["Cancel"].tap()
-            }
-            XCTAssertTrue(app.buttons["composio.app.remove.notion_demo-1"].waitForExistence(timeout: 15),
-                          "Notion now has an account")
+            allowSignInPage()
+            XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "composio.app.remove.notion"))
+                .firstMatch.waitForExistence(timeout: 20), "Notion's account arrives and the page closes by itself")
             evidence("composio-app-connected-\(appearance)", app)
             app.terminate()
         }
+    }
+
+    /// iOS asks before a sign-in page opens.
+    @MainActor
+    private func allowSignInPage() {
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        if springboard.alerts.buttons["Continue"].waitForExistence(timeout: 8) {
+            springboard.alerts.buttons["Continue"].tap()
+        }
+    }
+
+    /// The open sign-in page's Cancel button, in Safari's view service or in the app (up to 15 seconds).
+    @MainActor
+    private func signInPageCancel(in app: XCUIApplication) -> XCUIElement {
+        let candidates = [XCUIApplication(bundleIdentifier: "com.apple.SafariViewService").buttons["Cancel"],
+                          app.buttons["Cancel"]]
+        for _ in 0..<30 {
+            if let found = candidates.first(where: \.exists) { return found }
+            usleep(500_000)
+        }
+        return candidates[0]
     }
 
     @MainActor

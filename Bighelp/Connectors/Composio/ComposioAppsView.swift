@@ -249,7 +249,6 @@ struct ComposioAppDetailView: View {
     let app: ComposioCatalog.Toolkit
 
     @State private var browser = ProviderSignInBrowser()
-    @State private var pending = false
     @State private var removing: ComposioConnection.Account?
     @Environment(\.scenePhase) private var scenePhase
 
@@ -300,7 +299,7 @@ struct ComposioAppDetailView: View {
                         HStack {
                             Text(accounts.contains(where: \.isActive) ? "Add another account" : "Connect")
                                 .fontWeight(.semibold)
-                            if model.busySlug == app.slug || pending { Spacer(); ProgressView() }
+                            if model.busySlug == app.slug || model.openSignIn?.slug == app.slug { Spacer(); ProgressView() }
                         }
                     }
                     .disabled(model.busySlug == app.slug)
@@ -318,8 +317,10 @@ struct ComposioAppDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.loadStatus(for: [app]) }
         .onChange(of: scenePhase) { _, phase in
-            // On the Mac the sign-in opens in the browser; coming back is the signal.
-            if phase == .active, pending { Task { await finish() } }
+            // On the Mac the page opens in the browser, so coming back is worth a look. It never
+            // closes the page: iOS's "wants to use … to sign in" prompt also makes bighelp active
+            // again, and closing the page then shut it as soon as it opened (2.5.0 (126)).
+            if phase == .active, model.openSignIn?.slug == app.slug { Task { await model.checkSignIn() } }
         }
         .confirmationDialog(
             "Remove this \(app.name) account?",
@@ -340,15 +341,10 @@ struct ComposioAppDetailView: View {
     }
 
     private func open() async {
-        guard let url = await model.connectLink(app.slug) else { return }
-        pending = true
-        browser.start(url) { Task { @MainActor in await finish() } }
-    }
-
-    private func finish() async {
-        guard pending else { return }
-        pending = false
-        browser.finish()
-        await model.confirm(app.slug)
+        guard let url = await model.startConnect(app.slug) else { return }
+        let model = model
+        browser.start(url) { Task { await model.signInPageClosed() } }
+        // Closes the page for the person once Composio has the new account.
+        if await model.waitForSignIn() { browser.finish() }
     }
 }

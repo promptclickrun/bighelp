@@ -19,14 +19,17 @@ final class SettingsStore {
     private(set) var sessionSectionPreferencesRevision = 0
 
     var appearanceContext: BighelpAppearanceContext {
-        BighelpAppearanceContext(
+        // Simple Bot mode has one look: a white page by day, black at night, black bubbles.
+        var context = BighelpAppearanceContext(
             appearance: appearance,
-            lightBackground: lightBackground,
-            darkBackground: darkBackground,
+            lightBackground: simpleBotsEnabled ? .paper : lightBackground,
+            darkBackground: simpleBotsEnabled ? .black : darkBackground,
             bubbleColor: bubbleColor,
             customBubbleHex: customBubbleHex,
             windowTransparency: windowTransparency
         )
+        context.simpleBots = simpleBotsEnabled
+        return context
     }
 
     /// Appearance studio: light and dark page colors and the bubble color.
@@ -249,6 +252,12 @@ final class SettingsStore {
         }
     }
 
+    /// Settings › Simple Bot mode: a calm home with just your bots, in place of
+    /// the tab bar and ☰. Its own Settings sheet turns it off again.
+    var simpleBotsEnabled: Bool {
+        didSet { defaults.set(simpleBotsEnabled, forKey: Keys.simpleBots) }
+    }
+
     /// Settings › Open in: the home a launch starts on while Bighelp IDE is on.
     var startExperience: BighelpExperience {
         didSet { defaults.set(startExperience.rawValue, forKey: Keys.startExperience) }
@@ -406,6 +415,7 @@ final class SettingsStore {
         let codeMode = defaults.bool(forKey: Keys.codeMode, default: false)
         let start = defaults.string(forKey: Keys.startExperience).flatMap(BighelpExperience.init(rawValue:)) ?? .bighelp
         codeModeEnabled = codeMode
+        simpleBotsEnabled = defaults.bool(forKey: Keys.simpleBots, default: false)
         startExperience = start
         experience = codeMode ? start : .bighelp
         let landing = defaults.string(forKey: BighelpLanding.screenKey).flatMap(BighelpLandingScreen.init(rawValue:))
@@ -711,6 +721,7 @@ private extension SettingsStore {
         static let allHostsMode = "bighelp.hosts.all-hosts"
         static let codeMode = "bighelp.settings.code-mode"
         static let startExperience = "bighelp.settings.code-mode.open-in"
+        static let simpleBots = "bighelp.settings.simple-bots"
         static let sessionSectionPreferences = "loopdy.sessions.section-preferences.v1"
     }
 }

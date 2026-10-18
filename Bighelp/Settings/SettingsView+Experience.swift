@@ -1,9 +1,16 @@
 import SwiftUI
 
-/// Settings › Experience: Bighelp IDE, and which home a launch opens in once it's on.
+/// Settings › Experience: Simple Bot mode, Bighelp IDE, and which home a launch opens in once it's on.
 extension SettingsView {
     var experienceSection: some View {
         Section {
+            Toggle(isOn: $settings.simpleBotsEnabled) {
+                HStack(spacing: BighelpTokens.space12) {
+                    BighelpIconTile(systemName: "circle.hexagongrid")
+                    settingLabel("Simple Bot mode", detail: "Just your bots and their chats, nothing else.")
+                }
+            }
+            .accessibilityIdentifier("settings.simple-bots")
             Toggle(isOn: $settings.codeModeEnabled) {
                 HStack(spacing: BighelpTokens.space12) {
                     BighelpIconTile(systemName: "chevron.left.forwardslash.chevron.right")

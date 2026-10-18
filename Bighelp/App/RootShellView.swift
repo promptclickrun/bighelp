@@ -569,8 +569,9 @@ struct RootShellView: View {
     private var shell: some View {
         rootTabs
         .toolbar(.hidden, for: .tabBar)
-        .toolbar(showsAgentBoard ? .hidden : .automatic, for: .navigationBar)
-        .navigationTitle(showsAgentBoard ? "" : rootNavigationTitle)
+        // Boards and Simple Bot mode's home draw their own header.
+        .toolbar(showsAgentBoard || showsSimpleBotsHome ? .hidden : .automatic, for: .navigationBar)
+        .navigationTitle(showsAgentBoard || showsSimpleBotsHome ? "" : rootNavigationTitle)
         // One title size on every tab: the bar's. A large title kept the size of the tab before
         // (small after Feed or Kanban, large after Chat), so the same screen looked different.
         .navigationBarTitleDisplayMode(.inline)
@@ -621,6 +622,17 @@ struct RootShellView: View {
         .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.bottom } action: { rootBottomSafeArea = $0 }
         // Bighelp Chat or Bighelp IDE: the launch's choice, then ☰'s switch.
         .onChange(of: settings.experience, initial: true) { applyExperience() }
+        // Simple Bot mode on or off: back to that mode's home, whatever was open.
+        .onChange(of: settings.simpleBotsEnabled) {
+            appState.path.removeAll()
+            appState.homeTab = .sessions
+            applyExperience()
+            appState.select(appState.homeTab)
+        }
+        // It has no ☰: the Mac's sidebar, kept open between launches, closes too.
+        .onChange(of: simpleBotsOn, initial: true) { _, on in
+            if on { isHomeDrawerPresented = false }
+        }
         .animation(reduceMotion ? nil : .snappy(duration: BighelpTokens.transitionDuration), value: showsBottomNavigation)
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
             isKeyboardVisible = true
@@ -646,9 +658,13 @@ struct RootShellView: View {
             action?()
         }) {
             NavigationStack {
-                // Done on every page closes Settings; Back steps through its pages.
-                let settingsSheet = workspaceSettings().withDone { isUnifiedSettingsPresented = false }
-                settingsSheet.settingsDone(settingsSheet)
+                if simpleBotsOn {
+                    simpleBotsSettings()
+                } else {
+                    // Done on every page closes Settings; Back steps through its pages.
+                    let settingsSheet = workspaceSettings().withDone { isUnifiedSettingsPresented = false }
+                    settingsSheet.settingsDone(settingsSheet)
+                }
             }
             .bighelpSheetSize()
             .presentationDragIndicator(.visible)
@@ -720,7 +736,8 @@ struct RootShellView: View {
     private var showsTabsOnRoot: Bool {
         let tab = appState.selectedTab
         // Bighelp IDE's message box sits where the bar would; ☰ goes everywhere else.
-        guard tab != .code else { return false }
+        // Simple Bot mode has no bar: its home is the whole app.
+        guard tab != .code, !simpleBotsOn else { return false }
         let pinned = tab != .sessions && barTabs.contains(tab)
         return (tab != .agents || pinned) && (!fleetModeOn || tab.isAgentBoard || pinned)
     }
@@ -745,7 +762,7 @@ struct RootShellView: View {
         case .profile:
             workspaceSettings()
         case .sessions:
-            sessionsRootTab
+            if simpleBotsOn { simpleBotsHome } else { sessionsRootTab }
         case .feed, .ideas, .goals, .apps:
             agentBoardTab(appState.selectedTab)
         // Pinned to the bottom bar: the page ☰ opens, as a tab.
@@ -1046,7 +1063,7 @@ struct RootShellView: View {
         }
     }
 
-    private func leaveSettings(perform action: @escaping () -> Void) {
+    func leaveSettings(perform action: @escaping () -> Void) {
         if isUnifiedSettingsPresented {
             afterSettingsDismiss = action
             isUnifiedSettingsPresented = false

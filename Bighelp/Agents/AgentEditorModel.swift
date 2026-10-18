@@ -564,7 +564,7 @@ struct AgentTemplateFormRequest: Identifiable, Equatable {
     let form: TemplateForm
 }
 
-private extension AgentAvatar {
+extension AgentAvatar {
     init(preparedAvatar avatar: PreparedAvatar) throws {
         let mimeType: String
         switch avatar.fileExtension {

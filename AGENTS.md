@@ -45,6 +45,10 @@ change in both repos.
   - Bighelp IDE is a second home, not a second app: Settings turns it on and picks the mode a launch opens in
     (`settings.codeModeEnabled`, `startExperience`); ☰ gets a mode switch on top and Code's places while it's the
     home (`AppTab.code`, `appState.homeTab`). Bighelp Chat stays the out-of-box home.
+  - Simple Bot mode (Settings › Experience, `settings.simpleBotsEnabled`) is the one exception to ☰ and the bar:
+    its home (`SimpleBotsHomeView`) takes the Chat tab's place with neither, and the person's circle opens its
+    short Settings (`SimpleBotsSettingsView`), whose All Settings row and Simple Bot mode switch lead back.
+    Everything in it uses the same stores and chat; `Bighelp/SimpleBots/` holds its screens.
 - **Real data only.**
   - Avatars, activity poses and badges must come from what the agent is actually doing.
   - Never fake progress.

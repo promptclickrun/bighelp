@@ -73,7 +73,12 @@ extension RootShellView {
     /// something (Feed's Discuss, a task, a deeper page) goes back to it with
     /// the edge swipe; ☰ reaches everything else.
     var homeChrome: AgentHomeChrome {
-        AgentHomeChrome(
+        // Simple Bot mode: Back, the bot's name (its profile) and options; no ☰ or bar.
+        if simpleBotsOn {
+            return AgentHomeChrome(isSimpleBots: true,
+                                   onProfile: { appState.open(.simpleBotProfile(agentID: $0)) })
+        }
+        return AgentHomeChrome(
             isEnabled: true,
             // All hosts too: a chat's agent is on the selected host, so its tabs are that agent's.
             // Bighelp IDE has no bottom bar: its sessions return to its home through ☰ or Back.
@@ -217,6 +222,11 @@ extension RootShellView {
         // Never push under the "Unable to open" alert: iOS drops that push while
         // the path keeps it, leaving the Chats list with no ☰ or tab bar. A link,
         // widget or notification opening the app wins (it marks this done).
+        // Simple Bot mode opens on its own home, the list of bots.
+        if simpleBotsOn, !didAutoOpenHomeChat {
+            didAutoOpenHomeChat = true
+            return true
+        }
         guard !didAutoOpenHomeChat, actionErrorMessage == nil, !hasPendingOutsideOpen,
               appState.selectedTab == .sessions, appState.path.isEmpty,
               sessionCatalog.hasLoadedState, let owner = currentWorkspaceOwner, homeAgent != nil else { return true }

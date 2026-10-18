@@ -4,6 +4,8 @@ import SwiftUI
 /// big live avatar, the ☰ drawer, New chat, and the bottom bar under the composer.
 struct AgentHomeChrome {
     var isEnabled = false
+    /// Simple Bot mode's chat header: Back, the bot (its profile) and options, no New chat.
+    var isSimpleBots = false
     /// The tab bar under the message box. Every chat on one computer has it,
     /// whether it's the Chat tab's own or opened from the list, Agents or Feed.
     var showsTabBar = false

@@ -425,6 +425,28 @@ struct SettingsView: View {
         .frame(minHeight: 52)
     }
 
+    /// One page of Settings on its own, for Simple Bot mode's short Settings.
+    @ViewBuilder
+    func simpleBotsPage(_ page: SimpleBotsSettingsPage) -> some View {
+        switch page {
+        case .you:
+            settingsDone(settingsPage(title: "You") { localIdentity })
+        case .appearance:
+            settingsDone(destination(for: .appearance))
+        case .notifications:
+            settingsDone(destination(for: .notifications))
+        case .apps:
+            if let composio = composioApps?() {
+                settingsDone(AppsHubView(native: connectorApps?() ?? nil, composio: composio))
+            } else if let connectorApps, let apps = connectorApps() {
+                settingsDone(ConnectorAppsView(model: apps))
+            } else {
+                ContentUnavailableView("Apps need your computer", systemImage: "app.connected.to.app.below.fill",
+                                       description: Text("Connect to your computer, then come back."))
+            }
+        }
+    }
+
     @ViewBuilder
     private func destination(for section: SettingsMenuSection) -> some View {
         switch section {

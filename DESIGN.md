@@ -324,6 +324,31 @@ Long instructions (an agent's SOUL, a personality) have an expand icon that open
 form. Present that editor from the form's root: a full-screen cover hung on a list section header never got the
 keyboard.
 
+## Simple Bot mode
+
+An opt-in calm home (Settings › Experience › Simple Bot mode): just your bots and their chats. No tab bar
+and no ☰. The page is white by day and black at night, your bubbles are black (ink after dark), and the
+text is SF Pro, as everywhere.
+
+- **Home**: your circle top left opens Settings; search and + (New Bot, New Group Chat) top right. The
+  primary bot leads, large, with a star; under it every other bot (pinned first, then by its latest
+  message) and each group chat, with the latest message and its time. Hidden bots stay off the home;
+  search's filter shows them.
+- **Touch and hold** a bot: its latest message, then Mark Unread (kept on this device), Pin, Replace
+  Primary Bot… or Make Primary Bot, Save as Template, Hide, and More (profile, new chat, routines).
+- **Marks**: thirteen shapes in eleven colors with two white eyes (`SimpleBotMark`). Picking one in a
+  bot's profile or in Create New Bot saves it as the bot's picture on its computer, so every screen,
+  device and Hermes Desktop shows it, and drops a character or pet drawn over the picture. A bot that
+  already has a picture, character or pet keeps it until a mark is picked; one with none starts on a
+  mark made from its ID.
+- **Chat**: Back, the bot's name (its profile) and ⋯; no New chat button.
+- **Profile**: the mark, name and role, then Info (Character, Instructions, Routines) and Computer
+  (its screen, when the host has one).
+- **Settings**: you and Usage (your tightest plan limit); Connect apps; the primary bot's Auto-review
+  (Hermes' smart approvals on, manual off; never off), its rules, and the time zone every bot works in
+  (or this device's, automatically); Bot Computer; Notifications and Appearance; then the switch back
+  and All Settings.
+
 ## Bighelp IDE
 
 An opt-in second home for coding (Settings › Bighelp IDE; Bighelp Chat stays the default). Its home is the

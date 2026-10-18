@@ -735,6 +735,8 @@ struct BighelpAppearanceContext: Equatable, Sendable {
     var bubbleHex: String? { customBubbleHex ?? bubbleColor?.hex }
     /// Vision Pro: 0 is a solid window, 1 shows the room through the glass.
     var windowTransparency = BighelpVisionGlass.defaultTransparency
+    /// Simple Bot mode's look: your bubbles and buttons black by day, ink after dark.
+    var simpleBots = false
 
     init(
         appearance: AppAppearance,
@@ -768,11 +770,13 @@ extension BighelpTheme {
         case (true, .increased): definition.darkHighContrast
         @unknown default: dark ? definition.dark : definition.light
         }
+        // Black bubbles would vanish on a black page, so after dark they're ink.
+        let simpleBubble = context.simpleBots ? (dark ? "3A3A3F" : "111111") : nil
         var theme = selected.resolvedForLivePresentation(
             colorScheme: dark ? .dark : .light, contrast: contrast,
             lightBackground: context.lightBackground, darkBackground: context.darkBackground,
-            bubbleColor: context.bubbleColor, customBubbleHex: context.customBubbleHex)
-        theme.chosenBubbleHex = context.bubbleHex
+            bubbleColor: context.bubbleColor, customBubbleHex: simpleBubble ?? context.customBubbleHex)
+        theme.chosenBubbleHex = simpleBubble ?? context.bubbleHex
         theme.visionCanvasOpacity = BighelpVisionGlass.canvasOpacity(forTransparency: context.windowTransparency,
                                                                      dark: dark)
         theme.visionIsLight = !dark

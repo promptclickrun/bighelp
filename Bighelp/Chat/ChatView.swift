@@ -667,16 +667,19 @@ struct ChatView: View {
             .frame(width: 92, alignment: .leading)
             conversationHeader.frame(maxWidth: .infinity)
             HStack(spacing: 4) {
-                Button(action: onNewChatTap) {
-                    Image(systemName: "square.and.pencil")
-                        .font(.bighelp(.title3))
-                        .frame(width: 44, height: 44)
-                        .contentShape(.circle)
-                        .bighelpNavigationGlass(in: Circle(), isInteractive: true)
+                // Simple Bot mode keeps each bot to one chat on its home; ⋯ still starts a new one.
+                if !homeChrome.isSimpleBots {
+                    Button(action: onNewChatTap) {
+                        Image(systemName: "square.and.pencil")
+                            .font(.bighelp(.title3))
+                            .frame(width: 44, height: 44)
+                            .contentShape(.circle)
+                            .bighelpNavigationGlass(in: Circle(), isInteractive: true)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("New chat")
+                    .accessibilityIdentifier("chat.new-chat")
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("New chat")
-                .accessibilityIdentifier("chat.new-chat")
                 chatOptionsMenu
                     .bighelpNavigationGlass(in: Circle(), isInteractive: true)
             }
@@ -743,6 +746,8 @@ struct ChatView: View {
                     groupConversationIdentityButton
                     if let teamCallAction { TeamCallHeaderButton(action: teamCallAction) }
                 }
+            } else if homeChrome.isSimpleBots {
+                simpleBotIdentityButton
             } else {
                 conversationIdentityButton
             }
@@ -840,10 +845,43 @@ struct ChatView: View {
     }
     #endif
 
+    /// Simple Bot mode: the bot's mark and name in one pill; it opens the bot's profile.
+    private var simpleBotIdentityButton: some View {
+        let participant = resolvedIdentityParticipants.first
+        let agentID = model.memberIDs.first ?? participant?.stableID ?? agentName
+        return Button {
+            dismissKeyboard()
+            homeChrome.onProfile(agentID)
+        } label: {
+            HStack(spacing: BighelpTokens.space8) {
+                SimpleBotFace(agentID: agentID, name: agentName, imageURL: participant?.imageURL, size: 28)
+                Text(agentName)
+                    .font(.bighelp(.title3, weight: .semibold))
+                    .foregroundStyle(theme.primaryText)
+                    .lineLimit(1)
+            }
+            .padding(.leading, BighelpTokens.space12)
+            .padding(.trailing, BighelpTokens.space16)
+            .frame(minHeight: BighelpTokens.hitTarget)
+            .contentShape(Capsule())
+            .bighelpNavigationGlass(in: Capsule(), isInteractive: true)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(agentName)
+        .accessibilityValue(headerLiveActivityPresentation?.text ?? headerLiveState.label)
+        .accessibilityHint("Opens its profile")
+        .accessibilityIdentifier("chat.identity")
+    }
+
     private var conversationIdentityButton: some View {
         Button {
             dismissKeyboard()
-            onPeopleTap()
+            // Simple Bot mode: a bot's name opens its profile; a group's still opens its people.
+            if homeChrome.isSimpleBots, !model.isBotMode, let agentID = model.memberIDs.first {
+                homeChrome.onProfile(agentID)
+            } else {
+                onPeopleTap()
+            }
         } label: {
             ChatConversationIdentityLabel(
                 title: agentName,

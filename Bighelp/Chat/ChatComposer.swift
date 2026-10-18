@@ -437,7 +437,7 @@ struct ChatComposer: View {
         )
         .overlay(alignment: .topLeading) {
             if composerText.wrappedValue.isEmpty {
-                Text("Message \(placeholderName)")
+                Text(homeChrome.isSimpleBots && !model.isBotMode ? "Ask \(placeholderName)" : "Message \(placeholderName)")
                     .bighelpFont(.body)
                     .foregroundStyle(theme.secondaryText)
                     .allowsHitTesting(false)
@@ -447,6 +447,8 @@ struct ChatComposer: View {
         .accessibilityLabel("Message")
         .accessibilityValue(composerText.wrappedValue.isEmpty ? "Empty" : composerText.wrappedValue)
     }
+
+    @Environment(\.agentHomeChrome) private var homeChrome
 
     private var placeholderName: String {
         guard model.isBotMode else { return agentName }

@@ -15,7 +15,8 @@ extension RootShellView {
 
     /// Shows the home `settings.experience` picks, and returns to it after host and account changes.
     func applyExperience() {
-        let home: AppTab = settings.experience == .code ? .code : .sessions
+        // Simple Bot mode's home is the Chat tab's place, whatever IDE's choice.
+        let home: AppTab = settings.experience == .code && !simpleBotsOn ? .code : .sessions
         guard appState.homeTab != home else { return }
         appState.homeTab = home
         appState.select(home)

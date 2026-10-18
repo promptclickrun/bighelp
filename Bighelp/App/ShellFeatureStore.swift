@@ -360,7 +360,7 @@ final class ShellFeatureStore {
              .workspaceActivity, .workspaceSettings, .workspaceManagement, .workspaceConnections, .workspaceHub,
              .projects, .project, .kanban, .usage, .allHostsChats, .board,
              .workflows, .workflow, .workflowRun, .workflowSignoff, .workflowRuns, .codeChanges, .codeBatch,
-             .devFactory, .devFactoryRecipe, .devFactoryGroup, .devFactoryChanges:
+             .devFactory, .devFactoryRecipe, .devFactoryGroup, .devFactoryChanges, .simpleBotProfile:
             nil
         }
     }
@@ -438,7 +438,7 @@ final class ShellFeatureStore {
              .workspaceActivity, .workspaceSettings, .workspaceManagement, .workspaceConnections, .workspaceHub,
              .projects, .project, .kanban, .usage, .allHostsChats, .board,
              .workflows, .workflow, .workflowRun, .workflowSignoff, .workflowRuns, .codeChanges, .codeBatch,
-             .devFactory, .devFactoryRecipe, .devFactoryGroup, .devFactoryChanges:
+             .devFactory, .devFactoryRecipe, .devFactoryGroup, .devFactoryChanges, .simpleBotProfile:
             return true
         }
     }

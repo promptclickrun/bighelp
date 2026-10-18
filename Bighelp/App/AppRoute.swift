@@ -65,6 +65,8 @@ enum AppRoute: Hashable {
     case devFactoryRecipe(id: String)
     case devFactoryGroup(id: String)
     case devFactoryChanges(runID: String)
+    /// Simple Bot mode: a bot's profile, from its chat's name or a long press.
+    case simpleBotProfile(agentID: String)
 
     /// Screens about every computer, which stay put when the working computer changes.
     var isAllHosts: Bool { self == .allHostsChats }

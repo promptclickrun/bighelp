@@ -11,8 +11,7 @@ enum ChatCardTranscriptProjection {
             guard case .message(let item) = entry,
                   item.role == .assistant,
                   case .message(let text) = item.content else { continue }
-            let prose = ReferenceCodec.decode(text).prose
-            durableCardIDs.formUnion(ChatCardMessageProjection(source: prose, role: .assistant).cardIDs)
+            durableCardIDs.formUnion(ChatCardMessageProjection.cardIDs(in: ReferenceCodec.decode(text).prose))
         }
         guard !durableCardIDs.isEmpty else { return entries }
         return entries.filter { entry in

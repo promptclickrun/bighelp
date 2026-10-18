@@ -15,6 +15,19 @@ struct ChatCardMessageProjectionTests {
         #expect(ChatCardMessageProjection(source: source, role: .human).cardIDs.isEmpty)
     }
 
+    /// The chat finds which cards its messages name without laying each message out:
+    /// the quick answer matches the full one, card or not.
+    @Test func cardIDsMatchTheFullProjection() {
+        let sources = ["Plain reply with **bold** and `code`.", "Before\n\n" + fence + "\n\nAfter",
+                       "````text\n" + fence + "\n````", String(fence.dropLast(3)),
+                       "Mentions loopdy-card in prose only.", "```swift\nlet x = 1\n```"]
+        for source in sources {
+            #expect(ChatCardMessageProjection.cardIDs(in: source)
+                    == ChatCardMessageProjection(source: source, role: .assistant).cardIDs, "\(source)")
+        }
+        #expect(ChatCardMessageProjection.cardIDs(in: "Before\n\n" + fence).count == 1)
+    }
+
     @Test func incompleteAndNestedExampleFencesDoNotBecomeInteractiveCards() {
         #expect(ChatCardMessageProjection(source: String(fence.dropLast(3)), role: .assistant).cardIDs.isEmpty)
         for enclosing in ["````", "~~~"] {

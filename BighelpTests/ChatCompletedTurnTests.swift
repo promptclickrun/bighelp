@@ -484,6 +484,28 @@ struct ChatCompletedTurnTests {
         )]))
     }
 
+    /// A fold finds its steps by turn or by order through an index; it must find exactly
+    /// what walking the whole ledger would, in ledger order.
+    @Test func ledgerIndexFindsWhatAFullWalkFinds() {
+        let events = (0..<40).map { index in
+            ChatActivityEvent(eventID: "e\(index)", sessionID: "s", turnID: "t\(index % 7)", kind: .tool,
+                              lifecycle: .succeeded, title: "Step", summary: nil, detail: nil,
+                              occurredAt: index, sourceOrder: index.isMultiple(of: 5) ? nil : (index * 37) % 41)
+        }
+        let index = ChatLedgerIndex(events)
+        let cases: [(Set<String>, Int?, Int?)] = [([], nil, nil), (["t2"], nil, nil), ([], 10, 20), (["t1", "t5"], 30, nil),
+                                                   (["t3"], 25, 12), ([], 0, nil), (["missing"], 40, 41)]
+        for (turns, start, end) in cases {
+            let walked = events.filter { event in
+                var inOrder = false
+                if let start, let order = event.sourceOrder { inOrder = order >= start && end.map { order < $0 } != false }
+                return turns.contains(event.turnID) || inOrder
+            }
+            #expect(index.events(inTurns: turns, startOrder: start, endOrder: end).map(\.id) == walked.map(\.id),
+                    "\(turns) \(String(describing: start))..<\(String(describing: end))")
+        }
+    }
+
     private func message(_ id: String, time: TimeInterval?, human: Bool = false, duration: Int? = nil, order: Int? = nil) -> TimelineItem {
         TimelineItem(
             id: id, role: human ? .human : .assistant,

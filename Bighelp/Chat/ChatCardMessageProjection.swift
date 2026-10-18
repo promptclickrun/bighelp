@@ -41,6 +41,13 @@ struct ChatCardMessageProjection: Equatable, Sendable {
     let segments: [Segment]
     let cardIDs: Set<String>
 
+    /// The cards an assistant message names. Most messages have none, and laying each one
+    /// out to find out made a long chat parse every message on every redraw.
+    static func cardIDs(in source: String) -> Set<String> {
+        guard source.contains("```\(fenceLanguage)") else { return [] }
+        return ChatCardMessageProjection(source: source, role: .assistant).cardIDs
+    }
+
     /// Cards, tables or rules: the message is drawn part by part at full width.
     var hasRichContent: Bool {
         !cardIDs.isEmpty || segments.contains { if case .markdown = $0 { false } else { true } }

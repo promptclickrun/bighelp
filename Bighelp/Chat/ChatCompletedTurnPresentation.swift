@@ -81,6 +81,14 @@ enum ChatCompletedTurnProjection {
             }
         }
         guard enabled else { return presentableEntries.map(ChatTurnDisplayRow.entry) }
+        // Every turn finds its steps and timed reasoning in the chat's ledger. Sort those out
+        // and index them once per redraw: walking the whole ledger for each turn made a long
+        // chat full of tool calls take a second or more to redraw.
+        let chatSteps = ChatLedgerIndex(activityEvents.filter(isStep))
+        let timedReasoning = ChatLedgerIndex(activityEvents.filter { event in
+            event.kind == .reasoning && event.lifecycle != .running
+                && event.durationMilliseconds.map { (0...86_400_000).contains($0) } == true
+        })
         var rows: [ChatTurnDisplayRow] = []
         var work: [ChatTranscriptEntry] = []
         var startedAt: Date?
@@ -155,8 +163,8 @@ enum ChatCompletedTurnProjection {
             }
             if let foldPosition, let first = folded.first {
                 let elapsed = elapsed(work, startedAt: startedAt, startOrder: startOrder, endOrder: endOrder,
-                                      activityEvents: activityEvents)
-                let steps = steps(folded, startOrder: startOrder, endOrder: endOrder, activityEvents: activityEvents)
+                                      timedReasoning: timedReasoning)
+                let steps = steps(folded, startOrder: startOrder, endOrder: endOrder, chatSteps: chatSteps)
                 turnRows.insert(.completed(ChatCompletedTurn(
                     id: "completed-turn:\(first.id)",
                     entries: folded,
@@ -184,17 +192,20 @@ enum ChatCompletedTurnProjection {
         return rows
     }
 
+    /// A tool call or helper the fold counts; pictures and agents talking stay out in the chat.
+    private static func isStep(_ event: ChatActivityEvent) -> Bool {
+        (event.kind == .tool || event.kind == .subagent) && GeneratedMediaProjection.kind(for: event) == nil
+            && event.agentTalkCall == nil
+    }
+
     /// Steps the fold stands for, in order: its own tool calls and helper
     /// agents, plus the turn's work the chat hides (Show tool calls off), from
-    /// the ledger by turn or by order. Generated pictures and messages to
-    /// other agents stay outside the fold and the count.
+    /// the ledger by turn or by order (`chatSteps`: the chat's events that pass
+    /// `isStep`). Generated pictures and messages to other agents stay outside
+    /// the fold and the count.
     private static func steps(
-        _ folded: [ChatTranscriptEntry], startOrder: Int?, endOrder: Int?, activityEvents: [ChatActivityEvent]
+        _ folded: [ChatTranscriptEntry], startOrder: Int?, endOrder: Int?, chatSteps: ChatLedgerIndex
     ) -> [ChatActivityEvent] {
-        func isStep(_ event: ChatActivityEvent) -> Bool {
-            (event.kind == .tool || event.kind == .subagent) && GeneratedMediaProjection.kind(for: event) == nil
-                && event.agentTalkCall == nil
-        }
         var steps: [ChatActivityEvent] = []
         var seen = Set<String>()
         var turnIDs = Set<String>()
@@ -205,19 +216,16 @@ enum ChatCompletedTurnProjection {
                 if isStep(event), seen.insert(event.id).inserted { steps.append(event) }
             }
         }
-        for event in activityEvents where isStep(event) && !seen.contains(event.id) {
-            var inOrder = false
-            if let startOrder, let order = event.sourceOrder {
-                inOrder = order >= startOrder && endOrder.map { order < $0 } != false
-            }
-            if turnIDs.contains(event.turnID) || inOrder, seen.insert(event.id).inserted { steps.append(event) }
+        for event in chatSteps.events(inTurns: turnIDs, startOrder: startOrder, endOrder: endOrder)
+        where seen.insert(event.id).inserted {
+            steps.append(event)
         }
         return steps
     }
 
     private static func elapsed(
         _ entries: [ChatTranscriptEntry], startedAt: Date?, startOrder: Int?,
-        endOrder: Int?, activityEvents: [ChatActivityEvent]
+        endOrder: Int?, timedReasoning: ChatLedgerIndex
     ) -> TimeInterval? {
         let messages = entries.compactMap { entry -> TimelineItem? in
             guard case .message(let item) = entry else { return nil }
@@ -232,26 +240,51 @@ enum ChatCompletedTurnProjection {
             guard case .activity(let turn) = entry else { return [] }
             return turn.events.map(\.turnID)
         })
-        let durations = activityEvents.compactMap { event -> Int? in
-            guard event.kind == .reasoning, event.lifecycle != .running,
-                  let duration = event.durationMilliseconds,
-                  (0...86_400_000).contains(duration) else { return nil }
-            let inTurn = turnIDs.contains(event.turnID)
-            let inOrder: Bool
-            if let startOrder, let order = event.sourceOrder {
-                inOrder = order >= startOrder && endOrder.map { order < $0 } != false
-            } else {
-                inOrder = false
-            }
-            return inTurn || inOrder ? duration : nil
+        if let duration = timedReasoning.events(inTurns: turnIDs, startOrder: startOrder, endOrder: endOrder)
+            .compactMap(\.durationMilliseconds).max() {
+            return TimeInterval(duration) / 1_000
         }
-        if let duration = durations.max() { return TimeInterval(duration) / 1_000 }
         // Older hosts have no measured duration. Use only persisted human/final
         // message timestamps, never synthetic activity order or the render clock.
         guard let start = startedAt,
               let final = messages.last(where: { $0.role == .assistant && $0.metadata.delivery != "Streaming" }),
               let end = final.metadata.timestamp, end >= start else { return nil }
         return end.timeIntervalSince(start)
+    }
+}
+
+/// Ledger events a fold can claim, found by turn or by source order without walking
+/// the whole ledger for every turn of a long chat.
+struct ChatLedgerIndex {
+    private let events: [ChatActivityEvent]
+    private let positionsByTurn: [String: [Int]]
+    /// (source order, position), sorted by order.
+    private let byOrder: [(order: Int, position: Int)]
+
+    init(_ events: [ChatActivityEvent]) {
+        self.events = events
+        positionsByTurn = Dictionary(grouping: events.indices, by: { events[$0].turnID })
+        byOrder = events.indices.compactMap { index in events[index].sourceOrder.map { (order: $0, position: index) } }
+            .sorted { $0.order < $1.order }
+    }
+
+    /// In ledger order: the events of `turnIDs`, and those ordered from `startOrder` up to
+    /// (not including) `endOrder`, or onward without one.
+    func events(inTurns turnIDs: Set<String>, startOrder: Int?, endOrder: Int?) -> [ChatActivityEvent] {
+        var positions = Set<Int>()
+        for turnID in turnIDs { positions.formUnion(positionsByTurn[turnID] ?? []) }
+        if let startOrder {
+            var low = 0, high = byOrder.count
+            while low < high {
+                let middle = (low + high) / 2
+                if byOrder[middle].order < startOrder { low = middle + 1 } else { high = middle }
+            }
+            for entry in byOrder[low...] {
+                if let endOrder, entry.order >= endOrder { break }
+                positions.insert(entry.position)
+            }
+        }
+        return positions.sorted().map { events[$0] }
     }
 }
 

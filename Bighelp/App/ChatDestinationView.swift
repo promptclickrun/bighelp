@@ -24,6 +24,8 @@ struct ChatDestinationView: View {
     @State private var isHapticsSurfaceVisible = false
     @State private var projectChanges: ProjectChangesStore
     @State var voicePresentation: VoicePresentation?
+    /// Simple Bot mode's voice: a bar over the chat instead of the voice screen.
+    @State var voiceBar: VoicePresentation?
     @State var attachmentFlow = ChatAttachmentFlowState()
     @State var isPhotoPickerPresented = false
     @State var isFilePickerPresented = false
@@ -268,6 +270,40 @@ struct ChatDestinationView: View {
         Task { @MainActor in try? await featureStore.forceRefreshSession(id: id) }
     }
 
+    private func makeVoice(_ mode: VoiceConversationMode) -> VoicePresentation {
+        featureStore.makeVoicePresentation(
+            for: model.conversationID,
+            mode: settings.voiceMode,
+            transcription: settings.voiceTranscription,
+            conversationMode: mode,
+            liveProvider: settings.liveVoiceProvider,
+            liveVoice: settings.liveVoice(for: settings.liveVoiceProvider)
+        )
+    }
+
+    /// The voice bar over a Simple Bot mode chat, under its header.
+    @ViewBuilder
+    private var voiceBarOverlay: some View {
+        if let voiceBar, let agentID = model.memberIDs.first {
+            let profile = agents.profiles.first { $0.id == agentID }
+            SimpleBotVoiceBar(
+                presentation: voiceBar, agentID: agentID, agentName: profile?.name ?? "Your bot",
+                imageURL: profile.flatMap { agents.avatarURL(for: $0) }, permissionCenter: permissionCenter,
+                onSwitchMode: { mode in
+                    settings.voiceConversationMode = mode
+                    self.voiceBar = makeVoice(mode)
+                },
+                onEnded: { withAnimation(.snappy(duration: 0.25)) { self.voiceBar = nil } }
+            )
+            .id(voiceBar.id)
+            .onChange(of: model.isSending, initial: true) { _, active in
+                voiceBar.model.reconcileAgentRun(isActive: active)
+            }
+            .padding(.top, 72)
+            .transition(.move(edge: .top).combined(with: .opacity))
+        }
+    }
+
     /// Live voice couldn't start: remember turn-based voice in Settings
     /// (listens on the phone, answers with the host's text-to-speech) and
     /// reopen voice with it.
@@ -320,14 +356,12 @@ struct ChatDestinationView: View {
                 }
             },
             onVoiceTap: {
-                voicePresentation = featureStore.makeVoicePresentation(
-                    for: model.conversationID,
-                    mode: settings.voiceMode,
-                    transcription: settings.voiceTranscription,
-                    conversationMode: settings.voiceConversationMode,
-                    liveProvider: settings.liveVoiceProvider,
-                    liveVoice: settings.liveVoice(for: settings.liveVoiceProvider)
-                )
+                let presentation = makeVoice(settings.voiceConversationMode)
+                if homeChrome.isSimpleBots, model.memberIDs.count == 1 {
+                    withAnimation(.snappy(duration: 0.25)) { voiceBar = presentation }
+                } else {
+                    voicePresentation = presentation
+                }
             },
             onApprovalTap: onOpenApproval,
             onPeopleTap: { isPeopleAndChatPresented = true },
@@ -377,6 +411,8 @@ struct ChatDestinationView: View {
                 }
             }
         }
+        // Over the edge-swipe strips, so they never take a tap meant for the bar.
+        .overlay(alignment: .top) { voiceBarOverlay }
         .overlay(alignment: .trailing) {
             if horizontalSizeClass == .regular, isProjectChangesPresented {
                 GeometryReader { geometry in
@@ -832,8 +868,8 @@ struct ChatDestinationView: View {
         containerWidth: CGFloat
     ) -> some View {
         let action = side == .left
-            ? settings.leftEdgeSwipeAction
-            : settings.rightEdgeSwipeAction
+            ? settings.effectiveLeftEdgeSwipeAction
+            : settings.effectiveRightEdgeSwipeAction
         Color.clear
             .frame(width: WorkspaceEdgeSwipeResolver.activationEdgeWidth)
             .contentShape(Rectangle())
@@ -853,8 +889,8 @@ struct ChatDestinationView: View {
                             ),
                             translation: value.translation,
                             containerWidth: containerWidth,
-                            leftAction: settings.leftEdgeSwipeAction,
-                            rightAction: settings.rightEdgeSwipeAction
+                            leftAction: settings.effectiveLeftEdgeSwipeAction,
+                            rightAction: settings.effectiveRightEdgeSwipeAction
                         ) else { return }
                         performChatEdgeAction(resolved)
                     }

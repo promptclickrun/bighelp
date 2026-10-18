@@ -44,6 +44,28 @@ extension RootShellView {
         )
     }
 
+    /// The edge swipes in Simple Bot mode (`effectiveLeftEdgeSwipeAction`): from the left back to your
+    /// bots, from the right this bot's profile (the primary bot's on the home). False for anything else.
+    func performSimpleBotsSwipe(_ action: WorkspaceSwipeAction) -> Bool {
+        switch action {
+        case .agents:
+            appState.select(.sessions)
+            appState.path.removeAll()
+            return true
+        case .profile:
+            let chatBot: String? = if case .chat(let id)? = appState.path.last {
+                featureStore.preparedChatModel(id: id)?.memberIDs.first
+            } else { nil }
+            guard let botID = chatBot ?? agents.primaryAgentID ?? agents.profiles.first(where: \.isDefault)?.id
+            else { return true }
+            if case .simpleBotProfile(let shown)? = appState.path.last, shown == botID { return true }
+            appState.open(.simpleBotProfile(agentID: botID))
+            return true
+        default:
+            return false
+        }
+    }
+
     /// A bot's chat over the home, with Back: its Bot Chat, like everywhere else.
     func openSimpleBotChat(_ agentID: String) {
         openCanonicalAgentChat(agentID, fromList: true)

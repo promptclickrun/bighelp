@@ -24,6 +24,20 @@ struct SimpleBotsTests {
         #expect(context.darkBackground == .black)
     }
 
+    @Test func edgeSwipesGoToYourBotsAndThisBotsProfile() {
+        let suiteName = #function
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let settings = SettingsStore(defaults: defaults)
+        settings.leftEdgeSwipeAction = .newChat
+        settings.rightEdgeSwipeAction = .none
+        #expect(settings.effectiveLeftEdgeSwipeAction == .newChat, "Your choices everywhere else")
+        settings.simpleBotsEnabled = true
+        #expect(settings.effectiveLeftEdgeSwipeAction == .agents)
+        #expect(settings.effectiveRightEdgeSwipeAction == .profile)
+    }
+
     @Test func simpleLookHasBlackBubblesByDayAndInkAfterDark() {
         var context = BighelpAppearanceContext(appearance: .light, lightBackground: .paper, darkBackground: .black)
         context.simpleBots = true

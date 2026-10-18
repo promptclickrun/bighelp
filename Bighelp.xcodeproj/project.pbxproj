@@ -493,6 +493,7 @@
 		4ED4A40ABDBB0B15FBB5D05C /* RawConfigurationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 941A003838BB4E928B9DECCC /* RawConfigurationView.swift */; };
 		4F2BD0E4B2B920B3DDF06152 /* KanbanCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2D90A74097F0FF386ACDEF3 /* KanbanCardView.swift */; };
 		4F3B17E2E566E942FEDCD536 /* AsyncOperationTestGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9965BF9A6F80AA4F0C3FEA00 /* AsyncOperationTestGate.swift */; };
+		4F4BFD5D7FE39BBA056987FA /* SimpleBotVoiceBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2D043AD3DE1B95D66A8421C /* SimpleBotVoiceBar.swift */; };
 		504D0D4DBC028D5E7DCAEF13 /* SpatialAvatarRig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99A41F789761960F1B5EFD87 /* SpatialAvatarRig.swift */; };
 		50780189A3CAD330F23725C5 /* AvatarCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C365F7E695CE29FA628F71A /* AvatarCatalog.swift */; };
 		50DFA069E487F7C411CC704E /* PetdexGallery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59C1D022528FB63E037C7B28 /* PetdexGallery.swift */; };
@@ -3071,6 +3072,7 @@
 		E2A14692501D4ABFB17F76BB /* UsageStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageStoreTests.swift; sourceTree = "<group>"; };
 		E2B0B12CCADA6D8292B64AFA /* SimpleBotProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimpleBotProfileView.swift; sourceTree = "<group>"; };
 		E2C274F8CDDC43A089AC6DB9 /* BighelpAppearanceChoices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpAppearanceChoices.swift; sourceTree = "<group>"; };
+		E2D043AD3DE1B95D66A8421C /* SimpleBotVoiceBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimpleBotVoiceBar.swift; sourceTree = "<group>"; };
 		E2D90A74097F0FF386ACDEF3 /* KanbanCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanbanCardView.swift; sourceTree = "<group>"; };
 		E2DC853C3341972B406D5AF9 /* DeferredVoiceSessionClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeferredVoiceSessionClientTests.swift; sourceTree = "<group>"; };
 		E2F8FB47038C2E9A1EE89696 /* DirectHermesProjectClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectHermesProjectClientTests.swift; sourceTree = "<group>"; };
@@ -3734,6 +3736,7 @@
 				E870F072CBA0B66AC95493FB /* SimpleBotsSearchView.swift */,
 				89F6727324898A0915DEB6F3 /* SimpleBotsSettingsView.swift */,
 				6F4DD82DEE8EB5910B718623 /* SimpleBotsStyle.swift */,
+				E2D043AD3DE1B95D66A8421C /* SimpleBotVoiceBar.swift */,
 			);
 			path = SimpleBots;
 			sourceTree = "<group>";
@@ -6909,6 +6912,7 @@
 				C2499B7A9C27898D36572D0F /* SimpleBotMark.swift in Sources */,
 				1CBBCA37E4825CA82FAB683F /* SimpleBotProfileExtras.swift in Sources */,
 				842B5E01AA01D87DE0AD45A9 /* SimpleBotProfileView.swift in Sources */,
+				4F4BFD5D7FE39BBA056987FA /* SimpleBotVoiceBar.swift in Sources */,
 				9439485E2A2FA9EC2B7ED47F /* SimpleBotsHomeView.swift in Sources */,
 				78269EBC10C58BA4BFDAB67B /* SimpleBotsSearchView.swift in Sources */,
 				BC9C0771242CAEFB1F8A3E25 /* SimpleBotsSettingsView.swift in Sources */,

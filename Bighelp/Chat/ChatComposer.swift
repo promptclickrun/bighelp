@@ -284,8 +284,8 @@ struct ChatComposer: View {
     }
 
     private var showsExpandButton: Bool {
-        // Keep rich editing discoverable before the draft reaches its height cap.
-        !model.draft.isEmpty || isDraftOverflowing
+        // Beside the box once the draft wraps: a one-line draft keeps the box full width.
+        isDraftOverflowing
     }
 
     private var usesCompactEditingLayout: Bool {
@@ -304,29 +304,18 @@ struct ChatComposer: View {
         // undo state, keyboard ownership, and the exact draft owner.
         HStack(alignment: .center, spacing: BighelpTokens.space8) {
             attachmentButton
-            ZStack(alignment: .topTrailing) {
+            // Voice mode, Send and Stop sit inside the box, at its bottom as the draft grows.
+            HStack(alignment: .bottom, spacing: BighelpTokens.space4) {
                 composerInput
                     .bighelpFont(.body)
                     .foregroundStyle(theme.primaryText)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .frame(height: usesCompactEditingLayout ? max(44, compactDraftLineHeight) : nil)
-                    .padding(.trailing, showsExpandButton ? 44 : 0)
                     .frame(minHeight: BighelpTokens.hitTarget)
                     .submitLabel(.send)
                     .disabled(model.isComposerInputDisabled)
                     .onSubmit { send() }
-                if showsExpandButton {
-                    Button(action: openExpandedEditor) {
-                        Image(systemName: "arrow.up.left.and.arrow.down.right")
-                            .font(.bighelp(.footnote).weight(.medium))
-                            .foregroundStyle(theme.secondaryText)
-                            .frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
-                            .contentShape(.rect)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Expand message editor")
-                    .accessibilityIdentifier("chat.composer.expand")
-                }
+                primaryAction
             }
             // iMessage-style field: a fixed-radius continuous shape reads as a
             // pill on one line and keeps square-ish corners as the draft grows,
@@ -354,7 +343,19 @@ struct ChatComposer: View {
                 // Geometry marker for the visible field; not an accessibility container.
                 Color.clear.accessibilityElement().accessibilityIdentifier("chat.composer.field")
             }
-            primaryAction
+            // Beside the box, so the pill inside it never covers it.
+            if showsExpandButton {
+                Button(action: openExpandedEditor) {
+                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                        .font(.bighelp(.footnote).weight(.medium))
+                        .foregroundStyle(theme.secondaryText)
+                        .frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Expand message editor")
+                .accessibilityIdentifier("chat.composer.expand")
+            }
         }
         .padding(.vertical, 4)
         .background {
@@ -677,7 +678,8 @@ enum ComposerFieldMetrics {
     /// Painted diameter of the attach and send circles; hit areas stay at the hit target.
     static var controlDiameter: CGFloat { BighelpTokens.scaled(36) }
     static let leadingInset: CGFloat = 16
-    static let trailingInset: CGFloat = 12
+    /// The pill inside the box sits this close to its end.
+    static let trailingInset: CGFloat = 4
     static var shape: RoundedRectangle { RoundedRectangle(cornerRadius: cornerRadius, style: .continuous) }
 }
 

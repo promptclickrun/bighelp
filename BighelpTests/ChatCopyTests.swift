@@ -96,9 +96,9 @@ struct ChatCopyTests {
         #expect(ChatAttachmentMarkdown.isMarkdown(fileName: "notes", mimeType: "text/markdown"))
         #expect(ChatAttachmentMarkdown.isMarkdown(fileName: "README.MARKDOWN", mimeType: "text/plain"))
         #expect(!ChatAttachmentMarkdown.isMarkdown(fileName: "report.pdf", mimeType: "application/pdf"))
-        let note = try ChatAttachment(id: "fixture-note", fileName: "plan.md", mimeType: "text/markdown", data: Data("# Hi".utf8))
+        let note = try ChatAttachment(id: "fixture-note-0001", fileName: "plan.md", mimeType: "text/markdown", data: Data("# Hi".utf8))
         #expect(ChatAttachmentMarkdown.text(of: note) == "# Hi")
-        let huge = try ChatAttachment(id: "fixture-huge", fileName: "log.md", mimeType: "text/markdown",
+        let huge = try ChatAttachment(id: "fixture-huge-0001", fileName: "log.md", mimeType: "text/markdown",
                                       data: Data(repeating: 0x61, count: ChatAttachmentMarkdown.maximumBytes + 1))
         #expect(ChatAttachmentMarkdown.text(of: huge) == nil, "Very long files use the plain viewer")
     }

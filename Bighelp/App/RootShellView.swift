@@ -833,8 +833,8 @@ struct RootShellView: View {
     @ViewBuilder
     private func edgeGestureSurface(side: EdgeSide, containerWidth: CGFloat) -> some View {
         let action = side == .left
-            ? settings.leftEdgeSwipeAction
-            : settings.rightEdgeSwipeAction
+            ? settings.effectiveLeftEdgeSwipeAction
+            : settings.effectiveRightEdgeSwipeAction
         Color.clear
             .frame(width: WorkspaceEdgeSwipeResolver.activationEdgeWidth)
             .contentShape(Rectangle())
@@ -853,8 +853,8 @@ struct RootShellView: View {
                             start: CGPoint(x: startX, y: value.startLocation.y),
                             translation: value.translation,
                             containerWidth: containerWidth,
-                            leftAction: settings.leftEdgeSwipeAction,
-                            rightAction: settings.rightEdgeSwipeAction
+                            leftAction: settings.effectiveLeftEdgeSwipeAction,
+                            rightAction: settings.effectiveRightEdgeSwipeAction
                         ) else { return }
                         performWorkspaceAction(resolved)
                     }
@@ -872,6 +872,7 @@ struct RootShellView: View {
     /// Where an edge swipe goes, from any screen (a chat included) and in either mode.
     func performWorkspaceAction(_ action: WorkspaceSwipeAction) {
         BighelpKeyboard.dismiss()
+        if simpleBotsOn, performSimpleBotsSwipe(action) { return }
         switch action {
         case .quickWorkspace:
             presentMenu()

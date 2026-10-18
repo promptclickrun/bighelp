@@ -150,8 +150,10 @@ struct ReferenceComposerTextView: UIViewRepresentable {
         if expanded, let height = proposal.height { return CGSize(width: width, height: height) }
         let measured = uiView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
         let lineHeight = uiView.font?.lineHeight ?? UIFont.bighelp(.body).lineHeight
+        // Wrapped onto a second line (one line plus the editor's insets stays under two line heights):
+        // the expand button shows beside the box from there.
         let overflowing = DraftFieldSizing.shouldOfferExpandedEditor(hasText: !uiView.text.isEmpty,
-            measuredHeight: measured.height, lineHeight: lineHeight)
+            measuredHeight: measured.height, lineHeight: lineHeight, thresholdLines: 2)
         if isSurfaceActive { context.coordinator.reportOverflow(overflowing) }
         // A compact editor has a real native viewport, not merely a clipped
         // SwiftUI frame. Keep enough room for UIKit's caret and line leading.

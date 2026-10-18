@@ -47,6 +47,9 @@ are historical (`docs/ui-v3-design.md`).
   grid, round 2-pt strokes and the brand's dot, with agents drawn as the orb with two eyes. Call sites still name SF
   Symbols; ones without a glyph fall back to the symbol. Edit `glyphs.py`, then run `export_assets.py`.
 - Product type is SF Pro. Root screens use large titles; section captions are small, bold, letterspaced and muted.
+- The message box: + beside it, and one pill inside it at its end: voice mode (a waveform) while it's empty,
+  Send once there's text, Stop while the agent works. No other microphone button. A long draft's expand
+  button sits beside the box, so the pill never covers it.
 - Attachments in a draft are one small glass tag above the message box, lined up with the field
   (`DraftAttachmentRail`): the count first, then the kinds ("4 attached · 3 photos, 1 PDF"), with photos leading a
   stack of up to three thumbnails. One photo says "1 photo"; one file shows its name and size. While photos or files
@@ -364,7 +367,12 @@ text is SF Pro, as everywhere.
   device and Hermes Desktop shows it, and drops a character or pet drawn over the picture. A bot that
   already has a picture, character or pet keeps it until a mark is picked; one with none starts on a
   mark made from its ID.
-- **Chat**: Back, the bot's name (its profile) and ⋯; no New chat button.
+- **Chat**: Back, the bot's name (its profile) and ⋯; no New chat button. Voice is a bar over the chat, under
+  its header (`SimpleBotVoiceBar`), and the chat stays in use: the bot's face, a visualizer from the real audio
+  levels (your voice in the page's ink, the bot's in its color, dots while nobody speaks), voice choices (live
+  or TTS, the bot's voice on or off), the microphone and End.
+- **Swipes**: from the left edge back to your bots; from the right, this bot's profile (the primary bot's on
+  the home). The full app's swipe choices lead to places this mode hides, so they don't apply here.
 - **Profile**: the mark, name and role, then Info (Character, Instructions, Default Model, Routines) and
   Computer (its screen, when the host has one). More avatars opens the full avatar studio (`AvatarCreatorView`)
   with the marks as its Bots section; Save applies the pick at once. Default Model is the model and reasoning

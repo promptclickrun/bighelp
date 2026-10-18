@@ -88,6 +88,9 @@ final class LiveVoiceModel {
     private(set) var jobErrors: [String: String] = [:]
     private(set) var isRefreshingJobs = false
     private(set) var media = BighelpRealtimeAudioPeer.MediaStatistics()
+    /// Your microphone's and the agent's loudness (0–1) in the last media reading, for a visualizer.
+    var inputLevel: Double { media.inputAudioLevel }
+    var outputLevel: Double { media.outputAudioLevel }
     private(set) var mediaStatus = "No native media observed"
 
     @ObservationIgnored private let client: LiveVoiceControlClient
@@ -435,6 +438,14 @@ final class LiveVoiceModel {
         guard generation == token, isCallOpen, client.hasCurrentOwner else {
             throw LiveVoiceControlError.wrongOwner
         }
+    }
+
+    /// One more media reading now: a visualizer wants several a second, the monitor takes one.
+    func refreshLevels() async {
+        guard isCallOpen, let peer else { return }
+        let token = generation
+        guard let statistics = try? await peer.statistics(), generation == token else { return }
+        media = statistics
     }
 
     private func startMonitor(generation token: UUID) {

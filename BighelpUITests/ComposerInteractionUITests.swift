@@ -19,15 +19,20 @@ final class ComposerInteractionUITests: BighelpUITestCase {
             action.frame.midY,
             input.frame.midY,
             accuracy: 1,
-            "The idle microphone action should share the input's vertical center."
+            "The idle voice-mode pill should share the input's vertical center."
         )
+        // The pill sits inside the message box, at its end, with nothing else beside the box.
+        let field = app.otherElements["chat.composer.field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 3))
+        XCTAssertTrue(field.frame.insetBy(dx: -1, dy: -1).contains(action.frame), "\(action.frame) in \(field.frame)")
+        XCTAssertGreaterThan(action.frame.minX, input.frame.minX)
         let attachment = app.buttons["chat.attachment"]
         XCTAssertTrue(attachment.exists)
         XCTAssertEqual(attachment.frame.midY, input.frame.midY, accuracy: 1)
         XCTAssertEqual(attachment.frame.midY, action.frame.midY, accuracy: 1)
-        XCTAssertEqual(attachment.frame.size.width, action.frame.size.width, accuracy: 1)
         XCTAssertEqual(attachment.frame.size.height, action.frame.size.height, accuracy: 1)
         print("COMPOSER_ALIGNMENT idle input=\(input.frame) plus=\(attachment.frame) voice=\(action.frame)")
+        saveComposer("composer-idle-light", app)
         input.tap()
         input.typeText("Hello")
         let send = app.buttons["chat.send"]
@@ -36,6 +41,16 @@ final class ComposerInteractionUITests: BighelpUITestCase {
         XCTAssertTrue(toolbar.waitForExistence(timeout: 3))
         XCTAssertTrue(toolbar.frame.contains(send.frame))
         XCTAssertEqual(send.frame.midY, app.buttons["chat.attachment"].frame.midY, accuracy: 1)
+        XCTAssertFalse(app.buttons["chat.voice"].exists, "Typing swaps voice mode for Send, in the same place")
+        XCTAssertTrue(field.frame.insetBy(dx: -1, dy: -1).contains(send.frame))
+        saveComposer("composer-typing-light", app)
+    }
+
+    @MainActor
+    private func saveComposer(_ name: String, _ app: XCUIApplication) {
+        guard let folder = ProcessInfo.processInfo.environment["BIGHELP_COMPOSER_EVIDENCE"] else { return }
+        try? FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
+        try? app.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: folder).appendingPathComponent("\(name).png"))
     }
 
     @MainActor
@@ -47,7 +62,8 @@ final class ComposerInteractionUITests: BighelpUITestCase {
         ]
         var testedPaddingRegions = 0
 
-        for (index, region) in ["top", "bottom", "left", "right"].enumerated() {
+        // The box's right end is the voice-mode pill now, so there's no padding there to tap.
+        for (index, region) in ["top", "bottom", "left"].enumerated() {
             if index > 0 {
                 app.terminate()
                 app.launch()

@@ -127,6 +127,46 @@ final class SimpleBotsUITests: BighelpUITestCase {
         XCTAssertTrue(listed.waitForExistence(timeout: 5), "Unpinned, it's back in the list")
     }
 
+    /// The message box: voice mode's pill inside it, Send in its place once there's text. Voice opens as a
+    /// bar over the chat, which stays in use, and End closes the bar. Needs the microphone allowed for
+    /// bighelp on the simulator (`simctl privacy … grant microphone`).
+    @MainActor
+    func testVoiceIsABarOverTheChat() throws {
+        let app = makeApp()
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
+                               "-bighelp.settings.simple-bots", "YES", "-loopdy.demo.appearance", "dark",
+                               "-loopdy.voice.conversation-mode", "turnBased", "-bighelp.voice.transcription", "hermes"]
+        app.launch()
+        XCTAssertTrue(app.buttons["simple-bots.primary"].waitForExistence(timeout: 15))
+        app.buttons["simple-bots.primary"].tap()
+        let voice = app.buttons["chat.voice"]
+        XCTAssertTrue(voice.waitForExistence(timeout: 10))
+        save("simple-composer-idle-dark", app)
+
+        voice.tap()
+        let bar = app.descendants(matching: .any)["simple-bots.voice"]
+        XCTAssertTrue(bar.waitForExistence(timeout: 10), "Voice is a bar over the chat")
+        XCTAssertFalse(app.descendants(matching: .any)["voice.screen"].exists, "Not the voice screen")
+        XCTAssertTrue(app.buttons["simple-bots.voice.microphone"].exists)
+        XCTAssertTrue(app.buttons["chat.attachment"].isHittable, "The chat stays in use")
+        save("simple-voice-bar-dark", app)
+        app.buttons["simple-bots.voice.end"].tap()
+        let gone = NSPredicate(format: "exists == false")
+        expectation(for: gone, evaluatedWith: bar)
+        waitForExpectations(timeout: 10)
+
+        let input = app.textViews.firstMatch
+        input.tap()
+        input.typeText("Text 123")
+        XCTAssertTrue(app.buttons["chat.send"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["chat.voice"].exists, "Typing swaps voice mode for Send")
+        XCTAssertFalse(app.buttons["chat.composer.expand"].exists, "One line keeps the box full width")
+        save("simple-composer-typing-dark", app)
+        input.typeText(" and a longer draft that wraps onto a second line in the box")
+        XCTAssertTrue(app.buttons["chat.composer.expand"].waitForExistence(timeout: 3),
+                      "Expand sits beside the box once the draft wraps")
+    }
+
     @MainActor
     func testTurningSimpleBotModeOffComesBackToBighelp() throws {
         let app = launch(appearance: "light")

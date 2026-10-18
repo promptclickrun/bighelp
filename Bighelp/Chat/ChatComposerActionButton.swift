@@ -18,8 +18,10 @@ enum MidSessionSendPresentation {
 
 enum AdaptiveComposerActionPresentation {
     static let tintOpacity = 0.82
-    /// Painted circle inside the 44pt hit area, matching the attach control.
+    /// The pill's height inside the message box; its hit area stays at the hit target.
     static var diameter: CGFloat { ComposerFieldMetrics.controlDiameter }
+    /// The pill's width: wider than tall, so it reads as the box's own button.
+    static var pillWidth: CGFloat { BighelpTokens.scaled(52) }
     /// Touches this far outside the button still count: Send and Voice sit at
     /// the screen's edge, where fingers land a little off.
     static let hitSlop: CGFloat = 8
@@ -67,7 +69,7 @@ struct AdaptiveComposerActionButton: View {
             if midSessionAlternatives.isEmpty {
                 Button(action: perform) {
                     actionContent
-                        .frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
+                        .frame(width: AdaptiveComposerActionPresentation.pillWidth, height: BighelpTokens.hitTarget)
                         .contentShape(.interaction,
                                       Rectangle().inset(by: -AdaptiveComposerActionPresentation.hitSlop))
                         .contentShape(.accessibility, Rectangle())
@@ -76,7 +78,7 @@ struct AdaptiveComposerActionButton: View {
                 .disabled(!isEnabled)
             } else {
                 actionContent
-                    .frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
+                    .frame(width: AdaptiveComposerActionPresentation.pillWidth, height: BighelpTokens.hitTarget)
                     .contentShape(.interaction,
                                   Rectangle().inset(by: -AdaptiveComposerActionPresentation.hitSlop))
                     .contentShape(.accessibility, Rectangle())
@@ -99,7 +101,7 @@ struct AdaptiveComposerActionButton: View {
             }
         }
         .overlay {
-            Circle()
+            Capsule()
                 .trim(from: 0, to: unlockProgress)
                 .stroke(
                     uiV3Enabled
@@ -109,9 +111,8 @@ struct AdaptiveComposerActionButton: View {
                         : theme.actionForeground,
                     style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
                 )
-                .rotationEffect(.degrees(-90))
                 .frame(
-                    width: AdaptiveComposerActionPresentation.diameter + 6,
+                    width: AdaptiveComposerActionPresentation.pillWidth + 6,
                     height: AdaptiveComposerActionPresentation.diameter + 6
                 )
                 .opacity(unlockProgress > 0 ? 1 : 0)
@@ -223,7 +224,7 @@ struct AdaptiveComposerActionButton: View {
                 .opacity(isBusy ? 1 : 0)
         }
         .foregroundStyle(actionForeground)
-        .frame(width: AdaptiveComposerActionPresentation.diameter, height: AdaptiveComposerActionPresentation.diameter)
+        .frame(width: AdaptiveComposerActionPresentation.pillWidth, height: AdaptiveComposerActionPresentation.diameter)
         .animation(reduceMotion ? nil : .snappy(duration: BighelpTokens.stateDuration), value: actionSystemImage)
         .animation(reduceMotion ? nil : .easeInOut(duration: BighelpTokens.stateDuration), value: isBusy)
         content
@@ -234,8 +235,7 @@ struct AdaptiveComposerActionButton: View {
 
     private var actionForeground: Color {
         switch effectiveAction {
-        case .voice: theme.primaryText
-        case .send: theme.actionForeground
+        case .voice, .send: theme.actionForeground
         case .stop: stopIcon
         }
     }
@@ -244,24 +244,15 @@ struct AdaptiveComposerActionButton: View {
     private var stopFill: Color { theme.isDarkPalette ? .white : .black }
     private var stopIcon: Color { theme.isDarkPalette ? .black : .white }
 
-    /// Solid circles for Send (accent) and Stop (ink); the voice shortcut shown while the draft
-    /// is empty is glass in the quiet incoming color.
+    /// A solid pill inside the message box: voice mode (the waveform) while the draft is empty, Send
+    /// (accent) once there's something to send, and Stop (ink) while the agent works.
     @ViewBuilder
     private var actionBackground: some View {
         switch effectiveAction {
-        case .voice:
-            // Glass like the message box beside it; Send and Stop stay solid so they read as actions.
-            Color.clear
-                .composerGlass(Circle(), fill: theme.incomingMessageBackground)
-                .overlay {
-                    if colorSchemeContrast == .increased {
-                        Circle().strokeBorder(theme.primaryText, lineWidth: 1.5)
-                    }
-                }
-        case .send:
-            Circle().fill(theme.action)
+        case .voice, .send:
+            Capsule().fill(theme.action)
         case .stop:
-            Circle().fill(stopFill)
+            Capsule().fill(stopFill)
         }
     }
 
@@ -349,7 +340,7 @@ struct AdaptiveComposerActionButton: View {
 
     private var actionSystemImage: String {
         switch effectiveAction {
-        case .voice: uiV3Enabled ? "mic" : "waveform"
+        case .voice: "waveform"
         case .send: isQueueingAttachments ? "clock.arrow.circlepath" : "arrow.up"
         case .stop: "stop.fill"
         }

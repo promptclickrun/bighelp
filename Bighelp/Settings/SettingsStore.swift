@@ -178,6 +178,11 @@ final class SettingsStore {
         didSet { defaults.set(rightEdgeSwipeAction.rawValue, forKey: Keys.rightEdgeSwipeAction) }
     }
 
+    /// What the edge swipes do. Simple Bot mode hides most places they lead to, so there they're its
+    /// own: from the left, your bots; from the right, this bot's profile.
+    var effectiveLeftEdgeSwipeAction: WorkspaceSwipeAction { simpleBotsEnabled ? .agents : leftEdgeSwipeAction }
+    var effectiveRightEdgeSwipeAction: WorkspaceSwipeAction { simpleBotsEnabled ? .profile : rightEdgeSwipeAction }
+
     var preferredBrowser: ChatBrowserPreference {
         didSet { defaults.set(preferredBrowser.rawValue, forKey: Keys.preferredBrowser) }
     }

@@ -381,6 +381,13 @@ final class DirectHermesNativePluginClient {
             // Read every few seconds while an agent waits on another; small and quick.
             return Route(path: "agents/talk", feature: DirectHermesAgentTalkReader.feature, isMutation: false,
                          maximumResponseBytes: 65_536, timeout: 10)
+        case .chatActivity:
+            // Read every few seconds while a chat is open; tiny.
+            return Route(path: "chat/activity", feature: DirectHermesAgentTalkReader.chatActivityFeature,
+                         isMutation: false, maximumResponseBytes: 4_096, timeout: 10)
+        case .chatStop:
+            return Route(path: "chat/stop", feature: DirectHermesAgentTalkReader.chatActivityFeature,
+                         isMutation: true, maximumResponseBytes: 4_096, timeout: 10)
         case .teamSettings:
             // Turning it on saves each agent's config on the computer.
             return Route(path: "team", feature: DirectHermesTeamworkClient.feature, isMutation: true,

@@ -148,11 +148,26 @@ struct ChatAttachmentPreviewView: View {
     @State private var saveActivity = ChatAttachmentSaveActivity()
     @State private var isExporting = false
     @State private var alert: ChatAttachmentSaveAlert?
+    @State private var markdownMode = ChatAttachmentMarkdownMode.preview
+    @BighelpThemeReader private var theme
 
     var body: some View {
         NavigationStack {
             Group {
-                if saveDestination == .photosVideo, let previewURL {
+                if let markdown = ChatAttachmentMarkdown.text(of: attachment) {
+                    ChatAttachmentMarkdownView(text: markdown, mode: markdownMode)
+                        .safeAreaInset(edge: .top, spacing: 0) {
+                            Picker("Show", selection: $markdownMode) {
+                                ForEach(ChatAttachmentMarkdownMode.allCases) { Text($0.title).tag($0) }
+                            }
+                            .pickerStyle(.segmented)
+                            .bighelpSegmentedPicker()
+                            .padding(.horizontal, BighelpTokens.space16)
+                            .padding(.vertical, BighelpTokens.space8)
+                            .background(theme.canvas)
+                            .accessibilityIdentifier("chat.attachment.markdown.mode")
+                        }
+                } else if saveDestination == .photosVideo, let previewURL {
                     VideoPlayer(player: AVPlayer(url: previewURL))
                         .background(.black)
                 } else if case .unavailable(let error)? = saveDestination {
@@ -336,6 +351,61 @@ private enum ChatAttachmentSaveAlert: String, Identifiable {
     }
 
     var offersSettings: Bool { self == .photosPermission }
+}
+
+enum ChatAttachmentMarkdownMode: String, CaseIterable, Identifiable {
+    case preview, raw
+    var id: String { rawValue }
+    var title: String { self == .preview ? "Preview" : "Raw" }
+}
+
+/// A Markdown file sent in a chat reads rendered; its raw text is a tap away.
+enum ChatAttachmentMarkdown {
+    static let extensions: Set<String> = ["md", "markdown", "mdown", "mkd", "mkdn"]
+    /// Longer files open in the system's plain viewer: rendering a few megabytes would stall.
+    static let maximumBytes = 1_000_000
+
+    static func isMarkdown(fileName: String, mimeType: String) -> Bool {
+        let type = mimeType.lowercased()
+        return type.contains("markdown")
+            || extensions.contains((fileName as NSString).pathExtension.lowercased())
+    }
+
+    static func text(of attachment: ChatAttachment) -> String? {
+        guard isMarkdown(fileName: attachment.fileName, mimeType: attachment.mimeType),
+              attachment.data.count <= maximumBytes else { return nil }
+        return String(data: attachment.data, encoding: .utf8)
+    }
+}
+
+private struct ChatAttachmentMarkdownView: View {
+    let text: String
+    let mode: ChatAttachmentMarkdownMode
+    @BighelpThemeReader private var theme
+
+    var body: some View {
+        ScrollView {
+            Group {
+                switch mode {
+                case .preview:
+                    MarkdownMessageView(document: MarkdownDocument(text), primaryText: theme.primaryText,
+                                        secondaryText: theme.secondaryText, accent: theme.action)
+                        .accessibilityIdentifier("chat.attachment.markdown.rendered")
+                case .raw:
+                    Text(text)
+                        .font(.bighelp(.body).monospaced())
+                        .foregroundStyle(theme.primaryText)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityIdentifier("chat.attachment.markdown.raw")
+                }
+            }
+            .textSelection(.enabled)
+            .padding(BighelpTokens.space16)
+            .frame(maxWidth: 760, alignment: .leading)
+            .frame(maxWidth: .infinity)
+        }
+        .background(theme.canvas.ignoresSafeArea())
+    }
 }
 
 struct ChatAttachmentDocument: FileDocument {

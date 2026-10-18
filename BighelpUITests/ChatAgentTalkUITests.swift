@@ -84,6 +84,29 @@ final class ChatAgentTalkUITests: BighelpUITestCase {
         }
     }
 
+    /// An agent another one asked works in its own Hermes process. Opening its chat then shows it
+    /// typing with Stop, and Stop ends that run.
+    @MainActor
+    func testAChatBusyInAnotherProcessShowsWorkingAndStops() throws {
+        let app = makeApp()
+        // The usual demo chat, idle on this device; another process is running it.
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-start-chat", "-preview-ui-v3",
+                               "-test-other-process-run", "-loopdy.demo.appearance", "dark"]
+        app.launch()
+        let typing = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "Sending."))
+            .firstMatch
+        XCTAssertTrue(typing.waitForExistence(timeout: 15), "The agent shows as working")
+        let stop = app.buttons["chat.stop"]
+        XCTAssertTrue(stop.waitForExistence(timeout: 5))
+        XCTAssertTrue(stop.isEnabled, "Stop reaches the other process")
+        save("agent-talk-other-process-dark", app)
+        stop.tap()
+        let gone = NSPredicate(format: "exists == false")
+        expectation(for: gone, evaluatedWith: typing)
+        waitForExpectations(timeout: 15)
+        XCTAssertFalse(app.buttons["chat.stop"].exists, "Back to an idle chat")
+    }
+
     @MainActor
     private func launch(appearance: String, extra: [String] = []) -> XCUIApplication {
         let app = makeApp()

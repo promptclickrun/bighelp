@@ -170,6 +170,9 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     case peopleSpeaking = "people.speaking"
     /// Other agents' runs a chat started, and what they're doing (plugin, `native-agent-talk-v1`).
     case agentTalkRuns = "agents.talk"
+    /// Whether another Hermes process is running a chat now, and stopping that run (plugin, `native-chat-activity-v1`).
+    case chatActivity = "chat.activity"
+    case chatStop = "chat.stop"
     /// Teamwork: every agent told about the others (plugin, `native-team-v1`).
     case teamSettings = "team.settings"
     /// Composio Connect in Hermes, for Settings › Apps › Composio Apps (plugin `native-composio-v1`).

@@ -14,6 +14,8 @@ final class ChatModel {
     let nativeSessionResumeProgress = NativeSessionResumeProgressPresentation()
     /// What the other agents this chat's agent talks to are doing (`ChatAgentTalkRail`).
     let agentTalkLive = ChatAgentTalkLive()
+    /// Another Hermes process running this chat now (an agent another one asked), from the plugin.
+    var otherProcessRun: ChatOtherProcessRun?
     /// Reads this chat's saved history again from the host (set by the shell; nil in previews and tests).
     @ObservationIgnored var hostHistoryRefresh: (@MainActor () async throws -> Void)?
     @ObservationIgnored var hostRefreshTask: Task<Void, Never>?

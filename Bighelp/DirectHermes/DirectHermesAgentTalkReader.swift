@@ -30,6 +30,29 @@ protocol AgentTalkReading: AnyObject {
     func runs(agentID: String, sessionID: String, calls: [AgentTalkRunQuery]) async -> [AgentTalkRun]?
     /// What `agentID` did in its chat `sessionID`, in plain words ("Searched the web").
     func steps(agentID: String, sessionID: String) async -> [String]?
+    /// Whether another Hermes process is running this chat now: an agent another one asked, working
+    /// in its Bot Chat.
+    func otherProcessRun(agentID: String, sessionID: String) async -> ChatOtherProcessReading
+    /// Stops that run as Ctrl-C would. False when nothing was stopped.
+    func stopOtherProcessRun(agentID: String, sessionID: String) async -> Bool
+}
+
+extension AgentTalkReading {
+    func otherProcessRun(agentID: String, sessionID: String) async -> ChatOtherProcessReading { .unavailable }
+    func stopOtherProcessRun(agentID: String, sessionID: String) async -> Bool { false }
+}
+
+/// A chat another Hermes process is running: the tool it's on, and whether Stop can reach it.
+struct ChatOtherProcessRun: Equatable, Sendable {
+    let toolName: String?
+    let canStop: Bool
+}
+
+enum ChatOtherProcessReading: Equatable, Sendable {
+    /// An older plugin, or no connection.
+    case unavailable
+    case idle
+    case running(ChatOtherProcessRun)
 }
 
 /// The message hash both sides compute: the words with Hermes' "Message from
@@ -55,6 +78,7 @@ enum AgentTalkMessageHash {
 @MainActor
 final class DirectHermesAgentTalkReader: AgentTalkReading {
     static let feature = "native-agent-talk-v1"
+    static let chatActivityFeature = "native-chat-activity-v1"
     static let maximumCalls = 16
     static let maximumRuns = 32
     static let maximumSteps = 12
@@ -63,6 +87,32 @@ final class DirectHermesAgentTalkReader: AgentTalkReading {
 
     init(currentWorkspace: @escaping @MainActor () -> (any WorkspaceOperationPerforming)?) {
         self.currentWorkspace = currentWorkspace
+    }
+
+    func otherProcessRun(agentID: String, sessionID: String) async -> ChatOtherProcessReading {
+        guard let response = await perform(.chatActivity, agentID: agentID, sessionID: sessionID),
+              let working = response["working"]?.boolean else { return .unavailable }
+        guard working else { return .idle }
+        let tool = response["tool"]?.string.flatMap { $0.count <= 64 ? $0 : nil }
+        return .running(ChatOtherProcessRun(toolName: tool, canStop: response["canStop"]?.boolean == true))
+    }
+
+    func stopOtherProcessRun(agentID: String, sessionID: String) async -> Bool {
+        await perform(.chatStop, agentID: agentID, sessionID: sessionID)?["stopped"]?.boolean == true
+    }
+
+    private func perform(_ operation: WorkspaceOperation, agentID: String,
+                         sessionID: String) async -> [String: BighelpJSONValue]? {
+        guard let workspace = currentWorkspace(), let owner = workspace.owner else { return nil }
+        let payload: [String: BighelpJSONValue] = ["agentId": .string(agentID), "sessionId": .string(sessionID)]
+        do {
+            return try await workspace.perform(operation, payload: payload, owner: owner)
+        } catch WorkspaceClientError.conflict {
+            // The plugin's context changed (412): the next call loads it again. Once.
+            return try? await workspace.perform(operation, payload: payload, owner: owner)
+        } catch {
+            return nil
+        }
     }
 
     func runs(agentID: String, sessionID: String, calls: [AgentTalkRunQuery]) async -> [AgentTalkRun]? {

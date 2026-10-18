@@ -217,15 +217,15 @@ struct ChatToolFolderTests {
         #expect(folds.first?.label == "Worked for 2m 14s")
         #expect(folds.first?.stepCount == 2)
         #expect(display.last?.id == "message:\(projection.messages.last!.id)", "The answer stays outside the fold")
-        // Unfolded, its folder says what it did.
+        // Unfolded, it shows its tools: no second "Called 2 tools" folder inside it.
         let store = ChatActivityDisclosureStore()
         store.setCompletedTurnExpanded(true, id: folds[0].id)
         let canvas = ChatCanvasTranscriptProjection.rows(from: display, disclosures: store)
-        let trail = canvas.compactMap { row -> ChatActivityTurn? in
-            guard case .workTrailHeader(let turn, _) = row else { return nil }
-            return turn
-        }.first
-        #expect(trail.map { BighelpActivitySummary.label(for: ChatActivityPresentation.trailPhase(for: $0.events)) }
-                == "Cloned app, ran tests")
+        #expect(!canvas.contains { if case .workTrailHeader = $0 { true } else { false } })
+        let tools = canvas.compactMap { row -> ChatActivityEvent? in
+            guard case .activityDetail(let event) = row else { return nil }
+            return event
+        }
+        #expect(tools.count == 2, "Each step is right there")
     }
 }

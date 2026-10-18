@@ -389,9 +389,11 @@ struct ChatComposer: View {
 
     private var primaryAction: some View {
         AdaptiveComposerActionButton(
-            action: ChatComposerPrimaryAction.resolve(draft: model.draft, isTurnActive: model.isSending, hasAttachments: model.hasDraftAttachmentActivity),
+            action: ChatComposerPrimaryAction.resolve(draft: model.draft,
+                                                      isTurnActive: model.isSending || model.otherProcessRun != nil,
+                                                      hasAttachments: model.hasDraftAttachmentActivity),
             isBusy: model.isStopping || model.hasExclusiveMidSessionSubmission,
-            canSend: model.canSend, canStop: model.canStop,
+            canSend: model.canSend, canStop: model.canStop || (!model.isSending && model.otherProcessRun?.canStop == true),
             onVoice: onVoiceTap, onSend: send, onStop: stop,
             defaultMidSessionBehavior: model.isMidSessionTurnLive ? model.defaultMidSessionBehavior : nil,
             onMidSessionSend: sendMidSession,
@@ -578,6 +580,10 @@ struct ChatComposer: View {
     }
 
     private func stop() {
+        if !model.isSending, model.otherProcessRun != nil {
+            Task { await model.stopOtherProcessRun() }
+            return
+        }
         guard model.canStop else { return }
         Task { await model.stop() }
     }

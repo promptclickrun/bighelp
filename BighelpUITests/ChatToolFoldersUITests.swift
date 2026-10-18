@@ -44,27 +44,21 @@ final class ChatToolFoldersUITests: BighelpUITestCase {
             place(fold, at: 0.3, in: timeline)
             save("tool-folders-turn-folded-\(appearance)", app)
 
-            // Unfolded: the folders and narration as they were.
+            // Unfolded: its steps and narration as they were, with no second folder inside it.
             fold.tap()
             XCTAssertEqual(fold.value as? String, "Expanded")
-            let research = trail(in: app, labelPrefix: "Searched the web, read docs.example.com")
-            XCTAssertTrue(research.waitForExistence(timeout: 5))
-            let work = trail(in: app, labelPrefix: "Cloned weather-app, installed packages, ran tests")
-            XCTAssertTrue(work.exists, "Expected the second folder's summary")
-            XCTAssertTrue(work.label.contains("4 steps"), work.label)
             XCTAssertTrue(app.textViews.matching(NSPredicate(format: "value CONTAINS %@", "Next I'm cloning"))
                 .firstMatch.waitForExistence(timeout: 5))
+            XCTAssertFalse(trail(in: app, labelPrefix: "Searched the web").exists, "No folder inside the opened turn")
+            XCTAssertFalse(trail(in: app, labelPrefix: "Cloned weather-app").exists, "No folder inside the opened turn")
             reveal(fold, in: timeline)
             place(fold, at: 0.2, in: timeline)
             save("tool-folders-turn-unfolded-\(appearance)", app)
 
             // A call's output reads as facts and real lines, not escaped JSON.
-            reveal(work, in: timeline, towardOlder: false)
-            work.tap()
             let tests = app.buttons["chat.activity.folders-t5"]
-            XCTAssertTrue(tests.waitForExistence(timeout: 5))
-            XCTAssertTrue(tests.label.hasPrefix("Ran tests"), tests.label)
             reveal(tests, in: timeline, towardOlder: false)
+            XCTAssertTrue(tests.label.hasPrefix("Ran tests"), tests.label)
             tests.tap()
             XCTAssertEqual(tests.value as? String, "Expanded")
             let exitCode = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Exit code")).firstMatch

@@ -103,3 +103,51 @@ extension ChatModel {
         }
     }
 }
+
+extension ChatModel {
+    /// The watch restarts with the chat, and pauses while this device's own turn runs.
+    var otherProcessFollowKey: String {
+        guard !isBotMode, agentTalkReader != nil, !isSending else { return "" }
+        return conversationID
+    }
+
+    /// An agent another one asked answers in its own Hermes process, which never streams here. While
+    /// the chat is open, the plugin says when another process is running it: the chat shows the agent
+    /// working and offers Stop, and reads what Hermes saved as the run goes and once it ends.
+    func followOtherProcess() async {
+        guard !otherProcessFollowKey.isEmpty, let reader = agentTalkReader else {
+            otherProcessRun = nil
+            return
+        }
+        var reads = 0
+        while !Task.isCancelled {
+            let sessionID = nativeConversationClient?.storedID ?? sourceSession?.remoteStoredID ?? conversationID
+            let reading = await reader.otherProcessRun(agentID: agentID, sessionID: sessionID)
+            guard !Task.isCancelled else { return }
+            switch reading {
+            case .unavailable, .idle:
+                if otherProcessRun != nil {
+                    otherProcessRun = nil
+                    refreshFromHostSoon()
+                }
+                // An older plugin can't say; asking again won't change that.
+                if reading == .unavailable { return }
+            case .running(let run):
+                reads += 1
+                if otherProcessRun == nil || run.toolName != otherProcessRun?.toolName || reads % 3 == 0 {
+                    refreshFromHostSoon()
+                }
+                otherProcessRun = run
+            }
+            try? await Task.sleep(for: .seconds(otherProcessRun == nil ? 10 : 4))
+        }
+    }
+
+    func stopOtherProcessRun() async {
+        guard otherProcessRun?.canStop == true, let reader = agentTalkReader else { return }
+        let sessionID = nativeConversationClient?.storedID ?? sourceSession?.remoteStoredID ?? conversationID
+        guard await reader.stopOtherProcessRun(agentID: agentID, sessionID: sessionID) else { return }
+        otherProcessRun = nil
+        refreshFromHostSoon()
+    }
+}

@@ -408,7 +408,9 @@ struct BighelpAppComposition {
                     agentDisplayName: agent?.name ?? "Assistant",
                     agentAvatarFileName: agent?.avatarFileName
                 )
-                if arguments.contains("-test-agent-talk") { client.agentTalk = DemoAgentTalkReader() }
+                if arguments.contains("-test-agent-talk") || arguments.contains("-test-other-process-run") {
+                    client.agentTalk = DemoAgentTalkReader()
+                }
                 return client
             }
             : { _, _ in unavailable }

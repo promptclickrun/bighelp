@@ -91,6 +91,18 @@ struct ChatCopyTests {
         #expect(ChatPictureClipboard.items(data: Data("text".utf8), mimeType: "text/plain").isEmpty)
     }
 
+    @Test func markdownFilesOpenRenderedAndOthersDont() throws {
+        #expect(ChatAttachmentMarkdown.isMarkdown(fileName: "Kyoto plan.md", mimeType: "application/octet-stream"))
+        #expect(ChatAttachmentMarkdown.isMarkdown(fileName: "notes", mimeType: "text/markdown"))
+        #expect(ChatAttachmentMarkdown.isMarkdown(fileName: "README.MARKDOWN", mimeType: "text/plain"))
+        #expect(!ChatAttachmentMarkdown.isMarkdown(fileName: "report.pdf", mimeType: "application/pdf"))
+        let note = try ChatAttachment(id: "fixture-note", fileName: "plan.md", mimeType: "text/markdown", data: Data("# Hi".utf8))
+        #expect(ChatAttachmentMarkdown.text(of: note) == "# Hi")
+        let huge = try ChatAttachment(id: "fixture-huge", fileName: "log.md", mimeType: "text/markdown",
+                                      data: Data(repeating: 0x61, count: ChatAttachmentMarkdown.maximumBytes + 1))
+        #expect(ChatAttachmentMarkdown.text(of: huge) == nil, "Very long files use the plain viewer")
+    }
+
     @Test func aCardCopiesAsASharpPicture() throws {
         let card = try #require(BighelpCardDemoFixtures.documents.first)
         let png = try #require(ChatCardImage.png(BighelpCardView(card: card), width: 320, scale: 3,

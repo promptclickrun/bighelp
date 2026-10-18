@@ -94,4 +94,19 @@ final class DemoAgentTalkReader: AgentTalkReading {
         guard sessionID == ConversationFixtures.agentTalkTripSession else { return [] }
         return ["Searched the web", "Read flights.example.com", "Ran a command"]
     }
+
+    /// `-test-other-process-run`: the chat is busy in another Hermes process until Stop.
+    private var otherRunStopped = false
+
+    func otherProcessRun(agentID: String, sessionID: String) async -> ChatOtherProcessReading {
+        guard ProcessInfo.processInfo.arguments.contains("-test-other-process-run"), !otherRunStopped else {
+            return .idle
+        }
+        return .running(ChatOtherProcessRun(toolName: "web_search", canStop: true))
+    }
+
+    func stopOtherProcessRun(agentID: String, sessionID: String) async -> Bool {
+        otherRunStopped = true
+        return true
+    }
 }

@@ -362,7 +362,8 @@ extension ChatView {
         #endif
     }
     private var showsPendingMessage: Bool {
-        guard model.isSending else { return false }
+        // Another Hermes process running this chat (an agent another one asked) is working too.
+        guard model.isSending || model.otherProcessRun != nil else { return false }
         // Only the work card at the live tail can replace the waiting status.
         // Scanning the whole ledger lets old running events suppress a new
         // response, even after a newer human/assistant message is on screen.

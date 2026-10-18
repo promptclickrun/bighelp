@@ -50,8 +50,12 @@ change in both repos.
     short Settings (`SimpleBotsSettingsView`), whose All Settings row and Simple Bot mode switch lead back.
     Everything in it uses the same stores and chat; `Bighelp/SimpleBots/` holds its screens. It wins over the
     all-hosts view and Settings › Open on (`fleetModeOn` is off while it's on). Its Multi-gateway switch
-    (`simpleBotsMultiGateway`) lists every gateway's bots from the all-hosts copies (`SimpleBotsGateways`);
-    acting on another gateway's bot goes through `openFleet`, which switches gateway first.
+    (`simpleBotsMultiGateway`) lists every gateway's bots (`SimpleBotsGateways`, one `SimpleBotsBot` model
+    keyed by `FleetID`): the gateway in use live, the others from the all-hosts copies. Pins live on each
+    bot's own gateway; the primary bot is kept on the device (`simpleBotsMultiPrimary`). Acting on another
+    gateway's bot goes through `openFleet`; the home stays on screen while that gateway connects.
+  - While every host's data shows (all-hosts view or Multi-gateway), the other hosts stay connected
+    (`keepsFleetHostsConnected`), through the background grace too, so opening on one is instant.
 - **Real data only.**
   - Avatars, activity poses and badges must come from what the agent is actually doing.
   - Never fake progress.

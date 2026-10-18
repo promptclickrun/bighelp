@@ -363,6 +363,8 @@ struct RootShellView: View {
                 HostSetupView(registry: registry, allowsDismiss: false)
             } else if nativeWorkspaceStore != nil {
                 if nativeRuntime != nil { workspace }
+                // Multi-gateway: the bots stay on screen while the tapped one's gateway connects.
+                else if simpleBotsMultiGatewayOn, let pending = fleet?.pendingOpen { simpleBotsSwitching(to: pending.hostID) }
                 else if fleetModeOn, let fleet {
                     FleetConnectingView(
                         fleet: fleet, hostFilter: fleetFocusBinding, onOpen: openFleetAgent,

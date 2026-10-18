@@ -117,41 +117,45 @@ struct SimpleBotsTests {
         #expect(SimpleBotMarkStore(defaults: defaults).mark(scope: "computer:a", agentID: "nova") == nil)
     }
 
-    /// Multi-gateway: the other gateways' bots join the list, by their latest chat, each keeping one ID
-    /// whichever gateway is selected, so a dragged order survives a switch.
-    @Test func multiGatewayListsEveryGatewaysBots() {
+    /// Multi-gateway: every gateway's bots in one home. Pins come from any gateway (five beside the
+    /// primary bot at most), each bot keeps one ID whichever gateway is in use, and the rest list by
+    /// their latest chat.
+    @Test func multiGatewayPinsAndListsBotsFromEveryGateway() {
         let home = UUID(uuidString: "0D0D0D0D-0000-4000-8000-000000000001")!
         let studio = UUID(uuidString: "0D0D0D0D-0000-4000-8000-000000000002")!
-        func bot(_ id: String, isDefault: Bool = false) -> AgentProfile {
-            AgentProfile(id: id, name: id.capitalized, role: "", summary: "", instructions: "", avatarFileName: nil,
-                         isDefault: isDefault)
+        func bot(_ id: String, on host: UUID, isDefault: Bool = false, hidden: Bool = false) -> SimpleBotsBot {
+            SimpleBotsBot(id: FleetID.make(host, id), profileID: id, hostID: host, name: id.capitalized, role: "Helper",
+                          isDefault: isDefault, isHidden: hidden)
         }
-        func gatewayBot(_ id: String, hidden: Bool = false, at seconds: TimeInterval?) -> SimpleBotsGatewayBot {
-            SimpleBotsGatewayBot(
-                agent: FleetAgent(hostID: studio, profileID: id, name: id.capitalized, role: "", avatarFile: nil,
-                                  isPinned: false, isDefault: false,
-                                  placement: hidden ? AgentListPlacement(isHidden: true) : nil),
-                gatewayName: "Studio Mac", imageURL: nil, preview: seconds.map { _ in "Hi from \(id)" },
-                date: seconds.map { Date(timeIntervalSince1970: $0) })
-        }
-        let profiles = [bot("default", isDefault: true), bot("nova")]
-        let summaries = [SessionSummary(id: "nova", kind: .direct, agentIDs: ["nova"], title: "nova", preview: "Nova",
-                                        updatedAt: Date(timeIntervalSince1970: 20))]
-        let others = [gatewayBot("rio", at: 30), gatewayBot("sage", at: nil), gatewayBot("ghost", hidden: true, at: 99)]
+        func id(_ profile: String, _ host: UUID) -> String { FleetID.make(host, profile) }
+        let bots = [bot("default", on: home, isDefault: true), bot("nova", on: home), bot("rio", on: studio),
+                    bot("sage", on: studio), bot("ghost", on: studio, hidden: true)]
+        let latest = [id("nova", home): SimpleBotsLatest(preview: "Nova", date: Date(timeIntervalSince1970: 20)),
+                      id("sage", studio): SimpleBotsLatest(preview: "Sage", date: Date(timeIntervalSince1970: 30))]
 
-        let off = SimpleBotsHomeProjection.home(profiles: profiles, primaryID: nil, pinnedIDs: [], summaries: summaries)
-        #expect(off.rows.map(\.id) == ["bot:nova"])
+        let shown = SimpleBotsHomeProjection.home(bots: bots, primaryID: id("default", home),
+                                                  pinnedIDs: [id("rio", studio)], latest: latest, groups: [])
+        #expect(shown.top.map(\.id) == [id("default", home), id("rio", studio)], "A pin from another gateway sits on top")
+        #expect(shown.rows.map(\.id) == ["bot:" + id("sage", studio), "bot:" + id("nova", home)])
+        #expect(shown.rows.first.flatMap { item -> String? in
+            if case .bot(let bot) = item.kind { return bot.role } else { return nil } } == "Helper",
+            "A bot shows its role, as with one gateway")
 
-        let on = SimpleBotsHomeProjection.home(profiles: profiles, primaryID: nil, pinnedIDs: [], summaries: summaries,
-                                               gateways: (home, others))
-        #expect(on.primary?.id == "default")
-        #expect(on.rows.map(\.id) == ["bot:\(studio.uuidString)/rio", "bot:\(home.uuidString)/nova",
-                                      "bot:\(studio.uuidString)/sage"])
-        let dragged = SimpleBotsHomeProjection.home(
-            profiles: profiles, primaryID: nil, pinnedIDs: [], summaries: summaries,
-            order: ["bot:\(studio.uuidString)/sage", "bot:\(home.uuidString)/nova"], gateways: (home, others))
-        #expect(dragged.rows.map(\.id) == ["bot:\(studio.uuidString)/rio", "bot:\(studio.uuidString)/sage",
-                                           "bot:\(home.uuidString)/nova"], "Not placed yet first, then the order")
+        // The primary bot can be on any gateway, and stays when another one is in use.
+        let studioPrimary = SimpleBotsHomeProjection.home(bots: bots, primaryID: id("sage", studio), pinnedIDs: [],
+                                                          latest: latest, groups: [])
+        #expect(studioPrimary.primary?.id == id("sage", studio))
+        #expect(SimpleBotsHomeProjection.canPin(id("nova", home), bots: bots, primaryID: id("sage", studio),
+                                                pinnedIDs: [id("rio", studio)]))
+        #expect(!SimpleBotsHomeProjection.canPin(id("ghost", studio), bots: bots, primaryID: nil, pinnedIDs: []),
+                "Hidden bots can't be pinned")
+
+        // Filter by Gateway: only that gateway's bots.
+        let studioOnly = SimpleBotsHomeProjection.home(bots: bots.filter { $0.hostID == studio },
+                                                       primaryID: id("default", home), pinnedIDs: [id("rio", studio)],
+                                                       latest: latest, groups: [])
+        #expect(studioOnly.top.map(\.id) == [id("rio", studio)], "The primary bot is on another gateway")
+        #expect(studioOnly.rows.map(\.id) == ["bot:" + id("sage", studio)])
     }
 
     @Test func homeLeadsWithThePrimaryBotThenPinnedThenLatest() {
@@ -180,7 +184,7 @@ struct SimpleBotsTests {
         let picked = SimpleBotsHomeProjection.home(profiles: profiles, primaryID: "sage", pinnedIDs: [],
                                                    summaries: summaries)
         #expect(picked.primary?.id == "sage")
-        #expect(picked.primaryPreview?.id == "sage")
+        #expect(picked.primaryPreview == "From sage")
         #expect(picked.rows.first?.id == "bot:nova")
     }
 

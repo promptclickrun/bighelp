@@ -623,8 +623,10 @@ struct BighelpApp: App {
                     (native?.features ?? featureStore).flushChatPersistence()
                     // Keep the workspace through a quick trip away; mark the
                     // presentation boundary only if the app stays away.
-                    BighelpBackgroundGrace.shared.begin("workspace") { [nativeWorkspaces] in
+                    BighelpBackgroundGrace.shared.begin("workspace") { [nativeWorkspaces, hostRegistry] in
                         nativeWorkspaces.suspend()
+                        // Other gateways kept connected for the all-hosts view or Multi-gateway close too.
+                        hostRegistry.keepsOtherHostsConnected = false
                     }
                 }
                 if phase == .active { BighelpBackgroundGrace.shared.cancel() }

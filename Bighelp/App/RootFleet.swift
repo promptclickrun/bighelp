@@ -376,10 +376,10 @@ extension RootShellView {
         return sessionCatalog.hasLoadedState
     }
 
-    /// Other hosts stay connected while the all-hosts view is on and the app
-    /// is open; in the background only the selected host's connection stays,
-    /// as before.
-    var keepsFleetHostsConnected: Bool { showsEveryHost && scenePhase != .background && hostRegistry != nil }
+    /// Other hosts stay connected while every host's data is on screen, so opening an agent on one
+    /// doesn't connect first. In the background they close with the selected host's connection, once
+    /// the app has been away a while (`BighelpBackgroundGrace`), and connect again when it's back.
+    var keepsFleetHostsConnected: Bool { showsEveryHost && hostRegistry != nil }
 
     func setKeepsFleetHostsConnected(_ keep: Bool) {
         hostRegistry?.keepsOtherHostsConnected = keep
@@ -636,7 +636,11 @@ struct FleetHooks: ViewModifier {
             .onChange(of: liveKey, initial: true) { _, _ in recordLive() }
             .onChange(of: readiness, initial: true) { _, _ in openPending() }
             .onChange(of: hostsKey, initial: true) { _, _ in syncHosts() }
-            .onChange(of: scenePhase) { _, phase in if phase != .active { cancelReads() } }
+            .onChange(of: scenePhase) { _, phase in
+                if phase != .active { cancelReads() }
+                // Back from the background: connect the other hosts again (and read the stale ones).
+                if phase == .active, keepsConnected { setKeepsConnected(true) }
+            }
             .onChange(of: keepsConnected, initial: true) { _, keep in setKeepsConnected(keep) }
     }
 }

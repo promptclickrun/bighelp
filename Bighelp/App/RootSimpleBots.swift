@@ -15,6 +15,25 @@ extension RootShellView {
         SimpleBotsHomeView(context: simpleBotsContext)
     }
 
+    /// Multi-gateway while the gateway of a tapped bot connects: the home, from every gateway's copy,
+    /// with a line saying so. What was tapped opens once it's connected (`openPendingFleetIfReady`).
+    func simpleBotsSwitching(to hostID: UUID) -> some View {
+        simpleBotsHome
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                HStack(spacing: BighelpTokens.space8) {
+                    ProgressView()
+                    Text("Connecting to \(fleet?.hostName(hostID) ?? "your gateway")…")
+                        .font(.bighelp(.subheadline))
+                }
+                .padding(.horizontal, BighelpTokens.space16)
+                .frame(minHeight: 40)
+                .background(.regularMaterial, in: Capsule())
+                .padding(.bottom, BighelpTokens.space8)
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("simple-bots.connecting")
+            }
+    }
+
     private var simpleBotsContext: SimpleBotsContext {
         let owner = currentWorkspaceOwner
         let capabilities = currentWorkspaceCapabilities
@@ -45,28 +64,68 @@ extension RootShellView {
         )
     }
 
-    /// Multi-gateway: the other gateways' bots from the all-hosts copy of each, each with its latest chat.
+    /// Multi-gateway: every gateway's bots. The one in use is live, or its all-hosts copy until its agents
+    /// are known (the home stays on screen while it connects); the others come from their copies, which
+    /// stay current because those gateways stay connected (`keepsFleetHostsConnected`).
     private var simpleBotsGateways: SimpleBotsGateways? {
-        guard simpleBotsMultiGatewayOn, let fleet, let selected = fleet.selectedHostID else { return nil }
-        let others = fleet.hosts.filter { $0.id != selected }.flatMap { host in
-            fleet.agents(on: host.id).filter { !$0.isHidden }.map { agent in
-                let chat = fleet.latestChat(for: agent)
-                return SimpleBotsGatewayBot(agent: agent, gatewayName: host.name,
-                                            imageURL: fleet.avatars.url(for: agent.avatarFile),
-                                            preview: chat?.preview, date: chat?.updatedAt)
+        guard simpleBotsMultiGatewayOn, let fleet else { return nil }
+        let selected = fleet.selectedHostID
+        let liveKnown = nativeRuntime != nil && agents.knowsProfiles
+        var bots: [SimpleBotsBot] = [], latest: [String: SimpleBotsLatest] = [:], pinned: [String] = []
+        for host in fleet.hosts {
+            if host.id == selected, liveKnown {
+                let live = agents.profiles.map { SimpleBotsBot($0, hostID: host.id, imageURL: agents.avatarURL(for: $0)) }
+                bots += live
+                latest.merge(SimpleBotsHomeProjection.latestChats(
+                    sessionCatalog.recentSummaries(includeCronSessions: false), bots: live.map { ($0.id, $0.profileID) }
+                )) { _, new in new }
+                pinned += agents.pinnedAgentIDs.map { FleetID.make(host.id, $0) }
+            } else {
+                for agent in fleet.agents(on: host.id) {
+                    bots.append(SimpleBotsBot(agent, imageURL: fleet.avatars.url(for: agent.avatarFile)))
+                    if let chat = fleet.latestChat(for: agent) {
+                        latest[agent.id] = SimpleBotsLatest(preview: chat.preview, date: chat.updatedAt)
+                    }
+                    if agent.isPinned { pinned.append(agent.id) }
+                }
             }
         }
+        let shown = bots.filter { !$0.isHidden }
+        // The one picked on this device; else the gateway in use's primary bot, then its default one.
+        let inUse = selected.flatMap { host in
+            (agents.primaryAgentID ?? agents.profiles.first(where: \.isDefault)?.id).map { FleetID.make(host, $0) }
+        }
+        let primaryID = [settings.simpleBotsMultiPrimary, inUse].compactMap { $0 }
+            .first { id in shown.contains { $0.id == id } }
+            ?? shown.first { $0.hostID == selected && $0.isDefault }?.id ?? shown.first(where: \.isDefault)?.id
         return SimpleBotsGateways(
-            selectedHostID: selected, selectedName: fleet.hostName(selected), otherBots: others,
+            selectedHostID: selected, bots: bots, latest: latest, pinnedIDs: pinned, primaryID: primaryID,
+            filter: settings.simpleBotsGatewayFilter ? fleet.hosts : nil,
             open: { open, hostID in openFleet(open, on: hostID) },
-            hide: { agent in
+            setPinned: { bot, pin in
+                if bot.profile != nil, bot.hostID == fleet.selectedHostID {
+                    _ = pin ? agents.pinAgent(bot.profileID, limit: .max, counting: 0) : agents.unpinAgent(bot.profileID)
+                } else if let agent = bot.fleetAgent {
+                    fleet.setPinned(agent, pin)
+                }
+            },
+            setPrimary: { bot in
+                settings.simpleBotsMultiPrimary = bot.id
+                if bot.profile != nil { _ = agents.setPrimaryAgent(bot.profileID) }
+            },
+            hide: { bot in
+                guard let agent = bot.fleetAgent else { return }
                 Task { @MainActor in
                     do { try await fleet.setHidden(agent, true) } catch {
                         actionErrorMessage = "\(agent.name) couldn't be hidden. Try again."
                     }
                 }
             },
-            refresh: { fleet.refresh() })
+            refresh: {
+                // Keep the primary bot put from now on, whichever gateway comes into use.
+                if settings.simpleBotsMultiPrimary == nil, let primaryID { settings.simpleBotsMultiPrimary = primaryID }
+                fleet.refresh()
+            })
     }
 
     /// The edge swipes in Simple Bot mode (`effectiveLeftEdgeSwipeAction`): from the left back to your

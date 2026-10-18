@@ -99,14 +99,18 @@ Settings in Simple Bot mode is short. It has:
 - Time zone
 - Bot Computer
 - Notifications and Appearance
-- Multi-gateway, and Active gateway when Multi-gateway is off
+- Multi-gateway, with Filter by Gateway, and Active gateway when Multi-gateway is off
 - The Simple Bot mode switch and All Settings
 
 **Multi-gateway** shows the bots of all your gateways on the home screen:
 
-- On: the list shows the bots of each gateway, with the name of the gateway. Select a bot to open its chat.
-  The app connects to the gateway of that bot first. The menu of the bot has Bot Profile, New Chat, Routines
-  and Hide.
+- On: the home screen shows the bots of all your gateways. Each bot shows its role. Select a bot to open its
+  chat. You can pin bots from all gateways, and your primary bot can be on any gateway.
+- The app keeps all your gateways connected while you use Multi-gateway, so a chat opens without a wait.
+  When you return to the app, the gateways connect again. While a gateway connects, your bots stay on the
+  screen and a line shows that the gateway connects.
+- **Filter by Gateway** (on or off): when it is on, a filter button shows next to Search. Select a gateway
+  to see only its bots, or select **All Gateways**.
 - Off: the home screen shows the bots of one gateway. Select **Active gateway** to change the gateway.
 
 When Simple Bot mode is on, the app always opens on your bots. The **Open on** setting has no effect.
@@ -205,6 +209,8 @@ To add the widget:
 - In the plugin: the names of agents show correctly on Hermes 0.22 and later, and plugin updates work there.
 - In Simple Bot mode, a message from your primary bot stays in the chat while other agents work. Before, some
   messages went away until you refreshed the chat.
+- In the all-agents view, the other computers stay connected for a short time when you leave the app. When
+  you return, they connect again at once.
 - Widgets keep their content when you open or close the app, when you change the gateway, and when a
   Shortcut or your Apple Watch uses bighelp. Before, some widgets went empty, for example the Bots widget
   showed "Add bots in bighelp".

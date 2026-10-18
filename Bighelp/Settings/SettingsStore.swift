@@ -264,6 +264,17 @@ final class SettingsStore {
         didSet { defaults.set(simpleBotsMultiGateway, forKey: Keys.simpleBotsMultiGateway) }
     }
 
+    /// Multi-gateway's Filter by Gateway: a filter button on the home that shows one gateway's bots.
+    var simpleBotsGatewayFilter: Bool {
+        didSet { defaults.set(simpleBotsGatewayFilter, forKey: Keys.simpleBotsGatewayFilter) }
+    }
+
+    /// Multi-gateway's primary bot (gateway and bot, `FleetID`), kept on this device so it stays put
+    /// whichever gateway is in use.
+    var simpleBotsMultiPrimary: String? {
+        didSet { defaults.set(simpleBotsMultiPrimary, forKey: Keys.simpleBotsMultiPrimary) }
+    }
+
     var simpleBotsEnabled: Bool {
         didSet { defaults.set(simpleBotsEnabled, forKey: Keys.simpleBots) }
     }
@@ -427,6 +438,8 @@ final class SettingsStore {
         codeModeEnabled = codeMode
         simpleBotsEnabled = defaults.bool(forKey: Keys.simpleBots, default: false)
         simpleBotsMultiGateway = defaults.bool(forKey: Keys.simpleBotsMultiGateway, default: false)
+        simpleBotsGatewayFilter = defaults.bool(forKey: Keys.simpleBotsGatewayFilter, default: false)
+        simpleBotsMultiPrimary = defaults.string(forKey: Keys.simpleBotsMultiPrimary)
         startExperience = start
         experience = codeMode ? start : .bighelp
         let landing = defaults.string(forKey: BighelpLanding.screenKey).flatMap(BighelpLandingScreen.init(rawValue:))
@@ -736,6 +749,8 @@ private extension SettingsStore {
         static let startExperience = "bighelp.settings.code-mode.open-in"
         static let simpleBots = "bighelp.settings.simple-bots"
         static let simpleBotsMultiGateway = "bighelp.simple-bots.multi-gateway"
+        static let simpleBotsGatewayFilter = "bighelp.simple-bots.gateway-filter"
+        static let simpleBotsMultiPrimary = "bighelp.simple-bots.multi-gateway.primary"
         static let sessionSectionPreferences = "loopdy.sessions.section-preferences.v1"
     }
 }

@@ -402,7 +402,17 @@ struct SimpleBotsSettingsView: View {
             .padding(.horizontal, BighelpTokens.space20)
             .padding(.vertical, BighelpTokens.space12)
             .accessibilityIdentifier("simple-bots.settings.multi-gateway")
-            if !context.settings.simpleBotsMultiGateway, !context.gateways.hosts.isEmpty {
+            if context.settings.simpleBotsMultiGateway {
+                SimpleBotsDivider()
+                Toggle(isOn: Binding(get: { context.settings.simpleBotsGatewayFilter },
+                                     set: { context.settings.simpleBotsGatewayFilter = $0 })) {
+                    rowText("Filter by Gateway", detail: "Adds a filter button beside Search, to show one gateway's bots.")
+                }
+                .tint(SimpleBotColor.green.color)
+                .padding(.horizontal, BighelpTokens.space20)
+                .padding(.vertical, BighelpTokens.space12)
+                .accessibilityIdentifier("simple-bots.settings.gateway-filter")
+            } else if !context.gateways.hosts.isEmpty {
                 SimpleBotsDivider()
                 Menu {
                     ForEach(context.gateways.hosts) { host in

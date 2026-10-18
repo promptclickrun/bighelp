@@ -196,6 +196,29 @@ struct BighelpApp: App {
                 registry: hostRegistry, fleet: fleet, liveAgents: { nativeWorkspaces.current?.agents.profiles ?? [] })
         }
         AppDependencyManager.shared.add(dependency: composition.shortcutService)
+        #if os(iOS) && !targetEnvironment(macCatalyst)
+        if !usesDemoWorkspace {
+            let shortcuts = composition.shortcutService
+            let widgetFleet = fleet
+            BighelpWidgetBackgroundRefresh.register {
+                // Connects (or reconnects) to the computer in use, as a Shortcut does.
+                guard (try? await shortcuts.connectedWorkspace()) != nil,
+                      let runtime = nativeWorkspaces.current else { return }
+                // The Bots and Pinned Agents widgets follow this computer's agents with no screen up.
+                BighelpPinnedAgentsWidgetFeed.shared.attach(agents: runtime.agents, fleet: widgetFleet)
+                BighelpBotsWidgetFeed.shared.attach(agents: runtime.agents, fleet: widgetFleet)
+                await BighelpPinnedAgentsWidgetFeed.shared.refreshOtherComputers()
+                // Chats and tasks load right after the agents; then the widgets get them at once.
+                for _ in 0..<20 where !runtime.sessions.hasLoadedState && !Task.isCancelled {
+                    try? await Task.sleep(for: .milliseconds(250))
+                }
+                try? await Task.sleep(for: .seconds(2))
+                runtime.publishWidgetsNow()
+                // The feeds write half a second after a change.
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
+        #endif
         let notificationComposition = BighelpManagedNotificationComposition(
             factory: composition.managedNotificationFactory,
             registry: hostRegistry
@@ -594,6 +617,9 @@ struct BighelpApp: App {
                 }
                 #endif
                 if !usesDemoFixtures, phase == .background {
+                    #if os(iOS) && !targetEnvironment(macCatalyst)
+                    BighelpWidgetBackgroundRefresh.scheduleIfWidgets()
+                    #endif
                     (native?.features ?? featureStore).flushChatPersistence()
                     // Keep the workspace through a quick trip away; mark the
                     // presentation boundary only if the app stays away.

@@ -32,12 +32,14 @@ extension RootShellView {
     /// Reconnecting to the same computer keeps the board and the menu row;
     /// only a clear answer from the host changes the row (`KanbanAvailability`).
     func configureKanban(_ key: AgentBoardClientKey) async {
+        let hadHost = kanbanAvailability.host != nil
         let isNewHost = kanbanAvailability.use(host: key.owner?.cacheScopeID)
         if isNewHost {
-            // Another computer: nothing from the old one stays.
+            // Another computer: nothing from the old one stays. The first computer after a launch
+            // keeps the widget's boards until it answers, so they don't blank on every open.
             kanbanModel?.setOnScreen(false)
             kanbanModel = nil
-            if !key.fixtures { KanbanWidgetPublisher.clear() }
+            if !key.fixtures, hadHost { KanbanWidgetPublisher.clear() }
         }
         guard key.owner != nil, let service = makeKanbanService() else { return }
         // A board that showed before the computer answered gets its data now.

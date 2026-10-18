@@ -99,7 +99,17 @@ Settings in Simple Bot mode is short. It has:
 - Time zone
 - Bot Computer
 - Notifications and Appearance
+- Multi-gateway, and Active gateway when Multi-gateway is off
 - The Simple Bot mode switch and All Settings
+
+**Multi-gateway** shows the bots of all your gateways on the home screen:
+
+- On: the list shows the bots of each gateway, with the name of the gateway. Select a bot to open its chat.
+  The app connects to the gateway of that bot first. The menu of the bot has Bot Profile, New Chat, Routines
+  and Hide.
+- Off: the home screen shows the bots of one gateway. Select **Active gateway** to change the gateway.
+
+When Simple Bot mode is on, the app always opens on your bots. The **Open on** setting has no effect.
 
 **Auto-review** changes the approvals setting of Hermes for your primary bot:
 
@@ -160,6 +170,9 @@ The Bots widget shows bots on your Home Screen. Select a bot to open its chat.
 - The small widget shows 1 bot. The medium widget shows 2 bots. The large widget shows 4 bots.
 - You select the gateway and the bots.
 - The widget keeps your bots when you close the app. Select a bot to open bighelp at the chat of that bot.
+- When a widget is on your Home Screen, iOS lets bighelp get new data from your computer from time to time,
+  also when the app does not run. iOS decides when. To allow this, keep **Background App Refresh** on for bighelp
+  in the Settings app of your iPhone.
 
 To add the widget:
 
@@ -192,5 +205,8 @@ To add the widget:
 - In the plugin: the names of agents show correctly on Hermes 0.22 and later, and plugin updates work there.
 - In Simple Bot mode, a message from your primary bot stays in the chat while other agents work. Before, some
   messages went away until you refreshed the chat.
+- Widgets keep their content when you open or close the app, when you change the gateway, and when a
+  Shortcut or your Apple Watch uses bighelp. Before, some widgets went empty, for example the Bots widget
+  showed "Add bots in bighelp".
 - The Send button stays on while the chat gets new messages from your computer. Before, it was gray for a short
   time each time the chat checked for new messages.

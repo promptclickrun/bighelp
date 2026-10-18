@@ -25,18 +25,17 @@ final class BighelpWidgetBoardLoader {
     /// to the same one keeps them until the next refresh.
     func configure(client: (any AgentBoardClient)?, scope: String?) {
         guard client !== self.client else { return }
-        let sameComputer = client != nil && scope != nil && scope == self.scope
+        // Another computer than before in this run; the first one after a launch keeps the widget's boards.
+        let switched = scope != nil && self.scope != nil && scope != self.scope
         self.client = client
-        self.scope = scope
+        if scope != nil { self.scope = scope }
         generation &+= 1
-        if !sameComputer, !extras.agentBoards.isEmpty { extras.agentBoards = [:] }
+        if switched, !extras.agentBoards.isEmpty { extras.agentBoards = [:] }
     }
 
     func refresh(homeAgentID: String?, knownAgentIDs: Set<String>) async {
-        guard let client else {
-            if !extras.agentBoards.isEmpty { extras.agentBoards = [:] }
-            return
-        }
+        // No connection yet (or closed in the background): the widgets keep the boards they show.
+        guard let client else { return }
         let generation = generation
         var wanted: [String] = []
         for id in await pickedAgentIDs() where id != homeAgentID && knownAgentIDs.contains(id) && !wanted.contains(id) {
@@ -54,6 +53,7 @@ final class BighelpWidgetBoardLoader {
         }
         guard generation == self.generation, !Task.isCancelled else { return }
         if boards != extras.agentBoards { extras.agentBoards = boards }
+        extras.markFilled(.boards)
     }
 
     /// The agents Feed, Ideas and Goals widgets on this device are set to (not Auto).

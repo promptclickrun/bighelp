@@ -58,6 +58,9 @@ final class AgentDirectoryStore {
     var isInitialLoadPending: Bool {
         !hasLoaded && profiles.isEmpty && errorMessage == nil
     }
+    /// Its agents are known: read from the host, or kept on this device from before. A store that
+    /// knows nothing yet (a launch before the computer answers) mustn't empty the widgets.
+    var knowsProfiles: Bool { hasLoaded || !profiles.isEmpty }
     var avatarDirectory: URL? { avatarDirectoryProvider() }
 
     private let client: any AgentDirectoryClient

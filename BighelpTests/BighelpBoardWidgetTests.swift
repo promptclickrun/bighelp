@@ -88,10 +88,14 @@ struct BighelpBoardWidgetTests {
         #expect(client.requested.isEmpty)
         #expect(extras.agentBoards.isEmpty)
 
-        // Signing out or switching computers drops every board.
+        // A connection that closes (every trip to the background) keeps the boards the widgets show;
+        // switching computers drops every board.
         picked = [Self.rex]
         await loader.refresh(homeAgentID: Self.juno, knownAgentIDs: known)
         loader.configure(client: nil, scope: nil)
+        await loader.refresh(homeAgentID: Self.juno, knownAgentIDs: known)
+        #expect(extras.agentBoards[Self.rex] != nil)
+        loader.configure(client: client, scope: "office")
         #expect(extras.agentBoards.isEmpty)
     }
 

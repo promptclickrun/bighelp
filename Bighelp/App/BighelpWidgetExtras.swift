@@ -10,23 +10,36 @@ import Observation
 final class BighelpWidgetExtras {
     static let shared = BighelpWidgetExtras()
 
-    var feed: [BighelpWidgetSnapshot.BoardItem] = []
-    var ideas: [BighelpWidgetSnapshot.BoardItem] = []
-    var goals: [BighelpWidgetSnapshot.BoardItem] = []
+    var feed: [BighelpWidgetSnapshot.BoardItem] = [] { didSet { markFilled(.board) } }
+    var ideas: [BighelpWidgetSnapshot.BoardItem] = [] { didSet { markFilled(.board) } }
+    var goals: [BighelpWidgetSnapshot.BoardItem] = [] { didSet { markFilled(.board) } }
     /// Boards of other agents that Feed, Ideas or Goals widgets are set to, by agent.
-    var agentBoards: [String: BighelpWidgetSnapshot.AgentBoard] = [:]
-    var lightPalette: BighelpWidgetSnapshot.Palette?
-    var darkPalette: BighelpWidgetSnapshot.Palette?
+    var agentBoards: [String: BighelpWidgetSnapshot.AgentBoard] = [:] { didSet { markFilled(.boards) } }
+    var lightPalette: BighelpWidgetSnapshot.Palette? { didSet { markFilled(.palettes) } }
+    var darkPalette: BighelpWidgetSnapshot.Palette? { didSet { markFilled(.palettes) } }
     /// Pinned agents of the computer in use, and of every computer
     /// (`BighelpPinnedAgentsWidgetFeed`).
-    var pinnedAgents: [BighelpWidgetSnapshot.PinnedAgent] = []
-    var allPinnedAgents: [BighelpWidgetSnapshot.PinnedAgent] = []
+    var pinnedAgents: [BighelpWidgetSnapshot.PinnedAgent] = [] { didSet { markFilled(.pins) } }
+    var allPinnedAgents: [BighelpWidgetSnapshot.PinnedAgent] = [] { didSet { markFilled(.pins) } }
+
+    /// The parts this run has filled in. A run with no screens (bighelp woken in the background for a
+    /// Shortcut, the Watch or a widget refresh) fills few or none, and the widgets keep the rest from
+    /// their saved copy instead of losing them.
+    enum Part: Hashable { case board, boards, palettes, pins }
+    private(set) var filled: Set<Part> = []
+
+    func markFilled(_ part: Part) {
+        if !filled.contains(part) { filled.insert(part) }
+    }
 
     func update(board: AgentBoardStore) {
+        // A board not read yet says nothing about the agent's posts.
+        guard board.state == .loaded || !board.items.isEmpty else { return }
         let board = Self.board(agentID: board.agentID ?? "", items: board.items)
         if board.feed != feed { feed = board.feed }
         if board.ideas != ideas { ideas = board.ideas }
         if board.goals != goals { goals = board.goals }
+        markFilled(.board)
     }
 
     /// The newest few of each section, small enough for the widget file.
@@ -74,6 +87,7 @@ final class BighelpWidgetExtras {
         let light = palette(.light), dark = palette(.dark)
         if light != lightPalette { lightPalette = light }
         if dark != darkPalette { darkPalette = dark }
+        markFilled(.palettes)
     }
 
     private static func clip(_ value: String, _ limit: Int) -> String {

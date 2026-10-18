@@ -18,21 +18,25 @@ final class BighelpWidgetSnapshotPublisher {
     private var retired = false
     private let interval: Duration
     private let write: (BighelpWidgetSnapshot) -> Void
+    /// This gateway's saved copy: what the widgets keep of anything this run doesn't know yet.
+    private let saved: BighelpWidgetSnapshot?
 
     init(sessions: SessionCatalogStore, scheduledTasks: ScheduledTasksStore?, agents: AgentDirectoryStore,
          hostID: String? = nil, extras: BighelpWidgetExtras = .shared, interval: Duration = .seconds(2),
+         saved: BighelpWidgetSnapshot? = nil,
          write: @escaping (BighelpWidgetSnapshot) -> Void = BighelpWidgetSnapshotPublisher.persist) {
         self.sessions = sessions; self.scheduledTasks = scheduledTasks; self.agents = agents; self.extras = extras
         self.hostID = hostID; self.interval = interval; self.write = write
+        self.saved = saved.flatMap { $0.hostID == hostID ? $0 : nil }
         observe()
     }
 
-    func retire() {
+    /// `next`: the gateway that took over. Widgets that follow the gateway in use show its copy from
+    /// its last visit at once, not nothing until it loads. A signed-out host leaves nothing (nil).
+    func retire(next: BighelpWidgetSnapshot? = nil) {
         retired = true
         pending?.cancel(); pending = nil
-        // A signed-out or switched host must not leave its chats on widgets that follow
-        // the gateway in use. Widgets set to it keep its own copy until it's removed.
-        write(.empty)
+        write(next ?? .empty)
     }
 
     private func observe() {
@@ -55,7 +59,9 @@ final class BighelpWidgetSnapshotPublisher {
     }
 
     func publishNow() {
-        guard !retired else { return }
+        // Until the gateway's agents are known (a launch, or bighelp woken in the background, before
+        // the computer answers), the widgets keep what they show.
+        guard !retired, agents?.knowsProfiles == true else { return }
         var snapshot = makeSnapshot()
         if var previous = lastPublished {
             previous.generatedAt = snapshot.generatedAt
@@ -96,7 +102,7 @@ final class BighelpWidgetSnapshotPublisher {
         let agentRows = profiles.prefix(50).map { BighelpWidgetSnapshot.Agent(id: $0.id, name: Self.clip($0.name, 40) ?? "Agent") }
         let boards = extras.agentBoards.values.filter { names[$0.agentID] != nil }.sorted { $0.agentID < $1.agentID }
         let limit = BighelpWidgetSnapshot.maximumPinnedAgents
-        return BighelpWidgetSnapshot(defaultAgentID: defaultAgent?.id, defaultAgentName: defaultAgent?.name,
+        var snapshot = BighelpWidgetSnapshot(defaultAgentID: defaultAgent?.id, defaultAgentName: defaultAgent?.name,
                                     sessions: Array(sessionRows), tasks: Array(taskRows), generatedAt: .now,
                                     feed: extras.feed, goals: extras.goals, ideas: extras.ideas,
                                     agents: Array(agentRows), boards: boards,
@@ -105,6 +111,26 @@ final class BighelpWidgetSnapshotPublisher {
                                     pinnedAgents: Array(extras.pinnedAgents.filter { names[$0.agentID] != nil }.prefix(limit)),
                                     allPinnedAgents: Array(extras.allPinnedAgents.prefix(limit)),
                                     hostID: hostID)
+        // What this run hasn't read or filled in yet stays as the widgets last showed it.
+        if let saved {
+            // Chats and tasks not loaded yet (the chats load first, with the tasks right behind).
+            if sessions?.hasLoadedState != true, sessionRows.isEmpty {
+                snapshot.sessions = saved.sessions
+                if taskRows.isEmpty { snapshot.tasks = saved.tasks }
+            }
+            let filled = extras.filled
+            if !filled.contains(.board) { snapshot.feed = saved.feed; snapshot.goals = saved.goals; snapshot.ideas = saved.ideas }
+            if !filled.contains(.boards) { snapshot.boards = saved.boards }
+            if !filled.contains(.palettes) {
+                snapshot.lightPalette = saved.lightPalette
+                snapshot.darkPalette = saved.darkPalette
+            }
+            if !filled.contains(.pins) {
+                snapshot.pinnedAgents = saved.pinnedAgents
+                snapshot.allPinnedAgents = saved.allPinnedAgents
+            }
+        }
+        return snapshot
     }
 
     private static func status(for record: SessionRecord) -> String {

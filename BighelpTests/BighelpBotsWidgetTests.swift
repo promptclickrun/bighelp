@@ -69,6 +69,37 @@ struct BighelpBotsWidgetTests {
         #expect(files == ["a1.png", "b2.png"], "Faces no longer listed go")
     }
 
+    /// The widget went empty after bighelp opened from it: at launch, before the computer answered,
+    /// the app wrote "no bots" over the saved list and removed every face. A gateway whose bots the app
+    /// doesn't know yet keeps its saved ones; a gateway no longer set up goes.
+    @Test func botsNotKnownYetKeepTheSavedOnesAndTheirFaces() throws {
+        let folder = FileManager.default.temporaryDirectory.appending(path: "bots-widget-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let faces = folder.appending(path: "faces"), rosterURL = folder.appending(path: "roster.json")
+        try FileManager.default.createDirectory(at: faces, withIntermediateDirectories: true)
+        let home = UUID(uuidString: "0D0D0D0D-0000-4000-8000-000000000001")!.uuidString
+        let removed = UUID(uuidString: "0D0D0D0D-0000-4000-8000-000000000009")!.uuidString
+        try BighelpBotsWidgetRoster(gateways: [
+            home: [.init(agentID: "nova", name: "Nova", faceKey: "nova", isShape: true)],
+            removed: [.init(agentID: "old", name: "Old", faceKey: "old")],
+        ], inUseHostID: home).save(to: rosterURL)
+        try Data("nova".utf8).write(to: faces.appending(path: "nova.png"))
+        try Data("old".utf8).write(to: faces.appending(path: "old.png"))
+
+        // A launch before the computer answers: its agents aren't known, and All agents has no copy.
+        let unknown = BighelpBotsWidgetFeed.plan(current: nil, primaryID: nil, pinnedIDs: [], picture: { _ in nil },
+                                                 currentHostID: UUID(uuidString: home), fleet: nil)
+        #expect(unknown.roster.gateways.isEmpty)
+        BighelpBotsWidgetFeed.write(unknown, drawn: [:], keeping: [home, Self.studio.uuidString],
+                                    faces: faces, roster: rosterURL)
+
+        let roster = BighelpBotsWidgetRoster.load(from: rosterURL)
+        #expect(roster.shown(onGateway: nil, picked: ["nova"]).map(\.agentID) == ["nova"])
+        #expect(roster.bots(onGateway: home).first?.isShape == true)
+        #expect(roster.bots(onGateway: removed).isEmpty, "A gateway no longer set up goes")
+        #expect(Set(try FileManager.default.contentsOfDirectory(atPath: faces.path)) == ["nova.png"])
+    }
+
     @Test func tappingABotOpensItsChatOnTheChosenGateway() {
         let thurman = BighelpBotsWidgetRoster.Bot(agentID: "thurman", name: "Thurman")
         let chosen = BighelpBotsWidgetView(bots: [thurman], hostID: Self.studio.uuidString)

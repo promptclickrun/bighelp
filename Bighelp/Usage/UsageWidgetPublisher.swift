@@ -17,24 +17,24 @@ enum UsageWidgetPublisher {
     /// Reads and saves. Another computer or sign-in starts over.
     static func refresh(reader: (any UsageReading)?, plans: (any ProviderUsageClient)?, agentID: String,
                         scope: AnyHashable?, hidden: Set<String> = currentHidden(), force: Bool = false) async {
-        guard let scope else {
-            lastScope = nil
-            lastRead = nil
-            clear()
-            return
-        }
+        // No sign-in yet (a launch before the computer answers): the widget keeps its numbers.
+        guard let scope else { return }
         var snapshot = BighelpUsageSnapshot.load()
         if scope != lastScope {
+            // Another computer or sign-in in this run starts over; the first one after a launch keeps
+            // the saved numbers until it has read new ones.
+            if lastScope != nil { snapshot = .empty }
             lastScope = scope
             lastRead = nil
-            snapshot = .empty
         }
         if !force, let last = lastRead, ContinuousClock.now - last < interval { return }
         lastRead = .now
+        var read = false
         if let reader {
             let hosts = await reader.read(days: days, refresh: false)
             if hosts.contains(where: { $0.failure == nil }) {
                 apply(UsageSummary(hosts: hosts, days: days), to: &snapshot)
+                read = true
             }
         }
         if let plans {
@@ -42,14 +42,17 @@ enum UsageWidgetPublisher {
                 let report = try await plans.usage(agentID: agentID, refresh: false)
                 snapshot.plans = Self.plans(report, hidden: hidden)
                 snapshot.plansNote = nil
+                read = true
             } catch WorkspaceClientError.unavailable(.unsupportedOperation), WorkspaceClientError.unavailable(.pluginRequired) {
                 snapshot.plans = nil
                 snapshot.plansNote = "Update the bighelp plugin on your computer to see plans and limits."
+                read = true
             } catch {
                 // Keep the last plans on the widget.
             }
         }
-        guard !Task.isCancelled, scope == lastScope else { return }
+        // Nothing read (the computer didn't answer): the widget keeps what it shows.
+        guard read, !Task.isCancelled, scope == lastScope else { return }
         snapshot.generatedAt = .now
         write(snapshot)
     }

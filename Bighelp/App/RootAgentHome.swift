@@ -709,6 +709,7 @@ extension RootShellView {
             .task(id: hostReactionsKey) { await syncHostReactions(hostReactionsKey) }
             // Widgets show the home agent's Feed and Goals in the app's colors.
             .onChange(of: agentBoard.items, initial: true) { _, _ in BighelpWidgetExtras.shared.update(board: agentBoard) }
+            .onChange(of: agentBoard.state) { _, _ in BighelpWidgetExtras.shared.update(board: agentBoard) }
             .onChange(of: settings.appearanceContext, initial: true) { _, context in
                 BighelpWidgetExtras.shared.update(appearance: context)
             }

@@ -17,11 +17,13 @@ extension RootShellView {
     /// row only where it works. The same computer keeps its row and its store;
     /// only a clear answer from the host changes the row (`WorkflowsAvailability`).
     func configureWorkflows(_ key: AgentBoardClientKey) async {
+        let hadHost = workflowsAvailability.host != nil
         if workflowsAvailability.use(host: key.owner?.cacheScopeID) {
-            // Another computer: nothing from the old one stays.
+            // Another computer: nothing from the old one stays. The first computer after a launch
+            // keeps the widget's runs until it answers.
             workflowsStore?.setOnScreen(false)
             workflowsStore = nil
-            WorkflowsWidgetPublisher.clear()
+            if hadHost { WorkflowsWidgetPublisher.clear() }
         }
         guard key.owner != nil, let client = makeWorkflowsClient() else { return }
         // A page that showed before the computer answered gets its data now.

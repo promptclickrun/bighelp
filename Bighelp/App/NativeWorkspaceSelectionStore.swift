@@ -89,7 +89,7 @@ final class NativeWorkspaceSelectionStore {
         if selectedID != hostID {
             retirementWorkspace?.onBeforeConnectionRetired = nil
             retirementWorkspace = nil
-            runtime?.retire()
+            runtime?.retire(nextHostID: selectedID)
             runtime = nil
             hostID = selectedID
             synchronizedOwner = nil

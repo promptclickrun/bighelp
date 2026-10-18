@@ -166,7 +166,12 @@
     </dict>
     <key>UIBackgroundModes</key>
     <array>
+        <string>fetch</string>
         <string>remote-notification</string>
+    </array>
+    <key>BGTaskSchedulerPermittedIdentifiers</key>
+    <array>
+        <string>app.loopdy.mobile.widget-refresh</string>
     </array>
     <key>UIAppFonts</key>
     <array>

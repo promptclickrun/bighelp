@@ -66,16 +66,19 @@ final class BighelpPinnedAgentsWidgetFeed {
         }
     }
 
-    private func makeLists() -> Lists {
-        guard let agents else { return Lists() }
+    /// Nil until the computer in use's agents are known (a launch before it answers, or a store another
+    /// computer replaced): the widget keeps its pins and pictures until then.
+    private func makeLists() -> Lists? {
+        guard let agents, agents.knowsProfiles else { return nil }
         let pins = agents.pinnedAgents.map { Pin(agentID: $0.id, name: $0.name, picture: agents.avatarURL(for: $0)) }
         return Self.lists(livePins: pins, fleet: fleet)
     }
 
     private func update() {
-        let lists = makeLists()
+        guard let lists = makeLists() else { return }
         if extras.pinnedAgents != lists.current { extras.pinnedAgents = lists.current }
         if extras.allPinnedAgents != lists.all { extras.allPinnedAgents = lists.all }
+        extras.markFilled(.pins)
         guard lists.pictures != writtenPictures else { return }
         writtenPictures = lists.pictures
         let pictures = lists.pictures, previous = writing
@@ -213,7 +216,8 @@ struct PinnedAgentsWidgetHooks: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .task {
+            // Each computer's runtime has its own agents: follow the one in use, whichever it is.
+            .task(id: ObjectIdentifier(agents)) {
                 BighelpPinnedAgentsWidgetFeed.shared.attach(agents: agents, fleet: fleet)
                 BighelpBotsWidgetFeed.shared.attach(agents: agents, fleet: fleet)
                 #if DEBUG

@@ -56,17 +56,18 @@ final class BighelpBotsWidgetFeed {
         }
     }
 
-    private func makePlan() -> Plan {
-        guard let agents else { return Plan() }
+    /// Nil when the store it followed is gone (another computer took over): nothing to write then.
+    private func makePlan() -> Plan? {
+        guard let agents else { return nil }
         let current = fleet?.hosts.first(where: \.isSelected)?.id
             ?? BighelpWidgetSnapshot.load().hostID.flatMap(UUID.init(uuidString:))
-        return Self.plan(current: agents.profiles, primaryID: agents.primaryAgentID, pinnedIDs: agents.pinnedAgentIDs,
-                         picture: { agents.avatarURL(for: $0) }, currentHostID: current, fleet: fleet)
+        return Self.plan(current: agents.knowsProfiles ? agents.profiles : nil, primaryID: agents.primaryAgentID,
+                         pinnedIDs: agents.pinnedAgentIDs, picture: { agents.avatarURL(for: $0) },
+                         currentHostID: current, fleet: fleet)
     }
 
     private func update() {
-        let plan = makePlan()
-        guard plan != written else { return }
+        guard let plan = makePlan(), plan != written else { return }
         written = plan
         // Shapes are drawn here (SwiftUI); pictures are copied off the main thread.
         var drawn: [String: Data] = [:]
@@ -76,18 +77,36 @@ final class BighelpBotsWidgetFeed {
             drawn[key] = shapes[mark]
         }
         let previous = writing
+        // Gateways still set up keep their saved bots when this plan doesn't know them yet.
+        let gateways = fleet.map { Set($0.hosts.map(\.id.uuidString)) }.flatMap { $0.isEmpty ? nil : $0 }
         writing = Task.detached(priority: .utility) {
             await previous?.value
-            Self.write(plan, drawn: drawn)
+            Self.write(plan, drawn: drawn, keeping: gateways)
             WidgetCenter.shared.reloadTimelines(ofKind: BighelpWidgetSnapshot.botsWidgetKind)
         }
     }
 
     /// Writes the faces, marks which ones are shapes, removes faces no longer listed, then the roster.
-    nonisolated static func write(_ plan: Plan, drawn: [String: Data],
+    /// A gateway the plan has no bots for keeps its saved ones and their faces, while it's still among
+    /// `keeping` (every gateway when nil): the app often doesn't know a gateway's bots yet, like at
+    /// launch before the computer answers, and a widget must never go empty for that.
+    nonisolated static func write(_ plan: Plan, drawn: [String: Data], keeping gateways: Set<String>? = nil,
                                   faces directory: URL? = BighelpBotsWidgetFaces.directory,
                                   roster url: URL? = BighelpBotsWidgetRoster.fileURL) {
+        let saved = BighelpBotsWidgetRoster.load(from: url)
+        var carried: [String: [BighelpBotsWidgetRoster.Bot]] = [:]
+        for (gateway, bots) in saved.gateways where plan.roster.gateways[gateway] == nil {
+            guard gateway == BighelpWidgetGateway.inUseID || gateways?.contains(gateway) != false else { continue }
+            carried[gateway] = bots
+        }
         var shapeKeys: Set<String> = [], kept: Set<String> = []
+        for bots in carried.values {
+            for bot in bots {
+                guard let key = bot.faceKey else { continue }
+                kept.insert("\(key).png")
+                if bot.isShape { shapeKeys.insert(key) }
+            }
+        }
         if let directory {
             try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             for key in plan.faces.keys.sorted().prefix(BighelpBotsWidgetFaces.maximumFiles) {
@@ -110,7 +129,7 @@ final class BighelpBotsWidgetFeed {
             }
         }
         var roster = plan.roster
-        for (gateway, bots) in roster.gateways {
+        for (gateway, bots) in plan.roster.gateways {
             roster.gateways[gateway] = bots.map { bot in
                 var bot = bot
                 if let key = bot.faceKey, !kept.contains("\(key).png") { bot.faceKey = nil }
@@ -118,6 +137,7 @@ final class BighelpBotsWidgetFeed {
                 return bot
             }
         }
+        roster.gateways.merge(carried) { planned, _ in planned }
         try? roster.save(to: url)
     }
 
@@ -138,7 +158,9 @@ final class BighelpBotsWidgetFeed {
     // MARK: Plan
 
     /// Each gateway's bots, the primary one first, then pinned, then by name; hidden bots stay off.
-    static func plan(current: [AgentProfile], primaryID: String?, pinnedIDs: [String],
+    /// `current` is nil while the computer in use's bots aren't known: All agents' copy of it stands in,
+    /// or nothing, and `write` keeps that gateway's saved bots.
+    static func plan(current: [AgentProfile]?, primaryID: String?, pinnedIDs: [String],
                      picture: (AgentProfile) -> URL?, currentHostID: UUID?, fleet: FleetStore?) -> Plan {
         var plan = Plan()
         let currentKey = currentHostID?.uuidString ?? BighelpWidgetGateway.inUseID
@@ -150,11 +172,14 @@ final class BighelpBotsWidgetFeed {
                 return .init(agentID: bot.id, name: clip(bot.name), faceKey: key)
             }
         }
-        let primary = current.first { $0.id == primaryID } ?? current.first(where: \.isDefault)
-        add(ordered(current.filter { $0.placement?.isHidden != true }, primaryID: primary?.id, pinnedIDs: pinnedIDs,
-                    id: \.id, name: \.name).map { (id: $0.id, name: $0.name, picture: picture($0)) },
-            gateway: currentKey, hostID: currentHostID)
-        for host in (fleet?.hosts ?? []).prefix(BighelpBotsWidgetRoster.maximumGateways) where host.id != currentHostID {
+        if let current {
+            let primary = current.first { $0.id == primaryID } ?? current.first(where: \.isDefault)
+            add(ordered(current.filter { $0.placement?.isHidden != true }, primaryID: primary?.id, pinnedIDs: pinnedIDs,
+                        id: \.id, name: \.name).map { (id: $0.id, name: $0.name, picture: picture($0)) },
+                gateway: currentKey, hostID: currentHostID)
+        }
+        for host in (fleet?.hosts ?? []).prefix(BighelpBotsWidgetRoster.maximumGateways)
+            where host.id != currentHostID || current == nil {
             let agents = fleet?.agents(on: host.id).filter { !$0.isHidden } ?? []
             guard !agents.isEmpty else { continue }
             add(ordered(agents, primaryID: agents.first(where: \.isDefault)?.profileID,

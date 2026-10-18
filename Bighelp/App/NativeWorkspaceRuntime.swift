@@ -450,8 +450,14 @@ final class NativeWorkspaceRuntime {
             self.scheduleActiveSessionsRefresh(expectedOwner: owner)
         }
         // A runtime serves the host selected when it's made; another host gets a new one.
+        let hostID = connections.hosts.selectedHostID?.uuidString
         widgetPublisher = BighelpWidgetSnapshotPublisher(sessions: sessions, scheduledTasks: scheduledTasks, agents: agents,
-                                                         hostID: connections.hosts.selectedHostID?.uuidString)
+                                                         hostID: hostID, saved: BighelpWidgetSnapshot.load(gateway: hostID))
+    }
+
+    /// The widgets get this computer's data now, not after the usual pause (a background refresh).
+    func publishWidgetsNow() {
+        widgetPublisher?.publishNow()
     }
 
     /// Features the bighelp plugin serves (from its `/native/context`), not Hermes itself.
@@ -847,9 +853,12 @@ final class NativeWorkspaceRuntime {
         rooms.configureNativeActivityClient(nil)
     }
 
-    func retire() {
+    /// `nextHostID`: the computer that takes over, whose saved copy the widgets show until it loads.
+    func retire(nextHostID: UUID? = nil) {
         guard !retired else { return }
-        widgetPublisher?.retire(); widgetPublisher = nil
+        let next = nextHostID.map { BighelpWidgetSnapshot.load(gateway: $0.uuidString) }
+        widgetPublisher?.retire(next: next.flatMap { $0.hostID == nextHostID?.uuidString ? $0 : nil })
+        widgetPublisher = nil
         observedPromptStore?.removeObserver(id: promptObserverID)
         observedPromptStore = nil
         suspend()

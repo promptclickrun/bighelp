@@ -41,6 +41,56 @@ struct BighelpWidgetSnapshotTests {
         #expect(decoded.runningSessions.map(\.id) == ["running-old"])
     }
 
+    /// bighelp woken in the background (a Shortcut, the Watch, a widget refresh) or launched before the
+    /// computer answers: nothing it doesn't know yet replaces what the widgets show.
+    @Test func whatThisRunDoesNotKnowYetStaysOnTheWidgets() async throws {
+        let home = "0D0D0D0D-0000-4000-8000-000000000001"
+        let palette = BighelpWidgetSnapshot.Palette(canvasHex: "#000000", surfaceHex: "#111111", primaryTextHex: "#FFFFFF",
+                                                    secondaryTextHex: "#AAAAAA", accentHex: "#33CC66",
+                                                    accentForegroundHex: "#000000")
+        var saved = BighelpWidgetSnapshot(
+            defaultAgentID: "finance", defaultAgentName: "Finley",
+            sessions: [.init(id: "chat", title: "Budget", agentName: "Finley", status: "Replied", preview: "Done.",
+                             isRunning: false, updatedAt: .now)],
+            tasks: [], generatedAt: .now,
+            feed: [.init(id: "post", title: "Market brief", icon: "📈", date: .now)],
+            lightPalette: palette, darkPalette: palette,
+            pinnedAgents: [.init(agentID: AgentProfile.financeFixture.id, name: "Finley", hostID: home)])
+        saved.hostID = home
+        var writes: [BighelpWidgetSnapshot] = []
+        let notLoaded = AgentDirectoryStore(client: AgentDirectoryFixtureClient(profiles: [.financeFixture]),
+                                            defaults: isolatedDefaults())
+        let catalog = SessionCatalogStore(client: DemoSessionCatalogClient(), records: [])
+        let waiting = BighelpWidgetSnapshotPublisher(sessions: catalog, scheduledTasks: nil, agents: notLoaded,
+            hostID: home, extras: BighelpWidgetExtras(), interval: .milliseconds(1), saved: saved,
+            write: { writes.append($0) })
+        waiting.publishNow()
+        #expect(writes.isEmpty, "Its agents aren't known yet: nothing is written")
+
+        try await notLoaded.load()
+        waiting.publishNow()
+        let written = try #require(writes.last)
+        #expect(written.defaultAgentName == AgentProfile.financeFixture.name)
+        #expect(written.sessions.map(\.id) == ["chat"], "Chats not loaded yet stay")
+        #expect(written.feed?.map(\.id) == ["post"], "No screen filled the Feed in this run")
+        #expect(written.lightPalette == palette && written.pinnedAgents?.count == 1)
+        waiting.retire()
+    }
+
+    /// Another gateway takes over: widgets that follow the one in use show its copy from its last visit.
+    @Test func switchingGatewaysShowsTheNextOnesSavedCopy() {
+        var next = BighelpWidgetSnapshot.empty
+        next.defaultAgentName = "Rio"
+        next.hostID = "0D0D0D0D-0000-4000-8000-000000000002"
+        var writes: [BighelpWidgetSnapshot] = []
+        let publisher = BighelpWidgetSnapshotPublisher(
+            sessions: SessionCatalogStore(client: DemoSessionCatalogClient(), records: []), scheduledTasks: nil,
+            agents: AgentDirectoryStore(client: AgentDirectoryFixtureClient(profiles: []), defaults: isolatedDefaults()),
+            interval: .milliseconds(1), write: { writes.append($0) })
+        publisher.retire(next: next)
+        #expect(writes.last?.defaultAgentName == "Rio")
+    }
+
     @Test func retiringThePublisherClearsTheHomeScreen() async throws {
         var writes: [BighelpWidgetSnapshot] = []
         let agents = AgentDirectoryStore(client: AgentDirectoryFixtureClient(profiles: [.financeFixture]),

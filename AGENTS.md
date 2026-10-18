@@ -48,7 +48,10 @@ change in both repos.
   - Simple Bot mode (Settings › Experience, `settings.simpleBotsEnabled`) is the one exception to ☰ and the bar:
     its home (`SimpleBotsHomeView`) takes the Chat tab's place with neither, and the person's circle opens its
     short Settings (`SimpleBotsSettingsView`), whose All Settings row and Simple Bot mode switch lead back.
-    Everything in it uses the same stores and chat; `Bighelp/SimpleBots/` holds its screens.
+    Everything in it uses the same stores and chat; `Bighelp/SimpleBots/` holds its screens. It wins over the
+    all-hosts view and Settings › Open on (`fleetModeOn` is off while it's on). Its Multi-gateway switch
+    (`simpleBotsMultiGateway`) lists every gateway's bots from the all-hosts copies (`SimpleBotsGateways`);
+    acting on another gateway's bot goes through `openFleet`, which switches gateway first.
 - **Real data only.**
   - Avatars, activity poses and badges must come from what the agent is actually doing.
   - Never fake progress.
@@ -456,6 +459,14 @@ sections can crash only on devices ("Thread stack size exceeded").
 
 - The app closes its host connection in the background. A suspended runtime can still report "ready".
 - Shortcuts and widgets first check that the host answers, and reconnect once if it doesn't.
+- **Widgets never go empty for what the app doesn't know yet.** A launch before the host answers, a gateway
+  switch, or bighelp woken in the background (a Shortcut, the Watch, Background App Refresh) has no agents,
+  chats or screens yet. Widget writers keep the saved data then: `AgentDirectoryStore.knowsProfiles`, the
+  snapshot publisher's `saved` copy and `BighelpWidgetExtras.filled`, the Bots roster's carried gateways,
+  and Kanban, Workflows and Usage clear only on a switch within one run. A switch shows the next gateway's
+  saved copy (`retire(next:)`).
+- Background App Refresh (`BighelpWidgetBackgroundRefresh`, iPhone and iPad) wakes the app while a bighelp
+  widget is on the device: it connects the way Shortcuts do and publishes the widgets' data. iOS picks when.
 - A Shortcut on a gateway that isn't in use switches bighelp to it, and the app starts connecting at once.
   `reconnect()` returns at once while another connection is under way, so the Shortcut waits for that one
   (`BighelpShortcutConnectionWait`). `ShortcutGatewaySwitchHostUITests` checks it on two real hosts.

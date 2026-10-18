@@ -53,24 +53,27 @@ enum SimpleBotsHomeProjection {
         /// Each pinned bot's latest chat, for its touch-and-hold preview.
         var pinnedChats: [String: SessionSummary] = [:]
         var rows: [SimpleBotsItem]
+        /// The primary and pinned bots in the order the person dragged them into.
+        var top: [AgentProfile] = []
     }
 
-    /// The top row holds this many bots: the primary one and pinned ones.
-    static let topRowLimit = 6
+    /// The bots on top, all the same size: the primary one and pinned ones, three to a row, two rows.
+    static let topLimit = 6
+    static let topPerRow = 3
 
-    /// The primary bot leads, with up to five pinned bots beside it in their
-    /// order. The list under them: any other pinned bots and group chats, then
-    /// the rest by their latest chat (bots without one last, by name). Hidden
-    /// bots stay off the home; group chats sit among them by their own time.
+    /// The primary bot leads the top, with up to five pinned bots after it in
+    /// their order. The list under them: bots and group chats in the order
+    /// the person dragged them, any not placed yet first; without an order, other
+    /// pinned bots and group chats, then the rest by their latest chat (bots
+    /// without one last, by name). Hidden bots stay off the home.
     static func home(profiles: [AgentProfile], primaryID: String?, pinnedIDs: [String],
-                     summaries: [SessionSummary]) -> Home {
-        let primary = profiles.first { $0.id == primaryID } ?? profiles.first(where: \.isDefault) ?? profiles.first
+                     summaries: [SessionSummary], order: [String] = [], topOrder: [String] = []) -> Home {
+        let primary = self.primary(profiles: profiles, primaryID: primaryID)
         func latest(_ agentID: String) -> SessionSummary? {
             summaries.filter { $0.kind == .direct && $0.agentIDs == [agentID] }.max { $0.updatedAt < $1.updatedAt }
         }
-        let pinned = Array(pinnedIDs.compactMap { id in
-            profiles.first { $0.id == id && $0.id != primary?.id && $0.placement?.isHidden != true }
-        }.prefix(primary == nil ? 0 : topRowLimit - 1))
+        let pinned = primary == nil ? [] : Array(shownPins(profiles: profiles, primaryID: primary?.id,
+                                                            pinnedIDs: pinnedIDs).prefix(topLimit - 1))
         let onTop = Set(pinned.map(\.id))
         var rows: [SimpleBotsItem] = []
         for profile in profiles where profile.id != primary?.id && !onTop.contains(profile.id)
@@ -83,7 +86,14 @@ enum SimpleBotsHomeProjection {
             rows.append(SimpleBotsItem(kind: .group(summary), preview: summary.preview, date: summary.updatedAt,
                                        isPinned: summary.isPinned))
         }
+        let placed = Dictionary(order.enumerated().map { ($0.element, $0.offset) }, uniquingKeysWith: { first, _ in first })
         rows.sort { left, right in
+            switch (placed[left.id], placed[right.id]) {
+            case let (l?, r?): return l < r
+            case (nil, .some): return true
+            case (.some, nil): return false
+            case (nil, nil): break
+            }
             switch (left.pinOrder(pinnedIDs), right.pinOrder(pinnedIDs)) {
             case let (l?, r?): return l < r
             case (.some, nil): return true
@@ -99,8 +109,79 @@ enum SimpleBotsHomeProjection {
         }
         var pinnedChats: [String: SessionSummary] = [:]
         for profile in pinned { pinnedChats[profile.id] = latest(profile.id) }
+        // On top: the dragged order, then any bot not placed yet (the primary one first, then new pins).
+        let rank = Dictionary(topOrder.enumerated().map { ($0.element, $0.offset) }, uniquingKeysWith: { first, _ in first })
+        let top = ((primary.map { [$0] } ?? []) + pinned).enumerated().sorted { left, right in
+            switch (rank[left.element.id], rank[right.element.id]) {
+            case let (l?, r?): l < r
+            case (.some, nil): true
+            case (nil, .some): false
+            case (nil, nil): left.offset < right.offset
+            }
+        }.map(\.element)
         return Home(primary: primary, primaryPreview: primary.flatMap { latest($0.id) }, pinned: pinned,
-                    pinnedChats: pinnedChats, rows: rows)
+                    pinnedChats: pinnedChats, rows: rows, top: top)
+    }
+
+    /// The bots on top in rows of three.
+    static func topRows(_ bots: [AgentProfile]) -> [[AgentProfile]] {
+        stride(from: 0, to: bots.count, by: topPerRow).map { Array(bots[$0..<min($0 + topPerRow, bots.count)]) }
+    }
+
+    /// Whether `id` can join the pinned bots. Only pins the home shows count: the
+    /// primary bot (pinned as the default agent), hidden bots and bots this
+    /// computer no longer has share the Agents screen's list but take no room here.
+    static func canPin(_ id: String, profiles: [AgentProfile], primaryID: String?, pinnedIDs: [String]) -> Bool {
+        let primary = primary(profiles: profiles, primaryID: primaryID)
+        guard id != primary?.id, !pinnedIDs.contains(id),
+              profiles.contains(where: { $0.id == id && $0.placement?.isHidden != true }) else { return false }
+        return shownPins(profiles: profiles, primaryID: primary?.id, pinnedIDs: pinnedIDs).count < topLimit - 1
+    }
+
+    /// `ids` with `moved` in `target`'s place, the rest shifting toward where it was. A drag
+    /// over another row moves it there at once, so the list opens up under the finger.
+    static func moving(_ moved: String, to target: String, in ids: [String]) -> [String] {
+        guard moved != target, let from = ids.firstIndex(of: moved), let to = ids.firstIndex(of: target) else { return ids }
+        var result = ids
+        result.remove(at: from)
+        result.insert(moved, at: to)
+        return result
+    }
+
+    private static func primary(profiles: [AgentProfile], primaryID: String?) -> AgentProfile? {
+        profiles.first { $0.id == primaryID } ?? profiles.first(where: \.isDefault) ?? profiles.first
+    }
+
+    private static func shownPins(profiles: [AgentProfile], primaryID: String?, pinnedIDs: [String]) -> [AgentProfile] {
+        var seen = Set<String>()
+        return pinnedIDs.compactMap { id in
+            guard id != primaryID, seen.insert(id).inserted else { return nil }
+            return profiles.first { $0.id == id && $0.placement?.isHidden != true }
+        }
+    }
+}
+
+/// The order the person dragged Simple Bot mode's list into, per computer.
+@MainActor
+@Observable
+final class SimpleBotsOrderStore {
+    static let shared = SimpleBotsOrderStore()
+    private static let key = "bighelp.simple-bots.order"
+
+    private(set) var orders: [String: [String]]
+    @ObservationIgnored private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        orders = defaults.dictionary(forKey: Self.key) as? [String: [String]] ?? [:]
+    }
+
+    func order(scope: String) -> [String] { orders[scope] ?? [] }
+
+    func set(_ order: [String], scope: String) {
+        guard orders[scope] != order else { return }
+        orders[scope] = Array(order.prefix(512))
+        defaults.set(orders, forKey: Self.key)
     }
 }
 
@@ -168,35 +249,54 @@ struct SimpleBotsHomeView: View {
 
     @State private var sheet: SimpleBotsSheet?
     @State private var hideError: String?
-    @State private var templateNotice: String?
+    /// Rearrange: the order being arranged, kept only when the person taps Save.
+    @State private var arranging: SimpleBotsArrangement?
+    /// While rearranging: the row or top bot under the finger ("top:" before a top bot's id), where it
+    /// started, how far it has moved, and where each one sits.
+    @State private var dragging: String?
+    @State private var dragStart: CGRect = .zero
+    @State private var dragTranslation: CGSize = .zero
+    @State private var frames: [String: CGRect] = [:]
+    private static let arrangeSpace = "simple-bots.arrange"
     private let unread = SimpleBotsUnreadStore.shared
+    private let order = SimpleBotsOrderStore.shared
     @BighelpThemeReader private var theme
 
     private var home: SimpleBotsHomeProjection.Home {
         SimpleBotsHomeProjection.home(
             profiles: context.agents.profiles, primaryID: context.agents.primaryAgentID,
             pinnedIDs: context.agents.pinnedAgentIDs,
-            summaries: context.catalog.recentSummaries(includeCronSessions: false))
+            summaries: context.catalog.recentSummaries(includeCronSessions: false),
+            order: arranging?.list ?? order.order(scope: context.scope),
+            topOrder: arranging?.top ?? order.order(scope: Self.topScope(context.scope)))
     }
+
+    private static func topScope(_ scope: String) -> String { "top|" + scope }
 
     var body: some View {
         let home = home
-        ScrollView {
-            LazyVStack(spacing: 0) {
-                if let primary = home.primary {
-                    topRow(primary, home: home)
-                } else {
-                    emptyHome
+        Group {
+            if arranging == nil {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        if let primary = home.primary {
+                            topRow(primary, home: home)
+                        } else {
+                            emptyHome
+                        }
+                        ForEach(home.rows) { item in
+                            row(item)
+                        }
+                    }
+                    .padding(.bottom, BighelpTokens.space32)
+                    .frame(maxWidth: 720)
+                    .frame(maxWidth: .infinity)
                 }
-                ForEach(home.rows) { item in
-                    row(item)
-                }
+                .scrollBounceBehavior(.basedOnSize)
+            } else {
+                arrangeList(home)
             }
-            .padding(.bottom, BighelpTokens.space32)
-            .frame(maxWidth: 720)
-            .frame(maxWidth: .infinity)
         }
-        .scrollBounceBehavior(.basedOnSize)
         .safeAreaInset(edge: .top, spacing: 0) { header }
         .background(theme.canvas.ignoresSafeArea())
         .bighelpSheet(item: $sheet) { sheet in sheetView(sheet) }
@@ -204,15 +304,49 @@ struct SimpleBotsHomeView: View {
                                                              set: { if !$0 { hideError = nil } })) {
             Button("OK") { hideError = nil }
         } message: { Text(hideError ?? "") }
-        .alert("Saved as a template", isPresented: Binding(get: { templateNotice != nil },
-                                                          set: { if !$0 { templateNotice = nil } })) {
-            Button("OK") { templateNotice = nil }
-        } message: { Text(templateNotice ?? "") }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("simple-bots.home")
     }
 
+    @ViewBuilder
     private var header: some View {
+        if arranging != nil { arrangeHeader } else { homeHeader }
+    }
+
+    /// While rearranging: Cancel and Save, nothing else.
+    private var arrangeHeader: some View {
+        HStack {
+            Button("Cancel") { withAnimation(.snappy) { arranging = nil } }
+                .font(.bighelp(.body))
+                .foregroundStyle(.primary)
+                .frame(minHeight: BighelpTokens.hitTarget)
+                .accessibilityIdentifier("simple-bots.rearrange.cancel")
+            Spacer()
+            Text("Rearrange")
+                .font(.bighelp(.headline))
+            Spacer()
+            Button {
+                saveArrangement()
+            } label: {
+                Text("Save")
+                    .font(.bighelp(.body, weight: .semibold))
+                    .foregroundStyle(theme.actionForeground)
+                    .padding(.horizontal, BighelpTokens.space16)
+                    .frame(minHeight: 36)
+                    .background(theme.action, in: Capsule())
+                    .frame(minHeight: BighelpTokens.hitTarget)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("simple-bots.rearrange.save")
+        }
+        .padding(.horizontal, BighelpTokens.space20)
+        .padding(.top, BighelpTokens.space4)
+        .padding(.bottom, BighelpTokens.space8)
+        .background { SimpleBotsHeaderFade() }
+    }
+
+    private var homeHeader: some View {
         HStack(spacing: BighelpTokens.space8) {
             SimpleBotsPersonButton(name: context.personName, imageURL: context.personImageURL,
                                    action: context.onOpenSettings)
@@ -243,20 +377,34 @@ struct SimpleBotsHomeView: View {
         .background { SimpleBotsHeaderFade() }
     }
 
-    /// The primary bot and the pinned ones beside it: one large, else two or three across, six at most.
+    /// The primary bot and the pinned ones, all the same size and in the order the person dragged
+    /// them into: one large, else two or three across, six at most in two rows.
     private func topRow(_ primary: AgentProfile, home: SimpleBotsHomeProjection.Home) -> some View {
-        let bots = [primary] + home.pinned
-        let across = bots.count <= 2 ? bots.count : bots.count == 4 ? 2 : 3
-        let size: CGFloat = bots.count == 1 ? 104 : across == 2 ? 92 : 76
-        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: BighelpTokens.space12,
-                                                            alignment: .top), count: across),
-                         spacing: BighelpTokens.space24) {
-            ForEach(bots) { bot in
-                let isPrimary = bot.id == primary.id
-                topTile(bot, isPrimary: isPrimary, size: size,
-                        chat: isPrimary ? home.primaryPreview : home.pinnedChats[bot.id])
+        let bots = home.top
+        let across = min(bots.count, SimpleBotsHomeProjection.topPerRow)
+        let size: CGFloat = across == 1 ? 104 : across == 2 ? 92 : 76
+        return VStack(spacing: BighelpTokens.space24) {
+            ForEach(Array(SimpleBotsHomeProjection.topRows(bots).enumerated()), id: \.offset) { _, row in
+                HStack(alignment: .top, spacing: BighelpTokens.space12) {
+                    ForEach(row) { bot in
+                        let isPrimary = bot.id == primary.id
+                        Group {
+                            if arranging == nil {
+                                topTile(bot, isPrimary: isPrimary, size: size,
+                                        chat: isPrimary ? home.primaryPreview : home.pinnedChats[bot.id])
+                            } else {
+                                arrangeableTile(bot, isPrimary: isPrimary, size: size, top: bots)
+                            }
+                        }
+                        // A short last row keeps the columns of the full one.
+                        .frame(maxWidth: across == 3 ? 112 : .infinity)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .zIndex(row.contains { "top:\($0.id)" == dragging } ? 1 : 0)
             }
         }
+        .coordinateSpace(.named(Self.arrangeSpace))
         .padding(.horizontal, BighelpTokens.space20)
         .padding(.top, BighelpTokens.space24)
         .padding(.bottom, BighelpTokens.space32)
@@ -291,6 +439,11 @@ struct SimpleBotsHomeView: View {
         .accessibilityLabel(isPrimary ? "\(bot.name), your primary bot" : "\(bot.name), pinned")
         .accessibilityHint("Opens its chat")
         .accessibilityIdentifier(isPrimary ? "simple-bots.primary" : "simple-bots.pinned.\(bot.id)")
+    }
+
+    private func canPin(_ id: String) -> Bool {
+        SimpleBotsHomeProjection.canPin(id, profiles: context.agents.profiles, primaryID: context.agents.primaryAgentID,
+                                        pinnedIDs: context.agents.pinnedAgentIDs)
     }
 
     private var emptyHome: some View {
@@ -339,6 +492,7 @@ struct SimpleBotsHomeView: View {
             .buttonStyle(.plain)
             .contextMenu {
                 unreadButton(summary.id)
+                rearrangeButton
             }
             .accessibilityIdentifier("simple-bots.group.\(summary.id)")
         }
@@ -359,27 +513,169 @@ struct SimpleBotsHomeView: View {
     @ViewBuilder
     private func botMenu(_ profile: AgentProfile, isPrimary: Bool) -> some View {
         unreadButton(profile.id)
-        if context.agents.isPinned(profile.id) {
+        if context.agents.isPinned(profile.id), !isPrimary {
             Button("Unpin", systemImage: "pin.slash") { _ = context.agents.unpinAgent(profile.id) }
-        } else if !isPrimary, context.agents.canPin(profile.id) {
-            Button("Pin", systemImage: "pin") { _ = context.agents.pinAgent(profile.id) }
+        } else if !isPrimary, canPin(profile.id) {
+            Button("Pin", systemImage: "pin") {
+                _ = context.agents.pinAgent(profile.id, limit: SimpleBotsHomeProjection.topLimit - 1,
+                                            counting: home.pinned.count)
+            }
         }
         if isPrimary {
             Button("Replace Primary Bot…", systemImage: "arrow.left.arrow.right") { sheet = .primary }
         } else {
             Button("Make Primary Bot", systemImage: "star") { _ = context.agents.setPrimaryAgent(profile.id) }
         }
-        Button("Save as Template", systemImage: "square.and.arrow.down.on.square") {
-            let template = AgentTemplateLibrary.shared.save(from: profile)
-            templateNotice = "“\(template.title)” is saved on this device. Pick it when you make a new bot."
-        }
-        if !isPrimary {
-            Button("Hide", systemImage: "eye.slash", role: .destructive) { hide(profile) }
-        }
+        rearrangeButton
         Menu("More", systemImage: "ellipsis") {
             Button("Bot Profile", systemImage: "person.crop.circle") { context.onOpenProfile(profile.id) }
             Button("New Chat", systemImage: "square.and.pencil") { context.onNewChat(profile.id) }
             Button("Routines", systemImage: "clock") { context.onRoutines(profile.id) }
+            if !isPrimary {
+                Divider()
+                Button("Hide", systemImage: "eye.slash", role: .destructive) { hide(profile) }
+            }
+        }
+    }
+
+    /// Turns on dragging for every bot and group chat, until Save or Cancel.
+    private var rearrangeButton: some View {
+        Button("Rearrange", systemImage: "arrow.up.arrow.down") {
+            let home = home
+            withAnimation(.snappy) {
+                arranging = SimpleBotsArrangement(list: home.rows.map(\.id), top: home.top.map(\.id))
+            }
+        }
+    }
+
+    private func saveArrangement() {
+        guard let arranging else { return }
+        order.set(arranging.list, scope: context.scope)
+        order.set(arranging.top, scope: Self.topScope(context.scope))
+        withAnimation(.snappy) { self.arranging = nil }
+    }
+
+    /// Rearranging: the top bots drag among themselves; the list is a list in edit mode, with the
+    /// system's reorder handles, so it scrolls and moves the way lists do everywhere.
+    private func arrangeList(_ home: SimpleBotsHomeProjection.Home) -> some View {
+        let ids = home.rows.map(\.id)
+        return List {
+            Group {
+                if let primary = home.primary { topRow(primary, home: home) }
+                Text("Drag your bots and group chats into the order you want, then tap Save.")
+                    .font(.bighelp(.footnote))
+                    .foregroundStyle(theme.secondaryText)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, BighelpTokens.space32)
+                    .padding(.bottom, BighelpTokens.space16)
+            }
+            .listRowInsets(EdgeInsets())
+            .listRowSeparator(.hidden)
+            .listRowBackground(Color.clear)
+            ForEach(home.rows) { item in
+                arrangeableRow(item, ids: ids)
+                    .listRowInsets(EdgeInsets())
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(theme.canvas)
+            }
+            .onMove { from, to in
+                var moved = ids
+                moved.move(fromOffsets: from, toOffset: to)
+                withAnimation(.snappy) { arranging?.list = moved }
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .environment(\.editMode, .constant(.active))
+        // A top bot being dragged keeps the list still.
+        .scrollDisabled(dragging != nil)
+    }
+
+    /// A list row while rearranging: no menu and no chat; the list adds its reorder handle.
+    private func arrangeableRow(_ item: SimpleBotsItem, ids: [String]) -> some View {
+        let label: SimpleBotsRowLabel
+        let identifier: String
+        switch item.kind {
+        case .bot(let profile):
+            label = SimpleBotsRowLabel(
+                face: AnyView(SimpleBotFace(agentID: profile.id, name: profile.name,
+                                            imageURL: context.agents.avatarURL(for: profile), size: 56)),
+                title: profile.name, role: profile.role, preview: item.preview, date: nil,
+                isUnread: false, isPinned: item.isPinned)
+            identifier = "simple-bots.bot.\(profile.id)"
+        case .group(let summary):
+            label = SimpleBotsRowLabel(face: AnyView(groupFaces(summary)), title: summary.title,
+                                       preview: item.preview, date: nil, isUnread: false, isPinned: item.isPinned)
+            identifier = "simple-bots.group.\(summary.id)"
+        }
+        return label
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier(identifier)
+            .accessibilityAction(named: "Move up") { step(item.id, by: -1, in: ids, top: false) }
+            .accessibilityAction(named: "Move down") { step(item.id, by: 1, in: ids, top: false) }
+    }
+
+    /// A bot on top while rearranging: still, with no menu or chat, and it drags among the top bots.
+    private func arrangeableTile(_ bot: AgentProfile, isPrimary: Bool, size: CGFloat, top: [AgentProfile]) -> some View {
+        let ids = top.map(\.id), key = "top:\(bot.id)"
+        return VStack(spacing: BighelpTokens.space12) {
+            SimpleBotFace(agentID: bot.id, name: bot.name, imageURL: context.agents.avatarURL(for: bot),
+                          size: size, isPrimary: isPrimary, blinks: false)
+            Text(bot.name)
+                .font(.bighelp(.subheadline))
+                .foregroundStyle(theme.secondaryText)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity)
+        .contentShape(.rect)
+        .gesture(arrangeDrag(key, peers: ids.map { "top:\($0)" }) { target in
+            arranging?.top = SimpleBotsHomeProjection.moving(bot.id, to: String(target.dropFirst(4)), in: ids)
+        })
+        .arrangeLift(key, dragging: dragging, offset: dragOffset(key), space: Self.arrangeSpace) { frames[key] = $0 }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(isPrimary ? "simple-bots.primary" : "simple-bots.pinned.\(bot.id)")
+        .accessibilityHint("Drag to change its place")
+        .accessibilityAction(named: "Move left") { step(bot.id, by: -1, in: ids, top: true) }
+        .accessibilityAction(named: "Move right") { step(bot.id, by: 1, in: ids, top: true) }
+    }
+
+    /// Follows the finger; passing over another of `peers` moves the dragged one into its place.
+    private func arrangeDrag(_ key: String, peers: [String], move: @escaping (String) -> Void) -> some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .named(Self.arrangeSpace))
+            .onChanged { value in
+                if dragging != key {
+                    dragging = key
+                    dragStart = frames[key] ?? .zero
+                }
+                dragTranslation = value.translation
+                let center = CGPoint(x: dragStart.midX + value.translation.width,
+                                     y: dragStart.midY + value.translation.height)
+                if let target = peers.first(where: { $0 != key && frames[$0]?.contains(center) == true }) {
+                    withAnimation(.snappy) { move(target) }
+                }
+            }
+            .onEnded { _ in
+                withAnimation(.snappy) {
+                    dragging = nil
+                    dragTranslation = .zero
+                }
+            }
+    }
+
+    /// Keeps the dragged one under the finger while the others move around it.
+    private func dragOffset(_ key: String) -> CGSize {
+        guard dragging == key, let current = frames[key] else { return .zero }
+        return CGSize(width: dragStart.minX + dragTranslation.width - current.minX,
+                      height: dragStart.minY + dragTranslation.height - current.minY)
+    }
+
+    /// VoiceOver's Move actions: one place at a time.
+    private func step(_ id: String, by offset: Int, in ids: [String], top: Bool) {
+        guard let index = ids.firstIndex(of: id), ids.indices.contains(index + offset) else { return }
+        let moved = SimpleBotsHomeProjection.moving(id, to: ids[index + offset], in: ids)
+        withAnimation(.snappy) {
+            if top { arranging?.top = moved } else { arranging?.list = moved }
         }
     }
 
@@ -573,5 +869,24 @@ private struct SimpleBotsPrimaryPicker: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
             }
         }
+    }
+}
+
+/// The order the person is arranging: the list's rows and the top's bots.
+struct SimpleBotsArrangement: Equatable {
+    var list: [String]
+    var top: [String]
+}
+
+private extension View {
+    /// The lift while it's dragged, and where an arrangeable row or bot sits. Measured outside the
+    /// offset and scale, so following the finger never moves where it's said to sit.
+    func arrangeLift(_ key: String, dragging: String?, offset shift: CGSize, space: String,
+                     frame: @escaping (CGRect) -> Void) -> some View {
+        offset(shift)
+            .scaleEffect(dragging == key ? 1.04 : 1)
+            .shadow(color: .black.opacity(dragging == key ? 0.25 : 0), radius: 12, y: 6)
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(space)) } action: { frame($0) }
+            .zIndex(dragging == key ? 1 : 0)
     }
 }

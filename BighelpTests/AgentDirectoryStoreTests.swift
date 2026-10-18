@@ -144,6 +144,22 @@ struct AgentDirectoryStoreTests {
         #expect(restored.pinnedAgents.isEmpty)
     }
 
+    /// Simple Bot mode pins by its own count (the bots its home shows), past the shared list's five.
+    @Test func simpleBotModePinsByItsOwnCount() async throws {
+        let defaults = isolatedDefaults()
+        let profiles = (0..<7).map { index in
+            AgentProfile(id: "agent-\(index)", name: "Agent \(index)", role: "Role", summary: "Summary",
+                         instructions: "", avatarFileName: nil, isDefault: false)
+        }
+        let store = AgentDirectoryStore(client: AgentDirectoryFixtureClient(profiles: profiles), defaults: defaults)
+        try await store.load()
+        for profile in profiles.prefix(5) { store.pinAgent(profile.id) }
+        #expect(!store.pinAgent("agent-5"), "The shared list holds five")
+        #expect(store.pinAgent("agent-5", limit: 6, counting: 3), "Simple Bot mode counts only the pins it shows")
+        #expect(!store.pinAgent("agent-6", limit: 6, counting: 6))
+        #expect(store.pinnedAgentIDs.last == "agent-5")
+    }
+
     @Test func quickWorkspaceHoldsAtMostFivePinnedAgents() async throws {
         let defaults = isolatedDefaults()
         let profiles = (0..<7).map { index in

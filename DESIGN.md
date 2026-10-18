@@ -112,8 +112,12 @@ grid of faces with names under them, like contacts: Current Gateway shows the co
 Multi Gateway every computer's (All agents' pinned row), with a small computer name under each when they're on
 more than one. A tap opens that agent's canonical Bot Chat (`loopdy://agent-chat?agent=…&host=…`), switching
 computers first like All agents. Pictures are copied per agent and computer (`BighelpPinnedAvatarStore`), and a
-computer called only by its address shows as "Computer 2". On Vision Pro the same widgets sit on a wall or table as glass,
-without the Lock Screen sizes.
+computer called only by its address shows as "Computer 2". **Bots** shows one, two or four chosen bots (small,
+medium, large) on a chosen gateway, on the plain page color: each bot's face (a Simple Bot shape standing free, a
+photo in a circle, its default shape without a picture) over its name, and a tap opens its Bot Chat on that gateway.
+The app writes every gateway's bots and faces into the app group (`BighelpBotsWidgetFeed`, the computer in use live
+and the others from All agents), so the widget keeps them with bighelp closed. On Vision Pro the same widgets sit on
+a wall or table as glass, without the Lock Screen sizes.
 
 Apps: **Artifacts** lists what the agent made or changed lately, newest first, from one plugin request
 (`files.recent`, plugin 2.15+): its `write_file`/`patch` history and deliveries plus new top-level files. It never
@@ -355,13 +359,17 @@ picked a bubble color in Appearance, and buttons and tinted text are the page's 
 text is SF Pro, as everywhere.
 
 - **Home**: your circle top left opens Settings; search and + (New Bot, New Group Chat) top right. The
-  primary bot leads, large, with a star, and pinned bots join it there (two or three across, six bots at
-  most); their marks blink now and then (never with Reduce Motion). Under them every other bot (any further
-  pinned ones first, then by its latest message) and each group chat, with the latest message and its time; a bot's role is a small gray label
-  after its name. Hidden bots stay off the home;
-  search's filter shows them.
+  primary bot (with a star) and pinned bots share the top, all the same size: one large, else two or three
+  across, six at most in two rows. Only pins the top shows count toward the six, not the primary bot, hidden bots
+  or ones this computer no longer has. Their marks blink now and then (never with Reduce Motion). Under them every
+  other bot and each group chat, with the latest message and its time; a bot's role is a small gray label after
+  its name. Rearrange (in each menu) turns the home into an arranging mode: Cancel and Save in the header, no
+  menus, chats or blinking, and every bot and group chat drags into place, on top (the primary bot too) or in
+  the list. Save keeps the order per computer (`SimpleBotsOrderStore`); a bot or group chat not placed yet leads
+  the list, by its latest message. Hidden bots stay off the home; search's filter shows them.
 - **Touch and hold** a bot: its latest message, then Mark Unread (kept on this device), Pin, Replace
-  Primary Bot… or Make Primary Bot, Save as Template, Hide, and More (profile, new chat, routines).
+  Primary Bot… or Make Primary Bot, Rearrange, and More (profile, new chat, routines, then Hide at the bottom).
+  A group chat's menu has Mark Unread and Rearrange.
 - **Marks**: thirteen shapes in eleven colors with two white eyes (`SimpleBotMark`). Picking one in a
   bot's profile or in Create New Bot saves it as the bot's picture on its computer, so every screen,
   device and Hermes Desktop shows it, and drops a character or pet drawn over the picture. A bot that

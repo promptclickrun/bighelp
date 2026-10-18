@@ -117,9 +117,10 @@ struct BighelpWidgetSnapshot: Codable, Equatable, Sendable {
     static let fileName = "loopdy-widget-snapshot-v1.json"
     static let boardWidgetKinds = ["BighelpFeedWidget", "BighelpIdeasWidget", "BighelpGoalsWidget"]
     static let pinnedAgentsWidgetKind = "BighelpPinnedAgentsWidget"
+    static let botsWidgetKind = "BighelpBotsWidget"
     static let widgetKinds = ["LoopdyAgentWidget", "LoopdyActiveSessionsWidget", "LoopdyScheduledTasksWidget",
                               "LoopdyNewChatWidget", "LoopdyActivityFeedWidget"] + boardWidgetKinds
-                              + [pinnedAgentsWidgetKind]
+                              + [pinnedAgentsWidgetKind, botsWidgetKind]
     /// The most pinned agents the snapshot carries per list (a large widget shows 12).
     static let maximumPinnedAgents = 24
 

@@ -17,6 +17,7 @@ struct BighelpLiveActivityBundle: WidgetBundle {
         BighelpIdeasWidget()
         BighelpGoalsWidget()
         BighelpPinnedAgentsWidget()
+        BighelpBotsWidget()
         BighelpUsageWidget()
         BighelpWorkflowsWidget()
     }

@@ -127,6 +127,81 @@ final class SimpleBotsUITests: BighelpUITestCase {
         XCTAssertTrue(listed.waitForExistence(timeout: 5), "Unpinned, it's back in the list")
     }
 
+    /// Touch and hold a bot: Rearrange (no Save as Template; Hide is under More). Rearrange lets the top
+    /// bots be dragged (the primary bot too); Save keeps the order, Cancel drops it.
+    @MainActor
+    func testRearrangeReordersTheListAndTheTop() throws {
+        let app = makeApp()
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
+                               "-bighelp.settings.simple-bots", "YES", "-loopdy.demo.appearance", "dark",
+                               // Each run starts with no saved order, and keeps its own out of later runs.
+                               "-bighelp.simple-bots.order", "{}"]
+        app.launch()
+        let rows = app.descendants(matching: .any).matching(NSPredicate(
+            format: "identifier BEGINSWITH 'simple-bots.bot.' OR identifier BEGINSWITH 'simple-bots.group.'"))
+        XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 15))
+        let bots = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'simple-bots.bot.'"))
+        let draggedID = bots.element(boundBy: bots.count - 1).identifier
+        let agentID = String(draggedID.dropFirst("simple-bots.bot.".count))
+
+        // Pin it, so the top has two bots to arrange.
+        app.buttons[draggedID].press(forDuration: 1.2)
+        XCTAssertTrue(app.buttons["Rearrange"].waitForExistence(timeout: 5), "The menu offers Rearrange")
+        XCTAssertFalse(app.buttons["Save as Template"].exists, "Save as Template is gone")
+        XCTAssertFalse(app.buttons["Hide"].exists, "Hide moved into More")
+        app.buttons["More"].tap()
+        XCTAssertTrue(app.buttons["Hide"].waitForExistence(timeout: 5), "Hide is at the bottom of More")
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.06)).tap()
+        let listed = app.buttons[draggedID]
+        XCTAssertTrue(listed.waitForExistence(timeout: 5))
+        listed.press(forDuration: 1.2)
+        app.buttons["Pin"].tap()
+        XCTAssertTrue(app.buttons["simple-bots.pinned.\(agentID)"].waitForExistence(timeout: 5))
+
+        // A bot still in the list moves up; the pinned one goes before the primary bot.
+        let other = bots.element(boundBy: bots.count - 1).identifier
+        app.buttons[other].press(forDuration: 1.2)
+        app.buttons["Rearrange"].tap()
+        let saveButton = app.buttons["simple-bots.rearrange.save"]
+        XCTAssertTrue(saveButton.waitForExistence(timeout: 5), "Rearrange shows Save")
+        save("simple-rearrange-dark", app)
+        // The list's rows use the system's reorder handles, which the test can't drive; the top bots drag here.
+        let pinned = app.descendants(matching: .any)["simple-bots.pinned.\(agentID)"]
+        let primary = app.descendants(matching: .any)["simple-bots.primary"]
+        XCTAssertGreaterThan(pinned.frame.minX, primary.frame.minX)
+        pinned.press(forDuration: 0.1, thenDragTo: primary, withVelocity: .slow, thenHoldForDuration: 0.3)
+        XCTAssertTrue(waitUntil { pinned.frame.minX < primary.frame.minX }, "On top, the dragged bot goes first")
+        save("simple-rearranged-dark", app)
+        saveButton.tap()
+        XCTAssertTrue(app.buttons["simple-bots.search"].waitForExistence(timeout: 5), "Save ends rearranging")
+        XCTAssertLessThan(app.buttons["simple-bots.pinned.\(agentID)"].frame.minX, app.buttons["simple-bots.primary"].frame.minX)
+
+        // Cancel drops a change.
+        app.buttons["simple-bots.pinned.\(agentID)"].press(forDuration: 1.2)
+        app.buttons["Rearrange"].tap()
+        let pinnedAgain = app.descendants(matching: .any)["simple-bots.pinned.\(agentID)"]
+        pinnedAgain.press(forDuration: 0.1, thenDragTo: app.descendants(matching: .any)["simple-bots.primary"],
+                          withVelocity: .slow, thenHoldForDuration: 0.3)
+        app.buttons["simple-bots.rearrange.cancel"].tap()
+        XCTAssertTrue(app.buttons["simple-bots.search"].waitForExistence(timeout: 5))
+        XCTAssertLessThan(app.buttons["simple-bots.pinned.\(agentID)"].frame.minX, app.buttons["simple-bots.primary"].frame.minX,
+                          "Cancel keeps the saved order")
+
+        app.buttons["simple-bots.pinned.\(agentID)"].press(forDuration: 1.2)
+        app.buttons["Unpin"].tap()
+        XCTAssertTrue(app.buttons[draggedID].waitForExistence(timeout: 5))
+    }
+
+    @MainActor
+    private func waitUntil(_ condition: @escaping () -> Bool, timeout: TimeInterval = 5) -> Bool {
+        let end = Date().addingTimeInterval(timeout)
+        while Date() < end {
+            if condition() { return true }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        }
+        return condition()
+    }
+
     /// The message box: voice mode's pill inside it, Send in its place once there's text. Voice opens as a
     /// bar over the chat, which stays in use, and End closes the bar. Needs the microphone allowed for
     /// bighelp on the simulator (`simctl privacy … grant microphone`).

@@ -147,18 +147,70 @@ struct SimpleBotsTests {
         #expect(picked.rows.first?.id == "bot:nova")
     }
 
-    /// Six on top at most: the primary bot and five pinned ones. Later pins lead the list; hidden ones don't show.
-    @Test func topRowHoldsSixBots() {
-        let ids = ["default", "a", "b", "c", "d", "e", "f", "g"]
-        let profiles = ids.map { id in
+    private func bots(_ ids: [String], hidden: Set<String> = []) -> [AgentProfile] {
+        ids.map { id in
             AgentProfile(id: id, name: id.capitalized, role: "", summary: "", instructions: "", avatarFileName: nil,
-                         isDefault: id == "default", placement: id == "b" ? AgentListPlacement(isHidden: true) : nil)
+                         isDefault: id == "default", placement: hidden.contains(id) ? AgentListPlacement(isHidden: true) : nil)
         }
+    }
+
+    /// Six on top, all the same size: the primary bot and five pinned ones, three to a row. Later pins
+    /// lead the list; hidden ones don't show.
+    @Test func topHoldsTwoRowsOfThree() {
+        let profiles = bots(["default", "a", "b", "c", "d", "e", "f", "g"], hidden: ["b"])
         let home = SimpleBotsHomeProjection.home(profiles: profiles, primaryID: nil,
-                                                 pinnedIDs: ["a", "b", "c", "d", "e", "f", "g"], summaries: [])
+                                                 pinnedIDs: ["default", "a", "b", "c", "d", "e", "f", "g"], summaries: [])
+        #expect(home.primary?.id == "default")
         #expect(home.pinned.map(\.id) == ["a", "c", "d", "e", "f"])
-        #expect(1 + home.pinned.count == SimpleBotsHomeProjection.topRowLimit)
-        #expect(home.rows.map(\.id) == ["bot:g"], "The seventh pin leads the list")
+        let top = [home.primary!] + home.pinned
+        #expect(SimpleBotsHomeProjection.topRows(top).map { $0.map(\.id) } == [["default", "a", "c"], ["d", "e", "f"]])
+        #expect(home.rows.map(\.id) == ["bot:g"], "A pin past the top leads the list")
+        #expect(home.top.map(\.id) == ["default", "a", "c", "d", "e", "f"], "Undragged, the primary bot leads")
+
+        let dragged = SimpleBotsHomeProjection.home(profiles: profiles, primaryID: nil,
+                                                    pinnedIDs: ["default", "a", "c", "d"], summaries: [],
+                                                    topOrder: ["c", "default", "a"])
+        #expect(dragged.top.map(\.id) == ["c", "default", "a", "d"],
+                "The dragged order, the primary bot among them; a pin not placed yet follows")
+    }
+
+    /// Only pins the top shows count: the primary bot (pinned as the default), hidden bots and bots
+    /// this computer no longer has filled the shared list and left room for two.
+    @Test func onlyPinsTheHomeShowsCountTowardSix() {
+        let profiles = bots(["default", "hidden", "a", "b", "c"], hidden: ["hidden"])
+        let pins = ["default", "hidden", "gone", "a", "b"]
+        #expect(SimpleBotsHomeProjection.canPin("c", profiles: profiles, primaryID: nil, pinnedIDs: pins))
+        #expect(!SimpleBotsHomeProjection.canPin("default", profiles: profiles, primaryID: nil, pinnedIDs: pins),
+                "The primary bot isn't pinned below itself")
+        #expect(!SimpleBotsHomeProjection.canPin("a", profiles: profiles, primaryID: nil, pinnedIDs: pins), "Already pinned")
+        let full = bots(["default", "a", "b", "c", "d", "e", "f"])
+        #expect(!SimpleBotsHomeProjection.canPin("f", profiles: full, primaryID: nil,
+                                                 pinnedIDs: ["a", "b", "c", "d", "e"]), "Six on top is the most")
+    }
+
+    /// A dragged order wins; a bot or group chat not placed yet leads, by its latest chat.
+    @Test func draggedOrderPlacesTheListAndNewOnesLead() {
+        let profiles = bots(["default", "a", "b", "c", "new"])
+        let summaries = [SessionSummary(id: "c-chat", kind: .direct, agentIDs: ["c"], title: "c", preview: "Hi",
+                                        updatedAt: Date(timeIntervalSince1970: 90)),
+                         SessionSummary(id: "room", kind: .botMode, agentIDs: ["a", "b"], title: "Room", preview: "Yo",
+                                        updatedAt: Date(timeIntervalSince1970: 80))]
+        let home = SimpleBotsHomeProjection.home(profiles: profiles, primaryID: nil, pinnedIDs: [], summaries: summaries,
+                                                 order: ["bot:b", "group:room", "bot:a", "bot:c"])
+        #expect(home.rows.map(\.id) == ["bot:new", "bot:b", "group:room", "bot:a", "bot:c"])
+        #expect(SimpleBotsHomeProjection.moving("bot:c", to: "bot:b", in: home.rows.map(\.id))
+                == ["bot:new", "bot:c", "bot:b", "group:room", "bot:a"])
+        #expect(SimpleBotsHomeProjection.moving("bot:new", to: "bot:c", in: ["bot:new", "bot:b", "bot:c"])
+                == ["bot:b", "bot:c", "bot:new"], "Dragged down, it takes the place under the finger")
+    }
+
+    @Test func draggedOrderIsKeptPerComputer() {
+        let defaults = UserDefaults(suiteName: "SimpleBotsOrder-\(UUID().uuidString)")!
+        let store = SimpleBotsOrderStore(defaults: defaults)
+        store.set(["bot:a", "bot:b"], scope: "studio")
+        #expect(store.order(scope: "studio") == ["bot:a", "bot:b"])
+        #expect(store.order(scope: "laptop").isEmpty)
+        #expect(SimpleBotsOrderStore(defaults: defaults).order(scope: "studio") == ["bot:a", "bot:b"])
     }
 
     @Test func autoReviewIsSmartOrManualAndNeverTurnsApprovalsOff() async throws {

@@ -326,7 +326,14 @@ final class AgentDirectoryStore {
 
     @discardableResult
     func pinAgent(_ id: String) -> Bool {
-        guard canPin(id) else { return false }
+        pinAgent(id, limit: Self.pinnedAgentLimit, counting: pinnedAgentIDs.count)
+    }
+
+    /// Pins `id` while `counting` is under `limit`. Simple Bot mode counts only the
+    /// pinned bots its home shows (`SimpleBotsHomeProjection.canPin`).
+    @discardableResult
+    func pinAgent(_ id: String, limit: Int, counting: Int) -> Bool {
+        guard !isPinned(id), counting < limit, profiles.contains(where: { $0.id == id }) else { return false }
         pinnedAgentIDs.append(id)
         unpinnedAgentIDs.remove(id)
         persistPinState()

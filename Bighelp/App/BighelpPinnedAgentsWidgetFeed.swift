@@ -155,9 +155,9 @@ final class BighelpPinnedAgentsWidgetFeed {
 
     // MARK: Other computers
 
-    /// A Multi Gateway widget needs the other computers' pins: read them when
-    /// the app opens, at most once a minute (as All agents does). The demo's
-    /// sample computers are always read.
+    /// A Multi Gateway widget needs the other computers' pins, and a Bots widget on a
+    /// chosen gateway that computer's bots: read them when the app opens, at most once
+    /// a minute (as All agents does). The demo's sample computers are always read.
     func refreshOtherComputers() async {
         guard let fleet, fleet.hosts.count > 1 else { return }
         #if DEBUG
@@ -171,15 +171,18 @@ final class BighelpPinnedAgentsWidgetFeed {
         fleet.refresh()
     }
 
-    /// Whether a Pinned Agents widget on this device is set to Multi Gateway.
+    /// Whether a Pinned Agents widget on this device is set to Multi Gateway, or a Bots
+    /// widget to a chosen gateway.
     static func showsMultiGateway() async -> Bool {
         // The async form needs iOS 18; this one reaches back to iOS 17.
         await withCheckedContinuation { continuation in
             WidgetCenter.shared.getCurrentConfigurations { @Sendable result in
                 let widgets = (try? result.get()) ?? []
                 continuation.resume(returning: widgets.contains {
-                    $0.kind == BighelpWidgetSnapshot.pinnedAgentsWidgetKind
-                        && $0.widgetConfigurationIntent(of: PinnedAgentsWidgetIntent.self)?.scope == .multi
+                    ($0.kind == BighelpWidgetSnapshot.pinnedAgentsWidgetKind
+                        && $0.widgetConfigurationIntent(of: PinnedAgentsWidgetIntent.self)?.scope == .multi)
+                        || ($0.kind == BighelpWidgetSnapshot.botsWidgetKind
+                            && $0.widgetConfigurationIntent(of: BotsWidgetIntent.self)?.gateway?.hostID != nil)
                 })
             }
         }
@@ -212,6 +215,7 @@ struct PinnedAgentsWidgetHooks: ViewModifier {
         content
             .task {
                 BighelpPinnedAgentsWidgetFeed.shared.attach(agents: agents, fleet: fleet)
+                BighelpBotsWidgetFeed.shared.attach(agents: agents, fleet: fleet)
                 #if DEBUG
                 if let demo {
                     BighelpPinnedAgentsWidgetFeed.shared.publishDemo(sessions: demo.sessions,

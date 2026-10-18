@@ -599,6 +599,8 @@ New code uses Bighelp names. Don't "finish" the rename on this list.
   - Public TestFlight builds go out only when the maintainer says so. They cover everything since the last public
     build, with one set of notes, because every build notifies every tester.
   - When both repos change, release the plugin first, then the app build that needs it.
+- **Release notes** for each App Store version live in [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md), in ASD-STE100
+  plain English. The App Store "What's New", the TestFlight notes and the Mac release notes come from it.
 - **TestFlight "What to Test" notes** are plain text. Some symbols (like ☰) are rejected. Write them for testers:
   - new features
   - bug fixes

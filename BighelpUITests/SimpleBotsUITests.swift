@@ -71,6 +71,62 @@ final class SimpleBotsUITests: BighelpUITestCase {
         }
     }
 
+    /// A bot's profile: More avatars opens the full studio with the marks in it, and Save comes back
+    /// to the profile; Default Model opens the model and reasoning picker.
+    @MainActor
+    func testProfileOpensTheStudioAndTheModelPicker() throws {
+        let app = launch(appearance: "dark")
+        XCTAssertTrue(app.descendants(matching: .any)["simple-bots.home"].waitForExistence(timeout: 15))
+        app.buttons["simple-bots.primary"].tap()
+        let identity = app.buttons["chat.identity"]
+        XCTAssertTrue(identity.waitForExistence(timeout: 10))
+        identity.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["simple-bots.profile"].waitForExistence(timeout: 5))
+        save("simple-profile-rows-dark", app)
+
+        let more = app.buttons["simple-bots.profile.more-avatars"]
+        XCTAssertTrue(more.waitForExistence(timeout: 5))
+        more.tap()
+        let bots = app.buttons["avatar.creator.category.bots"]
+        XCTAssertTrue(bots.waitForExistence(timeout: 5), "The studio offers the bot marks")
+        XCTAssertTrue(app.buttons["avatar.creator.category.bighelp"].exists, "And every other avatar")
+        bots.tap()
+        // The profile under the sheet has the same picker; these are the studio's.
+        let marks = app.descendants(matching: .any)["avatar.creator.bots"]
+        XCTAssertTrue(marks.waitForExistence(timeout: 5))
+        marks.buttons["simple-bots.shape.heart"].tap()
+        marks.buttons["simple-bots.color.teal"].tap()
+        save("simple-studio-dark", app)
+        app.buttons["Save"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["simple-bots.profile"].waitForExistence(timeout: 5),
+                      "Save comes back to the profile")
+        XCTAssertFalse(app.buttons["avatar.creator.category.bots"].exists)
+
+        let model = app.buttons["simple-bots.profile.default-model"]
+        XCTAssertTrue(model.waitForExistence(timeout: 10), "Default Model is under Instructions")
+        model.tap()
+        XCTAssertTrue(app.navigationBars["Default Model"].waitForExistence(timeout: 5)
+                      || app.staticTexts["Default Model"].waitForExistence(timeout: 2))
+        save("simple-default-model-dark", app)
+    }
+
+    /// A pinned bot joins the primary one in the top row, and goes back to the list when unpinned.
+    @MainActor
+    func testPinnedBotsJoinTheTopRow() throws {
+        let app = launch(appearance: "dark")
+        let listed = app.buttons["simple-bots.bot.travel"]
+        XCTAssertTrue(listed.waitForExistence(timeout: 15))
+        listed.press(forDuration: 1.2)
+        app.buttons["Pin"].tap()
+        let pinned = app.buttons["simple-bots.pinned.travel"]
+        XCTAssertTrue(pinned.waitForExistence(timeout: 5), "Pinned bots sit beside the primary one")
+        XCTAssertFalse(listed.exists, "And leave the list")
+        save("simple-home-pinned-dark", app)
+        pinned.press(forDuration: 1.2)
+        app.buttons["Unpin"].tap()
+        XCTAssertTrue(listed.waitForExistence(timeout: 5), "Unpinned, it's back in the list")
+    }
+
     @MainActor
     func testTurningSimpleBotModeOffComesBackToBighelp() throws {
         let app = launch(appearance: "light")

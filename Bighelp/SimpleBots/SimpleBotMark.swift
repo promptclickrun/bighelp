@@ -194,8 +194,12 @@ struct SimpleBotMarkView: View {
     let mark: SimpleBotMark
     var size: CGFloat
     var isPrimary = false
+    /// Blinks now and then, so the bot looks alive (never with Reduce Motion).
+    var blinks = false
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isBlinking = false
 
     var body: some View {
         ZStack {
@@ -212,6 +216,7 @@ struct SimpleBotMarkView: View {
         .overlay(alignment: .bottomTrailing) {
             if isPrimary { SimpleBotPrimaryBadge(size: size * 0.3) }
         }
+        .task(id: blinks && !reduceMotion) { await blink() }
         .accessibilityHidden(true)
     }
 
@@ -221,7 +226,20 @@ struct SimpleBotMarkView: View {
             eye
             eye
         }
+        .scaleEffect(x: 1, y: isBlinking ? 0.1 : 1)
         .position(x: size * center.x, y: size * center.y)
+    }
+
+    /// A quick blink every few seconds, at its own pace, so marks side by side don't blink together.
+    private func blink() async {
+        guard blinks, !reduceMotion else { return }
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .milliseconds(Int.random(in: 2_400...5_600)))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeIn(duration: 0.07)) { isBlinking = true }
+            try? await Task.sleep(for: .milliseconds(110))
+            withAnimation(.easeOut(duration: 0.1)) { isBlinking = false }
+        }
     }
 
     private var eye: some View {
@@ -295,6 +313,8 @@ struct SimpleBotFace: View {
     let imageURL: URL?
     var size: CGFloat
     var isPrimary = false
+    /// Marks blink now and then; characters and pets move on their own.
+    var blinks = false
 
     @Environment(\.companionAgentScope) private var scope
     @Environment(\.companionStore) private var companions
@@ -302,14 +322,14 @@ struct SimpleBotFace: View {
     var body: some View {
         Group {
             if let mark = SimpleBotMarkStore.shared.mark(scope: scope, agentID: agentID) {
-                SimpleBotMarkView(mark: mark, size: size, isPrimary: isPrimary)
+                SimpleBotMarkView(mark: mark, size: size, isPrimary: isPrimary, blinks: blinks)
             } else if hasOwnPicture {
                 AgentLiveAvatar(agentID: agentID, displayName: name, imageURL: imageURL, size: size, showsBadge: false)
                     .overlay(alignment: .bottomTrailing) {
                         if isPrimary { SimpleBotPrimaryBadge(size: size * 0.3) }
                     }
             } else {
-                SimpleBotMarkView(mark: .defaultMark(for: agentID), size: size, isPrimary: isPrimary)
+                SimpleBotMarkView(mark: .defaultMark(for: agentID), size: size, isPrimary: isPrimary, blinks: blinks)
             }
         }
         .frame(width: size, height: size)

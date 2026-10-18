@@ -83,15 +83,29 @@ private struct BighelpFormSurfaceModifier: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.colorSchemeContrast) private var contrast
 
+    @ViewBuilder
     func body(content: Content) -> some View {
         let theme = BighelpTheme.resolve(appearance: appearance, colorScheme: colorScheme, contrast: contrast)
-        content
+        let form = content
             .formStyle(.grouped)
             .bighelpFont(.body)
             .environment(\.defaultMinListRowHeight, BighelpTokens.hitTarget)
             .scrollContentBackground(.hidden)
             .background(theme.canvas.ignoresSafeArea())
             .tint(theme.action)
+        if appearance.simpleBots {
+            form.toggleStyle(SimpleBotsSwitchStyle())
+        } else {
+            form
+        }
+    }
+}
+
+/// Simple Bot mode tints with the page's ink, which is white after dark: a switch would be white on
+/// white. Its switches are green, as on its own Settings page.
+private struct SimpleBotsSwitchStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        Toggle(configuration).toggleStyle(.automatic).tint(SimpleBotColor.green.color)
     }
 }
 

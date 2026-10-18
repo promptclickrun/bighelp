@@ -11,6 +11,8 @@ struct SimpleBotProfileContext {
     let onOpenChat: (String) -> Void
     let onOpenRoutine: (ScheduledTask) -> Void
     let onEditDetails: (AgentProfile) -> Void
+    /// The bot's default model and reasoning, where the computer lets the app read and change them.
+    var makeModelDefaults: ((String) -> AgentRuntimeDefaultsEditorModel?)? = nil
 }
 
 /// A bot's profile in Simple Bot mode: its mark, name and role, then Info
@@ -35,7 +37,13 @@ struct SimpleBotProfileView: View {
     @State private var newRoutine = false
     @State private var screen: BotScreenTabModel?
     @State private var templateNotice: String?
+    @State private var isStudioPresented = false
+    @State private var modelDefaults: AgentRuntimeDefaultsEditorModel?
+    @State private var isModelPresented = false
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appAppearance) private var appearance
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.companionAgentScope) private var scope
     @Environment(\.companionStore) private var companions
     @BighelpThemeReader private var theme
@@ -57,6 +65,10 @@ struct SimpleBotProfileView: View {
         .background(theme.canvas.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .task(id: agentID) {
+            modelDefaults = context.canEdit ? context.makeModelDefaults?(agentID) : nil
+            await modelDefaults?.loadIfNeeded()
+        }
+        .task(id: agentID) {
             guard let service = context.screenService else { return }
             let model = BotScreenTabModel(agentID: agentID, service: service)
             screen = model
@@ -66,6 +78,32 @@ struct SimpleBotProfileView: View {
             if let profile {
                 SimpleBotInstructionsEditor(profile: profile, agents: context.agents)
                     .bighelpSheetSize(.large)
+            }
+        }
+        .bighelpSheet(isPresented: $isStudioPresented) {
+            if let profile {
+                AvatarCreatorView(
+                    start: SimpleBotAvatarSaving.start(for: profile, agents: context.agents, companions: companions,
+                                                       scope: scope),
+                    characters: AvatarCreatorModel.surprise(), agentName: profile.name,
+                    faceName: AgentEditorModel.editing(profile, store: context.agents,
+                                                       processor: AvatarImageProcessor()).faceName,
+                    petSource: PetdexSource(store: context.agents, cacheScope: "\(ObjectIdentifier(context.agents))"),
+                    offersBotMarks: true, useTitle: "Save"
+                ) { result in saveAvatar(result, for: profile) }
+                .presentationDragIndicator(.visible)
+                #if os(visionOS)
+                .presentationSizing(.page)
+                #endif
+                .bighelpSheetSize(.large)
+            }
+        }
+        .bighelpSheet(isPresented: $isModelPresented) {
+            if let profile, let modelDefaults {
+                SimpleBotDefaultModelSheet(defaults: modelDefaults, botName: profile.name) { isModelPresented = false }
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+                    .bighelpSheetSize(.standard)
             }
         }
         .bighelpSheet(isPresented: $newRoutine) {
@@ -229,6 +267,18 @@ struct SimpleBotProfileView: View {
                 .buttonStyle(.plain)
                 .disabled(!context.canEdit)
                 .accessibilityIdentifier("simple-bots.profile.reset-mark")
+                SimpleBotsDivider()
+                Button { isStudioPresented = true } label: {
+                    Text("More avatars")
+                        .font(.bighelp(.body))
+                        .foregroundStyle(theme.information)
+                        .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+                        .padding(.horizontal, BighelpTokens.space20)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .disabled(!context.canEdit)
+                .accessibilityIdentifier("simple-bots.profile.more-avatars")
             }
             Text(saveState ?? (context.canEdit ? "How this Bot's mark looks everywhere"
                                                : "This computer doesn't let the app change this bot."))
@@ -244,6 +294,15 @@ struct SimpleBotProfileView: View {
                 .buttonStyle(.plain)
                 .disabled(!context.canEdit)
                 .accessibilityIdentifier("simple-bots.profile.instructions")
+                if let modelDefaults {
+                    SimpleBotsDivider()
+                    Button { isModelPresented = true } label: {
+                        SimpleBotsRow(title: "Default Model", leading: Image(systemName: "cpu"),
+                                      value: modelName(modelDefaults))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("simple-bots.profile.default-model")
+                }
             }
             .padding(.top, BighelpTokens.space12)
 
@@ -318,6 +377,38 @@ struct SimpleBotProfileView: View {
                 saveState = "Saved on this device. The computer didn't take the picture; try again later."
             }
         }
+    }
+
+    /// The studio's pick, saved at once; the face at the top changes as soon as it's in.
+    private func saveAvatar(_ result: AvatarCreatorResult, for profile: AgentProfile) {
+        if case .mark(let newMark) = result {
+            pick(newMark, for: profile)
+            return
+        }
+        saveTask?.cancel()
+        mark = nil
+        saveState = "Saving…"
+        let agents = context.agents
+        let companions = companions
+        let scope = scope
+        let look = SimpleBotAvatarSaving.Look(appearance: appearance, colorScheme: colorScheme, contrast: contrast)
+        saveTask = Task { @MainActor in
+            do {
+                let current = agents.profiles.first { $0.id == profile.id } ?? profile
+                try await SimpleBotAvatarSaving.save(result, for: current, agents: agents, companions: companions,
+                                                     scope: scope, look: look)
+                guard !Task.isCancelled else { return }
+                saveState = "Saved. This is how \(profile.name) looks everywhere."
+            } catch {
+                guard !Task.isCancelled else { return }
+                saveState = "The computer didn't take the new avatar. Try again."
+            }
+        }
+    }
+
+    private func modelName(_ defaults: AgentRuntimeDefaultsEditorModel) -> String {
+        let modelID = defaults.draft[.mainChats].modelID
+        return modelID.isEmpty ? "Automatic" : ModelNameCatalog.empty.displayName(for: modelID)
     }
 
     private func saveTemplate(_ profile: AgentProfile) {

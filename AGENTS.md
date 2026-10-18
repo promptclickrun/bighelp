@@ -262,6 +262,14 @@ change in both repos.
 - **Stale incremental builds:** after changing what a `some View` property returns in one file, a Debug build can
   crash in another file that uses it (`EXC_BAD_ACCESS` in `ViewBuilder.buildExpression`, two-frame stack). Touch
   the files that use it and rebuild before chasing it.
+- **Live properties read outside `body`:** calling another view's computed property (a section of
+  `SettingsView`, say) from elsewhere reads its `@Environment` and `@BighelpThemeReader` with their defaults,
+  the light theme, so Simple Bot mode's pages drew white rows and light-mode grays at night. Build such a page
+  in the view's own `body` (`opening(_:)`, `simpleBotsPage(_:)`).
+- **Light and Dark on open sheets:** `.preferredColorScheme` gives a sheet its style when it opens and doesn't
+  change it after, so a switch in Settings left the open sheet's text fields and pickers in the old style.
+  `BighelpWindowAppearance` sets every window and presented controller, and each `bighelpSheet` and
+  `bighelpFullScreenCover` applies it as it opens.
 - **One long-press menu per List row:** a List row shows the first `.contextMenu` in it for every item, so a grid of
   tiles in one row acted on the wrong item (holding a pinned chat offered another chat's Delete). Give each tile a
   `Menu(primaryAction:)` or its own gesture (`AgentPinnedGrid`).

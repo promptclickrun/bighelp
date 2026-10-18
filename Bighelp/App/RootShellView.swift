@@ -569,9 +569,10 @@ struct RootShellView: View {
     private var shell: some View {
         rootTabs
         .toolbar(.hidden, for: .tabBar)
-        // Boards and Simple Bot mode's home draw their own header.
-        .toolbar(showsAgentBoard || showsSimpleBotsHome ? .hidden : .automatic, for: .navigationBar)
-        .navigationTitle(showsAgentBoard || showsSimpleBotsHome ? "" : rootNavigationTitle)
+        // Boards and Simple Bot mode's home draw their own header. The home's stays hidden while a
+        // chat is pushed over it too: its bar (with ☰) showed through for the length of Back.
+        .toolbar(showsAgentBoard || simpleBotsHomeIsRoot ? .hidden : .automatic, for: .navigationBar)
+        .navigationTitle(showsAgentBoard || simpleBotsHomeIsRoot ? "" : rootNavigationTitle)
         // One title size on every tab: the bar's. A large title kept the size of the tab before
         // (small after Feed or Kanban, large after Chat), so the same screen looked different.
         .navigationBarTitleDisplayMode(.inline)

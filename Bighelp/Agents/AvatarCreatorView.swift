@@ -10,6 +10,8 @@ enum AvatarCreatorResult {
     /// A petdex pet's first frame, ready to save; its moves play in chats.
     case pet(PetdexPet, avatar: Data)
     case photo(PhotosPickerItem)
+    /// A Simple Bot mode mark: a shape in a color, with two eyes.
+    case mark(SimpleBotMark)
 }
 
 /// Where the creator opens. Editing an agent opens on the avatar it has now, so
@@ -25,6 +27,8 @@ enum AvatarCreatorStart: Equatable {
     case pet(slug: String, picture: Data?)
     /// A photo, or no avatar at all when there's no picture.
     case photo(Data?)
+    /// A Simple Bot mode mark.
+    case mark(SimpleBotMark)
 }
 
 /// Agent Studio avatar creator: pick a character or a Bit, then make it yours
@@ -35,7 +39,7 @@ enum AvatarCreatorStart: Equatable {
 final class AvatarCreatorModel {
     /// What the stage draws: a catalog character, Hermes Desktop's face or shape, a pet or a photo.
     enum Style: String, CaseIterable, Identifiable {
-        case catalog, face, shapes, pets, photo
+        case catalog, face, shapes, pets, photo, bots
 
         var id: String { rawValue }
 
@@ -46,6 +50,7 @@ final class AvatarCreatorModel {
             case .shapes: "Shapes"
             case .pets: "Pets"
             case .photo: "Photo"
+            case .bots: "Bots"
             }
         }
     }
@@ -53,12 +58,13 @@ final class AvatarCreatorModel {
     /// The picker's top row: bighelp's own art, Hermes's faces and shapes, petdex, approved
     /// community art, or a photo.
     enum Category: String, CaseIterable, Identifiable {
-        case bighelp, hermes, petdex, other, photo
+        case bots, bighelp, hermes, petdex, other, photo
 
         var id: String { rawValue }
 
         var title: String {
             switch self {
+            case .bots: "Bots"
             case .bighelp: "bighelp"
             case .hermes: "hermes"
             case .petdex: "petdex"
@@ -67,6 +73,12 @@ final class AvatarCreatorModel {
             }
         }
     }
+
+    /// Simple Bot mode's marks are offered where that mode opens the creator.
+    var offersBotMarks = false
+    var categories: [Category] { Category.allCases.filter { $0 != .bots || offersBotMarks } }
+    /// The Simple Bot mark being made while `style` is `.bots`.
+    var botMark = SimpleBotMark(shape: .circle, color: .blue)
 
     var style: Style = .catalog
     /// Which catalog group the characters come from while `style` is `.catalog`.
@@ -78,11 +90,13 @@ final class AvatarCreatorModel {
         case .face, .shapes: .hermes
         case .pets: .petdex
         case .photo: .photo
+        case .bots: .bots
         }
     }
 
     func select(_ category: Category) {
         switch category {
+        case .bots: style = .bots
         case .bighelp: style = .catalog; catalogGroup = .bighelp
         case .other: style = .catalog; catalogGroup = .other
         case .hermes: if style != .face, style != .shapes { style = .face }
@@ -189,6 +203,10 @@ final class AvatarCreatorModel {
             style = .photo
             currentPicture = picture
             hasNoAvatar = picture == nil
+        case .mark(let mark):
+            self.init(appearance: characters, catalog: catalog)
+            style = .bots
+            botMark = mark
         }
         if case .surprise = start { return }
         opening = choice
@@ -201,6 +219,7 @@ final class AvatarCreatorModel {
         case shape(String, color: String?)
         case pet(String?)
         case photo
+        case mark(SimpleBotMark)
     }
 
     private var choice: Choice {
@@ -210,6 +229,7 @@ final class AvatarCreatorModel {
         case .shapes: .shape(shape, color: shapeColor)
         case .pets: .pet(selectedPet?.slug ?? currentPetSlug)
         case .photo: .photo
+        case .bots: .mark(botMark)
         }
     }
 
@@ -271,7 +291,14 @@ final class AvatarCreatorModel {
             selectedPetAvatar.flatMap { data in selectedPet.map { .pet($0, avatar: data) } }
         case .photo:
             nil
+        case .bots:
+            .mark(botMark)
         }
+    }
+
+    func randomizeMark() {
+        botMark = SimpleBotMark(shape: SimpleBotShape.allCases.filter { $0 != botMark.shape }.randomElement() ?? botMark.shape,
+                                color: SimpleBotColor.allCases.filter { $0 != botMark.color }.randomElement() ?? botMark.color)
     }
 
     /// New agents start from a random pleasant look instead of the same one.
@@ -367,6 +394,8 @@ struct AvatarCreatorView: View {
     let agentName: String
     /// The profile name Hermes faces are drawn from.
     let faceName: String
+    /// What the confirm button says: "Use avatar" in Agent Studio, "Save" where it saves at once.
+    let useTitle: String
     let onUse: (AvatarCreatorResult) -> Void
     @Environment(\.dismiss) private var dismiss
     #if os(visionOS)
@@ -383,12 +412,17 @@ struct AvatarCreatorView: View {
         agentName: String,
         faceName: String,
         petSource: PetdexSource,
+        offersBotMarks: Bool = false,
+        useTitle: String = "Use avatar",
         onUse: @escaping (AvatarCreatorResult) -> Void
     ) {
-        _model = State(initialValue: AvatarCreatorModel(start: start, characters: characters))
+        let model = AvatarCreatorModel(start: start, characters: characters)
+        model.offersBotMarks = offersBotMarks
+        _model = State(initialValue: model)
         _pets = State(initialValue: PetdexGalleryModel(source: petSource))
         self.agentName = agentName
         self.faceName = faceName
+        self.useTitle = useTitle
         self.onUse = onUse
     }
 
@@ -416,7 +450,7 @@ struct AvatarCreatorView: View {
                         .bighelpToolbarText()
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Use avatar") {
+                    Button(useTitle) {
                         guard model.canUse(faceName: faceName), let result = model.result(faceName: faceName) else { return }
                         onUse(result)
                         dismiss()
@@ -547,7 +581,7 @@ struct AvatarCreatorView: View {
             .buttonStyle(.plain)
             .padding(BighelpTokens.space8)
             .accessibilityLabel("Randomize")
-            .accessibilityHint("Tries a random \(model.style == .pets ? "pet" : model.style == .shapes ? "shape" : model.style == .face ? "face" : "character and look").")
+            .accessibilityHint("Tries a random \(model.style == .pets ? "pet" : model.style == .shapes ? "shape" : model.style == .face ? "face" : model.style == .bots ? "shape and color" : "character and look").")
             .accessibilityIdentifier("avatar.creator.shuffle")
             }
         }
@@ -586,6 +620,7 @@ struct AvatarCreatorView: View {
         case .shapes: HermesShapeFace.displayName(model.shape)
         case .pets: model.selectedPet?.displayName ?? "Pets"
         case .photo: model.hasNoAvatar ? "No avatar yet" : "Photo"
+        case .bots: model.botMark.shape.title
         }
     }
 
@@ -726,6 +761,11 @@ struct AvatarCreatorView: View {
         case .shapes: shapesPanel
         case .pets: petsPanel
         case .photo: photoPanel
+        case .bots:
+            SimpleBotMarkPicker(mark: $model.botMark)
+                .padding(.top, BighelpTokens.space8)
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("avatar.creator.bots")
         }
     }
 
@@ -796,6 +836,8 @@ struct AvatarCreatorView: View {
             if let pet = choices.randomElement() { Task { await model.select(pet, gallery: pets) } }
         case .photo:
             break
+        case .bots:
+            model.randomizeMark()
         }
     }
 
@@ -1011,7 +1053,7 @@ struct AvatarCreatorView: View {
     private var styleBar: some View {
         ScrollView(.horizontal) {
             HStack(spacing: BighelpTokens.space8) {
-                ForEach(AvatarCreatorModel.Category.allCases) { category in
+                ForEach(model.categories) { category in
                     let isSelected = model.category == category
                     Button {
                         withAnimation(.snappy) { model.select(category) }
@@ -1080,6 +1122,8 @@ struct AvatarCreatorView: View {
             } else {
                 stagePlaceholder("pawprint", "Pick a pet below")
             }
+        case .bots:
+            SimpleBotMarkView(mark: model.botMark, size: Self.hermesPreviewSize)
         case .photo, .catalog:
             if let picture = model.currentPicture, let image = UIImage(data: picture) {
                 Image(uiImage: image).resizable().scaledToFill().clipShape(.circle)

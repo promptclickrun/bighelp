@@ -735,7 +735,7 @@ struct BighelpAppearanceContext: Equatable, Sendable {
     var bubbleHex: String? { customBubbleHex ?? bubbleColor?.hex }
     /// Vision Pro: 0 is a solid window, 1 shows the room through the glass.
     var windowTransparency = BighelpVisionGlass.defaultTransparency
-    /// Simple Bot mode's look: your bubbles and buttons black by day, ink after dark.
+    /// Simple Bot mode's look: black bubbles by day and ink after dark, unless a bubble color was picked.
     var simpleBots = false
 
     init(
@@ -770,12 +770,16 @@ extension BighelpTheme {
         case (true, .increased): definition.darkHighContrast
         @unknown default: dark ? definition.dark : definition.light
         }
-        // Black bubbles would vanish on a black page, so after dark they're ink.
-        let simpleBubble = context.simpleBots ? (dark ? "3A3A3F" : "111111") : nil
+        // Simple Bot mode's own look, unless a bubble color was picked in Appearance: black bubbles by day
+        // (they'd vanish on a black page, so ink after dark), and buttons and tinted text in the page's ink
+        // (the gray bubble color read as grayed out).
+        let simpleDefault = context.simpleBots && context.bubbleHex == nil
+        let simpleBubble = simpleDefault ? (dark ? "3A3A3F" : "111111") : nil
+        let simpleInk = simpleDefault ? (dark ? "FFFFFF" : "111111") : nil
         var theme = selected.resolvedForLivePresentation(
             colorScheme: dark ? .dark : .light, contrast: contrast,
             lightBackground: context.lightBackground, darkBackground: context.darkBackground,
-            bubbleColor: context.bubbleColor, customBubbleHex: simpleBubble ?? context.customBubbleHex)
+            bubbleColor: context.bubbleColor, customBubbleHex: simpleInk ?? context.customBubbleHex)
         theme.chosenBubbleHex = simpleBubble ?? context.bubbleHex
         theme.visionCanvasOpacity = BighelpVisionGlass.canvasOpacity(forTransparency: context.windowTransparency,
                                                                      dark: dark)

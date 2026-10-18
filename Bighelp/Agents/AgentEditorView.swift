@@ -259,6 +259,7 @@ struct AgentEditorView: View {
                 case .look(let look): prepareLookAvatar(look)
                 case .pet(let pet, let avatar): preparePetAvatar(pet, data: avatar)
                 case .photo(let item): photoSelection = item
+                case .mark(let mark): prepareMarkAvatar(mark)
                 }
             }
             .presentationDragIndicator(.visible)
@@ -623,6 +624,29 @@ struct AgentEditorView: View {
                 try Task.checkCancellation()
                 guard ownsAvatarPreparation(requestID) else { return }
                 try await model.importLookAvatar(data: data, look: look)
+            } catch is CancellationError {
+                return
+            } catch is AvatarImageProcessor.Error {
+                // The model already exposed a format or size-specific recovery message.
+            } catch {
+                guard ownsAvatarPreparation(requestID) else { return }
+                model.reportCompanionAvatarRenderFailure()
+            }
+        }
+    }
+
+    /// A Simple Bot mark, as the picture everyone sees.
+    private func prepareMarkAvatar(_ mark: SimpleBotMark) {
+        photoSelection = nil
+        let requestID = beginAvatarPreparation(label: "Preparing avatar")
+        avatarPreparationTask = Task { @MainActor in
+            defer { finishAvatarPreparation(requestID) }
+            do {
+                guard let data = SimpleBotMarkView.png(mark) else {
+                    throw AgentCompanionAvatarRenderer.RenderError.emptyImage
+                }
+                guard ownsAvatarPreparation(requestID) else { return }
+                try await model.importAvatar(data: data)
             } catch is CancellationError {
                 return
             } catch is AvatarImageProcessor.Error {

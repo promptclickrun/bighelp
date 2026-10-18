@@ -316,8 +316,19 @@ messages and answers other agents send in) are one quiet centered line in the ch
 plugin's `agents/talk` feed, "Nova is searching the web…". Back-to-back messages share one line. It stays
 out of the finished-turn fold and shows with tool calls and reasoning hidden, because it's conversation. A tap
 opens what they said as a short chat between them, with "What Nova did" from Nova's own chat. Simple Bot
-mode draws the faces as marks. Settings › Assistants › Teamwork (opt-in, plugin `native-team-v1`) tells every
-agent who the others are and how to ask them for help.
+mode draws the faces as marks. A `message_agent` message and its later answer are two lines, each where it
+happened: "Asked Nova" and "Nova answered"; the delivery notice that only repeats the answer stays out. Hermes
+runs some turns on its own (another agent wrote in, a background process finished), and other Hermes processes
+write some messages, so neither streams here: the chat reads what Hermes saved when such a turn ends, and while
+an answer is due. When another Hermes process runs the open chat (an agent another one asked, in its Bot Chat),
+the plugin's `chat/activity` says so: the agent shows typing, with Stop (`chat/stop`, Ctrl-C to that process).
+Settings › Assistants › Teamwork (opt-in, plugin `native-team-v1`) tells every agent who the others are and to
+hand them the work their roles cover, without being asked.
+
+An opened "Worked for…" fold shows its tools directly, never a "Called N tools" folder inside it.
+
+A file in a chat opens in the native preview with Save and Share. A Markdown file opens rendered
+(`MarkdownMessageView`, as chat messages are), with a Preview and Raw switch under its name.
 
 Compacting (⋯ › Advanced › Compact, or Hermes on its own when the context fills) shows `ChatCompactionRail` above the
 message box: a chip whose four-step bar moves once a second (still with Reduce Motion), then Compacted with the tokens
@@ -336,12 +347,15 @@ keyboard.
 ## Simple Bot mode
 
 An opt-in calm home (Settings › Experience › Simple Bot mode): just your bots and their chats. No tab bar
-and no ☰. The page is white by day and black at night, your bubbles are black (ink after dark), and the
+and no ☰. The page is white by day and black at night, your bubbles are black (ink after dark) unless you
+picked a bubble color in Appearance, and buttons and tinted text are the page's ink (white after dark). The
 text is SF Pro, as everywhere.
 
 - **Home**: your circle top left opens Settings; search and + (New Bot, New Group Chat) top right. The
-  primary bot leads, large, with a star; under it every other bot (pinned first, then by its latest
-  message) and each group chat, with the latest message and its time. Hidden bots stay off the home;
+  primary bot leads, large, with a star, and pinned bots join it there (two or three across, six bots at
+  most); their marks blink now and then (never with Reduce Motion). Under them every other bot (any further
+  pinned ones first, then by its latest message) and each group chat, with the latest message and its time; a bot's role is a small gray label
+  after its name. Hidden bots stay off the home;
   search's filter shows them.
 - **Touch and hold** a bot: its latest message, then Mark Unread (kept on this device), Pin, Replace
   Primary Bot… or Make Primary Bot, Save as Template, Hide, and More (profile, new chat, routines).
@@ -351,8 +365,10 @@ text is SF Pro, as everywhere.
   already has a picture, character or pet keeps it until a mark is picked; one with none starts on a
   mark made from its ID.
 - **Chat**: Back, the bot's name (its profile) and ⋯; no New chat button.
-- **Profile**: the mark, name and role, then Info (Character, Instructions, Routines) and Computer
-  (its screen, when the host has one).
+- **Profile**: the mark, name and role, then Info (Character, Instructions, Default Model, Routines) and
+  Computer (its screen, when the host has one). More avatars opens the full avatar studio (`AvatarCreatorView`)
+  with the marks as its Bots section; Save applies the pick at once. Default Model is the model and reasoning
+  picker, saved as the bot's default for chats.
 - **Settings**: you and Usage (your tightest plan limit); Connect apps; the primary bot's Auto-review
   (Hermes' smart approvals on, manual off; never off), its rules, and the time zone every bot works in
   (or this device's, automatically); Teamwork; Bot Computer; Notifications and Appearance; then the

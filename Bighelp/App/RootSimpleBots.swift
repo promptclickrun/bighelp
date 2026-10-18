@@ -6,9 +6,9 @@ extension RootShellView {
     /// The all-hosts view keeps its own list.
     var simpleBotsOn: Bool { settings.simpleBotsEnabled && !fleetModeOn }
 
-    /// The home on screen: no bar, no ☰; the person's circle opens Settings.
-    var showsSimpleBotsHome: Bool {
-        simpleBotsOn && appState.path.isEmpty && appState.selectedTab == .sessions
+    /// The home is the tab's root, whatever is pushed over it: no bar, no ☰; the person's circle opens Settings.
+    var simpleBotsHomeIsRoot: Bool {
+        simpleBotsOn && appState.selectedTab == .sessions
     }
 
     var simpleBotsHome: some View {
@@ -87,6 +87,14 @@ extension RootShellView {
                 guard let owner else { return }
                 workspaceProfileEditor = .editing(profile, store: agents, processor: AvatarImageProcessor(),
                                                   isCurrent: { currentWorkspaceOwner?.signIn == owner.signIn })
+            },
+            makeModelDefaults: { id in
+                let capabilities = currentWorkspaceCapabilities
+                guard usesWorkspaceFixtures || owner.map({
+                    capabilities.supports(.modelsRead, owner: $0, profileID: id)
+                        && capabilities.supports(.agentDefaultsEdit, owner: $0, profileID: id)
+                }) == true else { return nil }
+                return AgentRuntimeDefaultsEditorModel(agentID: id, client: agentRuntimeDefaults)
             }
         )
     }

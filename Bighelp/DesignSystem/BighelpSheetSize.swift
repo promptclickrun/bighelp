@@ -38,20 +38,20 @@ extension View {
     func bighelpSheet<Content: View>(isPresented: Binding<Bool>, onDismiss: (() -> Void)? = nil,
                                      @ViewBuilder content: @escaping () -> Content) -> some View {
         #if targetEnvironment(macCatalyst)
-        sheet(isPresented: isPresented, onDismiss: onDismiss, content: content)
+        sheet(isPresented: isPresented, onDismiss: onDismiss) { content().bighelpPresentedAppearance() }
             .background { BighelpMacSheetCloser(token: isPresented.wrappedValue ? AnyHashable(true) : nil) }
         #else
-        sheet(isPresented: isPresented, onDismiss: onDismiss, content: content)
+        sheet(isPresented: isPresented, onDismiss: onDismiss) { content().bighelpPresentedAppearance() }
         #endif
     }
 
     func bighelpSheet<Item: Identifiable, Content: View>(item: Binding<Item?>, onDismiss: (() -> Void)? = nil,
                                                          @ViewBuilder content: @escaping (Item) -> Content) -> some View {
         #if targetEnvironment(macCatalyst)
-        sheet(item: item, onDismiss: onDismiss, content: content)
+        sheet(item: item, onDismiss: onDismiss) { content($0).bighelpPresentedAppearance() }
             .background { BighelpMacSheetCloser(token: item.wrappedValue.map { AnyHashable($0.id) }) }
         #else
-        sheet(item: item, onDismiss: onDismiss, content: content)
+        sheet(item: item, onDismiss: onDismiss) { content($0).bighelpPresentedAppearance() }
         #endif
     }
 
@@ -59,10 +59,10 @@ extension View {
     func bighelpFullScreenCover<Content: View>(isPresented: Binding<Bool>, onDismiss: (() -> Void)? = nil,
                                                @ViewBuilder content: @escaping () -> Content) -> some View {
         #if targetEnvironment(macCatalyst)
-        fullScreenCover(isPresented: isPresented, onDismiss: onDismiss, content: content)
+        fullScreenCover(isPresented: isPresented, onDismiss: onDismiss) { content().bighelpPresentedAppearance() }
             .background { BighelpMacSheetCloser(token: isPresented.wrappedValue ? AnyHashable(true) : nil) }
         #else
-        fullScreenCover(isPresented: isPresented, onDismiss: onDismiss, content: content)
+        fullScreenCover(isPresented: isPresented, onDismiss: onDismiss) { content().bighelpPresentedAppearance() }
         #endif
     }
 
@@ -70,10 +70,10 @@ extension View {
         item: Binding<Item?>, onDismiss: (() -> Void)? = nil, @ViewBuilder content: @escaping (Item) -> Content
     ) -> some View {
         #if targetEnvironment(macCatalyst)
-        fullScreenCover(item: item, onDismiss: onDismiss, content: content)
+        fullScreenCover(item: item, onDismiss: onDismiss) { content($0).bighelpPresentedAppearance() }
             .background { BighelpMacSheetCloser(token: item.wrappedValue.map { AnyHashable($0.id) }) }
         #else
-        fullScreenCover(item: item, onDismiss: onDismiss, content: content)
+        fullScreenCover(item: item, onDismiss: onDismiss) { content($0).bighelpPresentedAppearance() }
         #endif
     }
 

@@ -445,6 +445,10 @@ struct BighelpApp: App {
                 #if DEBUG && os(iOS) && targetEnvironment(simulator)
                 CarPlaySessionFixture.rootView()
                 #endif
+            } else if isMarkdownAttachmentFixture {
+                #if DEBUG && targetEnvironment(simulator)
+                MarkdownAttachmentFixture.rootView()
+                #endif
             } else {
             @Bindable var navigation = nativeWorkspaces.current?.appState ?? appState
             let native = nativeWorkspaces.current
@@ -554,8 +558,10 @@ struct BighelpApp: App {
             .environment(\.reflectiveVisionCamera, reflectiveVisionCamera)
             .environment(\.subagentStreamAcceptanceFixture, subagentStreamAcceptanceFixture)
             .preferredColorScheme(settings.appearance.preferredColorScheme)
+            .onChange(of: settings.appearance) { _, appearance in BighelpWindowAppearance.apply(appearance) }
             .task(id: scenePhase) {
                 guard scenePhase == .active else { return }
+                BighelpWindowAppearance.apply(settings.appearance)
                 // Opening bighelp is "I've seen it": the icon badge goes away.
                 await BighelpAppBadge.clear()
                 await providerLogoStore?.refreshIfNeeded()
@@ -670,6 +676,14 @@ struct BighelpApp: App {
     private var isConnectorCardFixture: Bool {
         #if DEBUG && targetEnvironment(simulator)
         ProcessInfo.processInfo.arguments.contains(ConnectorCardFixture.launchArgument)
+        #else
+        false
+        #endif
+    }
+
+    private var isMarkdownAttachmentFixture: Bool {
+        #if DEBUG && targetEnvironment(simulator)
+        ProcessInfo.processInfo.arguments.contains(MarkdownAttachmentFixture.launchArgument)
         #else
         false
         #endif

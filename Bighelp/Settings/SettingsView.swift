@@ -42,6 +42,7 @@ struct SettingsView: View {
     @State var teamworkModel: TeamworkModel?
     /// Shows just this page (Fleet settings links Appearance and Chat here, so there's one copy of each).
     private var openSection: SettingsMenuSection?
+    private var simplePage: SimpleBotsSettingsPage?
     @Environment(\.bighelpNotificationContext) private var notificationContext
     @State private var pluginUpdates: PluginUpdateStore?
     /// Held in state so this screen redraws when the check finishes; the shared
@@ -152,7 +153,8 @@ struct SettingsView: View {
 
     var body: some View {
         Group {
-            if let openSection { destination(for: openSection) }
+            if let simplePage { simpleBotsPageContent(simplePage) }
+            else if let openSection { destination(for: openSection) }
             else if let focusedDestination { focusedPage(focusedDestination) }
             else { menuPage }
         }
@@ -430,9 +432,17 @@ struct SettingsView: View {
         .frame(minHeight: 52)
     }
 
-    /// One page of Settings on its own, for Simple Bot mode's short Settings.
+    /// One page of Settings on its own, for Simple Bot mode's short Settings. Built in `body`, like
+    /// `opening(_:)`: the page reads the theme live there. Built outside it, it drew the light theme's
+    /// rows and grays in dark mode (a white name box, gray text).
+    func simpleBotsPage(_ page: SimpleBotsSettingsPage) -> Self {
+        var copy = self
+        copy.simplePage = page
+        return copy
+    }
+
     @ViewBuilder
-    func simpleBotsPage(_ page: SimpleBotsSettingsPage) -> some View {
+    private func simpleBotsPageContent(_ page: SimpleBotsSettingsPage) -> some View {
         switch page {
         case .you:
             settingsDone(settingsPage(title: "You") { localIdentity })

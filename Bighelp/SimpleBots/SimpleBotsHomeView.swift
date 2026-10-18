@@ -48,20 +48,33 @@ enum SimpleBotsHomeProjection {
     struct Home: Equatable {
         var primary: AgentProfile?
         var primaryPreview: SessionSummary?
+        /// Pinned bots beside the primary one, in their pin order.
+        var pinned: [AgentProfile] = []
+        /// Each pinned bot's latest chat, for its touch-and-hold preview.
+        var pinnedChats: [String: SessionSummary] = [:]
         var rows: [SimpleBotsItem]
     }
 
-    /// The primary bot leads on its own. Then pinned bots in their order, then
+    /// The top row holds this many bots: the primary one and pinned ones.
+    static let topRowLimit = 6
+
+    /// The primary bot leads, with up to five pinned bots beside it in their
+    /// order. The list under them: any other pinned bots and group chats, then
     /// the rest by their latest chat (bots without one last, by name). Hidden
-    /// bots stay off the list; group chats sit among them by their own time.
+    /// bots stay off the home; group chats sit among them by their own time.
     static func home(profiles: [AgentProfile], primaryID: String?, pinnedIDs: [String],
                      summaries: [SessionSummary]) -> Home {
         let primary = profiles.first { $0.id == primaryID } ?? profiles.first(where: \.isDefault) ?? profiles.first
         func latest(_ agentID: String) -> SessionSummary? {
             summaries.filter { $0.kind == .direct && $0.agentIDs == [agentID] }.max { $0.updatedAt < $1.updatedAt }
         }
+        let pinned = Array(pinnedIDs.compactMap { id in
+            profiles.first { $0.id == id && $0.id != primary?.id && $0.placement?.isHidden != true }
+        }.prefix(primary == nil ? 0 : topRowLimit - 1))
+        let onTop = Set(pinned.map(\.id))
         var rows: [SimpleBotsItem] = []
-        for profile in profiles where profile.id != primary?.id && profile.placement?.isHidden != true {
+        for profile in profiles where profile.id != primary?.id && !onTop.contains(profile.id)
+            && profile.placement?.isHidden != true {
             let chat = latest(profile.id)
             rows.append(SimpleBotsItem(kind: .bot(profile), preview: chat?.preview, date: chat?.updatedAt,
                                        isPinned: pinnedIDs.contains(profile.id)))
@@ -84,7 +97,10 @@ enum SimpleBotsHomeProjection {
                 }
             }
         }
-        return Home(primary: primary, primaryPreview: primary.flatMap { latest($0.id) }, rows: rows)
+        var pinnedChats: [String: SessionSummary] = [:]
+        for profile in pinned { pinnedChats[profile.id] = latest(profile.id) }
+        return Home(primary: primary, primaryPreview: primary.flatMap { latest($0.id) }, pinned: pinned,
+                    pinnedChats: pinnedChats, rows: rows)
     }
 }
 
@@ -168,7 +184,7 @@ struct SimpleBotsHomeView: View {
         ScrollView {
             LazyVStack(spacing: 0) {
                 if let primary = home.primary {
-                    hero(primary, chat: home.primaryPreview)
+                    topRow(primary, home: home)
                 } else {
                     emptyHome
                 }
@@ -227,36 +243,54 @@ struct SimpleBotsHomeView: View {
         .background { SimpleBotsHeaderFade() }
     }
 
-    private func hero(_ primary: AgentProfile, chat: SessionSummary?) -> some View {
+    /// The primary bot and the pinned ones beside it: one large, else two or three across, six at most.
+    private func topRow(_ primary: AgentProfile, home: SimpleBotsHomeProjection.Home) -> some View {
+        let bots = [primary] + home.pinned
+        let across = bots.count <= 2 ? bots.count : bots.count == 4 ? 2 : 3
+        let size: CGFloat = bots.count == 1 ? 104 : across == 2 ? 92 : 76
+        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: BighelpTokens.space12,
+                                                            alignment: .top), count: across),
+                         spacing: BighelpTokens.space24) {
+            ForEach(bots) { bot in
+                let isPrimary = bot.id == primary.id
+                topTile(bot, isPrimary: isPrimary, size: size,
+                        chat: isPrimary ? home.primaryPreview : home.pinnedChats[bot.id])
+            }
+        }
+        .padding(.horizontal, BighelpTokens.space20)
+        .padding(.top, BighelpTokens.space24)
+        .padding(.bottom, BighelpTokens.space32)
+    }
+
+    private func topTile(_ bot: AgentProfile, isPrimary: Bool, size: CGFloat, chat: SessionSummary?) -> some View {
         Button {
-            unread.set(false, id: primary.id, scope: context.scope)
-            context.onOpenBot(primary.id)
+            unread.set(false, id: bot.id, scope: context.scope)
+            context.onOpenBot(bot.id)
         } label: {
             VStack(spacing: BighelpTokens.space12) {
-                SimpleBotFace(agentID: primary.id, name: primary.name,
-                              imageURL: context.agents.avatarURL(for: primary), size: 104, isPrimary: true)
+                SimpleBotFace(agentID: bot.id, name: bot.name, imageURL: context.agents.avatarURL(for: bot),
+                              size: size, isPrimary: isPrimary, blinks: true)
                 HStack(spacing: BighelpTokens.space4) {
-                    Text(primary.name)
+                    Text(bot.name)
                         .font(.bighelp(.subheadline))
                         .foregroundStyle(theme.secondaryText)
-                    if unread.isUnread(primary.id, scope: context.scope) { unreadDot }
+                        .lineLimit(1)
+                    if unread.isUnread(bot.id, scope: context.scope) { unreadDot }
                 }
             }
-            .padding(.top, BighelpTokens.space24)
-            .padding(.bottom, BighelpTokens.space32)
             .frame(maxWidth: .infinity)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
         .contextMenu {
-            botMenu(primary, isPrimary: true)
+            botMenu(bot, isPrimary: isPrimary)
         } preview: {
-            SimpleBotsPreview(agentID: primary.id, name: primary.name,
-                              imageURL: context.agents.avatarURL(for: primary), message: chat?.preview)
+            SimpleBotsPreview(agentID: bot.id, name: bot.name,
+                              imageURL: context.agents.avatarURL(for: bot), message: chat?.preview)
         }
-        .accessibilityLabel("\(primary.name), your primary bot")
+        .accessibilityLabel(isPrimary ? "\(bot.name), your primary bot" : "\(bot.name), pinned")
         .accessibilityHint("Opens its chat")
-        .accessibilityIdentifier("simple-bots.primary")
+        .accessibilityIdentifier(isPrimary ? "simple-bots.primary" : "simple-bots.pinned.\(bot.id)")
     }
 
     private var emptyHome: some View {
@@ -282,7 +316,7 @@ struct SimpleBotsHomeView: View {
                 SimpleBotsRowLabel(
                     face: AnyView(SimpleBotFace(agentID: profile.id, name: profile.name,
                                                 imageURL: context.agents.avatarURL(for: profile), size: 56)),
-                    title: profile.name, preview: item.preview ?? profile.role, date: item.date,
+                    title: profile.name, role: profile.role, preview: item.preview, date: item.date,
                     isUnread: unread.isUnread(profile.id, scope: context.scope), isPinned: item.isPinned)
             }
             .buttonStyle(.plain)
@@ -403,10 +437,11 @@ struct SimpleBotsHomeView: View {
     }
 }
 
-/// A home row: the face, the name over the latest message, and its time.
+/// A home row: the face, the name and what the bot does over the latest message, and its time.
 private struct SimpleBotsRowLabel: View {
     let face: AnyView
     let title: String
+    var role: String?
     let preview: String?
     let date: Date?
     let isUnread: Bool
@@ -422,6 +457,19 @@ private struct SimpleBotsRowLabel: View {
                         .font(.bighelp(.title3, weight: isUnread ? .semibold : .medium))
                         .foregroundStyle(theme.primaryText)
                         .lineLimit(1)
+                        .layoutPriority(1)
+                    if let role = role?.trimmingCharacters(in: .whitespacesAndNewlines), !role.isEmpty {
+                        // The name always shows in full; the role gives way first.
+                        Text(role)
+                            .font(.bighelp(.subheadline))
+                            .foregroundStyle(theme.secondaryText)
+                            .lineLimit(1)
+                            .padding(.horizontal, BighelpTokens.space8)
+                            .padding(.vertical, 3)
+                            .background(theme.secondaryText.opacity(0.14),
+                                        in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .accessibilityLabel(role)
+                    }
                     if isPinned {
                         Image(systemName: "pin.fill")
                             .font(.bighelp(.caption2))

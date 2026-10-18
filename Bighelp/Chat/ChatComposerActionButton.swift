@@ -104,7 +104,7 @@ struct AdaptiveComposerActionButton: View {
                 .stroke(
                     uiV3Enabled
                         ? (effectiveAction == .stop
-                            ? theme.danger
+                            ? stopFill
                             : theme.action)
                         : theme.actionForeground,
                     style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
@@ -236,11 +236,15 @@ struct AdaptiveComposerActionButton: View {
         switch effectiveAction {
         case .voice: theme.primaryText
         case .send: theme.actionForeground
-        case .stop: .white
+        case .stop: stopIcon
         }
     }
 
-    /// Solid circles for Send (accent) and Stop (danger); the voice shortcut shown while the draft
+    /// Stop is the page's ink, not an alarm: black with a white square by day, white with a black one at night.
+    private var stopFill: Color { theme.isDarkPalette ? .white : .black }
+    private var stopIcon: Color { theme.isDarkPalette ? .black : .white }
+
+    /// Solid circles for Send (accent) and Stop (ink); the voice shortcut shown while the draft
     /// is empty is glass in the quiet incoming color.
     @ViewBuilder
     private var actionBackground: some View {
@@ -257,7 +261,7 @@ struct AdaptiveComposerActionButton: View {
         case .send:
             Circle().fill(theme.action)
         case .stop:
-            Circle().fill(theme.danger)
+            Circle().fill(stopFill)
         }
     }
 

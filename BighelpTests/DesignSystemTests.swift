@@ -656,6 +656,35 @@ struct DesignSystemTests {
         #expect(AdaptiveComposerActionPresentation.tintOpacity == 0.82)
     }
 
+    /// Stop is the page's ink, not red: a black circle with a white square by day, the reverse at night.
+    @Test func stopButtonIsInkInBothModes() throws {
+        for (scheme, fill, square) in [(ColorScheme.light, 0, 255), (.dark, 255, 0)] {
+            let button = AdaptiveComposerActionButton(
+                action: .stop, isBusy: false, canSend: false, canStop: true, onVoice: {}, onSend: {}, onStop: {},
+                defaultMidSessionBehavior: nil, onMidSessionSend: { _ in })
+                .environment(\.colorScheme, scheme)
+            let renderer = ImageRenderer(content: button)
+            renderer.scale = 1
+            let image = try #require(renderer.cgImage)
+            let side = Double(min(image.width, image.height))
+            let center = try #require(pixel(in: image, x: image.width / 2, y: image.height / 2))
+            let ring = try #require(pixel(in: image, x: image.width / 2,
+                                          y: image.height / 2 - Int(side * 0.3)))
+            #expect(ring[3] > 230 && ring.prefix(3).allSatisfy { abs($0 - fill) < 24 }, "\(scheme) circle: \(ring)")
+            #expect(center[3] > 230 && center.prefix(3).allSatisfy { abs($0 - square) < 24 },
+                    "\(scheme) square: \(center)")
+        }
+    }
+
+    private func pixel(in image: CGImage, x: Int, y: Int) -> [Int]? {
+        var bytes = [UInt8](repeating: 0, count: 4)
+        guard let context = CGContext(data: &bytes, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+                                      space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        context.draw(image, in: CGRect(x: -x, y: y - image.height + 1, width: image.width, height: image.height))
+        return bytes.map(Int.init)
+    }
+
     @Test func resolverMatrixHonorsSystemAndExplicitAppearance() {
         let cases: [(
             appearance: AppAppearance,

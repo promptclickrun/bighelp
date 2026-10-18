@@ -87,6 +87,24 @@ struct AppStateTests {
         #expect(state.path == [.chat(conversationID: "second")])
     }
 
+    /// A notification, widget or link about a chat that's already open goes back to that
+    /// chat; a second copy of it would share its model, and Back would show it again.
+    @Test func openingAChatAlreadyOpenKeepsOneCopy() {
+        let state = AppState()
+        state.activateConversation(id: "bob", source: .sessions)
+        state.activateConversation(id: "bob", source: .sessions)
+        #expect(state.path == [.chat(conversationID: "bob")])
+
+        state.open(.simpleBotProfile(agentID: "bob"))
+        state.activateConversation(id: "bob", source: .sessions)
+        #expect(state.path == [.chat(conversationID: "bob")], "Back to the chat under its profile")
+
+        state.path = [.chat(conversationID: "first"), .chat(conversationID: "second")]
+        state.activateConversation(id: "first", source: .quickSwitch)
+        #expect(state.path == [.chat(conversationID: "first")])
+        #expect(state.activeConversationID == "first")
+    }
+
     @Test func forkPushesFromTheOriginalCheckpointChatAndTracksTheNewSession() {
         let state = AppState()
         state.path = [.chat(conversationID: "original")]

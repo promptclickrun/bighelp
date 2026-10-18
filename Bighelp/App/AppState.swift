@@ -100,6 +100,13 @@ final class AppState {
 
     func activateConversation(id: String, source: ConversationActivationSource) {
         let route = AppRoute.chat(conversationID: id)
+        // Already open (a notification, widget or link about it): go back to that copy. A second
+        // copy would share its model, both would redraw every change, and Back would show it again.
+        if let open = path.lastIndex(of: route) {
+            path.removeSubrange(path.index(after: open)...)
+            activeConversationID = id
+            return
+        }
         switch source {
         case .newChat, .quickSwitch:
             if case .chat = path.last {

@@ -1456,7 +1456,8 @@ struct RootShellView: View {
             }
             return
         }
-        if nativeRuntime != nil {
+        // Demo data opens links the way a real host does.
+        if nativeRuntime != nil || usesDemoFixtures {
             openNativeSession(id: sessionID)
             return
         }
@@ -1613,6 +1614,14 @@ struct RootShellView: View {
     }
 
     func openSession(_ session: SessionSummary) {
+        let route = AppRoute.chat(conversationID: session.id)
+        // On screen already (a notification or link about it): keep it as it is, any load it
+        // has under way included, and catch up from the host.
+        if appState.path.last == route, featureStore.preparedModel(for: route) != nil {
+            featureStore.refreshWarmSessionState(id: session.id)
+            appState.activateConversation(id: session.id, source: .sessions)
+            return
+        }
         sessionRestoreTask?.cancel()
         sessionRestoreTask = nil
         sessionRestoreRequest = nil
@@ -1621,7 +1630,6 @@ struct RootShellView: View {
             originTab: appState.selectedTab,
             originPath: appState.path
         )
-        let route = AppRoute.chat(conversationID: session.id)
         // Mount the retained owner and its scoped cache before any await.
         do {
             guard try featureStore.prepareCachedForUserNavigation(route),

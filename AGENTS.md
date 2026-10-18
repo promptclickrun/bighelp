@@ -252,6 +252,11 @@ change in both repos.
 - **Chat row environment:** chat rows (`NativeChatTimeline`) copy selected environment values into each row. If a row
   acts stale (for example, animations frozen because it still thinks the app is inactive), check what the timeline
   copies and whether the representable reads it.
+- **Chat redraw cost:** `ChatView` rebuilds the whole transcript projection on every change, each streaming
+  delta included. Keep that work linear in the chat's length: never walk the activity ledger once per turn
+  (`ChatLedgerIndex`) or lay out every message to find something (`ChatCardMessageProjection.cardIDs(in:)`).
+  A quadratic step made a 300-turn chat take most of a second per redraw. `ChatLoadSpeedUITests`
+  (`BIGHELP_SPEED`) times a long chat.
 - **Type-checker timeouts:** very large `body`s (`RootShellView`, `BighelpApp`) time out the type checker. Pull
   pieces out into functions or named `ViewModifier`s.
 - **Text styling:** styled text in the composer must pass attributes and theme colors. Plain `String` replacements
@@ -459,6 +464,9 @@ sections can crash only on devices ("Thread stack size exceeded").
 - Every reconnect is a new `WorkspaceOwner` (its `connectionGeneration` changes), and the owner is nil while
   disconnected. To decide whether to close open sheets or screens, compare `owner.signIn`, never the whole
   owner, or coming back after a minute away closes whatever was open (`WorkspacePresentationContinuity`).
+- A chat is on the navigation stack at most once. Opening one that's there (a notification, widget or link)
+  goes back to it (`AppState.activateConversation`): two copies shared one `ChatModel`, both redrew every
+  change, and Back showed the same chat again.
 - The connection pill at the top (`ConnectionIsland`) has its own pass-through window so it shows over sheets. iOS
   hides an app's own Live Activity while the app is open, so it can't be the real Dynamic Island.
 

@@ -34,8 +34,9 @@ extension HostNotificationSetupServing {
     func applyQuietHours() async -> BighelpQuietHoursSyncResult { BighelpQuietHoursSyncResult() }
 }
 
-/// Whether agents talking to each other (`hermes peer`, Bot Chat) alert this phone. Off unless
-/// the person turns it on in Settings › Notifications.
+/// Whether agents talking to each other alert this phone (`hermes peer`, Bot Chat, and with plugin
+/// 3.17.0 any agent's message to another, as from the agent that wrote it). Off unless the person
+/// turns it on in Settings › Notifications.
 enum BighelpPeerChatAlerts {
     static let key = "bighelp.notifications.peer-chats"
     static var isOn: Bool { UserDefaults.standard.bool(forKey: key) }

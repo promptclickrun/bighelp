@@ -97,7 +97,7 @@ struct ChatView: View {
     @Environment(\.providerUsage) private var providerUsage
     @Environment(\.companionStore) private var companionStore
     @Environment(\.companionAgentScope) private var companionAgentScope
-    @Environment(\.agentHomeChrome) private var homeChrome
+    @Environment(\.agentHomeChrome) var homeChrome
     @Environment(\.teamCallAction) private var teamCallAction
     private enum SessionTitleDialog {
         case rename

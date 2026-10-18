@@ -27,6 +27,10 @@ extension DirectHermesConversationClient {
         attachmentAttempts.removeAll()
         resetMediaRetries()
         let owner = generation
+        // Only a chat that recovered before and works is catching up. A first load or a
+        // reconnect keeps Send closed until it ends.
+        isCatchingUp = hasRecovered && isReadyForSubmission
+        defer { isCatchingUp = false }
         isHydrating = true
         let task = Task { @MainActor [weak self] in
             guard let self else { throw DirectHermesError.notConnected }
@@ -226,6 +230,7 @@ extension DirectHermesConversationClient {
         needsRecovery = false
         status = projection.running ? "Working" : "Ready"
         succeeded = true
+        hasRecovered = true
         // Durable reaction metadata is presentation-only. It must not keep the
         // canonical replay gate closed or delay held live events. Hydrate it
         // after this method unwinds and the catch-up defer publishes the stream.

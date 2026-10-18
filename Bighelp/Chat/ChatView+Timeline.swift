@@ -274,6 +274,7 @@ extension ChatView {
                 ChatCardTranscriptProjection.removingSupersededLiveCards(from: model.transcriptEntries),
                 isSending: model.isSending,
                 isBotMode: model.isBotMode,
+                isSimpleBots: homeChrome.isSimpleBots,
                 activityEvents: model.activityLedger.allEvents
             ),
             isSending: model.isSending,

@@ -111,6 +111,8 @@ final class ChatModel {
     /// When the last turn here ended: an alert about it while you're reading
     /// this chat is old news (`BighelpVisibleChats`).
     @ObservationIgnored private(set) var lastTurnEndedAt: Date?
+    /// Send was tapped while the chat catches up; the message waits in the box until it ends.
+    var isAwaitingCatchUp = false
     var isSending = false {
         didSet {
             // The runtime controls are the authority for whether a model or
@@ -411,6 +413,12 @@ final class ChatModel {
         return nativeConversationClient?.isReadyForSubmission ?? true
     }
 
+    /// Send's readiness: also on while a working chat only catches up with what Hermes saved,
+    /// which happens every few seconds while agents work together. A message waits it out.
+    var composerTransportIsReady: Bool {
+        directTransportIsReady || nativeConversationClient?.acceptsSubmissionAfterCatchUp == true
+    }
+
     var canSend: Bool {
         // Hosted groups have their own authenticated client and readiness gates.
         // Their unused direct-chat placeholder must not disable the composer.
@@ -420,12 +428,13 @@ final class ChatModel {
                       native.preparingAttachmentID == nil,
                       native.sessionActionsAreRunning else { return false }
             } else if !isSending {
-                guard directTransportIsReady else { return false }
+                guard orderedDraftAttachments.isEmpty ? composerTransportIsReady : directTransportIsReady
+                else { return false }
             } else {
                 guard supportsMidSessionSending else { return false }
             }
         }
-        guard !isAwaitingAuthoritativeSessionAllocation else { return false }
+        guard !isAwaitingAuthoritativeSessionAllocation, !isAwaitingCatchUp else { return false }
         guard !isBotMode || botModeExecutionEnabled else { return false }
         let sendsWhileRoomWorks = acceptsBotModeFollowUp
         if !sendsWhileRoomWorks {

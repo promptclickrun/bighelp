@@ -13,11 +13,12 @@ enum ChatInterimReplies {
     /// calls hidden the transcript has no work in it, but the notes before
     /// that work are still the agent thinking out loud.
     static func marking(
-        _ entries: [ChatTranscriptEntry], isSending: Bool, isBotMode: Bool,
+        _ entries: [ChatTranscriptEntry], isSending: Bool, isBotMode: Bool, isSimpleBots: Bool = false,
         activityEvents: [ChatActivityEvent] = []
     ) -> [ChatTranscriptEntry] {
-        // In a room several agents answer at once; each reply is someone's answer.
-        guard !isBotMode else { return entries }
+        // In a room several agents answer at once; each reply is someone's answer. Simple Bot mode
+        // reads like texting: every message the bot sends is a text, never grey or folded away.
+        guard !isBotMode, !isSimpleBots else { return entries }
         let turnStarts = entries.indices.filter {
             if case .message(let item) = entries[$0], item.role == .human { return true }
             return false

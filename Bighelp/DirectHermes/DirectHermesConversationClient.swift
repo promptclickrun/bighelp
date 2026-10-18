@@ -50,6 +50,12 @@ final class DirectHermesConversationClient: StreamingConversationClient, Stoppab
     var isReadyForSubmission: Bool {
         hasAuthoritativeEventCoverage && !hasPendingSubmission
     }
+    /// A working chat only catching up (rereading what Hermes saved while agents work together)
+    /// can take a message now: the send waits for the catch-up to end (`awaitHydrationIfNeeded`).
+    var acceptsSubmissionAfterCatchUp: Bool {
+        isCatchingUp && connected && isHydrating && !needsRecovery && !requiresDurableReattachment
+            && !hasPendingSubmission
+    }
     /// A pending local submission blocks another admission without weakening
     /// the already-recovered transport's sequence coverage.
     var hasAuthoritativeEventCoverage: Bool {
@@ -172,6 +178,8 @@ final class DirectHermesConversationClient: StreamingConversationClient, Stoppab
     @ObservationIgnored var draftSink: ((TimelineItem) -> Void)?
     @ObservationIgnored var recoveryTask: Task<Void, Error>?
     var isHydrating = false
+    var isCatchingUp = false
+    @ObservationIgnored var hasRecovered = false
     @ObservationIgnored var rosterTask: Task<Void, Never>?
     @ObservationIgnored var reactionHydrationTask: Task<Void, Never>?
     @ObservationIgnored var heldEvents: [DirectHermesEvent] = []

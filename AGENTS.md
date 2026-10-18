@@ -160,6 +160,10 @@ change in both repos.
 - **A turn stays pending while it streams:** after `prompt.submit` returns `streaming`, the chat isn't "ready for a
   new turn" until the turn ends. A mid-turn Send must go through the steer/queue path (`sendMidSession`). Steer is
   the default.
+- **Rereads keep Send on:** while agents work together, an open chat rereads what Hermes saved every few seconds,
+  and each reread recovers the chat's connection. Send stays on through it (`acceptsSubmissionAfterCatchUp`); a
+  message sent then waits in the box until the recovery ends (`isAwaitingCatchUp`). As a turn, the recovery's idle
+  readback would take it for a stale one and drop it.
 - **Plugin routes:**
   - Each route is a `WorkspaceOperation` case plus a `Route(path:feature:isMutation:maximumResponseBytes:)` in
     `DirectHermesNativeContext.swift`.

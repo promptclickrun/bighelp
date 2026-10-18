@@ -45,7 +45,18 @@ extension ChatModel {
         // While a turn runs, this chat's own prompt counts as pending until the
         // turn ends, so "ready for a new turn" is false. A plain Send then steers
         // (or queues) through sendMidSession, which has its own checks.
-        guard permitsOrdinaryComposerSend, isBotMode || directTransportIsReady || isMidSessionTurnLive else { return }
+        guard permitsOrdinaryComposerSend, isBotMode || isMidSessionTurnLive
+            || (orderedDraftAttachments.isEmpty ? composerTransportIsReady : directTransportIsReady) else { return }
+        // Send stays on while a working chat catches up. The message waits here, still in the box:
+        // as a turn, the catch-up's idle readback would take it for a stale one and drop it.
+        if !isBotMode, !isSending, !directTransportIsReady, let native = nativeConversationClient,
+           native.acceptsSubmissionAfterCatchUp {
+            guard !isAwaitingCatchUp else { return }
+            isAwaitingCatchUp = true
+            try? await native.awaitHydrationIfNeeded()
+            isAwaitingCatchUp = false
+            guard directTransportIsReady, !isSending else { return }
+        }
         guard !isBotMode || botModeExecutionEnabled else {
             failureMessage = "Group chats are unavailable for this Hermes connection."
             return

@@ -58,6 +58,30 @@ struct ChatInterimRepliesTests {
         #expect(interimIDs(ChatInterimReplies.marking(entries, isSending: false, isBotMode: true)).isEmpty)
     }
 
+    /// Simple Bot mode reads like texting: a message the agent kept working after is still a
+    /// text. It never turns grey while the turn runs, and it stays when the turn ends (with
+    /// Show reasoning off, the default, the full chat hides such notes).
+    @Test func simpleBotChatsKeepEveryMessageAsAText() {
+        func shownMessages(_ rows: [ChatTurnDisplayRow]) -> [String] {
+            rows.compactMap { row in
+                guard case .entry(.message(let item)) = row else { return nil }
+                return item.id
+            }
+        }
+        let entries = [human("q"), reply("a"), work("w1"), reply("b"), work("w2")]
+        let full = ChatInterimReplies.marking(entries, isSending: false, isBotMode: false)
+        #expect(shownMessages(ChatCompletedTurnProjection.rows(
+            from: full, isSending: false, enabled: true, interimReplies: .hidden)) == ["q", "b"])
+
+        let texts = ChatInterimReplies.marking(entries, isSending: false, isBotMode: false, isSimpleBots: true)
+        #expect(interimIDs(texts).isEmpty)
+        #expect(shownMessages(ChatCompletedTurnProjection.rows(
+            from: texts, isSending: false, enabled: true, interimReplies: .hidden)) == ["q", "a", "b"])
+        let running = [human("q"), reply("a"), work("w")]
+        #expect(interimIDs(ChatInterimReplies.marking(
+            running, isSending: true, isBotMode: false, isSimpleBots: true)).isEmpty)
+    }
+
     /// With tool calls hidden the transcript shows no work, but the agent kept
     /// working after its notes (Claude's thinking arrives blank, so the notes
     /// are the only thinking people see). Hidden work still makes them interim.

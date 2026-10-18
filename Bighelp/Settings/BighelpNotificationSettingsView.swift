@@ -414,10 +414,10 @@ struct BighelpNotificationSettingsView: View {
 
             Toggle(isOn: $peerChatAlerts) {
                 VStack(alignment: .leading, spacing: BighelpTokens.space4) {
-                    Text("Peer chats")
+                    Text("Agents messaging each other")
                         .bighelpFont(.body)
                         .foregroundStyle(theme.primaryText)
-                    Text("When your agents message each other with hermes peer. Questions and approvals still notify you.")
+                    Text("For example, an agent's answer to work another agent gave it. The alert shows the agent that wrote it. Questions and approvals always notify you.")
                         .bighelpFont(.metadata)
                         .foregroundStyle(theme.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)

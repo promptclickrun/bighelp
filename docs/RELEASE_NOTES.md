@@ -9,8 +9,9 @@ This release adds Simple Bot mode, Teamwork, the Bots widget, and many changes t
 
 ### Before you start
 
-- Update the bighelp plugin on each computer to version 3.16.0 or later. The app shows the update.
-- Teamwork, the live status of other agents, and the Stop button for busy chats need this plugin version.
+- Update the bighelp plugin on each computer to version 3.17.0 or later. The app shows the update.
+- Teamwork, the live status of other agents, and the Stop button for busy chats need plugin 3.16.0 or later.
+- Alerts for messages between agents need plugin 3.17.0 or later.
 
 ### Simple Bot mode
 
@@ -78,6 +79,8 @@ Select the name of a bot at the top of its chat. The profile shows:
 - Your messages use the bubble color that you select in Appearance.
 - The message box says "Ask" and the name of the bot.
 - Swipe from the left edge to go to your bots. Swipe from the right edge to open the bot profile.
+- Each message from a bot shows as a normal message. The messages do not turn gray and do not go away when the
+  bot continues to work.
 
 **Voice in Simple Bot mode**
 
@@ -143,6 +146,13 @@ Give each agent a clear role in its profile. The roles help your agents send wor
   bubbles. The Stop button stops the agent.
 - The chat list shows the answer of the other agent, not the raw message text.
 
+You can get an alert when one agent sends a message to another agent. For example, you get the answer that
+Big Bob sends after your primary bot gives work to Big Bob. The alert shows the name and the picture of Big
+Bob, and opens the chat of your primary bot. To turn on these alerts:
+
+1. Open **Settings**, then **Notifications**.
+2. Turn on **Agents messaging each other**.
+
 ### The Bots widget
 
 The Bots widget shows bots on your Home Screen. Select a bot to open its chat.
@@ -180,3 +190,7 @@ To add the widget:
 - Pinned bots in Simple Bot mode: you can pin 5 bots next to your primary bot. Before, pins that the home screen
   did not show used some of the space.
 - In the plugin: the names of agents show correctly on Hermes 0.22 and later, and plugin updates work there.
+- In Simple Bot mode, a message from your primary bot stays in the chat while other agents work. Before, some
+  messages went away until you refreshed the chat.
+- The Send button stays on while the chat gets new messages from your computer. Before, it was gray for a short
+  time each time the chat checked for new messages.

@@ -110,6 +110,7 @@ extension RootShellView {
                 }
             },
             usage: providerUsage,
+            makeTeamwork: { teamworkModel() },
             page: { page in AnyView(workspaceSettings().withDone(close).simpleBotsPage(page)) },
             allSettings: {
                 let settings = workspaceSettings().withDone(close)

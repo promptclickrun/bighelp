@@ -40,6 +40,12 @@ extension SettingsView {
                 .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
                 .accessibilityIdentifier("settings.apps")
             }
+            if let teamworkModel {
+                TeamworkToggle(model: teamworkModel) { detail in
+                    rowLabel("Teamwork", detail: detail, symbol: "person.3.fill", tint: Color(hex: "2E9E6B"))
+                }
+                .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+            }
             Button {
                 isPersonalitiesPresented = true
             } label: {
@@ -52,6 +58,8 @@ extension SettingsView {
             Text("Assistants")
         }
         .listRowBackground(theme.surface)
+        // Asked once per Settings visit; the switch reads and saves through the plugin.
+        .task { if teamworkModel == nil { teamworkModel = teamwork?() } }
     }
 
     private var personalityDetail: String {

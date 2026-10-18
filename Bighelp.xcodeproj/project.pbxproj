@@ -32,6 +32,7 @@
 		03B61C6BB681E2EC5C74EF77 /* ChatAttachmentSaving.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64AF3D5321DFFC9B9556E9B9 /* ChatAttachmentSaving.swift */; };
 		03F9FE405EA898D178406DEA /* NativeStockGitCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CFFAC304D97FEC231B22E68 /* NativeStockGitCoordinator.swift */; };
 		03FF4FE6DCBCA587ED0DCAC6 /* DeferredVoiceSessionClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97C4947AC3EDDEA0A082CA13 /* DeferredVoiceSessionClient.swift */; };
+		040D8CC44E215299B66F6A06 /* Teamwork.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F1EFA3A141B8A46192AF5C5 /* Teamwork.swift */; };
 		046D31CE6FBAE0AAEB73A002 /* BighelpImageGeneratingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E71BAF3ED050711558DACCE /* BighelpImageGeneratingView.swift */; };
 		048F7A61F0CA0760D47A2BF2 /* DirectHermesAttachmentClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81CABC4DD0A03C05A6531348 /* DirectHermesAttachmentClientTests.swift */; };
 		0499789C48A13CFC46D6E128 /* DirectHermesGeneratedMediaClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80938D1DC3C8FD823A41A1E1 /* DirectHermesGeneratedMediaClient.swift */; };
@@ -1391,6 +1392,7 @@
 		E1A6BEA733CC9424F89A341A /* WorkspaceManagementLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4F646E405205B3A5C8D7BED /* WorkspaceManagementLayoutTests.swift */; };
 		E1BD1F0D82A7FD303AB5312A /* runs-signoff-code.json in Resources */ = {isa = PBXBuildFile; fileRef = 8F1911F260ECEC3867A1B8CB /* runs-signoff-code.json */; };
 		E20BEE93D780D1651EE2D98B /* ForceRefreshSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D4E35462E68325AB197929D /* ForceRefreshSessionTests.swift */; };
+		E2224744D3218AE6F5036BC8 /* TeamworkUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F4DFC16C4655EE1CB5DA6BF /* TeamworkUITests.swift */; };
 		E225FD4A097B43D22FEA6165 /* ReferenceChatComposition.swift in Sources */ = {isa = PBXBuildFile; fileRef = E728546967FA8A1B5B5D6E37 /* ReferenceChatComposition.swift */; };
 		E23BFE1E57DE4375EF3D57F6 /* SessionReopenReplayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A763C604CBC8373EA5EDE00D /* SessionReopenReplayTests.swift */; };
 		E248A50A3BC66416D6C26004 /* ModelReasoningDefaultsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51EBF6C938422836EEFF31AF /* ModelReasoningDefaultsTests.swift */; };
@@ -2078,6 +2080,8 @@
 		3F0738A049DA123D59EF0166 /* CardBackgroundTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardBackgroundTests.swift; sourceTree = "<group>"; };
 		3F074CC92AFF2AA534532D2F /* bighelp-resting.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "bighelp-resting.json"; sourceTree = "<group>"; };
 		3F0FDE4E094EF1BBFD3E82DD /* SimpleBotsUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimpleBotsUITests.swift; sourceTree = "<group>"; };
+		3F1EFA3A141B8A46192AF5C5 /* Teamwork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Teamwork.swift; sourceTree = "<group>"; };
+		3F4DFC16C4655EE1CB5DA6BF /* TeamworkUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamworkUITests.swift; sourceTree = "<group>"; };
 		3F7281B7E7971EE34A73716B /* BighelpV3MessageStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpV3MessageStyle.swift; sourceTree = "<group>"; };
 		3F995AC2F5D7E281A7D8C7E1 /* UsageReaders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageReaders.swift; sourceTree = "<group>"; };
 		3FD7F747650F9C1AEB8642FF /* ChatCardImageCopy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatCardImageCopy.swift; sourceTree = "<group>"; };
@@ -4080,6 +4084,7 @@
 				0F108CDF2AF7D1B53DC2FE7B /* AgentTemplateFillView.swift */,
 				363125E35F32B409045A5DD4 /* AgentTemplateLibrary.swift */,
 				39E2D77A3FB09D926BCE99A5 /* AvatarCreatorView.swift */,
+				3F1EFA3A141B8A46192AF5C5 /* Teamwork.swift */,
 				F2A6AD3C777ECADEE2E4A349 /* TemplateVariables.swift */,
 				53997E89846DCEC17CBF0EF3 /* Petdex */,
 			);
@@ -4739,6 +4744,7 @@
 				3F0FDE4E094EF1BBFD3E82DD /* SimpleBotsUITests.swift */,
 				B786BE6FB911654CE87D487D /* SubagentCanvasUITests.swift */,
 				6B7A896B2C3D652785254B28 /* SystemPageUITests.swift */,
+				3F4DFC16C4655EE1CB5DA6BF /* TeamworkUITests.swift */,
 				BBD533A9FF9B1BB710AF3F81 /* TemplateCatalogUITests.swift */,
 				2D1E11795B7E88BB7F60730C /* ToolDisclosureUITests.swift */,
 				997B937232851A556998C545 /* UsageNavigationUITests.swift */,
@@ -6919,6 +6925,7 @@
 				E1883B0E26D9DBB14D25CEFE /* TeamCallSpeech.swift in Sources */,
 				D144791ABF58FAD459BA8C7E /* TeamCallSpeechPipeline.swift in Sources */,
 				9FEF8FAD150062A4D722D500 /* TeamCallView.swift in Sources */,
+				040D8CC44E215299B66F6A06 /* Teamwork.swift in Sources */,
 				42C6DB2374D7427D000AB094 /* TemplateCatalogStore.swift in Sources */,
 				DEDBAB57A6DC112EBA75BF84 /* TemplateVariables.swift in Sources */,
 				F6BBE258159B0F21F790EF53 /* ToolsetManagementView.swift in Sources */,
@@ -7572,6 +7579,7 @@
 				B44B30DBBAFA2B7EDB45621A /* SimpleBotsUITests.swift in Sources */,
 				CD53051F93E86414FE833F0F /* SubagentCanvasUITests.swift in Sources */,
 				299D2D9354374582D51BED53 /* SystemPageUITests.swift in Sources */,
+				E2224744D3218AE6F5036BC8 /* TeamworkUITests.swift in Sources */,
 				562B523D2568D03C42DCBC76 /* TemplateCatalogUITests.swift in Sources */,
 				6E06FD7A158360A66779DB29 /* ToolDisclosureUITests.swift in Sources */,
 				8D9B0E73D8D88ABC2AC19614 /* UsageNavigationUITests.swift in Sources */,

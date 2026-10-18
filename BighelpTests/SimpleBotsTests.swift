@@ -135,3 +135,66 @@ struct SimpleBotsTests {
         #expect(settings.approvalsOff)
     }
 }
+
+@MainActor
+struct TeamworkTests {
+    @Test func statusIsReadLeniently() throws {
+        let status = try TeamworkStatus(json: [
+            "enabled": .boolean(true), "extra": .string("ignored"),
+            "agents": .array([.object(["id": .string("default"), "name": .string("Gordie"), "role": .string("Chief")]),
+                              .object(["id": .string("Bad Id!"), "name": .string("Nope")]),
+                              .object(["id": .string("nova"), "name": .string("Nova")])]),
+            "reached": .array([.string("default"), .string("nova")]), "failed": .array([]),
+        ])
+        #expect(status.enabled)
+        #expect(status.agents.map(\.id) == ["default", "nova"])
+        #expect(status.agents[1].role == "")
+        #expect(throws: WorkspaceClientError.self) { try TeamworkStatus(json: ["agents": .array([])]) }
+    }
+
+    @Test func switchSaysWhatItDoes() async {
+        let model = TeamworkModel(client: DemoTeamworkClientForTests())
+        await model.refresh()
+        #expect(model.load == .loaded)
+        #expect(!model.isOn)
+        #expect(model.detail == "Your agents learn about each other and ask each other for help.")
+        await model.set(true)
+        #expect(model.isOn)
+        #expect(model.detail == "Your 3 agents know each other and ask each other for help.")
+    }
+
+    @Test func olderPluginAsksForAnUpdate() async {
+        let model = TeamworkModel(client: FailingTeamworkClient(error: .unavailable(.unsupportedOperation)))
+        await model.refresh()
+        #expect(model.load == .needsPluginUpdate)
+        #expect(model.detail == "Update the bighelp plugin on this computer to use this.")
+    }
+
+    @Test func agentsTheComputerMissedAreNamed() async {
+        let model = TeamworkModel(client: PartialTeamworkClient())
+        await model.set(true)
+        #expect(model.detail == "The computer didn't save it for Nova. Try again.")
+    }
+}
+
+@MainActor
+private final class DemoTeamworkClientForTests: TeamworkClient {
+    private let demo = DemoTeamworkClient()
+    func team(enabled: Bool?) async throws -> TeamworkStatus { try await demo.team(enabled: enabled) }
+}
+
+@MainActor
+private final class FailingTeamworkClient: TeamworkClient {
+    let error: WorkspaceClientError
+    init(error: WorkspaceClientError) { self.error = error }
+    func team(enabled: Bool?) async throws -> TeamworkStatus { throw error }
+}
+
+@MainActor
+private final class PartialTeamworkClient: TeamworkClient {
+    func team(enabled: Bool?) async throws -> TeamworkStatus {
+        TeamworkStatus(enabled: true, agents: [.init(id: "default", name: "Gordie", role: ""),
+                                               .init(id: "nova", name: "Nova", role: "")],
+                       reached: ["default"], failed: ["nova"])
+    }
+}

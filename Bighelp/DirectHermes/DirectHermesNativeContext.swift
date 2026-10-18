@@ -381,6 +381,10 @@ final class DirectHermesNativePluginClient {
             // Read every few seconds while an agent waits on another; small and quick.
             return Route(path: "agents/talk", feature: DirectHermesAgentTalkReader.feature, isMutation: false,
                          maximumResponseBytes: 65_536, timeout: 10)
+        case .teamSettings:
+            // Turning it on saves each agent's config on the computer.
+            return Route(path: "team", feature: DirectHermesTeamworkClient.feature, isMutation: true,
+                         maximumResponseBytes: 65_536, timeout: 30)
         case .peopleSpeaking:
             // Sent before each message; a slow host never holds a message for long.
             return Route(path: "people/speaking", feature: "native-people-v1", isMutation: true,

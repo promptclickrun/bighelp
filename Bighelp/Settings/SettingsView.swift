@@ -37,6 +37,9 @@ struct SettingsView: View {
     var connectorApps: (@MainActor () -> ConnectorAppsModel?)?
     /// Settings › Apps › Composio Apps (one Composio sign-in for every computer); nil hides it.
     var composioApps: (@MainActor () -> ComposioAppsModel?)?
+    /// Settings › Teamwork for the computer in use; nil hides the row.
+    var teamwork: (@MainActor () -> TeamworkModel?)?
+    @State var teamworkModel: TeamworkModel?
     /// Shows just this page (Fleet settings links Appearance and Chat here, so there's one copy of each).
     private var openSection: SettingsMenuSection?
     @Environment(\.bighelpNotificationContext) private var notificationContext
@@ -112,12 +115,14 @@ struct SettingsView: View {
         onOpenWorkspaceDestination: ((WorkspaceDestination) -> Void)? = nil,
         onOpenRoute: ((AppRoute) -> Void)? = nil,
         connectorApps: (@MainActor () -> ConnectorAppsModel?)? = nil,
-        composioApps: (@MainActor () -> ComposioAppsModel?)? = nil
+        composioApps: (@MainActor () -> ComposioAppsModel?)? = nil,
+        teamwork: (@MainActor () -> TeamworkModel?)? = nil
     ) {
         self.onOpenWorkspaceDestination = onOpenWorkspaceDestination
         self.onOpenRoute = onOpenRoute
         self.connectorApps = connectorApps
         self.composioApps = composioApps
+        self.teamwork = teamwork
         self.focusedDestination = focusedDestination
         _settings = Bindable(wrappedValue: settings)
         _userIdentity = Bindable(wrappedValue: userIdentity)

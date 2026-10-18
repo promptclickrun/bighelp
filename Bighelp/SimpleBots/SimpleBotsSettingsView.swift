@@ -154,6 +154,8 @@ struct SimpleBotsSettingsContext {
     /// The primary bot's Hermes settings; nil without a computer to ask.
     let makeHostSettings: () -> SimpleBotHostSettings?
     let usage: ProviderUsageStore?
+    /// Teamwork for the computer in use; nil hides the row.
+    let makeTeamwork: () -> TeamworkModel?
     /// Settings' own pages (Settings › Appearance and the rest).
     let page: (SimpleBotsSettingsPage) -> AnyView
     let allSettings: () -> AnyView
@@ -173,6 +175,7 @@ struct SimpleBotsSettingsView: View {
     let context: SimpleBotsSettingsContext
 
     @State private var host: SimpleBotHostSettings?
+    @State private var teamwork: TeamworkModel?
     @State private var isRulesPresented = false
     @State private var isTimeZonePresented = false
     @AppStorage("bighelp.simple-bots.automatic-time-zone") private var automaticTimeZone = false
@@ -216,6 +219,7 @@ struct SimpleBotsSettingsView: View {
         .navigationDestination(for: SimpleBotsSettingsPage.self) { page in context.page(page) }
         .task {
             if host == nil { host = context.makeHostSettings() }
+            if teamwork == nil { teamwork = context.makeTeamwork() }
             await host?.refresh()
         }
         .task {
@@ -346,6 +350,16 @@ struct SimpleBotsSettingsView: View {
                         .padding(BighelpTokens.space20)
                 } else {
                     ProgressView().frame(maxWidth: .infinity, minHeight: 56)
+                }
+                if let teamwork {
+                    SimpleBotsDivider()
+                    TeamworkToggle(model: teamwork) { detail in
+                        rowText("Teamwork", detail: detail.replacingOccurrences(of: "agents", with: "bots")
+                            .replacingOccurrences(of: "agent", with: "bot"))
+                    }
+                    .tint(SimpleBotColor.green.color)
+                    .padding(.horizontal, BighelpTokens.space20)
+                    .padding(.vertical, BighelpTokens.space12)
                 }
                 SimpleBotsDivider()
                 Button { if let primary { context.onOpenComputer(primary.id) } } label: {

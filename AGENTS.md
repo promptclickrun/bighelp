@@ -180,7 +180,8 @@ change in both repos.
   (`AgentTalkIncomingMessage`, `AgentTalkDelivery`), never from prose. The plugin's `agents/talk` route reads the
   other agent's own history read-only and matches runs by a SHA-256 of the message (`AgentTalkMessageHash`, same
   normalization on both sides). Each Hermes agent loads only its own plugins, and usually only the default agent
-  has bighelp's, so a route has to read other agents' data from the dashboard side.
+  has bighelp's, so nothing that must reach every agent can be a plugin prompt section: Teamwork writes each
+  agent's `platform_hints.bighelp.append` instead.
 - **Files agents send** (`MEDIA:` lines, generated pictures): the plugin's `attachments/resolve` + `attachments/fetch`
   routes serve them in ~3 MB pieces. After the first piece the rest download three at a time, and a dropped piece is
   asked for again from its offset. Finished files are kept on the phone (`AgentAttachmentCache`, Caches, 512 MB, least

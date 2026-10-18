@@ -316,7 +316,8 @@ messages and answers other agents send in) are one quiet centered line in the ch
 plugin's `agents/talk` feed, "Nova is searching the web…". Back-to-back messages share one line. It stays
 out of the finished-turn fold and shows with tool calls and reasoning hidden, because it's conversation. A tap
 opens what they said as a short chat between them, with "What Nova did" from Nova's own chat. Simple Bot
-mode draws the faces as marks.
+mode draws the faces as marks. Settings › Assistants › Teamwork (opt-in, plugin `native-team-v1`) tells every
+agent who the others are and how to ask them for help.
 
 Compacting (⋯ › Advanced › Compact, or Hermes on its own when the context fills) shows `ChatCompactionRail` above the
 message box: a chip whose four-step bar moves once a second (still with Reduce Motion), then Compacted with the tokens
@@ -354,8 +355,8 @@ text is SF Pro, as everywhere.
   (its screen, when the host has one).
 - **Settings**: you and Usage (your tightest plan limit); Connect apps; the primary bot's Auto-review
   (Hermes' smart approvals on, manual off; never off), its rules, and the time zone every bot works in
-  (or this device's, automatically); Bot Computer; Notifications and Appearance; then the switch back
-  and All Settings.
+  (or this device's, automatically); Teamwork; Bot Computer; Notifications and Appearance; then the
+  switch back and All Settings.
 
 ## Bighelp IDE
 

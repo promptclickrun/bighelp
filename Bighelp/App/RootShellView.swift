@@ -1101,8 +1101,19 @@ struct RootShellView: View {
                 leaveSettings { openPrepared(route) }
             },
             connectorApps: { connectorAppsModel() },
-            composioApps: { composioAppsModel() }
+            composioApps: { composioAppsModel() },
+            teamwork: { teamworkModel() }
         )
+    }
+
+    /// Settings › Teamwork on the computer in use; demo mode's made-up computer otherwise.
+    func teamworkModel() -> TeamworkModel? {
+        if usesWorkspaceFixtures, workspaceConnections?.isDirectSelected != true {
+            return TeamworkModel(client: DemoTeamworkClient.shared)
+        }
+        guard currentWorkspaceOwner != nil else { return nil }
+        return TeamworkModel(client: DirectHermesTeamworkClient(
+            workspace: { [weak workspaceConnections] in workspaceConnections?.workspace }))
     }
 
     /// Settings › Apps › Composio Apps: your Composio sign-in, and the agent in use on the

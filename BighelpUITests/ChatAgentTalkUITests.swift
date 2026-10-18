@@ -67,6 +67,24 @@ final class ChatAgentTalkUITests: BighelpUITestCase {
     }
 
     @MainActor
+    func testRailsShowInSimpleBotMode() throws {
+        for appearance in ["light", "dark"] {
+            let app = launch(appearance: appearance, extra: ["-bighelp.settings.simple-bots", "YES"])
+            let timeline = app.tables["chat.timeline"]
+            XCTAssertTrue(timeline.waitForExistence(timeout: 15))
+            XCTAssertTrue(rail(in: app, label: "Mina Shah is searching the web…").waitForExistence(timeout: 10))
+            let finished = rail(in: app, label: "4 messages with Mina Shah and Jordan Lee")
+            reveal(finished, in: timeline)
+            XCTAssertTrue(finished.exists)
+            save("agent-talk-simple-\(appearance)", app)
+            finished.tap()
+            XCTAssertTrue(text(in: app, containing: "About $3,100 for two").waitForExistence(timeout: 5))
+            save("agent-talk-simple-sheet-\(appearance)", app)
+            app.terminate()
+        }
+    }
+
+    @MainActor
     private func launch(appearance: String, extra: [String] = []) -> XCUIApplication {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-start-chat", "-preview-ui-v3",

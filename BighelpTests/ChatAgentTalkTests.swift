@@ -209,6 +209,15 @@ struct ChatAgentTalkTests {
         }, "The raw background notice never shows as the person's bubble")
     }
 
+    @Test func chatListPreviewsReadAsTheOtherAgents() {
+        #expect(SessionPreviewText.plain("Message from 🤖 Havok (@havok): **Not** in my chats.")
+                == "Havok: Not in my chats.")
+        #expect(SessionPreviewText.plain(deliveryNotice("proc_abc", reply: "Not mine.")) == "Havok: Not mine.")
+        // A comma signature runs into the words: shown as written, without looping.
+        #expect(SessionPreviewText.plain("Message from Avery (@hermes), on behalf of Sam.")
+                == "Message from Avery (@hermes), on behalf of Sam.")
+    }
+
     // MARK: The plugin's feed
 
     @Test func messageHashMatchesThePluginsNormalization() {

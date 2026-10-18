@@ -310,6 +310,14 @@ the context pop-up, each with Change into Model & reasoning. Showing them reads 
 is replying. Deleting an agent stops its reply and clears its unsent drafts on this device instead of refusing; only a
 group chat that includes it holds the delete back, by name.
 
+Agents talking to each other (`hermes -p <agent> chat -q …`, `hermes peer dm`, `message_agent`, and the
+messages and answers other agents send in) are one quiet centered line in the chat, not a tool step
+(`ChatAgentTalkRail`): the agents' faces stacked, then "4 messages with Nova", "Asking Nova…" or, from the
+plugin's `agents/talk` feed, "Nova is searching the web…". Back-to-back messages share one line. It stays
+out of the finished-turn fold and shows with tool calls and reasoning hidden, because it's conversation. A tap
+opens what they said as a short chat between them, with "What Nova did" from Nova's own chat. Simple Bot
+mode draws the faces as marks.
+
 Compacting (⋯ › Advanced › Compact, or Hermes on its own when the context fills) shows `ChatCompactionRail` above the
 message box: a chip whose four-step bar moves once a second (still with Reduce Motion), then Compacted with the tokens
 before and after for two seconds before it shrinks away. Hermes' own status starts and ends it.

@@ -377,18 +377,38 @@ struct ChatAgentFaceStack: View {
     var body: some View {
         HStack(spacing: -size * 0.3) {
             ForEach(Array(agents.prefix(4).enumerated()), id: \.element.agentID) { index, agent in
-                let display = resolver.display(forAgentID: agent.agentID)
-                AgentLiveAvatar(agentID: agent.agentID,
-                                displayName: ChatAgentTalkPresentation.name(for: agent.agentID,
-                                                                           fallback: agent.fallbackName,
-                                                                           resolver: resolver),
-                                imageURL: display.imageURL, size: size, showsBadge: false)
-                    .frame(width: size, height: size)
+                ChatAgentTalkFace(agentID: agent.agentID,
+                                  name: ChatAgentTalkPresentation.name(for: agent.agentID, fallback: agent.fallbackName,
+                                                                       resolver: resolver),
+                                  imageURL: resolver.display(forAgentID: agent.agentID).imageURL, size: size)
                     .padding(1.5)
                     .background(Circle().fill(theme.canvas))
                     .zIndex(Double(agents.count - index))
             }
         }
+        .accessibilityHidden(true)
+    }
+}
+
+/// One agent's face: its Simple Bot mode mark while that mode is on, else the
+/// face the rest of the app draws (character, pet or picture).
+struct ChatAgentTalkFace: View {
+    let agentID: String
+    let name: String
+    let imageURL: URL?
+    let size: CGFloat
+
+    @Environment(\.appAppearance) private var appearance
+
+    var body: some View {
+        Group {
+            if appearance.simpleBots {
+                SimpleBotFace(agentID: agentID, name: name, imageURL: imageURL, size: size)
+            } else {
+                AgentLiveAvatar(agentID: agentID, displayName: name, imageURL: imageURL, size: size, showsBadge: false)
+            }
+        }
+        .frame(width: size, height: size)
         .accessibilityHidden(true)
     }
 }
@@ -501,11 +521,9 @@ private struct ChatAgentTalkBubble: View {
     }
 
     private var face: some View {
-        AgentLiveAvatar(agentID: message.agentID, displayName: name,
-                        imageURL: resolver.display(forAgentID: message.agentID).imageURL,
-                        size: ChatMessageGrouping.perchedAvatarSize, showsBadge: false)
-            .frame(width: ChatMessageGrouping.perchedAvatarSize, height: ChatMessageGrouping.perchedAvatarSize)
-            .accessibilityHidden(true)
+        ChatAgentTalkFace(agentID: message.agentID, name: name,
+                          imageURL: resolver.display(forAgentID: message.agentID).imageURL,
+                          size: ChatMessageGrouping.perchedAvatarSize)
     }
 
     @ViewBuilder

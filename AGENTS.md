@@ -175,6 +175,12 @@ change in both repos.
     plugin. An install that may still be running on the host is finished with the commit it asked for.
   - When the app needs a newer plugin feature, gate it on `/native/context` and say "update the plugin".
   - CI tests against the plugin's `main`.
+- **Agents talking to each other:** the app reads them from the tool calls Hermes recorded (`AgentTalkCall`:
+  `hermes -p <agent> chat -q`, `hermes peer dm`, `message_agent`) and from the messages other agents send in
+  (`AgentTalkIncomingMessage`, `AgentTalkDelivery`), never from prose. The plugin's `agents/talk` route reads the
+  other agent's own history read-only and matches runs by a SHA-256 of the message (`AgentTalkMessageHash`, same
+  normalization on both sides). Each Hermes agent loads only its own plugins, and usually only the default agent
+  has bighelp's, so a route has to read other agents' data from the dashboard side.
 - **Files agents send** (`MEDIA:` lines, generated pictures): the plugin's `attachments/resolve` + `attachments/fetch`
   routes serve them in ~3 MB pieces. After the first piece the rest download three at a time, and a dropped piece is
   asked for again from its offset. Finished files are kept on the phone (`AgentAttachmentCache`, Caches, 512 MB, least

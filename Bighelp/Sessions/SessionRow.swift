@@ -123,6 +123,19 @@ struct SessionRow: View {
 /// never show raw `**`, `#`, or link syntax.
 enum SessionPreviewText {
     nonisolated static func plain(_ raw: String) -> String {
+        // Another agent's message or answer reads as theirs, never as Hermes' wrapper.
+        if raw.hasPrefix("[IMPORTANT: Background process "), let delivery = AgentTalkDelivery.parse(raw) {
+            let name = AgentTalkCall(targetID: delivery.targetID ?? "agent", message: nil, route: .message)
+                .fallbackTargetName
+            return delivery.reply.map { "\(name): " + markdownPlain($0) } ?? "\(name) didn't answer"
+        }
+        if raw.hasPrefix("Message from"), let incoming = AgentTalkIncomingMessage.parse(raw), incoming.body != raw {
+            return "\(incoming.senderName): " + markdownPlain(incoming.body)
+        }
+        return markdownPlain(raw)
+    }
+
+    private nonisolated static func markdownPlain(_ raw: String) -> String {
         // Previews render on one line; bound the parse work for long replies.
         let bounded = String(raw.prefix(600))
         var lines: [String] = []

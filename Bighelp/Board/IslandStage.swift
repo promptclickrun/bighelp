@@ -6,6 +6,7 @@ import SwiftUI
 struct IslandStage: View {
     let activity: AgentIslandActivity
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.appAppearance) private var appearance
 
     static let avatarSize: CGFloat = 38
 
@@ -17,9 +18,7 @@ struct IslandStage: View {
                 let scene = IslandScene(kind: activity.kind, size: proxy.size, time: time)
                 ZStack(alignment: .topLeading) {
                     Canvas { context, _ in scene.drawBehind(&context) }
-                    AgentLiveAvatar(agentID: activity.agentID, displayName: activity.name,
-                                    imageURL: activity.imageURL, activity: activity.kind,
-                                    size: Self.avatarSize, showsBadge: false)
+                    face
                         .rotationEffect(.degrees(scene.avatarTilt))
                         .position(scene.avatarCenter)
                     Canvas { context, _ in scene.drawInFront(&context) }
@@ -28,6 +27,19 @@ struct IslandStage: View {
         }
         .clipped()
         .accessibilityHidden(true)
+    }
+
+    /// Simple Bot mode draws each bot as its mark, here too.
+    @ViewBuilder
+    private var face: some View {
+        if appearance.simpleBots {
+            SimpleBotFace(agentID: activity.agentID, name: activity.name, imageURL: activity.imageURL,
+                          size: Self.avatarSize)
+        } else {
+            AgentLiveAvatar(agentID: activity.agentID, displayName: activity.name,
+                            imageURL: activity.imageURL, activity: activity.kind,
+                            size: Self.avatarSize, showsBadge: false)
+        }
     }
 }
 

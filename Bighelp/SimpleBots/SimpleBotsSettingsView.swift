@@ -162,6 +162,8 @@ struct SimpleBotsSettingsContext {
     let onOpenUsage: () -> Void
     let onOpenComputer: (String) -> Void
     let onDone: () -> Void
+    /// Your gateways (computers) and how to pick the one in use.
+    var gateways = BighelpMenuHosts()
 }
 
 enum SimpleBotsSettingsPage: Hashable {
@@ -196,6 +198,7 @@ struct SimpleBotsSettingsView: View {
                 appsCard
                 botSection
                 appCard
+                gatewaysCard
                 modeCard
             }
             .padding(.horizontal, BighelpTokens.space20)
@@ -385,6 +388,38 @@ struct SimpleBotsSettingsView: View {
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("simple-bots.settings.appearance")
+        }
+    }
+
+    /// Multi-gateway shows every gateway's bots on the home; off, you pick the one gateway it shows.
+    private var gatewaysCard: some View {
+        SimpleBotsCard {
+            Toggle(isOn: Binding(get: { context.settings.simpleBotsMultiGateway },
+                                 set: { context.settings.simpleBotsMultiGateway = $0 })) {
+                rowText("Multi-gateway", detail: "Show, use and manage the bots on all your gateways.")
+            }
+            .tint(SimpleBotColor.green.color)
+            .padding(.horizontal, BighelpTokens.space20)
+            .padding(.vertical, BighelpTokens.space12)
+            .accessibilityIdentifier("simple-bots.settings.multi-gateway")
+            if !context.settings.simpleBotsMultiGateway, !context.gateways.hosts.isEmpty {
+                SimpleBotsDivider()
+                Menu {
+                    ForEach(context.gateways.hosts) { host in
+                        Button {
+                            guard !host.isSelected else { return }
+                            context.gateways.select(host.id)
+                        } label: {
+                            if host.isSelected { Label(host.name, systemImage: "checkmark") } else { Text(host.name) }
+                        }
+                    }
+                } label: {
+                    SimpleBotsRow(title: "Active gateway",
+                                  value: context.gateways.hosts.first(where: \.isSelected)?.name)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("simple-bots.settings.active-gateway")
+            }
         }
     }
 

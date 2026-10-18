@@ -3,8 +3,8 @@ import SwiftUI
 // Simple Bot mode (Settings › Simple Bot mode): its home in place of the Chat
 // tab, its short Settings, bot profiles, and how its chats look.
 extension RootShellView {
-    /// The all-hosts view keeps its own list.
-    var simpleBotsOn: Bool { settings.simpleBotsEnabled && !fleetModeOn }
+    /// Simple Bot mode wins over the all-hosts view and Open on (`fleetModeOn`).
+    var simpleBotsOn: Bool { settings.simpleBotsEnabled }
 
     /// The home is the tab's root, whatever is pushed over it: no bar, no ☰; the person's circle opens Settings.
     var simpleBotsHomeIsRoot: Bool {
@@ -40,8 +40,33 @@ extension RootShellView {
             },
             onCreateGroup: { createGroupChat(with: $0) },
             makeCreator: { makeSimpleBotCreator() },
-            onRoutines: { openSimpleBotRoutines($0) }
+            onRoutines: { openSimpleBotRoutines($0) },
+            gateways: simpleBotsGateways
         )
+    }
+
+    /// Multi-gateway: the other gateways' bots from the all-hosts copy of each, each with its latest chat.
+    private var simpleBotsGateways: SimpleBotsGateways? {
+        guard simpleBotsMultiGatewayOn, let fleet, let selected = fleet.selectedHostID else { return nil }
+        let others = fleet.hosts.filter { $0.id != selected }.flatMap { host in
+            fleet.agents(on: host.id).filter { !$0.isHidden }.map { agent in
+                let chat = fleet.latestChat(for: agent)
+                return SimpleBotsGatewayBot(agent: agent, gatewayName: host.name,
+                                            imageURL: fleet.avatars.url(for: agent.avatarFile),
+                                            preview: chat?.preview, date: chat?.updatedAt)
+            }
+        }
+        return SimpleBotsGateways(
+            selectedHostID: selected, selectedName: fleet.hostName(selected), otherBots: others,
+            open: { open, hostID in openFleet(open, on: hostID) },
+            hide: { agent in
+                Task { @MainActor in
+                    do { try await fleet.setHidden(agent, true) } catch {
+                        actionErrorMessage = "\(agent.name) couldn't be hidden. Try again."
+                    }
+                }
+            },
+            refresh: { fleet.refresh() })
     }
 
     /// The edge swipes in Simple Bot mode (`effectiveLeftEdgeSwipeAction`): from the left back to your
@@ -148,7 +173,8 @@ extension RootShellView {
             },
             onOpenUsage: { leaveSettings { appState.open(.usage) } },
             onOpenComputer: { id in leaveSettings { appState.open(.simpleBotProfile(agentID: id)) } },
-            onDone: close
+            onDone: close,
+            gateways: BighelpMenuHosts.current(registry: hostRegistry, demoHosts: demoHosts)
         ))
     }
 }

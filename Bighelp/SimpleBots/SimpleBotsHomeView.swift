@@ -21,12 +21,40 @@ struct SimpleBotsContext {
     /// A model for a new bot, set up the way the shell creates agents; nil when this computer can't.
     let makeCreator: () -> AgentEditorModel?
     let onRoutines: (String) -> Void
+    /// Multi-gateway: every other gateway's bots too; nil when it's off.
+    var gateways: SimpleBotsGateways? = nil
+}
+
+/// Simple Bot mode's Multi-gateway: the other gateways' bots, from the copy the all-hosts view keeps of
+/// each gateway. Opening or managing one makes its gateway the selected one first.
+@MainActor
+struct SimpleBotsGateways {
+    let selectedHostID: UUID
+    let selectedName: String
+    let otherBots: [SimpleBotsGatewayBot]
+    let open: (FleetOpen, UUID) -> Void
+    let hide: (FleetAgent) -> Void
+    let refresh: () -> Void
+}
+
+/// A bot on a gateway that isn't the selected one.
+struct SimpleBotsGatewayBot: Equatable {
+    let agent: FleetAgent
+    let gatewayName: String
+    let imageURL: URL?
+    let preview: String?
+    let date: Date?
+
+    /// Marks and characters on this device are kept per gateway (`CompanionSurfaceScope`).
+    var faceScope: String { CompanionSurfaceScope.computer(agent.hostID.uuidString) }
+    var unreadScope: String { "gateway:" + agent.hostID.uuidString }
 }
 
 /// One row of the home list: a bot and its latest chat, or a group chat.
 struct SimpleBotsItem: Identifiable, Equatable {
     enum Kind: Equatable {
         case bot(AgentProfile)
+        case gatewayBot(SimpleBotsGatewayBot)
         case group(SessionSummary)
     }
 
@@ -34,10 +62,13 @@ struct SimpleBotsItem: Identifiable, Equatable {
     let preview: String?
     let date: Date?
     let isPinned: Bool
+    /// Multi-gateway: the selected gateway, so a bot keeps its place in the order when gateways switch.
+    var hostID: UUID? = nil
 
     var id: String {
         switch kind {
-        case .bot(let profile): "bot:\(profile.id)"
+        case .bot(let profile): "bot:" + (hostID.map { FleetID.make($0, profile.id) } ?? profile.id)
+        case .gatewayBot(let bot): "bot:" + bot.agent.id
         case .group(let summary): "group:\(summary.id)"
         }
     }
@@ -67,7 +98,8 @@ enum SimpleBotsHomeProjection {
     /// pinned bots and group chats, then the rest by their latest chat (bots
     /// without one last, by name). Hidden bots stay off the home.
     static func home(profiles: [AgentProfile], primaryID: String?, pinnedIDs: [String],
-                     summaries: [SessionSummary], order: [String] = [], topOrder: [String] = []) -> Home {
+                     summaries: [SessionSummary], order: [String] = [], topOrder: [String] = [],
+                     gateways: (selected: UUID, others: [SimpleBotsGatewayBot])? = nil) -> Home {
         let primary = self.primary(profiles: profiles, primaryID: primaryID)
         func latest(_ agentID: String) -> SessionSummary? {
             summaries.filter { $0.kind == .direct && $0.agentIDs == [agentID] }.max { $0.updatedAt < $1.updatedAt }
@@ -80,7 +112,10 @@ enum SimpleBotsHomeProjection {
             && profile.placement?.isHidden != true {
             let chat = latest(profile.id)
             rows.append(SimpleBotsItem(kind: .bot(profile), preview: chat?.preview, date: chat?.updatedAt,
-                                       isPinned: pinnedIDs.contains(profile.id)))
+                                       isPinned: pinnedIDs.contains(profile.id), hostID: gateways?.selected))
+        }
+        for bot in gateways?.others ?? [] where bot.agent.hostID != gateways?.selected && !bot.agent.isHidden {
+            rows.append(SimpleBotsItem(kind: .gatewayBot(bot), preview: bot.preview, date: bot.date, isPinned: false))
         }
         for summary in summaries where summary.kind == .botMode {
             rows.append(SimpleBotsItem(kind: .group(summary), preview: summary.preview, date: summary.updatedAt,
@@ -195,6 +230,7 @@ private extension SimpleBotsItem {
     var sortName: String {
         switch kind {
         case .bot(let profile): profile.name
+        case .gatewayBot(let bot): bot.agent.name
         case .group(let summary): summary.title
         }
     }
@@ -267,9 +303,13 @@ struct SimpleBotsHomeView: View {
             profiles: context.agents.profiles, primaryID: context.agents.primaryAgentID,
             pinnedIDs: context.agents.pinnedAgentIDs,
             summaries: context.catalog.recentSummaries(includeCronSessions: false),
-            order: arranging?.list ?? order.order(scope: context.scope),
-            topOrder: arranging?.top ?? order.order(scope: Self.topScope(context.scope)))
+            order: arranging?.list ?? order.order(scope: listScope),
+            topOrder: arranging?.top ?? order.order(scope: Self.topScope(context.scope)),
+            gateways: context.gateways.map { ($0.selectedHostID, $0.otherBots) })
     }
+
+    /// The list's order is one across gateways with Multi-gateway on, and per gateway without it.
+    private var listScope: String { context.gateways == nil ? context.scope : "multi-gateway" }
 
     private static func topScope(_ scope: String) -> String { "top|" + scope }
 
@@ -293,6 +333,9 @@ struct SimpleBotsHomeView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .scrollBounceBehavior(.basedOnSize)
+                // Multi-gateway: the other gateways' bots are read again here (at most once a minute).
+                .task(id: context.gateways != nil) { context.gateways?.refresh() }
+                .refreshable { if let gateways = context.gateways { gateways.refresh() } }
             } else {
                 arrangeList(home)
             }
@@ -469,7 +512,8 @@ struct SimpleBotsHomeView: View {
                 SimpleBotsRowLabel(
                     face: AnyView(SimpleBotFace(agentID: profile.id, name: profile.name,
                                                 imageURL: context.agents.avatarURL(for: profile), size: 56)),
-                    title: profile.name, role: profile.role, preview: item.preview, date: item.date,
+                    title: profile.name, role: context.gateways?.selectedName ?? profile.role,
+                    preview: item.preview, date: item.date,
                     isUnread: unread.isUnread(profile.id, scope: context.scope), isPinned: item.isPinned)
             }
             .buttonStyle(.plain)
@@ -480,6 +524,25 @@ struct SimpleBotsHomeView: View {
                                   imageURL: context.agents.avatarURL(for: profile), message: item.preview)
             }
             .accessibilityIdentifier("simple-bots.bot.\(profile.id)")
+        case .gatewayBot(let bot):
+            Button {
+                unread.set(false, id: bot.agent.profileID, scope: bot.unreadScope)
+                context.gateways?.open(.agent(profileID: bot.agent.profileID), bot.agent.hostID)
+            } label: {
+                SimpleBotsRowLabel(
+                    face: AnyView(gatewayFace(bot, size: 56)),
+                    title: bot.agent.name, role: bot.gatewayName, preview: item.preview, date: item.date,
+                    isUnread: unread.isUnread(bot.agent.profileID, scope: bot.unreadScope), isPinned: false)
+            }
+            .buttonStyle(.plain)
+            .contextMenu {
+                gatewayBotMenu(bot)
+            } preview: {
+                SimpleBotsPreview(agentID: bot.agent.profileID, name: bot.agent.name, imageURL: bot.imageURL,
+                                  message: item.preview)
+                    .environment(\.companionAgentScope, bot.faceScope)
+            }
+            .accessibilityIdentifier("simple-bots.bot.\(bot.agent.id)")
         case .group(let summary):
             Button {
                 unread.set(false, id: summary.id, scope: context.scope)
@@ -538,6 +601,29 @@ struct SimpleBotsHomeView: View {
         }
     }
 
+    private func gatewayFace(_ bot: SimpleBotsGatewayBot, size: CGFloat) -> some View {
+        SimpleBotFace(agentID: bot.agent.profileID, name: bot.agent.name, imageURL: bot.imageURL, size: size)
+            .environment(\.companionAgentScope, bot.faceScope)
+    }
+
+    /// Another gateway's bot: each action makes that gateway the selected one, then acts there.
+    @ViewBuilder
+    private func gatewayBotMenu(_ bot: SimpleBotsGatewayBot) -> some View {
+        let isUnread = unread.isUnread(bot.agent.profileID, scope: bot.unreadScope)
+        Button(isUnread ? "Mark Read" : "Mark Unread", systemImage: isUnread ? "message" : "message.badge") {
+            unread.set(!isUnread, id: bot.agent.profileID, scope: bot.unreadScope)
+        }
+        rearrangeButton
+        Menu("More", systemImage: "ellipsis") {
+            let id = bot.agent.profileID, host = bot.agent.hostID
+            Button("Bot Profile", systemImage: "person.crop.circle") { context.gateways?.open(.botProfile(profileID: id), host) }
+            Button("New Chat", systemImage: "square.and.pencil") { context.gateways?.open(.newChat(profileID: id), host) }
+            Button("Routines", systemImage: "clock") { context.gateways?.open(.routines(profileID: id), host) }
+            Divider()
+            Button("Hide", systemImage: "eye.slash", role: .destructive) { context.gateways?.hide(bot.agent) }
+        }
+    }
+
     /// Turns on dragging for every bot and group chat, until Save or Cancel.
     private var rearrangeButton: some View {
         Button("Rearrange", systemImage: "arrow.up.arrow.down") {
@@ -550,7 +636,7 @@ struct SimpleBotsHomeView: View {
 
     private func saveArrangement() {
         guard let arranging else { return }
-        order.set(arranging.list, scope: context.scope)
+        order.set(arranging.list, scope: listScope)
         order.set(arranging.top, scope: Self.topScope(context.scope))
         withAnimation(.snappy) { self.arranging = nil }
     }
@@ -601,9 +687,14 @@ struct SimpleBotsHomeView: View {
             label = SimpleBotsRowLabel(
                 face: AnyView(SimpleBotFace(agentID: profile.id, name: profile.name,
                                             imageURL: context.agents.avatarURL(for: profile), size: 56)),
-                title: profile.name, role: profile.role, preview: item.preview, date: nil,
-                isUnread: false, isPinned: item.isPinned)
+                title: profile.name, role: context.gateways?.selectedName ?? profile.role, preview: item.preview,
+                date: nil, isUnread: false, isPinned: item.isPinned)
             identifier = "simple-bots.bot.\(profile.id)"
+        case .gatewayBot(let bot):
+            label = SimpleBotsRowLabel(face: AnyView(gatewayFace(bot, size: 56)), title: bot.agent.name,
+                                       role: bot.gatewayName, preview: item.preview, date: nil, isUnread: false,
+                                       isPinned: false)
+            identifier = "simple-bots.bot.\(bot.agent.id)"
         case .group(let summary):
             label = SimpleBotsRowLabel(face: AnyView(groupFaces(summary)), title: summary.title,
                                        preview: item.preview, date: nil, isUnread: false, isPinned: item.isPinned)

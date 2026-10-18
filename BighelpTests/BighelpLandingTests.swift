@@ -189,6 +189,17 @@ struct BighelpLandingTests {
         #expect(standard.allHostsMode, "Nothing picked: the all-hosts switch stays as it was")
     }
 
+    /// Simple Bot mode opens on its own home: Open on doesn't turn the all-hosts view on at launch.
+    @Test func simpleBotModeIgnoresOpenOn() {
+        let saved = defaults()
+        saved.set("all-agents", forKey: BighelpLanding.screenKey)
+        saved.set(true, forKey: "bighelp.settings.simple-bots")
+        let settings = SettingsStore(defaults: saved)
+        settings.applyLaunchLandingToAllHostsMode()
+        #expect(!settings.allHostsMode)
+        #expect(!SettingsStore(defaults: saved).allHostsMode, "Nothing saved for the next launch either")
+    }
+
     @Test func choicesUseThePlainLabels() {
         #expect(BighelpLandingScreen.allCases.map(\.title)
                 == ["Agents", "Agents (multi)", "Last chat", "Sessions", "Feed", "Ideas", "Goals", "Kanban", "Projects"])

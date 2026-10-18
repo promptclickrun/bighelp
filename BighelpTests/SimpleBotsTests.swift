@@ -117,6 +117,43 @@ struct SimpleBotsTests {
         #expect(SimpleBotMarkStore(defaults: defaults).mark(scope: "computer:a", agentID: "nova") == nil)
     }
 
+    /// Multi-gateway: the other gateways' bots join the list, by their latest chat, each keeping one ID
+    /// whichever gateway is selected, so a dragged order survives a switch.
+    @Test func multiGatewayListsEveryGatewaysBots() {
+        let home = UUID(uuidString: "0D0D0D0D-0000-4000-8000-000000000001")!
+        let studio = UUID(uuidString: "0D0D0D0D-0000-4000-8000-000000000002")!
+        func bot(_ id: String, isDefault: Bool = false) -> AgentProfile {
+            AgentProfile(id: id, name: id.capitalized, role: "", summary: "", instructions: "", avatarFileName: nil,
+                         isDefault: isDefault)
+        }
+        func gatewayBot(_ id: String, hidden: Bool = false, at seconds: TimeInterval?) -> SimpleBotsGatewayBot {
+            SimpleBotsGatewayBot(
+                agent: FleetAgent(hostID: studio, profileID: id, name: id.capitalized, role: "", avatarFile: nil,
+                                  isPinned: false, isDefault: false,
+                                  placement: hidden ? AgentListPlacement(isHidden: true) : nil),
+                gatewayName: "Studio Mac", imageURL: nil, preview: seconds.map { _ in "Hi from \(id)" },
+                date: seconds.map { Date(timeIntervalSince1970: $0) })
+        }
+        let profiles = [bot("default", isDefault: true), bot("nova")]
+        let summaries = [SessionSummary(id: "nova", kind: .direct, agentIDs: ["nova"], title: "nova", preview: "Nova",
+                                        updatedAt: Date(timeIntervalSince1970: 20))]
+        let others = [gatewayBot("rio", at: 30), gatewayBot("sage", at: nil), gatewayBot("ghost", hidden: true, at: 99)]
+
+        let off = SimpleBotsHomeProjection.home(profiles: profiles, primaryID: nil, pinnedIDs: [], summaries: summaries)
+        #expect(off.rows.map(\.id) == ["bot:nova"])
+
+        let on = SimpleBotsHomeProjection.home(profiles: profiles, primaryID: nil, pinnedIDs: [], summaries: summaries,
+                                               gateways: (home, others))
+        #expect(on.primary?.id == "default")
+        #expect(on.rows.map(\.id) == ["bot:\(studio.uuidString)/rio", "bot:\(home.uuidString)/nova",
+                                      "bot:\(studio.uuidString)/sage"])
+        let dragged = SimpleBotsHomeProjection.home(
+            profiles: profiles, primaryID: nil, pinnedIDs: [], summaries: summaries,
+            order: ["bot:\(studio.uuidString)/sage", "bot:\(home.uuidString)/nova"], gateways: (home, others))
+        #expect(dragged.rows.map(\.id) == ["bot:\(studio.uuidString)/rio", "bot:\(studio.uuidString)/sage",
+                                           "bot:\(home.uuidString)/nova"], "Not placed yet first, then the order")
+    }
+
     @Test func homeLeadsWithThePrimaryBotThenPinnedThenLatest() {
         func bot(_ id: String, hidden: Bool = false, isDefault: Bool = false) -> AgentProfile {
             AgentProfile(id: id, name: id.capitalized, role: "", summary: "", instructions: "", avatarFileName: nil,

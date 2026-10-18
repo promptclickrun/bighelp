@@ -259,6 +259,11 @@ final class SettingsStore {
 
     /// Settings › Simple Bot mode: a calm home with just your bots, in place of
     /// the tab bar and ☰. Its own Settings sheet turns it off again.
+    /// Simple Bot mode's Multi-gateway: the home lists every gateway's bots, not only the selected one's.
+    var simpleBotsMultiGateway: Bool {
+        didSet { defaults.set(simpleBotsMultiGateway, forKey: Keys.simpleBotsMultiGateway) }
+    }
+
     var simpleBotsEnabled: Bool {
         didSet { defaults.set(simpleBotsEnabled, forKey: Keys.simpleBots) }
     }
@@ -421,6 +426,7 @@ final class SettingsStore {
         let start = defaults.string(forKey: Keys.startExperience).flatMap(BighelpExperience.init(rawValue:)) ?? .bighelp
         codeModeEnabled = codeMode
         simpleBotsEnabled = defaults.bool(forKey: Keys.simpleBots, default: false)
+        simpleBotsMultiGateway = defaults.bool(forKey: Keys.simpleBotsMultiGateway, default: false)
         startExperience = start
         experience = codeMode ? start : .bighelp
         let landing = defaults.string(forKey: BighelpLanding.screenKey).flatMap(BighelpLandingScreen.init(rawValue:))
@@ -446,9 +452,11 @@ final class SettingsStore {
         defaults.set(startAgentIDs, forKey: BighelpLanding.startAgentKey)
     }
 
-    /// A picked Open on decides, at launch, whether every computer's agents show.
+    /// A picked Open on decides, at launch, whether every computer's agents show. Simple Bot mode
+    /// opens on its own home and ignores Open on (its Multi-gateway switch shows every computer).
     func applyLaunchLandingToAllHostsMode() {
-        guard let on = BighelpLanding.allHostsMode(for: launchLanding), allHostsMode != on else { return }
+        guard !simpleBotsEnabled,
+              let on = BighelpLanding.allHostsMode(for: launchLanding), allHostsMode != on else { return }
         modeBeforeLaunchLanding = (allHostsMode, now())
         allHostsMode = on
     }
@@ -727,6 +735,7 @@ private extension SettingsStore {
         static let codeMode = "bighelp.settings.code-mode"
         static let startExperience = "bighelp.settings.code-mode.open-in"
         static let simpleBots = "bighelp.settings.simple-bots"
+        static let simpleBotsMultiGateway = "bighelp.simple-bots.multi-gateway"
         static let sessionSectionPreferences = "loopdy.sessions.section-preferences.v1"
     }
 }

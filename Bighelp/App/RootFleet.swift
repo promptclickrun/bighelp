@@ -4,7 +4,16 @@ import SwiftUI
 /// all hosts; opening anything first makes its host the selected one, and
 /// screens that belong to one host (Settings, Projects…) ask which host.
 extension RootShellView {
-    var fleetModeOn: Bool { settings.allHostsMode && fleet != nil }
+    /// Simple Bot mode wins: its home stays, and its Multi-gateway switch lists every host instead.
+    var fleetModeOn: Bool { settings.allHostsMode && fleet != nil && !settings.simpleBotsEnabled }
+
+    /// Simple Bot mode's home lists every host's bots.
+    var simpleBotsMultiGatewayOn: Bool {
+        settings.simpleBotsEnabled && settings.simpleBotsMultiGateway && fleet != nil
+    }
+
+    /// Every host's data is on screen: the all-hosts view, or Simple Bot mode's Multi-gateway.
+    var showsEveryHost: Bool { fleetModeOn || simpleBotsMultiGatewayOn }
 
     func setAllHostsMode(_ on: Bool) {
         settings.allHostsMode = on
@@ -370,7 +379,7 @@ extension RootShellView {
     /// Other hosts stay connected while the all-hosts view is on and the app
     /// is open; in the background only the selected host's connection stays,
     /// as before.
-    var keepsFleetHostsConnected: Bool { fleetModeOn && scenePhase != .background && hostRegistry != nil }
+    var keepsFleetHostsConnected: Bool { showsEveryHost && scenePhase != .background && hostRegistry != nil }
 
     func setKeepsFleetHostsConnected(_ keep: Bool) {
         hostRegistry?.keepsOtherHostsConnected = keep
@@ -424,7 +433,9 @@ extension RootShellView {
         case .newGroup(let profileIDs, let peers):
             createGroupChat(with: profileIDs, peers: peers)
         case .routines(let profileID):
-            openScheduledTasks(filteredTo: profileID)
+            if simpleBotsOn { openSimpleBotRoutines(profileID) } else { openScheduledTasks(filteredTo: profileID) }
+        case .botProfile(let profileID):
+            appState.open(.simpleBotProfile(agentID: profileID))
         case .task(let jobID, let profileID):
             if appState.selectedTab != .scheduledTasks { appState.select(.scheduledTasks) }
             openPrepared(.scheduledTask(id: jobID, agentID: profileID))
@@ -461,7 +472,7 @@ extension RootShellView {
     }
 
     var liveFleetKey: LiveFleetKey? {
-        guard fleetModeOn, let hostID = fleet?.selectedHostID, isFleetHostReady else { return nil }
+        guard showsEveryHost, let hostID = fleet?.selectedHostID, isFleetHostReady else { return nil }
         return LiveFleetKey(
             hostID: hostID, agents: agents.profiles, pinned: agents.pinnedAgentIDs,
             chats: Array(sessionCatalog.recentSummaries(includeCronSessions: false)

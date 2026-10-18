@@ -1084,6 +1084,48 @@ struct DirectHermesConversationTests {
         turn.cancel()
     }
 
+    /// A turn Hermes runs on its own (a background process finished, another agent wrote in) streams
+    /// only its answer: the message that started it never reaches this socket, and an agent's answer
+    /// can be written by another Hermes process entirely. Once it ends, the chat reads what Hermes saved.
+    /// The person's own turns don't need that.
+    @Test func aTurnHermesStartedReadsTheSavedHistoryAfterwards() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let rpc = DirectTestRPC()
+        rpc.handler = { method, _ in .object(["status": .string(method == "prompt.submit" ? "streaming" : "queued")]) }
+        let client = try DirectHermesConversationClient(rpc: rpc, hostIdentity: "host", profile: "default",
+            runtimeID: "runtime", storedID: "stored", title: "Native", epoch: "epoch", drafts: .init(root: root))
+        defer { client.suspend() }
+        let model = ChatModel(conversationID: client.conversationID, client: client, initialItems: [])
+        client.model = model
+        var reads = 0
+        model.hostHistoryRefresh = { reads += 1 }
+        func waitForReads(_ count: Int) async throws {
+            for _ in 0..<300 where reads < count { try await Task.sleep(for: .milliseconds(10)) }
+        }
+
+        client.receive(.init(type: "message.start", sessionID: "runtime", payload: [:], sequence: 1))
+        client.receive(.init(type: "message.complete", sessionID: "runtime",
+                             payload: ["text": .string("Nova says #26 merged on Oct 9.")], sequence: 2))
+        client.receive(.init(type: "session.info", sessionID: "runtime", payload: ["running": .boolean(false)],
+                             sequence: 3))
+        #expect(!model.isSending)
+        try await waitForReads(1)
+        #expect(reads == 1, "A turn this device didn't send reads the saved history")
+
+        model.draft = "Thanks"
+        let turn = Task { await model.send() }
+        for _ in 0..<200 where !rpc.requests.contains(where: { $0.method == "prompt.submit" }) {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        client.receive(.init(type: "message.start", sessionID: "runtime", payload: [:], sequence: 4))
+        client.receive(.init(type: "message.complete", sessionID: "runtime",
+                             payload: ["text": .string("You're welcome.")], sequence: 5))
+        try await Task.sleep(for: .milliseconds(800))
+        #expect(reads == 1, "The person's own turn already shows everything")
+        turn.cancel()
+    }
+
     /// Hermes retries a reply with no text, so an agent whose reaction says it all ends the turn
     /// with a silence marker. That answers the person: no bubble and no "silence marker" warning,
     /// whether the reaction lands before the marker or just after it. Without a reaction the

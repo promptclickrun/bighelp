@@ -151,7 +151,7 @@ struct ChatAgentTalkTests {
 
     @Test func runningCallIsLiveAndAsks() throws {
         let running = tool("t1", command: "hermes -p nova chat -Q -q 'Is Monday free?'", output: nil, lifecycle: .running)
-        let talk = ChatAgentTalk(.call(running, delivery: nil))
+        let talk = ChatAgentTalk(.call(running, answer: nil))
         #expect(talk.isLive)
         let resolver = TimelineSenderResolver()
         #expect(ChatAgentTalkPresentation.label(for: talk, chatAgentID: "finance", resolver: resolver) == "Asking Nova…")
@@ -204,9 +204,59 @@ struct ChatAgentTalkTests {
         #expect(first.messages(chatAgentID: "finance").map(\.state) == [.said("Is it yours?"), .said("Not mine.")])
         let second = try #require(talks.last)
         #expect(second.messages(chatAgentID: "finance").map(\.state) == [.said("Is it yours?"), .said("Not mine.")])
+        #expect(labels(talks) == ["Asked Havok", "Havok answered"], "Two rows that say different things")
         #expect(!rows.contains { row in
             if case .transcript(.entry(.message(let item))) = row { item.id == notice.id } else { false }
         }, "The raw background notice never shows as the person's bubble")
+    }
+
+    /// Hermes 0.22 and later: the answer comes in as the other agent's own message, then the delivery's
+    /// notice follows with that agent's wrap-up. One question and one answer, whenever the chat is read.
+    @Test func messageAgentAnswerAsItsOwnMessageShowsOnce() throws {
+        let user = message("Ask Nova", human: true, order: 1)
+        let call = ChatActivityEvent(
+            eventID: "m1", sessionID: "session", turnID: "turn", kind: .tool, lifecycle: .succeeded,
+            title: "message_agent", summary: nil, detail: nil, occurredAt: 2, toolCallID: "call-m1",
+            toolName: "message_agent", arguments: #"{"target":"nova","message":"When did #26 merge?"}"#,
+            result: #"{"status":"queued","to":"@nova","reply_delivery":"notification","process_id":"proc_abc"}"#,
+            sourceOrder: 2)
+        let sent = message("I asked Nova. I'll pass on her reply.", order: 3)
+        let answer = message("Message from 🤖 Nova (@nova): #26 merged on Oct 9.", human: true, order: 4)
+        let relay = message("Nova says #26 merged on Oct 9.", order: 5)
+        let notice = message(deliveryNotice("proc_abc", reply: "Avery got the answer.", target: "nova"),
+                             human: true, order: 6)
+        let wrapUp = message("Nova's delivery finished.", order: 7)
+        func read(_ items: [TimelineItem]) -> (talks: [ChatAgentTalk], rows: [ChatCanvasRow]) {
+            let entries = ChatTranscriptProjection.entries(
+                items: items, activityEvents: [call],
+                visibility: .init(showReasoning: false, showToolCalls: false), isBotMode: false)
+            let rows = ChatCanvasTranscriptProjection.rows(from: entries.map(ChatTurnDisplayRow.entry),
+                                                           disclosures: ChatActivityDisclosureStore())
+            return (rows.compactMap { row in if case .agentTalk(let talk) = row { talk } else { nil } }, rows)
+        }
+        func bubbles(_ rows: [ChatCanvasRow]) -> [String] {
+            rows.compactMap { row in
+                guard case .transcript(.entry(.message(let item))) = row, case .message(let text) = item.content
+                else { return nil }
+                return text
+            }
+        }
+
+        #expect(labels(read([user, sent]).talks) == ["Waiting for Nova"])
+
+        // Read again after the answer came in, before the notice (the case Refresh showed).
+        var now = read([user, sent, answer, relay])
+        #expect(labels(now.talks) == ["Asked Nova", "Nova answered"])
+        #expect(now.talks.last?.messages(chatAgentID: "finance").map(\.state)
+                == [.said("When did #26 merge?"), .said("#26 merged on Oct 9.")],
+                "The relay to the person isn't an answer to Nova")
+        #expect(bubbles(now.rows).contains("Nova says #26 merged on Oct 9."))
+
+        // And after the notice, as reopening the chat showed: no third row, no raw notice.
+        now = read([user, sent, answer, relay, notice, wrapUp])
+        #expect(labels(now.talks) == ["Asked Nova", "Nova answered"])
+        #expect(!bubbles(now.rows).contains { $0.hasPrefix("[IMPORTANT") })
+        #expect(bubbles(now.rows).contains("Nova's delivery finished."))
     }
 
     @Test func chatListPreviewsReadAsTheOtherAgents() {
@@ -292,10 +342,14 @@ struct ChatAgentTalkTests {
                             sourceOrder: order))
     }
 
-    private func deliveryNotice(_ process: String, reply: String) -> String {
+    private func labels(_ talks: [ChatAgentTalk]) -> [String] {
+        talks.map { ChatAgentTalkPresentation.label(for: $0, chatAgentID: "finance", resolver: TimelineSenderResolver()) }
+    }
+
+    private func deliveryNotice(_ process: String, reply: String, target: String = "havok") -> String {
         "[IMPORTANT: Background process \(process) completed normally (exit code 0).\n"
             + #"Command: /usr/bin/python3 /srv/hermes/tools/bot_mode_dm.py --run-delivery --author '{"id": "bot:default", "is_bot": true}' "#
-            + #"query-file /tmp/q hermes -p havok chat --in ~ -c "Bot Chat" --create-if-missing -Q --query-file /tmp/q"#
+            + "query-file /tmp/q hermes -p \(target) chat --in ~ -c \"Bot Chat\" --create-if-missing -Q --query-file /tmp/q"
             + "\nOutput:\n\(reply)]"
     }
 

@@ -6,19 +6,19 @@ import SwiftUI
 /// Show reasoning say.
 struct ChatAgentTalk: Identifiable, Equatable {
     enum Piece: Identifiable, Equatable {
-        /// This chat's agent wrote to another agent. `delivery` is the later
-        /// answer to a `message_agent` message, found by its process.
-        case call(ChatActivityEvent, delivery: AgentTalkDelivery?)
+        /// This chat's agent wrote to another agent. `answer` is the later
+        /// answer to a `message_agent` message.
+        case call(ChatActivityEvent, answer: ChatAgentTalkAnswer?)
         /// Another agent wrote into this chat; `reply` is how this chat's agent answered.
         case incoming(TimelineItem, AgentTalkIncomingMessage, reply: TimelineItem?)
-        /// The answer to a `message_agent` message, with the call that sent it.
-        case delivery(TimelineItem, AgentTalkDelivery, call: ChatActivityEvent?)
+        /// The answer to a `message_agent` message, where it came in, with the call that sent it.
+        case answer(TimelineItem, ChatAgentTalkAnswer, call: ChatActivityEvent?)
 
         var id: String {
             switch self {
             case .call(let event, _): "call:\(event.id)"
             case .incoming(let item, _, _): "incoming:\(item.id)"
-            case .delivery(let item, _, _): "delivery:\(item.id)"
+            case .answer(let item, _, _): "answer:\(item.id)"
             }
         }
     }
@@ -68,7 +68,7 @@ struct ChatAgentTalk: Identifiable, Equatable {
         }
         for piece in pieces {
             switch piece {
-            case .call(let event, let delivery):
+            case .call(let event, let answer):
                 guard let call = event.agentTalkCall else { continue }
                 sent(event, call)
                 let state: ChatAgentTalkMessage.State?
@@ -78,14 +78,14 @@ struct ChatAgentTalk: Identifiable, Equatable {
                     switch event.agentTalkReply?.outcome {
                     case .answered: state = event.agentTalkReply?.text.map(ChatAgentTalkMessage.State.said)
                     case .failed: state = .noAnswer
-                    case .queued: state = delivery.map { $0.reply.map(ChatAgentTalkMessage.State.said) ?? .noAnswer }
+                    case .queued: state = answer.map { $0.text.map(ChatAgentTalkMessage.State.said) ?? .noAnswer }
                         ?? .waiting
                     case nil: state = nil
                     }
                 }
                 if let state {
-                    put(ChatAgentTalkMessage(id: "reply:\(event.id)", agentID: delivery?.targetID ?? call.targetID,
-                                             fallbackName: call.fallbackTargetName, state: state, date: nil))
+                    put(ChatAgentTalkMessage(id: "reply:\(event.id)", agentID: answer?.agentID ?? call.targetID,
+                                             fallbackName: call.fallbackTargetName, state: state, date: answer?.date))
                 }
             case .incoming(let item, let message, let reply):
                 put(ChatAgentTalkMessage(id: "incoming:\(item.id)", agentID: message.senderID,
@@ -98,18 +98,19 @@ struct ChatAgentTalk: Identifiable, Equatable {
                                                  state: .said(prose), date: reply.metadata.timestamp))
                     }
                 }
-            case .delivery(let item, let delivery, let event):
-                let state: ChatAgentTalkMessage.State = delivery.reply.map(ChatAgentTalkMessage.State.said) ?? .noAnswer
+            case .answer(let item, let answer, let event):
+                let state: ChatAgentTalkMessage.State = answer.text.map(ChatAgentTalkMessage.State.said) ?? .noAnswer
                 if let event, let call = event.agentTalkCall {
                     sent(event, call)
-                    put(ChatAgentTalkMessage(id: "reply:\(event.id)", agentID: delivery.targetID ?? call.targetID,
-                                             fallbackName: call.fallbackTargetName, state: state,
-                                             date: item.metadata.timestamp))
+                    put(ChatAgentTalkMessage(id: "reply:\(event.id)", agentID: answer.agentID ?? call.targetID,
+                                             fallbackName: answer.fallbackName ?? call.fallbackTargetName,
+                                             state: state, date: item.metadata.timestamp))
                 } else {
-                    let target = delivery.targetID ?? "agent"
-                    put(ChatAgentTalkMessage(id: "delivery:\(item.id)", agentID: target,
-                                             fallbackName: AgentTalkCall(targetID: target, message: nil,
-                                                                         route: .message).fallbackTargetName,
+                    let target = answer.agentID ?? "agent"
+                    put(ChatAgentTalkMessage(id: "answer:\(item.id)", agentID: target,
+                                             fallbackName: answer.fallbackName
+                                                ?? AgentTalkCall(targetID: target, message: nil,
+                                                                 route: .message).fallbackTargetName,
                                              state: state, date: item.metadata.timestamp))
                 }
             }
@@ -129,14 +130,26 @@ struct ChatAgentTalk: Identifiable, Equatable {
     }
 }
 
+/// How a `message_agent` message was answered, later in the chat: the other
+/// agent's own message back (Hermes 0.22 and later), or the notice that its
+/// delivery ended, which carries the answer on older Hermes.
+struct ChatAgentTalkAnswer: Equatable {
+    /// The agent that answered, when the chat says.
+    let agentID: String?
+    let fallbackName: String?
+    /// The other agent's words; nil when it didn't answer.
+    let text: String?
+    let date: Date?
+}
+
 /// Links across the chat for agent messages: a `message_agent` call and the
-/// notice that later carries its answer, and each message another agent sent
-/// in with the answer this chat's agent gave it.
+/// answer that comes in later, and each message another agent sent in with
+/// the answer this chat's agent gave it.
 @MainActor
 struct ChatAgentTalkIndex {
-    private var callsByProcess: [String: ChatActivityEvent] = [:]
-    private var deliveriesByProcess: [String: AgentTalkDelivery] = [:]
+    private var answersByCall: [String: ChatAgentTalkAnswer] = [:]
     private var piecesByItem: [String: ChatAgentTalk.Piece] = [:]
+    private var hiddenItems: Set<String> = []
 
     init(_ rows: [ChatTurnDisplayRow], readsAgentMessages: Bool) {
         var entries: [ChatTranscriptEntry] = []
@@ -147,7 +160,7 @@ struct ChatAgentTalkIndex {
             }
         }
         var incoming: [(TimelineItem, AgentTalkIncomingMessage)] = []
-        var deliveries: [(TimelineItem, AgentTalkDelivery)] = []
+        var answers: [(TimelineItem, ChatAgentTalkAnswer, ChatActivityEvent?)] = []
         var replies: [String: TimelineItem] = [:]
         var open: TimelineItem?
         var lastAnswer: TimelineItem?
@@ -156,11 +169,17 @@ struct ChatAgentTalkIndex {
             open = nil
             lastAnswer = nil
         }
+        // Queued `message_agent` messages: by their delivery process, and those still without an answer.
+        var callsByProcess: [String: ChatActivityEvent] = [:]
+        var unanswered: [ChatActivityEvent] = []
+        var answeredByMessage: Set<String> = []
         for entry in entries {
             switch entry {
             case .activity(let turn):
-                for event in turn.events where event.agentTalkCall?.route == .message {
+                for event in turn.events where event.agentTalkCall?.route == .message
+                    && event.agentTalkReply?.outcome == .queued {
                     if let process = event.agentTalkReply?.processID { callsByProcess[process] = event }
+                    unanswered.append(event)
                 }
             case .message(let item):
                 guard readsAgentMessages else { continue }
@@ -168,11 +187,34 @@ struct ChatAgentTalkIndex {
                     close()
                     guard case .message(let text) = item.content else { continue }
                     if let delivery = AgentTalkDelivery.parse(text) {
-                        deliveries.append((item, delivery))
-                        deliveriesByProcess[delivery.processID] = delivery
+                        let call = callsByProcess[delivery.processID]
+                        if let call, answeredByMessage.contains(call.id) {
+                            // The answer came in as the agent's own message; the notice only repeats it.
+                            hiddenItems.insert(item.id)
+                            continue
+                        }
+                        let answer = ChatAgentTalkAnswer(
+                            agentID: delivery.targetID ?? call?.agentTalkCall?.targetID, fallbackName: nil,
+                            text: delivery.reply, date: item.metadata.timestamp)
+                        if let call {
+                            answersByCall[call.id] = answer
+                            unanswered.removeAll { $0.id == call.id }
+                        }
+                        answers.append((item, answer, call))
                     } else if let message = AgentTalkIncomingMessage.parse(text) {
-                        incoming.append((item, message))
-                        open = item
+                        // A message from an agent this chat's agent is waiting on is its answer, not a new
+                        // request: what this chat's agent says next is for the person.
+                        if let index = unanswered.firstIndex(where: { $0.agentTalkCall?.targetID == message.senderID }) {
+                            let call = unanswered.remove(at: index)
+                            let answer = ChatAgentTalkAnswer(agentID: message.senderID, fallbackName: message.senderName,
+                                                             text: message.body, date: item.metadata.timestamp)
+                            answersByCall[call.id] = answer
+                            answeredByMessage.insert(call.id)
+                            answers.append((item, answer, call))
+                        } else {
+                            incoming.append((item, message))
+                            open = item
+                        }
                     }
                 } else if open != nil, !item.metadata.isInterimReply, item.metadata.delivery != "Streaming",
                           item.sender.kind != .system {
@@ -185,18 +227,19 @@ struct ChatAgentTalkIndex {
         for (item, message) in incoming {
             piecesByItem[item.id] = .incoming(item, message, reply: replies[item.id])
         }
-        for (item, delivery) in deliveries {
-            piecesByItem[item.id] = .delivery(item, delivery, call: callsByProcess[delivery.processID])
+        for (item, answer, call) in answers {
+            piecesByItem[item.id] = .answer(item, answer, call: call)
         }
     }
 
     /// The rail piece a message is, when another agent wrote it.
     func piece(for item: TimelineItem) -> ChatAgentTalk.Piece? { piecesByItem[item.id] }
 
+    /// A delivery notice whose answer already showed: it stays out of the chat.
+    func hides(_ item: TimelineItem) -> Bool { hiddenItems.contains(item.id) }
+
     /// The later answer to a `message_agent` call.
-    func delivery(for event: ChatActivityEvent) -> AgentTalkDelivery? {
-        event.agentTalkReply?.processID.flatMap { deliveriesByProcess[$0] }
-    }
+    func answer(for event: ChatActivityEvent) -> ChatAgentTalkAnswer? { answersByCall[event.id] }
 }
 
 struct ChatAgentTalkMessage: Identifiable, Equatable {
@@ -262,6 +305,22 @@ enum ChatAgentTalkPresentation {
                   let activity = live[event.id], activity.isWorking else { continue }
             let name = name(for: call.targetID, fallback: call.fallbackTargetName, resolver: resolver)
             return working(name, activity) ?? "\(name) is working on it…"
+        }
+        // A `message_agent` message and its answer are two rows, each where it happened: say which.
+        if talk.pieces.count == 1 {
+            switch talk.pieces[0] {
+            case .call(let event, let answer?):
+                if event.agentTalkReply?.outcome == .queued, let call = event.agentTalkCall {
+                    return "Asked \(name(for: answer.agentID ?? call.targetID, fallback: call.fallbackTargetName, resolver: resolver))"
+                }
+            case .answer(_, let answer, let event):
+                let call = event?.agentTalkCall
+                let who = name(for: answer.agentID ?? call?.targetID ?? "agent",
+                               fallback: answer.fallbackName ?? call?.fallbackTargetName, resolver: resolver)
+                return answer.text == nil ? "\(who) didn't answer" : "\(who) answered"
+            default:
+                break
+            }
         }
         if let last = messages.last, last.agentID != chatAgentID {
             let name = name(for: last.agentID, fallback: last.fallbackName, resolver: resolver)

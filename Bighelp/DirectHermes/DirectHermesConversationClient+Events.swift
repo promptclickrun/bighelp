@@ -194,6 +194,7 @@ extension DirectHermesConversationClient {
             }
             scheduleMessageMedia()
             scheduleDurableMessageReactionHydration(activation: [:])
+            if !isReplayingActivity, !submissionTurns.contains(projection.turnID) { model?.hostTurnEnded(from: self) }
         }
     }
 

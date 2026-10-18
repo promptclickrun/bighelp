@@ -114,7 +114,9 @@ enum ChatCanvasTranscriptProjection {
         }
         func append(_ entry: ChatTranscriptEntry) {
             guard case .activity(let turn) = entry else {
-                if case .message(let item) = entry, let piece = talk.piece(for: item) {
+                if case .message(let item) = entry, talk.hides(item) {
+                    return
+                } else if case .message(let item) = entry, let piece = talk.piece(for: item) {
                     appendTalk(piece)
                 } else {
                     result.append(.transcript(.entry(entry)))
@@ -125,7 +127,7 @@ enum ChatCanvasTranscriptProjection {
             for (index, segment) in segments.enumerated() {
                 switch segment {
                 case .agentTalk(let event):
-                    appendTalk(.call(event, delivery: talk.delivery(for: event)))
+                    appendTalk(.call(event, answer: talk.answer(for: event)))
                 case .workTrail(let trail):
                     let isTail = entry.id == tailEntryID && index == segments.count - 1
                     let isLive = isSending && (isTail || trail.events.contains { $0.lifecycle == .running })

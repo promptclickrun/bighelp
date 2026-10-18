@@ -1377,6 +1377,16 @@ final class ShellFeatureStore {
             }
         )
         referenceModel = model
+        // Turns Hermes runs on its own (a background process finished, another agent wrote in) never stream
+        // their messages here, so the chat reads the saved history again, as it does after Stop.
+        model.hostHistoryRefresh = { [weak self, weak catalog] in
+            guard let self, let catalog, self.accountGeneration == referenceGeneration,
+                  let referenceModel, self.chatModels[session.id] === referenceModel,
+                  !referenceModel.isSending else { return }
+            let authoritative = try await catalog.refreshExistingSession(id: session.id)
+            guard self.chatModels[session.id] === referenceModel, !referenceModel.isSending else { return }
+            referenceModel.reconcileHydratedSession(authoritative)
+        }
         if let runtime = session.sessionRuntime {
             runtimeControls?.reconcileSessionRuntime(runtime)
         }

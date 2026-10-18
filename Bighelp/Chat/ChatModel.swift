@@ -14,6 +14,10 @@ final class ChatModel {
     let nativeSessionResumeProgress = NativeSessionResumeProgressPresentation()
     /// What the other agents this chat's agent talks to are doing (`ChatAgentTalkRail`).
     let agentTalkLive = ChatAgentTalkLive()
+    /// Reads this chat's saved history again from the host (set by the shell; nil in previews and tests).
+    @ObservationIgnored var hostHistoryRefresh: (@MainActor () async throws -> Void)?
+    @ObservationIgnored var hostRefreshTask: Task<Void, Never>?
+    @ObservationIgnored var hostRefreshRequested = false
 
     @ObservationIgnored let responseTextGrowthSubject = PassthroughSubject<ResponseTextGrowth, Never>()
     var responseTextGrowth: AnyPublisher<ResponseTextGrowth, Never> {

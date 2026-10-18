@@ -18,31 +18,88 @@ extension ChatModel {
         let calls = activityLedger.allEvents.filter { $0.agentTalkCall != nil }
         guard !calls.isEmpty else { return "" }
         let running = calls.filter { $0.lifecycle == .running }.map(\.id).joined(separator: ",")
-        return "\(conversationID)|\(calls.count)|\(running)"
+        return "\(conversationID)|\(calls.count)|\(running)|\(agentTalkAwaitingDeliveries.count)"
+    }
+
+    /// `message_agent` messages whose delivery hasn't ended yet. Each ends with Hermes' notice in this chat,
+    /// after any answer; the answer itself may be written by another Hermes process, which never streams here.
+    var agentTalkAwaitingDeliveries: [String] {
+        let processes = activityLedger.allEvents.compactMap { event -> String? in
+            guard event.agentTalkCall?.route == .message, event.agentTalkReply?.outcome == .queued else { return nil }
+            return event.agentTalkReply?.processID
+        }
+        guard !processes.isEmpty else { return [] }
+        let ended = Set(items.compactMap { item -> String? in
+            guard item.role == .human, case .message(let text) = item.content else { return nil }
+            return AgentTalkDelivery.parse(text)?.processID
+        })
+        return processes.filter { !ended.contains($0) }
     }
 
     /// Reads what the agents this chat's agent called are doing, every two
     /// seconds while any is still on it. Real data only: without the plugin's
-    /// feed the rails just say who's being asked.
+    /// feed the rails just say who's being asked. While a `message_agent`
+    /// answer is due, the chat also reads its saved history: when the other
+    /// agent stops working, and every 15 seconds for up to 20 minutes.
     func followAgentTalk() async {
-        guard !agentTalkFollowKey.isEmpty, let reader = agentTalkReader else { return }
+        guard !agentTalkFollowKey.isEmpty else { return }
+        let reader = agentTalkReader
         let sessionID = nativeConversationClient?.storedID ?? sourceSession?.remoteStoredID ?? conversationID
+        let started = ContinuousClock.now
+        var lastHistoryRead = started
+        var wasWorking = false
         while !Task.isCancelled {
             let calls = activityLedger.allEvents.filter { $0.agentTalkRunQuery != nil }
-            guard !calls.isEmpty else { return }
-            // The newest calls: the running ones, and the latest ones whose other chat isn't known yet.
-            var queries: [AgentTalkRunQuery] = []
-            for call in calls.reversed() {
-                guard let query = call.agentTalkRunQuery, !queries.contains(query) else { continue }
-                queries.append(query)
-                if queries.count == DirectHermesAgentTalkReader.maximumCalls { break }
+            var working = false
+            if let reader, !calls.isEmpty {
+                // The newest calls: the running ones, and the latest ones whose other chat isn't known yet.
+                var queries: [AgentTalkRunQuery] = []
+                for call in calls.reversed() {
+                    guard let query = call.agentTalkRunQuery, !queries.contains(query) else { continue }
+                    queries.append(query)
+                    if queries.count == DirectHermesAgentTalkReader.maximumCalls { break }
+                }
+                if let runs = await reader.runs(agentID: agentID, sessionID: sessionID, calls: queries) {
+                    guard !Task.isCancelled else { return }
+                    agentTalkLive.update(runs: runs, calls: calls)
+                    working = agentTalkLive.hasWorkingRuns
+                }
             }
-            guard let runs = await reader.runs(agentID: agentID, sessionID: sessionID, calls: queries) else { return }
-            guard !Task.isCancelled else { return }
-            agentTalkLive.update(runs: runs, calls: calls)
-            let waiting = calls.contains { $0.lifecycle == .running } || agentTalkLive.hasWorkingRuns
-            guard waiting else { return }
+            let awaiting = !agentTalkAwaitingDeliveries.isEmpty
+                && ContinuousClock.now - started < .seconds(20 * 60)
+            if awaiting, (wasWorking && !working) || ContinuousClock.now - lastHistoryRead >= .seconds(15) {
+                lastHistoryRead = .now
+                refreshFromHostSoon()
+            }
+            wasWorking = working
+            guard calls.contains(where: { $0.lifecycle == .running }) || working || awaiting else { return }
             try? await Task.sleep(for: .seconds(2))
+        }
+    }
+}
+
+extension ChatModel {
+    /// Hermes ran a turn this device didn't send: a background process finished, or another agent or
+    /// device wrote in. Only its answer streams here, so the chat reads what Hermes saved.
+    func hostTurnEnded(from owner: DirectHermesConversationClient) {
+        guard (client as? DirectHermesConversationClient) === owner, !isBotMode else { return }
+        refreshFromHostSoon()
+    }
+
+    /// One read at a time; asks made while one runs are folded into one more read after it.
+    func refreshFromHostSoon() {
+        guard hostHistoryRefresh != nil else { return }
+        hostRefreshRequested = true
+        guard hostRefreshTask == nil else { return }
+        hostRefreshTask = Task { @MainActor [weak self] in
+            while let self, self.hostRefreshRequested, !Task.isCancelled {
+                self.hostRefreshRequested = false
+                // Let the turn's own last events land first; a send of the person's own goes first too.
+                try? await Task.sleep(for: .milliseconds(400))
+                for _ in 0..<30 where self.isSending { try? await Task.sleep(for: .seconds(1)) }
+                try? await self.hostHistoryRefresh?()
+            }
+            self?.hostRefreshTask = nil
         }
     }
 }

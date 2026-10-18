@@ -125,7 +125,7 @@ struct ChatActivityTurnView: View {
             ForEach(presentation.segments) { segment in
                 switch segment {
                 case .agentTalk(let event):
-                    ChatAgentTalkRail(talk: ChatAgentTalk(.call(event, delivery: nil)),
+                    ChatAgentTalkRail(talk: ChatAgentTalk(.call(event, answer: nil)),
                                       chatAgentID: agentID ?? "default", senderResolver: senderResolver)
                 case .collaboration(let event):
                     AgentCollaborationCard(

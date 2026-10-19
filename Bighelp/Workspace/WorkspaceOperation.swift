@@ -175,6 +175,10 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     case chatStop = "chat.stop"
     /// Teamwork: every agent told about the others (plugin, `native-team-v1`).
     case teamSettings = "team.settings"
+    /// My Templates: bots saved as templates on the computer (plugin, `native-my-templates-v1`).
+    case myTemplatesList = "my-templates.list"
+    case myTemplatesSave = "my-templates.save"
+    case myTemplatesDelete = "my-templates.delete"
     /// Composio Connect in Hermes, for Settings › Apps › Composio Apps (plugin `native-composio-v1`).
     case composioStatus = "composio.status"
     case composioInstall = "composio.install"

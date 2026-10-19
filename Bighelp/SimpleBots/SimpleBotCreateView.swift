@@ -84,8 +84,9 @@ private struct SimpleBotShapeRing: Shape {
 }
 
 /// Create New Bot: a big preview, its name, a shape and a color. The bot
-/// starts with bighelp's everyday helper personality and the default bot's
-/// setup, like New agent; its mark becomes its picture.
+/// starts with bighelp's everyday helper personality, or a template attached
+/// with Templates, and the default bot's setup, like New agent; its mark
+/// becomes its picture.
 @MainActor
 struct SimpleBotCreateView: View {
     let makeCreator: () -> AgentEditorModel?
@@ -96,12 +97,24 @@ struct SimpleBotCreateView: View {
                                             color: [.orange, .pink, .green, .blue, .purple, .teal].randomElement() ?? .orange)
     @State private var isCreating = false
     @State private var errorMessage: String?
+    /// Made when the screen opens, so a template can fill it in before Create.
+    @State private var creator: AgentEditorModel?
+    @State private var isPickingTemplate = false
+    /// Picked in Templates; attached once that sheet has closed, since a template's form opens as a sheet of its own.
+    @State private var pickedTemplate: AgentSoulTemplate?
+    @State private var lastTemplate: AgentSoulTemplate?
     @FocusState private var isNameFocused: Bool
     @Environment(\.dismiss) private var dismiss
     @Environment(\.companionAgentScope) private var scope
     @BighelpThemeReader private var theme
 
     private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    /// The template filling this bot in, once it has.
+    private var attachedTemplate: AgentSoulTemplate? {
+        guard let creator, let id = SimpleBotCreation.attachedID(creator) else { return nil }
+        return lastTemplate?.id == id ? lastTemplate : nil
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -111,10 +124,24 @@ struct SimpleBotCreateView: View {
                 }
                 Text("Create New Bot")
                     .font(.bighelp(.title3, weight: .semibold))
-                Spacer()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                Spacer(minLength: BighelpTokens.space8)
+                if creator != nil {
+                    SimpleBotTemplatesButton { isPickingTemplate = true }
+                }
             }
             .padding(.horizontal, BighelpTokens.space16)
             .padding(.top, BighelpTokens.space16)
+            if let attachedTemplate {
+                SimpleBotTemplateChip(template: attachedTemplate) {
+                    if let creator { SimpleBotCreation.detach(creator) }
+                }
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .padding(.horizontal, BighelpTokens.space16)
+                .padding(.top, BighelpTokens.space8)
+                .transition(.opacity)
+            }
 
             ScrollView {
                 VStack(spacing: BighelpTokens.space32) {
@@ -131,6 +158,18 @@ struct SimpleBotCreateView: View {
                         .frame(minHeight: 60)
                         .background(theme.surface, in: .rect(cornerRadius: BighelpTokens.radius20, style: .continuous))
                         .accessibilityIdentifier("simple-bots.create.name")
+                    if let attachedTemplate {
+                        // Its role as filled in, fields and all.
+                        let role = creator?.draft.role.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                        Text(verbatim: role.isEmpty ? "From \(attachedTemplate.title)"
+                                                    : "From \(attachedTemplate.title): \(role)")
+                            .font(.bighelp(.subheadline))
+                            .foregroundStyle(theme.secondaryText)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, -BighelpTokens.space16)
+                            .accessibilityIdentifier("simple-bots.create.template-note")
+                    }
                     SimpleBotMarkPicker(mark: $mark)
                     if let errorMessage {
                         Text(errorMessage)
@@ -157,22 +196,36 @@ struct SimpleBotCreateView: View {
         }
         .background(theme.canvas.ignoresSafeArea())
         .interactiveDismissDisabled(isCreating)
+        .onAppear { if creator == nil { creator = makeCreator() } }
+        .bighelpSheet(isPresented: $isPickingTemplate, onDismiss: attachPickedTemplate) {
+            AgentTemplateBrowser(title: "Templates") { pickedTemplate = $0 }
+                .bighelpSheetSize(.large)
+        }
+        .agentTemplateForm(creator)
+        .onChange(of: creator?.appliedTemplateID) { _, applied in
+            // A template's form asks for the name too; what was typed there shows here.
+            if applied != nil, let typed = creator?.draft.name, !typed.isEmpty { name = typed }
+        }
+    }
+
+    private func attachPickedTemplate() {
+        guard let template = pickedTemplate, let creator else { return }
+        pickedTemplate = nil
+        TemplateUsage.shared.recordUse(AgentTemplateBrowsing.usageID(template))
+        lastTemplate = template
+        SimpleBotCreation.attach(template, to: creator, name: name)
     }
 
     private func create() async {
-        guard let model = makeCreator() else {
+        guard let model = creator ?? makeCreator() else {
             errorMessage = "This computer can't make new bots."
             return
         }
+        creator = model
         isCreating = true
         errorMessage = nil
         defer { isCreating = false }
-        let template = AgentSoulTemplate.bundled.first { $0.id == "anchor" }
-        model.draft.name = trimmedName
-        model.draft.role = template?.profile ?? "Everyday helper"
-        model.draft.summary = template?.about ?? "Warm, direct, adaptable."
-        model.draft.instructions = template?.soul
-            ?? "You are {{agent_name}}, a friendly helper. Keep answers short and clear, and ask before doing anything that can't be undone."
+        SimpleBotCreation.prepare(model, name: trimmedName)
         if let picture = SimpleBotMarkView.png(mark) { try? await model.importLookAvatar(data: picture, look: .photo) }
         do {
             let profile = try await model.save()

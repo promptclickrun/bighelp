@@ -97,6 +97,7 @@
 		0F7503A6FF6BBDB9B82E5EA6 /* KanbanLane.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED592EAB0C77EF222B56EC54 /* KanbanLane.swift */; };
 		0FA7A6AFF29411F90A565A9E /* BighelpSpinner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1626430F2EC2CF189A88B4B0 /* BighelpSpinner.swift */; };
 		0FD8DC0DB698ECC7FA4C95F0 /* NativeHermesGroupFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 824C90FAE0E0E8E8A689E9CA /* NativeHermesGroupFlowTests.swift */; };
+		10006BC271D7C92540B570B2 /* SimpleBotTemplates.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D3CFECA336C5F41FF704F2B /* SimpleBotTemplates.swift */; };
 		100982301E3E8EC010AE9AFC /* WorkspaceNavigationUITestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8017569C6675F6EF32837C5E /* WorkspaceNavigationUITestSupport.swift */; };
 		102318C3EA490692A1F42CEC /* ResponseHaptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19CBE3874A5EB0DBC56584FC /* ResponseHaptics.swift */; };
 		1041DB26B353971614540418 /* ProviderUsageHostUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F69C0374B3943429B3465FDF /* ProviderUsageHostUITests.swift */; };
@@ -635,6 +636,7 @@
 		677F557F35BF7773EC1AD1C2 /* DirectHermesWorkspaceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CCCB5ED966F2CF4F355D6B1 /* DirectHermesWorkspaceStore.swift */; };
 		6783EE29885D2E6E26863C22 /* BighelpModelChoiceRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A71E63C37770914A367700E4 /* BighelpModelChoiceRow.swift */; };
 		67A8615E5BFF7CFA5F936C92 /* DirectHermesApplicationFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 546B070F4E4E8DBAA091AED2 /* DirectHermesApplicationFactory.swift */; };
+		67B8F6757651C668CC1B65E3 /* MyTemplatesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11073DDD6A9E23FFD6048851 /* MyTemplatesTests.swift */; };
 		67CDDC69AE2084A28C976223 /* WorkflowSignoffView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A48D538BC09DE38454C2C6F1 /* WorkflowSignoffView.swift */; };
 		67D4744BB85A11BD72A1C110 /* RootPresentationContracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86A4501FBA77CB8F1BCE049E /* RootPresentationContracts.swift */; };
 		67DD7F4636C186AF5788B138 /* ChatCardMessageProjection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 515B729EC6C73BB17D8A272A /* ChatCardMessageProjection.swift */; };
@@ -1372,6 +1374,7 @@
 		DB397D515D2AB0E53843550D /* context-unavailable.json in Resources */ = {isa = PBXBuildFile; fileRef = CF09114FB6F2C004FCEABA09 /* context-unavailable.json */; };
 		DBBDCEA6636324C0FF3A294D /* BighelpSideMenuTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4C635A2879E0F34F2D33F7D /* BighelpSideMenuTests.swift */; };
 		DBFE063EF4F0B08D8B940F3C /* HermesWorkspaceViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8546AC159C9E5D6329F24043 /* HermesWorkspaceViews.swift */; };
+		DC115120B7391B9232890E7E /* MyTemplates.swift in Sources */ = {isa = PBXBuildFile; fileRef = E66CF2C4316246F7516BB541 /* MyTemplates.swift */; };
 		DC5DEC5DE80BF100187A66F3 /* HermesLogModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0156F75829D25E6BA0D4AC18 /* HermesLogModels.swift */; };
 		DC6E15CAB1F3A7D383C47616 /* DirectHermesHostToolBackendsClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99B0B8D3F02D5C92ADE88D45 /* DirectHermesHostToolBackendsClient.swift */; };
 		DC78FF2CB9A9D070CA8B6E31 /* WorkspaceGrantedFilesClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75BC105CA160422A2BAFE38B /* WorkspaceGrantedFilesClientTests.swift */; };
@@ -1821,6 +1824,7 @@
 		10D0A42CB691AD7900EDF822 /* MarkdownDocumentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownDocumentTests.swift; sourceTree = "<group>"; };
 		10E8CACAEEB9CB965F521E5A /* WorkspaceFolderChooser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceFolderChooser.swift; sourceTree = "<group>"; };
 		110327E861D3E832B5032BF2 /* ReferenceNativeEditorAcceptanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReferenceNativeEditorAcceptanceTests.swift; sourceTree = "<group>"; };
+		11073DDD6A9E23FFD6048851 /* MyTemplatesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyTemplatesTests.swift; sourceTree = "<group>"; };
 		112773F6B2779C39B4332F60 /* pin.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = pin.json; sourceTree = "<group>"; };
 		112D329592AC95EB7826923E /* ScheduledTaskPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduledTaskPresentationTests.swift; sourceTree = "<group>"; };
 		113548A3FB4DC14DE70D90B3 /* UserIdentityStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserIdentityStoreTests.swift; sourceTree = "<group>"; };
@@ -2000,6 +2004,7 @@
 		2CC23C241BE39F27A688DFE9 /* BighelpShortcutAskProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpShortcutAskProbe.swift; sourceTree = "<group>"; };
 		2D1E11795B7E88BB7F60730C /* ToolDisclosureUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolDisclosureUITests.swift; sourceTree = "<group>"; };
 		2D356EE28404175C59E19A01 /* KanbanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanbanView.swift; sourceTree = "<group>"; };
+		2D3CFECA336C5F41FF704F2B /* SimpleBotTemplates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimpleBotTemplates.swift; sourceTree = "<group>"; };
 		2D4F0775A087437288D32E0B /* PetdexAnimation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetdexAnimation.swift; sourceTree = "<group>"; };
 		2D7F47D20D53B5FF15C7CD63 /* AgentActivityIsland.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentActivityIsland.swift; sourceTree = "<group>"; };
 		2DA1AB00CBFD4C4778E695C2 /* AgentOpenRealHostUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentOpenRealHostUITests.swift; sourceTree = "<group>"; };
@@ -3117,6 +3122,7 @@
 		E5F79F934C5B97C55FBDEB32 /* CardRepliesUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardRepliesUITests.swift; sourceTree = "<group>"; };
 		E6241B3C68880AD101042260 /* ChatToolDetailText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatToolDetailText.swift; sourceTree = "<group>"; };
 		E6382873E9B8EF8068E7994D /* BighelpWidgetBackgroundRefresh.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpWidgetBackgroundRefresh.swift; sourceTree = "<group>"; };
+		E66CF2C4316246F7516BB541 /* MyTemplates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyTemplates.swift; sourceTree = "<group>"; };
 		E6A8DCAEDD9803080A9D1BAF /* ChatTurnFailureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatTurnFailureTests.swift; sourceTree = "<group>"; };
 		E6B07EC6B775EE897F1611EF /* SessionRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRow.swift; sourceTree = "<group>"; };
 		E6CE286DA9BDD6839D991E10 /* RootWorkspaceServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootWorkspaceServices.swift; sourceTree = "<group>"; };
@@ -3770,6 +3776,7 @@
 				E870F072CBA0B66AC95493FB /* SimpleBotsSearchView.swift */,
 				89F6727324898A0915DEB6F3 /* SimpleBotsSettingsView.swift */,
 				6F4DD82DEE8EB5910B718623 /* SimpleBotsStyle.swift */,
+				2D3CFECA336C5F41FF704F2B /* SimpleBotTemplates.swift */,
 				E2D043AD3DE1B95D66A8421C /* SimpleBotVoiceBar.swift */,
 			);
 			path = SimpleBots;
@@ -4135,6 +4142,7 @@
 				0F108CDF2AF7D1B53DC2FE7B /* AgentTemplateFillView.swift */,
 				363125E35F32B409045A5DD4 /* AgentTemplateLibrary.swift */,
 				39E2D77A3FB09D926BCE99A5 /* AvatarCreatorView.swift */,
+				E66CF2C4316246F7516BB541 /* MyTemplates.swift */,
 				3F1EFA3A141B8A46192AF5C5 /* Teamwork.swift */,
 				F2A6AD3C777ECADEE2E4A349 /* TemplateVariables.swift */,
 				53997E89846DCEC17CBF0EF3 /* Petdex */,
@@ -4507,6 +4515,7 @@
 				06E0752CDEB93F69DFC3661C /* ModelNameCatalogTests.swift */,
 				EC5FC19EDFA0F25D3A66F291 /* ModelProviderPlanTests.swift */,
 				51EBF6C938422836EEFF31AF /* ModelReasoningDefaultsTests.swift */,
+				11073DDD6A9E23FFD6048851 /* MyTemplatesTests.swift */,
 				380D86D09ADE0D64E0E00DE9 /* NativeAgentCreationVisualTests.swift */,
 				C57D8A18708453461E88F17A /* NativeContinuousStreamLiveTests.swift */,
 				6889347DEEE3C4D54499D7E5 /* NativeDeviceToolSessionTests.swift */,
@@ -6786,6 +6795,7 @@
 				23B60460BED5D72BE1D7C6F4 /* ModelNameCatalog.swift in Sources */,
 				6A98A35508750BA3FAB61D48 /* ModelNameCatalogStore.swift in Sources */,
 				9DB3108A1C8618661A5F1616 /* ModelProviderPlan.swift in Sources */,
+				DC115120B7391B9232890E7E /* MyTemplates.swift in Sources */,
 				8AD07EFBEA77678E73BE2C04 /* NativeAdministrationPresentation.swift in Sources */,
 				E321D19D467864BCE80DFAE2 /* NativeBotModeHandles.swift in Sources */,
 				12301F3F2B8E250EF645B699 /* NativeChatTimeline.swift in Sources */,
@@ -6966,6 +6976,7 @@
 				C2499B7A9C27898D36572D0F /* SimpleBotMark.swift in Sources */,
 				1CBBCA37E4825CA82FAB683F /* SimpleBotProfileExtras.swift in Sources */,
 				842B5E01AA01D87DE0AD45A9 /* SimpleBotProfileView.swift in Sources */,
+				10006BC271D7C92540B570B2 /* SimpleBotTemplates.swift in Sources */,
 				4F4BFD5D7FE39BBA056987FA /* SimpleBotVoiceBar.swift in Sources */,
 				9439485E2A2FA9EC2B7ED47F /* SimpleBotsHomeView.swift in Sources */,
 				78269EBC10C58BA4BFDAB67B /* SimpleBotsSearchView.swift in Sources */,
@@ -7463,6 +7474,7 @@
 				E631FB670F611061813B80C9 /* ModelNameCatalogTests.swift in Sources */,
 				FAD78D4E195692FC547BA54B /* ModelProviderPlanTests.swift in Sources */,
 				E248A50A3BC66416D6C26004 /* ModelReasoningDefaultsTests.swift in Sources */,
+				67B8F6757651C668CC1B65E3 /* MyTemplatesTests.swift in Sources */,
 				DD9B0458037184ABC60AC77B /* NativeAgentCreationVisualTests.swift in Sources */,
 				C98E642B79FB5D970AF17C6D /* NativeContinuousStreamLiveTests.swift in Sources */,
 				AE5A79DA64189A49AD9F5719 /* NativeDeviceToolSessionTests.swift in Sources */,

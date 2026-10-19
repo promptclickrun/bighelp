@@ -188,6 +188,76 @@ final class SimpleBotsUITests: BighelpUITestCase {
         }
     }
 
+    /// New Bot's Templates: the picker with My Templates on top (the demo computer's saved one, and
+    /// its broken one hidden), a template's fields, the attached chip and taking it off. Then a bot's
+    /// Share: name it, Save, and it's one of My Templates.
+    @MainActor
+    func testTemplatesInNewBotAndSavingABotAsATemplate() throws {
+        for appearance in ["light", "dark"] {
+            let app = launch(appearance: appearance)
+            XCTAssertTrue(app.descendants(matching: .any)["simple-bots.home"].waitForExistence(timeout: 15))
+            app.buttons["simple-bots.new"].tap()
+            app.buttons["New Bot"].tap()
+            let name = app.textFields["simple-bots.create.name"]
+            XCTAssertTrue(name.waitForExistence(timeout: 5))
+            let templates = app.buttons["simple-bots.create.templates"]
+            XCTAssertTrue(templates.waitForExistence(timeout: 5), "Templates sits at the top right")
+            name.tap()
+            name.typeText("Juniper")
+            save("templates-create-\(appearance)", app)
+
+            templates.tap()
+            let mine = app.descendants(matching: .any)["agent.templates.mine"]
+            XCTAssertTrue(mine.waitForExistence(timeout: 10), "My Templates comes first")
+            XCTAssertTrue(app.staticTexts["agent.templates.mine.skipped"].exists, "The broken one is hidden, not the list")
+            let saved = app.buttons["agent.templates.mine-3d2b7c1e-5a4f-4b6d-9e8c-1f2a3b4c5d6e"]
+            XCTAssertTrue(saved.exists)
+            XCTAssertTrue(app.buttons["agent.templates.lens"].exists || app.buttons["agent.templates.anchor"].exists,
+                          "The catalog's templates are still there")
+            save("templates-picker-\(appearance)", app)
+            saved.tap()
+
+            let town = app.textFields["agent.template-form.field.home_town"]
+            XCTAssertTrue(town.waitForExistence(timeout: 10), "Its fill-in fields come first")
+            town.tap()
+            town.typeText("Porto")
+            app.buttons["agent.template-form.continue"].tap()
+            let chip = app.descendants(matching: .any)["simple-bots.create.template"]
+            XCTAssertTrue(chip.waitForExistence(timeout: 5), "The template shows as a chip")
+            XCTAssertEqual(chip.label, "Template: Weekend Planner")
+            XCTAssertTrue(app.staticTexts["simple-bots.create.template-note"].exists)
+            XCTAssertEqual(name.value as? String, "Juniper")
+            save("templates-attached-\(appearance)", app)
+            app.buttons["simple-bots.create.template.remove"].tap()
+            XCTAssertTrue(chip.waitForNonExistence(timeout: 5), "Its x takes it off")
+            XCTAssertFalse(app.staticTexts["simple-bots.create.template-note"].exists)
+            app.buttons["simple-bots.create.close"].tap()
+
+            // A bot's Share saves it as a template on the computer.
+            app.buttons["simple-bots.primary"].tap()
+            let identity = app.buttons["chat.identity"]
+            XCTAssertTrue(identity.waitForExistence(timeout: 10))
+            identity.tap()
+            let share = app.buttons["simple-bots.profile.template"]
+            XCTAssertTrue(share.waitForExistence(timeout: 5))
+            share.tap()
+            let templateName = app.textFields["simple-bots.template.name"]
+            XCTAssertTrue(templateName.waitForExistence(timeout: 5))
+            // The bot's name is filled in; at the end of it, so every delete removes a letter.
+            templateName.coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: 0.5)).tap()
+            if let value = templateName.value as? String, !value.isEmpty {
+                templateName.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: value.count))
+            }
+            templateName.typeText("Budget Buddy")
+            save("templates-share-\(appearance)", app)
+            app.buttons["simple-bots.template.save"].tap()
+            XCTAssertTrue(app.alerts["Saved as a template"].waitForExistence(timeout: 10))
+            save("templates-saved-\(appearance)", app)
+            app.alerts.buttons["OK"].tap()
+            app.terminate()
+        }
+    }
+
     /// A pinned bot joins the primary one in the top row, and goes back to the list when unpinned.
     @MainActor
     func testPinnedBotsJoinTheTopRow() throws {

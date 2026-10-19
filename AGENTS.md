@@ -580,6 +580,10 @@ New code uses Bighelp names. Don't "finish" the rename on this list.
   [services/catalog/docs/TEMPLATE_VARIABLES.md](services/catalog/docs/TEMPLATE_VARIABLES.md).
 - The app's side is `TemplateVariables` (parse, check and fill in one pass) and `AgentTemplateFillView`, the
   short form that opens when someone starts an agent from a template that has fields.
+- My Templates are bots saved as templates on the person's computer (a Simple Bot profile's Share), through the
+  plugin's `my-templates` routes (`native-my-templates-v1`, `MyTemplatesStore`) in the catalog's agent shape. They
+  show first in every template picker, including New Bot's Templates (`SimpleBotCreation`). A saved template
+  that doesn't read is skipped and counted, on the host and in the app, never the whole list.
 
 ### Secrets and access
 

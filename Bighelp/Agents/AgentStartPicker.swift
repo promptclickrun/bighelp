@@ -26,6 +26,7 @@ struct AgentStudioCaption: View {
 struct AgentStartPicker: View {
     let model: AgentEditorModel
     @Bindable var library: AgentTemplateLibrary
+    var myTemplates: MyTemplatesStore = .shared
     @State private var renaming: SavedAgentTemplate?
     @State private var renameText = ""
     @State private var isBrowsingTemplates = false
@@ -78,9 +79,25 @@ struct AgentStartPicker: View {
                     .accessibilityIdentifier("agent.editor.templates.share")
                 }
             case .saved:
+                let onComputer = myTemplates.templates
+                if !onComputer.isEmpty {
+                    carousel {
+                        ForEach(onComputer) { template in
+                            card(title: template.title, subtitle: template.cardRole, detail: template.cardStrength,
+                                 systemImage: template.systemImage, selected: "builtin:\(template.id)",
+                                 identifier: "agent.editor.template.\(template.id)") {
+                                pick(template)
+                            }
+                            .accessibilityHint("Fills in everything from this template. Your agent's name goes into it.")
+                        }
+                    }
+                    note("Saved on your computer, so they're on all your devices.")
+                }
                 if library.templates.isEmpty {
-                    note("No saved templates yet. Save one from an agent's Edit screen or by holding it in Agents.")
-                        .accessibilityIdentifier("agent.editor.saved-templates.empty")
+                    if onComputer.isEmpty {
+                        note("No saved templates yet. Save one from an agent's Edit screen or by holding it in Agents.")
+                            .accessibilityIdentifier("agent.editor.saved-templates.empty")
+                    }
                 } else {
                     carousel {
                         ForEach(library.templates) { template in
@@ -108,6 +125,7 @@ struct AgentStartPicker: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .task { await myTemplates.refresh() }
         .bighelpSheet(isPresented: $isBrowsingTemplates, onDismiss: {
             guard let browsedTemplate else { return }
             self.browsedTemplate = nil

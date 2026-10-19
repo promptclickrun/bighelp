@@ -3,6 +3,8 @@ import SwiftUI
 /// Every agent template from the catalog: search, newest or most used, and bighelp's own only.
 /// Picking one fills in the editor like the Templates rail.
 struct AgentTemplateBrowser: View {
+    var title = "Agent templates"
+    var myTemplates: MyTemplatesStore = .shared
     let onPick: (AgentSoulTemplate) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var search = ""
@@ -13,9 +15,17 @@ struct AgentTemplateBrowser: View {
         let shown = AgentTemplateBrowsing.sorted(
             AgentTemplateBrowsing.filter(AgentSoulTemplate.all, search: search, officialOnly: officialOnly),
             by: order, usage: TemplateUsage.shared)
+        // The person's own come first, newest first as the computer lists them.
+        let mine = AgentTemplateBrowsing.filter(myTemplates.templates, search: search, officialOnly: officialOnly)
+        let showsMine = !mine.isEmpty || (myTemplates.skipped > 0 && search.isEmpty && !officialOnly)
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: BighelpTokens.space16) {
+                    if showsMine {
+                        myTemplatesSection(mine)
+                        sectionTitle("All templates")
+                            .padding(.top, BighelpTokens.space8)
+                    }
                     HStack(spacing: BighelpTokens.space12) {
                         Picker("Order", selection: $order) {
                             ForEach(BoardBlueprintsSheet.BlueprintOrder.allCases) { Text($0.title).tag($0) }
@@ -29,13 +39,10 @@ struct AgentTemplateBrowser: View {
                     }
                     .tint(theme.action)
                     .accessibilityIdentifier("agent.templates.official")
-                    if shown.isEmpty {
+                    if shown.isEmpty, mine.isEmpty {
                         ContentUnavailableView.search(text: search)
                     } else {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: BighelpTokens.space12)],
-                                  spacing: BighelpTokens.space12) {
-                            ForEach(shown) { template in card(template) }
-                        }
+                        grid(shown)
                     }
                     Link(destination: TemplateCatalogPolicy.submitURL) {
                         Label("Share yours", systemImage: "square.and.arrow.up")
@@ -49,7 +56,7 @@ struct AgentTemplateBrowser: View {
             }
             .background(theme.canvas.ignoresSafeArea())
             .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search templates")
-            .navigationTitle("Agent templates")
+            .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -60,6 +67,52 @@ struct AgentTemplateBrowser: View {
             }
         }
         .accessibilityIdentifier("agent.templates.browser")
+        .task { await myTemplates.refresh() }
+    }
+
+    /// My Templates: bots the person saved as templates on their computer. Hold one to delete it.
+    private func myTemplatesSection(_ mine: [AgentSoulTemplate]) -> some View {
+        VStack(alignment: .leading, spacing: BighelpTokens.space8) {
+            sectionTitle("My Templates")
+            Text("Saved on your computer. Hold one to delete it.")
+                .font(.bighelp(.footnote))
+                .foregroundStyle(theme.secondaryText)
+            if myTemplates.skipped > 0 {
+                Text(myTemplates.skipped == 1 ? "One saved template couldn't be opened, so it's hidden."
+                                              : "\(myTemplates.skipped) saved templates couldn't be opened, so they're hidden.")
+                    .font(.bighelp(.footnote))
+                    .foregroundStyle(theme.tertiaryText)
+                    .accessibilityIdentifier("agent.templates.mine.skipped")
+            }
+            grid(mine)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("agent.templates.mine")
+    }
+
+    private func sectionTitle(_ text: String) -> some View {
+        Text(text)
+            .font(.bighelp(.title3, weight: .semibold))
+            .foregroundStyle(theme.primaryText)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    private func grid(_ templates: [AgentSoulTemplate]) -> some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: BighelpTokens.space12)],
+                  spacing: BighelpTokens.space12) {
+            ForEach(templates) { template in
+                if template.isMine {
+                    card(template)
+                        .contextMenu {
+                            Button("Delete", systemImage: "trash", role: .destructive) {
+                                Task { await myTemplates.delete(template) }
+                            }
+                        }
+                } else {
+                    card(template)
+                }
+            }
+        }
     }
 
     private func card(_ template: AgentSoulTemplate) -> some View {
@@ -90,7 +143,9 @@ struct AgentTemplateBrowser: View {
                 }
                 Spacer(minLength: BighelpTokens.space4)
                 HStack(spacing: BighelpTokens.space4) {
-                    if !template.isCommunity {
+                    if template.isMine {
+                        Label("Yours", systemImage: "person.fill").foregroundStyle(theme.action)
+                    } else if !template.isCommunity {
                         Label("bighelp", systemImage: "checkmark.seal.fill").foregroundStyle(theme.action)
                     } else if let credit = template.credit {
                         Text(verbatim: "by @\(credit)")

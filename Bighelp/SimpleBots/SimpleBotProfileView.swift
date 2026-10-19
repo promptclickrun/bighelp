@@ -40,6 +40,8 @@ struct SimpleBotProfileView: View {
     @State private var newRoutine = false
     @State private var screen: BotScreenTabModel?
     @State private var templateNotice: String?
+    @State private var isSavingTemplate = false
+    @State private var savedTemplateTitle: String?
     @State private var isStudioPresented = false
     @State private var modelDefaults: AgentRuntimeDefaultsEditorModel?
     @State private var isModelPresented = false
@@ -129,6 +131,19 @@ struct SimpleBotProfileView: View {
                 .bighelpSheetSize(.standard)
             }
         }
+        .bighelpSheet(isPresented: $isSavingTemplate, onDismiss: {
+            // After the sheet has gone, so the alert can show.
+            guard let title = savedTemplateTitle else { return }
+            savedTemplateTitle = nil
+            templateNotice = "“\(title)” is saved on your computer. Pick it from Templates when you make a new bot."
+        }) {
+            if let profile {
+                SimpleBotSaveTemplateSheet(profile: profile) { savedTemplateTitle = $0.title }
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .bighelpSheetSize(.compact)
+            }
+        }
         .alert("Saved as a template", isPresented: Binding(get: { templateNotice != nil },
                                                           set: { if !$0 { templateNotice = nil } })) {
             Button("OK") { templateNotice = nil }
@@ -145,7 +160,7 @@ struct SimpleBotProfileView: View {
             Spacer()
             if let profile {
                 SimpleBotsCircleButton(systemImage: "square.and.arrow.up", label: "Save as Template",
-                                       identifier: "simple-bots.profile.template") { saveTemplate(profile) }
+                                       identifier: "simple-bots.profile.template") { isSavingTemplate = true }
                 Menu {
                     Button("Message", systemImage: "message") { context.onOpenChat(profile.id) }
                     if !isPrimary {
@@ -453,10 +468,6 @@ struct SimpleBotProfileView: View {
         return modelID.isEmpty ? "Automatic" : ModelNameCatalog.empty.displayName(for: modelID)
     }
 
-    private func saveTemplate(_ profile: AgentProfile) {
-        let template = AgentTemplateLibrary.shared.save(from: profile)
-        templateNotice = "“\(template.title)” is saved on this device. Pick it when you make a new bot."
-    }
 }
 
 /// A bot's instructions (its SOUL), edited and saved straight to the host.

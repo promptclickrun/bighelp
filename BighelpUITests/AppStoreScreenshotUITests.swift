@@ -36,10 +36,7 @@ final class AppStoreScreenshotUITests: BighelpUITestCase {
         // During onboarding the bottom button reports the screen's identifier.
         app.buttons.matching(NSPredicate(format: "identifier IN %@ AND label IN %@",
             ["host-setup.connect-host", "host-setup.screen"], ["Continue", "Connect"])).firstMatch.tap()
-        let next = app.buttons.matching(NSPredicate(format: "identifier IN %@ AND (label == %@ OR label BEGINSWITH %@)",
-            ["host-setup.continue", "host-setup.screen"], "Start chatting", "Let")).firstMatch
-        XCTAssertTrue(next.waitForExistence(timeout: 45), "Connected")
-        next.tap()
+        XCTAssertTrue(continueAfterConnecting(app), "Connected")
 
         // Juno, the everyday agent, opens first.
         try ask("Put this week's highlights on my Feed, and keep track of my goals.",

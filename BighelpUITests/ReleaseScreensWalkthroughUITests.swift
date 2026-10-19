@@ -50,13 +50,13 @@ final class ReleaseScreensWalkthroughUITests: BighelpUITestCase {
         password.tap()
         password.typeText(parts[2])
         tapConnect()
-        let next = app.buttons.matching(NSPredicate(
-            format: "identifier IN %@ AND (label == %@ OR label BEGINSWITH %@)",
-            ["host-setup.continue", "host-setup.screen"], "Start chatting", "Let")).firstMatch
         // A Hermes without its own sign-in connects straight away.
-        if !next.waitForExistence(timeout: 20), app.staticTexts["Sign in to Hermes"].exists { tapConnect() }
-        XCTAssertTrue(next.waitForExistence(timeout: 30))
-        next.tap()
+        var connected = continueAfterConnecting(app, timeout: 20)
+        if !connected {
+            if app.staticTexts["Sign in to Hermes"].exists { tapConnect() }
+            connected = continueAfterConnecting(app, timeout: 30)
+        }
+        XCTAssertTrue(connected, "Connected")
         // The chat header the 16 Pro tester found cramped.
         let avatar = app.buttons["agent.hero.avatar"]
         XCTAssertTrue(avatar.waitForExistence(timeout: 30), "The agent's chat opens")

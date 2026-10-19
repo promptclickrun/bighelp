@@ -125,10 +125,7 @@ final class BotScreenHostUITests: BighelpUITestCase {
         // Return ends editing: iOS's Passwords bar sits over Connect while the box has focus.
         secret.typeText(password + "\n")
         tapConnect(app)
-        let next = app.buttons.matching(NSPredicate(format: "identifier IN %@ AND (label == %@ OR label BEGINSWITH %@)",
-            ["host-setup.continue", "host-setup.screen"], "Start chatting", "Let")).firstMatch
-        XCTAssertTrue(next.waitForExistence(timeout: 45), "Connected")
-        next.tap()
+        XCTAssertTrue(continueAfterConnecting(app), "Connected")
     }
 
     @MainActor private func tapConnect(_ app: XCUIApplication) {

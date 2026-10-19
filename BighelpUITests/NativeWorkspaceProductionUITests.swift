@@ -1132,12 +1132,11 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
             for _ in 0..<2 where !signIn.isHittable { browser.webViews.firstMatch.swipeUp() }
             signIn.tap()
         }
-        let proceed = app.buttons.matching(identifier: "host-setup.screen").matching(
-            NSPredicate(format: "label == %@", "Let's start chatting")
-        ).firstMatch
-        XCTAssertTrue(proceed.waitForExistence(timeout: 40))
-        guard proceed.exists else { capture("native-production-auth-result", app); return }
-        proceed.tap()
+        guard continueAfterConnecting(app, timeout: 40) else {
+            XCTFail("Connected")
+            capture("native-production-auth-result", app)
+            return
+        }
         let newChat = app.buttons["root.new-chat"]
         let homeChat = app.buttons["agent.hero.avatar"]
         let reachDeadline = Date().addingTimeInterval(60)

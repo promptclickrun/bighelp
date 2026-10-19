@@ -16,7 +16,7 @@ final class SessionsParityUITests: BighelpUITestCase {
         XCTAssertFalse(app.buttons["chat.workspace-menu"].exists, "Go to… is gone: ☰ is the menu")
         // Close it with a tap on the chat, away from the menu.
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.6)).tap()
-        XCTAssertTrue(app.buttons["chat.rename"].firstMatch.waitForNonExistence(timeout: 3))
+        XCTAssertTrue(chatMenuElement("chat.rename", in: app).waitForNonExistence(timeout: 3))
 
         menu.tap()
         let seeAll = app.buttons["menu.chats"].firstMatch

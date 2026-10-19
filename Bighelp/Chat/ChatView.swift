@@ -1082,6 +1082,13 @@ struct ChatView: View {
 
     private var thisChatMenu: some View {
         Menu {
+            // Chat Info (the title, details, files, look and session tools) for every chat;
+            // one-on-one chats have no other way in, since their name switches agents.
+            Button("Chat info", systemImage: "info.circle") {
+                dismissKeyboard()
+                onPeopleTap()
+            }
+            .accessibilityIdentifier("chat.info")
             if dynamicTypeSize.isAccessibilitySize {
                 Menu {
                     renameChatMenuItem

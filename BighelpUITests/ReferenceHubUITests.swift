@@ -76,11 +76,10 @@ class BighelpUITestCase: XCTestCase {
     @MainActor
     @discardableResult
     func openChatInfo(in app: XCUIApplication, timeout: TimeInterval = 8) -> Bool {
-        // Group chats open their details from the header; one-agent chats keep
-        // files, appearance and session tools in the ⋯ menu instead.
-        let identity = app.buttons["chat.identity"].firstMatch
-        guard identity.waitForExistence(timeout: timeout), identity.isHittable else { return false }
-        identity.tap()
+        // ⋯ › This chat › Chat info, in every chat (a group's name opens it too).
+        let item = chatMenuItem("chat.info", in: app, timeout: timeout)
+        guard item.exists, item.isHittable else { return false }
+        item.tap()
         return true
     }
 
@@ -94,14 +93,15 @@ class BighelpUITestCase: XCTestCase {
     /// Opens the chat's ⋯ menu when it's closed and returns one of its items.
     @MainActor
     func chatMenuItem(_ identifier: String, in app: XCUIApplication, timeout: TimeInterval = 5) -> XCUIElement {
-        let item = app.buttons[identifier].firstMatch
+        let item = chatMenuElement(identifier, in: app)
         if item.exists, item.isHittable { return item }
         let groups: [String]
         switch identifier {
         case "chat.session-controls", "chat.fast-mode": groups = ["chat.options.model-speed"]
         case "chat.context-window", "chat.provider-usage": groups = ["chat.options.more", "chat.options.usage"]
         case "chat.rename", "chat.appearance": groups = ["chat.options.this-chat", "chat.options.settings"]
-        case "chat.files", "chat.edit-current-agent", "chat.options.settings", "chat.new-bot-chat": groups = ["chat.options.this-chat"]
+        case "chat.info", "chat.files", "chat.edit-current-agent", "chat.options.settings", "chat.new-bot-chat":
+            groups = ["chat.options.this-chat"]
         case "chat.options.usage", "chat.options.advanced", "chat.file-changes": groups = ["chat.options.more"]
         case "chat.compact", "chat.force-refresh", "chat.options.display": groups = ["chat.options.more", "chat.options.advanced"]
         case "chat.visibility.reasoning", "chat.visibility.tool-calls": groups = ["chat.options.more", "chat.options.advanced", "chat.options.display"]
@@ -112,11 +112,24 @@ class BighelpUITestCase: XCTestCase {
             if options.waitForExistence(timeout: timeout) { options.tap() }
         }
         for group in groups {
+            // The menu animates open: wait for each submenu before its tap, or the tap is skipped.
             let submenu = app.buttons[group].firstMatch
-            if submenu.exists, submenu.isHittable { submenu.tap() }
+            if submenu.waitForExistence(timeout: 3), submenu.isHittable { submenu.tap() }
         }
         _ = item.waitForExistence(timeout: timeout)
         return item
+    }
+
+    /// A native menu row reports its title instead of its identifier, so look for both.
+    @MainActor
+    func chatMenuElement(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
+        let titles: [String: String] = [
+            "chat.info": "Chat info", "chat.rename": "Rename chat", "chat.appearance": "Chat appearance",
+            "chat.files": "Chat files", "chat.edit-current-agent": "Edit this agent",
+            "chat.new-bot-chat": "New Bot Chat",
+        ]
+        guard let title = titles[identifier] else { return app.buttons[identifier].firstMatch }
+        return app.buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@", identifier, title)).firstMatch
     }
 
     /// Leaves a pushed chat the way people do: a swipe from the leading edge.

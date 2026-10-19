@@ -193,6 +193,63 @@ struct ComposioAppsTests {
         #expect(hermes.httpPaths.filter { $0.hasSuffix("/test") }.count == 3)
     }
 
+    // MARK: The agent's own Composio account
+
+    /// Hermes can be signed in to another Composio account, or one without these apps. Its connection works, so
+    /// the agent says Composio is connected, but it sees none of the apps connected here (#450). The plugin's
+    /// `composio/apps` lists the apps the agent's own sign-in has connected.
+    @Test func anAgentOnAnotherComposioAccountDoesNotSeeYourApps() async throws {
+        let hermes = try ComposioHermes(tests: [ComposioHermes.reached, ComposioHermes.reached],
+                                        apps: [ComposioHermes.listed([]), ComposioHermes.listed(["gmail", "github"])])
+        let model = try hermes.model()
+        await model.appear()
+        #expect(model.connectedApps.map(\.slug) == ["github", "gmail"])
+        #expect(model.agent == .doesNotSee(server: "composio", apps: ["github", "gmail"], seesSome: false))
+        #expect(hermes.operationNames.contains("composio.apps"))
+        var opened: [URL] = []
+        let flow = try #require(await model.turnOnForAgent { opened.append($0) })
+        #expect(opened.map(\.host) == ["login.composio.dev"], "Hermes' own sign-in, again")
+        #expect(!hermes.operationNames.contains("composio.install"))
+        await model.finishAgentSignIn(flow)
+        #expect(model.agent == .ready(server: "composio"))
+    }
+
+    @Test func anAgentThatSeesSomeOfYourAppsNamesTheOthers() async throws {
+        let hermes = try ComposioHermes(tests: [ComposioHermes.reached], apps: [ComposioHermes.listed(["gmail", "slack"])])
+        let model = try hermes.model()
+        await model.appear()
+        #expect(model.agent == .doesNotSee(server: "composio", apps: ["github"], seesSome: true))
+        #expect(model.appNames(["github"]) == "GitHub")
+        #expect(model.appNames(["github", "gmail"]) == "GitHub and Gmail")
+        #expect(model.appNames(["github", "gmail", "slack", "notion", "zoho_crm"]) == "GitHub, Gmail, Slack and 2 more")
+    }
+
+    @Test func theAgentsAppsComeFromTheirOwnRoute() {
+        #expect(DirectHermesNativePluginClient.supports(.composioApps))
+        #expect(ComposioAgentApps.decode(ComposioHermes.listed(["gmail", "google_calendar"])) == ["gmail", "google_calendar"])
+        #expect(ComposioAgentApps.decode(ComposioHermes.listed([])) == [], "That account has no connected apps")
+        var unknown = ComposioHermes.listed([])
+        unknown["state"] = .string("unknown")
+        #expect(ComposioAgentApps.decode(unknown) == nil)
+        #expect(ComposioAgentApps.decode(ComposioHermes.listed(["gmail", "Not A Slug"])) == nil, "Never a partial list")
+    }
+
+    /// An older plugin, or a list the computer can't read, keeps the page as it was: never a guess.
+    @Test(arguments: [nil, ["state": "unknown", "apps": "none"], ["state": "listed", "apps": "bad"]] as [[String: String]?])
+    func noListFromTheAgentKeepsReady(answer: [String: String]?) async throws {
+        var apps: [[String: BighelpJSONValue]] = []
+        if let answer {
+            var value = ComposioHermes.listed(answer["apps"] == "bad" ? ["Gmail", "../github"] : [])
+            value["state"] = .string(answer["state"] ?? "")
+            if answer["state"] == "unknown" { value["reason"] = .string("unreachable") }
+            apps = [value]
+        }
+        let hermes = try ComposioHermes(tests: [ComposioHermes.reached], apps: apps)
+        let model = try hermes.model()
+        await model.appear()
+        #expect(model.agent == .ready(server: "composio"))
+    }
+
     // MARK: The screen's model, on the demo
 
     @Test func connectingAnAppWaitsForTheNewAccountThenClosesThePage() async throws {
@@ -278,15 +335,25 @@ final class ComposioHermes: WorkspaceOperationPerforming, DirectHermesAuthentica
         }),
     ])
 
+    /// The plugin's `composio/apps`: the apps the agent's own Composio sign-in has connected.
+    static func listed(_ apps: [String]) -> [String: BighelpJSONValue] {
+        ["agentId": .string("atlas"), "schemaVersion": .integer(1), "connect": .string("composio"),
+         "state": .string("listed"), "reason": .null, "apps": .array(apps.map(BighelpJSONValue.string))]
+    }
+
     let owner: WorkspaceOwner?
     var capabilities: WorkspaceCapabilities { .init(owner: owner, values: [:]) }
     private var tests: [BighelpJSONValue]
+    /// `composio/apps` answers in order, the last one repeating; none is a plugin without the route.
+    private var apps: [[String: BighelpJSONValue]]
     private(set) var operations: [WorkspaceOperation] = []
+    private(set) var operationNames: [String] = []
     private(set) var httpPaths: [String] = []
     private(set) var httpProfiles: [String] = []
 
-    init(tests: [BighelpJSONValue]) throws {
+    init(tests: [BighelpJSONValue], apps: [[String: BighelpJSONValue]] = []) throws {
         self.tests = tests
+        self.apps = apps
         owner = WorkspaceOwner(
             authority: try .direct(endpointIdentity: "https://hermes.example", providerID: "basic", userID: "person"),
             authenticationGeneration: UUID(), connectionGeneration: UUID())
@@ -299,10 +366,27 @@ final class ComposioHermes: WorkspaceOperationPerforming, DirectHermesAuthentica
             mcp: DirectHermesMCPClient(http: self, rpc: nil, owner: owner, profileID: "atlas", currentOwner: { owner }))
     }
 
+    /// The screen's model, signed in to Composio with Gmail and GitHub connected (the demo account).
+    func model() throws -> ComposioAppsModel {
+        let vault = DemoComposioVault()
+        try vault.save(DemoComposio.credential)
+        return ComposioAppsModel(account: ComposioAccount(vault: vault), connect: DemoComposioConnect(),
+                                 catalog: DemoComposioCatalog(), agentHost: try agentHost(),
+                                 signIn: { _ in }, sleep: { _ in })
+    }
+
     func perform(_ operation: WorkspaceOperation, payload: [String: BighelpJSONValue],
                  owner: WorkspaceOwner) async throws -> [String: BighelpJSONValue] {
-        guard owner == self.owner, payload["agentId"]?.string == "atlas",
-              [.composioStatus, .composioInstall].contains(operation) else { throw WorkspaceClientError.invalidRequest }
+        guard owner == self.owner, payload["agentId"]?.string == "atlas", payload.count == 1 else {
+            throw WorkspaceClientError.invalidRequest
+        }
+        operationNames.append(operation.rawValue)
+        if operation.rawValue == "composio.apps" {
+            guard let answer = apps.first else { throw WorkspaceClientError.unavailable(.unsupportedOperation) }
+            if apps.count > 1 { apps.removeFirst() }
+            return answer
+        }
+        guard [.composioStatus, .composioInstall].contains(operation) else { throw WorkspaceClientError.invalidRequest }
         operations.append(operation)
         return ["agentId": .string("atlas"), "schemaVersion": .integer(1), "connect": .string("composio"),
                 "servers": .array([.object([

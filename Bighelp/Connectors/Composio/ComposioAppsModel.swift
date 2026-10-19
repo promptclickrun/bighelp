@@ -12,6 +12,9 @@ enum ComposioAgentAccess: Equatable, Sendable {
     case needsSignIn(server: String)
     /// Hermes has a sign-in saved, but its connection test doesn't reach Composio's tools with it.
     case cannotReach(server: String)
+    /// Hermes reaches Composio, but its sign-in doesn't see `apps`, which are connected here: it may be
+    /// another Composio account (#450). `seesSome`: it sees others of the apps connected here.
+    case doesNotSee(server: String, apps: [String], seesSome: Bool)
     case ready(server: String)
 }
 
@@ -24,6 +27,8 @@ protocol ComposioAgentHost: AnyObject {
     func access() async throws -> ComposioAgentAccess
     /// Installs and turns on Composio Connect; returns the server's name.
     func install() async throws -> String
+    /// The apps the agent's own Composio sign-in has connected; nil when the computer can't say.
+    func agentApps() async -> [String]?
     func startSignIn(server: String) async throws -> MCPOAuthFlow
     func signInStatus(flowID: String) async throws -> MCPOAuthFlow
 }
@@ -52,6 +57,10 @@ final class ComposioAppsModel {
     @ObservationIgnored private let agentHost: (any ComposioAgentHost)?
     @ObservationIgnored private let signInFlow: @MainActor (ComposioAccount) async throws -> Void
     @ObservationIgnored private let sleep: (Duration) async throws -> Void
+    /// The computer's answer, and the apps the agent's own Composio sign-in sees (nil: unknown).
+    /// `agent` is both, once both are in (`settleAgent`).
+    @ObservationIgnored private var hostAccess: ComposioAgentAccess = .unknown
+    @ObservationIgnored private var agentSees: [String]?
 
     init(account: ComposioAccount,
          connect: (any ComposioConnecting)? = nil,
@@ -92,9 +101,10 @@ final class ComposioAppsModel {
         account.reload()
         if catalog == nil { catalog = catalogStore.cached() }
         async let catalogLoad: Void = refreshCatalog()
-        async let agentLoad: Void = refreshAgent()
+        async let agentLoad: Void = loadAgent()
         if account.isSignedIn { await refreshConnected() }
         _ = await (catalogLoad, agentLoad)
+        settleAgent()
     }
 
     func signIn() async {
@@ -105,6 +115,7 @@ final class ComposioAppsModel {
         do {
             try await signInFlow(account)
             await refreshConnected()
+            await refreshAgent()
         } catch ComposioError.signInCancelled {
         } catch {
             message = "Composio didn't finish the sign-in. Try again."
@@ -115,6 +126,7 @@ final class ComposioAppsModel {
         account.signOut()
         connections = [:]
         connectedSlugs = []
+        settleAgent()
     }
 
     /// Which apps Composio lists as connected, with their accounts.
@@ -239,14 +251,50 @@ final class ComposioAppsModel {
     // MARK: The agent
 
     func refreshAgent() async {
-        guard let agentHost else { agent = .unknown; return }
+        await loadAgent()
+        settleAgent()
+    }
+
+    private func loadAgent() async {
+        guard let agentHost else { hostAccess = .unknown; agentSees = nil; return }
         do {
-            agent = try await agentHost.access()
+            hostAccess = try await agentHost.access()
         } catch WorkspaceClientError.unavailable(.unsupportedOperation) {
-            agent = .needsPluginUpdate
+            hostAccess = .needsPluginUpdate
         } catch {
-            agent = .unknown
+            hostAccess = .unknown
         }
+        await loadAgentApps()
+    }
+
+    /// Only for a ready agent and a person signed in here: nothing to compare otherwise.
+    private func loadAgentApps() async {
+        agentSees = nil
+        guard let agentHost, case .ready = hostAccess, account.isSignedIn else { return }
+        agentSees = await agentHost.agentApps()
+    }
+
+    /// What the page says: the computer's answer, unless the agent's own Composio sign-in doesn't see apps
+    /// connected here. The agent then says Composio is connected but sees no apps (#450). An unknown list
+    /// keeps the computer's answer.
+    private func settleAgent() {
+        guard case .ready(let server) = hostAccess, account.isSignedIn, let sees = agentSees else {
+            agent = hostAccess
+            return
+        }
+        let mine = connectedApps.map(\.slug)
+        let missing = mine.filter { !sees.contains($0) }
+        agent = missing.isEmpty ? hostAccess
+            : .doesNotSee(server: server, apps: missing, seesSome: missing.count < mine.count)
+    }
+
+    /// "GitHub", "GitHub and Gmail", "GitHub, Gmail, Slack and 2 more": the catalog's names, short.
+    func appNames(_ slugs: [String]) -> String {
+        let names = slugs.map { catalog?.toolkit($0)?.name ?? Self.displayName($0) }
+        let shown = Array(names.prefix(3))
+        if names.count > shown.count { return shown.joined(separator: ", ") + " and \(names.count - shown.count) more" }
+        guard let last = shown.last, shown.count > 1 else { return shown.first ?? "" }
+        return shown.dropLast().joined(separator: ", ") + " and " + last
     }
 
     /// Installs and turns on Composio Connect on the computer if needed, then opens Composio's
@@ -261,17 +309,24 @@ final class ComposioAppsModel {
             let server: String
             switch agent {
             case .needsSignIn(let name), .cannotReach(let name), .ready(let name): server = name
+            case .doesNotSee(let name, _, _): server = name
             default: server = try await agentHost.install()
             }
-            agent = try await agentHost.access()
+            // An agent that sees other apps has a working sign-in: sign in again, nothing to check first.
+            if case .doesNotSee = agent {} else {
+                hostAccess = try await agentHost.access()
+                await loadAgentApps()
+                settleAgent()
+            }
             switch agent {
-            case .needsSignIn, .cannotReach: break
+            case .needsSignIn, .cannotReach, .doesNotSee: break
             default: return nil
             }
             let flow = try await agentHost.startSignIn(server: server)
             if let url = flow.authorizationURL { open(url) }
             return flow
         } catch WorkspaceClientError.unavailable(.unsupportedOperation) {
+            hostAccess = .needsPluginUpdate
             agent = .needsPluginUpdate
         } catch {
             message = "\(agentHost.hostName) couldn't turn on Composio. Try again."

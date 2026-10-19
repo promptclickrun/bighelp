@@ -75,6 +75,35 @@ struct DirectHermesNativeContextTests {
         #expect(http.calls[1].request.timeout <= DirectHermesHTTP.longestRequestSeconds)
     }
 
+    /// The host connects to Composio with the agent's own sign-in (up to 30 seconds) before it answers;
+    /// a plugin without the feature is never asked.
+    @Test func theAgentsComposioAppsWaitForTheHostsConnection() async throws {
+        let owner = try owner()
+        for features in [["native-composio-apps-v1"], ["native-composio-v1"]] {
+            let http = HTTP()
+            http.handler = { request, guardValue in
+                if let guardValue {
+                    return try self.response(request, body: ["state": .string("listed"), "apps": .array([])],
+                                             headers: ["ETag": guardValue.etag, "X-Loopdy-Request-ID": guardValue.requestIDHeader])
+                }
+                return try self.response(request, body: self.context(features: ["native-context-v1", "serving-profile-v1"] + features))
+            }
+            let client = DirectHermesNativePluginClient(http: http, owner: owner, currentOwner: { owner })
+            if features == ["native-composio-v1"] {
+                await #expect(throws: WorkspaceClientError.unavailable(.unsupportedOperation)) {
+                    try await client.perform(.composioApps, payload: ["agentId": .string("default")])
+                }
+                #expect(http.calls.count == 1, "Only the context")
+                continue
+            }
+            _ = try await client.perform(.composioApps, payload: ["agentId": .string("default")])
+            #expect(http.calls[1].request.path == "/api/plugins/loopdy/native/composio/apps")
+            #expect(http.calls[1].request.body == ["agentId": .string("default")])
+            #expect(http.calls[1].request.timeout >= 45)
+            #expect(http.calls[1].request.timeout <= DirectHermesHTTP.longestRequestSeconds)
+        }
+    }
+
     /// A Cloudflare Tunnel compresses replies for iPhones (which always accept
     /// compression) and marks their ETag weak: `W/"sha256:…"`. The app refused
     /// that, so every plugin feature behind a Cloudflare tunnel failed

@@ -102,10 +102,11 @@ struct ComposioAppsView: View {
                         .accessibilityIdentifier("composio.agent.update-plugin")
                 case .unknown:
                     Label("Checking \(host)…", systemImage: "hourglass")
-                case .notInstalled, .turnedOff, .needsSignIn, .cannotReach:
+                case .notInstalled, .turnedOff, .needsSignIn, .cannotReach, .doesNotSee:
                     VStack(alignment: .leading, spacing: BighelpTokens.space4) {
                         Text("Let \(agent) use these apps").font(.bighelp(.headline))
-                        Text(agentDetail(host)).font(.bighelp(.footnote)).foregroundStyle(.secondary)
+                        Text(agentDetail(host, agent: agent)).font(.bighelp(.footnote)).foregroundStyle(.secondary)
+                            .accessibilityIdentifier("composio.agent.detail")
                     }
                     Button {
                         Task {
@@ -124,17 +125,21 @@ struct ComposioAppsView: View {
         }
     }
 
-    private func agentDetail(_ host: String) -> String {
+    private func agentDetail(_ host: String, agent: String) -> String {
         switch model.agent {
         case .needsSignIn: "Sign in to the same Composio account for your agent on \(host)."
         case .cannotReach: "Your agent on \(host) can't reach Composio with its sign-in. Sign in again with the same Composio account."
+        case .doesNotSee(_, let apps, true):
+            "\(agent) on \(host) doesn't see \(model.appNames(apps)). It may use another Composio account. Sign in again with the same account."
+        case .doesNotSee:
+            "\(agent) on \(host) is signed in to Composio, but it doesn't see the apps you connected here. It may use another Composio account."
         default: "Turns on Composio on \(host), then you sign in to the same Composio account for your agent."
         }
     }
 
     private var agentButtonTitle: String {
         switch model.agent {
-        case .needsSignIn, .cannotReach: "Sign in for my agent"
+        case .needsSignIn, .cannotReach, .doesNotSee: "Sign in for my agent"
         default: "Turn on for my agent"
         }
     }

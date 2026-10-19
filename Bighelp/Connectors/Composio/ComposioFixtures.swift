@@ -12,7 +12,7 @@ enum DemoComposio {
         let account = ComposioAccount(vault: vault)
         return ComposioAppsModel(
             account: account, connect: connect, catalog: DemoComposioCatalog(),
-            agentHost: DemoComposioAgentHost(),
+            agentHost: DemoComposioAgentHost(connect: connect),
             signIn: { account in try await account.finishSignInForDemo() },
             sleep: { _ in }
         )
@@ -108,13 +108,33 @@ final class DemoComposioConnect: ComposioConnecting {
     }
 }
 
+/// The demo computer's agent. Its Composio sign-in sees the demo account's apps; the launch argument
+/// `-bighelp.demo.composio-agent-apps none` (or `some`) makes its first sign-in see none (or only the first),
+/// as when Hermes signs in to another Composio account. Signing in again sees them all.
 @MainActor
 final class DemoComposioAgentHost: ComposioAgentHost {
     let hostName = "Demo Mac"
     let agentName = "Atlas"
     private var state: ComposioAgentAccess = .notInstalled
+    private let connect: DemoComposioConnect
+    private let sees = UserDefaults.standard.string(forKey: "bighelp.demo.composio-agent-apps")
+    private var signIns = 0
+
+    init(connect: DemoComposioConnect = DemoComposioConnect()) {
+        self.connect = connect
+    }
 
     func access() async throws -> ComposioAgentAccess { state }
+
+    func agentApps() async -> [String]? {
+        let apps = (try? await connect.connectedToolkits()) ?? []
+        guard signIns <= 1 else { return apps }
+        switch sees {
+        case "none": return []
+        case "some": return Array(apps.prefix(1))
+        default: return apps
+        }
+    }
 
     func install() async throws -> String {
         if case .notInstalled = state { state = .needsSignIn(server: "composio") }
@@ -128,6 +148,7 @@ final class DemoComposioAgentHost: ComposioAgentHost {
 
     func signInStatus(flowID: String) async throws -> MCPOAuthFlow {
         state = .ready(server: "composio")
+        signIns += 1
         return .init(id: flowID, serverName: "composio", status: .approved, authorizationURL: nil, error: nil, tools: [])
     }
 }

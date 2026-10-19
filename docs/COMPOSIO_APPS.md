@@ -14,7 +14,7 @@ Settings › Apps has two parts:
 | Composio sign-in (`ComposioAccount`) | OAuth 2.1 with PKCE against Composio Connect. bighelp registers itself as a public client for each sign-in (dynamic client registration), signs in on Composio's page in `ASWebAuthenticationSession`, and returns to `loopdy://composio-auth`. | The person's tokens, in iCloud Keychain (`app.bighelp.composio.v1`, synchronizable, after first unlock). One sign-in for every computer and device. |
 | Composio Connect (`ComposioConnectClient`) | MCP over HTTP to `https://connect.composio.dev/mcp`. Uses `tools/list` (the search tool's description names the connected apps) and `COMPOSIO_MANAGE_CONNECTIONS` with `list`, `add` (returns `redirect_url`, the app's sign-in page) and `remove` (`account_id`). Never a tool that acts in an app. | The person's bearer token. |
 | App catalog (`ComposioCatalog`) | Apps by category, from `https://catalog.bighelp.app/v1/composio/catalog.json` (`services/catalog`), cached on the device with its ETag. | None in the app. The catalog service reads Composio's developer API with a bighelp key: app names, categories and logos only. |
-| The agent (`ComposioAgentHost`) | The bighelp plugin (`native-composio-v1`) reports Composio's MCP servers in the agent's Hermes settings (`composio/status`) and installs or turns on Composio Connect (`composio/install`). Hermes' own MCP sign-in (`POST /api/mcp/servers/<name>/auth`, then `/api/mcp/oauth/flows/<id>`) signs it in to the same Composio account. Hermes' connection test (`POST /api/mcp/servers/<name>/test`) checks that the agent's saved sign-in still reaches Composio's tools. | Hermes keeps its own Composio tokens (`mcp-tokens/`). The plugin never sees them. |
+| The agent (`ComposioAgentHost`) | The bighelp plugin (`native-composio-v1`) reports Composio's MCP servers in the agent's Hermes settings (`composio/status`) and installs or turns on Composio Connect (`composio/install`). Hermes' own MCP sign-in (`POST /api/mcp/servers/<name>/auth`, then `/api/mcp/oauth/flows/<id>`) signs it in to the same Composio account. Hermes' connection test (`POST /api/mcp/servers/<name>/test`) checks that the agent's saved sign-in still reaches Composio's tools. The plugin's `composio/apps` (`native-composio-apps-v1`) lists the apps the agent's own sign-in has connected. | Hermes keeps its own Composio tokens (`mcp-tokens/`). The plugin never sees them. |
 
 The person's sign-in can't read Composio's developer API (it answers `401 Invalid API key`), so the catalog
 comes from the catalog service. Composio Connect keeps connected apps with the account, so an app connected
@@ -38,8 +38,17 @@ builds the chat's agent, so a chat that was already open when Composio came on d
   agent" again (Hermes' MCP sign-in, no second install). A test that doesn't answer keeps the plugin's
   answer. When ready, the page says to use the apps in a new chat.
   A plugin without `native-composio-v1` shows "Update the bighelp plugin".
+- **Same account:** Hermes' sign-in can work but be for another Composio account, or one without these apps.
+  The agent then says Composio is connected but sees no apps (#450). When the agent is ready and the person
+  is signed in, the page compares the apps connected here with `composio/apps` (Hermes connects with its own
+  sign-in and reads the search tool's whole description; Hermes' own test cuts it to 80 characters). Apps the
+  agent doesn't see show `doesNotSee`: "… doesn't see the apps you connected here. It may use another Composio
+  account", or the missing apps by name when it sees some. "Sign in for my agent" runs Hermes' MCP sign-in
+  again. A plugin without the feature, or an answer the computer can't give (`state: unknown`), keeps `ready`.
 
 ## Demo
 
 `DemoComposio` (DEBUG): a made-up catalog and account, Gmail and GitHub connected, a demo computer
-without Composio until "Turn on for my agent". Tests: `ComposioAppsTests`.
+without Composio until "Turn on for my agent". Its agent sees the account's apps; the launch argument
+`-bighelp.demo.composio-agent-apps none` (or `some`) makes it see none (or only the first). Tests:
+`ComposioAppsTests`, `ComposioAppsUITests`.

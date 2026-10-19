@@ -378,6 +378,10 @@ final class DirectHermesNativePluginClient {
         case .composioInstall:
             return Route(path: "composio/install", feature: "native-composio-v1", isMutation: true,
                          maximumResponseBytes: 32_768)
+        case .composioApps:
+            // The host connects to Composio with the agent's own sign-in (up to 30 seconds) before it answers.
+            return Route(path: "composio/apps", feature: "native-composio-apps-v1", isMutation: false,
+                         maximumResponseBytes: 32_768, timeout: 45)
         case .agentTalkRuns:
             // Read every few seconds while an agent waits on another; small and quick.
             return Route(path: "agents/talk", feature: DirectHermesAgentTalkReader.feature, isMutation: false,

@@ -182,6 +182,8 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     /// Composio Connect in Hermes, for Settings › Apps › Composio Apps (plugin `native-composio-v1`).
     case composioStatus = "composio.status"
     case composioInstall = "composio.install"
+    /// The apps the agent's own Composio sign-in has connected (plugin `native-composio-apps-v1`).
+    case composioApps = "composio.apps"
     /// Instant alerts while bighelp is open (plugin, `native-live-alerts-v1`).
     case liveAlertsListen = "alerts.listen"
     case liveAlertsAck = "alerts.ack"

@@ -76,18 +76,40 @@ final class DirectHermesComposioAgentHost: ComposioAgentHost {
         return name
     }
 
+    func agentApps() async -> [String]? {
+        // A plugin without `native-composio-apps-v1`, or no answer, keeps the page as it was.
+        guard let answer = try? await answer(.composioApps) else { return nil }
+        return ComposioAgentApps.decode(answer)
+    }
+
     func startSignIn(server: String) async throws -> MCPOAuthFlow { try await mcp.startOAuth(serverName: server) }
 
     func signInStatus(flowID: String) async throws -> MCPOAuthFlow { try await mcp.pollOAuth(flowID: flowID) }
 
     private func status(_ operation: WorkspaceOperation) async throws -> ComposioAgentStatus {
+        try ComposioAgentStatus.decode(try await answer(operation))
+    }
+
+    private func answer(_ operation: WorkspaceOperation) async throws -> [String: BighelpJSONValue] {
         guard let owner = workspace.owner else { throw WorkspaceClientError.ownerChanged }
         let payload: [String: BighelpJSONValue] = ["agentId": .string(profileID)]
         do {
-            return try ComposioAgentStatus.decode(try await workspace.perform(operation, payload: payload, owner: owner))
+            return try await workspace.perform(operation, payload: payload, owner: owner)
         } catch WorkspaceClientError.conflict {
             // The plugin's context changed: it's loaded again on the next call. Once.
-            return try ComposioAgentStatus.decode(try await workspace.perform(operation, payload: payload, owner: owner))
+            return try await workspace.perform(operation, payload: payload, owner: owner)
         }
+    }
+}
+
+/// The plugin's answer to `composio/apps`: the apps the agent's own Composio sign-in has connected, as
+/// Composio Connect's search tool names them. Nil when the computer can't say (`state: unknown`) or the
+/// answer doesn't read: never a guess.
+enum ComposioAgentApps {
+    static func decode(_ object: [String: BighelpJSONValue]) -> [String]? {
+        guard object["schemaVersion"]?.integer == 1, object["state"]?.string == "listed",
+              case .array(let rows)? = object["apps"], rows.count <= 200 else { return nil }
+        let apps = rows.compactMap { row in row.string.flatMap { ComposioConnectClient.isSlug($0) ? $0 : nil } }
+        return apps.count == rows.count ? apps : nil
     }
 }

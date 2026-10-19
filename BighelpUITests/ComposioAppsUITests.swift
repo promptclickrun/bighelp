@@ -76,6 +76,41 @@ final class ComposioAppsUITests: BighelpUITestCase {
         }
     }
 
+    /// The agent's Composio sign-in sees none (or only some) of the apps connected here, as when Hermes signed
+    /// in to another Composio account (#450): the page says so, and signing in again for the agent fixes it.
+    @MainActor
+    func testAnAgentOnAnotherComposioAccountSignsInAgain() {
+        for sees in ["none", "some"] {
+            for appearance in ["light", "dark"] {
+                let app = makeApp()
+                app.launchArguments += ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.demo.appearance", appearance,
+                                        "-bighelp.demo.composio-agent-apps", sees]
+                app.launch()
+                _ = app.buttons.matching(NSPredicate(format: "identifier IN %@", ["home.drawer.open", "chat.menu", "tab.profile"]))
+                    .firstMatch.waitForExistence(timeout: 60)
+                openSettings(in: app)
+                settingsRow("settings.apps", in: app).tap()
+                let composio = app.buttons["apps.composio"]
+                XCTAssertTrue(composio.waitForExistence(timeout: 10))
+                composio.tap()
+                let turnOn = app.buttons["composio.agent.turn-on"]
+                XCTAssertTrue(turnOn.waitForExistence(timeout: 10))
+                turnOn.tap()
+                let detail = app.descendants(matching: .any)["composio.agent.detail"]
+                let expected = sees == "none" ? "doesn't see the apps you connected here" : "doesn't see Gmail"
+                XCTAssertTrue(detail.waitForExistence(timeout: 15))
+                XCTAssertTrue(NSPredicate(format: "label CONTAINS %@", expected).evaluate(with: detail),
+                              "The page says the agent doesn't see these apps: \(detail.label)")
+                XCTAssertEqual(turnOn.label, "Sign in for my agent")
+                evidence("composio-agent-other-account-\(sees)-\(appearance)", app)
+                turnOn.tap()
+                XCTAssertTrue(app.descendants(matching: .any)["composio.agent.ready"].waitForExistence(timeout: 15),
+                              "Signed in again, it sees them")
+                app.terminate()
+            }
+        }
+    }
+
     /// iOS asks before a sign-in page opens.
     @MainActor
     private func allowSignInPage() {

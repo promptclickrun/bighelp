@@ -53,7 +53,9 @@ change in both repos.
     (`simpleBotsMultiGateway`) lists every gateway's bots (`SimpleBotsGateways`, one `SimpleBotsBot` model
     keyed by `FleetID`): the gateway in use live, the others from the all-hosts copies. Pins live on each
     bot's own gateway; the primary bot is kept on the device (`simpleBotsMultiPrimary`). Acting on another
-    gateway's bot goes through `openFleet`; the home stays on screen while that gateway connects.
+    gateway's bot goes through `openFleet`; the home stays under the Noodle loader (`SimpleBotsOpeningOverlay`,
+    with Cancel) until the bot opens. A computer that doesn't answer gives the selection back to the one the tap
+    came from (`FleetSwitchFallback`), so neither the app nor its next launch is left on it.
   - First run (`FirstRunOnboardingView`) is Welcome, Connect, the optional plugin, notifications (only once the
     plugin is in), then Choose your mode (`FirstRunMode`: Bots, Sessions, Code). Optional steps have a small Skip;
     Connect and the mode don't. `FirstRunOnboarding.afterConnectKey` keeps it on screen after host setup's own

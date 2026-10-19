@@ -349,13 +349,50 @@ extension RootShellView {
             return
         }
         recordLiveFleet()
-        fleet.pendingOpen = FleetPendingOpen(hostID: hostID, open: open)
+        let previous = fleet.selectedHostID
+        fleet.pendingOpen = FleetPendingOpen(hostID: hostID, open: open, returnHostID: previous)
         appState.chatOpenedFromList = false
         // An all-hosts list stays under what opens, so Back goes there again.
         let onAllHostsList = appState.path.first?.isAllHosts == true
             || (appState.path.isEmpty && [.sessions, .scheduledTasks].contains(appState.selectedTab))
         if !onAllHostsList { appState.select(.sessions) }
         fleet.select(hostID)
+        returnIfFleetHostDoesNotAnswer(hostID, previous: previous)
+    }
+
+    /// Cancel on Multi-gateway's loader: back to the computer the tap came from.
+    func cancelPendingFleetOpen() {
+        guard let fleet, let pending = fleet.pendingOpen else { return }
+        fleet.pendingOpen = nil
+        if let back = pending.returnHostID, fleet.selectedHostID == pending.hostID { fleet.select(back) }
+    }
+
+    /// A tapped agent's computer that doesn't answer gives the selection back to the one that
+    /// worked, so the app (and its next launch) isn't left on a computer that's down, and
+    /// Multi-gateway's "Connecting to…" line ends. The one that worked stays connected while
+    /// every host shows, so going back is at once.
+    private func returnIfFleetHostDoesNotAnswer(_ hostID: UUID, previous: UUID?) {
+        guard let fleet, let previous, previous != hostID else { return }
+        Task { @MainActor in
+            // Selecting it starts its connection; this makes sure an attempt runs now.
+            await nativeWorkspaceStore?.reconnect()
+            let wait = BighelpShortcutConnectionWait.Host(
+                isWanted: { FleetSwitchFallback.isWaiting(for: hostID, pending: fleet.pendingOpen?.hostID,
+                                                         selected: fleet.selectedHostID) },
+                isConnecting: { nativeWorkspaceStore?.isConnecting == true },
+                isConnected: { nativeWorkspaceStore?.isConnected == true },
+                isReady: { isFleetHostReady },
+                synchronize: {})
+            let ready = (try? await BighelpShortcutConnectionWait.untilReady(wait, timeout: FleetSwitchFallback.timeout))
+                ?? false
+            guard FleetSwitchFallback.shouldReturn(ready: ready, waitingFor: hostID,
+                                                   pending: fleet.pendingOpen?.hostID,
+                                                   selected: fleet.selectedHostID) else { return }
+            fleet.pendingOpen = nil
+            fleet.select(previous)
+            actionErrorMessage = FleetSwitchFallback.message(unreachable: fleet.hostName(hostID),
+                                                             stillOn: fleet.hostName(previous))
+        }
     }
 
     /// The host a tap waited for is ready: open what was tapped.

@@ -83,8 +83,9 @@ is covered. Tap for a compact pill, touch and hold to open the chat. Settings �
 turns it off. Outside the app the Live Activity shows the agent's picture and the same icon (the plugin sends only
 a fixed category). Every phone chat uses this big-avatar header and keeps the tab bar under its message box (All
 agents' chats excepted). Every chat has ☰ in the top left, like the other root screens; a chat opened from the
-list, Agents, Feed or a task goes back to it with the edge swipe. Chat Info lives in ⋯ › People & Chat, and the line under
-the name says "Updating…" while a chat reloads from Hermes. iPad works the same way, with no always-open sidebar:
+list, Agents, Feed or a task goes back to it with the edge swipe. A group chat's name opens its Chat Info. The line under
+the name says "Updating…" while a chat reloads from Hermes, the agent's activity while it works, and otherwise the
+chat's title when Settings › Chat › Session title is on (off by default; never "New chat" or "Bot Chat"). iPad works the same way, with no always-open sidebar:
 ☰ slides the menu in from the leading edge, and chats use the width of the screen. On Vision Pro bighelp always
 starts in its own window. The tabs sit in a strip beside the window (`VisionTabOrnament`), clear of the system's
 move and close controls under it; ☰ opens the menu as a column inside the window and the page beside it narrows

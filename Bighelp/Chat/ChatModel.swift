@@ -208,6 +208,9 @@ final class ChatModel {
     var compaction: ChatCompaction?
     var sessionGoal: SessionGoalSnapshot?
     var sessionTitle: String
+    /// The title to show under the agent's name (Settings › Chat › Session title): nil for an
+    /// untitled chat and the agent's home chat, whose names don't tell one chat from another.
+    var headerSessionTitle: String? { Self.headerSessionTitle(from: sessionTitle) }
     var sessionWorkspaceID: String? { sourceSession?.workspaceID }
     var sessionWorkspaceName: String? { sourceSession?.workspaceName }
     var sessionSubagents: [SessionSubagentSnapshot] = []

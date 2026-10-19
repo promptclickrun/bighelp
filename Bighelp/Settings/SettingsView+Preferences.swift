@@ -260,6 +260,11 @@ extension SettingsView {
             .accessibilityIdentifier("settings.chat.agent-island")
             #endif
 
+            SessionTitleToggle {
+                settingLabel("Session title", detail: "Show the chat's title under the agent's name.")
+            }
+            .accessibilityIdentifier("settings.chat.session-title")
+
             ReturnSendsToggle {
                 settingLabel("Return sends", detail: Self.returnSendsDetail)
             }
@@ -392,6 +397,17 @@ extension SettingsView {
             }
             .listRowBackground(theme.surface)
         }
+    }
+}
+
+/// Saved with the chat look (`@AppStorage`), which the chat headers read directly.
+private struct SessionTitleToggle<Label: View>: View {
+    @AppStorage(ChatLayoutPreferences.showsSessionTitleKey)
+    private var showsSessionTitle = ChatLayoutPreferences.showsSessionTitleByDefault
+    @ViewBuilder let label: Label
+
+    var body: some View {
+        Toggle(isOn: $showsSessionTitle) { label }
     }
 }
 

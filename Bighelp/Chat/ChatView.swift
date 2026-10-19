@@ -195,6 +195,8 @@ struct ChatView: View {
     @State private var screenHeight: CGFloat = 0
     @State private var bottomSafeArea: CGFloat = 0
     @AppStorage(ChatLayoutPreferences.densityKey) var chatDensity: ChatDensity = .comfortable
+    @AppStorage(ChatLayoutPreferences.showsSessionTitleKey)
+    private var showsSessionTitle = ChatLayoutPreferences.showsSessionTitleByDefault
     @State var composerHeight: CGFloat = 0
 
     init(
@@ -633,6 +635,12 @@ struct ChatView: View {
     }
 
     /// Chat tab: the agent's live avatar leads, like a home screen.
+    /// One-on-one chats only: group chats already show their title.
+    private var shownSessionTitle: String? {
+        guard showsSessionTitle, !model.isBotMode else { return nil }
+        return model.headerSessionTitle
+    }
+
     private var homeHeader: some View {
         let participant = resolvedIdentityParticipants.first
         return AgentHomeChatHeader(
@@ -642,6 +650,7 @@ struct ChatView: View {
             activity: model.liveActivityKind,
             // Coming back reloads the chat from Hermes; say so while it catches up.
             status: isChatVisible && model.isRefreshingFromHost && !model.isSending ? "Updating…" : nil,
+            sessionTitle: shownSessionTitle,
             groupIdentity: model.isBotMode ? AnyView(conversationHeader) : nil,
             options: AnyView(chatOptionsMenu),
             chrome: homeChrome,
@@ -858,10 +867,21 @@ struct ChatView: View {
         } label: {
             HStack(spacing: BighelpTokens.space8) {
                 SimpleBotFace(agentID: agentID, name: agentName, imageURL: participant?.imageURL, size: 28)
-                Text(agentName)
-                    .font(.bighelp(.title3, weight: .semibold))
-                    .foregroundStyle(theme.primaryText)
-                    .lineLimit(1)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(agentName)
+                        .font(.bighelp(.title3, weight: .semibold))
+                        .foregroundStyle(theme.primaryText)
+                        .lineLimit(1)
+                    if let title = shownSessionTitle {
+                        Text(title)
+                            .font(.bighelp(.caption2).weight(.medium))
+                            .foregroundStyle(theme.secondaryText)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .accessibilityIdentifier("chat.identity.session-title")
+                    }
+                }
+                .frame(maxWidth: 220, alignment: .leading)
             }
             .padding(.leading, BighelpTokens.space12)
             .padding(.trailing, BighelpTokens.space16)
@@ -871,7 +891,7 @@ struct ChatView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(agentName)
-        .accessibilityValue(headerLiveActivityPresentation?.text ?? headerLiveState.label)
+        .accessibilityValue(headerLiveActivityPresentation?.text ?? shownSessionTitle ?? headerLiveState.label)
         .accessibilityHint("Opens its profile")
         .accessibilityIdentifier("chat.identity")
     }

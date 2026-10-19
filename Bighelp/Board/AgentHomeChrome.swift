@@ -43,6 +43,8 @@ struct AgentHomeChatHeader: View {
     let imageURL: URL?
     let activity: AgentActivityKind
     var status: String? = nil
+    /// The chat's title when Settings › Chat › Session title is on.
+    var sessionTitle: String? = nil
     /// Group chats show their own identity control instead of one agent.
     let groupIdentity: AnyView?
     let options: AnyView
@@ -62,7 +64,7 @@ struct AgentHomeChatHeader: View {
                     AgentHeroHeader(agentID: agentID, displayName: displayName, imageURL: imageURL,
                                     activity: activity,
                                     avatarSize: avatarSize.points(screenHeight: screenHeight),
-                                    status: status, showsName: showsAgentName,
+                                    status: status, showsName: showsAgentName, sessionTitle: sessionTitle,
                                     onAvatarTap: { beforeAction(); chrome.onProfile(agentID) },
                                     onNameTap: { beforeAction(); chrome.onSwitchAgent() })
                         // Who the chat is with, like the name chip in the iPad header.

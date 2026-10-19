@@ -16,22 +16,22 @@ extension RootShellView {
     }
 
     /// Multi-gateway while the gateway of a tapped bot connects: the home, from every gateway's copy,
-    /// with a line saying so. What was tapped opens once it's connected (`openPendingFleetIfReady`).
+    /// under the opening loader. What was tapped opens once it's connected (`openPendingFleetIfReady`).
     func simpleBotsSwitching(to hostID: UUID) -> some View {
         simpleBotsHome
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                HStack(spacing: BighelpTokens.space8) {
-                    ProgressView()
-                    Text("Connecting to \(fleet?.hostName(hostID) ?? "your gateway")…")
-                        .font(.bighelp(.subheadline))
-                }
-                .padding(.horizontal, BighelpTokens.space16)
-                .frame(minHeight: 40)
-                .background(.regularMaterial, in: Capsule())
-                .padding(.bottom, BighelpTokens.space8)
-                .accessibilityElement(children: .combine)
-                .accessibilityIdentifier("simple-bots.connecting")
-            }
+    }
+
+    /// Multi-gateway: a bot on another gateway opens once that gateway is connected and its chats
+    /// are loaded, often a few seconds. The Noodle loader covers the whole wait, from the tap to
+    /// the chat, so the screen never looks stuck; Cancel goes back to where the tap came from.
+    @ViewBuilder var simpleBotsOpeningLoader: some View {
+        if simpleBotsMultiGatewayOn, let fleet, let pending = fleet.pendingOpen {
+            SimpleBotsOpeningOverlay(
+                botName: pending.profileID.flatMap { fleet.agent(hostID: pending.hostID, profileID: $0)?.name },
+                gatewayName: fleet.hostName(pending.hostID),
+                onCancel: cancelPendingFleetOpen)
+            .transition(.opacity)
+        }
     }
 
     private var simpleBotsContext: SimpleBotsContext {

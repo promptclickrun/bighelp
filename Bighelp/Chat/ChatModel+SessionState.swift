@@ -337,3 +337,14 @@ extension ChatModel {
         acceptTurnEnded(turnID: turnID)
     }
 }
+
+extension ChatModel {
+    /// What an untitled chat holds until Hermes names it, and what every agent's home chat is called.
+    static let titlesThatNameNoChat: Set<String> = ["New chat", "Bot Chat"]
+
+    static func headerSessionTitle(from title: String) -> String? {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !titlesThatNameNoChat.contains(trimmed) else { return nil }
+        return trimmed
+    }
+}

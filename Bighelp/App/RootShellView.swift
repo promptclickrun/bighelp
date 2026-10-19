@@ -377,6 +377,10 @@ struct RootShellView: View {
                 nativeWorkspace
             }
         }
+        .overlay {
+            ZStack { simpleBotsOpeningLoader }
+                .animation(.snappy, value: fleet?.pendingOpen != nil)
+        }
     }
 
     var presentsFirstRunOnboarding: Bool {

@@ -9,6 +9,9 @@ enum ChatLayoutPreferences {
     static let densityKey = "bighelp.chat.density"
     /// With a hardware keyboard, Return sends (true) or adds a line (false).
     static let returnSendsKey = "bighelp.chat.return-sends"
+    /// Settings › Chat › Session title: the chat's title under the agent's name. Off by default.
+    static let showsSessionTitleKey = "bighelp.chat.shows-session-title"
+    static let showsSessionTitleByDefault = false
 
     /// The Pro Max and Plus phones are at least this tall, in points.
     static let tallPhoneHeight: CGFloat = 900

@@ -174,6 +174,17 @@ enum FleetDestination: String, Equatable, Sendable, Identifiable {
 struct FleetPendingOpen: Equatable, Sendable {
     let hostID: UUID
     let open: FleetOpen
+    /// The computer the tap came from: Cancel, or a computer that doesn't answer, goes back to it.
+    var returnHostID: UUID? = nil
+
+    /// The agent it opens, for "Opening Mina…". Nil for a group.
+    var profileID: String? {
+        switch open {
+        case .agent(let id), .newChat(let id), .routines(let id), .botProfile(let id): id
+        case .chat(let id, _, _), .task(_, let id): id
+        case .group, .newGroup, .destination: nil
+        }
+    }
 }
 
 /// What a group chat's row can do from the all-hosts list.

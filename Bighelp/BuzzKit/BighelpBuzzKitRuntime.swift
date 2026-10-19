@@ -379,7 +379,7 @@ final class BighelpBuzzKitRuntime {
         credentials: BighelpManagedNotificationCredentials
     ) async throws {
         guard configureIfPossible() else {
-            throw BighelpManagedNotificationSetupError(stage: .providerBootstrap)
+            throw BighelpManagedNotificationSetupError(stage: .providerBootstrap, code: notConfiguredReason)
         }
         let operationGeneration = advanceGeneration()
         providerReadiness = nil
@@ -406,7 +406,7 @@ final class BighelpBuzzKitRuntime {
                 try requireCurrent(operationGeneration)
             } else {
                 guard allowsOfflineFixtureConfiguration else {
-                    throw BighelpManagedNotificationSetupError(stage: .providerBootstrap)
+                    throw BighelpManagedNotificationSetupError(stage: .providerBootstrap, code: "buzzkit_sdk_not_awaitable")
                 }
                 sdk.identify(
                     envelope.identity.externalId,
@@ -438,7 +438,8 @@ final class BighelpBuzzKitRuntime {
                 }
             }
             let code: String? = Self.identityLinkCode(for: error)
-            throw BighelpManagedNotificationSetupError(stage: .providerIdentity, code: code)
+            throw BighelpManagedNotificationSetupError(stage: .providerIdentity, code: code,
+                                                       underlying: BighelpNotificationErrorKind(error))
         } catch {
             if generation == operationGeneration {
                 if identityCredentials == credentials,
@@ -450,8 +451,15 @@ final class BighelpBuzzKitRuntime {
                 }
             }
             throw BighelpManagedNotificationSetupError(
-                stage: .providerIdentity, code: Self.identityDiagnosticCode(for: error))
+                stage: .providerIdentity, code: Self.identityDiagnosticCode(for: error),
+                underlying: BighelpNotificationErrorKind(error))
         }
+    }
+
+    /// Why the push service didn't start, as `configureIfPossible` recorded it.
+    private var notConfiguredReason: String {
+        if case .notConfigured(let reason) = state { return reason }
+        return "buzzkit_not_started"
     }
 
     /// Maps an identify() failure to a stable diagnostic code so a failed
@@ -518,7 +526,7 @@ final class BighelpBuzzKitRuntime {
     /// app's existing OS permission surface has confirmed authorization.
     func registerCurrentDevice() async throws {
         guard let identity, identityCredentials != nil, identityGeneration == generation else {
-            throw BighelpManagedNotificationSetupError(stage: .providerIdentity)
+            throw BighelpManagedNotificationSetupError(stage: .providerIdentity, code: "buzzkit_identity_required")
         }
         let operationGeneration = generation
         let status = await sdk.notificationPermission()
@@ -527,7 +535,7 @@ final class BighelpBuzzKitRuntime {
             if generation == operationGeneration {
                 state = .failed(code: "notification_permission_required")
             }
-            throw BighelpManagedNotificationSetupError(stage: .notificationPermission)
+            throw BighelpManagedNotificationSetupError(stage: .notificationPermission, code: "notification_permission_required")
         }
         let callbackEpoch = tokenCallbackEpoch
         let failureEpoch = tokenFailureEpoch
@@ -560,16 +568,17 @@ final class BighelpBuzzKitRuntime {
             }
             state = .failed(code: "buzzkit_device_registration_failed")
             throw BighelpManagedNotificationSetupError(
-                stage: .deviceRegistration, code: "buzzkit_device_registration_failed")
+                stage: .deviceRegistration, code: "buzzkit_device_registration_failed",
+                underlying: BighelpNotificationErrorKind(error))
         }
         try requireCurrent(operationGeneration, identity: identity)
         guard let currentTokenData, let currentToken, let currentTokenHash else {
             state = .failed(code: "current_apns_token_readback_required")
-            throw BighelpManagedNotificationSetupError(stage: .deviceRegistration)
+            throw BighelpManagedNotificationSetupError(stage: .deviceRegistration, code: "current_apns_token_readback_required")
         }
         guard let requiredEnvironment = configuredEnvironment else {
             state = .failed(code: "buzzkit_push_environment_unavailable")
-            throw BighelpManagedNotificationSetupError(stage: .providerBootstrap)
+            throw BighelpManagedNotificationSetupError(stage: .providerBootstrap, code: "buzzkit_push_environment_unavailable")
         }
         let registration: BuzzKit.PushSubscriptionRegistration?
         do {
@@ -588,17 +597,20 @@ final class BighelpBuzzKitRuntime {
                 registration = result
             } else {
                 guard allowsOfflineFixtureConfiguration else {
-                    throw BighelpManagedNotificationSetupError(stage: .providerBootstrap)
+                    throw BighelpManagedNotificationSetupError(stage: .providerBootstrap, code: "buzzkit_sdk_not_awaitable")
                 }
                 registration = nil
             }
         } catch let error as CancellationError {
             throw error
+        } catch let error as BighelpManagedNotificationSetupError {
+            throw error
         } catch {
             if generation == operationGeneration {
-                state = .failed(code: "buzzkit_device_registration_failed")
+                state = .failed(code: "buzzkit_subscription_registration_failed")
             }
-            throw BighelpManagedNotificationSetupError(stage: .deviceRegistration)
+            throw BighelpManagedNotificationSetupError(stage: .deviceRegistration, code: "buzzkit_subscription_registration_failed",
+                                                       underlying: BighelpNotificationErrorKind(error))
         }
         do {
             try await sdk.migrateLegacyPreferences()
@@ -608,7 +620,8 @@ final class BighelpBuzzKitRuntime {
             if generation == operationGeneration {
                 state = .failed(code: "buzzkit_preference_migration_failed")
             }
-            throw BighelpManagedNotificationSetupError(stage: .deviceRegistration)
+            throw BighelpManagedNotificationSetupError(stage: .deviceRegistration, code: "buzzkit_preference_migration_failed",
+                                                       underlying: BighelpNotificationErrorKind(error))
         }
         try requireCurrent(operationGeneration, identity: identity)
         guard self.currentTokenHash == currentTokenHash,
@@ -643,16 +656,16 @@ final class BighelpBuzzKitRuntime {
     ) async throws -> BighelpBuzzKitProviderReadiness {
         guard let identity, identityGeneration == generation,
               identityCredentials == credentials else {
-            throw BighelpManagedNotificationSetupError(stage: .providerIdentity)
+            throw BighelpManagedNotificationSetupError(stage: .providerIdentity, code: "buzzkit_identity_required")
         }
         guard let currentTokenHash else {
             state = .failed(code: "current_apns_token_readback_required")
-            throw BighelpManagedNotificationSetupError(stage: .deviceRegistration)
+            throw BighelpManagedNotificationSetupError(stage: .deviceRegistration, code: "current_apns_token_readback_required")
         }
         let operationGeneration = generation
         guard let requiredEnvironment = configuredEnvironment?.rawValue else {
             state = .failed(code: "buzzkit_push_environment_unavailable")
-            throw BighelpManagedNotificationSetupError(stage: .providerBootstrap)
+            throw BighelpManagedNotificationSetupError(stage: .providerBootstrap, code: "buzzkit_push_environment_unavailable")
         }
         let requiredProof: BighelpBuzzKitRegistrationProof?
         if requiringCurrentRegistration {
@@ -662,7 +675,7 @@ final class BighelpBuzzKitRuntime {
                   proof.tokenHash == currentTokenHash,
                   proof.environment == requiredEnvironment else {
                 state = .failed(code: "buzzkit_registration_required")
-                throw BighelpManagedNotificationSetupError(stage: .deviceRegistration)
+                throw BighelpManagedNotificationSetupError(stage: .deviceRegistration, code: "buzzkit_registration_required")
             }
             requiredProof = proof
         } else {
@@ -699,7 +712,8 @@ final class BighelpBuzzKitRuntime {
             // opaque error.
             throw BighelpManagedNotificationSetupError(
                 stage: .providerReadiness,
-                code: Self.readinessDiagnosticCode(for: error)
+                code: Self.readinessDiagnosticCode(for: error),
+                underlying: BighelpNotificationErrorKind(error)
             )
         }
         providerReadiness = readiness

@@ -1,6 +1,5 @@
 import Foundation
 import Observation
-import os
 
 /// Main's notification implementation must verify the authenticated plugin
 /// capability and recipient grant. Installed/configured-enabled is not readiness.
@@ -204,7 +203,10 @@ struct HostInstalledPlugin: Equatable {
 final class HostNotificationSetupModel {
     private(set) var state: HostNotificationState
     private(set) var isWorking = false
-    private(set) var providerFailure: BighelpManagedNotificationSetupError?
+    /// What stopped setup, with its code. Nil while setup works or after it finishes.
+    private(set) var failure: BighelpNotificationSetupFailure?
+    /// The failure is from an earlier run: whatever stopped it may be fixed now.
+    private(set) var failureIsFromEarlierRun = false
     /// The commit an install uses: the newest release, looked up only when one is needed.
     private(set) var pin: HostPluginPin?
     private(set) var release: PluginRelease?
@@ -213,25 +215,47 @@ final class HostNotificationSetupModel {
     @ObservationIgnored private let registry: BighelpHostRegistry
     @ObservationIgnored private let management: any HostPluginManagementServing
     @ObservationIgnored private let releases: any PluginReleaseResolving
+    @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var operation: UUID?
 
     /// `pin` fixes the commit up front (tests); otherwise the newest release is used.
     init(host: BighelpConfiguredHost, registry: BighelpHostRegistry, pin: HostPluginPin? = nil,
          releases: (any PluginReleaseResolving)? = nil,
-         management: (any HostPluginManagementServing)? = nil, enrollNotifications: Bool = true) {
+         management: (any HostPluginManagementServing)? = nil, enrollNotifications: Bool = true,
+         defaults: UserDefaults = .standard) {
         hostID = host.id
         self.registry = registry
         self.management = management ?? registry.workspace(for: host)
         self.pin = pin
         self.releases = releases ?? GitHubPluginReleaseSource.shared
         self.enrollNotifications = enrollNotifications
+        self.defaults = defaults
         // Preserve the user's saved opt-in without prompting on every visit.
         // Actual grant and delivery authority still belong to the service ledger.
         state = enrollNotifications ? host.notificationState : .notConfigured
+        // The code of a setup that stopped earlier stays with its message, on this build only:
+        // an update can change what happens next.
+        if enrollNotifications, let last = BighelpNotificationLastFailure.load(defaults), last.hostID == host.id,
+           last.state == host.notificationState, last.build == BighelpNotificationFailureReport.build {
+            failure = last.failure
+            failureIsFromEarlierRun = true
+        }
+        #if DEBUG
+        // Demo mode has no computer to set up, so a forced failure shows as soon as setup opens.
+        if enrollNotifications, let forced = Self.forcedFailure() {
+            failure = forced
+            failureIsFromEarlierRun = false
+            state = forced.state
+            BighelpNotificationLastFailure.save(forced, hostID: host.id, defaults: defaults)
+        }
+        #endif
     }
 
+    /// A push service failure: setup shows it as an error, not a warning.
+    var providerFailure: BighelpManagedNotificationSetupError? { failure?.provider }
+
     var message: String {
-        if let providerFailure { return providerFailure.localizedDescription }
+        if let failure { return failure.message }
         guard !enrollNotifications else { return state.message }
         return switch state {
         case .notConfigured:
@@ -247,8 +271,16 @@ final class HostNotificationSetupModel {
         }
     }
 
+    /// Trying again can help. False when the failure's way forward is something else (Set Up
+    /// Again, turning notifications off and on, updating bighelp), so no Check Again shows.
+    /// A plugin page has no other way forward, so it always offers one.
+    var offersRetry: Bool {
+        guard let failure, enrollNotifications else { return true }
+        return failure.canRetry || failureIsFromEarlierRun
+    }
+
     var actionTitle: String? {
-        guard !isWorking else { return nil }
+        guard !isWorking, offersRetry else { return nil }
         return switch state {
         case .enabled:
             nil
@@ -301,6 +333,7 @@ final class HostNotificationSetupModel {
                 && registry.hosts.contains(where: { $0.id == hostID }) && !Task.isCancelled
         }
         state = .checking
+        failure = nil
         do {
             if !management.isConnected { await management.reconnect() }
             guard owns() else { return }
@@ -313,7 +346,10 @@ final class HostNotificationSetupModel {
             state = rows.first?.configuredEnabled == true ? .installed : .notConfigured
         } catch {
             guard owns() else { return }
-            state = Self.failureState(error)
+            let named = BighelpNotificationSetupFailure(step: .pluginCheck, error: error)
+            named.log()
+            failure = named
+            state = named.state
         }
     }
 
@@ -326,6 +362,9 @@ final class HostNotificationSetupModel {
         case .installing:
             // The request may still have reached the host. Preserve its intent
             // and require list readback instead of exposing another install.
+            let named = BighelpNotificationSetupFailure(.pluginInstallMayBeRunning, step: .pluginInstall,
+                                                        kind: .check("left_during_install"), state: .outcomeUnknown)
+            note(named)
             state = .outcomeUnknown
             if enrollNotifications {
                 host.notificationState = .outcomeUnknown
@@ -346,6 +385,7 @@ final class HostNotificationSetupModel {
         guard enrollNotifications, !isWorking, let host = registry.hosts.first(where: { $0.id == hostID }),
               let setup = registry.notificationSetup else { return }
         isWorking = true
+        failure = nil
         state = .checking
         await setup.resetHost(host)
         isWorking = false
@@ -363,7 +403,8 @@ final class HostNotificationSetupModel {
         let operationID = UUID()
         operation = operationID
         isWorking = true
-        providerFailure = nil
+        failure = nil
+        failureIsFromEarlierRun = false
         defer { if operation == operationID { isWorking = false } }
         @MainActor func owns() -> Bool {
             registry.generation == owner && registry.accountScope == scope && operation == operationID
@@ -371,7 +412,15 @@ final class HostNotificationSetupModel {
         }
         var host = original
         let workspace = management
+        // Where setup is, so an error says which step it stopped.
+        var step = BighelpNotificationSetupStep.pluginCheck
         do {
+            #if DEBUG
+            if let forced = Self.forcedFailure() {
+                try? await Task.sleep(for: .milliseconds(300))
+                throw forced
+            }
+            #endif
             if !workspace.isConnected { await workspace.reconnect() }
             guard owns() else { return }
             guard workspace.isConnected else { throw DirectHermesError.notConnected }
@@ -382,13 +431,16 @@ final class HostNotificationSetupModel {
             var rows = try HostInstalledPlugin.decodeList(await workspace.managePlugins(["action": .string("list")]))
             guard owns() else { return }
             var matches = rows.filter { $0.name == "loopdy" }
-            guard matches.count <= 1 else { try finish(.replacementRequired, host: &host); return }
+            guard matches.count <= 1 else {
+                try fail(.duplicatePlugins, step, "several_plugins", state: .replacementRequired, host: &host); return
+            }
             if let installed = matches.first {
                 // A newer or equal plugin stays; GitHub being unreachable doesn't block enabling it.
                 var target: HostPluginPin?
                 if !enrollNotifications { target = try? await installTarget(for: host) }
                 guard owns() else { return }
                 if let pin = target, installed.pinnedSHA != pin.revision, isOlderThanRelease(installed) {
+                    step = .pluginInstall
                     host.pluginIntent = HostPluginIntent(
                         identifier: pin.identifier, revision: pin.revision,
                         profile: nil, phase: .installRequested
@@ -405,7 +457,11 @@ final class HostNotificationSetupModel {
                     guard owns() else { return }
                     guard observed.count == 1, let verified = observed.first,
                           verified.pinnedSHA == pin.revision, verified.configuredEnabled else {
-                        try finish(updateError.map(Self.failureState) ?? .outcomeUnknown, host: &host)
+                        if let updateError {
+                            try fail(BighelpNotificationSetupFailure(step: step, error: updateError), host: &host)
+                        } else {
+                            try fail(.pluginInstallUnconfirmed, step, "update_not_listed", state: .outcomeUnknown, host: &host)
+                        }
                         return
                     }
                     host.pluginIntent = HostPluginIntent(
@@ -416,6 +472,7 @@ final class HostNotificationSetupModel {
                     return
                 }
                 if !installed.configuredEnabled {
+                    step = .pluginEnable
                     try Self.validateKey(installed.key)
                     var toggleError: (any Error)?
                     do {
@@ -432,7 +489,11 @@ final class HostNotificationSetupModel {
                     guard observed.count == 1, let verified = observed.first,
                           verified.key == installed.key, verified.pinnedSHA == installed.pinnedSHA,
                           verified.configuredEnabled else {
-                        try finish(toggleError.map(Self.failureState) ?? .outcomeUnknown, host: &host)
+                        if let toggleError {
+                            try fail(BighelpNotificationSetupFailure(step: step, error: toggleError), host: &host)
+                        } else {
+                            try fail(.pluginNotTurnedOn, step, "plugin_not_enabled", state: .outcomeUnknown, host: &host)
+                        }
                         return
                     }
                 }
@@ -442,6 +503,7 @@ final class HostNotificationSetupModel {
                 // Observed installation also resolves an older app's install intent.
                 host.pluginIntent = nil
                 try finish(.installed, host: &host)
+                step = .startingSetup
                 try await enrollInstalled(host: &host, connection: workspace.savedConnection, isCurrent: { owns() })
                 return
             }
@@ -452,23 +514,28 @@ final class HostNotificationSetupModel {
                 return
             } catch {
                 guard owns() else { return }
-                try finish(.releaseUnavailable, host: &host)
+                try fail(BighelpNotificationSetupFailure(.pluginReleaseUnavailable, step: .pluginRelease,
+                                                         kind: BighelpNotificationErrorKind(error), state: .releaseUnavailable),
+                         host: &host)
                 return
             }
             guard owns() else { return }
+            step = .pluginInstall
             if let intent = host.pluginIntent, Self.isUnfinished(intent),
                intent.profile != nil || intent.identifier != pin.identifier || intent.revision != pin.revision {
-                try finish(.replacementRequired, host: &host)
+                try fail(.earlierInstallUnfinished, step, "other_install_pending", state: .replacementRequired, host: &host)
                 return
             }
             if let found = matches.first, found.pinnedSHA != pin.revision {
-                try finish(.replacementRequired, host: &host); return
+                try fail(.earlierInstallUnfinished, step, "other_plugin_commit", state: .replacementRequired, host: &host)
+                return
             }
             if matches.isEmpty {
                 // A lost reply may still be executing on the backend. Absence is
                 // not proof of rejection and never authorizes duplicate install.
                 if let intent = host.pluginIntent, intent.phase != .consented {
-                    try finish(.outcomeUnknown, host: &host); return
+                    try fail(.pluginInstallMayBeRunning, step, "install_pending", state: .outcomeUnknown, host: &host)
+                    return
                 }
                 host.pluginIntent = HostPluginIntent(identifier: pin.identifier, revision: pin.revision,
                     profile: nil, phase: .installRequested)
@@ -482,9 +549,12 @@ final class HostNotificationSetupModel {
                     // that may follow a completed file install but failed enable.
                     do {
                         rows = try HostInstalledPlugin.decodeList(await workspace.managePlugins(["action": .string("list")]))
-                    } catch {
+                    } catch let listError {
                         guard owns() else { return }
-                        try finish(.outcomeUnknown, host: &host); return
+                        try fail(BighelpNotificationSetupFailure(.pluginInstallUnconfirmed, step: step,
+                                                                 kind: BighelpNotificationErrorKind(listError),
+                                                                 state: .outcomeUnknown), host: &host)
+                        return
                     }
                     guard owns() else { return }
                     matches = rows.filter { $0.name == "loopdy" }
@@ -494,7 +564,7 @@ final class HostNotificationSetupModel {
                         if matches.isEmpty, let directError = error as? DirectHermesError, case .rpcRejected = directError {
                             host.pluginIntent?.phase = .consented
                         }
-                        try finish(Self.failureState(error), host: &host); return
+                        try fail(BighelpNotificationSetupFailure(step: step, error: error), host: &host); return
                     }
                 }
                 guard owns() else { return }
@@ -503,10 +573,13 @@ final class HostNotificationSetupModel {
                 matches = rows.filter { $0.name == "loopdy" }
             }
             guard matches.count == 1, let installed = matches.first, installed.pinnedSHA == pin.revision else {
-                try finish(.outcomeUnknown, host: &host); return
+                try fail(.pluginInstallUnconfirmed, step, "install_not_listed", state: .outcomeUnknown, host: &host); return
             }
             if !installed.configuredEnabled {
-                if host.pluginIntent?.phase == .toggleRequested { try finish(.outcomeUnknown, host: &host); return }
+                step = .pluginEnable
+                if host.pluginIntent?.phase == .toggleRequested {
+                    try fail(.pluginNotTurnedOn, step, "enable_pending", state: .outcomeUnknown, host: &host); return
+                }
                 // Canonical key is read from this same verified list. Reject
                 // controls and path traversal instead of interpolating into a URL.
                 try Self.validateKey(installed.key)
@@ -518,21 +591,26 @@ final class HostNotificationSetupModel {
                     guard owns() else { return }
                     do {
                         rows = try HostInstalledPlugin.decodeList(await workspace.managePlugins(["action": .string("list")]))
-                    } catch {
+                    } catch let listError {
                         guard owns() else { return }
-                        try finish(.outcomeUnknown, host: &host); return
+                        try fail(BighelpNotificationSetupFailure(.pluginNotTurnedOn, step: step,
+                                                                 kind: BighelpNotificationErrorKind(listError),
+                                                                 state: .outcomeUnknown), host: &host)
+                        return
                     }
                     guard owns() else { return }
                     let observed = rows.filter { $0.name == "loopdy" }
                     guard observed.count == 1, observed[0].key == installed.key,
                           observed[0].pinnedSHA == pin.revision else {
-                        try finish(.outcomeUnknown, host: &host); return
+                        try fail(.pluginInstallUnconfirmed, step, "plugin_changed_while_enabling", state: .outcomeUnknown,
+                                 host: &host)
+                        return
                     }
                     if !observed[0].configuredEnabled {
                         if let directError = error as? DirectHermesError, case .rpcRejected = directError {
                             host.pluginIntent?.phase = .consented
                         }
-                        try finish(Self.failureState(error), host: &host); return
+                        try fail(BighelpNotificationSetupFailure(step: step, error: error), host: &host); return
                     }
                 }
                 guard owns() else { return }
@@ -540,18 +618,20 @@ final class HostNotificationSetupModel {
                 guard owns() else { return }
                 guard rows.filter({ $0.name == "loopdy" }).count == 1,
                       rows.contains(where: { $0.key == installed.key && $0.pinnedSHA == pin.revision && $0.configuredEnabled }) else {
-                    try finish(.outcomeUnknown, host: &host); return
+                    try fail(.pluginNotTurnedOn, step, "plugin_not_enabled", state: .outcomeUnknown, host: &host); return
                 }
             }
             host.pluginIntent = HostPluginIntent(identifier: pin.identifier, revision: pin.revision, profile: nil, phase: .verified)
             try finish(.installed, host: &host)
+            step = .startingSetup
             try await enrollInstalled(host: &host, connection: workspace.savedConnection, isCurrent: { owns() })
         } catch {
-            Self.log.error("Setup stopped: \(Self.errorKind(error), privacy: .public)")
+            let named = BighelpNotificationSetupFailure(step: step, error: error)
+            named.log()
             guard owns() else { return }
-            state = Self.failureState(error)
+            show(named)
+            state = named.state
             host.notificationBinding = registry.hosts.first(where: { $0.id == host.id })?.notificationBinding
-            providerFailure = error as? BighelpManagedNotificationSetupError
             if enrollNotifications { host.notificationState = state.saved }
             try? registry.update(host)
         }
@@ -594,63 +674,76 @@ final class HostNotificationSetupModel {
     private func enrollInstalled(host: inout BighelpConfiguredHost, connection: DirectHermesSavedConnection?,
                                  isCurrent: @escaping @MainActor () -> Bool) async throws {
         guard enrollNotifications else { return }
-        guard let setup = registry.notificationSetup, let connection, host.owns(connection) else {
-            try finish(.prerequisitesRequired, host: &host); return
+        guard let setup = registry.notificationSetup else {
+            // Only demo mode and tests run without the notification service.
+            try fail(.demoMode, .startingSetup, "notifications_not_running", state: .prerequisitesRequired, host: &host)
+            return
+        }
+        guard let connection, host.owns(connection) else {
+            try fail(.computerSignInChanged, .startingSetup, "connection_changed", state: .prerequisitesRequired, host: &host)
+            return
         }
         let result = try await setup.enroll(host: host, connection: connection, isCurrent: isCurrent)
         guard isCurrent() else { return }
         host.notificationBinding = registry.hosts.first(where: { $0.id == host.id })?.notificationBinding
         switch result {
         case .enabled: try finish(.enabled, host: &host)
-        case .backendRestartRequired: try finish(.backendRestartRequired, host: &host)
-        case .prerequisitesRequired: try finish(.prerequisitesRequired, host: &host)
+        case .backendRestartRequired:
+            try fail(.restartHermes, .computerCheck, "notification_routes_missing", state: .backendRestartRequired, host: &host)
+        case .prerequisitesRequired:
+            try fail(.pluginTooOld, .computerCheck, "no_managed_enrollment", state: .prerequisitesRequired, host: &host)
         }
     }
 
     private func finish(_ next: HostNotificationState, host: inout BighelpConfiguredHost) throws {
         if enrollNotifications { host.notificationState = next }
-        try registry.update(host)
+        do { try registry.update(host) } catch {
+            throw BighelpNotificationSetupFailure(step: .savingSetup, error: error)
+        }
         state = next
     }
+
+    /// Setup stopped at one of its own checks.
+    private func fail(_ code: BighelpNotificationErrorCode, _ step: BighelpNotificationSetupStep, _ check: String,
+                      state next: HostNotificationState, host: inout BighelpConfiguredHost) throws {
+        try fail(BighelpNotificationSetupFailure(code, step: step, kind: .check(check), state: next), host: &host)
+    }
+
+    private func fail(_ named: BighelpNotificationSetupFailure, host: inout BighelpConfiguredHost) throws {
+        note(named)
+        try finish(named.state, host: &host)
+    }
+
+    private func note(_ named: BighelpNotificationSetupFailure) {
+        named.log()
+        show(named)
+    }
+
+    /// Shows and keeps the failure (the setup screen shows its code when it opens again).
+    private func show(_ named: BighelpNotificationSetupFailure) {
+        failure = named
+        failureIsFromEarlierRun = false
+        if enrollNotifications { BighelpNotificationLastFailure.save(named, hostID: hostID, defaults: defaults) }
+    }
+
     private static func validateKey(_ key: String) throws {
         guard key.unicodeScalars.allSatisfy({ $0.value >= 0x21 && $0.value < 0x7f }),
               !key.contains(".."), !key.contains("\\") else { throw DirectHermesError.invalidResponse }
     }
-    private static let log = Logger(subsystem: "app.loopdy.mobile", category: "NotificationSetup")
 
-    /// What stopped setup, for the log: the error's type and case, never a computer, sign-in or account.
-    static func errorKind(_ error: any Error) -> String {
-        switch error {
-        case let error as DirectHermesError: "DirectHermesError.\(error)"
-        case let error as BighelpManagedNotificationSetupError: "NotificationSetupError.\(error.stage.rawValue)"
-        case let error as BighelpLinkCryptoError: "LinkCryptoError.\(error)"
-        case let error as BighelpLinkAPIError:
-            if case .requestFailed(let status, _) = error { "LinkAPIError.requestFailed(\(status))" } else { "LinkAPIError.\(error)" }
-        default: String(describing: type(of: error))
+    #if DEBUG
+    /// "-test-notification-failure NS-102" stops setup with that code, for screenshots and UI
+    /// tests in demo mode.
+    private static func forcedFailure() -> BighelpNotificationSetupFailure? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: "-test-notification-failure"), arguments.indices.contains(index + 1),
+              let code = BighelpNotificationErrorCode(rawValue: arguments[index + 1]) else { return nil }
+        let state: HostNotificationState = switch code.rawValue.dropFirst(3).first {
+        case "1", "2": .prerequisitesRequired
+        case "3": code == .computerNotConnected ? .notConnected : .outcomeUnknown
+        default: .outcomeUnknown
         }
+        return BighelpNotificationSetupFailure(code, step: .startingSetup, kind: .check("forced_for_testing"), state: state)
     }
-
-    private static func failureState(_ error: any Error) -> HostNotificationState {
-        if error is BighelpManagedNotificationSetupError { return .prerequisitesRequired }
-        if let linkError = error as? BighelpLinkAPIError,
-           case let .requestFailed(_, code) = linkError {
-            switch code {
-            case "not_found", "device_credentials_missing", "notification_service_unavailable",
-                 "notification_mobile_required", "notification_recipient_unavailable",
-                 "notification_recipient_changed":
-                return .prerequisitesRequired
-            default:
-                break
-            }
-        }
-        guard let error = error as? DirectHermesError else { return .outcomeUnknown }
-        switch error {
-        case .notConnected: return .notConnected
-        case .identityChanged: return .signInChanged
-        case .rpcRejected(code: -32601, _): return .unsupported
-        case .rpcRejected(code: 403, _): return .permissionDenied
-        case .rpcRejected(code: 5026, _): return .managementRejected
-        default: return .outcomeUnknown
-        }
-    }
+    #endif
 }

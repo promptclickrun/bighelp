@@ -289,6 +289,9 @@ struct HostPluginInstallationSection: View {
             Text(model.message)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("hosts.plugin-install.status")
+            if let failure = model.failure, !model.isWorking {
+                BighelpNotificationFailureCodeRow(failure: failure, identifier: "hosts.plugin-install.failure")
+            }
 
             if model.isWorking {
                 ProgressView(model.state == .installing ? "Installing the plugin…" : "Checking the plugin…")

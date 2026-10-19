@@ -44,7 +44,11 @@ protocol DirectHostNotificationServing: AnyObject {
                        isCurrent: @escaping @MainActor () -> Bool) async throws -> BighelpJSONValue
 }
 
-enum DirectHostNotificationError: Error { case backendRestartRequired, featureUnavailable }
+enum DirectHostNotificationError: Error, Equatable {
+    case backendRestartRequired, featureUnavailable
+    /// The plugin said no with one of its own codes (`{"detail": {"code": …}}`).
+    case rejected(status: Int, code: String)
+}
 
 /// Native authentication only. A fresh authenticator is restored from the exact
 /// host vault for each request, so a chat client's newer rotation is not replaced
@@ -72,6 +76,7 @@ final class DirectHostNotificationClient: DirectHostNotificationServing {
         if response.http.statusCode == 404, suffix == "/capabilities" {
             throw DirectHostNotificationError.backendRestartRequired
         }
+        if let rejection = Self.pluginRejection(status: response.http.statusCode, body: response.body) { throw rejection }
         try DirectHermesHTTP.requireSuccess(response)
         guard response.body.count <= 262_144 else { throw DirectHermesError.messageTooLarge }
         let object = try response.object()
@@ -113,6 +118,16 @@ final class DirectHostNotificationClient: DirectHostNotificationServing {
     private typealias Send = @MainActor (_ route: String, _ method: String, _ body: [String: BighelpJSONValue]?,
                                          _ nativeGuard: DirectHermesNativeRequestGuard?, _ maximum: Int)
         async throws -> DirectHermesHTTP.Response
+
+    /// The plugin's own error code, so setup can name what it refused. Only its short codes are
+    /// kept; anything else falls through to the plain HTTP status.
+    static func pluginRejection(status: Int, body: Data) -> DirectHostNotificationError? {
+        guard !(200...299).contains(status), body.count <= 16_384,
+              let value = try? JSONDecoder().decode(BighelpJSONValue.self, from: body),
+              let code = value.object?["detail"]?.object?["code"]?.string,
+              BighelpNotificationErrorKind.safe(code) == code else { return nil }
+        return .rejected(status: status, code: code)
+    }
 
     private static func validSuffix(_ suffix: String) -> Bool {
         suffix.utf8.count <= 512 && suffix.hasPrefix("/") && !suffix.contains("..")

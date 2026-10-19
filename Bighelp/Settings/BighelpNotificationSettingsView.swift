@@ -60,6 +60,8 @@ struct BighelpNotificationSettingsView: View {
     @State private var turnOffStep: BighelpNotificationTurnOffStep?
     @State private var turnOffMessage: String?
     @State private var turnOffFailed = false
+    @State private var turnOffFailure: BighelpNotificationSetupFailure?
+    @State private var lastFailure: BighelpNotificationLastFailure?
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
 
@@ -187,6 +189,7 @@ struct BighelpNotificationSettingsView: View {
                 hostName: host.name,
                 hostEndpoint: host.endpoint.identity,
                 onCompletion: {
+                    lastFailure = BighelpNotificationLastFailure.load()
                     guard scenePhase == .active else { return }
                     runtime = runtimeSource()
                     await permissionCenter.refresh(.notification)
@@ -234,6 +237,9 @@ struct BighelpNotificationSettingsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("settings.notifications.turn-off.result")
                 }
+                if turnOffStep == nil, let turnOffFailure {
+                    BighelpNotificationFailureCodeRow(failure: turnOffFailure, identifier: "settings.notifications.turn-off.failure")
+                }
             } footer: {
                 if turnOffStep == nil, turnOffMessage == nil || turnOffFailed {
                     Text("Deletes this device's notification data everywhere, as if you never turned notifications on.")
@@ -268,10 +274,12 @@ struct BighelpNotificationSettingsView: View {
         operationToken = UUID()
         turnOffMessage = nil
         turnOffFailed = false
+        turnOffFailure = nil
         turnOffStep = .hosts
         do {
             let result = try await turnOff.run { step in turnOffStep = step }
             turnOffStep = nil
+            BighelpNotificationLastFailure.clear()
             if result.registrationLeftOnService {
                 // Honest about what wasn't done: the old key couldn't be read, so it wasn't cancelled.
                 turnOffMessage = "Notifications are off, and this device's notification data was deleted. bighelp couldn't read this device's old notification key, so the notification service may keep its old registration. If alerts still come, turn them off for bighelp in iOS Settings."
@@ -284,7 +292,11 @@ struct BighelpNotificationSettingsView: View {
         } catch {
             turnOffStep = nil
             turnOffFailed = true
-            turnOffMessage = "Couldn't reach the notification service, so notifications aren't fully off yet. Check your connection and try again."
+            let failure = BighelpNotificationSetupFailure(step: .turnOff, error: error)
+            failure.log()
+            BighelpNotificationLastFailure.save(failure, hostID: nil)
+            turnOffFailure = failure
+            turnOffMessage = failure.message
         }
         configureNotificationSetup()
         await reloadAll()
@@ -356,6 +368,16 @@ struct BighelpNotificationSettingsView: View {
                 .bighelpFont(.metadata)
                 .foregroundStyle(theme.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
+            if let lastFailure {
+                LabeledContent("Last setup problem",
+                               value: lastFailure.date.formatted(.relative(presentation: .named)))
+                    .accessibilityIdentifier("settings.notifications.last-failure")
+                Text("\(lastFailure.step.title): \(lastFailure.code.message)")
+                    .bighelpFont(.metadata)
+                    .foregroundStyle(theme.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                BighelpNotificationFailureCodeRow(failure: lastFailure, identifier: "settings.notifications.last-failure")
+            }
             LabeledContent("Optional diagnostics", value: providerStatusTitle)
             Text(providerStatusDetail)
                 .bighelpFont(.metadata)
@@ -599,6 +621,7 @@ struct BighelpNotificationSettingsView: View {
         isRefreshingRuntime = false
         savingTopicID = nil
         runtimeError = nil
+        lastFailure = BighelpNotificationLastFailure.load()
         await permissionCenter.refresh(.notification)
         guard operationToken == token, !Task.isCancelled else { return }
         liveActivitiesEnabled = Self.liveActivitiesAllowed

@@ -525,6 +525,8 @@ Helpful, never a pile to clear (`BighelpNotificationGrouping`):
   and opening the app clears any still there.
 - The Live Activity uses the app's palette from the widget snapshot, like the Home widgets. Its four steps come from
   the phase Hermes reports, never a guessed percentage.
+- Every setup failure gets its own code where it happens (`BighelpNotificationErrorCode`, never reused or renumbered);
+  the FAQ is [docs/NOTIFICATION_ERROR_CODES.md](docs/NOTIFICATION_ERROR_CODES.md).
 
 ### Names that must stay "loopdy"
 

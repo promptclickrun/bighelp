@@ -11,10 +11,14 @@ struct BighelpManagedNotificationSetupError: Error, LocalizedError, Equatable, S
 
     let stage: Stage
     let code: String?
+    /// The error underneath, in privacy-safe words, so a network or service failure inside the
+    /// push service's steps gets the code that names it (NS-101, NS-118).
+    let underlying: BighelpNotificationErrorKind?
 
-    init(stage: Stage, code: String? = nil) {
+    init(stage: Stage, code: String? = nil, underlying: BighelpNotificationErrorKind? = nil) {
         self.stage = stage
         self.code = code
+        self.underlying = underlying
     }
 
     /// The diagnostic code is appended when present so a failing stage names
@@ -113,12 +117,13 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
         var host = host
         // Turning notifications on again replaces an unfinished turn-off.
         defaults.removeObject(forKey: Self.turnOffPendingKey)
-        var credentials = try await identity.resolveForEnrollment()
+        var credentials = try await during(.serviceSignUp) { try await identity.resolveForEnrollment() }
         guard isCurrent(), registry.accountScope == host.accountScope,
               let current = registry.hosts.first(where: { $0.id == host.id }),
               current.principalIdentity == host.principalIdentity else {
             registry.notificationSetupError = "The selected Hermes instance changed while notification identity was being prepared."
-            return .prerequisitesRequired
+            throw BighelpNotificationSetupFailure(.interrupted, step: .serviceSignUp, kind: .check("computer_changed"),
+                                                  state: .prerequisitesRequired)
         }
         host = current
         func persistBinding() throws {
@@ -132,63 +137,89 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
             host.notificationBinding = binding
             try registry.update(host)
         }
-        try persistBinding()
+        try at(.savingSetup) { try persistBinding() }
         retiredHosts.remove(host.notificationScope + ":" + host.hostConnectionID)
-        try requireCurrent(host, credentials: credentials)
-        try ledger.pruneExpiredRevocations(accountScope: host.notificationScope, now: timestamp)
+        try at(.contextCheck) { try requireCurrent(host, credentials: credentials) }
+        try at(.savingSetup) { try ledger.pruneExpiredRevocations(accountScope: host.notificationScope, now: timestamp) }
         let profile = registry.workspace(for: host).selectedProfile
         guard ManagedNotificationValidation.profile(profile), connection.endpoint == host.endpoint,
-              host.owns(connection) else { throw DirectHermesError.identityChanged }
+              host.owns(connection) else {
+            throw Self.named(.computerSignInChanged, .contextCheck, "connection_changed", was: DirectHermesError.identityChanged)
+        }
         let key = BighelpManagedNotificationLedger.key(scope: host.notificationScope, host: host.hostConnectionID, profile: profile)
-        guard enrolling.insert(key).inserted else { throw DirectHermesError.tooManyRequests }
+        guard enrolling.insert(key).inserted else {
+            throw Self.named(.alreadyRunning, .contextCheck, "setup_running", was: DirectHermesError.tooManyRequests)
+        }
         defer { enrolling.remove(key) }
+        /// Setup's computer, agent and sign-in are still the ones it started with.
         @MainActor func check() throws {
-            try requireCurrent(host, credentials: credentials)
-            guard isCurrent(), registry.workspace(for: host).selectedProfile == profile else { throw DirectHermesError.secureStorageChanged }
+            do {
+                try requireCurrent(host, credentials: credentials)
+                guard isCurrent(), registry.workspace(for: host).selectedProfile == profile else {
+                    throw DirectHermesError.secureStorageChanged
+                }
+            } catch {
+                throw BighelpNotificationSetupFailure(step: .contextCheck, error: error)
+            }
         }
         try check()
-        do {
-            try await buzzKit.identify(accountAPI: api, credentials: credentials)
-        } catch let error as BighelpManagedNotificationSetupError
-            where error.stage == .providerIdentity && error.code == "notification_credentials_revoked" {
-            credentials = try await identity.replaceRevokedForEnrollment(expected: credentials)
-            try persistBinding()
-            retiredHosts.remove(host.notificationScope + ":" + host.hostConnectionID)
-            try requireCurrent(host, credentials: credentials)
-            try await buzzKit.identify(accountAPI: api, credentials: credentials)
+        try await during(.pushSignIn) {
+            do {
+                try await buzzKit.identify(accountAPI: api, credentials: credentials)
+            } catch let error as BighelpManagedNotificationSetupError
+                where error.stage == .providerIdentity && error.code == "notification_credentials_revoked" {
+                credentials = try await during(.serviceSignUp) {
+                    try await identity.replaceRevokedForEnrollment(expected: credentials)
+                }
+                try at(.savingSetup) { try persistBinding() }
+                retiredHosts.remove(host.notificationScope + ":" + host.hostConnectionID)
+                try at(.contextCheck) { try requireCurrent(host, credentials: credentials) }
+                try await buzzKit.identify(accountAPI: api, credentials: credentials)
+            }
         }
         try check()
         // This is called only by the explicit setup Enable action, never startup.
-        let permissionGranted = try await providerOperation(stage: .notificationPermission) {
-            try await requestPermission()
+        let permissionGranted = try await during(.permission) {
+            try await providerOperation(stage: .notificationPermission) {
+                try await requestPermission()
+            }
         }
         try check()
         guard permissionGranted else {
-            throw BighelpManagedNotificationSetupError(stage: .notificationPermission)
+            throw BighelpNotificationSetupFailure(step: .permission, error: BighelpManagedNotificationSetupError(
+                stage: .notificationPermission, code: "notification_permission_required"))
         }
         try check()
-        try await providerOperation(stage: .deviceRegistration) {
-            try await buzzKit.registerCurrentDevice()
+        try await during(.pushRegistration) {
+            try await providerOperation(stage: .deviceRegistration) {
+                try await buzzKit.registerCurrentDevice()
+            }
         }
         try check()
         // Explicit enablement requires both this attempt's current registration
         // and provider status readback for that exact subscription before any
         // host grant can be created or claimed.
-        _ = try await providerOperation(stage: .providerReadiness) {
-            try await buzzKit.refreshProviderReadiness(
-                accountAPI: api,
-                credentials: credentials,
-                requiringCurrentRegistration: true
-            )
+        _ = try await during(.pushCheck) {
+            try await providerOperation(stage: .providerReadiness) {
+                try await buzzKit.refreshProviderReadiness(
+                    accountAPI: api,
+                    credentials: credentials,
+                    requiringCurrentRegistration: true
+                )
+            }
         }
         try check()
-        let client = try hostClient(host)
-        let capabilities: BighelpManagedCapabilities
-        do {
-            capabilities = try ManagedNotificationValidation.decode(BighelpManagedCapabilities.self,
-                from: await client.request("/capabilities", method: "GET", body: nil, isCurrent: { (try? check()) != nil }))
-        } catch DirectHostNotificationError.backendRestartRequired { try check(); return .backendRestartRequired }
-        try check(); try capabilities.validate()
+        let client = try at(.computerCheck) { try hostClient(host) }
+        let loaded: BighelpManagedCapabilities? = try await during(.computerCheck) {
+            do {
+                return try ManagedNotificationValidation.decode(BighelpManagedCapabilities.self,
+                    from: await client.request("/capabilities", method: "GET", body: nil, isCurrent: { (try? check()) != nil }))
+            } catch DirectHostNotificationError.backendRestartRequired {
+                return nil
+            }
+        }
+        guard let capabilities = loaded else { try check(); return .backendRestartRequired }
+        try check(); try at(.computerCheck) { try capabilities.validate() }
         guard capabilities.managedEnrollmentSupported, capabilities.supportsCompletionEnrollment else { return .prerequisitesRequired }
         var record = ledger.record(host: host, profile: profile) ?? BighelpManagedEnrollmentRecord(
             accountScope: host.notificationScope, accountID: credentials.deviceID, hostConnectionID: host.hostConnectionID,
@@ -196,41 +227,37 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
             richLiveActivitySupported: (capabilities.richLiveActivitySupported ?? capabilities.producerCapabilities.richLiveActivity),
             enabled: false, revokePending: false, subscriptions: [])
         if record.revokePending {
-            try await reconcilePendingRevocations(); try check()
+            try await during(.serviceGrant) {
+                do { try await reconcilePendingRevocations() } catch DirectHermesError.tooManyRequests {
+                    throw Self.named(.earlierRemovalPending, .serviceGrant, "removal_running", was: DirectHermesError.tooManyRequests)
+                }
+            }
+            try check()
             guard let recovered = ledger.record(host: host, profile: profile), !recovered.revokePending else {
-                throw DirectHermesError.secureStorageChanged
+                throw Self.named(.earlierRemovalPending, .serviceGrant, "removal_pending", was: DirectHermesError.secureStorageChanged)
             }
             record = recovered
         }
         if let pin = record.grant {
             guard pin.hostPublicKey == capabilities.hostPublicKey, pin.hostKeyId == capabilities.hostKeyId else {
-                throw DirectHermesError.identityChanged
+                throw Self.named(.computerKeyChanged, .serviceGrant, "computer_key_changed", was: DirectHermesError.identityChanged)
             }
         }
-        var listed = try await list(credentials)
+        var listed = try await during(.serviceGrant) { try await list(credentials) }
         try check()
         for stale in listed where stale.hostPublicKey == capabilities.hostPublicKey
             && stale.hostKeyId == capabilities.hostKeyId && stale.profile == profile
             && stale.state != "revoked" && stale.expiresAt <= timestamp {
             record.grant = stale; record.enabled = false; record.revokePending = true
-            try ledger.save(record)
-            let body = try ManagedNotificationValidation.data(BighelpJSONValue.object([
-                "version": .integer(2), "expectedRevision": .integer(stale.revision)]))
-            let deleted = try ManagedNotificationValidation.grant(await api.managedNotificationRequest(
-                path: Self.root + "/" + stale.grantId, method: "DELETE", body: body, credentials: credentials))
-            try check()
-            guard deleted.grantId == stale.grantId, deleted.state == "revoked" else { throw DirectHermesError.invalidResponse }
-            listed = try await list(credentials); try check()
-            guard listed.contains(where: { $0.grantId == stale.grantId && $0.state == "revoked" }) else {
-                throw DirectHermesError.invalidResponse
-            }
+            try at(.savingSetup) { try ledger.save(record) }
+            listed = try await removeOldGrant(stale, credentials: credentials, check: check)
             record.grant = nil; record.creationBody = nil; record.revokePending = false
             record.subscriptions = []; record.enrollmentID = UUID().uuidString.lowercased()
-            try ledger.save(record)
+            try at(.savingSetup) { try ledger.save(record) }
         }
         if let old = record.grant, listed.contains(where: { $0.grantId == old.grantId && $0.state == "revoked" }) {
             record.grant = nil; record.creationBody = nil; record.subscriptions = []; record.enabled = false
-            record.enrollmentID = UUID().uuidString.lowercased(); try ledger.save(record)
+            record.enrollmentID = UUID().uuidString.lowercased(); try at(.savingSetup) { try ledger.save(record) }
         }
         // An earlier release could persist enabled metadata for the legacy topic
         // layout. Explicit opt-in authorizes replacing that grant; loading saved
@@ -242,44 +269,35 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
                 && $0.state != "revoked" && $0.expiresAt > timestamp
                 && ($0.instanceId != host.hostConnectionID.lowercased() || Set($0.eventTypes) != expectedEvents)
         }
-        guard obsolete.count <= 1 else { throw DirectHermesError.invalidResponse }
+        guard obsolete.count <= 1 else { throw Self.named(.manyOldGrants, .serviceGrant, "several_old_grants") }
         if let stale = obsolete.first {
             record.grant = stale; record.enabled = false; record.revokePending = true
-            try ledger.save(record)
-            let body = try ManagedNotificationValidation.data(BighelpJSONValue.object([
-                "version": .integer(2), "expectedRevision": .integer(stale.revision)]))
-            let deleted = try ManagedNotificationValidation.grant(await api.managedNotificationRequest(
-                path: Self.root + "/" + stale.grantId, method: "DELETE", body: body, credentials: credentials))
-            try check()
-            guard deleted.grantId == stale.grantId, deleted.state == "revoked" else {
-                throw DirectHermesError.invalidResponse
-            }
-            listed = try await list(credentials); try check()
-            guard listed.contains(where: { $0.grantId == stale.grantId && $0.state == "revoked" }) else {
-                throw DirectHermesError.invalidResponse
-            }
+            try at(.savingSetup) { try ledger.save(record) }
+            listed = try await removeOldGrant(stale, credentials: credentials, check: check)
             record.grant = nil; record.creationBody = nil; record.revokePending = false
             record.subscriptions = []; record.enrollmentID = UUID().uuidString.lowercased()
-            try ledger.save(record)
+            try at(.savingSetup) { try ledger.save(record) }
         }
         let matches = listed.filter { $0.hostPublicKey == capabilities.hostPublicKey && $0.hostKeyId == capabilities.hostKeyId
             && $0.profile == profile && $0.authorizationEpoch == credentials.authorizationEpoch
             && $0.state != "revoked" && $0.expiresAt > timestamp
             && $0.instanceId == host.hostConnectionID.lowercased()
             && ManagedNotificationValidation.validEnrollmentEventTypes($0.eventTypes) }
-        guard matches.count <= 1 else { throw DirectHermesError.invalidResponse }
+        guard matches.count <= 1 else { throw Self.named(.manyMatchingGrants, .serviceGrant, "several_matching_grants") }
         var grant: BighelpManagedGrant
         if let existing = matches.first {
             if let pinned = record.grant, pinned.expiresAt > timestamp, pinned.grantId != existing.grantId {
-                throw DirectHermesError.identityChanged
+                throw Self.named(.grantDiffersFromSaved, .serviceGrant, "saved_grant_id_differs", was: DirectHermesError.identityChanged)
             }
             if let pinned = record.grant, !pinned.sameAuthority(as: existing) {
-                throw DirectHermesError.identityChanged
+                throw Self.named(.grantDiffersFromSaved, .serviceGrant, "saved_grant_authority_differs",
+                                 was: DirectHermesError.identityChanged)
             }
             if let frozen = record.creationBody {
-                let intent = try JSONDecoder().decode(BighelpManagedGrantIntent.self, from: frozen)
+                let intent = try Self.savedIntent(frozen)
                 guard Set(intent.eventTypes) == Set(existing.eventTypes), intent.expiresAt == existing.expiresAt else {
-                    throw DirectHermesError.identityChanged
+                    throw Self.named(.grantDiffersFromSaved, .serviceGrant, "saved_request_differs",
+                                     was: DirectHermesError.identityChanged)
                 }
             }
             grant = existing
@@ -290,53 +308,70 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
                     hostPublicKey: capabilities.hostPublicKey, hostKeyId: capabilities.hostKeyId, profile: profile,
                     eventTypes: capabilities.enrollmentEventTypes.sorted(),
                     expiresAt: timestamp + 2_592_000)
-                record.creationBody = try ManagedNotificationValidation.data(intent)
-                try check(); try ledger.save(record) // durable BEFORE cloud mutation
+                record.creationBody = try at(.serviceGrant) { try ManagedNotificationValidation.data(intent) }
+                try check(); try at(.savingSetup) { try ledger.save(record) } // durable BEFORE cloud mutation
             }
-            guard let body = record.creationBody else { throw DirectHermesError.savedConnectionInvalid }
-            let intent = try JSONDecoder().decode(BighelpManagedGrantIntent.self, from: body)
+            guard let body = record.creationBody else {
+                throw Self.named(.savedGrantRequestDamaged, .serviceGrant, "saved_request_missing",
+                                 was: DirectHermesError.savedConnectionInvalid)
+            }
+            let intent = try Self.savedIntent(body)
             guard intent.version == 3, ManagedNotificationValidation.uuid(intent.idempotencyKey),
                   intent.instanceId == host.hostConnectionID.lowercased(),
                   intent.hostPublicKey == capabilities.hostPublicKey, intent.hostKeyId == capabilities.hostKeyId,
                   intent.profile == profile, ManagedNotificationValidation.validEnrollmentEventTypes(intent.eventTypes) else {
-                throw DirectHermesError.identityChanged
+                throw Self.named(.savedGrantRequestDamaged, .serviceGrant, "saved_request_out_of_date",
+                                 was: DirectHermesError.identityChanged)
             }
             // Unknown outcome retains these exact bytes; never generates a new key.
-            grant = try ManagedNotificationValidation.grant(await api.managedNotificationRequest(
-                path: Self.root, method: "POST", body: body, credentials: credentials))
+            grant = try await during(.serviceGrant) {
+                try ManagedNotificationValidation.grant(await api.managedNotificationRequest(
+                    path: Self.root, method: "POST", body: body, credentials: credentials))
+            }
             try check()
             guard Set(grant.eventTypes) == Set(intent.eventTypes), grant.expiresAt == intent.expiresAt else {
-                throw DirectHermesError.identityChanged
+                throw Self.named(.newGrantDiffers, .serviceGrant, "new_grant_differs", was: DirectHermesError.identityChanged)
             }
         }
         record.richLiveActivitySupported = (capabilities.richLiveActivitySupported ?? capabilities.producerCapabilities.richLiveActivity)
-        try validate(grant, host: host, profile: profile, credentials: credentials)
+        do { try validate(grant, host: host, profile: profile, credentials: credentials) } catch {
+            throw Self.named(.grantFailedChecks, .serviceGrant, "grant_checks", was: error)
+        }
         guard grant.hostKeyId == capabilities.hostKeyId, grant.hostPublicKey == capabilities.hostPublicKey else {
-            throw DirectHermesError.identityChanged
+            throw Self.named(.newGrantDiffers, .serviceGrant, "grant_key_differs", was: DirectHermesError.identityChanged)
         }
 
         // A grant cannot silently migrate between two configured local hosts.
         guard !ledger.enrollments.contains(where: { $0.grant?.grantId == grant.grantId
             && ($0.accountScope != host.notificationScope || $0.hostConnectionID != host.hostConnectionID) }) else {
-            throw DirectHermesError.identityChanged
+            throw Self.named(.grantBelongsToOtherComputer, .serviceGrant, "grant_on_other_computer",
+                             was: DirectHermesError.identityChanged)
         }
         record.grant = grant
-        try ledger.save(record)
-        let claimed = try ManagedNotificationValidation.grant(await client.request("/enroll", method: "POST",
-            body: ["version": .integer(1), "idempotencyKey": .string(record.enrollmentID), "grantId": .string(grant.grantId)],
-            isCurrent: { (try? check()) != nil }))
+        try at(.savingSetup) { try ledger.save(record) }
+        let claimed = try await during(.computerEnroll) {
+            try ManagedNotificationValidation.grant(await client.request("/enroll", method: "POST",
+                body: ["version": .integer(1), "idempotencyKey": .string(record.enrollmentID), "grantId": .string(grant.grantId)],
+                isCurrent: { (try? check()) != nil }))
+        }
         try check()
-        guard grant.sameAuthority(as: claimed), claimed.state == "active" else { throw DirectHermesError.invalidResponse }
-        let observed = try ManagedNotificationValidation.grant(await client.request("/enrollments/" + grant.grantId,
-            method: "GET", body: nil, isCurrent: { (try? check()) != nil }))
+        guard grant.sameAuthority(as: claimed), claimed.state == "active" else {
+            throw Self.named(.claimMismatch, .computerEnroll, "claimed_grant_differs")
+        }
+        let observed = try await during(.computerEnroll) {
+            try ManagedNotificationValidation.grant(await client.request("/enrollments/" + grant.grantId,
+                method: "GET", body: nil, isCurrent: { (try? check()) != nil }))
+        }
         try check()
-        guard claimed == observed else { throw DirectHermesError.invalidResponse }
+        guard claimed == observed else { throw Self.named(.enrollmentChangedDuringCheck, .computerEnroll, "readback_differs") }
         grant = observed; record.grant = grant; record.enabled = true
         record.creationBody = nil
-        try ledger.save(record)
+        try at(.savingSetup) { try ledger.save(record) }
         if capabilities.supportsSealedAlerts {
-            try await registerSealedRecipient(host: host, profile: profile, grant: grant, client: client,
-                                              isCurrent: { (try? check()) != nil })
+            try await during(.computerEnroll) {
+                try await registerSealedRecipient(host: host, profile: profile, grant: grant, client: client,
+                                                  isCurrent: { (try? check()) != nil })
+            }
             try check()
         }
         // Quiet Hours never hold up notifications: an older plugin or a miss now is
@@ -348,10 +383,57 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
         // opened. Subscribe that exact authenticated session now; later chats use
         // the normal onChatOpened hook.
         if let chat = registry.workspace(for: host).selectedChat {
-            try await onChatOpened(host: host, chat: chat)
+            try await during(.computerEnroll) { try await onChatOpened(host: host, chat: chat) }
             try check()
         }
         return .enabled
+    }
+
+    /// Revokes an old grant for this computer at the notification service and reads the list back.
+    private func removeOldGrant(_ stale: BighelpManagedGrant, credentials: BighelpManagedNotificationCredentials,
+                                check: @MainActor () throws -> Void) async throws -> [BighelpManagedGrant] {
+        let body = try at(.serviceGrant) {
+            try ManagedNotificationValidation.data(BighelpJSONValue.object([
+                "version": .integer(2), "expectedRevision": .integer(stale.revision)]))
+        }
+        let deleted = try await during(.serviceGrant) {
+            try ManagedNotificationValidation.grant(await api.managedNotificationRequest(
+                path: Self.root + "/" + stale.grantId, method: "DELETE", body: body, credentials: credentials))
+        }
+        try check()
+        guard deleted.grantId == stale.grantId, deleted.state == "revoked" else {
+            throw Self.named(.oldGrantNotRemoved, .serviceGrant, "old_grant_not_revoked")
+        }
+        let listed = try await during(.serviceGrant) { try await list(credentials) }
+        try check()
+        guard listed.contains(where: { $0.grantId == stale.grantId && $0.state == "revoked" }) else {
+            throw Self.named(.oldGrantNotRemoved, .serviceGrant, "old_grant_still_listed")
+        }
+        return listed
+    }
+
+    /// The grant request saved on this phone before it was sent.
+    private static func savedIntent(_ body: Data) throws -> BighelpManagedGrantIntent {
+        do { return try JSONDecoder().decode(BighelpManagedGrantIntent.self, from: body) } catch {
+            throw named(.savedGrantRequestDamaged, .serviceGrant, "saved_request_unreadable", was: error)
+        }
+    }
+
+    /// Names a failure in `work` by the step it stopped; one already named keeps its name.
+    private func during<Value>(_ step: BighelpNotificationSetupStep,
+                               _ work: @MainActor () async throws -> Value) async throws -> Value {
+        do { return try await work() } catch { throw BighelpNotificationSetupFailure(step: step, error: error) }
+    }
+
+    private func at<Value>(_ step: BighelpNotificationSetupStep, _ work: @MainActor () throws -> Value) throws -> Value {
+        do { return try work() } catch { throw BighelpNotificationSetupFailure(step: step, error: error) }
+    }
+
+    /// One of setup's own checks failed. `was` is what it used to throw, which keeps the
+    /// setup state it leaves the same.
+    private static func named(_ code: BighelpNotificationErrorCode, _ step: BighelpNotificationSetupStep, _ check: String,
+                              was error: any Error = DirectHermesError.invalidResponse) -> BighelpNotificationSetupFailure {
+        BighelpNotificationSetupFailure(code, step: step, check: check, was: error)
     }
 
     func ownsChat(host: BighelpConfiguredHost, client: DirectHermesConversationClient) -> Bool {
@@ -410,7 +492,9 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
               object["sessionReference"]?.string == ManagedNotificationValidation.sessionReference(profile: profile, session: session),
               object["enabled"]?.boolean == true, chat.client.storedID == session,
               let current = ledger.record(host: host, profile: profile), current.enabled,
-              current.grant == grant, !current.revokePending else { throw DirectHermesError.invalidResponse }
+              current.grant == grant, !current.revokePending else {
+            throw Self.named(.chatAlertsUnconfirmed, .computerEnroll, "chat_subscription_differs")
+        }
         record = current; record.subscriptions.insert(session); try ledger.save(record)
     }
 
@@ -529,9 +613,10 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
         let value = try await client.request("/enrollments/\(grant.grantId)/recipient-key", method: "PUT", body: [
             "version": .integer(1), "publicKey": .string(BighelpSealedAlertRecipient.publicKey(key))
         ], isCurrent: isCurrent)
-        guard isCurrent(), value.object?["recipientKeyId"]?.string == keyID,
+        guard isCurrent() else { throw DirectHermesError.secureStorageChanged }
+        guard value.object?["recipientKeyId"]?.string == keyID,
               var current = ledger.record(host: host, profile: profile), current.grant == grant else {
-            throw DirectHermesError.invalidResponse
+            throw Self.named(.recipientKeyUnconfirmed, .computerEnroll, "recipient_key_differs")
         }
         current.sealedRecipientKeyID = keyID
         try ledger.save(current)
@@ -739,31 +824,56 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
             var cleanups = pendingHostCleanups
             cleanups[host.id.uuidString, default: []].formUnion(grants)
             pendingHostCleanups = cleanups
-            _ = await retryPendingHostCleanups()
+            if !(await retryPendingHostCleanups()).isEmpty {
+                Self.noteReset(.setUpAgainComputerKeptCopy, .check("computer_kept_copy"))
+            }
         }
-        try? removeLocalEnrollment(host: host)
-        try? await reconcilePendingRevocations()
+        do { try removeLocalEnrollment(host: host) } catch { Self.noteReset(.setUpAgainCouldNotClearPhone, error) }
+        do { try await reconcilePendingRevocations() } catch { Self.noteReset(.setUpAgainServiceKeptGrant, error) }
         await revokeUntrackedGrants(for: host)
-        try? ledger.forget(host: host)
+        do { try ledger.forget(host: host) } catch { Self.noteReset(.setUpAgainCouldNotClearPhone, error) }
         retiredHosts.remove(host.notificationScope + ":" + host.hostConnectionID)
         guard var current = registry.hosts.first(where: { $0.id == host.id }) else { return }
         current.notificationState = .notConfigured
         current.notificationBinding = nil
         // An install or toggle never confirmed would hold setup at "Couldn't confirm".
         if current.pluginIntent?.phase != .verified { current.pluginIntent = nil }
-        try? registry.update(current)
+        do { try registry.update(current) } catch { Self.noteReset(.setUpAgainCouldNotClearPhone, error) }
+    }
+
+    /// Set Up Again never stops for what it can't clear: it's retried later or replaced by the
+    /// next setup. The log still names it.
+    private static func noteReset(_ code: BighelpNotificationErrorCode, _ error: any Error) {
+        noteReset(code, BighelpNotificationErrorKind(error))
+    }
+
+    private static func noteReset(_ code: BighelpNotificationErrorCode, _ kind: BighelpNotificationErrorKind) {
+        BighelpNotificationSetupFailure(code, step: .setUpAgain, kind: kind, state: .notConfigured).log()
     }
 
     /// Grants the notification service holds for this computer with no record here,
     /// from a setup cut off before it saved one.
     private func revokeUntrackedGrants(for host: BighelpConfiguredHost) async {
-        guard let credentials = try? identity.current(), let listed = try? await list(credentials) else { return }
+        let listed: [BighelpManagedGrant]
+        let credentials: BighelpManagedNotificationCredentials
+        do {
+            guard let current = try identity.current() else { return }
+            credentials = current
+            listed = try await list(current)
+        } catch {
+            Self.noteReset(.setUpAgainCouldNotListGrants, error)
+            return
+        }
         for grant in listed where grant.instanceId == host.hostConnectionID.lowercased()
             && grant.authorizationEpoch == credentials.authorizationEpoch && grant.state != "revoked" {
             guard let body = try? ManagedNotificationValidation.data(BighelpJSONValue.object([
                 "version": .integer(2), "expectedRevision": .integer(grant.revision)])) else { continue }
-            _ = try? await api.managedNotificationRequest(path: Self.root + "/" + grant.grantId, method: "DELETE",
-                                                          body: body, credentials: credentials)
+            do {
+                _ = try await api.managedNotificationRequest(path: Self.root + "/" + grant.grantId, method: "DELETE",
+                                                             body: body, credentials: credentials)
+            } catch {
+                Self.noteReset(.setUpAgainServiceKeptGrant, error)
+            }
         }
     }
 
@@ -976,7 +1086,9 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
         } catch let error as CancellationError {
             throw error
         } catch {
-            throw BighelpManagedNotificationSetupError(stage: stage)
+            throw BighelpManagedNotificationSetupError(
+                stage: stage, code: stage == .notificationPermission ? "permission_request_failed" : nil,
+                underlying: BighelpNotificationErrorKind(error))
         }
     }
     private func requireCurrentNotificationIdentity(

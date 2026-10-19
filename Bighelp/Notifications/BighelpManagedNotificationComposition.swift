@@ -156,9 +156,16 @@ final class BighelpManagedNotificationComposition: HostNotificationSetupServing 
         connection: DirectHermesSavedConnection,
         isCurrent externalIsCurrent: @escaping @MainActor () -> Bool
     ) async throws -> HostNotificationSetupResult {
-        let integration = try requireIntegrationForExplicitAction()
+        let integration: BighelpManagedNotificationIntegration
+        do {
+            integration = try requireIntegrationForExplicitAction()
+        } catch {
+            throw BighelpNotificationSetupFailure(isFixture ? .demoMode : Self.loadFailureCode(error), step: .loadingSetup,
+                                                  kind: BighelpNotificationErrorKind(error),
+                                                  state: BighelpNotificationSetupFailure.state(after: error))
+        }
         guard let owner = captureOwner(), isCurrent(owner), externalIsCurrent() else {
-            throw DirectHermesError.secureStorageChanged
+            throw BighelpNotificationSetupFailure(step: .startingSetup, error: DirectHermesError.secureStorageChanged)
         }
         return try await integration.service.enroll(host: host, connection: connection) {
             !Task.isCancelled && externalIsCurrent() && self.isCurrent(owner)
@@ -412,6 +419,15 @@ final class BighelpManagedNotificationComposition: HostNotificationSetupServing 
             registry?.notificationSetupError = nil
         }
         self.publishedLoadError = nil
+    }
+
+    /// Notification setup couldn't load on this phone: the same three cases the load notice names.
+    static func loadFailureCode(_ error: any Error) -> BighelpNotificationErrorCode {
+        switch classify(error) {
+        case .protectedStorageUnavailable: .keychainUnavailable
+        case .savedStateRejected: .savedSetupDamaged
+        case .storageUnavailable: .loadFailed
+        }
     }
 
     private static func classify(_ error: any Error) -> LoadFailureKind {

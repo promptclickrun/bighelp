@@ -23,6 +23,8 @@ struct AgentTemplateBrowser: View {
                 VStack(alignment: .leading, spacing: BighelpTokens.space16) {
                     if showsMine {
                         myTemplatesSection(mine)
+                        sectionTitle("All templates")
+                            .padding(.top, BighelpTokens.space8)
                     }
                     HStack(spacing: BighelpTokens.space12) {
                         Picker("Order", selection: $order) {
@@ -37,9 +39,6 @@ struct AgentTemplateBrowser: View {
                     }
                     .tint(theme.action)
                     .accessibilityIdentifier("agent.templates.official")
-                    if showsMine {
-                        sectionTitle("All templates")
-                    }
                     if shown.isEmpty, mine.isEmpty {
                         ContentUnavailableView.search(text: search)
                     } else {

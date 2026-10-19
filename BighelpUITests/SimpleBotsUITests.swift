@@ -144,14 +144,15 @@ final class SimpleBotsUITests: BighelpUITestCase {
             town.tap()
             town.typeText("Porto")
             app.buttons["agent.template-form.continue"].tap()
-            let chip = app.buttons["simple-bots.create.template"]
+            let chip = app.descendants(matching: .any)["simple-bots.create.template"]
             XCTAssertTrue(chip.waitForExistence(timeout: 5), "The template shows as a chip")
             XCTAssertEqual(chip.label, "Template: Weekend Planner")
             XCTAssertTrue(app.staticTexts["simple-bots.create.template-note"].exists)
             XCTAssertEqual(name.value as? String, "Juniper")
             save("templates-attached-\(appearance)", app)
             app.buttons["simple-bots.create.template.remove"].tap()
-            XCTAssertTrue(templates.waitForExistence(timeout: 5), "Taking it off brings Templates back")
+            XCTAssertTrue(chip.waitForNonExistence(timeout: 5), "Its x takes it off")
+            XCTAssertFalse(app.staticTexts["simple-bots.create.template-note"].exists)
             app.buttons["simple-bots.create.close"].tap()
 
             // A bot's Share saves it as a template on the computer.

@@ -128,13 +128,20 @@ struct SimpleBotCreateView: View {
                     .minimumScaleFactor(0.75)
                 Spacer(minLength: BighelpTokens.space8)
                 if creator != nil {
-                    SimpleBotTemplateControl(attached: attachedTemplate, onBrowse: { isPickingTemplate = true },
-                                             onRemove: { if let creator { SimpleBotCreation.detach(creator) } })
-                        .layoutPriority(1)
+                    SimpleBotTemplatesButton { isPickingTemplate = true }
                 }
             }
             .padding(.horizontal, BighelpTokens.space16)
             .padding(.top, BighelpTokens.space16)
+            if let attachedTemplate {
+                SimpleBotTemplateChip(template: attachedTemplate) {
+                    if let creator { SimpleBotCreation.detach(creator) }
+                }
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .padding(.horizontal, BighelpTokens.space16)
+                .padding(.top, BighelpTokens.space8)
+                .transition(.opacity)
+            }
 
             ScrollView {
                 VStack(spacing: BighelpTokens.space32) {

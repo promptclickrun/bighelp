@@ -51,59 +51,59 @@ enum SimpleBotCreation {
     }
 }
 
-/// New Bot's top-right control: Templates, or the attached template as a chip with an x to take it off.
-struct SimpleBotTemplateControl: View {
-    let attached: AgentSoulTemplate?
-    let onBrowse: () -> Void
+/// New Bot's Templates button, top right.
+struct SimpleBotTemplatesButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label("Templates", systemImage: "square.grid.2x2")
+                .font(.bighelp(.subheadline, weight: .semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .padding(.horizontal, BighelpTokens.space16)
+                .frame(minHeight: BighelpTokens.hitTarget)
+                .contentShape(Capsule())
+                .bighelpNavigationGlass(in: Capsule(), isInteractive: true)
+        }
+        .buttonStyle(.plain)
+        .fixedSize()
+        .accessibilityHint("Start from a template. It fills in the role, vibe and instructions.")
+        .accessibilityIdentifier("simple-bots.create.templates")
+    }
+}
+
+/// The attached template, under the Templates button: its name, and an x to take it off.
+struct SimpleBotTemplateChip: View {
+    let template: AgentSoulTemplate
     let onRemove: () -> Void
     @BighelpThemeReader private var theme
 
     var body: some View {
-        if let attached {
-            HStack(spacing: 0) {
-                Button(action: onBrowse) {
-                    Label {
-                        Text(verbatim: attached.title).lineLimit(1)
-                    } icon: {
-                        Image(systemName: attached.systemImage)
-                    }
-                    .font(.bighelp(.subheadline, weight: .semibold))
-                    .foregroundStyle(theme.primaryText)
-                    .padding(.leading, BighelpTokens.space12)
-                    .frame(minHeight: BighelpTokens.hitTarget)
-                    .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Template: \(attached.title)")
-                .accessibilityHint("Pick another template.")
-                .accessibilityIdentifier("simple-bots.create.template")
-                Button(action: onRemove) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.bighelp(.body))
-                        .foregroundStyle(theme.tertiaryText)
-                        .frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
-                        .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Remove template")
-                .accessibilityIdentifier("simple-bots.create.template.remove")
+        HStack(spacing: BighelpTokens.space4) {
+            Label {
+                Text(verbatim: template.title).lineLimit(1)
+            } icon: {
+                Image(systemName: template.systemImage)
             }
-            .frame(maxWidth: 200)
-            .bighelpNavigationGlass(in: Capsule(), isInteractive: true)
-        } else {
-            Button(action: onBrowse) {
-                Label("Templates", systemImage: "square.grid.2x2")
-                    .font(.bighelp(.subheadline, weight: .semibold))
-                    .foregroundStyle(.primary)
-                    .padding(.horizontal, BighelpTokens.space16)
-                    .frame(minHeight: BighelpTokens.hitTarget)
-                    .contentShape(Capsule())
-                    .bighelpNavigationGlass(in: Capsule(), isInteractive: true)
+            .font(.bighelp(.subheadline, weight: .semibold))
+            .foregroundStyle(theme.primaryText)
+            .padding(.leading, BighelpTokens.space16)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Template: \(template.title)")
+            .accessibilityIdentifier("simple-bots.create.template")
+            Button(action: onRemove) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.bighelp(.body))
+                    .foregroundStyle(theme.tertiaryText)
+                    .frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
+                    .contentShape(.rect)
             }
             .buttonStyle(.plain)
-            .accessibilityHint("Start from a template. It fills in the role, vibe and instructions.")
-            .accessibilityIdentifier("simple-bots.create.templates")
+            .accessibilityLabel("Remove template")
+            .accessibilityIdentifier("simple-bots.create.template.remove")
         }
+        .background(theme.surface, in: Capsule())
     }
 }
 

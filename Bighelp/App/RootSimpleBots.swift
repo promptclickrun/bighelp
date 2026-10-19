@@ -201,8 +201,35 @@ extension RootShellView {
                         && capabilities.supports(.agentDefaultsEdit, owner: $0, profileID: id)
                 }) == true else { return nil }
                 return AgentRuntimeDefaultsEditorModel(agentID: id, client: agentRuntimeDefaults)
-            }
+            },
+            makeFilesSource: { makeSimpleBotFilesSource() },
+            makeMediaClient: { makeSimpleBotMediaClient() },
+            showsHiddenFiles: settings.nerdModeEnabled
         )
+    }
+
+    /// The folder the computer shares, read through the connection of the moment.
+    func makeSimpleBotFilesSource() -> (any SimpleBotFilesSource)? {
+        if usesWorkspaceFixtures, workspaceConnections?.isDirectSelected != true {
+            return SimpleBotDemoFiles(servingProfileID: agents.profiles.first { $0.isDefault }?.id)
+        }
+        guard let connections = workspaceConnections else { return nil }
+        return SimpleBotHostFiles { [weak connections] in
+            guard let connections, let owner = connections.owner,
+                  let http = connections.hosts.selectedWorkspace?.nativeClient else { return nil }
+            return .init(owner: owner, http: http,
+                         servingProfileID: connections.workspace?.nativeContext?.servingProfileID)
+        }
+    }
+
+    /// The bot's photos and videos, as the full app's Files › Media reads them.
+    func makeSimpleBotMediaClient() -> (any AgentMediaClient)? {
+        if usesWorkspaceFixtures, workspaceConnections?.isDirectSelected != true { return DemoAgentMediaClient.shared }
+        guard let connections = workspaceConnections else { return nil }
+        return SimpleBotHostMedia { [weak connections] in
+            guard let connections, let owner = connections.owner, let workspace = connections.workspace else { return nil }
+            return (workspace, owner)
+        }
     }
 
     /// Simple Bot mode's Settings sheet; All Settings leads to everything else.

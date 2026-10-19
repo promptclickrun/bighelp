@@ -110,6 +110,84 @@ final class SimpleBotsUITests: BighelpUITestCase {
         save("simple-default-model-dark", app)
     }
 
+    /// A bot's profile: Files and Media after Computer. Files opens a folder in place, Back goes up,
+    /// and a file opens in the chat preview; Media shows the bot's photos and videos.
+    @MainActor
+    func testProfileFilesAndMedia() throws {
+        for appearance in ["light", "dark"] {
+            let app = launch(appearance: appearance)
+            let primary = app.buttons["simple-bots.primary"]
+            XCTAssertTrue(primary.waitForExistence(timeout: 15))
+            primary.tap()
+            let identity = app.buttons["chat.identity"]
+            XCTAssertTrue(identity.waitForExistence(timeout: 10))
+            let profile = app.descendants(matching: .any)["simple-bots.profile"]
+            // A tap while the chat is still sliding in can miss; one more is enough.
+            identity.tap()
+            if !profile.waitForExistence(timeout: 5) { identity.tap() }
+            XCTAssertTrue(profile.waitForExistence(timeout: 5))
+            let filesTab = app.buttons["simple-bots.profile.tab.files"]
+            let mediaTab = app.buttons["simple-bots.profile.tab.media"]
+            XCTAssertTrue(filesTab.waitForExistence(timeout: 5))
+            XCTAssertTrue(mediaTab.exists)
+            XCTAssertLessThan(filesTab.frame.minX, mediaTab.frame.minX, "Files, then Media")
+
+            filesTab.tap()
+            let items = app.buttons.matching(identifier: "simple-bots.files.item")
+            XCTAssertTrue(items.firstMatch.waitForExistence(timeout: 10), "The bot's folder lists its files")
+            app.swipeUp()
+            save("simple-files-\(appearance)", app)
+
+            // Markdown reads rendered, as in chats.
+            let notes = items.matching(NSPredicate(format: "label BEGINSWITH 'Notes.md'")).firstMatch
+            XCTAssertTrue(notes.exists)
+            notes.tap()
+            let done = app.buttons["Done"]
+            XCTAssertTrue(done.waitForExistence(timeout: 10), "The file opens in the preview")
+            XCTAssertTrue(app.descendants(matching: .any)["chat.attachment.markdown.mode"].waitForExistence(timeout: 5))
+            save("simple-files-markdown-\(appearance)", app)
+            done.tap()
+
+            let reports = items.matching(NSPredicate(format: "label BEGINSWITH 'Reports'")).firstMatch
+            XCTAssertTrue(reports.waitForExistence(timeout: 5))
+            reports.tap()
+            let up = app.buttons["simple-bots.files.up"]
+            XCTAssertTrue(up.waitForExistence(timeout: 5), "A folder opens in place, with Back above it")
+            save("simple-files-folder-\(appearance)", app)
+
+            let plan = items.matching(NSPredicate(format: "label BEGINSWITH 'Lisbon trip options'")).firstMatch
+            XCTAssertTrue(plan.waitForExistence(timeout: 5))
+            plan.tap()
+            XCTAssertTrue(done.waitForExistence(timeout: 10), "The PDF opens in the preview")
+            sleep(2)
+            save("simple-files-preview-\(appearance)", app)
+            // Quick Look draws out of process, so these screenshots miss it: hold for `simctl io`.
+            if let hold = ProcessInfo.processInfo.environment["BIGHELP_FILES_PREVIEW_HOLD"].flatMap(UInt32.init) {
+                sleep(hold)
+            }
+            done.tap()
+            XCTAssertTrue(up.waitForExistence(timeout: 5))
+            up.tap()
+            XCTAssertTrue(reports.waitForExistence(timeout: 5), "Back goes up to the top folder")
+
+            app.swipeDown()
+            mediaTab.tap()
+            let tile = app.buttons["board.media.item"].firstMatch
+            XCTAssertTrue(tile.waitForExistence(timeout: 10), "Media shows the bot's photos and videos")
+            sleep(1)
+            save("simple-media-\(appearance)", app)
+            tile.tap()
+            XCTAssertTrue(done.waitForExistence(timeout: 10), "A picture opens in the preview")
+            sleep(2)
+            save("simple-media-preview-\(appearance)", app)
+            if let hold = ProcessInfo.processInfo.environment["BIGHELP_FILES_PREVIEW_HOLD"].flatMap(UInt32.init) {
+                sleep(hold)
+            }
+            done.tap()
+            app.terminate()
+        }
+    }
+
     /// A pinned bot joins the primary one in the top row, and goes back to the list when unpinned.
     @MainActor
     func testPinnedBotsJoinTheTopRow() throws {

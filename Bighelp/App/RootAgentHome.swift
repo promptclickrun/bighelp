@@ -567,7 +567,8 @@ extension RootShellView {
     func configureAgentBoard(_ key: AgentBoardClientKey) async {
         // Media has its own plugin feature; the route says when it's missing.
         agentMedia.configure(client: key.owner.flatMap { owner in
-            key.fixtures ? nil : workspaceConnections?.workspace.map { DirectHermesAgentMediaClient(workspace: $0, owner: owner) }
+            key.fixtures ? DemoAgentMediaClient.shared
+                : workspaceConnections?.workspace.map { DirectHermesAgentMediaClient(workspace: $0, owner: owner) }
         })
         if key.fixtures, key.owner != nil {
             let client = DemoAgentBoardClient()

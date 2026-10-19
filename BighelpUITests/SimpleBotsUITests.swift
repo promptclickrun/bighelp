@@ -121,8 +121,11 @@ final class SimpleBotsUITests: BighelpUITestCase {
             primary.tap()
             let identity = app.buttons["chat.identity"]
             XCTAssertTrue(identity.waitForExistence(timeout: 10))
+            let profile = app.descendants(matching: .any)["simple-bots.profile"]
+            // A tap while the chat is still sliding in can miss; one more is enough.
             identity.tap()
-            XCTAssertTrue(app.descendants(matching: .any)["simple-bots.profile"].waitForExistence(timeout: 5))
+            if !profile.waitForExistence(timeout: 5) { identity.tap() }
+            XCTAssertTrue(profile.waitForExistence(timeout: 5))
             let filesTab = app.buttons["simple-bots.profile.tab.files"]
             let mediaTab = app.buttons["simple-bots.profile.tab.media"]
             XCTAssertTrue(filesTab.waitForExistence(timeout: 5))
@@ -135,8 +138,18 @@ final class SimpleBotsUITests: BighelpUITestCase {
             app.swipeUp()
             save("simple-files-\(appearance)", app)
 
+            // Markdown reads rendered, as in chats.
+            let notes = items.matching(NSPredicate(format: "label BEGINSWITH 'Notes.md'")).firstMatch
+            XCTAssertTrue(notes.exists)
+            notes.tap()
+            let done = app.buttons["Done"]
+            XCTAssertTrue(done.waitForExistence(timeout: 10), "The file opens in the preview")
+            XCTAssertTrue(app.descendants(matching: .any)["chat.attachment.markdown.mode"].waitForExistence(timeout: 5))
+            save("simple-files-markdown-\(appearance)", app)
+            done.tap()
+
             let reports = items.matching(NSPredicate(format: "label BEGINSWITH 'Reports'")).firstMatch
-            XCTAssertTrue(reports.exists)
+            XCTAssertTrue(reports.waitForExistence(timeout: 5))
             reports.tap()
             let up = app.buttons["simple-bots.files.up"]
             XCTAssertTrue(up.waitForExistence(timeout: 5), "A folder opens in place, with Back above it")
@@ -145,10 +158,13 @@ final class SimpleBotsUITests: BighelpUITestCase {
             let plan = items.matching(NSPredicate(format: "label BEGINSWITH 'Lisbon trip options'")).firstMatch
             XCTAssertTrue(plan.waitForExistence(timeout: 5))
             plan.tap()
-            let done = app.buttons["Done"]
-            XCTAssertTrue(done.waitForExistence(timeout: 10), "The file opens in the preview")
+            XCTAssertTrue(done.waitForExistence(timeout: 10), "The PDF opens in the preview")
             sleep(2)
             save("simple-files-preview-\(appearance)", app)
+            // Quick Look draws out of process, so these screenshots miss it: hold for `simctl io`.
+            if let hold = ProcessInfo.processInfo.environment["BIGHELP_FILES_PREVIEW_HOLD"].flatMap(UInt32.init) {
+                sleep(hold)
+            }
             done.tap()
             XCTAssertTrue(up.waitForExistence(timeout: 5))
             up.tap()
@@ -160,6 +176,14 @@ final class SimpleBotsUITests: BighelpUITestCase {
             XCTAssertTrue(tile.waitForExistence(timeout: 10), "Media shows the bot's photos and videos")
             sleep(1)
             save("simple-media-\(appearance)", app)
+            tile.tap()
+            XCTAssertTrue(done.waitForExistence(timeout: 10), "A picture opens in the preview")
+            sleep(2)
+            save("simple-media-preview-\(appearance)", app)
+            if let hold = ProcessInfo.processInfo.environment["BIGHELP_FILES_PREVIEW_HOLD"].flatMap(UInt32.init) {
+                sleep(hold)
+            }
+            done.tap()
             app.terminate()
         }
     }

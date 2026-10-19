@@ -251,6 +251,7 @@ extension DirectHermesConversationClient {
         do {
             receipt = try await rpc.request("session.compress", params: sessionParams).object ?? [:]
         } catch DirectHermesError.timedOut {
+            if owner == generation { model?.releaseRequestedCompaction() }
             return
         } catch {
             if owner == generation { model?.cancelCompaction() }
@@ -269,17 +270,32 @@ extension DirectHermesConversationClient {
         }
     }
 
-    /// Hermes compacting this chat: "compressing" for one asked for, "compacting" for one
-    /// it starts during a turn. Its next status, or the reply carrying on, ends it.
+    /// Hermes compacting this chat: "compressing" for one asked for, "compacting" for one it
+    /// starts itself, and "compacted" only once one commits. Notices that Hermes also tags
+    /// "compacting" start nothing, and an automatic attempt the turn moves on from without a
+    /// commit (nothing to fold, the default compressor's or a context engine's) leaves no Done.
     func trackCompaction(_ event: DirectHermesEvent, status: DirectHermesStatusUpdate?) {
-        if let status, ["compressing", "compacting"].contains(status.kind) {
-            model?.beginCompaction(status: status.text)
-            return
+        if let status {
+            switch status.kind {
+            case "compacted":
+                model?.confirmCompaction()
+                return
+            case "compressing", "compacting":
+                guard ChatCompaction.isProgress(status.text) else { break }
+                if model?.compaction?.isRequested == true || status.kind == "compressing" {
+                    model?.beginCompaction(status: status.text)
+                } else {
+                    model?.announceCompaction(status: status.text)
+                }
+                return
+            default:
+                break
+            }
         }
-        guard model?.compaction?.phase == .compacting else { return }
+        guard let compaction = model?.compaction, compaction.phase != .done, !compaction.isRequested else { return }
         if status != nil || event.type.hasPrefix("message.") || event.type.hasPrefix("tool.")
             || event.type == "thinking.delta" {
-            model?.finishCompaction()
+            model?.endUnconfirmedCompaction()
         }
     }
 

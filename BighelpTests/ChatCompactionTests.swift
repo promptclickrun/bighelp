@@ -14,16 +14,92 @@ struct ChatCompactionTests {
         #expect(plain.messages == nil && plain.tokens == nil)
     }
 
-    /// Hermes compacts on its own when the context fills during a turn ("compacting"),
-    /// and its next status ends it.
-    @Test func compactionHermesStartsShowsUntilItsNextStatus() async throws {
+    /// Hermes announces an automatic attempt before it knows there's anything to fold. On a
+    /// host with a fixed `compression.threshold_tokens` (or a context engine such as LCM) that
+    /// happens on chats with most of their window left; with nothing folded, the rail never shows.
+    @Test func anAttemptWithNothingToFoldNeverShows() async throws {
         let fixture = try CompactionFixture()
         defer { fixture.close() }
         try await fixture.client.recover(epoch: "epoch")
-        fixture.status("compacting", "Compacting context…")
-        #expect(fixture.model.compaction?.phase == .compacting)
+        fixture.status("compacting", "📦 Preflight compression: ~114,586 tokens >= 96,000 threshold. This may take a moment.")
+        #expect(fixture.model.compaction?.phase == .announced)
+        #expect(fixture.model.compaction?.isShown == false)
+        fixture.status("compacting", "🗜️ Compacting context — summarizing earlier conversation so I can continue...")
         fixture.status("thinking", "Thinking")
+        #expect(fixture.model.compaction == nil, "No commit from Hermes: no Done")
+    }
+
+    /// A real compaction is still running after the wait, so it shows, and Hermes' commit
+    /// ("compacted") turns it into Done.
+    @Test func aRealCompactionShowsThenHermesCommitSaysDone() async throws {
+        let fixture = try CompactionFixture()
+        defer { fixture.close() }
+        try await fixture.client.recover(epoch: "epoch")
+        fixture.status("compacting", "🗜️ Compacting context — summarizing earlier conversation so I can continue...")
+        try await Task.sleep(for: ChatCompaction.showAfter + .milliseconds(300))
+        #expect(fixture.model.compaction?.phase == .compacting)
+        #expect(fixture.model.compaction?.isShown == true)
+        fixture.status("compacting", "🗜️ Compacting context — still summarizing earlier conversation so I can continue...")
+        #expect(fixture.model.compaction?.phase == .compacting)
+        fixture.status("compacted", "✓ Context compaction complete — continuing turn...")
         #expect(fixture.model.compaction?.phase == .done)
+    }
+
+    /// Hermes tags notices "compacting" too: they say something about compaction, not that it runs.
+    @Test func noticesAboutCompactionStartNothing() async throws {
+        let fixture = try CompactionFixture()
+        defer { fixture.close() }
+        try await fixture.client.recover(epoch: "epoch")
+        for notice in [
+            "⚠️  Session compressed 3 times — accuracy may degrade. Consider /new to start fresh.",
+            "⚠ Compression model sonnet (helper) context is 120,000 tokens, but the main model's compression "
+                + "threshold was 825,000 tokens. Auto-lowered this session's threshold to 120,000 tokens so compression can run.",
+            "⚠ Configured auxiliary compression provider 'helper' is unavailable, so older messages in long chats "
+                + "will be cut without a summary.",
+            "❌ Context compression failed: the summary model refused",
+            "Context is over the threshold but compression is currently blocked",
+        ] {
+            fixture.status("compacting", notice)
+            #expect(fixture.model.compaction == nil, "\(notice)")
+        }
+        #expect(ChatCompaction.isProgress("📦 Pre-API compression: ~90,000 tokens near the context/output limit. Compacting before the next model call."))
+        #expect(ChatCompaction.isProgress("💤 Resumed after 3600s idle — compacting ~120,000 tokens before continuing."))
+        #expect(ChatCompaction.isProgress("🗜️ Context too large (~250,000 tokens) — compressing (1/3)..."))
+    }
+
+    /// A commit whose start went unseen (or was a notice) still says Done: Hermes only sends it for real work.
+    @Test func aCommitAloneSaysDone() async throws {
+        let fixture = try CompactionFixture()
+        defer { fixture.close() }
+        try await fixture.client.recover(epoch: "epoch")
+        fixture.status("compacted", "✓ Context compaction complete — continuing turn...")
+        #expect(fixture.model.compaction?.phase == .done)
+    }
+
+    /// Advanced › Compact: Hermes says "ready" just before its receipt, which must not end it.
+    @Test func compactWaitsForItsReceipt() async throws {
+        let fixture = try CompactionFixture()
+        defer { fixture.close() }
+        try await fixture.client.recover(epoch: "epoch")
+        fixture.model.beginCompaction()
+        fixture.status("compressing", "⠋ compressing 48 messages (~41,200 tok)…")
+        fixture.status("ready", "ready")
+        #expect(fixture.model.compaction?.phase == .compacting)
+        #expect(fixture.model.compaction?.messages == 48)
+        fixture.model.finishCompaction(tokensBefore: 41_200, tokensAfter: 6_100)
+        #expect(fixture.model.compaction?.phase == .done)
+    }
+
+    /// Done never shows the chat's unchanged usage as what's left.
+    @Test func doneNeverReportsAnUnchangedReadingAsWhatsLeft() {
+        let model = ChatModel(conversationID: "c", client: ConversationFixtureClient(), initialItems: [])
+        model.sessionContext = .init(sessionId: "s", model: "m", contextUsed: 103_000, contextMax: 1_000_000,
+                                     contextPercent: 10, compressions: 0, isCompacting: false, updatedAt: 0)
+        model.announceCompaction(status: "🗜️ Compacting context — summarizing earlier conversation so I can continue...")
+        model.confirmCompaction()
+        #expect(model.compaction?.phase == .done)
+        #expect(model.compaction?.tokensBefore == 103_000)
+        #expect(model.compaction?.tokensAfter == nil)
     }
 
     @Test func compactAsksHermesAndShowsWhatItSaved() async throws {

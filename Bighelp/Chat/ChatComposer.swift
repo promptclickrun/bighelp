@@ -39,7 +39,7 @@ struct ChatComposer: View {
 
     var body: some View {
         VStack(spacing: BighelpTokens.space4) {
-            if let compaction = model.compaction {
+            if let compaction = model.compaction, compaction.isShown {
                 ChatCompactionRail(compaction: compaction)
                     .padding(.horizontal, BighelpTokens.space4)
                     .transition(reduceMotion ? .opacity : .scale(scale: 0.85).combined(with: .opacity))

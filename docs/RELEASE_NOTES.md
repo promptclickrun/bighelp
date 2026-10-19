@@ -78,6 +78,13 @@ The profile of a bot has 2 new tabs after **Computer**:
 Each bot shows its own work folder. To see the files of all your bots, update the bighelp plugin to version 3.20.0 or
 later. With an older plugin, only the bot that runs the plugin shows its files.
 
+### Fixes
+
+- The compaction bar above the message box shows only while Hermes compacts the chat. Before, it showed for
+  notices about compaction and for compaction attempts that did nothing, also in chats with most of their context
+  window left. This occurred with the default compressor and with context engines such as LCM.
+- The bar shows "Compacted" only when Hermes confirms that it compacted the chat.
+
 ## 2.5.1
 
 This release adds Simple Bot mode, Teamwork, the Bots widget, and many changes to chats.

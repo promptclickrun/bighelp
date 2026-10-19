@@ -3,20 +3,38 @@ import SwiftUI
 /// Hermes compacting a chat's context: its earlier messages folded into a summary, the
 /// same chat with a lighter memory. Asked for with Advanced › Compact, or done by Hermes
 /// on its own when the context fills during a turn. Drives `ChatCompactionRail`.
+///
+/// Hermes tags any lifecycle line that mentions compression as "compacting", notices included
+/// (a helper model's smaller window, "Session compressed 2 times"), and it announces automatic
+/// attempts (Preflight, Pre-API, idle, a context engine such as LCM) before it knows whether
+/// there is anything to fold. Only a commit sends "compacted". So notices never start the rail,
+/// an automatic attempt shows only once it's still running after `showAfter`, and Done shows
+/// only when Hermes confirms the work.
 struct ChatCompaction: Equatable {
-    enum Phase: Equatable { case compacting, done }
+    enum Phase: Equatable {
+        /// Hermes announced an automatic attempt; not shown until it's still running after `showAfter`.
+        case announced
+        case compacting
+        case done
+    }
 
     /// One compaction, so a finished one's hold can't clear a newer one.
     let id = UUID()
     var phase: Phase = .compacting
     let startedAt: Date
+    /// Advanced › Compact: its receipt ends it, not the turn's next event.
+    var isRequested = false
     /// How many messages Hermes said it's compacting, when it says.
     var messages: Int?
     var tokensBefore: Int?
     var tokensAfter: Int?
 
+    var isShown: Bool { phase != .announced }
+
     /// How long Done stays before the rail goes.
     static let doneHold: Duration = .seconds(2)
+    /// An automatic attempt shows after this: a no-op ends sooner, a real summary takes longer.
+    static let showAfter: Duration = .seconds(2)
     /// A compaction whose end never arrived (a lost connection) stops showing after this.
     static let staleAfter: Duration = .seconds(600)
 
@@ -33,26 +51,75 @@ struct ChatCompaction: Equatable {
             .flatMap { Int(status[$0].replacingOccurrences(of: ",", with: "")) }
         return (number(before: "messages"), tokens)
     }
+
+    /// Whether a "compacting" status is compaction work rather than a notice about it. Hermes'
+    /// warnings and errors carry ⚠ or ❌; the rest name what they report.
+    static func isProgress(_ status: String) -> Bool {
+        if status.contains("⚠") || status.contains("❌") { return false }
+        let lowered = status.lowercased()
+        let notices = ["accuracy may degrade", "auto-lowered", "blocked", "compaction complete", "failed",
+                       "unavailable", "disabled", "skipped"]
+        return !notices.contains { lowered.contains($0) }
+    }
 }
 
 extension ChatModel {
-    /// Hermes started compacting this chat, or said more about the compaction it's running.
+    /// Advanced › Compact started, or Hermes said more about the compaction running: shown at once.
     func beginCompaction(status: String? = nil) {
         let counts: (messages: Int?, tokens: Int?) = status.map(ChatCompaction.counts(in:)) ?? (nil, nil)
-        if var current = compaction, current.phase == .compacting {
+        if var current = compaction, current.phase != .done {
+            current.messages = counts.messages ?? current.messages
+            current.tokensBefore = counts.tokens ?? current.tokensBefore
+            current.phase = .compacting
+            compaction = current
+            return
+        }
+        var started = ChatCompaction(startedAt: .now, messages: counts.messages,
+                                     tokensBefore: counts.tokens ?? sessionContext?.contextUsed)
+        started.isRequested = true
+        compaction = started
+        expireCompaction(started.id)
+    }
+
+    /// Hermes announced an automatic compaction (`status` is its progress line). It shows only if
+    /// it's still running after `ChatCompaction.showAfter`, so an attempt with nothing to fold never flashes.
+    func announceCompaction(status: String) {
+        let counts = ChatCompaction.counts(in: status)
+        if var current = compaction, current.phase != .done {
             current.messages = counts.messages ?? current.messages
             current.tokensBefore = counts.tokens ?? current.tokensBefore
             compaction = current
             return
         }
-        let started = ChatCompaction(startedAt: .now, messages: counts.messages,
-                                     tokensBefore: counts.tokens ?? sessionContext?.contextUsed)
-        compaction = started
+        let announced = ChatCompaction(phase: .announced, startedAt: .now, messages: counts.messages,
+                                       tokensBefore: counts.tokens ?? sessionContext?.contextUsed)
+        compaction = announced
         Task { @MainActor [weak self] in
-            try? await Task.sleep(for: ChatCompaction.staleAfter)
-            guard let self, self.compaction?.id == started.id, self.compaction?.phase == .compacting else { return }
-            self.compaction = nil
+            try? await Task.sleep(for: ChatCompaction.showAfter)
+            guard let self, self.compaction?.id == announced.id, self.compaction?.phase == .announced else { return }
+            self.compaction?.phase = .compacting
         }
+        expireCompaction(announced.id)
+    }
+
+    /// Hermes committed a compaction ("compacted"): Done, even if its start went unseen.
+    func confirmCompaction() {
+        if compaction == nil || compaction?.phase == .done {
+            compaction = ChatCompaction(phase: .compacting, startedAt: .now)
+        }
+        finishCompaction()
+    }
+
+    /// The turn moved on with no commit from Hermes: nothing was folded, so the rail goes without a Done.
+    func endUnconfirmedCompaction() {
+        guard let current = compaction, current.phase != .done, !current.isRequested else { return }
+        compaction = nil
+    }
+
+    /// Advanced › Compact's request outlasted its wait: the compaction may carry on, and from
+    /// here the turn's events end it, as an automatic one's do.
+    func releaseRequestedCompaction() {
+        compaction?.isRequested = false
     }
 
     /// Hermes finished: Done shows what it saved for a moment, then the rail goes. Hermes'
@@ -60,8 +127,12 @@ extension ChatModel {
     func finishCompaction(tokensBefore: Int? = nil, tokensAfter: Int? = nil) {
         guard var finished = compaction else { return }
         finished.tokensBefore = tokensBefore ?? finished.tokensBefore
-        finished.tokensAfter = tokensAfter ?? finished.tokensAfter ?? sessionContext?.contextUsed
-        guard finished.phase == .compacting else {
+        // The chat's usage may not have caught up yet: an unchanged reading isn't what's left.
+        let current = sessionContext.map(\.contextUsed).flatMap { used in
+            finished.tokensBefore.map { used < $0 } == true ? used : nil
+        }
+        finished.tokensAfter = tokensAfter ?? finished.tokensAfter ?? current
+        guard finished.phase != .done else {
             compaction = finished
             return
         }
@@ -77,6 +148,14 @@ extension ChatModel {
     /// Nothing was compacted (too little to fold, or Hermes declined): no Done to show.
     func cancelCompaction() {
         compaction = nil
+    }
+
+    private func expireCompaction(_ id: UUID) {
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: ChatCompaction.staleAfter)
+            guard let self, self.compaction?.id == id, self.compaction?.phase != .done else { return }
+            self.compaction = nil
+        }
     }
 }
 

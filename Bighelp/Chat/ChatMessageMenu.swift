@@ -123,6 +123,8 @@ final class ChatMessageMenuDriver: NSObject, UIContextMenuInteractionDelegate {
         configuration: UIContextMenuConfiguration,
         highlightPreviewForItemWithIdentifier identifier: any NSCopying
     ) -> UITargetedPreview? {
+        // A hold let go before its menu showed leaves no copy behind.
+        if preview?.view.window != nil { preview?.view.removeFromSuperview() }
         preview = nil
         guard ChatMessageMenuStyle.liftsBubble, let source = interaction.view, let window = source.window else {
             return nil
@@ -344,11 +346,15 @@ final class ChatReactionBarOverlay {
         root.addChild(host)
         root.view.addSubview(host.view)
         host.didMove(toParent: root)
-        window.isHidden = false
+        window.bar = host.view
         self.window = window
         self.host = host
 
-        guard let frame = targetFrame() else { return }
+        guard let frame = targetFrame() else {
+            dismantle()
+            return
+        }
+        window.isHidden = false
         host.view.frame = frame
         host.view.alpha = 0
         host.view.transform = CGAffineTransform(scaleX: 0.5, y: 0.5)
@@ -398,10 +404,14 @@ final class ChatReactionBarOverlay {
         bubbleFrame = { nil }
     }
 
+    /// Only touches on the bar stay here; iPad wraps the root view in
+    /// containers of its own, so anything else must fall through by name.
     private final class PassthroughWindow: UIWindow {
+        weak var bar: UIView?
+
         override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
-            let hit = super.hitTest(point, with: event)
-            return hit === rootViewController?.view || hit === self ? nil : hit
+            guard let bar, let hit = super.hitTest(point, with: event), hit.isDescendant(of: bar) else { return nil }
+            return hit
         }
     }
 
@@ -415,17 +425,10 @@ final class ChatReactionBarOverlay {
             return controller
         }
 
-        override func loadView() { view = PassthroughView() }
         override var prefersStatusBarHidden: Bool { appController?.prefersStatusBarHidden ?? false }
         override var preferredStatusBarStyle: UIStatusBarStyle { appController?.preferredStatusBarStyle ?? .default }
     }
 
-    private final class PassthroughView: UIView {
-        override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
-            let hit = super.hitTest(point, with: event)
-            return hit === self ? nil : hit
-        }
-    }
 }
 
 /// The edges of a message around its text: holding them opens the same menu

@@ -10,6 +10,8 @@ enum ComposioAgentAccess: Equatable, Sendable {
     case notInstalled
     case turnedOff(server: String)
     case needsSignIn(server: String)
+    /// Hermes has a sign-in saved, but its connection test doesn't reach Composio's tools with it.
+    case cannotReach(server: String)
     case ready(server: String)
 }
 
@@ -248,7 +250,8 @@ final class ComposioAppsModel {
     }
 
     /// Installs and turns on Composio Connect on the computer if needed, then opens Composio's
-    /// sign-in for Hermes. `open` shows the page; the caller polls `finishAgentSignIn`.
+    /// sign-in for Hermes (again, when Composio no longer takes the saved one). `open` shows the
+    /// page; the caller polls `finishAgentSignIn`.
     func turnOnForAgent(open: (URL) -> Void) async -> MCPOAuthFlow? {
         guard let agentHost, !agentWorking else { return nil }
         agentWorking = true
@@ -257,12 +260,14 @@ final class ComposioAppsModel {
         do {
             let server: String
             switch agent {
-            case .needsSignIn(let name): server = name
-            case .ready(let name): server = name
+            case .needsSignIn(let name), .cannotReach(let name), .ready(let name): server = name
             default: server = try await agentHost.install()
             }
             agent = try await agentHost.access()
-            guard case .needsSignIn = agent else { return nil }
+            switch agent {
+            case .needsSignIn, .cannotReach: break
+            default: return nil
+            }
             let flow = try await agentHost.startSignIn(server: server)
             if let url = flow.authorizationURL { open(url) }
             return flow

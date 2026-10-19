@@ -89,15 +89,20 @@ struct ComposioAppsView: View {
             Section {
                 switch model.agent {
                 case .ready:
-                    Label("\(agent) on \(host) can use these apps", systemImage: "checkmark.circle.fill")
-                        .accessibilityIdentifier("composio.agent.ready")
+                    VStack(alignment: .leading, spacing: BighelpTokens.space4) {
+                        Label("\(agent) on \(host) can use these apps", systemImage: "checkmark.circle.fill")
+                            .accessibilityIdentifier("composio.agent.ready")
+                        // Hermes fixes a chat's tools when the chat starts (#450).
+                        Text("Use them in a new chat with \(agent). A chat that was already open may not have them.")
+                            .font(.bighelp(.footnote)).foregroundStyle(.secondary)
+                    }
                 case .needsPluginUpdate:
                     Label("Update the bighelp plugin on \(host) so your agent can use these apps.",
                           systemImage: "arrow.down.circle")
                         .accessibilityIdentifier("composio.agent.update-plugin")
                 case .unknown:
                     Label("Checking \(host)…", systemImage: "hourglass")
-                case .notInstalled, .turnedOff, .needsSignIn:
+                case .notInstalled, .turnedOff, .needsSignIn, .cannotReach:
                     VStack(alignment: .leading, spacing: BighelpTokens.space4) {
                         Text("Let \(agent) use these apps").font(.bighelp(.headline))
                         Text(agentDetail(host)).font(.bighelp(.footnote)).foregroundStyle(.secondary)
@@ -122,13 +127,16 @@ struct ComposioAppsView: View {
     private func agentDetail(_ host: String) -> String {
         switch model.agent {
         case .needsSignIn: "Sign in to the same Composio account for your agent on \(host)."
+        case .cannotReach: "Composio doesn't accept your agent's sign-in on \(host). Sign in again with the same Composio account."
         default: "Turns on Composio on \(host), then you sign in to the same Composio account for your agent."
         }
     }
 
     private var agentButtonTitle: String {
-        if case .needsSignIn = model.agent { return "Sign in for my agent" }
-        return "Turn on for my agent"
+        switch model.agent {
+        case .needsSignIn, .cannotReach: "Sign in for my agent"
+        default: "Turn on for my agent"
+        }
     }
 
     @ViewBuilder

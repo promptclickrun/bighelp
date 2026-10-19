@@ -43,7 +43,10 @@ final class NativeDeviceToolSession {
     private var enabled: Set<DeviceToolCapability>
     /// Tools turned on here that this host's plugin is too old to offer.
     private(set) var needsNewerPlugin: Set<DeviceToolCapability> = []
-    /// Appearance is on for every chat and never urgent, so a channel with nothing else polls every
+    /// The agent the plugin serves, set when this chat is with another one. Hermes loads the plugin,
+    /// and so the phone tools, only into that agent, and the plugin refuses any other agent's channel.
+    private(set) var servingAgentID: String?
+    /// Appearance is on by default and never urgent, so a channel with nothing else polls every
     /// 8 seconds: well inside the plugin's 30-second lease and tool timeout, a quarter of the traffic.
     var pollInterval: Duration { enabled == [.appearance] ? .seconds(8) : .milliseconds(750) }
     private let isAvailable: @MainActor () -> Bool
@@ -83,6 +86,12 @@ final class NativeDeviceToolSession {
         let offered = enabled.filter { $0.pluginFeature.map(context.features.contains) ?? true }
         needsNewerPlugin = enabled.subtracting(offered)
         guard !offered.isEmpty else { throw WorkspaceClientError.unavailable(.pluginRequired) }
+        // Another agent's chat has no phone tools to call; a connect would only be refused
+        // (`profile_not_served`) and its cleanup close too (`channel_not_found`), on every chat change.
+        guard let served = context.servingProfileID, served == agentID else {
+            servingAgentID = context.servingProfileID
+            throw WorkspaceClientError.unavailable(.unsupportedOperation)
+        }
         enabled = offered
         self.context = context
         closeCleanup = closeCleanupFactory?(channelID)
@@ -214,6 +223,12 @@ final class NativeDeviceToolSession {
 enum DeviceToolChannelNote {
     static func noChat(enabled: Set<DeviceToolCapability>) -> String? {
         enabled.contains(where: \.sharesPersonalData) ? "Open a chat to use this iPhone’s shared data." : nil
+    }
+
+    /// Another agent's chat is open; only the agent the plugin serves can use the phone's tools.
+    static func otherAgent(enabled: Set<DeviceToolCapability>, servingAgentName: String) -> String? {
+        enabled.contains(where: \.sharesPersonalData)
+            ? "Open a chat with \(servingAgentName) to use this iPhone’s shared data." : nil
     }
 
     static func connected(needsNewerPlugin: Set<DeviceToolCapability>) -> String? {

@@ -132,6 +132,36 @@ struct NativeDeviceToolSessionTests {
         #expect(busy.pollInterval == .milliseconds(750))
     }
 
+    /// Hermes loads the plugin's phone tools only into the agent it serves, and the plugin refuses any
+    /// other agent's channel (`profile_not_served`). Another agent's chat asks the host nothing more.
+    @Test func anotherAgentsChatNeverOpensOrClosesAChannel() async throws {
+        let fixture = try Fixture()
+        fixture.http.features.append("native-device-appearance-v1")
+        let session = fixture.session(enabled: [.calendar, .appearance], agentID: "researcher")
+        await #expect(throws: WorkspaceClientError.self) { try await session.run() }
+        #expect(fixture.http.paths == ["context"])
+        #expect(fixture.http.refusals.isEmpty)
+        #expect(session.servingAgentID == "default")
+        #expect(fixture.handled == 0)
+    }
+
+    @Test func theServedAgentsChatStillOpensItsChannel() async throws {
+        let fixture = try Fixture()
+        let session = fixture.session(agentID: "default")
+        try await session.connect()
+        #expect(session.servingAgentID == nil)
+        #expect(fixture.http.paths == ["context", "device-tools/connect"])
+        await session.close()
+        #expect(fixture.http.paths == ["context", "device-tools/connect", "device-tools/close"])
+        #expect(fixture.http.refusals.isEmpty)
+    }
+
+    @Test func anotherAgentsChatSaysWhichAgentCanUseSharedData() {
+        #expect(DeviceToolChannelNote.otherAgent(enabled: [.calendar, .appearance], servingAgentName: "Sol")
+            == "Open a chat with Sol to use this iPhone’s shared data.")
+        #expect(DeviceToolChannelNote.otherAgent(enabled: [.appearance], servingAgentName: "Sol") == nil)
+    }
+
     @Test func duplicateRequestIDsInOnePollBatchAreRejectedAtomically() async throws {
         let fixture = try Fixture()
         fixture.http.duplicateRequest = true
@@ -198,9 +228,9 @@ struct NativeDeviceToolSessionTests {
                 "turnId": .string("turn"), "operation": .string("calendar.list"), "arguments": .object([:]),
                 "sentAt": .integer(Int(Date().timeIntervalSince1970)), "expiresAt": .integer(Int(Date().timeIntervalSince1970) + 60)]
         }
-        func session(enabled: Set<DeviceToolCapability> = [.calendar]) -> NativeDeviceToolSession {
+        func session(enabled: Set<DeviceToolCapability> = [.calendar], agentID: String = "default") -> NativeDeviceToolSession {
             NativeDeviceToolSession(http: http, owner: owner, currentOwner: { self.current ? self.owner : nil },
-                scope: scope, agentID: "default", sessionID: "session", enabled: enabled,
+                scope: scope, agentID: agentID, sessionID: "session", enabled: enabled,
                 isAvailable: { self.available }, handle: { request, _, _ in
                     self.handled += 1
                     var resultRequest = request
@@ -224,6 +254,11 @@ struct NativeDeviceToolSessionTests {
         var beforePollReply: () -> Void = {}
         var beforeConnectReply: () -> Void = {}
         var duplicateRequest = false
+        /// Like the plugin: it serves one Hermes profile and knows the channels it opened.
+        let servingProfile = "default"
+        var channels: Set<String> = []
+        /// The codes the plugin would answer and log (`bighelp native request rejected: …`).
+        var refusals: [String] = []
         func nativeResponse(_ request: DirectHermesHTTPRequest, requestGuard: DirectHermesNativeRequestGuard?) async throws -> DirectHermesHTTP.Response {
             let path = String(request.path.dropFirst("/api/plugins/loopdy/native/".count))
             paths.append(path)
@@ -231,11 +266,15 @@ struct NativeDeviceToolSessionTests {
             let value: [String: BighelpJSONValue]
             switch path {
             case "context": value = ["schemaVersion": .integer(1), "pluginVersion": .string("test"),
-                "runtimeId": .string("runtime"), "servingProfileId": .string("default"), "principal": .null,
+                "runtimeId": .string("runtime"), "servingProfileId": .string(servingProfile), "principal": .null,
                 "features": .array(features.map(BighelpJSONValue.string))]
             case "device-tools/connect":
+                guard request.body?["agentId"] == .string(servingProfile) else {
+                    return try refusal("profile_not_served", status: 403, request: request, requestGuard: requestGuard)
+                }
                 connectedEnabled = request.body?["enabled"]?.array?.compactMap(\.string) ?? []
                 beforeConnectReply()
+                if let id = channel.string { channels.insert(id) }
                 value = ["channelId": channel, "connected": .boolean(true)]
             case "device-tools/poll":
                 beforePollReply()
@@ -245,7 +284,11 @@ struct NativeDeviceToolSessionTests {
             case "device-tools/result":
                 if let result = request.body?["result"]?.object { results.append(result) }
                 value = ["accepted": .boolean(true)]
-            case "device-tools/close": value = ["closed": .boolean(true)]
+            case "device-tools/close":
+                guard let id = channel.string, channels.remove(id) != nil else {
+                    return try refusal("channel_not_found", status: 409, request: request, requestGuard: requestGuard)
+                }
+                value = ["closed": .boolean(true)]
             default: throw WorkspaceClientError.invalidRequest
             }
             var headers = ["ETag": requestGuard?.etag ?? "\"sha256:\(String(repeating: "a", count: 64))\"", "Cache-Control": "no-store"]
@@ -253,6 +296,20 @@ struct NativeDeviceToolSessionTests {
             let response = try #require(HTTPURLResponse(url: URL(string: "https://host.example:9119" + request.path)!,
                                                        statusCode: 200, httpVersion: nil, headerFields: headers))
             return .init(http: response, body: try JSONEncoder().encode(BighelpJSONValue.object(value)))
+        }
+
+        /// The plugin's `_error_response`: no ETag, the request ID echoed.
+        private func refusal(_ code: String, status: Int, request: DirectHermesHTTPRequest,
+                             requestGuard: DirectHermesNativeRequestGuard?) throws -> DirectHermesHTTP.Response {
+            refusals.append(code)
+            var headers = ["Cache-Control": "no-store"]
+            if let requestGuard { headers["X-Loopdy-Request-ID"] = requestGuard.requestIDHeader }
+            let response = try #require(HTTPURLResponse(url: URL(string: "https://host.example:9119" + request.path)!,
+                                                       statusCode: status, httpVersion: nil, headerFields: headers))
+            let body: BighelpJSONValue = .object(["error": .object(["code": .string(code),
+                "message": .string("The native iPhone tool channel is unavailable."),
+                "retryable": .boolean(false), "details": .object([:])])])
+            return .init(http: response, body: try JSONEncoder().encode(body))
         }
     }
 }

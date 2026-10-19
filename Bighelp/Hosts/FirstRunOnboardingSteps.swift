@@ -24,14 +24,14 @@ private struct FirstRunStepLayout<Content: View>: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: BighelpTokens.space24) {
+            VStack(spacing: BighelpTokens.space20) {
                 Image(systemName: systemImage)
-                    .font(.system(size: 34, weight: .semibold))
+                    .font(.system(size: 28, weight: .semibold))
                     .foregroundStyle(theme.actionForeground)
-                    .frame(width: 76, height: 76)
+                    .frame(width: 64, height: 64)
                     .background(theme.action, in: .circle)
                     .accessibilityHidden(true)
-                    .padding(.top, BighelpTokens.space24)
+                    .padding(.top, BighelpTokens.space16)
                 VStack(spacing: BighelpTokens.space8) {
                     Text(title)
                         .bighelpFont(.display)
@@ -131,7 +131,7 @@ struct FirstRunPluginStep: View {
             title: alreadyInstalled ? "The bighelp plugin is on" : "Add the bighelp plugin",
             subtitle: alreadyInstalled
                 ? "Your computer already has it. Here's what it adds."
-                : "It's optional. It adds extras to Hermes on your computer. Skip it if you like; you can add it later in Settings.",
+                : "Optional. It adds extras to Hermes on your computer. You can add it later in Settings.",
             primaryTitle: primaryTitle,
             primaryIdentifier: "onboarding.plugin.install",
             isWorking: setup?.isWorking == true && !alreadyInstalled,
@@ -139,7 +139,7 @@ struct FirstRunPluginStep: View {
                 if needsRestart { onSkip() } else if alreadyInstalled { onInstalled() } else { install() }
             }
         ) {
-            VStack(alignment: .leading, spacing: BighelpTokens.space16) {
+            VStack(alignment: .leading, spacing: BighelpTokens.space12) {
                 FirstRunFeatureRow(systemImage: "bell.badge.fill", title: "Alerts",
                                    detail: "Know when your agents reply, finish a task, or need you.", tint: .red)
                 FirstRunFeatureRow(systemImage: "person.2.fill", title: "Teamwork",
@@ -153,7 +153,7 @@ struct FirstRunPluginStep: View {
                 FirstRunFeatureRow(systemImage: "lock.shield.fill", title: "Chats that stay put",
                                    detail: "Your chats stay open when your phone sleeps.", tint: .green)
             }
-            .padding(BighelpTokens.space20)
+            .padding(BighelpTokens.space16)
             .background(theme.surface, in: .rect(cornerRadius: 20))
             if let outcome {
                 Label(outcome, systemImage: needsRestart ? "checkmark.circle.fill" : "exclamationmark.circle")
@@ -219,6 +219,13 @@ struct FirstRunNotificationsStep: View {
             isWorking: setup?.isWorking == true,
             primary: enable
         ) {
+            VStack(spacing: BighelpTokens.space12) {
+                FirstRunAlertPreview(name: "Avery Park", message: "Your October budget is ready.", time: "now")
+                FirstRunAlertPreview(name: "Mina Shah", message: "I found three flights under $400. Should I book one?",
+                                     time: "2m ago")
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Sample alerts from your agents")
             if let outcome {
                 Label(outcome, systemImage: "exclamationmark.circle")
                     .bighelpFont(.metadata)
@@ -238,6 +245,37 @@ struct FirstRunNotificationsStep: View {
             await model.enable()
             if model.state == .enabled { onDone() } else { outcome = model.message }
         }
+    }
+}
+
+/// A sample alert, drawn like the system's banner, so people can see what they'd get.
+private struct FirstRunAlertPreview: View {
+    let name: String
+    let message: String
+    let time: String
+    @BighelpThemeReader private var theme
+
+    var body: some View {
+        HStack(alignment: .top, spacing: BighelpTokens.space12) {
+            Image("BighelpMarkColor")
+                .resizable()
+                .scaledToFit()
+                .padding(6)
+                .frame(width: 38, height: 38)
+                .background(theme.raisedSurface, in: .rect(cornerRadius: 9))
+            VStack(alignment: .leading, spacing: 2) {
+                HStack {
+                    Text(name).bighelpFont(.label, weight: .semibold).foregroundStyle(theme.primaryText)
+                    Spacer(minLength: BighelpTokens.space8)
+                    Text(time).bighelpFont(.metadata).foregroundStyle(theme.secondaryText)
+                }
+                Text(message).bighelpFont(.metadata).foregroundStyle(theme.primaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(BighelpTokens.space12)
+        .background(theme.surface, in: .rect(cornerRadius: 22))
+        .overlay(RoundedRectangle(cornerRadius: 22).stroke(theme.border, lineWidth: BighelpTokens.hairline))
     }
 }
 

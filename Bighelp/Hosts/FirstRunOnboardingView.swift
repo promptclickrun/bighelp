@@ -36,7 +36,7 @@ struct FirstRunOnboardingView: View {
             case .appearance: "Appearance · Optional"
             case .host: "Step 2 of 4 · Connect"
             case .plugin: "Step 3 of 4 · Plugin · Optional"
-            case .notifications: "Step 3 of 4 · Notifications"
+            case .notifications: "Step 3 of 4 · Notifications · Optional"
             case .mode: "Step 4 of 4 · Your mode"
             }
         }

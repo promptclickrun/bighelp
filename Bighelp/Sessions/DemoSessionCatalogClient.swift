@@ -137,14 +137,14 @@ final class DemoSessionCatalogClient: SessionCatalogClient {
             id: "demo-session-\(index)",
             kind: kind,
             agentIDs: agentIDs,
-            title: kind == .botMode ? groupNames[(index / 6) % groupNames.count] : "Direct session \(index)",
+            title: kind == .botMode ? groupNames[(index / 3) % groupNames.count] : "Direct session \(index)",
             remoteSource: kind == .botMode ? nil : sources[index % sources.count],
             items: [
                 TimelineItem(
                     id: "demo-session-\(index)-message",
                     role: .assistant,
                     sender: .agent(id: agentIDs[0], snapshot: .init(name: "Assistant")),
-                    content: .message(index.isMultiple(of: 4) ? "Budget planning update" : previews[index % previews.count]),
+                    content: .message(index.isMultiple(of: 4) ? "Budget planning update" : previews[(index / 3) % previews.count]),
                     metadata: TimelineMetadata(delivery: "Delivered")
                 )
             ],

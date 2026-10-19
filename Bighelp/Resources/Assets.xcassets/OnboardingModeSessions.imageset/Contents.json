@@ -1,0 +1,22 @@
+{
+  "images": [
+    {
+      "filename": "onboarding-mode-sessions-light.jpg",
+      "idiom": "universal"
+    },
+    {
+      "filename": "onboarding-mode-sessions-dark.jpg",
+      "idiom": "universal",
+      "appearances": [
+        {
+          "appearance": "luminosity",
+          "value": "dark"
+        }
+      ]
+    }
+  ],
+  "info": {
+    "author": "xcode",
+    "version": 1
+  }
+}

@@ -30,6 +30,17 @@ You can change the mode later in Settings.
 - To save a bot as a template, update the bighelp plugin on your computer to version 3.19.0 or later. The app
   shows the update.
 
+### A new reaction bar
+
+Touch and hold a message. A bar of reactions shows above the message, and the menu shows below it, as in Messages.
+
+- Tap a reaction to send it. The menu closes.
+- Your reaction has a highlight. Tap it again to remove it.
+- Tap **+** to see all the reactions.
+- The menu has no **React** item now.
+
+On a Mac and on Apple Vision Pro, the reactions are the first row of the menu.
+
 ### Templates for new bots
 
 In Simple Bot mode, **Create New Bot** has a **Templates** button at the top right.

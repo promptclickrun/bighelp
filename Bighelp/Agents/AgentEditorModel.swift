@@ -212,7 +212,7 @@ final class AgentEditorModel: Identifiable {
 
     func startFrom(_ template: AgentSoulTemplate) {
         guard !isEditing, let soul = template.soul else { return }
-        startChoice = .builtIn
+        startChoice = template.isMine ? .saved : .builtIn
         let userName = UserIdentity.savedName(savedUserName())
         if let form = template.form(agentName: draft.name, savedUserName: userName) {
             templateForm = AgentTemplateFormRequest(template: template, form: form)

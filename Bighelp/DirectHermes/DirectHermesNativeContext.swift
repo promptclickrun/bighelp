@@ -273,7 +273,8 @@ final class DirectHermesNativePluginClient {
 
     /// Features whose plugin routes refuse requests over 192 KB.
     private static let smallRequestFeatures: Set<String> = ["native-card-templates-v1", workflowsFeature,
-                                                            workflowsEditFeature, workflowsTriggerFeature]
+                                                            workflowsEditFeature, workflowsTriggerFeature,
+                                                            MyTemplatesWire.feature]
 
     /// Workflows: stages run by agents on the host, with your sign-off.
     static let workflowsFeature = "native-workflows-v1"
@@ -392,6 +393,16 @@ final class DirectHermesNativePluginClient {
             // Turning it on saves each agent's config on the computer.
             return Route(path: "team", feature: DirectHermesTeamworkClient.feature, isMutation: true,
                          maximumResponseBytes: 65_536, timeout: 30)
+        case .myTemplatesList:
+            // Up to 40 templates of up to 20,000 characters each.
+            return Route(path: "my-templates/list", feature: MyTemplatesWire.feature, isMutation: false,
+                         maximumResponseBytes: 4 * 1_024 * 1_024)
+        case .myTemplatesSave:
+            return Route(path: "my-templates/save", feature: MyTemplatesWire.feature, isMutation: true,
+                         maximumResponseBytes: 196_608)
+        case .myTemplatesDelete:
+            return Route(path: "my-templates/delete", feature: MyTemplatesWire.feature, isMutation: true,
+                         maximumResponseBytes: 16_384)
         case .peopleSpeaking:
             // Sent before each message; a slow host never holds a message for long.
             return Route(path: "people/speaking", feature: "native-people-v1", isMutation: true,

@@ -22,6 +22,11 @@ struct AgentSoulTemplate: Identifiable, Equatable, Sendable {
     var updatedAt: Date? = nil
     /// Fill-in fields for its other `{{key}}`s (services/catalog/docs/TEMPLATE_VARIABLES.md).
     var variables: [TemplateVariable] = []
+    /// Its ID on the person's computer, for one of My Templates (`MyTemplatesStore`).
+    var savedTemplateID: String? = nil
+
+    /// One of the person's own, saved on their computer.
+    var isMine: Bool { savedTemplateID != nil }
 
     /// The personality text with `{{agent_name}}` still in it.
     var soul: String? {
@@ -31,7 +36,11 @@ struct AgentSoulTemplate: Identifiable, Equatable, Sendable {
         return text
     }
 
-    var about: String { voice + "." }
+    /// A saved bot's vibe is its About line, which may already end a sentence.
+    var about: String {
+        guard let last = voice.last, !".!?".contains(last) else { return voice }
+        return voice + "."
+    }
 
     /// Its role and strength for a card: each field shows as "[Its label]".
     var cardRole: String { TemplateVariables.preview(profile, variables: variables) }

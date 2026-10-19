@@ -232,19 +232,19 @@ struct AgentTemplateFillView: View {
 extension View {
     /// Shows a template's form when the editor's model asks for one. Hang it on the editor's root:
     /// a sheet from a form's section header shows, but its fields never get the keyboard.
-    func agentTemplateForm(_ model: AgentEditorModel) -> some View {
+    func agentTemplateForm(_ model: AgentEditorModel?) -> some View {
         modifier(AgentTemplateFormPresenter(model: model))
     }
 }
 
 private struct AgentTemplateFormPresenter: ViewModifier {
-    let model: AgentEditorModel
+    let model: AgentEditorModel?
 
     func body(content: Content) -> some View {
-        content.bighelpSheet(item: Binding(get: { model.templateForm },
-                                    set: { if $0 == nil { model.cancelTemplateForm() } })) { request in
-            AgentTemplateFillView(request: request, onContinue: { model.finishTemplateForm($0) },
-                                  onCancel: { model.cancelTemplateForm() })
+        content.bighelpSheet(item: Binding(get: { model?.templateForm },
+                                    set: { if $0 == nil { model?.cancelTemplateForm() } })) { request in
+            AgentTemplateFillView(request: request, onContinue: { model?.finishTemplateForm($0) },
+                                  onCancel: { model?.cancelTemplateForm() })
                 .presentationDragIndicator(.visible)
                 .bighelpSheetSize(.standard)
         }

@@ -133,6 +133,12 @@ struct BighelpApp: App {
         _nativeWorkspaces = State(initialValue: nativeWorkspaces)
         // Demo runs without a real host use the demo stores, as the shell does.
         let usesDemoWorkspace = arguments.contains("-use-demo-fixtures") || arguments.contains("-disable-demo-delays")
+        // My Templates: the computer in use, for every template picker.
+        MyTemplatesStore.shared.connection = {
+            if usesDemoWorkspace, !connections.isDirectSelected { return ("demo", DemoMyTemplatesClient.shared) }
+            guard let owner = connections.owner else { return nil }
+            return (owner.cacheScopeID, DirectHermesMyTemplatesClient(workspace: { connections.workspace }))
+        }
         let nativeWorkspaceKey: @MainActor () -> BighelpShortcutWorkspaceKey? = {
             if usesDemoWorkspace, !connections.isDirectSelected { return nil }
             guard hostRegistry.connectionMode == .independent || connections.isDirectSelected else { return nil }

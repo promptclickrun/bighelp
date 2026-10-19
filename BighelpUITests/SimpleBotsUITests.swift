@@ -188,6 +188,35 @@ final class SimpleBotsUITests: BighelpUITestCase {
         }
     }
 
+    /// Each bot's Files tab is its own folder: Mina's shows her trip, not Avery's budget.
+    @MainActor
+    func testEachBotsFilesAreItsOwnFolder() throws {
+        let app = launch(appearance: "light")
+        let mina = app.buttons["simple-bots.bot.travel"]
+        XCTAssertTrue(mina.waitForExistence(timeout: 15))
+        mina.tap()
+        let identity = app.buttons["chat.identity"]
+        XCTAssertTrue(identity.waitForExistence(timeout: 10))
+        let profile = app.descendants(matching: .any)["simple-bots.profile"]
+        identity.tap()
+        if !profile.waitForExistence(timeout: 5) { identity.tap() }
+        XCTAssertTrue(profile.waitForExistence(timeout: 5))
+        app.buttons["simple-bots.profile.tab.files"].tap()
+        let items = app.buttons.matching(identifier: "simple-bots.files.item")
+        let trip = items.matching(NSPredicate(format: "label BEGINSWITH 'Lisbon trip'")).firstMatch
+        XCTAssertTrue(trip.waitForExistence(timeout: 10), "Mina's own folder")
+        XCTAssertFalse(items.matching(NSPredicate(format: "label BEGINSWITH 'Budget'")).firstMatch.exists,
+                       "Not Avery's folder")
+        app.swipeUp()
+        save("simple-files-other-bot", app)
+        trip.tap()
+        let itinerary = items.matching(NSPredicate(format: "label BEGINSWITH 'Itinerary.md'")).firstMatch
+        XCTAssertTrue(itinerary.waitForExistence(timeout: 5))
+        itinerary.tap()
+        XCTAssertTrue(app.buttons["Done"].waitForExistence(timeout: 10), "Her file opens in the preview")
+        save("simple-files-other-bot-preview", app)
+    }
+
     /// New Bot's Templates: the picker with My Templates on top (the demo computer's saved one, and
     /// its broken one hidden), a template's fields, the attached chip and taking it off. Then a bot's
     /// Share: name it, Save, and it's one of My Templates.

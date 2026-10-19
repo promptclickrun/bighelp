@@ -2,36 +2,46 @@ import CryptoKit
 import Foundation
 import UIKit
 
-/// The demo computer's shared folder: like a real host, the bighelp plugin shares only the
-/// folder of the bot it runs as (the default one). Every file is made up.
+/// The demo computer's folders: each bot has its own, as each Hermes agent works in its own folder.
+/// Every file is made up. Bots without any show the empty state.
 @MainActor
 final class SimpleBotDemoFiles: SimpleBotFilesSource {
     static let root = "/home/hermes/workspace"
+    static let travelRoot = "/home/hermes/.hermes/profiles/travel/workspace"
+    static let homeRoot = "/home/hermes/.hermes/profiles/home/workspace"
+
+    /// The default agent works in Hermes' workspace folder; the others in their profiles' own.
+    static func root(for agentID: String) -> String {
+        switch agentID {
+        case "finance": root
+        case "travel": travelRoot
+        case "home": homeRoot
+        default: "/home/hermes/.hermes/profiles/\(agentID)/workspace"
+        }
+    }
 
     private enum Entry {
         case folder(String)
         case file(String, mimeType: String, daysAgo: Double, data: @MainActor () -> Data)
     }
 
-    private let servingProfileID: String?
     private let now = Date()
-
-    init(servingProfileID: String?) {
-        self.servingProfileID = servingProfileID
-    }
 
     var downloadLimit: Int { DirectHermesManagedFilesClient.maximumNativeTransferBytes }
 
     func list(agentID: String, path: String?) async throws -> HermesManagedFileDirectory {
-        try SimpleBotHostFiles.requireShared(agentID: agentID, servingProfileID: servingProfileID)
-        let path = path ?? Self.root
-        guard let entries = Self.tree[path] else { throw DirectHermesManagedFilesError.invalidPath }
-        return .init(path: path, parent: path == Self.root ? nil : (path as NSString).deletingLastPathComponent,
+        let root = Self.root(for: agentID)
+        let path = path ?? root
+        guard path == root || path.hasPrefix(root + "/") else { throw DirectHermesManagedFilesError.invalidPath }
+        guard let entries = Self.tree[path] ?? (path == root ? [] : nil) else {
+            throw DirectHermesManagedFilesError.invalidPath
+        }
+        return .init(path: path, parent: path == root ? nil : (path as NSString).deletingLastPathComponent,
                      files: entries.map { file($0, in: path) })
     }
 
     func download(agentID: String, file: HermesManagedFile) async throws -> HermesManagedFileContents {
-        try SimpleBotHostFiles.requireShared(agentID: agentID, servingProfileID: servingProfileID)
+        guard file.path.hasPrefix(Self.root(for: agentID) + "/") else { throw DirectHermesManagedFilesError.invalidPath }
         let folder = (file.path as NSString).deletingLastPathComponent
         guard let entry = Self.tree[folder]?.first(where: { Self.name(of: $0) == file.name }),
               case .file(_, _, _, let data) = entry else { throw DirectHermesManagedFilesError.invalidPath }
@@ -82,7 +92,75 @@ final class SimpleBotDemoFiles: SimpleBotFilesSource {
             .file(DemoBoardFiles.planName, mimeType: "application/pdf", daysAgo: 0.5) { DemoBoardFiles.plan },
             .file("savings-goal.png", mimeType: "image/png", daysAgo: 4) { DemoAgentMedia.savings },
         ],
+        travelRoot: [
+            .folder("Lisbon trip"),
+            .file("Flights.csv", mimeType: "text/csv", daysAgo: 1) { Data(flights.utf8) },
+            .file("Ideas.md", mimeType: "text/markdown", daysAgo: 5) { Data(tripIdeas.utf8) },
+        ],
+        travelRoot + "/Lisbon trip": [
+            .file("Itinerary.md", mimeType: "text/markdown", daysAgo: 0.2) { Data(itinerary.utf8) },
+            .file("Packing list.md", mimeType: "text/markdown", daysAgo: 0.4) { Data(packing.utf8) },
+            .file("lisbon-evening.png", mimeType: "image/png", daysAgo: 0.1) { DemoAgentMedia.sunset },
+            .file(DemoBoardFiles.chartName, mimeType: "image/png", daysAgo: 1) { DemoBoardFiles.chart },
+            .file("trip-preview.mp4", mimeType: "video/mp4", daysAgo: 2) { DemoAgentMedia.video },
+        ],
+        homeRoot: [
+            .folder("House"),
+            .file("Grocery list.txt", mimeType: "text/plain", daysAgo: 0.3) { Data(shopping.utf8) },
+        ],
+        homeRoot + "/House": [
+            .file("Chores.md", mimeType: "text/markdown", daysAgo: 0.5) { Data(chores.utf8) },
+            .file("Repairs.csv", mimeType: "text/csv", daysAgo: 3) { Data(repairs.utf8) },
+        ],
     ]
+
+    private static let flights = """
+    flight,departs,price
+    TAP 202,Oct 9 18:40,$389
+    United 64,Oct 9 21:15,$412
+    Delta 248,Oct 10 07:05,$436
+    """
+
+    private static let tripIdeas = """
+    # Trip ideas
+
+    - Lisbon in October: mild days, fewer crowds.
+    - Porto by train for one night.
+    - Kyoto in spring, next year.
+    """
+
+    private static let itinerary = """
+    # Lisbon, October 9–16
+
+    1. **Thu:** land at 7:30 AM, check in, walk Alfama.
+    2. **Fri:** tram 28, then the Gulbenkian.
+    3. **Sat:** day trip to Sintra; book trains a day ahead.
+    4. **Sun:** fado dinner in Alfama.
+    """
+
+    private static let packing = """
+    # Packing list
+
+    - [x] Passport
+    - [x] Travel adapter (Type F)
+    - [ ] Comfortable walking shoes
+    - [ ] Light rain jacket
+    - [ ] Sunglasses and sunscreen
+    """
+
+    private static let chores = """
+    # Chores this week
+
+    - Water the plants on Tuesday and Friday.
+    - Change the air filter (size 16×25).
+    - Take the recycling out on Wednesday night.
+    """
+
+    private static let repairs = """
+    repair,who,when
+    Kitchen faucet drip,Plumber,Oct 22
+    Squeaky hallway door,Me,This weekend
+    """
 
     private static let notes = """
     # Notes

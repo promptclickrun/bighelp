@@ -213,16 +213,20 @@ final class DirectHermesManagedFilesClient {
     private let suppliedScopeOwnerMismatch: Bool
     private var establishedScope: DirectHermesWorkspaceFileScope?
     private var configuredWorkspaceClient: DirectHermesArtifactClient?
+    /// The agent whose own folder this reads; nil is the plugin's serving agent.
+    private let agentID: String?
 
     init(
         http: any DirectHermesAuthenticatedHTTP,
         binaryHTTP: (any DirectHermesManagedFileBinaryHTTP)? = nil,
         owner: WorkspaceOwner,
         scope: DirectHermesWorkspaceFileScope? = nil,
+        agentID: String? = nil,
         currentOwner: @escaping @MainActor () -> WorkspaceOwner?
     ) {
         self.http = http
         self.binaryHTTP = binaryHTTP
+        self.agentID = agentID
         capturedOwner = owner
         suppliedScopeOwnerMismatch = scope != nil && scope?.owner != owner
         establishedScope = scope?.owner == owner ? scope : nil
@@ -686,7 +690,7 @@ final class DirectHermesManagedFilesClient {
             throw DirectHermesManagedFilesError.scopeUnavailable
         }
         let client = DirectHermesArtifactClient(
-            http: transport, owner: capturedOwner, currentOwner: currentOwner
+            http: transport, owner: capturedOwner, agentID: agentID, currentOwner: currentOwner
         )
         configuredWorkspaceClient = client
         return client

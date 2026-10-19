@@ -398,9 +398,7 @@ struct SimpleBotProfileView: View {
     @ViewBuilder
     private func filesTab(_ profile: AgentProfile) -> some View {
         if let files {
-            SimpleBotFilesTab(model: files, botName: profile.name) { id in
-                context.agents.profiles.first { $0.id == id }?.name ?? "another bot"
-            }
+            SimpleBotFilesTab(model: files, botName: profile.name)
         } else {
             SimpleBotsMessageCard(systemImage: "wifi.slash", title: "Your computer isn't connected",
                                   detail: "\(profile.name)'s files show up here once it's back.")

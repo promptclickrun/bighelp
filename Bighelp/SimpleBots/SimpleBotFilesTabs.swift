@@ -26,8 +26,6 @@ enum SimpleBotProfileTab: String, CaseIterable, Identifiable {
 struct SimpleBotFilesTab: View {
     @Bindable var model: SimpleBotFilesModel
     let botName: String
-    /// The name of the bot whose folder the computer shares instead.
-    let nameOfBot: (String) -> String
 
     @BighelpThemeReader private var theme
 
@@ -39,11 +37,6 @@ struct SimpleBotFilesTab: View {
             case .needsPluginUpdate:
                 SimpleBotsMessageCard(systemImage: "arrow.down.circle", title: "Update the bighelp plugin to see files",
                                       detail: "Update it on your computer in Settings, then come back here.")
-            case .sharedByAnotherBot(let id):
-                let other = nameOfBot(id)
-                SimpleBotsMessageCard(systemImage: "folder", title: "\(botName)'s files aren't shared",
-                                      detail: "Your computer shares one bot's folder with bighelp: \(other)'s. "
-                                          + "Open \(other) to see those files.")
             case .failed(let message):
                 SimpleBotsMessageCard(systemImage: "exclamationmark.triangle", title: "Files didn't load",
                                       detail: message, actionTitle: "Try Again") { Task { await model.refresh() } }

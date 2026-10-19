@@ -239,6 +239,49 @@ struct DirectHermesManagedFilesTests {
         #expect(throws: DirectHermesManagedFilesError.self) { try locked.parent(of: locked.root) }
     }
 
+    @Test func anotherAgentsFolderIsAskedForByName() async throws {
+        let owner = try makeOwner()
+        let http = ManagedFilesTestHTTP()
+        http.readsOtherAgents = true
+        http.result = listing(root: http.root)
+        let client = DirectHermesManagedFilesClient(http: http, owner: owner, agentID: "research", currentOwner: { owner })
+        let result = try await client.list()
+        #expect(result.files.map(\.path) == [http.root + "/result.txt"])
+        let fileRequests = http.requests.filter { $0.path.contains("/workspace-files/") }
+        #expect(!fileRequests.isEmpty)
+        #expect(fileRequests.allSatisfy { $0.body?["profile"]?.string == "research" })
+    }
+
+    @Test func theServingAgentNeverNamesItselfSoOlderPluginsStillWork() async throws {
+        let owner = try makeOwner()
+        let http = ManagedFilesTestHTTP()
+        http.result = listing(root: http.root)
+        let client = DirectHermesManagedFilesClient(http: http, owner: owner, agentID: "default", currentOwner: { owner })
+        _ = try await client.list()
+        #expect(http.requests.filter { $0.path.contains("/workspace-files/") }.allSatisfy { $0.body?["profile"] == nil })
+    }
+
+    @Test func anOlderPluginAsksForAnUpdateBeforeReadingAnotherAgent() async throws {
+        let owner = try makeOwner()
+        let http = ManagedFilesTestHTTP()
+        http.result = listing(root: http.root)
+        let client = DirectHermesManagedFilesClient(http: http, owner: owner, agentID: "research", currentOwner: { owner })
+        await #expect(throws: WorkspaceClientError.rejected(code: WorkspaceClientError.workspacePluginOutdated)) {
+            _ = try await client.list()
+        }
+        #expect(!http.requests.contains { $0.path.contains("/workspace-files/") })
+    }
+
+    @Test func aReplyAboutAnotherAgentIsNotShown() async throws {
+        let owner = try makeOwner()
+        let http = ManagedFilesTestHTTP()
+        http.readsOtherAgents = true
+        http.repliedProfile = "default"
+        http.result = listing(root: http.root)
+        let client = DirectHermesManagedFilesClient(http: http, owner: owner, agentID: "research", currentOwner: { owner })
+        await #expect(throws: (any Error).self) { _ = try await client.list() }
+    }
+
     private func makeOwner() throws -> WorkspaceOwner {
         WorkspaceOwner(authority: try .direct(endpointIdentity: "https://fixture.example.test", providerID: "test", userID: "files"),
             authenticationGeneration: UUID(), connectionGeneration: UUID())
@@ -265,6 +308,10 @@ private final class ManagedFilesTestHTTP: DirectHermesAuthenticatedHTTP, DirectH
     var findsHermesWorkspace = true
     /// How the plugin found the folder; older plugins send no origin.
     var origin: String?
+    /// Plugins that read another agent's own folder when a request names it.
+    var readsOtherAgents = false
+    /// The agent the reply says it read; nil echoes the request (or the serving one).
+    var repliedProfile: String?
     var onRequest: (@MainActor () -> Void)?
     func request(_ request: DirectHermesHTTPRequest) async throws -> BighelpJSONValue {
         requests.append(request)
@@ -283,7 +330,8 @@ private final class ManagedFilesTestHTTP: DirectHermesAuthenticatedHTTP, DirectH
                 "principal": .object(["provider": .string("test"), "userId": .string("files"), "displayName": .null]),
                 "features": .array([.string("native-context-v1"), .string("serving-profile-v1")]
                     + (sharesWorkspaceFiles ? [.string("native-workspace-files-v1")] : [])
-                    + (sharesWorkspaceFiles && findsHermesWorkspace ? [.string("native-workspace-hermes-home-v1")] : []))]
+                    + (sharesWorkspaceFiles && findsHermesWorkspace ? [.string("native-workspace-hermes-home-v1")] : [])
+                    + (sharesWorkspaceFiles && readsOtherAgents ? [.string("native-workspace-files-agents-v1")] : []))]
         } else if let refusal {
             // The plugin's own error reply, as Hermes sends it.
             object = ["error": .object(["code": .string(refusal.code), "message": .string(refusal.message),
@@ -301,8 +349,9 @@ private final class ManagedFilesTestHTTP: DirectHermesAuthenticatedHTTP, DirectH
                 configured = value
             } else { configured = root }
             object = request.path.hasSuffix("/list") ? result.object ?? [:] : ["entries": .array([])]
+            let profile = repliedProfile ?? request.body?["profile"]?.string ?? "default"
             var workspace: [String: BighelpJSONValue] = ["root": .string(configured), "source": .string("terminal.cwd"),
-                                                         "profileId": .string("default")]
+                                                         "profileId": .string(profile)]
             if let origin { workspace["origin"] = .string(origin) }
             object["workspace"] = .object(workspace)
             object["path"] = .string(configured)

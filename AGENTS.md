@@ -212,6 +212,10 @@ change in both repos.
   recently opened go first), so a reopened chat shows them at once. Until a file lands, its message shows a loading
   tile (`PendingAgentFilesView`), never the raw line. Hosted image tools (Nous Portal, FAL) report the picture's
   https address instead of a host file; the card reads it from there (public hosts only, no cookies, bounded).
+- **Each agent's own files:** the plugin's `workspace-files/*` routes take an optional `profile` (plugin 3.20.0,
+  `native-workspace-files-agents-v1`) and read that agent's working folder with the same refusals. A bot's Files
+  tab sends its ID (`DirectHermesManagedFilesClient(agentID:)`); the serving agent never names itself, so older
+  plugins keep working for it, and other bots say to update the plugin.
 - **Hermes versions never gate connections or features.** Older, newer, custom and absent version strings are
   metadata, not an allowlist. Check actual host capabilities and route responses instead.
   - Hosts differ, so parse leniently: ignore unknown keys and treat most parts as optional.

@@ -27,8 +27,8 @@ You can change the mode later in Settings.
 
 ### Before you start
 
-- To save a bot as a template, update the bighelp plugin on your computer to version 3.19.0 or later. The app
-  shows the update.
+- Update the bighelp plugin on your computer to version 3.20.0 or later. The app shows the update. Templates need
+  3.19.0 or later, and Files for each bot needs 3.20.0 or later.
 
 ### A new reaction bar
 
@@ -75,8 +75,8 @@ The profile of a bot has 2 new tabs after **Computer**:
 - **Media** shows the photos and videos from your chats with the bot. Select a photo to see it, or a video to
   play it.
 
-Files can show the folder of the bot that runs the bighelp plugin. This is usually your primary agent. For other bots,
-the tab tells you that the plugin does not share their files.
+Each bot shows its own work folder. To see the files of all your bots, update the bighelp plugin to version 3.20.0 or
+later. With an older plugin, only the bot that runs the plugin shows its files.
 
 ## 2.5.1
 

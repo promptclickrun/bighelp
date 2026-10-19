@@ -208,17 +208,14 @@ extension RootShellView {
         )
     }
 
-    /// The folder the computer shares, read through the connection of the moment.
+    /// Each bot's own folder on the computer, read through the connection of the moment.
     func makeSimpleBotFilesSource() -> (any SimpleBotFilesSource)? {
-        if usesWorkspaceFixtures, workspaceConnections?.isDirectSelected != true {
-            return SimpleBotDemoFiles(servingProfileID: agents.profiles.first { $0.isDefault }?.id)
-        }
+        if usesWorkspaceFixtures, workspaceConnections?.isDirectSelected != true { return SimpleBotDemoFiles() }
         guard let connections = workspaceConnections else { return nil }
         return SimpleBotHostFiles { [weak connections] in
             guard let connections, let owner = connections.owner,
                   let http = connections.hosts.selectedWorkspace?.nativeClient else { return nil }
-            return .init(owner: owner, http: http,
-                         servingProfileID: connections.workspace?.nativeContext?.servingProfileID)
+            return .init(owner: owner, http: http)
         }
     }
 

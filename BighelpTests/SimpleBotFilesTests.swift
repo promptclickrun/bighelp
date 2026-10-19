@@ -10,16 +10,6 @@ struct SimpleBotFilesTests {
         #expect(SimpleBotProfileTab.available(showsComputer: true).map(\.title) == ["Info", "Computer", "Files", "Media"])
     }
 
-    @Test func onlyTheBotThePluginRunsAsSeesTheSharedFolder() throws {
-        try SimpleBotHostFiles.requireShared(agentID: "finance", servingProfileID: "finance")
-        #expect(throws: SimpleBotFilesError.sharedByAnotherBot("finance")) {
-            try SimpleBotHostFiles.requireShared(agentID: "travel", servingProfileID: "finance")
-        }
-        #expect(throws: DirectHermesManagedFilesError.scopeUnavailable) {
-            try SimpleBotHostFiles.requireShared(agentID: "travel", servingProfileID: nil)
-        }
-    }
-
     @Test func aRowOpensByWhatItIs() {
         let folder = Self.file("/w/Reports", directory: true)
         let video = Self.file("/w/clip.mp4", size: 40_000_000, mime: "video/mp4")
@@ -42,7 +32,6 @@ struct SimpleBotFilesTests {
         #expect(SimpleBotFilesModel.phase(for: WorkspaceClientError.unavailable(.unsupportedOperation)) == .needsPluginUpdate)
         #expect(SimpleBotFilesModel.phase(for: WorkspaceClientError.rejected(code: WorkspaceClientError.workspacePluginOutdated))
                 == .needsPluginUpdate)
-        #expect(SimpleBotFilesModel.phase(for: SimpleBotFilesError.sharedByAnotherBot("finance")) == .sharedByAnotherBot("finance"))
         let reason = WorkspaceClientError.workspaceFilesMessage("workspace_in_container") ?? ""
         #expect(SimpleBotFilesModel.phase(for: WorkspaceClientError.rejected(code: "workspace_in_container")) == .failed(reason))
         if case .failed(let message) = SimpleBotFilesModel.phase(for: WorkspaceClientError.transportUnavailable) {
@@ -103,15 +92,16 @@ struct SimpleBotFilesTests {
         #expect(model.notice != nil)
     }
 
-    @Test func anotherBotSaysWhoseFolderIsShared() async {
-        let model = SimpleBotFilesModel(agentID: "travel", source: FakeFilesSource())
+    @Test func everyBotOpensItsOwnFolder() async {
+        let source = FakeFilesSource()
+        let model = SimpleBotFilesModel(agentID: "travel", source: source)
         await model.refresh()
-        #expect(model.phase == .sharedByAnotherBot("finance"))
-        #expect(model.entries.isEmpty)
+        #expect(model.phase == .loaded)
+        #expect(source.agents == ["travel"])
     }
 
-    @Test func theDemoSharesTheDefaultBotsFolderLikeARealHost() async throws {
-        let demo = SimpleBotDemoFiles(servingProfileID: "finance")
+    @Test func theDemoGivesEachBotItsOwnFolder() async throws {
+        let demo = SimpleBotDemoFiles()
         let top = try await demo.list(agentID: "finance", path: nil)
         #expect(top.parent == nil)
         #expect(top.files.contains { $0.isDirectory && $0.name == "Reports" })
@@ -120,9 +110,21 @@ struct SimpleBotFilesTests {
         let pdf = try #require(reports.files.first { $0.mimeType == "application/pdf" })
         let contents = try await demo.download(agentID: "finance", file: pdf)
         #expect(contents.bytes.count == pdf.byteCount)
-        await #expect(throws: SimpleBotFilesError.sharedByAnotherBot("finance")) {
-            try await demo.list(agentID: "travel", path: nil)
+        let travel = try await demo.list(agentID: "travel", path: nil)
+        #expect(travel.path == SimpleBotDemoFiles.travelRoot)
+        #expect(travel.files.contains { $0.isDirectory && $0.name == "Lisbon trip" })
+        #expect(!travel.files.contains { $0.name == "Reports" })
+        let trip = try await demo.list(agentID: "travel", path: SimpleBotDemoFiles.travelRoot + "/Lisbon trip")
+        let itinerary = try #require(trip.files.first { $0.name == "Itinerary.md" })
+        #expect(try await demo.download(agentID: "travel", file: itinerary).bytes.count == itinerary.byteCount)
+        // One bot's folder never opens another's.
+        await #expect(throws: DirectHermesManagedFilesError.invalidPath) {
+            try await demo.list(agentID: "travel", path: SimpleBotDemoFiles.root + "/Reports")
         }
+        await #expect(throws: DirectHermesManagedFilesError.invalidPath) {
+            try await demo.download(agentID: "travel", file: pdf)
+        }
+        #expect(try await demo.list(agentID: "new-bot", path: nil).files.isEmpty)
     }
 
     @Test func demoMediaIsEachBotsOwn() async throws {
@@ -161,12 +163,13 @@ struct SimpleBotFilesTests {
 @MainActor
 private final class FakeFilesSource: SimpleBotFilesSource {
     var listed: [String?] = []
+    var agents: [String] = []
     var failure: Error?
 
     var downloadLimit: Int { 1_000_000 }
 
     func list(agentID: String, path: String?) async throws -> HermesManagedFileDirectory {
-        try SimpleBotHostFiles.requireShared(agentID: agentID, servingProfileID: "finance")
+        agents.append(agentID)
         listed.append(path)
         if let failure { throw failure }
         switch path ?? "/w" {

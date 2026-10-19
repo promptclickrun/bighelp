@@ -3,8 +3,8 @@ import Foundation
 import Observation
 import UniformTypeIdentifiers
 
-/// Where a bot's Files tab reads: the folder its computer shares with bighelp (what Files
-/// shows in the full app, through `DirectHermesManagedFilesClient`), or the demo's folders.
+/// Where a bot's Files tab reads: the bot's own folder on its computer (what Files shows in the
+/// full app, through `DirectHermesManagedFilesClient`), or the demo's folders.
 @MainActor
 protocol SimpleBotFilesSource: AnyObject {
     /// The largest file that opens in the preview.
@@ -16,76 +16,65 @@ protocol SimpleBotFilesSource: AnyObject {
     func playback(agentID: String, file: HermesManagedFile) -> DirectHermesManagedMediaPlayback?
 }
 
-enum SimpleBotFilesError: Error, Equatable {
-    /// The computer shares the folder of the agent its bighelp plugin runs as; this is another one.
-    case sharedByAnotherBot(String)
-}
-
-/// A bot's files on its computer. The bighelp plugin shares one folder: that of the agent it
-/// runs as (`servingProfileID`), so another bot's tab never shows it as its own. Each call
-/// uses the connection of the moment, so a reconnect needs nothing from the screen.
+/// A bot's files on its computer: its own working folder, which the bighelp plugin finds the way
+/// Hermes does for that agent (`native-workspace-files-agents-v1`; an older plugin shows only the
+/// agent it runs as, and the tab says to update it). Each call uses the connection of the
+/// moment, so a reconnect needs nothing from the screen.
 @MainActor
 final class SimpleBotHostFiles: SimpleBotFilesSource {
     /// The computer in use; nil while it's disconnected.
     struct Connection {
         let owner: WorkspaceOwner
         let http: any DirectHermesAuthenticatedHTTP
-        let servingProfileID: String?
     }
 
     private let connection: @MainActor () -> Connection?
-    private var client: DirectHermesManagedFilesClient?
+    /// One client per bot, each holding its own folder.
+    private var clients: [String: DirectHermesManagedFilesClient] = [:]
 
     init(connection: @escaping @MainActor () -> Connection?) {
         self.connection = connection
     }
 
     var downloadLimit: Int {
-        currentClient()?.supportsBinaryTransfers == true ? DirectHermesManagedFilesClient.maximumNativeTransferBytes
+        connection()?.http is any DirectHermesManagedFileBinaryHTTP ? DirectHermesManagedFilesClient.maximumNativeTransferBytes
             : DirectHermesManagedFilesClient.maximumJSONDownloadBytes
     }
 
     func list(agentID: String, path: String?) async throws -> HermesManagedFileDirectory {
-        try await sharedClient(for: agentID).list(path: path)
+        try await requireClient(for: agentID).list(path: path)
     }
 
     func download(agentID: String, file: HermesManagedFile) async throws -> HermesManagedFileContents {
-        try await sharedClient(for: agentID).download(file)
+        try await requireClient(for: agentID).download(file)
     }
 
     func canStream(agentID: String, file: HermesManagedFile) -> Bool {
-        guard connection()?.servingProfileID == agentID, let client = currentClient() else { return false }
+        guard let client = client(for: agentID) else { return false }
         return client.supportsBinaryTransfers && DirectHermesManagedMediaPlayback.supports(file)
     }
 
     func playback(agentID: String, file: HermesManagedFile) -> DirectHermesManagedMediaPlayback? {
-        guard canStream(agentID: agentID, file: file), let client = currentClient() else { return nil }
+        guard canStream(agentID: agentID, file: file), let client = client(for: agentID) else { return nil }
         return DirectHermesManagedMediaPlayback(file: file, reader: client)
     }
 
-    /// One client per connection: every reconnect is a new owner, which the old client refuses.
-    private func currentClient() -> DirectHermesManagedFilesClient? {
+    /// Every reconnect is a new owner, which the old clients refuse, so they all start again.
+    private func client(for agentID: String) -> DirectHermesManagedFilesClient? {
         guard let current = connection() else { return nil }
-        if let client, client.ownsScope { return client }
+        if let client = clients[agentID], client.ownsScope { return client }
+        if clients.values.contains(where: { !$0.ownsScope }) { clients.removeAll() }
         let connection = connection
         let made = DirectHermesManagedFilesClient(
             http: current.http, binaryHTTP: current.http as? any DirectHermesManagedFileBinaryHTTP,
-            owner: current.owner, currentOwner: { connection()?.owner })
-        client = made
+            owner: current.owner, agentID: agentID, currentOwner: { connection()?.owner })
+        clients[agentID] = made
         return made
     }
 
-    private func sharedClient(for agentID: String) async throws -> DirectHermesManagedFilesClient {
-        guard let client = currentClient() else { throw WorkspaceClientError.transportUnavailable }
-        // A plugin that can't share files says so first, whichever bot asks.
-        _ = try await client.workspaceScope()
-        try Self.requireShared(agentID: agentID, servingProfileID: connection()?.servingProfileID)
+    private func requireClient(for agentID: String) throws -> DirectHermesManagedFilesClient {
+        guard let client = client(for: agentID) else { throw WorkspaceClientError.transportUnavailable }
         return client
-    }
-
-    static func requireShared(agentID: String, servingProfileID: String?) throws {
-        guard let servingProfileID, !servingProfileID.isEmpty else { throw DirectHermesManagedFilesError.scopeUnavailable }
-        guard servingProfileID == agentID else { throw SimpleBotFilesError.sharedByAnotherBot(servingProfileID) }
     }
 }
 
@@ -132,8 +121,6 @@ enum SimpleBotFileOpening: Equatable {
 final class SimpleBotFilesModel {
     enum Phase: Equatable {
         case loading, loaded, needsPluginUpdate, failed(String)
-        /// The computer shares this other bot's folder, not this one's.
-        case sharedByAnotherBot(String)
     }
 
     let agentID: String
@@ -264,8 +251,6 @@ final class SimpleBotFilesModel {
 
     static func phase(for error: any Error) -> Phase {
         switch error {
-        case SimpleBotFilesError.sharedByAnotherBot(let id):
-            return .sharedByAnotherBot(id)
         case WorkspaceClientError.unavailable(.unsupportedOperation), WorkspaceClientError.unavailable(.pluginRequired),
              WorkspaceClientError.rejected(code: .some(WorkspaceClientError.workspacePluginOutdated), _):
             return .needsPluginUpdate

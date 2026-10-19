@@ -9,12 +9,16 @@ final class DirectHermesArtifactClient: WorkspaceOperationPerforming {
     private static let recentFeature = "native-workspace-recent-v1"
     /// Plugins that find hosted Hermes' workspace folder (the agent works in Hermes' home).
     private static let hermesHomeFeature = "native-workspace-hermes-home-v1"
+    /// Plugins that read another agent's own folder when a request names it (`profile`).
+    private static let agentsFeature = "native-workspace-files-agents-v1"
     /// Refusals an older or not yet restarted plugin gives on hosted Hermes.
     private static let hermesHomeRefusals: Set<String> = ["workspace_not_configured", "workspace_hermes_folder"]
     private let http: any DirectHermesNativeHTTP
     private let capturedOwner: WorkspaceOwner
     private let currentOwner: @MainActor () -> WorkspaceOwner?
     private let fallback: (any WorkspaceOperationPerforming)?
+    /// The agent whose folder this reads; nil (or the serving agent) is the plugin's own agent.
+    private let agentID: String?
     private lazy var native = DirectHermesNativePluginClient(
         http: http, owner: capturedOwner, currentOwner: currentOwner
     )
@@ -23,11 +27,13 @@ final class DirectHermesArtifactClient: WorkspaceOperationPerforming {
         http: any DirectHermesNativeHTTP,
         owner: WorkspaceOwner,
         fallback: (any WorkspaceOperationPerforming)? = nil,
+        agentID: String? = nil,
         currentOwner: @escaping @MainActor () -> WorkspaceOwner?
     ) {
         self.http = http
         capturedOwner = owner
         self.fallback = fallback
+        self.agentID = agentID
         self.currentOwner = currentOwner
     }
 
@@ -70,7 +76,7 @@ final class DirectHermesArtifactClient: WorkspaceOperationPerforming {
     }
 
     /// A nil path is valid only for workspace discovery and always resolves to
-    /// the raw serving profile's configured terminal.cwd on the host.
+    /// the agent's configured terminal.cwd on the host (the serving profile's by default).
     func scope(owner expectedOwner: WorkspaceOwner) async throws -> [String: BighelpJSONValue] {
         try await request("scope", path: nil, maximumResponseBytes: 196_608, owner: expectedOwner)
     }
@@ -106,6 +112,14 @@ final class DirectHermesArtifactClient: WorkspaceOperationPerforming {
               context.features.contains(feature) else {
             throw WorkspaceClientError.unavailable(.unsupportedOperation)
         }
+        // Another agent's folder needs a plugin that reads it; the serving one's never names itself,
+        // so older plugins keep working for it.
+        let otherAgent = agentID.flatMap { $0 == context.servingProfileID ? nil : $0 }
+        if otherAgent != nil, !context.features.contains(Self.agentsFeature) {
+            throw WorkspaceClientError.rejected(code: WorkspaceClientError.workspacePluginOutdated)
+        }
+        var body: [String: BighelpJSONValue] = ["path": path.map(BighelpJSONValue.string) ?? .null]
+        if let otherAgent { body["profile"] = .string(otherAgent) }
         let guardValue = try DirectHermesNativeRequestGuard(etag: context.etag)
         let response: DirectHermesHTTP.Response
         do {
@@ -113,7 +127,7 @@ final class DirectHermesArtifactClient: WorkspaceOperationPerforming {
                 .init(
                     path: "/api/plugins/loopdy/native/workspace-files/" + operation,
                     method: .post,
-                    body: ["path": path.map(BighelpJSONValue.string) ?? .null],
+                    body: body,
                     maximumResponseBytes: maximumResponseBytes
                 ),
                 requestGuard: guardValue
@@ -147,7 +161,7 @@ final class DirectHermesArtifactClient: WorkspaceOperationPerforming {
               let root = workspace["root"]?.string,
               (try? DirectHermesWorkspaceFileScope.path(root)) != nil,
               let profile = workspace["profileId"]?.string,
-              profile == context.servingProfileID else {
+              profile == (otherAgent ?? context.servingProfileID) else {
             throw WorkspaceClientError.invalidResponse
         }
         try check(expectedOwner)

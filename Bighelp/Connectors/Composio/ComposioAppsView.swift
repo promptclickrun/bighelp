@@ -127,7 +127,7 @@ struct ComposioAppsView: View {
     private func agentDetail(_ host: String) -> String {
         switch model.agent {
         case .needsSignIn: "Sign in to the same Composio account for your agent on \(host)."
-        case .cannotReach: "Composio doesn't accept your agent's sign-in on \(host). Sign in again with the same Composio account."
+        case .cannotReach: "Your agent on \(host) can't reach Composio with its sign-in. Sign in again with the same Composio account."
         default: "Turns on Composio on \(host), then you sign in to the same Composio account for your agent."
         }
     }

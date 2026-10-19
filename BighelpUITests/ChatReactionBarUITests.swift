@@ -51,4 +51,37 @@ final class ChatReactionBarUITests: BighelpUITestCase {
         XCTAssertTrue(app.descendants(matching: .any)["chat.reaction-picker"].waitForExistence(timeout: 5),
                       "+ opens the full emoji choice")
     }
+
+    /// The bubble's edge, outside its text, opens the same menu; the bar sits on
+    /// the person's side, and Reply still works.
+    @MainActor
+    func testHoldingTheEdgeOfYourOwnMessageShowsTheBarOnYourSide() throws {
+        let app = makeApp()
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-test-native-reaction-ui",
+                               "-loopdy.demo.appearance", appearance]
+        app.launch()
+        let conversation = app.buttons["session.row.demo-finance"]
+        XCTAssertTrue(conversation.waitForExistence(timeout: 20))
+        conversation.tap()
+        let sent = app.textViews.matching(NSPredicate(
+            format: "identifier == 'chat.message.inline-selection' AND label CONTAINS %@", "A calmer chat"
+        )).firstMatch
+        XCTAssertTrue(sent.waitForExistence(timeout: 10))
+
+        // Below the text, inside the bubble's padding.
+        sent.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 1))
+            .withOffset(CGVector(dx: 0, dy: 5)).press(forDuration: 1)
+        let heart = app.buttons["chat.reaction-bar.heart"]
+        let more = app.buttons["chat.reaction-bar.more"]
+        XCTAssertTrue(heart.waitForExistence(timeout: 5), "The edge of the bubble opens the bar too")
+        XCTAssertLessThan(abs(more.frame.maxX - sent.frame.maxX), 24, "The bar lines up with the person's bubble")
+        XCTAssertTrue(heart.isHittable, "The bar stays on screen over a message at the top")
+        sleep(pause)
+        let reply = app.buttons["Reply"]
+        XCTAssertTrue(reply.waitForExistence(timeout: 2))
+        reply.tap()
+        XCTAssertTrue(heart.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["chat.reply-draft.quote"].waitForExistence(timeout: 5),
+                      "Reply still quotes the message")
+    }
 }

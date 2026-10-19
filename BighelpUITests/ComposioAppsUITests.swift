@@ -28,6 +28,7 @@ final class ComposioAppsUITests: BighelpUITestCase {
             turnOn.tap()
             XCTAssertTrue(app.descendants(matching: .any)["composio.agent.ready"].waitForExistence(timeout: 15),
                           "Installed, signed in, ready for the agent")
+            evidence("composio-agent-ready-\(appearance)", app)
 
             // Calendly's demo sign-in never finishes: its page must stay open until it's closed, also
             // when bighelp becomes active again (on iPhone, iOS's "wants to use … to sign in" prompt

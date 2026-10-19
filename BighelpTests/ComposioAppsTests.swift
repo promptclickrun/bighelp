@@ -153,6 +153,46 @@ struct ComposioAppsTests {
         #expect(try status([server("composio", enabled: true, signedIn: true)], connect: "composio") == .ready(server: "composio"))
     }
 
+    /// The plugin reads Hermes' settings and whether a sign-in is saved on disk. A saved sign-in
+    /// Composio refuses looked the same, so the page said the agent could use the apps while it
+    /// had none of Composio's tools (#450). Hermes' own connection test for that agent decides.
+    @Test func aSavedSignInThatComposioRefusesIsNotReady() async throws {
+        let hermes = try ComposioHermes(tests: [ComposioHermes.refused])
+        let access = try await hermes.agentHost().access()
+        #expect(access == .cannotReach(server: "composio"))
+        #expect(hermes.httpPaths == ["/api/mcp/servers/composio/test"])
+        #expect(hermes.httpProfiles == ["atlas"], "Hermes tests the sign-in of the agent on this page")
+    }
+
+    @Test func composiosToolsThroughHermesMeanReady() async throws {
+        let hermes = try ComposioHermes(tests: [ComposioHermes.reached])
+        #expect(try await hermes.agentHost().access() == .ready(server: "composio"))
+    }
+
+    /// A host that can't run the test (an error, a timeout) keeps the plugin's answer.
+    @Test func aTestThatDoesNotAnswerKeepsThePluginsAnswer() async throws {
+        let hermes = try ComposioHermes(tests: [])
+        #expect(try await hermes.agentHost().access() == .ready(server: "composio"))
+    }
+
+    /// A refused sign-in offers "Sign in for my agent" again: Hermes' own MCP sign-in, with no
+    /// second install, then the test again.
+    @Test func aRefusedSignInSignsInAgainForTheAgent() async throws {
+        let hermes = try ComposioHermes(tests: [ComposioHermes.refused, ComposioHermes.refused, ComposioHermes.reached])
+        let model = ComposioAppsModel(account: ComposioAccount(vault: DemoComposioVault()), connect: DemoComposioConnect(),
+                                      catalog: DemoComposioCatalog(), agentHost: try hermes.agentHost(),
+                                      signIn: { _ in }, sleep: { _ in })
+        await model.refreshAgent()
+        #expect(model.agent == .cannotReach(server: "composio"))
+        var opened: [URL] = []
+        let flow = try #require(await model.turnOnForAgent { opened.append($0) })
+        #expect(opened.map(\.host) == ["login.composio.dev"])
+        #expect(!hermes.operations.contains(.composioInstall))
+        await model.finishAgentSignIn(flow)
+        #expect(model.agent == .ready(server: "composio"))
+        #expect(hermes.httpPaths.filter { $0.hasSuffix("/test") }.count == 3)
+    }
+
     // MARK: The screen's model, on the demo
 
     @Test func connectingAnAppWaitsForTheNewAccountThenClosesThePage() async throws {
@@ -215,6 +255,80 @@ struct ComposioAppsTests {
         #expect(model.agent == .ready(server: "composio"))
         model.signOut()
         #expect(!model.account.isSignedIn && model.connectedApps.isEmpty)
+    }
+}
+
+/// A computer whose agent `atlas` has Composio Connect on and a sign-in saved: the plugin's
+/// `composio/status` and `composio/install`, and Hermes' MCP routes with Hermes' own answers.
+/// `tests` are the answers of Hermes' connection test, in order; none left is a host that
+/// doesn't answer it.
+@MainActor
+final class ComposioHermes: WorkspaceOperationPerforming, DirectHermesAuthenticatedHTTP {
+    /// `POST /api/mcp/servers/<name>/test` when the probe fails: Hermes' route catches it.
+    static let refused: BighelpJSONValue = .object([
+        "ok": .boolean(false), "tools": .array([]),
+        "error": .string("MCP OAuth for 'composio' could not refresh its token. Run `hermes mcp login <server>` interactively to (re)authorize, then restart or reload the gateway."),
+    ])
+    /// Composio Connect's tools as Hermes lists them (descriptions cut to 80 characters).
+    static let reached: BighelpJSONValue = .object([
+        "ok": .boolean(true), "prompts": .integer(0), "resources": .integer(0),
+        "tools": .array(["COMPOSIO_SEARCH_TOOLS", "COMPOSIO_MULTI_EXECUTE_TOOL", "COMPOSIO_MANAGE_CONNECTIONS"].map {
+            .object(["name": .string($0), "description": .string("Finds and runs tools in the apps the user connected. User has manually conne..."),
+                     "schema_chars": .integer(900)])
+        }),
+    ])
+
+    let owner: WorkspaceOwner?
+    var capabilities: WorkspaceCapabilities { .init(owner: owner, values: [:]) }
+    private var tests: [BighelpJSONValue]
+    private(set) var operations: [WorkspaceOperation] = []
+    private(set) var httpPaths: [String] = []
+    private(set) var httpProfiles: [String] = []
+
+    init(tests: [BighelpJSONValue]) throws {
+        self.tests = tests
+        owner = WorkspaceOwner(
+            authority: try .direct(endpointIdentity: "https://hermes.example", providerID: "basic", userID: "person"),
+            authenticationGeneration: UUID(), connectionGeneration: UUID())
+    }
+
+    func agentHost() throws -> DirectHermesComposioAgentHost {
+        guard let owner else { throw WorkspaceClientError.ownerChanged }
+        return DirectHermesComposioAgentHost(
+            hostName: "Studio Mac", agentName: "Atlas", profileID: "atlas", workspace: self,
+            mcp: DirectHermesMCPClient(http: self, rpc: nil, owner: owner, profileID: "atlas", currentOwner: { owner }))
+    }
+
+    func perform(_ operation: WorkspaceOperation, payload: [String: BighelpJSONValue],
+                 owner: WorkspaceOwner) async throws -> [String: BighelpJSONValue] {
+        guard owner == self.owner, payload["agentId"]?.string == "atlas",
+              [.composioStatus, .composioInstall].contains(operation) else { throw WorkspaceClientError.invalidRequest }
+        operations.append(operation)
+        return ["agentId": .string("atlas"), "schemaVersion": .integer(1), "connect": .string("composio"),
+                "servers": .array([.object([
+                    "name": .string("composio"), "url": .string("https://connect.composio.dev/mcp"),
+                    "enabled": .boolean(true), "auth": .string("oauth"), "kind": .string("connect"),
+                    "signedIn": .boolean(true),
+                ])])]
+    }
+
+    func request(_ request: DirectHermesHTTPRequest) async throws -> BighelpJSONValue {
+        httpPaths.append(request.path)
+        httpProfiles += request.query.filter { $0.name == "profile" }.compactMap(\.value)
+        switch (request.method, request.path) {
+        case (.post, "/api/mcp/servers/composio/test"):
+            guard !tests.isEmpty else { throw URLError(.timedOut) }
+            return tests.removeFirst()
+        case (.post, "/api/mcp/servers/composio/auth"):
+            return .object(["flow_id": .string("flow-1"), "server_name": .string("composio"),
+                            "status": .string("authorization_required"), "error": .null,
+                            "authorization_url": .string("https://login.composio.dev/oauth2/authorize?client_id=hermes-example")])
+        case (.get, "/api/mcp/oauth/flows/flow-1"):
+            return .object(["flow_id": .string("flow-1"), "server_name": .string("composio"), "status": .string("approved"),
+                            "authorization_url": .null, "error": .null, "tools": .array([])])
+        default:
+            throw WorkspaceClientError.invalidRequest
+        }
     }
 }
 

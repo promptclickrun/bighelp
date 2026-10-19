@@ -62,7 +62,13 @@ final class DirectHermesComposioAgentHost: ComposioAgentHost {
     }
 
     func access() async throws -> ComposioAgentAccess {
-        try await status(.composioStatus).access
+        let access = try await status(.composioStatus).access
+        guard case .ready(let server) = access else { return access }
+        // The plugin sees a saved sign-in, not whether Composio still takes it. Hermes' own test
+        // connects with this agent's sign-in and lists Composio's tools (#450). A host that can't
+        // run the test keeps the plugin's answer.
+        guard let test = try? await mcp.test(serverName: server) else { return access }
+        return test.succeeded && test.toolCount > 0 ? access : .cannotReach(server: server)
     }
 
     func install() async throws -> String {

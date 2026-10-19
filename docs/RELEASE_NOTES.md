@@ -25,6 +25,48 @@ After you connect your computer, the app shows these steps:
 
 You can change the mode later in Settings.
 
+### Before you start
+
+- To save a bot as a template, update the bighelp plugin on your computer to version 3.19.0 or later. The app
+  shows the update.
+
+### Templates for new bots
+
+In Simple Bot mode, **Create New Bot** has a **Templates** button at the top right.
+
+1. Select **Templates**.
+2. Select a template. If the template has fields, fill them in.
+3. Type a name for the bot and select a picture.
+4. Select **Create**.
+
+The template gives the bot its role, its vibe, and its instructions. The name of the template shows under
+**Templates**. To remove the template, select the **x** on it.
+
+### Save a bot as a template
+
+1. Open the profile of a bot.
+2. Select the **Share** button.
+3. Type a name for the template.
+4. Select **Save**.
+
+The app saves the template on your computer, not on your phone. The template keeps the role, the vibe, and the
+instructions of the bot. It does not keep the picture.
+
+**My Templates** at the top of the template list shows your templates. To delete a template, touch and hold it.
+The app does not show a damaged template. The other templates stay available.
+
+### Files and Media for each bot
+
+The profile of a bot has 2 new tabs after **Computer**:
+
+- **Files** shows the work folder of the bot on your computer. Select a folder to open it. Select a file
+  to see it. The app shows pictures, PDF files, videos, and text. Markdown files show with their format.
+- **Media** shows the photos and videos from your chats with the bot. Select a photo to see it, or a video to
+  play it.
+
+Files can show the folder of the bot that runs the bighelp plugin. This is usually your primary agent. For other bots,
+the tab tells you that the plugin does not share their files.
+
 ## 2.5.1
 
 This release adds Simple Bot mode, Teamwork, the Bots widget, and many changes to chats.

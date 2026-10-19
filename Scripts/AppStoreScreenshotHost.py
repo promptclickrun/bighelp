@@ -37,6 +37,7 @@ from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from DirectHermesProtocolProbe import request_status  # noqa: E402
@@ -81,16 +82,40 @@ STATEMENT = """date,merchant,category,amount
 2026-09-30,Green Basket Market,Groceries,68.20
 """
 
-TRIP_NOTES = """# Lisbon, October 9-16
+# The trip, the bills and the plans are dated from the day the host starts, so the
+# Feed reads "Lisbon in 8 days" and "bills due this week" whenever the set is taken.
+TODAY = date.today()
 
-Flights: SFO to LIS on Oct 9, overnight. Home on the 16th.
+
+def day(offset: int) -> date:
+    return TODAY + timedelta(days=offset)
+
+
+def short(moment: date) -> str:
+    return f"{moment:%b} {moment.day}"
+
+
+def nth(moment: date) -> str:
+    suffix = "th" if 11 <= moment.day % 100 <= 13 else {1: "st", 2: "nd", 3: "rd"}.get(moment.day % 10, "th")
+    return f"{moment.day}{suffix}"
+
+
+def trip_span() -> str:
+    start, end = day(8), day(15)
+    return f"{short(start)}–{end.day}" if start.month == end.month else f"{short(start)}–{short(end)}"
+
+
+def trip_notes() -> str:
+    return f"""# Lisbon, {trip_span()}
+
+Flights: SFO to LIS on {short(day(8))}, overnight. Home on the {nth(day(15))}.
 Stay: a small apartment in Alfama, near the Miradouro de Santa Luzia.
 
 ## Plans
-- Oct 10: tram 28, then the castle at sunset
-- Oct 12: day trip to Sintra (trains sell out on weekends, book ahead)
-- Oct 14: Belem, pasteis de nata, the tile museum
-- Oct 15: fado dinner in Alfama
+- {short(day(9))}: tram 28, then the castle at sunset
+- {short(day(11))}: day trip to Sintra (trains sell out on weekends, book ahead)
+- {short(day(13))}: Belem, pasteis de nata, the tile museum
+- {short(day(14))}: fado dinner in Alfama
 
 Weather: 70s and sunny, one rainy day likely. The hills are steep.
 
@@ -106,26 +131,27 @@ Weather: 70s and sunny, one rainy day likely. The hills are steep.
 Lisbon fund: $420 of $600
 """
 
-BILLS = """bill,amount,due
-Rent,1850.00,2026-10-01
-Bright Power,96.42,2026-10-03
-Phone,45.00,2026-10-05
-AquaFlow Water,41.16,2026-10-08
-Car insurance,112.00,2026-10-21
-"""
+
+def bills() -> str:
+    return "bill,amount,due\n" + "".join(f"{name},{amount},{day(offset).isoformat()}\n" for name, amount, offset in (
+        ("Rent", "1850.00", 1), ("Bright Power", "96.42", 3), ("Phone", "45.00", 5),
+        ("AquaFlow Water", "41.16", 7), ("Car insurance", "112.00", 20)))
+
 
 GOALS = """# Goals
 - Run three times a week (2 runs so far this week)
 - Read 2 books in October (halfway through the first)
 """
 
-KANBAN = [
-    ("Book Sintra train tickets", "Trains sell out on weekends. Oct 12, two seats.", None),
-    ("Find a fado dinner spot in Alfama", "Small place, near the apartment, Oct 15.", None),
-    ("Order a Type F travel adapter", "", "Ordered, arrives Friday."),
-    ("Renew passport photos", "", "Done at the pharmacy."),
-    ("Pick up euros", "About 200 for cafes and trams.", None),
-]
+
+def kanban() -> list:
+    return [
+        ("Book Sintra train tickets", f"Trains sell out on weekends. {short(day(11))}, two seats.", None),
+        ("Find a fado dinner spot in Alfama", f"Small place, near the apartment, {short(day(14))}.", None),
+        ("Order a Type F travel adapter", "", "Ordered, arrives Friday."),
+        ("Renew passport photos", "", "Done at the pharmacy."),
+        ("Pick up euros", "About 200 for cafes and trams.", None),
+    ]
 
 
 def read_tool_text(result: str) -> str:
@@ -176,7 +202,7 @@ def spending(results: list[str]):
     ranked = sorted(totals.items(), key=lambda item: -item[1])
     if len(results) == 1:
         return ("bighelp_render_chart", {
-            "schema": "loopdy.generative_ui", "version": 2, "component": "chart",
+            "schema": "bighelp.generative_ui", "version": 2, "component": "chart",
             "title": "September spending", "subtitle": f"{len(rows)} purchases on your card",
             "data": {"chart_type": "bar", "description": "Spending by category in September.",
                      "x_axis": {"label": "Category", "kind": "category"},
@@ -199,19 +225,19 @@ def spending(results: list[str]):
 
 def packing(results: list[str]):
     if not results:
-        return ("read_file", {"path": "~/Documents/Trips/lisbon-october.md"})
+        return ("read_file", {"path": "~/Documents/Trips/lisbon-trip.md"})
     notes = read_tool_text(results[0])
     section = notes.split("## Packing", 1)[1].split("##", 1)[0]
     items = re.findall(r"- \[( |x)\] (.+)", section)
     if len(results) == 1:
         return ("bighelp_render_checklist", {
-            "schema": "loopdy.generative_ui", "version": 2, "component": "checklist",
-            "title": "Lisbon packing list", "subtitle": "From your trip notes · Oct 9–16",
+            "schema": "bighelp.generative_ui", "version": 2, "component": "checklist",
+            "title": "Lisbon packing list", "subtitle": f"From your trip notes · {trip_span()}",
             "data": {"description": "What's packed is checked off.",
                      "items": [{"id": re.sub(r"[^a-z0-9]+", "-", label.lower()).strip("-")[:40] or f"item-{index}",
                                 "label": label.strip(), "completed": mark == "x"}
                                for index, (mark, label) in enumerate(items)]},
-            "provenance": provenance("lisbon-october.md")})
+            "provenance": provenance("lisbon-trip.md")})
     card = tool_json(results[1]).get("display_markdown", "")
     left = sum(1 for mark, _ in items if mark != "x")
     return (f"Here's your list from your notes: {len(items) - left} packed, {left} to go.\n\n{card}\n\n"
@@ -238,7 +264,7 @@ def brief(results: list[str]):
             except ValueError:
                 pass
         return ("bighelp_render_automation", {
-            "schema": "loopdy.generative_ui", "version": 2, "component": "automation",
+            "schema": "bighelp.generative_ui", "version": 2, "component": "automation",
             "title": "Morning brief", "subtitle": "Every weekday", "data": data,
             "provenance": provenance("Hermes schedule")})
     card = tool_json(results[1]).get("display_markdown", "")
@@ -247,7 +273,7 @@ def brief(results: list[str]):
 
 def board(results: list[str]):
     reads = [("read_file", {"path": "~/Documents/Home/bills.csv"}),
-             ("read_file", {"path": "~/Documents/Trips/lisbon-october.md"}),
+             ("read_file", {"path": "~/Documents/Trips/lisbon-trip.md"}),
              ("read_file", {"path": "~/Documents/goals.md"}),
              ("read_file", {"path": "~/Documents/Money/september-card.csv"})]
     if len(results) < len(reads):
@@ -255,19 +281,17 @@ def board(results: list[str]):
     bills = list(csv.DictReader(io.StringIO(read_tool_text(results[0]).strip())))
     notes, goals_text = read_tool_text(results[1]), read_tool_text(results[2])
     rows = list(csv.DictReader(io.StringIO(read_tool_text(results[3]).strip())))
-    today = date.today()
-    soon = [bill for bill in bills if 0 <= (date.fromisoformat(bill["due"]) - today).days <= 7]
-    trip = date(today.year, 10, 9)
-    days = (trip - today).days
+    soon = [bill for bill in bills if 0 <= (date.fromisoformat(bill["due"]) - TODAY).days <= 7]
     saved = re.search(r"\$(\d+) of \$(\d+)", notes)
     dining = sum(float(row["amount"]) for row in rows if row["category"] == "Dining out")
     goals = re.findall(r"- (.+?) \((.+?)\)", goals_text)
     posts = [
-        ("bighelp_board", {"action": "post", "icon": "✈️", "title": f"Lisbon in {days} days",
-                           "body": "Overnight flight on the 9th, home on the 16th. Sintra on the 12th: "
-                                   "weekend trains sell out, so book ahead.", "source": "Trip notes"}),
+        ("bighelp_board", {"action": "post", "icon": "✈️", "title": "Lisbon in 8 days",
+                           "body": f"Overnight flight on the {nth(day(8))}, home on the {nth(day(15))}. "
+                                   f"Sintra on the {nth(day(11))}: weekend trains sell out, so book ahead.",
+                           "source": "Trip notes"}),
         ("bighelp_board", {"action": "post", "icon": "🧾",
-                           "title": f"{len(soon)} bills due this week",
+                           "title": f"{len(soon)} bill{'s' * (len(soon) != 1)} due this week",
                            "body": "\n".join(f"- {bill['bill']}: {money(float(bill['amount']))}, due "
                                              f"{date.fromisoformat(bill['due']):%a %b} "
                                              f"{date.fromisoformat(bill['due']).day}" for bill in soon),
@@ -276,7 +300,7 @@ def board(results: list[str]):
                            "body": f"{money(sum(float(row['amount']) for row in rows))} spent. "
                                    f"Dining out was {money(dining)}.", "source": "Card statement"}),
         ("bighelp_board", {"action": "goal", "id": "lisbon-fund", "icon": "🏖️", "title": "Lisbon fund",
-                           "section": "goal", "status": "active",
+                           "section": "goal", "status": "active", "category": "finance",
                            "note": f"${saved.group(1)} of ${saved.group(2)} saved" if saved else "Started",
                            "source": "Trip notes"}),
         *[("bighelp_board", {"action": "goal", "id": f"goal-{index}", "icon": icon, "title": title,
@@ -284,7 +308,7 @@ def board(results: list[str]):
           for index, ((title, note), icon) in enumerate(zip(goals, ("🏃", "📚")))],
         ("bighelp_board", {"action": "idea", "id": "sintra-tickets", "icon": "🚆", "section": "Travel",
                            "title": "Book Sintra trains now",
-                           "body": "Weekend trains sell out. I can find two seats for the 12th.",
+                           "body": f"Weekend trains sell out. I can find two seats for the {nth(day(11))}.",
                            "source": "Trip notes"}),
         ("bighelp_board", {"action": "idea", "id": "dining-budget", "icon": "🍽️", "section": "Money",
                            "title": "An October dining budget",
@@ -392,14 +416,16 @@ def main():
 def serve(args, temp: Path) -> None:
     home = temp / "home"
     project = home / "Documents"
-    for folder, name, text in (("Money", "september-card.csv", STATEMENT), ("Trips", "lisbon-october.md", TRIP_NOTES),
-                               ("Home", "bills.csv", BILLS), ("", "goals.md", GOALS)):
+    zone = args.time_zone or morning_time_zone()
+    global TODAY
+    TODAY = datetime.now(ZoneInfo(zone)).date()
+    for folder, name, text in (("Money", "september-card.csv", STATEMENT), ("Trips", "lisbon-trip.md", trip_notes()),
+                               ("Home", "bills.csv", bills()), ("", "goals.md", GOALS)):
         (project / folder).mkdir(parents=True, exist_ok=True)
         (project / folder / name).write_text(text)
 
     model = ThreadingHTTPServer(("127.0.0.1", 0), StoryModel)
     threading.Thread(target=model.serve_forever, daemon=True).start()
-    zone = args.time_zone or morning_time_zone()
     origin = f"http://127.0.0.1:{args.port}"
     config = {"dashboard": {"public_url": origin},
               "model": {"default": "story-model", "provider": "custom",
@@ -423,13 +449,14 @@ def serve(args, temp: Path) -> None:
             hermes("profile", "rename", "default", display)
         else:
             hermes("profile", "create", profile, "--clone", "--no-alias", "--description", description)
-            # Each agent loads plugins from its own folder.
-            shutil.copytree(home / "plugins" / "loopdy", home / "profiles" / profile / "plugins" / "loopdy")
+            # Each agent loads plugins from its own folder (newer Hermes clones them too).
+            shutil.copytree(home / "plugins" / "loopdy", home / "profiles" / profile / "plugins" / "loopdy",
+                            dirs_exist_ok=True)
             # Hermes reads the name people see from profile.yaml (JSON is valid YAML).
             (home / "profiles" / profile / "profile.yaml").write_text(
                 json.dumps({"description": description, "description_auto": False, "display_name": display}))
     hermes("kanban", "init")
-    for title, body, state in KANBAN:
+    for title, body, state in kanban():
         created = subprocess.run([args.hermes, "kanban", "create", title, "--json", *(["--body", body] if body else [])],
                                  cwd=home, env=env, check=True, capture_output=True, text=True, timeout=120)
         task_id = str(json.loads(created.stdout).get("id", ""))

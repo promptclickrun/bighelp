@@ -59,6 +59,8 @@ struct HostSetupView: View {
     var hostToAuthenticate: BighelpConfiguredHost? = nil
     var firstRunPresentation = false
     var completionActionTitle = "Start chatting"
+    /// First-run onboarding offers notifications as a step of its own, after the plugin.
+    var showsNotificationSetup = true
     var retainedDraft: Binding<HostSetupDraft>? = nil
     var onConnectionCommitted: ((BighelpConfiguredHost) -> Void)? = nil
     var onFinished: (() -> Void)? = nil
@@ -432,8 +434,10 @@ struct HostSetupView: View {
                 }
                 .listRowBackground(Color.clear)
             }
-            HostNotificationSetupSection(model: notifications)
-                .listRowBackground(theme.surface)
+            if showsNotificationSetup {
+                HostNotificationSetupSection(model: notifications)
+                    .listRowBackground(theme.surface)
+            }
         }
     }
 

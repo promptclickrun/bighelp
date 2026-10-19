@@ -20,16 +20,34 @@ struct FirstRunOnboardingView: View {
     @State private var hostConnectionCommitted = false
     @State private var hostDraft = HostSetupDraft()
 
+    @AppStorage(FirstRunOnboarding.afterConnectKey) private var isAfterConnect = false
+
     private enum Step: Int, CaseIterable {
         case welcome
         case appearance
         case host
+        case plugin
+        case notifications
+        case mode
 
         var progressLabel: String {
             switch self {
-            case .welcome: "Step 1 of 2 · Welcome"
+            case .welcome: "Step 1 of 4 · Welcome"
             case .appearance: "Appearance · Optional"
-            case .host: "Step 2 of 2 · Connect"
+            case .host: "Step 2 of 4 · Connect"
+            case .plugin: "Step 3 of 4 · Plugin · Optional"
+            case .notifications: "Step 3 of 4 · Notifications"
+            case .mode: "Step 4 of 4 · Your mode"
+            }
+        }
+
+        /// Where the progress bar is, out of four.
+        var progress: Double {
+            switch self {
+            case .welcome, .appearance: 1
+            case .host: 2
+            case .plugin, .notifications: 3
+            case .mode: 4
             }
         }
 
@@ -38,6 +56,9 @@ struct FirstRunOnboardingView: View {
             case .welcome: "welcome"
             case .appearance: "appearance"
             case .host: "connection"
+            case .plugin: "plugin"
+            case .notifications: "notifications"
+            case .mode: "mode"
             }
         }
 
@@ -46,8 +67,16 @@ struct FirstRunOnboardingView: View {
             case .welcome: "Welcome"
             case .appearance: "Appearance"
             case .host: "Connect"
+            case .plugin: "Plugin"
+            case .notifications: "Notifications"
+            case .mode: "Mode"
             }
         }
+
+        /// After Connect, the computer is set up; Back can't undo that.
+        var allowsBack: Bool { [.appearance, .host, .mode].contains(self) }
+        /// Steps a person can pass by: everything but connecting and choosing a mode.
+        var allowsSkip: Bool { [.appearance, .plugin, .notifications].contains(self) }
     }
 
     var body: some View {
@@ -87,7 +116,7 @@ struct FirstRunOnboardingView: View {
     private var progressHeader: some View {
         HStack(spacing: BighelpTokens.space16) {
             Group {
-                if step != .welcome && !(step == .host && hostConnectionCommitted) {
+                if step.allowsBack && !(step == .host && hostConnectionCommitted) {
                     Button {
                         moveBack()
                     } label: {
@@ -108,7 +137,7 @@ struct FirstRunOnboardingView: View {
 
             VStack(spacing: BighelpTokens.space8) {
                 if step != .appearance {
-                    ProgressView(value: step == .welcome ? 1 : 2, total: 2)
+                    ProgressView(value: step.progress, total: 4)
                         .tint(theme.action)
                         .frame(maxWidth: 180)
                         .accessibilityHidden(true)
@@ -126,9 +155,21 @@ struct FirstRunOnboardingView: View {
             .accessibilityValue(step.accessibilityValue)
             .accessibilityIdentifier("onboarding.step")
 
-            Color.clear
-                .frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
-                .accessibilityHidden(true)
+            Group {
+                if step.allowsSkip {
+                    Button("Skip", action: skip)
+                        .bighelpFont(.label)
+                        .foregroundStyle(theme.secondaryText)
+                        .buttonStyle(.plain)
+                        .frame(minWidth: BighelpTokens.hitTarget, minHeight: BighelpTokens.hitTarget)
+                        .contentShape(.rect)
+                        .accessibilityIdentifier("onboarding.skip")
+                } else {
+                    Color.clear
+                        .frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
+                        .accessibilityHidden(true)
+                }
+            }
         }
         .padding(.horizontal, BighelpTokens.space16)
         .padding(.vertical, BighelpTokens.space8)
@@ -150,16 +191,32 @@ struct FirstRunOnboardingView: View {
                 registry: registry,
                 allowsDismiss: false,
                 firstRunPresentation: true,
-                completionActionTitle: "Let's start chatting",
+                completionActionTitle: "Continue",
+                showsNotificationSetup: false,
                 retainedDraft: $hostDraft,
                 onConnectionCommitted: { _ in
                     hostConnectionCommitted = true
                 },
-                onFinished: completeOnboarding
+                onFinished: {
+                    isAfterConnect = true
+                    move(to: .plugin)
+                }
             )
             .transition(stepTransition)
             .accessibilityElement(children: .contain)
         .accessibilityIdentifier("onboarding.connection")
+        case .plugin:
+            // An install still running after Skip must not pull the person back.
+            FirstRunPluginStep(registry: registry,
+                               onInstalled: { if step == .plugin { move(to: .notifications) } },
+                               onSkip: { if step == .plugin { move(to: .mode) } })
+                .transition(stepTransition)
+        case .notifications:
+            FirstRunNotificationsStep(registry: registry, onDone: { if step == .notifications { move(to: .mode) } })
+                .transition(stepTransition)
+        case .mode:
+            FirstRunModeStep(settings: settings, onChoose: completeOnboarding)
+                .transition(stepTransition)
         }
     }
 
@@ -335,8 +392,20 @@ struct FirstRunOnboardingView: View {
         if agreedToAIData { move(to: .host) } else { isAskingAIConsent = true }
     }
 
+    private func skip() {
+        switch step {
+        case .appearance: continueToConnect()
+        case .plugin, .notifications: move(to: .mode)
+        default: break
+        }
+    }
+
     private func moveBack() {
-        move(to: step == .host ? connectionBackStep : .welcome)
+        switch step {
+        case .host: move(to: connectionBackStep)
+        case .mode: move(to: .plugin)
+        default: move(to: .welcome)
+        }
     }
 
     private func move(to destination: Step) {
@@ -355,6 +424,10 @@ struct FirstRunOnboardingView: View {
         let destination: Step
         if registry.onboardingHostID != nil {
             destination = .host
+        } else if isAfterConnect {
+            // Connected already: pick up at the plugin, notifications or mode step.
+            destination = Step(rawValue: savedStepRawValue).flatMap { $0.rawValue > Step.host.rawValue ? $0 : nil }
+                ?? .plugin
         } else {
             destination = Step(rawValue: savedStepRawValue) ?? .welcome
         }
@@ -364,6 +437,7 @@ struct FirstRunOnboardingView: View {
 
     private func completeOnboarding() {
         savedStepRawValue = Step.welcome.rawValue
+        isAfterConnect = false
         onCompleted()
     }
 

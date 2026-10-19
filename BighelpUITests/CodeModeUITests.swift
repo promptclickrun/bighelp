@@ -27,6 +27,9 @@ final class CodeModeUITests: BighelpUITestCase {
         while cards.count < 2, Date() < deadline { usleep(200_000) }
         XCTAssertEqual(cards.count, 2, "Each send adds its own session card.")
         XCTAssertTrue(element("code.screen", in: app).exists, "Sending doesn't leave the Code home.")
+        // The saved screen shows the cards, not the keyboard.
+        cards.element(boundBy: 0).swipeDown()
+        _ = app.keyboards.firstMatch.waitForNonExistence(timeout: 3)
         save("02-two-sessions", app)
 
         app.buttons["code.chip.placement"].tap()

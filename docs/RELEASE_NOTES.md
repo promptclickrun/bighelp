@@ -3,6 +3,28 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.0
+
+This release makes the first setup easier and adds a new reaction bar, bot templates, and Files and Media for
+each bot.
+
+### A simpler first setup
+
+After you connect your computer, the app shows these steps:
+
+1. **Add the bighelp plugin.** This step is optional. The screen shows what the plugin adds. Select
+   **Install Plugin** to install it with one tap, or select **Skip**.
+2. **Turn on notifications.** The app shows this step only after it installs the plugin. Select
+   **Turn On Notifications**, or select **Skip**.
+3. **Choose your mode.** Swipe through the 3 cards: **Bots**, **Sessions**, and **Code**. Tap a card to see a
+   preview of the mode. Then select **Use** and the name of the mode.
+
+- **Bots** opens Simple Bot mode.
+- **Sessions** opens the full app with its usual settings.
+- **Code** opens Bighelp IDE.
+
+You can change the mode later in Settings.
+
 ## 2.5.1
 
 This release adds Simple Bot mode, Teamwork, the Bots widget, and many changes to chats.

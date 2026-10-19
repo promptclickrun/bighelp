@@ -127,18 +127,24 @@ final class DemoSessionCatalogClient: SessionCatalogClient {
         let updatedAt = Date.now.addingTimeInterval(TimeInterval(-index * 3_600))
         // Where each chat started, as Hermes reports it, for the tags and the Started in filter.
         let sources = ["desktop", "telegram", "tui", "claude-code", "codex-cli", "bighelp"]
+        // Group chats get everyday names: the onboarding previews and store screenshots show them.
+        let groupNames = ["Weekend trip", "Family budget", "Home projects", "Dinner plans",
+                          "Gift ideas", "Moving day", "Garden plans", "Party planning"]
+        let previews = ["Here's the plan for Saturday.", "Booked! The details are in your email.",
+                        "I moved your 3 PM to Thursday.", "The shopping list is ready.",
+                        "Your flight is on time.", "I found three good options."]
         return SessionRecord(
             id: "demo-session-\(index)",
             kind: kind,
             agentIDs: agentIDs,
-            title: "\(kind == .botMode ? "Shared" : "Direct") session \(index)",
+            title: kind == .botMode ? groupNames[(index / 6) % groupNames.count] : "Direct session \(index)",
             remoteSource: kind == .botMode ? nil : sources[index % sources.count],
             items: [
                 TimelineItem(
                     id: "demo-session-\(index)-message",
                     role: .assistant,
                     sender: .agent(id: agentIDs[0], snapshot: .init(name: "Assistant")),
-                    content: .message(index.isMultiple(of: 4) ? "Budget planning update" : "Saved fixture conversation"),
+                    content: .message(index.isMultiple(of: 4) ? "Budget planning update" : previews[index % previews.count]),
                     metadata: TimelineMetadata(delivery: "Delivered")
                 )
             ],

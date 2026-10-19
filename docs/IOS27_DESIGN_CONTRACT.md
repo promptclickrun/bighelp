@@ -14,7 +14,7 @@ The retained Figma design-context responses establish native toolbar, sheet tool
 
 A new user should understand how to connect and chat in roughly 30 seconds, with the low effort of Muse AI or similar chat apps. This is a comprehension target, not an unmeasured authentication-time guarantee. Keep one obvious primary action, group related settings in clear menus, and keep those settings editable. A setting does not need a separate screen. The source inventory preserves capabilities; it is not a page quota. Use progressive disclosure for advanced choices and recovery mechanics without hiding safety consequences.
 
-The primary first-run path is Welcome → Connect. Appearance customization is optional, not a required stop before setup, and remains accessible through Settings.
+The primary first-run path is Welcome → Connect → Choose your mode. Appearance customization is optional, not a required stop before setup, and remains accessible through Settings. After Connect, the bighelp plugin step is optional; notifications are offered only once the plugin is in. Every optional step has a small Skip at the top right; Connect and Choose your mode don't. The mode cards (Bots, Sessions, Code) each open a preview of their mode, and the screen says the choice can be changed later.
 
 ## Visual system
 

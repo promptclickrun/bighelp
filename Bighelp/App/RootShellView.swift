@@ -9,6 +9,9 @@ struct RootShellView: View {
 
     @AppStorage("loopdy.onboarding.first-run-v1.completed")
     private var hasCompletedFirstRunOnboarding = false
+    /// Connected, with the plugin, notifications and mode steps still to go (`FirstRunOnboarding`).
+    @AppStorage(FirstRunOnboarding.afterConnectKey)
+    private var isOnboardingAfterConnect = false
     @State private var didCompleteForcedFirstRunOnboarding = false
     let appState: AppState
     let settings: SettingsStore
@@ -386,6 +389,7 @@ struct RootShellView: View {
         if usesWorkspaceFixtures || ProcessInfo.processInfo.arguments.contains("-test-no-configured-hosts") { return false }
         #endif
         guard !hasCompletedFirstRunOnboarding else { return false }
+        if isOnboardingAfterConnect, !hostRegistry.hosts.isEmpty { return true }
         return hostRegistry.hosts.isEmpty || hostRegistry.onboardingHostID != nil
     }
 
@@ -425,7 +429,7 @@ struct RootShellView: View {
         guard let hostRegistry,
               hostRegistry.isWorkspaceReady,
               !hostRegistry.hosts.isEmpty,
-              hostRegistry.onboardingHostID == nil else { return }
+              hostRegistry.onboardingHostID == nil, !isOnboardingAfterConnect else { return }
         hasCompletedFirstRunOnboarding = true
     }
 

@@ -205,7 +205,8 @@ struct MyTemplatesTests {
     }
 
     @Test func theDemoComputerHasOneAndHidesItsBrokenOne() async throws {
-        let store = MyTemplatesStore(connection: { ("demo", DemoMyTemplatesClient()) })
+        let demo = DemoMyTemplatesClient()
+        let store = MyTemplatesStore(connection: { ("demo", demo) })
         await store.refresh()
         #expect(store.load == .loaded)
         #expect(store.templates.count == 1)

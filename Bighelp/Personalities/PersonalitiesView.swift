@@ -32,24 +32,24 @@ struct PersonalitiesView: View {
         .navigationTitle("Personalities")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            // Plain toolbar buttons, as in the other sheets: the bar already draws its own
+            // glass around each item (a second glass circle inside it shows as a double disk).
             ToolbarItem(placement: .topBarLeading) {
-                BighelpHeaderActionButton(
-                    systemImage: "chevron.left",
-                    accessibilityLabel: "Back to Settings",
-                    action: { dismiss() }
-                )
+                Button("Done") { dismiss() }
                 #if targetEnvironment(macCatalyst)
                 .keyboardShortcut(.cancelAction)
                 #endif
+                .bighelpToolbarText()
                 .accessibilityIdentifier("personalities.back")
             }
             ToolbarItem(placement: .primaryAction) {
-                BighelpHeaderActionButton(
-                    systemImage: "plus",
-                    accessibilityLabel: "New Personality",
-                    isEnabled: !store.isSaving && store.catalog != nil,
-                    action: { editor = .new }
-                )
+                Button {
+                    editor = .new
+                } label: {
+                    Image(systemName: "plus").bighelpToolbarIcon()
+                }
+                .bighelpIconLabel("New Personality")
+                .disabled(store.isSaving || store.catalog == nil)
                 .accessibilityIdentifier("personalities.add")
             }
         }

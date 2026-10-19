@@ -27,6 +27,11 @@ final class CodeModeUITests: BighelpUITestCase {
         while cards.count < 2, Date() < deadline { usleep(200_000) }
         XCTAssertEqual(cards.count, 2, "Each send adds its own session card.")
         XCTAssertTrue(element("code.screen", in: app).exists, "Sending doesn't leave the Code home.")
+        // A tap in the list puts the keyboard away, so the shot shows the message box and its chips. The
+        // chosen filter chip is in it and stays chosen; the cards would open their chats.
+        app.buttons["code.filter.all"].tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), "A tap in the list closes the keyboard.")
+        sleep(1)
         save("02-two-sessions", app)
 
         app.buttons["code.chip.placement"].tap()

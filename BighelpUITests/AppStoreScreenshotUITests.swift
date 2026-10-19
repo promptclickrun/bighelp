@@ -49,11 +49,11 @@ final class AppStoreScreenshotUITests: BighelpUITestCase {
                 until: "morning brief is scheduled", in: app)
         save("05-automation", app)
 
-        openTab("tab.feed", in: app)
+        openBoard("tab.feed", showing: "September in one line", in: app)
         save("03-feed", app)
-        openTab("tab.goals", in: app)
+        openBoard("tab.goals", showing: "Lisbon fund", in: app)
         save("04-goals", app)
-        openTab("tab.ideas", in: app)
+        openBoard("tab.ideas", showing: "Book Sintra trains now", in: app)
         save("08-ideas", app)
 
         try openAgent("penny", in: app)
@@ -64,11 +64,32 @@ final class AppStoreScreenshotUITests: BighelpUITestCase {
         save("01-spending", app)
 
         try openAgent("atlas", in: app)
-        try ask("We fly to Lisbon on the 9th. Can you turn my trip notes into a packing list?",
+        try ask("We fly to Lisbon next week. Can you turn my trip notes into a packing list?",
                 until: "reminder the night before", in: app)
         try expectCard("Lisbon packing list", chat: "Lisbon packing list", in: app)
         scrollToCard(in: app, by: 0)
         save("02-packing", app)
+
+        // Simple Bot mode's home on the same host, after the agents' chats above. The same app
+        // (and run ID) relaunched, so it stays connected.
+        app.terminate()
+        app.launchArguments += ["-bighelp.settings.simple-bots", "YES"]
+        app.launch()
+        let home = app.descendants(matching: .any)["simple-bots.home"]
+        XCTAssertTrue(home.waitForExistence(timeout: 60), "Simple Bot mode opens on its home")
+        for id in ["penny", "atlas"] {
+            let bot = app.descendants(matching: .any).matching(NSPredicate(format: "identifier IN %@",
+                ["simple-bots.bot.\(id)", "simple-bots.pinned.\(id)"])).firstMatch
+            XCTAssertTrue(bot.waitForExistence(timeout: 60), "\(id) is on the home")
+        }
+        // A row's last message comes with the chat list, after the bots themselves.
+        _ = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Here's your list"))
+            .firstMatch.waitForExistence(timeout: 30)
+        sleep(3)
+        save("11-bots", app)
+        app.terminate()
+        app.launchArguments.removeLast(2)
+        app.launch()
 
         openMenu(in: app)
         save("06-menu", app)
@@ -148,7 +169,8 @@ final class AppStoreScreenshotUITests: BighelpUITestCase {
         let menu = [app.buttons["home.drawer.open"].firstMatch, app.buttons["chat.menu"].firstMatch]
         let deadline = Date().addingTimeInterval(15)
         while Date() < deadline {
-            if let button = menu.first(where: { $0.exists && $0.isHittable }) {
+            // A button that's in the tree but not laid out yet has no frame to hit-test.
+            if let button = menu.first(where: { $0.exists && $0.frame.minX.isFinite && !$0.frame.isEmpty && $0.isHittable }) {
                 button.tap()
                 break
             }
@@ -175,6 +197,21 @@ final class AppStoreScreenshotUITests: BighelpUITestCase {
     private func openTab(_ identifier: String, in app: XCUIApplication) {
         openRootTab(identifier, in: app, timeout: 15)
         sleep(3)
+    }
+
+    /// A Feed, Goals or Ideas page with the agent's posts on it. A busy host can miss the
+    /// first load, which then stays failed until the page is pulled to refresh.
+    @MainActor
+    private func openBoard(_ identifier: String, showing text: String, in app: XCUIApplication) {
+        openTab(identifier, in: app)
+        let post = app.staticTexts[text].firstMatch
+        for _ in 0..<3 where !post.waitForExistence(timeout: 10) {
+            let window = app.windows.firstMatch
+            window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3))
+                .press(forDuration: 0.1, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75)))
+            sleep(3)
+        }
+        XCTAssertTrue(post.exists, "\(text) is on the page")
     }
 
     /// The reply's card, reopening the chat from ☰ once if the card hasn't drawn.
@@ -209,7 +246,7 @@ final class AppStoreScreenshotUITests: BighelpUITestCase {
             swipeBackFromLeadingEdge(in: app); sleep(1); return
         }
         let back = app.navigationBars.buttons.firstMatch
-        if back.exists, back.isHittable { back.tap(); sleep(1) }
+        if back.exists, back.frame.minX.isFinite, !back.frame.isEmpty, back.isHittable { back.tap(); sleep(1) }
     }
 
     private func environment(_ name: String) -> String? {

@@ -488,6 +488,21 @@ final class SessionCatalogStore {
         persistChangesIfNeeded()
     }
 
+    /// Chats someone archived on this computer (Archived Chats).
+    func archivedChats() async throws -> [SessionArchivedChat] {
+        try await client.archivedChats()
+    }
+
+    /// Restores an archived chat and lists it again; the restored record, when it's back.
+    @discardableResult
+    func restoreArchivedChat(_ chat: SessionArchivedChat) async throws -> SessionRecord? {
+        try await client.restoreArchivedChat(chat)
+        try await load(requireAuthoritativeRefresh: true)
+        return records.first {
+            $0.agentIDs == [chat.profileID] && $0.remoteStoredID.map { DirectHermesIdentity.matches($0, chat.storedID) } == true
+        }
+    }
+
     func archiveSession(id: String) async throws {
         try await removeSession(id: id, using: client.archive)
     }

@@ -245,15 +245,8 @@ struct RootShellView: View {
                     .bighelpSheetSize(.standard)
             }
         }
-        .bighelpSheet(isPresented: Binding(get: { hostRegistry?.isSetupPresented == true },
-                                   set: { if !$0 { hostRegistry?.finishSetup() } })) {
-            if let hostRegistry {
-                NavigationStack {
-                    HostSetupView(registry: hostRegistry, hostToAuthenticate: hostRegistry.hosts.first { $0.id == hostRegistry.setupHostID })
-                }
-                .bighelpSheetSize(.standard)
-            }
-        }
+        // With Settings open (Settings › System › Add Host), Settings presents it: one view shows one sheet.
+        .modifier(HostSetupSheet(registry: hostRegistry, isActive: !isUnifiedSettingsPresented))
         .onChange(of: hostRegistry?.selectedHostID) { _, _ in
             appState.resetForHostBoundary(keepsAllHostsScreens: fleetModeOn)
         }
@@ -671,6 +664,7 @@ struct RootShellView: View {
             }
             .bighelpSheetSize()
             .presentationDragIndicator(.visible)
+            .modifier(HostSetupSheet(registry: hostRegistry, isActive: true))
         }
         .bighelpSheet(isPresented: $isHermesWorkspacePresented) {
             HermesWorkspacePickerView(

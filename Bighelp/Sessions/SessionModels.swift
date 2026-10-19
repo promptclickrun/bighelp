@@ -110,7 +110,7 @@ enum SessionOrigin {
         case "slack": return "Slack"
         case "whatsapp": return "WhatsApp"
         case "signal": return "Signal"
-        case "imessage", "bluebubbles": return "iMessage"
+        case "imessage", "imsg", "bluebubbles": return "iMessage"
         case "sms": return "SMS"
         case "email": return "Email"
         case "matrix": return "Matrix"
@@ -551,9 +551,25 @@ struct SessionStartRuntime: Equatable, Sendable {
     var fast: Bool?
 }
 
+/// A chat someone archived on the computer, for Archived Chats. Restoring it brings it back to the lists.
+struct SessionArchivedChat: Identifiable, Equatable, Sendable {
+    let profileID: String
+    let storedID: String
+    let title: String
+    /// Hermes' `source`: the app or channel it came from (`imsg`, `telegram`, `bighelp`…).
+    let source: String?
+    let preview: String?
+    let lastActive: Date?
+
+    var id: String { profileID + "/" + storedID }
+}
+
 @MainActor
 protocol SessionCatalogClient {
     var canDeleteConversation: Bool { get }
+    /// Chats someone archived, every agent's, newest first.
+    func archivedChats() async throws -> [SessionArchivedChat]
+    func restoreArchivedChat(_ chat: SessionArchivedChat) async throws
     var allowsLocalAgentReassignment: Bool { get }
     func list() async throws -> [SessionRecord]
     func refreshMetadata(_ record: SessionRecord) async throws -> SessionRecord?
@@ -587,6 +603,11 @@ extension SessionCatalogClient {
     /// Native hosts can verify one saved session without enumerating every profile.
     /// Clients without that operation keep the existing catalog-refresh behavior.
     func refreshMetadata(_ record: SessionRecord) async throws -> SessionRecord? { nil }
+
+    func archivedChats() async throws -> [SessionArchivedChat] { [] }
+    func restoreArchivedChat(_ chat: SessionArchivedChat) async throws {
+        throw WorkspaceClientError.unavailable(.unsupportedOperation)
+    }
 
     /// IDs covered by this client's verified canonical history, including
     /// repeated/conflicting stored variants that cannot share one activity ID.

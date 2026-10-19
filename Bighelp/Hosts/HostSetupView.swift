@@ -900,3 +900,23 @@ struct HostNotificationSetupSection: View {
         }
     }
 }
+
+/// Add a computer (or sign in to one again), as a sheet over whatever presents it. The shell's root
+/// presents it, and Settings does while Settings is open: a second sheet from the root never showed.
+struct HostSetupSheet: ViewModifier {
+    let registry: BighelpHostRegistry?
+    let isActive: Bool
+
+    func body(content: Content) -> some View {
+        content.bighelpSheet(isPresented: Binding(get: { isActive && registry?.isSetupPresented == true },
+                                                  set: { if !$0 { registry?.finishSetup() } })) {
+            if let registry {
+                NavigationStack {
+                    HostSetupView(registry: registry,
+                                  hostToAuthenticate: registry.hosts.first { $0.id == registry.setupHostID })
+                }
+                .bighelpSheetSize(.standard)
+            }
+        }
+    }
+}

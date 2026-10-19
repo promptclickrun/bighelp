@@ -210,6 +210,8 @@ final class SessionsModel {
     private(set) var loadState: LoadState
 
     private let catalog: SessionCatalogStore?
+    /// For Archived Chats.
+    var archiveCatalog: SessionCatalogStore? { catalog }
     private let agents: AgentDirectoryStore?
     private let hostedRoomStore: BotModeRoomStore?
     private let fixtureRecords: [SessionRecord]

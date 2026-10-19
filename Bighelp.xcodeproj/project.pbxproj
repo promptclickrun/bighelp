@@ -1421,6 +1421,7 @@
 		E3FB752FCAD5CE9CEB226CE9 /* HermesAvatarLook.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82FD265A31C14F9585A9F7D6 /* HermesAvatarLook.swift */; };
 		E48DD0970737661BE8349B18 /* BighelpWidgetGateways.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7360B9B1CAA86FD498516A5 /* BighelpWidgetGateways.swift */; };
 		E4F06C54D7E5C01E36870064 /* IncomingChatLinkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FA3C250CDD715840DD68725 /* IncomingChatLinkTests.swift */; };
+		E5090DCFAD97653949515E17 /* ArchivedChatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 016B5A5AB576F05F2662F5A4 /* ArchivedChatsView.swift */; };
 		E51F00237AFBD9ECC2DF855E /* NativeSessionRollbackReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDDA296E17AEE83F9BF9EB5A /* NativeSessionRollbackReviewView.swift */; };
 		E5683264224E52876DEA1A4D /* soul-fable.md in Resources */ = {isa = PBXBuildFile; fileRef = 0921D2D213BFE85A3F673A09 /* soul-fable.md */; };
 		E5AE72FCAF0D598E265BF605 /* ProfileLifecycleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4B3EF4DE0B3F0D3F8FF8DA5 /* ProfileLifecycleView.swift */; };
@@ -1696,6 +1697,7 @@
 		0146AA0B6247AD289E1620B5 /* DirectHermesKanbanAdministrationClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectHermesKanbanAdministrationClient.swift; sourceTree = "<group>"; };
 		0156F75829D25E6BA0D4AC18 /* HermesLogModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesLogModels.swift; sourceTree = "<group>"; };
 		015D146A996F9F8372C8D7D5 /* BighelpLiveActivityProjection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpLiveActivityProjection.swift; sourceTree = "<group>"; };
+		016B5A5AB576F05F2662F5A4 /* ArchivedChatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchivedChatsView.swift; sourceTree = "<group>"; };
 		0170EA9C3CB2F9E421319E21 /* WorkspaceArtifactEnumeration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceArtifactEnumeration.swift; sourceTree = "<group>"; };
 		018AE94307FCF69BF62A9C22 /* PluginLifecycleManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginLifecycleManagementView.swift; sourceTree = "<group>"; };
 		01A918D06D010CA604387580 /* DemoSessionCatalogClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoSessionCatalogClient.swift; sourceTree = "<group>"; };
@@ -3640,6 +3642,7 @@
 		44572CEA4E3E39DE844D9BB2 /* Sessions */ = {
 			isa = PBXGroup;
 			children = (
+				016B5A5AB576F05F2662F5A4 /* ArchivedChatsView.swift */,
 				01A918D06D010CA604387580 /* DemoSessionCatalogClient.swift */,
 				9A141163A9E4FC5DB82AE632 /* OtherAppChats.swift */,
 				6C44773F84C3D6A3BE8C0459 /* SessionAppFilter.swift */,
@@ -6187,6 +6190,7 @@
 				FB1006D7E3368B0133A24FEF /* ApprovalModel.swift in Sources */,
 				FA469F6704FF6F1F7C61A902 /* ApprovalModels.swift in Sources */,
 				EAF24ECE6704D733065B4BBA /* AppsHubView.swift in Sources */,
+				E5090DCFAD97653949515E17 /* ArchivedChatsView.swift in Sources */,
 				AC28FD6885A7D68ED2CBB514 /* AssistantMessageRouting.swift in Sources */,
 				EACDEE842398F9FBCFCBF3CF /* AttachmentWireModels.swift in Sources */,
 				50780189A3CAD330F23725C5 /* AvatarCatalog.swift in Sources */,

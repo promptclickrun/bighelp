@@ -164,6 +164,9 @@ struct SimpleBotsSettingsContext {
     let onDone: () -> Void
     /// Your gateways (computers) and how to pick the one in use.
     var gateways = BighelpMenuHosts()
+    /// Archived Chats, and opening one of them.
+    var catalog: SessionCatalogStore? = nil
+    var onOpenSession: (SessionSummary) -> Void = { _ in }
 }
 
 enum SimpleBotsSettingsPage: Hashable {
@@ -443,6 +446,18 @@ struct SimpleBotsSettingsView: View {
             .padding(.horizontal, BighelpTokens.space20)
             .padding(.vertical, BighelpTokens.space12)
             .accessibilityIdentifier("simple-bots.settings.mode")
+            if let catalog = context.catalog {
+                SimpleBotsDivider()
+                NavigationLink {
+                    ArchivedChatsView(catalog: catalog,
+                                      agentName: { id in context.agents.profiles.first { $0.id == id }?.name ?? id },
+                                      onOpen: context.onOpenSession)
+                } label: {
+                    SimpleBotsRow(title: "Archived Chats")
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("simple-bots.settings.archived")
+            }
             SimpleBotsDivider()
             NavigationLink {
                 context.allSettings()

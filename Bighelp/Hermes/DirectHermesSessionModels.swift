@@ -128,7 +128,11 @@ struct DirectHermesSessionCreationState: Codable, Equatable, Sendable {
 struct DirectHermesSessionListOptions: Equatable, Sendable {
     enum Archive: String, Sendable { case exclude, only, include }
     enum Order: String, Sendable { case created, recent }
-    var archived: Archive = .exclude
+    /// `include` with the default list, which then leaves out only what someone archived
+    /// (`DirectHermesSessionCatalogClient.isDeliberatelyArchived`).
+    var archived: Archive = .include
+    /// Also lists chats someone archived (opening one by its ID, maintenance).
+    var keepsDeliberatelyArchived = false
     var order: Order = .created
     var sources: [String] = []
     var excludedSources: [String] = ["tool", "kanban", "bot_room"]

@@ -307,6 +307,10 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
                 }
                 for row in rows {
                     guard let object = row.object else { throw WorkspaceClientError.invalidResponse }
+                    // Hermes' idle sweep (`sessions.auto_archive`) archives a chat nobody touched for a few
+                    // days. That's not the person's choice, so the chat stays; one someone archived doesn't.
+                    if options.archived == .include, !options.keepsDeliberatelyArchived,
+                       Self.isDeliberatelyArchived(object) { continue }
                     let stored = try DirectHermesSessionValidation.string(object["id"])
                     if !seen.insert(DirectHermesSessionIdentity.key(stored)).inserted {
                         // REST pages include pinned sessions as a back-fill on
@@ -320,7 +324,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
                         continue
                     }
                     var binding = try catalogBinding(object, profile: profile)
-                    if options.archived == .exclude { archivedKeys.subtract(identityKeys(binding)) }
+                    if options.archived != .only { archivedKeys.subtract(identityKeys(binding)) }
                     binding = try coalescingSavedBinding(
                         binding,
                         claimedRetainedVisibleIDs: &claimedRetainedVisibleIDs
@@ -1228,6 +1232,60 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
             archivedKeys.formUnion(identityKeys(binding))
         }
         setBinding(nil, for: record.id)
+    }
+
+    /// Chats someone archived, every agent's, newest first. A plain read: the catalog's bindings and
+    /// open chats are untouched.
+    func archivedChats() async throws -> [SessionArchivedChat] {
+        var chats: [SessionArchivedChat] = []
+        for profile in try await loadProfiles() {
+            let response = try await perform(.sessionsList, [
+                "profile": .string(profile.id), "limit": .integer(100), "offset": .integer(0),
+                "archived": .string("only"), "order": .string("recent"),
+                "exclude_sources": .string("tool,kanban,bot_room,cron"),
+            ])
+            guard let rows = response["sessions"]?.array, rows.count <= 100 else {
+                throw WorkspaceClientError.invalidResponse
+            }
+            for row in rows {
+                guard let object = row.object, Self.isDeliberatelyArchived(object),
+                      let stored = try? DirectHermesSessionValidation.string(object["id"]) else { continue }
+                let title = (try? DirectHermesSessionValidation.optionalText(object["title"], maximum: 800)) ?? nil
+                let preview = (try? DirectHermesSessionValidation.optionalText(object["preview"], maximum: 2_000)) ?? nil
+                let source = (try? DirectHermesSessionValidation.optionalText(object["source"], maximum: 128)) ?? nil
+                let lastActive = ((try? DirectHermesSessionValidation.date(object["last_active"])) ?? nil)
+                    ?? ((try? DirectHermesSessionValidation.date(object["started_at"])) ?? nil)
+                chats.append(SessionArchivedChat(
+                    profileID: profile.id, storedID: stored,
+                    title: title.flatMap { $0.isEmpty ? nil : $0 } ?? preview ?? "Chat",
+                    source: source, preview: preview, lastActive: lastActive))
+            }
+        }
+        return chats.sorted { ($0.lastActive ?? .distantPast) > ($1.lastActive ?? .distantPast) }
+    }
+
+    /// Un-archives a chat, as Hermes Desktop's Restore does; the next list has it again.
+    func restoreArchivedChat(_ chat: SessionArchivedChat) async throws {
+        try DirectHermesSessionValidation.coordinate(chat.profileID, maximum: 128)
+        try DirectHermesSessionValidation.coordinate(chat.storedID)
+        let response = try await perform(.sessionUpdate, [
+            "session_id": .string(chat.storedID), "profile": .string(chat.profileID), "archived": .boolean(false),
+        ])
+        guard response["ok"]?.boolean == true else { throw WorkspaceClientError.invalidResponse }
+    }
+
+    /// Archived by someone (in bighelp, Hermes Desktop, the CLI…), not by Hermes' idle sweep, which marks
+    /// its own `auto_archived`. A Hermes without that mark: every archive counts as deliberate.
+    static func isDeliberatelyArchived(_ row: [String: BighelpJSONValue]) -> Bool {
+        func flag(_ value: BighelpJSONValue?) -> Bool {
+            switch value {
+            case .boolean(let on)?: on
+            case .integer(let number)?: number != 0
+            case .number(let number)?: number != 0
+            default: false
+            }
+        }
+        return flag(row["archived"]) && !flag(row["auto_archived"])
     }
 
     private func identityKeys(_ binding: Binding) -> Set<String> {

@@ -196,6 +196,14 @@ extension NativeWorkspaceSessionBridge {
         return (try? box.value())?.canonicalToolCallIDs(for: record) ?? []
     }
 
+    func archivedChats() async throws -> [SessionArchivedChat] {
+        try await box.value().archivedChats()
+    }
+
+    func restoreArchivedChat(_ chat: SessionArchivedChat) async throws {
+        try await box.value().restoreArchivedChat(chat)
+    }
+
     func refreshMetadata(_ record: SessionRecord) async throws -> SessionRecord? {
         try await prepare(record, catalog: box.value())
     }
@@ -344,6 +352,7 @@ extension NativeWorkspaceSessionBridge {
         let catalog = try box.value()
         var options = DirectHermesSessionListOptions()
         options.archived = .include
+        options.keepsDeliberatelyArchived = true
         let records = try await catalog.list(options: options)
         guard !retired, connections.owner == owner else {
             throw WorkspaceClientError.ownerChanged

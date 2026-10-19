@@ -1212,6 +1212,44 @@ struct DirectHermesSessionCatalogClientTests {
         }
     }
 
+    /// Hermes' idle sweep (`sessions.auto_archive`) archives chats nobody touched for days; they stay in the
+    /// lists. A chat someone archived waits in Archived Chats, which restores it.
+    @Test func idleSweptChatsStayListedAndArchivedOnesWaitInArchivedChats() async throws {
+        @MainActor final class Updates { var payloads: [[String: BighelpJSONValue]] = [] }
+        let updates = Updates()
+        var swept = try #require(Self.session(id: "swept").object)
+        swept["archived"] = .boolean(true)
+        swept["auto_archived"] = .integer(1)
+        var archived = try #require(Self.session(id: "taco-order").object)
+        archived["archived"] = .boolean(true)
+        archived["auto_archived"] = .integer(0)
+        archived["source"] = .string("imsg")
+        let workspace = try SessionWorkspaceStub()
+        workspace.handler = { operation, payload in
+            switch operation {
+            case .profilesList: return Self.profiles()
+            case .sessionsList:
+                if payload["archived"] == .string("only") {
+                    return Self.ownershipPage([.object(archived), .object(swept)])
+                }
+                #expect(payload["archived"] == .string("include"))
+                return Self.ownershipPage([Self.session(id: "plain"), .object(swept), .object(archived)])
+            case .sessionUpdate:
+                updates.payloads.append(payload)
+                return ["ok": .boolean(true)]
+            default: throw WorkspaceClientError.invalidRequest
+            }
+        }
+        let client = Self.client(workspace)
+        #expect(try await client.list().compactMap(\.remoteStoredID).sorted() == ["plain", "swept"])
+        let chats = try await client.archivedChats()
+        #expect(chats.map(\.storedID) == ["taco-order"])
+        #expect(SessionOrigin.label(chats.first?.source) == "iMessage")
+        try await client.restoreArchivedChat(try #require(chats.first))
+        #expect(updates.payloads.first?["archived"] == .boolean(false))
+        #expect(updates.payloads.first?["session_id"] == .string("taco-order"))
+    }
+
     @Test func canonicalPinUsesRegistryIdentity() async throws {
         let workspace = try SessionWorkspaceStub()
         workspace.handler = { operation, payload in

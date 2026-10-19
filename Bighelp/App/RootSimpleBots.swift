@@ -233,7 +233,14 @@ extension RootShellView {
             onOpenUsage: { leaveSettings { appState.open(.usage) } },
             onOpenComputer: { id in leaveSettings { appState.open(.simpleBotProfile(agentID: id)) } },
             onDone: close,
-            gateways: BighelpMenuHosts.current(registry: hostRegistry, demoHosts: demoHosts)
+            gateways: BighelpMenuHosts.current(registry: hostRegistry, demoHosts: demoHosts),
+            catalog: sessionCatalog,
+            onOpenSession: { summary in
+                leaveSettings {
+                    appState.chatOpenedFromList = true
+                    openSession(summary)
+                }
+            }
         ))
     }
 }

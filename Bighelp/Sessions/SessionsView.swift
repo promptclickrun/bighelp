@@ -40,6 +40,7 @@ struct SessionsView: View {
     @State private var lastSessionSectionDropTargetKey: SessionSectionKey?
     @State private var mutationSuccesses = 0
     @State private var mutationFailures = 0
+    @State private var isArchivedPresented = false
     let agents: AgentDirectoryStore
     let settings: SettingsStore
     let organizeByProjects: Bool
@@ -255,6 +256,24 @@ struct SessionsView: View {
         .onChange(of: model.appFilter) { _, filter in
             if let sharedAppFilter, sharedAppFilter.wrappedValue != filter { sharedAppFilter.wrappedValue = filter }
         }
+        .bighelpSheet(isPresented: $isArchivedPresented) {
+            if let catalog = model.archiveCatalog {
+                NavigationStack {
+                    ArchivedChatsView(catalog: catalog,
+                                      agentName: { id in agents.profiles.first { $0.id == id }?.name ?? id },
+                                      onOpen: { summary in
+                                          isArchivedPresented = false
+                                          onSelect(summary)
+                                      })
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") { isArchivedPresented = false }
+                        }
+                    }
+                }
+                .bighelpSheetSize(.standard)
+            }
+        }
         .bighelpSheet(isPresented: Binding(get: { otherAppsStore?.preview != nil },
                                     set: { if !$0 { otherAppsStore?.closePreview() } })) {
             if let store = otherAppsStore, let preview = store.preview {
@@ -459,6 +478,10 @@ struct SessionsView: View {
                     .accessibilityIdentifier("sessions.options.organize-by-projects")
                 Toggle("Show Scheduled Runs", systemImage: "calendar.badge.clock", isOn: $settings.showCronSessions)
                     .accessibilityIdentifier("sessions.options.show-cron-sessions")
+                if model.archiveCatalog != nil {
+                    Button("Archived Chats", systemImage: "archivebox") { isArchivedPresented = true }
+                        .accessibilityIdentifier("sessions.options.archived")
+                }
             }
         } label: {
             Image(systemName: hasActiveFilters(model)

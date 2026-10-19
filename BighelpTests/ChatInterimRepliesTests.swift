@@ -58,28 +58,36 @@ struct ChatInterimRepliesTests {
         #expect(interimIDs(ChatInterimReplies.marking(entries, isSending: false, isBotMode: true)).isEmpty)
     }
 
-    /// Simple Bot mode reads like texting: a message the agent kept working after is still a
-    /// text. It never turns grey while the turn runs, and it stays when the turn ends (with
-    /// Show reasoning off, the default, the full chat hides such notes).
-    @Test func simpleBotChatsKeepEveryMessageAsAText() {
-        func shownMessages(_ rows: [ChatTurnDisplayRow]) -> [String] {
-            rows.compactMap { row in
-                guard case .entry(.message(let item)) = row else { return nil }
-                return item.id
-            }
-        }
-        let entries = [human("q"), reply("a"), work("w1"), reply("b"), work("w2")]
-        let full = ChatInterimReplies.marking(entries, isSending: false, isBotMode: false)
-        #expect(shownMessages(ChatCompletedTurnProjection.rows(
-            from: full, isSending: false, enabled: true, interimReplies: .hidden)) == ["q", "b"])
+    /// Simple Bot mode: a turn's interim messages go under one "{Agent}'s reasoning" row where the first
+    /// was, shown with Show reasoning on and hidden with it off. The message that ends the turn is its
+    /// answer and always shows.
+    @Test func simpleBotChatsGroupInterimMessagesUnderTheBotsReasoning() {
+        func ids(_ rows: [ChatTurnDisplayRow]) -> [String] { rows.map(\.id) }
+        let entries = [human("q"), reply("a"), work("w1"), reply("b"), work("w2"), reply("answer")]
+        let rows = ChatCompletedTurnProjection.rows(
+            from: ChatInterimReplies.marking(entries, isSending: false, isBotMode: false),
+            isSending: false, enabled: false, interimReplies: .inline)
 
-        let texts = ChatInterimReplies.marking(entries, isSending: false, isBotMode: false, isSimpleBots: true)
-        #expect(interimIDs(texts).isEmpty)
-        #expect(shownMessages(ChatCompletedTurnProjection.rows(
-            from: texts, isSending: false, enabled: true, interimReplies: .hidden)) == ["q", "a", "b"])
-        let running = [human("q"), reply("a"), work("w")]
-        #expect(interimIDs(ChatInterimReplies.marking(
-            running, isSending: true, isBotMode: false, isSimpleBots: true)).isEmpty)
+        let shown = ChatInterimReplies.groupingForSimpleBots(rows, agentName: "Avery", showsReasoning: true)
+        #expect(ids(shown) == ["message:q", "reasoning:a", "activity:w1", "activity:w2", "message:answer"])
+        guard case .reasoning(let group)? = shown.first(where: { $0.id == "reasoning:a" }) else {
+            Issue.record("No reasoning row")
+            return
+        }
+        #expect(group.agentName == "Avery")
+        #expect(group.entries.map(\.id) == ["message:a", "message:b"])
+
+        let hidden = ChatInterimReplies.groupingForSimpleBots(rows, agentName: "Avery", showsReasoning: false)
+        #expect(ids(hidden) == ["message:q", "activity:w1", "activity:w2", "message:answer"],
+                "The answer shows even with reasoning hidden")
+
+        // While the bot works, its newest message stays a message until more work follows it.
+        let working = ChatCompletedTurnProjection.rows(
+            from: ChatInterimReplies.marking([human("q"), reply("a"), work("w"), reply("latest")],
+                                             isSending: true, isBotMode: false),
+            isSending: true, enabled: false, interimReplies: .inline)
+        #expect(ids(ChatInterimReplies.groupingForSimpleBots(working, agentName: "Avery", showsReasoning: false))
+                == ["message:q", "activity:w", "message:latest"])
     }
 
     /// With tool calls hidden the transcript shows no work, but the agent kept

@@ -164,6 +164,11 @@ enum ChatCanvasTranscriptProjection {
                 if disclosures.isCompletedTurnExpanded(turn.id) {
                     turn.expandedEntries.forEach { append($0, inOpenedTurn: true) }
                 }
+            case .reasoning(let group):
+                // The row names the bot; its messages follow as their own rows, in reasoning's look.
+                result.append(.transcript(.reasoning(ChatInterimReasoning(id: group.id, agentName: group.agentName,
+                                                                         entries: []))))
+                group.entries.forEach { append($0) }
             }
         }
         return result

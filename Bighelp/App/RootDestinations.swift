@@ -213,6 +213,11 @@ extension RootShellView {
             ReopeningChatView {
                 replaceLostChat(id: conversationID, agentID: nil, text: "")
             }
+        case (.chat(let conversationID), nil):
+            // A chat on screen whose live state was let go: open it again from its saved session.
+            ReopeningChatView {
+                reopenChatRoute(id: conversationID)
+            }
         default:
             ContentUnavailableView(
                 "Route unavailable",

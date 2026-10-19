@@ -269,19 +269,24 @@ extension ChatView {
         return ChatActivityWaiting.resolve(prompts: prompts, events: turn.events)
     }
     private var displayedTranscriptRows: [ChatTurnDisplayRow] {
-        ChatCompletedTurnProjection.rows(
+        // Simple Bot mode keeps interim messages out of the "Worked for" fold: they go under the
+        // bot's own reasoning row instead (`groupingForSimpleBots`).
+        let simpleBots = homeChrome.isSimpleBots && !model.isBotMode
+        let rows = ChatCompletedTurnProjection.rows(
             from: ChatInterimReplies.marking(
                 ChatCardTranscriptProjection.removingSupersededLiveCards(from: model.transcriptEntries),
                 isSending: model.isSending,
                 isBotMode: model.isBotMode,
-                isSimpleBots: homeChrome.isSimpleBots,
                 activityEvents: model.activityLedger.allEvents
             ),
             isSending: model.isSending,
             enabled: foldCompletedTurns,
             activityEvents: model.activityLedger.allEvents,
-            interimReplies: .following(model.activityVisibility)
+            interimReplies: simpleBots ? .inline : .following(model.activityVisibility)
         )
+        guard simpleBots else { return rows }
+        return ChatInterimReplies.groupingForSimpleBots(rows, agentName: agentName,
+                                                        showsReasoning: model.activityVisibility.showReasoning)
     }
     @ViewBuilder
     private func transcriptRow(_ row: ChatTurnDisplayRow) -> some View {
@@ -297,6 +302,8 @@ extension ChatView {
                 transcriptEntry(entry)
             }
             .id(row.id)
+        case .reasoning(let group):
+            ChatInterimReasoningHeader(agentName: group.agentName)
         }
     }
     @ViewBuilder

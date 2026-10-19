@@ -27,6 +27,24 @@ extension RootShellView {
         startNewChat(explicitAgentID: agentID ?? remembered?.agentID)
     }
 
+    /// A chat screen left without its chat (its live state was let go while it was open): open the
+    /// saved session again in its place, the usual way; if it's no longer there, go back and say so.
+    func reopenChatRoute(id: String) {
+        let route = AppRoute.chat(conversationID: id)
+        guard appState.path.last == route, featureStore.preparedModel(for: route) == nil else { return }
+        var instant = Transaction()
+        instant.disablesAnimations = true
+        withTransaction(instant) {
+            appState.path.removeLast()
+            if let record = sessionCatalog.session(id: id) {
+                appState.chatOpenedFromList = true
+                openSession(record.summary)
+            } else {
+                actionErrorMessage = "This chat isn't available right now. Open it again from your chats."
+            }
+        }
+    }
+
     /// Hooks the store's retire signal to the screen. Called whenever the root appears.
     func watchForLostChats() {
         featureStore.onUnsentChatRetired = { id, agentID, text in

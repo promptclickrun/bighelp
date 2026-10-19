@@ -36,13 +36,24 @@ struct ChatCompletedTurn: Identifiable {
 enum ChatTurnDisplayRow: Identifiable {
     case entry(ChatTranscriptEntry)
     case completed(ChatCompletedTurn)
+    /// Simple Bot mode: a turn's interim messages under one "{Agent}'s reasoning" row.
+    case reasoning(ChatInterimReasoning)
 
     var id: String {
         switch self {
         case .entry(let entry): entry.id
         case .completed(let turn): turn.id
+        case .reasoning(let group): group.id
         }
     }
+}
+
+/// The messages a bot wrote on the way to a turn's answer, in Simple Bot mode: one row named for the bot,
+/// its messages under it in reasoning's quiet look.
+struct ChatInterimReasoning: Identifiable, Equatable {
+    let id: String
+    let agentName: String
+    var entries: [ChatTranscriptEntry]
 }
 
 /// Where a finished turn's interim notes go. For Claude they're the only

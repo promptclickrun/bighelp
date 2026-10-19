@@ -289,6 +289,11 @@ extension NativeWorkspaceSessionBridge {
               recoveryModelMatches(current, modelIdentity) else {
             throw WorkspaceClientError.ownerChanged
         }
+        // The catalog's binding still names the old runtime, which Hermes may have reaped; a later
+        // prepare would activate that dead runtime and fail. Without it, prepare resumes durably.
+        if !DirectHermesSessionValidation.same(resumed.runtimeID, priorRuntimeID) {
+            try? box.value().invalidateRuntimeBinding(stream.record, runtimeID: priorRuntimeID)
+        }
         try client.adoptWorkspaceCoordinate(coordinate)
         client.rebind(stream.lease, openRequestRecovery: resumedBinding.recovery)
         stream = current

@@ -14,6 +14,8 @@ final class NativeWorkspaceSessionBridge: SessionCatalogClient {
         WorkspaceOwner, String, DirectHermesConversationClient, [NativeSubagentRailItem]
     ) -> Void)?
     var onSessionRetired: (@MainActor (String) -> Void)?
+    /// A refresh found open chats whose runtimes Hermes ended: resume them.
+    var onRetainedStreamsNeedResume: (@MainActor () -> Void)?
     var onSessionLivenessChange: (@MainActor (WorkspaceOwner, String, Bool) -> Void)?
     var onUnknownRuntimeEvent: (@MainActor (WorkspaceOwner) -> Void)?
 

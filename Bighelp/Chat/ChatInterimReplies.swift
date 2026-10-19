@@ -13,12 +13,11 @@ enum ChatInterimReplies {
     /// calls hidden the transcript has no work in it, but the notes before
     /// that work are still the agent thinking out loud.
     static func marking(
-        _ entries: [ChatTranscriptEntry], isSending: Bool, isBotMode: Bool, isSimpleBots: Bool = false,
+        _ entries: [ChatTranscriptEntry], isSending: Bool, isBotMode: Bool,
         activityEvents: [ChatActivityEvent] = []
     ) -> [ChatTranscriptEntry] {
-        // In a room several agents answer at once; each reply is someone's answer. Simple Bot mode
-        // reads like texting: every message the bot sends is a text, never grey or folded away.
-        guard !isBotMode, !isSimpleBots else { return entries }
+        // In a room several agents answer at once; each reply is someone's answer.
+        guard !isBotMode else { return entries }
         let turnStarts = entries.indices.filter {
             if case .message(let item) = entries[$0], item.role == .human { return true }
             return false
@@ -77,6 +76,38 @@ enum ChatInterimReplies {
         return lower.map { candidate > $0 } ?? true ? candidate : nil
     }
 
+    /// Simple Bot mode: each turn's interim messages move under one "{Agent}'s reasoning" row, where the
+    /// first of them was. With Show reasoning on it's open, filling in as the bot works; off, they're
+    /// hidden. The message that ends a turn is its answer and always shows as a message.
+    static func groupingForSimpleBots(_ rows: [ChatTurnDisplayRow], agentName: String,
+                                      showsReasoning: Bool) -> [ChatTurnDisplayRow] {
+        var result: [ChatTurnDisplayRow] = []
+        var group: Int?
+        for row in rows {
+            guard case .entry(.message(let item)) = row else {
+                result.append(row)
+                continue
+            }
+            if item.role == .human {
+                group = nil
+                result.append(row)
+            } else if item.metadata.isInterimReply {
+                guard showsReasoning else { continue }
+                if let index = group, case .reasoning(var reasoning) = result[index] {
+                    reasoning.entries.append(.message(item))
+                    result[index] = .reasoning(reasoning)
+                } else {
+                    group = result.count
+                    result.append(.reasoning(ChatInterimReasoning(
+                        id: "reasoning:\(item.id)", agentName: agentName, entries: [.message(item)])))
+                }
+            } else {
+                result.append(row)
+            }
+        }
+        return result
+    }
+
     /// Plain agent prose only; cards, approvals and media keep their own look.
     private static func isReply(_ entry: ChatTranscriptEntry) -> Bool {
         guard case .message(let item) = entry, item.role == .assistant,
@@ -104,5 +135,29 @@ struct ChatInterimReplyStyle: ViewModifier {
                     .accessibilityHidden(true)
             }
             .padding(.leading, BighelpTokens.space8)
+    }
+}
+
+/// Simple Bot mode's "{Agent}'s reasoning" row: the bot's interim messages follow it in the same quiet
+/// look, on the same line down their left.
+struct ChatInterimReasoningHeader: View {
+    let agentName: String
+    @BighelpThemeReader private var theme
+
+    var body: some View {
+        Label {
+            Text("\(agentName)\u{2019}s reasoning")
+                .font(.bighelp(.subheadline, weight: .medium))
+        } icon: {
+            Image(systemName: "brain")
+                .font(.bighelp(.footnote))
+        }
+        .foregroundStyle(theme.secondaryText)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.leading, BighelpTokens.space8)
+        .padding(.vertical, BighelpTokens.space4)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+        .accessibilityIdentifier("chat.reasoning.header")
     }
 }

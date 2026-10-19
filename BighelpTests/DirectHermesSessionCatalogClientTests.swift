@@ -1191,6 +1191,27 @@ struct DirectHermesSessionCatalogClientTests {
         #expect(deleted.mayRetainOtherHistory)
     }
 
+    /// Hermes hides every Bot Chat, so its session list never has one. The agent list names it
+    /// (`canonical_session`): each refresh keeps it, rather than dropping the agent's chat from the app.
+    @Test func everyRefreshKeepsTheAgentsHiddenBotChat() async throws {
+        let workspace = try SessionWorkspaceStub()
+        workspace.handler = { operation, _ in
+            switch operation {
+            case .profilesList: return Self.profiles(canonical: "bot-chat")
+            case .sessionsList: return Self.ownershipPage([Self.session(id: "other")])
+            default: throw WorkspaceClientError.invalidRequest
+            }
+        }
+        let client = Self.client(workspace)
+        for _ in 0..<2 {
+            let records = try await client.list()
+            let botChat = try #require(records.first { $0.remoteStoredID == "bot-chat" })
+            #expect(botChat.isBotChat)
+            #expect(botChat.agentIDs == ["alpha"])
+            #expect(records.contains { $0.remoteStoredID == "other" })
+        }
+    }
+
     @Test func canonicalPinUsesRegistryIdentity() async throws {
         let workspace = try SessionWorkspaceStub()
         workspace.handler = { operation, payload in

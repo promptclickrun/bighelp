@@ -422,6 +422,10 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
                 rows.append((newerReceipt || discovered == nil) && hasOwnership(current) ? current : removingLiveBinding(current))
                 represented.insert(current.record.id)
             }
+            if let canonical = canonicalBotChat(profile, represented: represented) {
+                rows.append(canonical)
+                represented.insert(canonical.record.id)
+            }
             for var row in rows {
                 if let current = bindings[row.record.id], let proof = current.ownership,
                    proof.isReceipt, proof.revision != startingRevisions[row.record.id], hasOwnership(current) {
@@ -2063,6 +2067,25 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
             offset += page["limit"]?.integer ?? rows.count
         }
         throw WorkspaceClientError.conflict
+    }
+
+    /// The agent's Bot Chat when the listing doesn't have it: Hermes hides every Bot Chat, so the listing
+    /// never does. The agent list names it (`canonical_session`); without this, each refresh dropped the
+    /// chat from the app, and with it the open chat ("Route unavailable") once its runtime had ended.
+    private func canonicalBotChat(_ profile: Profile, represented: Set<String>) -> Binding? {
+        guard let canonical = profile.canonical,
+              let appID = try? DirectHermesSessionIdentity.appID(owner: owner, profileID: profile.id,
+                                                                anchorID: canonical.id),
+              !represented.contains(appID) else { return nil }
+        if let current = bindings[appID] { return hasOwnership(current) ? current : removingLiveBinding(current) }
+        guard var record = try? draftRecord(profile: profile, storedID: canonical.id, title: "Bot Chat") else { return nil }
+        record.hasAcceptedMessage = true
+        return try? Binding(
+            coordinate: WorkspaceSessionCoordinate(owner: owner, profileID: profile.id, sessionID: appID,
+                                                   storedSessionID: canonical.resolvedID ?? canonical.id,
+                                                   runtimeSessionID: nil),
+            anchorID: canonical.id, record: record, durability: .persisted, cwd: nil,
+            canonicalRegistryID: canonical.id)
     }
 
     private func draftRecord(profile: Profile, storedID: String, title: String) throws -> SessionRecord {

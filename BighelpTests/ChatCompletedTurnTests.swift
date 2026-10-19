@@ -119,6 +119,7 @@ struct ChatCompletedTurnTests {
             switch row {
             case .entry(let entry): [entry.id]
             case .completed(let turn): turn.entries.map(\.id)
+            case .reasoning(let group): group.entries.map(\.id)
             }
         }
         #expect(expanded == entries.map(\.id))
@@ -465,6 +466,7 @@ struct ChatCompletedTurnTests {
             switch row {
             case .entry(let entry): [entry.id]
             case .completed(let turn): turn.entries.map(\.id)
+            case .reasoning(let group): group.entries.map(\.id)
             }
         }
     }

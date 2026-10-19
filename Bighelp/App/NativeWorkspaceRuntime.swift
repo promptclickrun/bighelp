@@ -453,6 +453,13 @@ final class NativeWorkspaceRuntime {
         let hostID = connections.hosts.selectedHostID?.uuidString
         widgetPublisher = BighelpWidgetSnapshotPublisher(sessions: sessions, scheduledTasks: scheduledTasks, agents: agents,
                                                          hostID: hostID, saved: BighelpWidgetSnapshot.load(gateway: hostID))
+        // A refresh found open chats whose runtimes Hermes ended (the app was away): resume them in place.
+        bridge.onRetainedStreamsNeedResume = { [weak self] in
+            guard let self, let owner = self.connections.owner, owner.authority == self.authority else { return }
+            Task { @MainActor [weak self] in
+                await self?.recoverRetainedSessionsAfterTransportReconnect(expectedOwner: owner)
+            }
+        }
     }
 
     /// The widgets get this computer's data now, not after the usual pause (a background refresh).

@@ -1,7 +1,6 @@
 import SwiftUI
 
 enum ChatBubbleMenuAction: Equatable, Sendable {
-    case react
     case copy
     case selectText
     case forkFromHere
@@ -10,6 +9,8 @@ enum ChatBubbleMenuAction: Equatable, Sendable {
 struct ChatBubbleInteraction: Equatable, Sendable {
     let copyText: String
     let menuActions: [ChatBubbleMenuAction]
+    /// Holding the message floats the reaction bar over it, apart from the menu.
+    let offersReactions: Bool
 
     init(markdown: String, canFork: Bool, canReact: Bool = false) {
         self.init(document: MarkdownDocument(markdown), canFork: canFork, canReact: canReact)
@@ -18,9 +19,8 @@ struct ChatBubbleInteraction: Equatable, Sendable {
     init(document: MarkdownDocument, canFork: Bool, canReact: Bool = false,
          canonicalSource: String? = nil) {
         copyText = canonicalSource ?? document.visiblePlainText
-        menuActions = (canReact ? [.react] : [])
-            + [.copy, .selectText]
-            + (canFork ? [.forkFromHere] : [])
+        menuActions = [.copy, .selectText] + (canFork ? [.forkFromHere] : [])
+        offersReactions = canReact
     }
 }
 

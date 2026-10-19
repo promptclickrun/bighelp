@@ -117,6 +117,7 @@ struct MessageBubble: View {
     @State private var isCopied = false
     @State private var isReactionPickerPresented = false
     @State private var contentCache = ChatMessageContentCache()
+    @State private var menuAnchor = ChatBubbleMenuAnchor()
     @State private var cardCopyContext = ChatCardCopyContext()
     @AppStorage(ChatLayoutPreferences.textSizeKey) private var chatTextSize: ChatTextSize = .defaultSize
     @AppStorage(LinkPreviewPreferences.enabledKey) private var showsLinkPreviews = true
@@ -291,9 +292,7 @@ struct MessageBubble: View {
 
     private var reactionPicker: some View {
         NativeMessageReactionPicker(
-            currentReaction: reactionPresentation?.reactions.first {
-                $0.author == .user
-            }?.emoji,
+            currentReaction: userReaction,
             onSelection: { emoji in
                 isReactionPickerPresented = false
                 onReaction?(emoji)
@@ -350,21 +349,59 @@ struct MessageBubble: View {
         }
     }
 
-    @ViewBuilder
     private func messagePaddingActions(_ interaction: ChatBubbleInteraction) -> some View {
-        Color.clear
-            .contentShape(Rectangle())
-            .contextMenu { messageActions(interaction) }
+        ChatMessageMenuStrip(anchor: menuAnchor, actions: menuActions(interaction), shape: bubbleShape, theme: theme)
+    }
+
+    private func menuActions(_ interaction: ChatBubbleInteraction) -> ChatMessageMenuActions {
+        ChatMessageMenuActions(
+            copyActionLabel: copyActionLabel,
+            onCopy: { copyMessage(interaction) },
+            onSelect: { isSelectingText = true },
+            onFork: onFork,
+            onReply: onReply,
+            reactions: reactionActions
+        )
+    }
+
+    private var reactionActions: ChatMessageReactionActions? {
+        guard canReact, let onReaction else { return nil }
+        return ChatMessageReactionActions(
+            selectedEmoji: userReaction,
+            onSelect: onReaction,
+            onMore: { isReactionPickerPresented = true }
+        )
+    }
+
+    private var userReaction: String? {
+        reactionPresentation?.reactions.first { $0.author == .user }?.emoji
+    }
+
+    private var bubbleShape: ChatBubbleMenuShape {
+        ChatBubbleMenuShape(alignsTrailing: role == .human, hasTail: !continuesGroup)
     }
 
     @ViewBuilder
     private func messageActions(_ interaction: ChatBubbleInteraction) -> some View {
-        if interaction.menuActions.contains(.react) {
-            Button {
-                isReactionPickerPresented = true
-            } label: {
-                Label("React", systemImage: "face.smiling")
+        if let reactions = reactionActions {
+            let projection = ChatReactionBarProjection(selectedEmoji: reactions.selectedEmoji)
+            ControlGroup {
+                ForEach(projection.choices) { choice in
+                    Button {
+                        reactions.onSelect(projection.selection(afterTapping: choice.emoji))
+                    } label: {
+                        Label {
+                            Text(choice.accessibilityLabel)
+                        } icon: {
+                            Image(uiImage: ChatReactionEmojiImage.image(choice.emoji))
+                        }
+                    }
+                }
+                Button(action: reactions.onMore) {
+                    Label("More reactions", systemImage: "plus")
+                }
             }
+            .controlGroupStyle(.palette)
         }
         if let onReply {
             Button(action: onReply) {
@@ -446,10 +483,12 @@ struct MessageBubble: View {
                 onCopy: { copyMessage(interaction) },
                 onSelect: { isSelectingText = true },
                 onFork: onFork,
-                onReact: canReact ? { isReactionPickerPresented = true } : nil,
+                reactions: reactionActions,
                 onReply: onReply,
                 textScale: (isInterimReply ? ChatInterimReplyStyle.textScale : 1) * chatTextSize.scale,
-                mentionIdentities: mentionIdentities
+                mentionIdentities: mentionIdentities,
+                menuAnchor: menuAnchor,
+                bubbleShape: bubbleShape
             )
             .modifier(BighelpV3MessageSurface(
                 role: role,
@@ -526,9 +565,11 @@ struct MessageBubble: View {
                             onCopy: { copyMessage(interaction) },
                             onSelect: { isSelectingText = true },
                             onFork: onFork,
-                            onReact: canReact ? { isReactionPickerPresented = true } : nil,
+                            reactions: reactionActions,
                             onReply: onReply,
-                            mentionIdentities: mentionIdentities
+                            mentionIdentities: mentionIdentities,
+                            menuAnchor: menuAnchor,
+                            bubbleShape: bubbleShape
                         )
                     } else {
                         MarkdownMessageView(document: document, proseLineSpacing: proseLineSpacing)
@@ -634,4 +675,5 @@ struct MessageBubble: View {
     @Environment(\.bighelpUIV3Enabled) private var uiV3Enabled
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     @Environment(\.openURL) private var openURL
+    @Environment(\.chatMessageContinuesGroup) private var continuesGroup
 }

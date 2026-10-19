@@ -343,9 +343,16 @@ extension ChatView {
         }
         guard usesNativeReactionAcceptanceFixture,
               let rowID = NativeMessageReactionRowIdentity.rowID(from: item.id) else { return nil }
+        #if DEBUG
+        let reactions = model.fixtureReactions[item.id].map {
+            [NativeMessageReaction(emoji: $0, author: .user, occurredAt: nil, isSeen: nil)]
+        } ?? []
+        #else
+        let reactions: [NativeMessageReaction] = []
+        #endif
         return NativeMessageReactionPresentation(
             rowID: rowID,
-            reactions: [],
+            reactions: reactions,
             availability: .available,
             isUpdating: false,
             errorMessage: nil
@@ -357,8 +364,11 @@ extension ChatView {
             return
         }
         guard usesNativeReactionAcceptanceFixture else { return }
-        // The UI fixture exercises the shipping menu and picker without
-        // mutating a host or pretending that an offline selection persisted.
+        // The UI fixture keeps the reaction on this screen only, as a host
+        // that accepts it would; nothing reaches a host.
+        #if DEBUG
+        model.fixtureReactions[item.id] = emoji
+        #endif
     }
     private var usesNativeReactionAcceptanceFixture: Bool {
         #if DEBUG && targetEnvironment(simulator)

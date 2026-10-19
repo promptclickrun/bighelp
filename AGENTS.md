@@ -167,6 +167,15 @@ change in both repos.
 - **A turn stays pending while it streams:** after `prompt.submit` returns `streaming`, the chat isn't "ready for a
   new turn" until the turn ends. A mid-turn Send must go through the steer/queue path (`sendMidSession`). Steer is
   the default.
+- **Hermes reaps and prunes app sessions:** 20 s after an app's socket goes, Hermes reclaims the session's
+  runtime and, for any source but `desktop`, ends its row (`ws_orphan_reap`); `sessions.auto_prune` then
+  deletes ended chats idle past `retention_days`. Plugin 3.18.0 (`durable_sessions.py`) gives `bighelp`
+  Desktop's treatment. In the app, a refresh never retires an open chat whose runtime ended: it resumes it
+  (`onRetainedStreamsNeedResume`), and a chat route without its model reopens (`reopenChatRoute`).
+- **Bot Chats are hidden in Hermes:** `GET /api/sessions` never returns them; the catalog list adds each
+  agent's (`canonical_session`, `canonicalBotChat`) so a refresh can't drop it.
+- **Archived:** the catalog lists `archived=include` and keeps rows Hermes' idle sweep archived
+  (`auto_archived`); deliberately archived chats live in Archived Chats (`archivedChats`, Restore).
 - **Rereads keep Send on:** while agents work together, an open chat rereads what Hermes saved every few seconds,
   and each reread recovers the chat's connection. Send stays on through it (`acceptsSubmissionAfterCatchUp`); a
   message sent then waits in the box until the recovery ends (`isAwaitingCatchUp`). As a turn, the recovery's idle

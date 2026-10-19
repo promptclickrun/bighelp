@@ -9,9 +9,11 @@ This release adds Simple Bot mode, Teamwork, the Bots widget, and many changes t
 
 ### Before you start
 
-- Update the bighelp plugin on each computer to version 3.17.0 or later. The app shows the update.
+- Update the bighelp plugin on each computer to version 3.18.0 or later. The app shows the update.
 - Teamwork, the live status of other agents, and the Stop button for busy chats need plugin 3.16.0 or later.
 - Alerts for messages between agents need plugin 3.17.0 or later.
+- Plugin 3.18.0 keeps your chats open when your phone loses its connection, as Hermes keeps the chats of
+  Hermes Desktop. Before, Hermes closed them, and a computer that removes old closed chats deleted them.
 
 ### Simple Bot mode
 
@@ -79,8 +81,10 @@ Select the name of a bot at the top of its chat. The profile shows:
 - Your messages use the bubble color that you select in Appearance.
 - The message box says "Ask" and the name of the bot.
 - Swipe from the left edge to go to your bots. Swipe from the right edge to open the bot profile.
-- Each message from a bot shows as a normal message. The messages do not turn gray and do not go away when the
-  bot continues to work.
+- The last message of each reply always shows as a normal message.
+- The messages that a bot writes while it works go under one "{Bot}'s reasoning" line. When **Show
+  reasoning** is on for the chat, the line is open and you see these messages as the bot works. Their text
+  is gray. When Show reasoning is off, these messages do not show.
 
 **Voice in Simple Bot mode**
 
@@ -214,5 +218,13 @@ To add the widget:
 - Widgets keep their content when you open or close the app, when you change the gateway, and when a
   Shortcut or your Apple Watch uses bighelp. Before, some widgets went empty, for example the Bots widget
   showed "Add bots in bighelp".
+- Your chats do not go away when Hermes closes their connection. Before, an open chat could show "Route
+  unavailable", and a chat could go away from your list until you refreshed it.
+- The chat of each bot stays in your list. Before, it went away after the app was in the background.
+- Chats that Hermes archives because nobody used them for some days stay in your lists.
+- **Archived Chats** shows the chats that someone archived, with the app or channel of each chat (for
+  example iMessage). Select a chat to restore and open it. Find it in the options menu of Sessions, and in
+  Settings in Simple Bot mode.
+- Add Host in Settings opens correctly. Before, Settings covered it.
 - The Send button stays on while the chat gets new messages from your computer. Before, it was gray for a short
   time each time the chat checked for new messages.

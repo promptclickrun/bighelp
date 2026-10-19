@@ -163,6 +163,7 @@ struct FirstRunPluginStep: View {
                     .accessibilityIdentifier("onboarding.plugin.outcome")
             }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("onboarding.plugin")
         .task { await checkInstalled() }
     }
@@ -233,6 +234,7 @@ struct FirstRunNotificationsStep: View {
                     .accessibilityIdentifier("onboarding.notifications.outcome")
             }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("onboarding.notifications")
     }
 

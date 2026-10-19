@@ -188,6 +188,7 @@ final class ChatMessageMenuDriver: NSObject, UIContextMenuInteractionDelegate {
         animator: (any UIContextMenuInteractionAnimating)?
     ) {
         activeInteraction = interaction
+        #if !os(visionOS)
         guard ChatMessageMenuStyle.floatsReactions, let reactions = actions?.reactions, let theme,
               let source = interaction.view, let scene = source.window?.windowScene else { return }
         let overlay = ChatReactionBarOverlay.shared
@@ -207,6 +208,7 @@ final class ChatMessageMenuDriver: NSObject, UIContextMenuInteractionDelegate {
             guard let self else { return }
             overlay.follow(owner: self)
         }
+        #endif
     }
 
     func contextMenuInteraction(
@@ -214,7 +216,9 @@ final class ChatMessageMenuDriver: NSObject, UIContextMenuInteractionDelegate {
         willEndFor configuration: UIContextMenuConfiguration,
         animator: (any UIContextMenuInteractionAnimating)?
     ) {
+        #if !os(visionOS)
         ChatReactionBarOverlay.shared.hide(owner: self)
+        #endif
         activeInteraction = nil
         // A sheet opened while the menu still closes never shows.
         let ending = preview
@@ -234,6 +238,7 @@ final class ChatMessageMenuDriver: NSObject, UIContextMenuInteractionDelegate {
         after?()
     }
 
+    #if !os(visionOS)
     /// The bubble in the scene's coordinates: where the lifted copy is, or the
     /// message itself when nothing lifts (a pointer's right-click).
     private func bubbleInScene() -> CGRect? {
@@ -245,6 +250,7 @@ final class ChatMessageMenuDriver: NSObject, UIContextMenuInteractionDelegate {
         let bubble = anchor?.frame(in: window) ?? source.convert(source.bounds, to: window)
         return window.convert(bubble, to: scene.coordinateSpace)
     }
+    #endif
 
     private func react(_ emoji: String?) {
         BighelpHaptics.tap()
@@ -303,6 +309,7 @@ final class ChatMessageMenuDriver: NSObject, UIContextMenuInteractionDelegate {
     }
 }
 
+#if !os(visionOS)
 /// The reaction bar's own window, above the lifted message and its menu.
 /// Only the bar takes touches; everything else falls through to the menu.
 @MainActor
@@ -428,8 +435,9 @@ final class ChatReactionBarOverlay {
         override var prefersStatusBarHidden: Bool { appController?.prefersStatusBarHidden ?? false }
         override var preferredStatusBarStyle: UIStatusBarStyle { appController?.preferredStatusBarStyle ?? .default }
     }
-
 }
+
+#endif
 
 /// The edges of a message around its text: holding them opens the same menu
 /// as holding the text, and the strips together give the bubble's frame.

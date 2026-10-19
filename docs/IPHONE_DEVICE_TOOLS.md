@@ -77,6 +77,14 @@ The plugin constructs context from the verified Link frame's phone ID and
 phone epoch, with the authenticated host ID as an attribute and profile as
 scope. Phone and host authorization epochs are independent.
 
+Only the agent the plugin serves has the phone tools: `servingProfileId` in
+`/native/context`, usually `default`. Hermes loads a profile's plugins only into
+that profile's agents, and the plugin refuses a channel for any other agent
+(`profile_not_served`). So the phone opens a channel only while that agent's
+chat is open (`NativeDeviceToolSession.servingAgentID`). Another agent's chat
+sends nothing after the context check, and Device access names the agent that
+can use the shared data.
+
 ## Transport and ownership
 
 The existing encrypted Link connection carries version-1
@@ -184,7 +192,7 @@ next pick there wins.
   `/native/context` lists `native-device-appearance-v1`. On its own, Appearance
   never puts "open a chat" or "check the plugin" in Device access; it only says
   when the plugin needs an update. A channel with only Appearance polls every
-  8 seconds instead of 0.75, since it opens for every chat.
+  8 seconds instead of 0.75, since it opens for every chat with the served agent.
 - Demo mode: `-test-agent-appearance '{"mode":"dark","color":"rose"}'` sends that
   one call through the real coordinator and tool when the first chat opens
   (`DeviceAppearanceFixture`, `AgentAppearanceUITests`).

@@ -150,6 +150,12 @@ extension RootShellView {
         } catch {
             guard !Task.isCancelled, currentWorkspaceOwner == owner,
                   permissions.revision == revision else { return }
+            if let served = session.servingAgentID {
+                let name = agents.resolvedAgent(explicitID: served)?.name ?? ""
+                permissionCenter.nativeDeviceToolStatus = DeviceToolChannelNote.otherAgent(
+                    enabled: enabled, servingAgentName: name.isEmpty ? "your default agent" : name)
+                return
+            }
             permissionCenter.nativeDeviceToolStatus = DeviceToolChannelNote.failed(
                 enabled: enabled, needsNewerPlugin: session.needsNewerPlugin)
         }

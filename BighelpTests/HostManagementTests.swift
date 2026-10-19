@@ -18,7 +18,9 @@ import Testing
             pin: fixture.pin, management: management)
         await model.enable()
         #expect(model.state == .prerequisitesRequired)
-        #expect(model.message == error.localizedDescription)
+        #expect(model.providerFailure == error)
+        #expect(model.failure?.code.rawValue.hasPrefix("NS-2") == true, "A push failure is this phone's")
+        #expect(model.message == model.failure?.message)
         #expect(management.actions == ["list"])
         setup.error = nil
         await model.enable()
@@ -54,7 +56,8 @@ import Testing
 
         await model.enable()
         #expect(model.state == .notConnected)
-        #expect(model.message == "Can't reach this computer. Reconnect and check setup again.")
+        #expect(model.failure?.code == .computerNotConnected)
+        #expect(model.message == BighelpNotificationErrorCode.computerNotConnected.message)
         #expect(model.actionTitle == "Retry Connection")
         #expect(management.actions.isEmpty)
         #expect(setup.calls == 0)
@@ -83,21 +86,155 @@ import Testing
 
         await model.enable()
         #expect(model.state == .signInChanged)
-        #expect(model.message == "This computer's sign-in changed. Sign in to this computer again, then check setup.")
+        #expect(model.failure?.code == .computerSignInChanged)
+        #expect(model.message == "This computer's sign-in changed. Sign in to this computer again, then try again.")
         #expect(model.actionTitle == "Check Setup Again")
         #expect(management.actions.isEmpty, "Nothing is read from another computer's connection")
         #expect(setup.calls == 0)
         #expect(fixture.registry.hosts.first?.notificationState == .notConnected, "Saved as a state older builds read")
     }
 
-    /// The setup log names what kind of error stopped setup and nothing the computer or service sent.
+    /// The setup log and Copy Details name what kind of error stopped setup, and nothing the
+    /// computer or service wrote: a server's code only when it is one of its short codes.
     @Test func setupLogNamesOnlyTheKindOfError() {
-        #expect(HostNotificationSetupModel.errorKind(DirectHermesError.identityChanged) == "DirectHermesError.identityChanged")
-        #expect(HostNotificationSetupModel.errorKind(BighelpLinkAPIError.requestFailed(status: 409, code: "fixture-detail"))
-            == "LinkAPIError.requestFailed(409)")
-        #expect(HostNotificationSetupModel.errorKind(BighelpManagedNotificationSetupError(stage: .deviceRegistration, code: "fixture-detail"))
-            == "NotificationSetupError.deviceRegistration")
-        #expect(HostNotificationSetupModel.errorKind(CancellationError()) == "CancellationError")
+        #expect(BighelpNotificationErrorKind(DirectHermesError.identityChanged).description == "DirectHermesError.identityChanged")
+        #expect(BighelpNotificationErrorKind(BighelpLinkAPIError.requestFailed(status: 409, code: "fixture-detail")).description
+            == "Notification service HTTP 409 unrecognized")
+        #expect(BighelpNotificationErrorKind(BighelpManagedNotificationSetupError(stage: .deviceRegistration, code: "fixture-detail"))
+            .description == "Push deviceRegistration unrecognized")
+        #expect(BighelpNotificationErrorKind(CancellationError()).description == "CancellationError")
+    }
+
+    /// Everything that used to end in "Couldn't confirm setup" (#443) now says which step
+    /// stopped and why, with a code people can send us. Where setup stands doesn't change.
+    @Test(arguments: [
+        (URLError(.notConnectedToInternet) as any Error, BighelpNotificationErrorCode.offline),
+        (URLError(.cannotFindHost), .serviceUnreachable),
+        (URLError(.secureConnectionFailed), .serviceInsecure),
+        (BighelpLinkAPIError.requestFailed(status: 409, code: "notification_bootstrap_conflict"), .signUpKeyConflict),
+        (BighelpLinkAPIError.requestFailed(status: 429, code: "notification_bootstrap_rate_limited"), .signUpRateLimited),
+        (BighelpLinkAPIError.requestFailed(status: 401, code: "notification_bootstrap_stale"), .signUpClockWrong),
+        (BighelpLinkAPIError.invalidResponse, .serviceAnswerUnreadable),
+        (DirectHostNotificationError.rejected(status: 503, code: "notification_service_unavailable"), .computerCannotReachService),
+        (DirectHermesError.secureStorageUnavailable, .keychainUnavailable),
+        (DirectHermesError.tooManyRequests, .alreadyRunning),
+        (CancellationError(), .interrupted),
+    ])
+    func failuresThatSaidCouldNotConfirmNameTheirCause(error: any Error, expected: BighelpNotificationErrorCode) async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        let management = Manager(saved: fixture.saved)
+        management.rows = [fixture.plugin(enabled: true)]
+        let setup = Enrollment()
+        setup.error = error
+        fixture.registry.notificationSetup = setup
+        let model = HostNotificationSetupModel(host: fixture.host, registry: fixture.registry,
+            pin: fixture.pin, management: management, defaults: fixture.defaults)
+        await model.enable()
+        #expect(model.state == BighelpNotificationSetupFailure.state(after: error), "The state is what it always was")
+        #expect(model.failure?.code == expected)
+        #expect(model.message == expected.message)
+        #expect(model.message != HostNotificationState.outcomeUnknown.message)
+        #expect(BighelpNotificationLastFailure.load(fixture.defaults)?.code == expected)
+    }
+
+    @Test func pluginFailuresNameThePluginStep() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        let management = Manager(saved: fixture.saved)
+        management.installError = .rpcRejected(code: 5026)
+        fixture.registry.notificationSetup = Enrollment()
+        let model = HostNotificationSetupModel(host: fixture.host, registry: fixture.registry,
+            pin: fixture.pin, management: management, defaults: fixture.defaults)
+        await model.enable()
+        #expect(model.state == .managementRejected)
+        #expect(model.failure?.code == .pluginRejected && model.failure?.step == .pluginInstall)
+
+        management.installError = .timedOut(outcomeUnknown: true)
+        await model.enable()
+        #expect(model.state == .outcomeUnknown)
+        #expect(model.failure?.code == .computerTimedOut && model.failure?.step == .pluginInstall)
+
+        let restart = Enrollment()
+        restart.result = .backendRestartRequired
+        fixture.registry.notificationSetup = restart
+        management.installError = nil
+        management.rows = [fixture.plugin(enabled: true)]
+        await model.enable()
+        #expect(model.state == .backendRestartRequired)
+        #expect(model.failure?.code == .restartHermes)
+
+        restart.result = .prerequisitesRequired
+        await model.enable()
+        #expect(model.state == .prerequisitesRequired)
+        #expect(model.failure?.code == .pluginTooOld)
+
+        restart.result = .enabled
+        await model.enable()
+        #expect(model.state == .enabled)
+        #expect(model.failure == nil)
+    }
+
+    /// No Check Again for a failure that trying again can't fix: its message says what to do.
+    @Test func failuresRetryingCannotFixOfferNoRetry() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        let management = Manager(saved: fixture.saved)
+        management.rows = [fixture.plugin(enabled: true)]
+        let setup = Enrollment()
+        setup.error = BighelpLinkAPIError.requestFailed(status: 403, code: "notification_credentials_revoked")
+        fixture.registry.notificationSetup = setup
+        let model = HostNotificationSetupModel(host: fixture.host, registry: fixture.registry,
+            pin: fixture.pin, management: management, defaults: fixture.defaults)
+        await model.enable()
+        #expect(model.failure?.code == .signUpEnded)
+        #expect(!model.offersRetry)
+        #expect(model.actionTitle == nil)
+        #expect(!model.message.localizedCaseInsensitiveContains("check again"))
+
+        setup.error = URLError(.notConnectedToInternet)
+        await model.enable()
+        #expect(model.offersRetry)
+        #expect(model.actionTitle != nil)
+    }
+
+    /// Settings opened again shows the same code, on this build, and lets people try again:
+    /// what stopped it may be fixed by now.
+    @Test func aStoppedSetupKeepsItsCodeWhenSetupOpensAgain() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        let management = Manager(saved: fixture.saved)
+        management.rows = [fixture.plugin(enabled: true)]
+        let setup = Enrollment()
+        setup.error = BighelpLinkAPIError.requestFailed(status: 409, code: "notification_bootstrap_conflict")
+        fixture.registry.notificationSetup = setup
+        let first = HostNotificationSetupModel(host: fixture.host, registry: fixture.registry,
+            pin: fixture.pin, management: management, defaults: fixture.defaults)
+        await first.enable()
+        #expect(!first.offersRetry)
+
+        let reopened = HostNotificationSetupModel(host: try #require(fixture.registry.hosts.first), registry: fixture.registry,
+            pin: fixture.pin, management: management, defaults: fixture.defaults)
+        #expect(reopened.failure?.code == .signUpKeyConflict)
+        #expect(reopened.failureIsFromEarlierRun)
+        #expect(reopened.offersRetry)
+
+        var other = try #require(fixture.registry.hosts.first)
+        other.notificationState = .notConfigured
+        let unrelated = HostNotificationSetupModel(host: other, registry: fixture.registry,
+            pin: fixture.pin, management: management, defaults: fixture.defaults)
+        #expect(unrelated.failure == nil, "A different state is a different setup")
+    }
+
+    @Test func unreachableGitHubHasItsCode() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        let model = HostNotificationSetupModel(host: fixture.host, registry: fixture.registry,
+            releases: FixedPluginReleases(.failure(.unreachable)), management: Manager(saved: fixture.saved),
+            enrollNotifications: false, defaults: fixture.defaults)
+        await model.enable()
+        #expect(model.state == .releaseUnavailable)
+        #expect(model.failure?.code == .pluginReleaseUnavailable && model.failure?.step == .pluginRelease)
     }
 
     @Test func savedNotificationOptInDoesNotPromptAgainOnReopen() throws {
@@ -494,6 +631,8 @@ import Testing
         let saved: DirectHermesSavedConnection
         let pin: HostPluginPin
         let root: URL
+        let defaultsSuite = "bighelp.test.host-management." + UUID().uuidString
+        var defaults: UserDefaults { UserDefaults(suiteName: defaultsSuite)! }
         init() throws {
             root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
             try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -515,6 +654,9 @@ import Testing
         func plugin(enabled: Bool) -> BighelpJSONValue {
             .object(["name": .string("loopdy"), "key": .string("loopdy"), "status": .string(enabled ? "enabled" : "disabled"), "pinned_sha": .string(pin.revision)])
         }
-        func cleanup() { registry.bind(deviceID: nil, authorizationEpoch: nil); try? FileManager.default.removeItem(at: root) }
+        func cleanup() {
+            registry.bind(deviceID: nil, authorizationEpoch: nil); try? FileManager.default.removeItem(at: root)
+            defaults.removePersistentDomain(forName: defaultsSuite)
+        }
     }
 }

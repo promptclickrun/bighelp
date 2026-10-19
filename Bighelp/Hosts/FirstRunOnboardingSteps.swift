@@ -161,6 +161,9 @@ struct FirstRunPluginStep: View {
                     .foregroundStyle(needsRestart ? theme.primaryText : theme.warning)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("onboarding.plugin.outcome")
+                if !needsRestart, let failure = setup?.failure {
+                    BighelpNotificationFailureCodeRow(failure: failure, identifier: "onboarding.plugin.failure")
+                }
             }
         }
         .accessibilityElement(children: .contain)
@@ -210,15 +213,24 @@ struct FirstRunNotificationsStep: View {
     @State private var setup: HostNotificationSetupModel?
     @State private var outcome: String?
 
+    /// Trying again can't fix this one: its message says what to do, and setup moves on.
+    private var retryCannotHelp: Bool { outcome != nil && setup?.offersRetry == false }
+
+    private var primaryTitle: String {
+        if setup?.isWorking == true { return "Turning On…" }
+        if retryCannotHelp { return "Continue" }
+        return outcome == nil ? "Turn On Notifications" : "Try Again"
+    }
+
     var body: some View {
         FirstRunStepLayout(
             systemImage: "bell.badge.fill",
             title: "Turn on notifications?",
             subtitle: "Get an alert when your agents reply, finish something, or have a question for you.",
-            primaryTitle: setup?.isWorking == true ? "Turning On…" : outcome == nil ? "Turn On Notifications" : "Try Again",
+            primaryTitle: primaryTitle,
             primaryIdentifier: "onboarding.notifications.enable",
             isWorking: setup?.isWorking == true,
-            primary: enable
+            primary: { if retryCannotHelp { onDone() } else { enable() } }
         ) {
             VStack(spacing: BighelpTokens.space12) {
                 FirstRunAlertPreview(name: "Avery Park", message: "Your October budget is ready.", time: "now")
@@ -232,6 +244,9 @@ struct FirstRunNotificationsStep: View {
                     .bighelpFont(.metadata)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("onboarding.notifications.outcome")
+                if let failure = setup?.failure {
+                    BighelpNotificationFailureCodeRow(failure: failure, identifier: "onboarding.notifications.failure")
+                }
             }
         }
         .accessibilityElement(children: .contain)

@@ -847,6 +847,9 @@ struct HostNotificationSetupSection: View {
                                    tone: model.providerFailure == nil ? .warning : .danger)
                     .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
                     .accessibilityIdentifier("host-setup.notification-status")
+                if let failure = model.failure {
+                    BighelpNotificationFailureCodeRow(failure: failure, identifier: "host-setup.notification-failure")
+                }
             }
             if model.isWorking {
                 ProgressView(model.state == .installing ? "Installing the plugin…" : "Checking notification setup…")
@@ -869,7 +872,8 @@ struct HostNotificationSetupSection: View {
                 }
                 Button("Not Now", role: .cancel) { showsReview = false }
                     .accessibilityIdentifier("host-setup.notifications-not-now")
-            } else {
+            } else if model.offersRetry {
+                // A failure that trying again can't fix says what to do instead.
                 Button(notificationReviewTitle) { showsReview = true }
                     .accessibilityIdentifier("host-setup.enable-notifications")
             }

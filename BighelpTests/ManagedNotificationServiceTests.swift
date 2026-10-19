@@ -6,6 +6,79 @@ import UserNotifications
 @testable import Bighelp
 
 @MainActor struct ManagedNotificationServiceTests {
+    /// Sign-up with the notification service used to pass URLSession's and the Worker's errors
+    /// straight up, where they all read "Couldn't confirm setup" (#443).
+    @Test(arguments: [
+        (URLError(.notConnectedToInternet), BighelpNotificationErrorCode.offline),
+        (URLError(.cannotFindHost), .serviceUnreachable),
+        (URLError(.timedOut), .serviceTimedOut),
+        (URLError(.serverCertificateUntrusted), .serviceInsecure),
+    ])
+    func signUpThatCantReachTheServiceSaysSo(error: URLError, expected: BighelpNotificationErrorCode) async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        fixture.identityVault.value = .none
+        fixture.transport.bootstrapError = error
+        await #expect(throws: BighelpNotificationSetupFailure(expected, step: .serviceSignUp,
+                                                              kind: .network(error.errorCode), state: .outcomeUnknown)) {
+            _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+        }
+        #expect(fixture.provider.identifiedDeviceIDs.isEmpty, "Nothing past sign-up ran")
+    }
+
+    @Test(arguments: [
+        (409, "notification_bootstrap_conflict", BighelpNotificationErrorCode.signUpKeyConflict, 1),
+        (429, "notification_bootstrap_rate_limited", .signUpRateLimited, 1),
+        // A stale sign-up is made fresh and sent once more before it counts as a wrong clock.
+        (401, "notification_bootstrap_stale", .signUpClockWrong, 2),
+        (503, "notification_bootstrap_rate_unavailable", .signUpUnavailable, 1),
+        (500, "internal_error", .serviceProblem, 1),
+    ])
+    func signUpRefusalsKeepTheServicesReason(status: Int, serverCode: String, expected: BighelpNotificationErrorCode,
+                                             attempts: Int) async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        fixture.identityVault.value = .none
+        fixture.transport.bootstrapRefusal = (status, serverCode)
+        do {
+            _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+            Issue.record("A refused sign-up must stop setup")
+        } catch let failure as BighelpNotificationSetupFailure {
+            #expect(failure.code == expected)
+            #expect(failure.step == .serviceSignUp)
+            #expect(failure.kind == .service(status: status, code: serverCode))
+        }
+        #expect(fixture.transport.bootstrapAttempts == attempts)
+    }
+
+    @Test func theComputersOwnRefusalNamesIt() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        fixture.hostAPI.enrollRejection = .rejected(status: 503, code: "notification_service_unavailable")
+        do {
+            _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+            Issue.record("A refused claim must stop setup")
+        } catch let failure as BighelpNotificationSetupFailure {
+            #expect(failure.code == .computerCannotReachService)
+            #expect(failure.step == .computerEnroll)
+            #expect(failure.state == .outcomeUnknown)
+        }
+    }
+
+    @Test func anOfflineComputerIsNamedAtItsCheck() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        fixture.hostAPI.offline = true
+        do {
+            _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+            Issue.record("An offline computer must stop setup")
+        } catch let failure as BighelpNotificationSetupFailure {
+            #expect(failure.code == .computerNotConnected)
+            #expect(failure.step == .computerCheck)
+            #expect(failure.state == .notConnected)
+        }
+    }
+
     @Test func turnOffDeletesHostServiceAndDeviceDataLeavingNothingBehind() async throws {
         let fixture = try Fixture(notificationDeviceID: UUID().uuidString.lowercased())
         defer { fixture.cleanup() }
@@ -54,8 +127,14 @@ import UserNotifications
             eventTypes: grant.eventTypes, createdAt: grant.createdAt, expiresAt: grant.expiresAt, revision: grant.revision,
             provider: grant.provider, subscriberScope: grant.subscriberScope, state: grant.state)
         try fixture.ledger.save(record)
-        await #expect(throws: DirectHermesError.identityChanged) {
+        do {
             _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+            Issue.record("A grant for the computer's earlier key must stop setup")
+        } catch let failure as BighelpNotificationSetupFailure {
+            #expect(failure.code == .computerKeyChanged, "Not a changed sign-in: the computer's key changed")
+            #expect(failure.step == .serviceGrant)
+            #expect(failure.state == .signInChanged, "Where setup stands is what it always was")
+            #expect(!failure.canRetry && failure.message.hasSuffix("Use Set Up Again."))
         }
 
         await fixture.service.resetHost(fixture.host)
@@ -207,8 +286,10 @@ import UserNotifications
                 isCurrent: { true }
             )
             Issue.record("Enrollment must require provider confirmation of the current subscription")
-        } catch let error as BighelpManagedNotificationSetupError {
-            #expect(error.stage == .providerReadiness)
+        } catch let failure as BighelpNotificationSetupFailure {
+            #expect(failure.provider?.stage == .providerReadiness)
+            #expect(failure.step == .pushCheck)
+            #expect(failure.code == .serviceAnswerUnreadable)
         }
 
         #expect(fixture.provider.registrations == 1)
@@ -224,8 +305,9 @@ import UserNotifications
         do {
             _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
             Issue.record("Denied permission must stop setup")
-        } catch let error as BighelpManagedNotificationSetupError {
-            #expect(error.stage == .notificationPermission)
+        } catch let failure as BighelpNotificationSetupFailure {
+            #expect(failure.provider?.stage == .notificationPermission)
+            #expect(failure.code == .permissionOff && failure.step == .permission)
         }
         #expect(fixture.provider.registrations == 0)
         #expect(fixture.account.postBodies.isEmpty)
@@ -811,6 +893,7 @@ import UserNotifications
         var recipientKeys: [String] = []
         init(_ account: Account, _ trust: BighelpNotificationHostTrustStore) { self.account=account;self.trust=trust }
         var offline = false
+        var enrollRejection: DirectHostNotificationError?
         var removedGrants: [String] = []
         func request(_ suffix: String, method: String, body: [String: BighelpJSONValue]?, isCurrent: @escaping @MainActor () -> Bool) async throws -> BighelpJSONValue {
             guard isCurrent() else { throw DirectHermesError.secureStorageChanged }
@@ -853,7 +936,11 @@ import UserNotifications
                     "profile":.string(profile),"sessionId":.string(session),"enabled":.boolean(true),
                     "sessionReference":.string(ManagedNotificationValidation.sessionReference(profile:profile,session:session))])
             }
-            if suffix == "/enroll" { sawPinnedClaim = hasPersistedGrant() }
+            if suffix == "/enroll" {
+                // The plugin's own refusal, as the real client reads `{"detail": {"code": …}}`.
+                if let enrollRejection { throw enrollRejection }
+                sawPinnedClaim = hasPersistedGrant()
+            }
             return .object(["version":.integer(1),"grant":try Account.value(#require(account.grant))])
         }
         /// Like the plugin: only a context that lists the feature has the route.
@@ -930,8 +1017,24 @@ import UserNotifications
         private(set) var bindingRequests = 0
         var installationRevokeFails = false
         private(set) var revokedInstallations: [String] = []
+        /// The phone can't reach the notification service: URLSession's own error.
+        var bootstrapError: URLError?
+        /// The Worker turns the sign-up down with one of its codes.
+        var bootstrapRefusal: (status: Int, code: String)?
+        private(set) var bootstrapAttempts = 0
 
         func data(for request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+            if request.url?.path == BighelpNotificationBrokerClient.bootstrapPath {
+                bootstrapAttempts += 1
+                if let bootstrapError { throw bootstrapError }
+                if let bootstrapRefusal, let url = request.url,
+                   let response = HTTPURLResponse(url: url, statusCode: bootstrapRefusal.status, httpVersion: nil, headerFields: nil) {
+                    let body = try JSONSerialization.data(withJSONObject: [
+                        "version": 2, "error": ["code": bootstrapRefusal.code],
+                    ])
+                    return (body, response)
+                }
+            }
             if request.httpMethod == "POST",
                request.url?.path == BighelpNotificationBrokerClient.bootstrapPath,
                let requestBody = request.httpBody,

@@ -37,7 +37,7 @@ text, goalCategory?: health|relationships|finance|career|interests|productivity|
 bighelp|community, credit?, updatedAt }`. `[brackets]` in `text` are the app's fill-in blanks.
 
 Agent: `{ id, name, role, vibe, description?, instructions, category:
-work|personal|learning|creative|research|support|fun, symbol?, variables?, source, credit?, updatedAt }`.
+productivity|business|coding|science|education|health|creative|personal|leadership|security, symbol?, variables?, source, credit?, updatedAt }`.
 `instructions` uses `{{agent_name}}` like the bundled SOUL templates. `symbol` is an SF Symbol name set
 by a reviewer; it can be missing. `variables` lists the fields the app asks for before it fills the
 template's other `{{key}}`s; submit, review and the seed all check them against the text. The rules are in

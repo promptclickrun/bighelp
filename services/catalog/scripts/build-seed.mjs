@@ -17,20 +17,20 @@ const blueprints = JSON.parse(readFileSync(join(app, "Resources/BoardBlueprints.
 // Mirrors AgentSoulTemplate.all in Bighelp/Agents/AgentSoulTemplates.swift.
 const agents = [
   ["anchor", "Anchor", "Everyday generalist", "Warm, direct, adaptable", "Helps with vague requests without turning simple tasks into an interview.", "sun.max", "personal"],
-  ["compass", "Compass", "Chief-of-staff partner", "Concise, discreet, decisive", "Sorts out conflicting priorities without inventing authority or commitments.", "safari", "work"],
-  ["spark", "Spark", "Focus companion", "Gentle, concrete, encouraging", "Helps you get started, and start again after a gap, without shame.", "bolt", "personal"],
-  ["lumen", "Lumen", "Learning partner", "Patient, curious, accessible", "Explains things another way when the first one doesn't land, at any age.", "lightbulb", "learning"],
-  ["lens", "Lens", "Research partner", "Measured, precise, inquisitive", "Resists confirmation bias and says when evidence is missing, not disproved.", "magnifyingglass", "research"],
-  ["forge", "Forge", "Engineering partner", "Candid, pragmatic, technical", "Keeps a plausible fix, passing checks and a working result apart.", "hammer", "work"],
-  ["beacon", "Beacon", "Incident partner", "Calm, brief, factual", "Communicates under pressure without false certainty or early all-clears.", "light.beacon.max", "work"],
-  ["counterpoint", "Counterpoint", "Strategy challenger", "Independent, fair, incisive", "Challenges big assumptions without becoming reflexively contrarian.", "arrow.left.arrow.right", "work"],
+  ["compass", "Compass", "Chief-of-staff partner", "Concise, discreet, decisive", "Sorts out conflicting priorities without inventing authority or commitments.", "safari", "productivity"],
+  ["spark", "Spark", "Focus companion", "Gentle, concrete, encouraging", "Helps you get started, and start again after a gap, without shame.", "bolt", "productivity"],
+  ["lumen", "Lumen", "Learning partner", "Patient, curious, accessible", "Explains things another way when the first one doesn't land, at any age.", "lightbulb", "education"],
+  ["lens", "Lens", "Research partner", "Measured, precise, inquisitive", "Resists confirmation bias and says when evidence is missing, not disproved.", "magnifyingglass", "science"],
+  ["forge", "Forge", "Engineering partner", "Candid, pragmatic, technical", "Keeps a plausible fix, passing checks and a working result apart.", "hammer", "coding"],
+  ["beacon", "Beacon", "Incident partner", "Calm, brief, factual", "Communicates under pressure without false certainty or early all-clears.", "light.beacon.max", "coding"],
+  ["counterpoint", "Counterpoint", "Strategy challenger", "Independent, fair, incisive", "Challenges big assumptions without becoming reflexively contrarian.", "arrow.left.arrow.right", "leadership"],
   ["muse", "Muse", "Creative collaborator", "Inventive, vivid, playful", "Takes a real new direction after a no, and keeps fiction apart from fact.", "paintpalette", "creative"],
   ["quill", "Quill", "Editor and writing partner", "Clear, attentive, restrained", "Improves your writing without changing its meaning, voice or promises.", "pencil.line", "creative"],
-  ["bridge", "Bridge", "Support and resolution partner", "Patient, courteous, firm", "Handles anger and demands for guarantees without fake fixes or scripted empathy.", "bubble.left.and.bubble.right", "support"],
+  ["bridge", "Bridge", "Support and resolution partner", "Patient, courteous, firm", "Handles anger and demands for guarantees without fake fixes or scripted empathy.", "bubble.left.and.bubble.right", "business"],
   ["hearth", "Hearth", "Household companion", "Warm, practical, considerate", "Handles a shared home: different people, preferences and private things.", "house", "personal"],
-  ["harbor", "Harbor", "Reflective companion", "Gentle, attentive, grounded", "Offers support without encouraging dependence or claiming human feelings.", "heart", "support"],
-  ["waypoint", "Waypoint", "Consequential-information guide", "Careful, plainspoken, calm", "Explains sensitive matters without posing as a professional or promising outcomes.", "signpost.right", "support"],
-  ["fable", "Fable", "Playful storyteller", "Imaginative, lightly theatrical", "Stays in character for fun, and drops it the moment you need it plain.", "book", "fun"],
+  ["harbor", "Harbor", "Reflective companion", "Gentle, attentive, grounded", "Offers support without encouraging dependence or claiming human feelings.", "heart", "health"],
+  ["waypoint", "Waypoint", "Consequential-information guide", "Careful, plainspoken, calm", "Explains sensitive matters without posing as a professional or promising outcomes.", "signpost.right", "personal"],
+  ["fable", "Fable", "Playful storyteller", "Imaginative, lightly theatrical", "Stays in character for fun, and drops it the moment you need it plain.", "book", "creative"],
 ];
 
 const sql = (value) => (value === null ? "NULL" : `'${String(value).replace(/'/g, "''")}'`);

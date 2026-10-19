@@ -3,6 +3,29 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.1
+
+This release adds an optional chat title and fixes problems with Chat Info, bots on other computers, and new Bot
+Chats.
+
+### Show the title of the chat
+
+You can show the title of the chat under the name of the agent. This setting is off by default.
+
+1. Open **Settings**.
+2. Select **Chat**.
+3. Turn on **Session title**.
+
+### Fixes
+
+- **Chat Info:** You can open Chat Info from every chat again. Select **⋯**, then **This chat**, then
+  **Chat info**.
+- **Bots on other computers:** In Simple Bot mode with **Multi-gateway** on, a bot on another computer opens with a
+  loading animation. Select **Cancel** to stop. If the other computer does not answer in 20 seconds, the app goes
+  back to the computer that you used before and tells you.
+- **New Bot Chats:** If the connection stops while the app makes the first Bot Chat of an agent, the app tries
+  again. You can always start new chats with that agent.
+
 ## 2.6.0
 
 This release makes the first setup easier and adds a new reaction bar, bot templates, and Files and Media for

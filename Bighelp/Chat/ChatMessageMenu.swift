@@ -96,6 +96,8 @@ final class ChatMessageMenuDriver: NSObject, UIContextMenuInteractionDelegate {
 
     private var preview: UITargetedPreview?
     private var bubbleInPreview: CGRect = .zero
+    private var barInPreview: CGRect?
+    private var barSlot = ChatReactionBarMetrics.preferredSlot
     private weak var activeInteraction: UIContextMenuInteraction?
     private var afterDismissal: (() -> Void)?
 
@@ -138,11 +140,21 @@ final class ChatMessageMenuDriver: NSObject, UIContextMenuInteractionDelegate {
               let snapshot = row.resizableSnapshotView(
                 from: row.convert(bubble, from: window), afterScreenUpdates: false, withCapInsets: .zero)
         else { return nil }
-        let reserve = actions?.reactions != nil && ChatMessageMenuStyle.floatsReactions
-            ? ChatReactionBarMetrics.reservedHeight : 0
-        let container = UIView(frame: CGRect(x: 0, y: 0, width: bubble.width, height: bubble.height + reserve))
+        // The bar's pill lifts with the bubble, so the system fits both on
+        // screen; its emoji arrive in the bar's own window over the pill.
+        var bar: CGRect?
+        if ChatMessageMenuStyle.floatsReactions, let reactions = actions?.reactions {
+            let count = ChatReactionBarProjection(selectedEmoji: reactions.selectedEmoji).choices.count
+            barSlot = ChatReactionBarMetrics.slot(choiceCount: count, availableWidth: window.bounds.width)
+            bar = ChatReactionBarMetrics.liftedFrame(
+                barSize: ChatReactionBarMetrics.barSize(choiceCount: count, slot: barSlot), over: bubble,
+                alignsTrailing: shape.alignsTrailing, minX: window.bounds.minX, maxX: window.bounds.maxX)
+        }
+        let area = bar.map { $0.union(bubble) } ?? bubble
+        let container = UIView(frame: CGRect(origin: .zero, size: area.size))
         container.backgroundColor = .clear
-        bubbleInPreview = CGRect(x: 0, y: reserve, width: bubble.width, height: bubble.height)
+        bubbleInPreview = bubble.offsetBy(dx: -area.minX, dy: -area.minY)
+        barInPreview = bar?.offsetBy(dx: -area.minX, dy: -area.minY)
         snapshot.frame = bubbleInPreview
         // A reply's bubble is a see-through tint over the chat; keep the chat behind it.
         let backing = UIView(frame: bubbleInPreview)
@@ -153,13 +165,21 @@ final class ChatMessageMenuDriver: NSObject, UIContextMenuInteractionDelegate {
             view.layer.mask = mask
             container.addSubview(view)
         }
-        // The system places and fits the whole visible area, so the empty room
-        // over the bubble stays on screen; only the bubble casts a shadow.
+        // Only the bubble and the pill are lifted; everything around them,
+        // the message above included, stays under the menu's blur.
+        let visible = shape.path(in: bubbleInPreview)
+        if let barInPreview {
+            let pill = UIView(frame: barInPreview)
+            pill.backgroundColor = theme.map { UIColor($0.raisedSurface) } ?? .systemBackground
+            pill.layer.cornerRadius = barInPreview.height / 2
+            container.addSubview(pill)
+            visible.append(UIBezierPath(roundedRect: barInPreview, cornerRadius: barInPreview.height / 2))
+        }
         let parameters = UIPreviewParameters()
         parameters.backgroundColor = .clear
-        parameters.visiblePath = UIBezierPath(rect: container.bounds)
-        parameters.shadowPath = shape.path(in: bubbleInPreview)
-        let target = UIPreviewTarget(container: window, center: CGPoint(x: bubble.midX, y: bubble.midY - reserve / 2))
+        parameters.visiblePath = visible
+        parameters.shadowPath = visible
+        let target = UIPreviewTarget(container: window, center: CGPoint(x: area.midX, y: area.midY))
         let preview = UITargetedPreview(view: container, parameters: parameters, target: target)
         self.preview = preview
         return preview
@@ -192,14 +212,19 @@ final class ChatMessageMenuDriver: NSObject, UIContextMenuInteractionDelegate {
         guard ChatMessageMenuStyle.floatsReactions, let reactions = actions?.reactions, let theme,
               let source = interaction.view, let scene = source.window?.windowScene else { return }
         let overlay = ChatReactionBarOverlay.shared
+        let projection = ChatReactionBarProjection(selectedEmoji: reactions.selectedEmoji)
+        if preview == nil, let window = source.window {
+            barSlot = ChatReactionBarMetrics.slot(choiceCount: projection.choices.count,
+                                                  availableWidth: window.bounds.width)
+        }
         overlay.show(
-            projection: ChatReactionBarProjection(selectedEmoji: reactions.selectedEmoji),
+            projection: projection,
             theme: theme,
             style: source.traitCollection.userInterfaceStyle,
             in: scene,
             owner: self,
-            alignsTrailing: shape.alignsTrailing,
-            bubbleFrame: { [weak self] in self?.bubbleInScene() },
+            slot: barSlot,
+            barFrame: { [weak self] in self?.barInScene() },
             onSelect: { [weak self] emoji in self?.react(emoji) },
             onMore: { [weak self] in self?.moreReactions() }
         )
@@ -239,16 +264,21 @@ final class ChatMessageMenuDriver: NSObject, UIContextMenuInteractionDelegate {
     }
 
     #if !os(visionOS)
-    /// The bubble in the scene's coordinates: where the lifted copy is, or the
+    /// The bar in the scene's coordinates: on the lifted pill, or over the
     /// message itself when nothing lifts (a pointer's right-click).
-    private func bubbleInScene() -> CGRect? {
-        if let container = preview?.view, let window = container.window, let scene = window.windowScene {
-            return container.convert(bubbleInPreview, to: scene.coordinateSpace)
+    private func barInScene() -> CGRect? {
+        if let container = preview?.view, let barInPreview, let window = container.window,
+           let scene = window.windowScene {
+            return container.convert(barInPreview, to: scene.coordinateSpace)
         }
         guard let source = activeInteraction?.view, let window = source.window,
-              let scene = window.windowScene else { return nil }
+              let scene = window.windowScene, let reactions = actions?.reactions else { return nil }
         let bubble = anchor?.frame(in: window) ?? source.convert(source.bounds, to: window)
-        return window.convert(bubble, to: scene.coordinateSpace)
+        let count = ChatReactionBarProjection(selectedEmoji: reactions.selectedEmoji).choices.count
+        let bar = ChatReactionBarMetrics.frame(
+            barSize: ChatReactionBarMetrics.barSize(choiceCount: count, slot: barSlot), over: bubble,
+            alignsTrailing: shape.alignsTrailing, within: window.bounds.inset(by: window.safeAreaInsets))
+        return window.convert(bar, to: scene.coordinateSpace)
     }
     #endif
 
@@ -319,8 +349,7 @@ final class ChatReactionBarOverlay {
     private var window: PassthroughWindow?
     private var host: UIHostingController<ChatReactionBarView>?
     private weak var owner: AnyObject?
-    private var alignsTrailing = false
-    private var bubbleFrame: () -> CGRect? = { nil }
+    private var barFrame: () -> CGRect? = { nil }
 
     func show(
         projection: ChatReactionBarProjection,
@@ -328,15 +357,14 @@ final class ChatReactionBarOverlay {
         style: UIUserInterfaceStyle,
         in scene: UIWindowScene,
         owner: AnyObject,
-        alignsTrailing: Bool,
-        bubbleFrame: @escaping () -> CGRect?,
+        slot: CGFloat,
+        barFrame: @escaping () -> CGRect?,
         onSelect: @escaping (String?) -> Void,
         onMore: @escaping () -> Void
     ) {
         dismantle()
         self.owner = owner
-        self.alignsTrailing = alignsTrailing
-        self.bubbleFrame = bubbleFrame
+        self.barFrame = barFrame
         let window = PassthroughWindow(windowScene: scene)
         window.windowLevel = .alert + 1
         window.backgroundColor = .clear
@@ -344,8 +372,6 @@ final class ChatReactionBarOverlay {
         let root = RootController()
         root.appWindow = scene.windows.first { $0.isKeyWindow } ?? scene.windows.first
         window.rootViewController = root
-        let slot = ChatReactionBarMetrics.slot(
-            choiceCount: projection.choices.count, availableWidth: window.bounds.width)
         let host = UIHostingController(rootView: ChatReactionBarView(
             projection: projection, theme: theme, slot: slot, onSelect: onSelect, onMore: onMore))
         host.view.backgroundColor = .clear
@@ -362,24 +388,30 @@ final class ChatReactionBarOverlay {
             return
         }
         window.isHidden = false
-        host.view.frame = frame
+        host.view.bounds = CGRect(origin: .zero, size: host.sizeThatFits(in: window.bounds.size))
+        Self.place(host.view, on: frame)
         host.view.alpha = 0
-        host.view.transform = CGAffineTransform(scaleX: 0.5, y: 0.5)
-            .translatedBy(x: alignsTrailing ? frame.width / 2 : -frame.width / 2, y: frame.height / 2)
-        UIView.animate(springDuration: 0.4, bounce: 0.3, initialSpringVelocity: 0, delay: 0.05, options: [.allowUserInteraction]) {
+        UIView.animate(withDuration: BighelpTokens.stateDuration, delay: 0, options: [.allowUserInteraction]) {
             host.view.alpha = 1
-            host.view.transform = .identity
         }
     }
 
-    /// Moves the bar to where the message ended up.
+    /// Moves the bar onto the lifted pill once the system has placed the message.
     func follow(owner: AnyObject) {
-        guard self.owner === owner, let host, let frame = targetFrame() else { return }
-        let center = CGPoint(x: frame.midX, y: frame.midY)
-        guard hypot(center.x - host.view.center.x, center.y - host.view.center.y) > 0.5 else { return }
+        guard self.owner === owner, let host, let frame = targetFrame(),
+              host.view.frame.integral != frame.integral else { return }
         UIView.animate(springDuration: 0.3, bounce: 0, initialSpringVelocity: 0, delay: 0, options: [.allowUserInteraction]) {
-            host.view.center = center
+            Self.place(host.view, on: frame)
         }
+    }
+
+    /// The lifted copy can be drawn a little larger than the message; the bar
+    /// takes the same scale so it covers its pill exactly.
+    private static func place(_ view: UIView, on frame: CGRect) {
+        let size = view.bounds.size
+        view.center = CGPoint(x: frame.midX, y: frame.midY)
+        guard size.width > 0, size.height > 0 else { return }
+        view.transform = CGAffineTransform(scaleX: frame.width / size.width, y: frame.height / size.height)
     }
 
     func hide(owner: AnyObject) {
@@ -387,7 +419,6 @@ final class ChatReactionBarOverlay {
         self.owner = nil
         UIView.animate(withDuration: BighelpTokens.stateDuration, delay: 0, options: [.beginFromCurrentState]) {
             host.view.alpha = 0
-            host.view.transform = CGAffineTransform(scaleX: 0.8, y: 0.8)
         } completion: { [weak self] _ in
             guard let self, self.window === window else { return }
             self.dismantle()
@@ -395,12 +426,8 @@ final class ChatReactionBarOverlay {
     }
 
     private func targetFrame() -> CGRect? {
-        guard let window, let host, let scene = window.windowScene, let bubbleInScene = bubbleFrame() else { return nil }
-        let bubble = window.convert(bubbleInScene, from: scene.coordinateSpace)
-        let size = host.sizeThatFits(in: window.bounds.size)
-        return ChatReactionBarMetrics.frame(
-            barSize: size, over: bubble, alignsTrailing: alignsTrailing,
-            within: window.bounds.inset(by: window.safeAreaInsets))
+        guard let window, let scene = window.windowScene, let barInScene = barFrame() else { return nil }
+        return window.convert(barInScene, from: scene.coordinateSpace)
     }
 
     private func dismantle() {
@@ -408,7 +435,7 @@ final class ChatReactionBarOverlay {
         window?.rootViewController = nil
         window = nil
         host = nil
-        bubbleFrame = { nil }
+        barFrame = { nil }
     }
 
     /// Only touches on the bar stay here; iPad wraps the root view in

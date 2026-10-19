@@ -82,6 +82,15 @@ struct ChatReactionBarTests {
         #expect(top.minY == bounds.minY)
     }
 
+    @Test func liftedPillStaysOverTheMessageForTheSystemToFitOnScreen() {
+        let size = ChatReactionBarMetrics.barSize(choiceCount: 6, slot: 44)
+        #expect(size == CGSize(width: 7 * 44 + 2 * ChatReactionBarMetrics.inset, height: 44 + 2 * ChatReactionBarMetrics.inset))
+        let high = CGRect(x: 16, y: 20, width: 120, height: 60)
+        let lifted = ChatReactionBarMetrics.liftedFrame(barSize: size, over: high, alignsTrailing: false, minX: 0, maxX: 393)
+        #expect(lifted.maxY == high.minY - ChatReactionBarMetrics.gap, "Never pushed down onto the message")
+        #expect(lifted.minX == 16)
+    }
+
     @Test func slotsShrinkToFitANarrowScreenButKeepATouchableSize() {
         #expect(ChatReactionBarMetrics.slot(choiceCount: 6, availableWidth: 393) == 44)
         let narrow = ChatReactionBarMetrics.slot(choiceCount: 7, availableWidth: 320)

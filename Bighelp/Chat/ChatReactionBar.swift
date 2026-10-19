@@ -81,19 +81,26 @@ enum ChatReactionBarMetrics {
         return max(minimumSlot, min(preferredSlot, fitting.rounded(.down)))
     }
 
-    static func barHeight(slot: CGFloat) -> CGFloat { slot + 2 * inset }
-
-    /// Room the lifted message keeps above itself, so the system places it
-    /// low enough for the bar to show.
-    static var reservedHeight: CGFloat { barHeight(slot: preferredSlot) + gap }
+    static func barSize(choiceCount: Int, slot: CGFloat) -> CGSize {
+        CGSize(width: CGFloat(choiceCount + 1) * slot + 2 * inset, height: slot + 2 * inset)
+    }
 
     /// The bar's frame: over the message, on its side of the chat, kept inside
     /// the visible area.
     static func frame(barSize: CGSize, over bubble: CGRect, alignsTrailing: Bool, within bounds: CGRect) -> CGRect {
+        var frame = liftedFrame(barSize: barSize, over: bubble, alignsTrailing: alignsTrailing,
+                                minX: bounds.minX, maxX: bounds.maxX)
+        frame.origin.y = max(frame.minY, bounds.minY)
+        return frame
+    }
+
+    /// The bar's place in the lifted message: never pushed down onto the
+    /// message, since the system moves the whole lifted copy onto the screen.
+    static func liftedFrame(barSize: CGSize, over bubble: CGRect, alignsTrailing: Bool,
+                            minX: CGFloat, maxX: CGFloat) -> CGRect {
         var x = alignsTrailing ? bubble.maxX - barSize.width : bubble.minX
-        x = min(max(x, bounds.minX + edgeMargin), bounds.maxX - edgeMargin - barSize.width)
-        let y = max(bubble.minY - gap - barSize.height, bounds.minY)
-        return CGRect(origin: CGPoint(x: x, y: y), size: barSize)
+        x = min(max(x, minX + edgeMargin), maxX - edgeMargin - barSize.width)
+        return CGRect(x: x, y: bubble.minY - gap - barSize.height, width: barSize.width, height: barSize.height)
     }
 }
 
@@ -140,8 +147,10 @@ struct ChatReactionBarView: View {
             .accessibilityIdentifier("chat.reaction-bar.more")
         }
         .padding(ChatReactionBarMetrics.inset)
-        .bighelpNavigationGlass(in: Capsule())
-        .shadow(color: .black.opacity(0.12), radius: 12, y: 4)
+        // A solid pill, like Messages' tapback: nothing under it shows through.
+        .background(Capsule().fill(theme.raisedSurface))
+        .overlay(Capsule().strokeBorder(theme.separator.opacity(0.6), lineWidth: BighelpTokens.hairline))
+        .shadow(color: .black.opacity(0.16), radius: 10, y: 3)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("chat.reaction-bar")
     }

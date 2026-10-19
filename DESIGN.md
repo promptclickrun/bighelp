@@ -153,10 +153,11 @@ reloads from Hermes, and the agent reads which message it answers (`ChatReplyQuo
 [Native chat transport](docs/NATIVE_TRANSPORT.md)).
 
 Holding a message lifts the whole bubble and floats a reaction bar over it, like Messages' tapback: the six common
-reactions in a glass pill, then + for any emoji (`ChatReactionBarProjection`, `ChatMessageMenuDriver`). The menu
-below has no React item. A tap reacts and closes the menu; the person's reaction shows chosen and a second tap takes
-it away. The bar has its own pass-through window over the menu (`ChatReactionBarOverlay`), and the lifted copy keeps
-room above the bubble so the system places it low enough for the bar. The Mac, Vision Pro and VoiceOver get the
+reactions in a solid pill (the raised surface; nothing under it shows through), then + for any emoji
+(`ChatReactionBarProjection`, `ChatMessageMenuDriver`). The menu below has no React item. A tap reacts and closes the
+menu; the person's reaction shows chosen and a second tap takes it away. The pill lifts with the bubble, so the system
+fits both on screen and everything else stays under the menu's blur; the emoji sit in the bar's own pass-through
+window over that pill (`ChatReactionBarOverlay`). The Mac, Vision Pro and VoiceOver get the
 same reactions as the menu's first row of icons instead.
 
 Reactions use Hermes' own: the app saves them with `message.react`, and with Settings › Chat › "Agents see your

@@ -112,6 +112,8 @@ struct DirectHermesWorkspaceClientTests {
             "profile": .string("studio"), "title": .string("Bot Chat"),
             "hidden": .boolean(true), "follow_profile_config": .boolean(true),
             "cwd": .string("/workspace/notes"), "cwd_explicit": .boolean(true), "source": .string("bighelp"),
+            // #440: one key per logical create, so a retry after a lost reply gets the same session.
+            "idempotency_key": .string("6f1c0d5e-3b7a-4c1e-9f2a-1d2b3c4d5e6f"),
         ]
         #expect(try DirectHermesWorkspaceClient.route(.sessionCreate, payload: create) == .rpc("session.create", create))
         let title: [String: BighelpJSONValue] = ["session_id": .string("live"), "title": .string("Bot Chat")]

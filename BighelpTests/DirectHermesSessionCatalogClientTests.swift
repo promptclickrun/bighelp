@@ -843,7 +843,8 @@ struct DirectHermesSessionCatalogClientTests {
             switch operation {
             case .profilesList: return Self.profiles()
             case .sessionCreate:
-                #expect(payload == ["profile": .string("alpha"), "source": .string("bighelp")])
+                #expect(payload.filter { $0.key != "idempotency_key" } == ["profile": .string("alpha"), "source": .string("bighelp")])
+                #expect(payload["idempotency_key"]?.string?.isEmpty == false)
                 return Self.created(stored: "ordinary")
             default: throw WorkspaceClientError.invalidRequest
             }
@@ -869,7 +870,8 @@ struct DirectHermesSessionCatalogClientTests {
                 return ["sessions": .array(titled ? [Self.registry("created")] : [])]
             case .sessionCreate:
                 #expect(states.last?.phase == .createRequested)
-                #expect(payload == ["profile": .string("alpha"), "title": .string("Bot Chat"),
+                #expect(payload["idempotency_key"] == .string(states.last?.intentID.lowercased() ?? "missing"))
+                #expect(payload.filter { $0.key != "idempotency_key" } == ["profile": .string("alpha"), "title": .string("Bot Chat"),
                                     "hidden": .boolean(true), "follow_profile_config": .boolean(true),
                                     "cwd": .string("/approved/work"), "cwd_explicit": .boolean(true),
                                     "source": .string("bighelp")])
@@ -911,14 +913,62 @@ struct DirectHermesSessionCatalogClientTests {
         #expect(!workspace.calls.contains { $0.operation == .sessionCreate || $0.operation == .sessionTitle })
     }
 
-    @Test func unknownCreateReceiptIsRetainedAcrossClientRestoreAndNeverReplayed() async throws {
+    /// #440: the reply to the agent's first Bot Chat create was lost (the socket dropped). Its title was
+    /// never asked for, so it can't hold the agent's Bot Chat: after a restore the app creates again
+    /// under the same idempotency key (Hermes hands back the same session while it still has it) and
+    /// finishes, instead of refusing every later attempt.
+    @Test func aLostFirstCreateRetriesUnderTheSameKeyAfterRestore() async throws {
         let workspace = try SessionWorkspaceStub()
         var retained: DirectHermesSessionCreationState?
+        var failCreate = true
+        var titled = false
+        var keys: [String] = []
+        workspace.handler = { operation, payload in
+            switch operation {
+            case .profilesList: return Self.profiles()
+            case .nativeSessionList: return ["sessions": .array(titled ? [Self.registry("retried")] : [])]
+            case .sessionCreate:
+                keys.append(payload["idempotency_key"]?.string ?? "")
+                if failCreate { throw WorkspaceClientError.outcomeUnknown }
+                return Self.created(stored: "retried")
+            case .sessionTitle:
+                titled = true
+                return ["pending": .boolean(false), "title": .string("Bot Chat")]
+            case .sessionResume: return Self.attached(stored: "retried")
+            default: throw WorkspaceClientError.invalidRequest
+            }
+        }
+        let first = Self.client(workspace, sink: { retained = $0 })
+        await #expect(throws: WorkspaceClientError.outcomeUnknown) {
+            try await first.createFirstCanonicalChat(profileID: "alpha")
+        }
+        let saved = try #require(retained)
+        #expect(saved.purpose == .firstCanonical && saved.phase == .createRequested)
+        let restored = try JSONDecoder().decode(DirectHermesSessionCreationState.self, from: JSONEncoder().encode(saved))
+        let authority = try #require(workspace.owner?.authority)
+        workspace.owner = WorkspaceOwner(authority: authority, authenticationGeneration: UUID(), connectionGeneration: UUID())
+        let second = Self.client(workspace, sink: { retained = $0 })
+        try second.restoreCreationState(restored)
+        failCreate = false
+        let resolved = try await second.createFirstCanonicalChat(profileID: "alpha")
+        #expect(resolved.coordinate.storedSessionID == "retried")
+        #expect(retained?.phase == .canonicalResolved)
+        #expect(keys.count == 2)
+        #expect(keys.allSatisfy { $0 == saved.intentID.lowercased() }, "One logical create, one key")
+    }
+
+    /// #440: an unfinished first Bot Chat never blocks New Chat for that agent.
+    @Test func anUnfinishedFirstBotChatDoesNotBlockNewChatsAfterRestore() async throws {
+        let workspace = try SessionWorkspaceStub()
+        var retained: DirectHermesSessionCreationState?
+        var failCreate = true
         workspace.handler = { operation, _ in
             switch operation {
-            case .profilesList: Self.profiles()
-            case .nativeSessionList: ["sessions": .array([])]
-            case .sessionCreate: throw WorkspaceClientError.outcomeUnknown
+            case .profilesList: return Self.profiles()
+            case .nativeSessionList: return ["sessions": .array([])]
+            case .sessionCreate:
+                if failCreate { throw WorkspaceClientError.outcomeUnknown }
+                return Self.created(stored: "ordinary")
             default: throw WorkspaceClientError.invalidRequest
             }
         }
@@ -930,13 +980,12 @@ struct DirectHermesSessionCatalogClientTests {
         let restored = try JSONDecoder().decode(DirectHermesSessionCreationState.self, from: JSONEncoder().encode(saved))
         let authority = try #require(workspace.owner?.authority)
         workspace.owner = WorkspaceOwner(authority: authority, authenticationGeneration: UUID(), connectionGeneration: UUID())
-        let second = Self.client(workspace, sink: { _ in })
+        let second = Self.client(workspace, sink: { retained = $0 })
         try second.restoreCreationState(restored)
-        await #expect(throws: DirectHermesSessionError.creationUnconfirmed(profileID: "alpha")) {
-            try await second.createFirstCanonicalChat(profileID: "alpha")
-        }
-        #expect(workspace.calls.filter { $0.operation == .sessionCreate }.count == 1)
-        #expect(!workspace.calls.contains { $0.operation == .sessionTitle })
+        failCreate = false
+        let session = try await second.createOrdinarySession(profileID: "alpha")
+        #expect(session.record.agentIDs == ["alpha"])
+        #expect(retained?.purpose == .ordinary && retained?.phase == .complete)
     }
 
     @Test func unconfirmedOrdinaryNewChatDoesNotBlockTheNextOneEvenAfterRestore() async throws {
@@ -1109,15 +1158,25 @@ struct DirectHermesSessionCatalogClientTests {
         #expect(try await client.list().map(\.id) == [record.id])
     }
 
-    @Test func unknownTitleResultRetainsReceiptAndNeverRepeatsTheMutation() async throws {
+    /// #440: the title's reply was lost. The next attempt finds no Bot Chat in the registry, resumes the
+    /// session Hermes made (no second create) and asks for the same title again, which can't change
+    /// anything else, instead of refusing every later attempt.
+    @Test func anUnknownTitleResultResumesItsSessionAndFinishesOnRetry() async throws {
         let workspace = try SessionWorkspaceStub()
         var retained: DirectHermesSessionCreationState?
+        var titleReplies = 0
+        var titled = false
         workspace.handler = { operation, _ in
             switch operation {
             case .profilesList: return Self.profiles()
-            case .nativeSessionList: return ["sessions": .array([])]
+            case .nativeSessionList: return ["sessions": .array(titled ? [Self.registry("created")] : [])]
             case .sessionCreate: return Self.created(stored: "created")
-            case .sessionTitle: throw WorkspaceClientError.outcomeUnknown
+            case .sessionTitle:
+                titleReplies += 1
+                if titleReplies == 1 { throw WorkspaceClientError.outcomeUnknown }
+                titled = true
+                return ["pending": .boolean(false), "title": .string("Bot Chat")]
+            case .sessionResume: return Self.attached(stored: "created")
             default: throw WorkspaceClientError.invalidRequest
             }
         }
@@ -1127,11 +1186,11 @@ struct DirectHermesSessionCatalogClientTests {
         }
         #expect(retained?.phase == .titleRequested)
         #expect(retained?.storedSessionID == "created")
-        await #expect(throws: DirectHermesSessionError.creationUnconfirmed(profileID: "alpha")) {
-            try await client.createFirstCanonicalChat(profileID: "alpha")
-        }
-        #expect(workspace.calls.filter { $0.operation == .sessionCreate }.count == 1)
-        #expect(workspace.calls.filter { $0.operation == .sessionTitle }.count == 1)
+        let resolved = try await client.createFirstCanonicalChat(profileID: "alpha")
+        #expect(resolved.coordinate.storedSessionID == "created")
+        #expect(retained?.phase == .canonicalResolved)
+        #expect(workspace.calls.filter { $0.operation == .sessionCreate }.count == 1, "No second chat")
+        #expect(workspace.calls.filter { $0.operation == .sessionTitle }.count == 2)
     }
 
     @Test func metadataTargetsStaySeparateFromNonCompressionTranscriptContinuation() async throws {

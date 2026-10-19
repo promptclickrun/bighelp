@@ -648,14 +648,12 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         // ordinary new chat can at most leave one unused empty chat on the host,
         // so a new attempt replaces it. (Blocking here used to lock an agent out
         // of new chats for good, across restarts, after one timed-out create.)
+        // A Bot Chat whose title was asked for is settled by the registry: it has the chat,
+        // or the title never landed. Either way a new chat is safe. One whose title was never
+        // asked for can't hold the agent's Bot Chat, so it doesn't hold up a new chat either
+        // (#440: refusing here locked an agent out of every new chat after one lost reply).
         if var pending = creations[key], pending.purpose == .firstCanonical,
-           pending.phase != .complete, pending.phase != .canonicalResolved {
-            // A Bot Chat whose title was asked for is settled by the registry: it
-            // has the chat, or the title never landed. Either way a new chat is safe.
-            // (Left pending, a refused title locked the agent out of new chats.)
-            guard pending.phase == .titleRequested || pending.phase == .awaitingRegistry else {
-                throw DirectHermesSessionError.creationUnconfirmed(profileID: profileID)
-            }
+           pending.phase == .titleRequested || pending.phase == .awaitingRegistry {
             if let found = try await registry(profileID: profileID) {
                 canonicalIDs[key] = found
                 pending.phase = .canonicalResolved
@@ -705,11 +703,16 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         }
         var state: DirectHermesSessionCreationState
         var binding: Binding
-        if let pending = creations[key], pending.phase != .complete, pending.phase != .canonicalResolved {
-            guard pending.purpose == .firstCanonical, pending.phase == .created,
-                  let stored = pending.storedSessionID else {
-                throw DirectHermesSessionError.creationUnconfirmed(profileID: profileID)
-            }
+        if let pending = creations[key], pending.purpose == .firstCanonical, pending.phase != .complete,
+           pending.phase != .canonicalResolved, pending.storedSessionID == nil {
+            // #440: the create's reply was lost before any title was asked for, so this attempt can't
+            // hold the agent's Bot Chat. Create again under the same key: Hermes hands back the same
+            // session while it still has it, else makes a fresh one. Never a permanent refusal.
+            state = pending
+            binding = try await dispatchCreate(&state, profile: profile)
+        } else if let pending = creations[key], pending.purpose == .firstCanonical, pending.phase != .complete,
+                  pending.phase != .canonicalResolved, let stored = pending.storedSessionID {
+            // Hermes made its session: resume it and finish (title, registry) from there.
             state = pending
             let record = try draftRecord(profile: profile, storedID: stored, title: "Bot Chat")
             let candidate = try Binding(
@@ -2196,6 +2199,9 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         try persistBeforeDispatch(state)
         var payload: [String: BighelpJSONValue] = [
             "profile": .string(profile.id), "source": .string(DirectHermesReleaseContract.sessionSource),
+            // One key per logical create (#440): a retry after a lost reply gets the same session back
+            // while Hermes still has it, not a second one. Hermes without the key ignores it.
+            "idempotency_key": .string(state.intentID.lowercased()),
         ]
         if let title { payload["title"] = .string(title) }
         // A per-session pick that beats the agent's defaults for this session only; Hermes

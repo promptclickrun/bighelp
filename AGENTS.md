@@ -170,6 +170,10 @@ change in both repos.
   people, a note on each message that only the model sees. The wait is capped (1.2 s), so a slow host sends the
   message without a name. `UserIdentity.name` is empty until someone saves one; "You" is an on-screen placeholder
   (`displayName`) and must never be sent. Names are at most 40 characters.
+- **A lost create never locks an agent out:** every `session.create` sends the creation record's `intentID` as
+  `idempotency_key` (Hermes keeps it 5 minutes and answers a retry with the same session). An unfinished first Bot
+  Chat retries under that key, or resumes the session Hermes made and asks for its title again; it never blocks
+  New Chat (#440).
 - **A turn stays pending while it streams:** after `prompt.submit` returns `streaming`, the chat isn't "ready for a
   new turn" until the turn ends. A mid-turn Send must go through the steer/queue path (`sendMidSession`). Steer is
   the default.

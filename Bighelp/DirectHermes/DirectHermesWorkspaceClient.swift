@@ -272,7 +272,7 @@ final class DirectHermesWorkspaceClient: WorkspaceOperationPerforming {
             return try rpc(operation, payload,
                            allowed: ["profile", "source", "close_on_disconnect", "cwd", "cwd_explicit",
                                      "omit_messages", "title", "hidden", "follow_profile_config",
-                                     "model", "provider", "reasoning_effort", "fast"],
+                                     "model", "provider", "reasoning_effort", "fast", "idempotency_key"],
                            required: ["profile"])
         case .nativeSessionList:
             return try rpc(operation, payload,

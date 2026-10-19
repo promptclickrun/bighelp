@@ -27,13 +27,10 @@ struct NativeMessageSelectionTests {
             hasMutationHandler: true
         )
         #expect(canReact)
-        #expect(
-            ChatBubbleInteraction(
-                markdown: "React to this message",
-                canFork: true,
-                canReact: canReact
-            ).menuActions == [.react, .copy, .selectText, .forkFromHere]
-        )
+        let interaction = ChatBubbleInteraction(markdown: "React to this message", canFork: true, canReact: canReact)
+        // Reactions float over the message; the menu below no longer has a React item.
+        #expect(interaction.offersReactions)
+        #expect(interaction.menuActions == [.copy, .selectText, .forkFromHere])
     }
 
     @Test func allMentionIsAnIdentityPillAtItsOriginalPosition() {

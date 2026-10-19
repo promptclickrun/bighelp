@@ -183,6 +183,10 @@ final class ChatModel {
     var nativeMessageReactionRevision: UInt64 = 0
     var nativeAffectionRevision: UInt64 = 0
     var nativeAffectionReaction: NativeAffectionReactionSignal?
+    #if DEBUG
+    /// The reaction UI fixture's host: each reaction kept as Hermes would, on this screen only.
+    var fixtureReactions: [String: String] = [:]
+    #endif
 
     @ObservationIgnored var defersTranscriptPresentation = false
     /// Messages whose files reached this device, by the saved text that named

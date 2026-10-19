@@ -8,7 +8,6 @@ enum NativeMessageReactionLayoutMetrics {
 }
 
 struct NativeMessageReactionBar: View {
-    static let choices = ["❤️", "👍", "👎", "😂", "🎉", "🤔"]
     static let maximumVisibleReactions = 5
 
     let presentation: NativeMessageReactionPresentation
@@ -110,6 +109,7 @@ struct NativeMessageReactionPicker: View {
     @State private var draft = ""
     @FocusState private var isFocused: Bool
     @Environment(\.dismiss) private var dismiss
+    @BighelpThemeReader private var theme
 
     var body: some View {
         NavigationStack {
@@ -120,13 +120,15 @@ struct NativeMessageReactionPicker: View {
                     columns: [GridItem(.adaptive(minimum: BighelpTokens.hitTarget), spacing: BighelpTokens.space8)],
                     spacing: BighelpTokens.space8
                 ) {
-                    ForEach(NativeMessageReactionBar.choices, id: \.self) { emoji in
-                        Button(emoji) { select(emoji) }
+                    ForEach(ChatReactionBarProjection(selectedEmoji: currentReaction).choices) { choice in
+                        Button(choice.emoji) { select(choice.emoji) }
                             .font(.bighelp(.title2))
                             .frame(minWidth: BighelpTokens.hitTarget,
                                    minHeight: BighelpTokens.hitTarget)
                             .buttonStyle(.bordered)
-                            .accessibilityLabel("React \(emoji)")
+                            .tint(choice.isSelected ? theme.action : nil)
+                            .accessibilityLabel(choice.accessibilityLabel)
+                            .accessibilityAddTraits(choice.isSelected ? .isSelected : [])
                     }
                 }
                 TextField("Any emoji", text: $draft)

@@ -65,17 +65,19 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
     let onCopy: () -> Void
     let onSelect: () -> Void
     let onFork: (() -> Void)?
-    let onReact: (() -> Void)?
+    let reactions: ChatMessageReactionActions?
     var onReply: (() -> Void)? = nil
     var textScale: CGFloat = 1
     var mentionIdentities: [ChatMentionIdentity] = []
+    /// The bubble around this text, so a hold lifts all of it.
+    var menuAnchor: ChatBubbleMenuAnchor? = nil
+    var bubbleShape = ChatBubbleMenuShape(alignsTrailing: false, hasTail: false)
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.opensHostFiles) private var opensHostFiles
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(openURL: openURL, copyActionLabel: copyActionLabel, onCopy: onCopy,
-            onSelect: onSelect, onFork: onFork, onReact: onReact, onReply: onReply)
+        Coordinator(openURL: openURL)
     }
 
     func makeUIView(context: Context) -> UITextView {
@@ -103,7 +105,7 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
         view.accessibilityIdentifier = "chat.message.inline-selection"
         view.accessibilityHint = "Long press shows message actions. Double tap selects a word. Links open in your chosen browser."
         let textLongPressRecognizers = (view.gestureRecognizers ?? []).compactMap { $0 as? UILongPressGestureRecognizer }
-        let contextMenuInteraction = UIContextMenuInteraction(delegate: context.coordinator)
+        let contextMenuInteraction = UIContextMenuInteraction(delegate: context.coordinator.menu)
         view.addInteraction(contextMenuInteraction)
         let textRecognizerIDs = Set(textLongPressRecognizers.map(ObjectIdentifier.init))
         if let contextMenuLongPress = (view.gestureRecognizers ?? [])
@@ -120,15 +122,13 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
     func updateUIView(_ view: UITextView, context: Context) {
         _ = dynamicTypeSize
         context.coordinator.openURL = openURL
-        context.coordinator.copyActionLabel = copyActionLabel
-        context.coordinator.onCopy = onCopy
-        context.coordinator.onSelect = onSelect
-        context.coordinator.onFork = onFork
-        context.coordinator.onReact = onReact
-        context.coordinator.onReply = onReply
+        context.coordinator.menu.update(
+            actions: ChatMessageMenuActions(copyActionLabel: copyActionLabel, onCopy: onCopy, onSelect: onSelect,
+                                            onFork: onFork, onReply: onReply, reactions: reactions),
+            anchor: menuAnchor, shape: bubbleShape, theme: theme)
         view.tintColor = UIColor(theme.action)
-        view.accessibilityCustomActions = (onReact.map { action in
-            [UIAccessibilityCustomAction(name: "React") { _ in action(); return true }]
+        view.accessibilityCustomActions = (reactions.map { reactions in
+            [UIAccessibilityCustomAction(name: "React") { _ in reactions.onMore(); return true }]
         } ?? []) + (onReply.map { action in
             [UIAccessibilityCustomAction(name: "Reply") { _ in action(); return true }]
         } ?? []) + [
@@ -190,28 +190,16 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
         return CGSize(width: width, height: ceil(measured.height))
     }
 
-    final class Coordinator: NSObject, UITextViewDelegate, UIContextMenuInteractionDelegate {
+    final class Coordinator: NSObject, UITextViewDelegate {
         let renderCache = ChatNativeMarkdownRenderCache()
+        /// The message menu: Reply, Copy and the rest, with the reaction bar.
+        let menu = ChatMessageMenuDriver()
         var idealLayout: ChatNativeMarkdownIdealLayout?
         var renderedText: NSAttributedString?
         var openURL: OpenURLAction
-        var copyActionLabel: String
-        var onCopy: () -> Void
-        var onSelect: () -> Void
-        var onFork: (() -> Void)?
-        var onReact: (() -> Void)?
-        var onReply: (() -> Void)?
 
-        init(openURL: OpenURLAction, copyActionLabel: String, onCopy: @escaping () -> Void,
-             onSelect: @escaping () -> Void, onFork: (() -> Void)?, onReact: (() -> Void)?,
-             onReply: (() -> Void)?) {
+        init(openURL: OpenURLAction) {
             self.openURL = openURL
-            self.copyActionLabel = copyActionLabel
-            self.onCopy = onCopy
-            self.onSelect = onSelect
-            self.onFork = onFork
-            self.onReact = onReact
-            self.onReply = onReply
         }
 
         func textView(
@@ -221,56 +209,6 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
         ) -> UIMenu? {
             guard range.length > 0, !suggestedActions.isEmpty else { return nil }
             return UIMenu(children: suggestedActions)
-        }
-
-        func contextMenuInteraction(
-            _ interaction: UIContextMenuInteraction,
-            configurationForMenuAtLocation location: CGPoint
-        ) -> UIContextMenuConfiguration? {
-            UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { [weak self] _ in
-                guard let self else { return nil }
-                var actions: [UIMenuElement] = []
-                if onReact != nil {
-                    actions.append(UIAction(
-                        title: "React",
-                        image: UIImage(systemName: "face.smiling")
-                    ) { [weak self] _ in
-                        self?.onReact?()
-                    })
-                }
-                if onReply != nil {
-                    actions.append(UIAction(
-                        title: "Reply",
-                        image: UIImage(systemName: "arrowshape.turn.up.left")
-                    ) { [weak self] _ in
-                        self?.onReply?()
-                    })
-                }
-                actions.append(UIAction(
-                    title: copyActionLabel,
-                    image: UIImage(systemName: "doc.on.doc")
-                ) { [weak self] _ in
-                    self?.onCopy()
-                })
-                // On the Mac, text is selected with the pointer; no separate sheet.
-                if !BighelpPlatform.isMac {
-                    actions.append(UIAction(
-                        title: "Select text",
-                        image: UIImage(systemName: "selection.pin.in.out")
-                    ) { [weak self] _ in
-                        self?.onSelect()
-                    })
-                }
-                if onFork != nil {
-                    actions.append(UIAction(
-                        title: "Fork from here",
-                        image: UIImage(systemName: "arrow.triangle.branch")
-                    ) { [weak self] _ in
-                        self?.onFork?()
-                    })
-                }
-                return UIMenu(children: actions)
-            }
         }
 
         func textView(

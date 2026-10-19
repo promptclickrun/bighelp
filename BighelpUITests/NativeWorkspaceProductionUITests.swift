@@ -222,11 +222,9 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         // Reactions need the reply's saved row; give the host a moment to confirm it.
         sleep(3)
         finished.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 12, dy: 10)).press(forDuration: 1.0)
-        let react = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "React")).firstMatch
-        if react.waitForExistence(timeout: 5) {
-            react.tap()
-            let heart = app.buttons["React ❤️"].firstMatch
-            XCTAssertTrue(heart.waitForExistence(timeout: 5))
+        // The reaction bar floats over the held message.
+        let heart = app.buttons["chat.reaction-bar.heart"]
+        if heart.waitForExistence(timeout: 5) {
             heart.tap()
             let noted = Date().addingTimeInterval(20)
             while Date() < noted, reactionNotes() == 0 { usleep(500_000) }
@@ -237,7 +235,7 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
             record("reacted")
         } else {
             record("no-react-action")
-            XCTFail("The reply offers no React action.")
+            XCTFail("The reply offers no reaction bar.")
             app.tap()
         }
 
@@ -1592,13 +1590,15 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         longPressTarget.coordinate(withNormalizedOffset: .zero)
             .withOffset(CGVector(dx: 12, dy: 10)).press(forDuration: 1)
 
-        let react = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "label == %@", "React")).firstMatch
-        XCTAssertTrue(react.waitForExistence(timeout: 5))
-        react.tap()
-        let picker = app.descendants(matching: .any)["chat.reaction-picker"]
-        XCTAssertTrue(picker.waitForExistence(timeout: 5))
+        // The bar over the held message: its common reactions, and + for any emoji.
+        let barNames = ["❤️": "heart", "👍": "thumbs-up", "👎": "thumbs-down",
+                        "😂": "laughing", "🎉": "party", "🤔": "thinking"]
         if usingAnyEmojiField {
+            let more = app.buttons["chat.reaction-bar.more"]
+            XCTAssertTrue(more.waitForExistence(timeout: 5))
+            more.tap()
+            let picker = app.descendants(matching: .any)["chat.reaction-picker"]
+            XCTAssertTrue(picker.waitForExistence(timeout: 5))
             let field = app.textFields["chat.reaction-picker.any-emoji"]
             XCTAssertTrue(field.waitForExistence(timeout: 5))
             field.tap()
@@ -1611,7 +1611,8 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
             XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 5), .completed)
             add.tap()
         } else {
-            let choice = app.buttons["React \(emoji)"]
+            let name = try XCTUnwrap(barNames[emoji], "\(emoji) is not on the reaction bar")
+            let choice = app.buttons["chat.reaction-bar.\(name)"]
             XCTAssertTrue(choice.waitForExistence(timeout: 5))
             choice.tap()
         }

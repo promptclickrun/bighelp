@@ -127,20 +127,30 @@ final class ChatMessageMenuDriver: NSObject, UIContextMenuInteractionDelegate {
         guard ChatMessageMenuStyle.liftsBubble, let source = interaction.view, let window = source.window else {
             return nil
         }
-        let bubble = anchor?.frame(in: window) ?? source.convert(source.bounds, to: window)
-        guard bubble.width > 1, bubble.height > 1,
-              let snapshot = window.resizableSnapshotView(
-                from: bubble, afterScreenUpdates: false, withCapInsets: .zero) else { return nil }
+        // Only the part on screen lifts, drawn from the message's own row so the
+        // header or the message box over it never comes along.
+        let bubble = (anchor?.frame(in: window) ?? source.convert(source.bounds, to: window))
+            .intersection(window.bounds)
+        let row = Self.row(containing: source) ?? window
+        guard !bubble.isNull, bubble.width > 1, bubble.height > 1,
+              let snapshot = row.resizableSnapshotView(
+                from: row.convert(bubble, from: window), afterScreenUpdates: false, withCapInsets: .zero)
+        else { return nil }
         let reserve = actions?.reactions != nil && ChatMessageMenuStyle.floatsReactions
             ? ChatReactionBarMetrics.reservedHeight : 0
         let container = UIView(frame: CGRect(x: 0, y: 0, width: bubble.width, height: bubble.height + reserve))
         container.backgroundColor = .clear
         bubbleInPreview = CGRect(x: 0, y: reserve, width: bubble.width, height: bubble.height)
         snapshot.frame = bubbleInPreview
-        let mask = CAShapeLayer()
-        mask.path = shape.path(in: snapshot.bounds).cgPath
-        snapshot.layer.mask = mask
-        container.addSubview(snapshot)
+        // A reply's bubble is a see-through tint over the chat; keep the chat behind it.
+        let backing = UIView(frame: bubbleInPreview)
+        backing.backgroundColor = theme.map { UIColor($0.canvas) } ?? .systemBackground
+        for view in [backing, snapshot] {
+            let mask = CAShapeLayer()
+            mask.path = shape.path(in: view.bounds).cgPath
+            view.layer.mask = mask
+            container.addSubview(view)
+        }
         // The system places and fits the whole visible area, so the empty room
         // over the bubble stays on screen; only the bubble casts a shadow.
         let parameters = UIPreviewParameters()
@@ -151,6 +161,15 @@ final class ChatMessageMenuDriver: NSObject, UIContextMenuInteractionDelegate {
         let preview = UITargetedPreview(view: container, parameters: parameters, target: target)
         self.preview = preview
         return preview
+    }
+
+    private static func row(containing view: UIView) -> UIView? {
+        var current = view.superview
+        while let candidate = current {
+            if candidate is UITableViewCell || candidate is UICollectionViewCell { return candidate }
+            current = candidate.superview
+        }
+        return nil
     }
 
     func contextMenuInteraction(

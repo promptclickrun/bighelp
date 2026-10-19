@@ -231,6 +231,8 @@ struct AgentHeroHeader: View {
             }
             if showsName || statusLine != nil || sessionTitle != nil {
             Button(action: onNameTap) {
+                // A long title stops short of the corner buttons; a short one keeps the chip snug.
+                BighelpHuggingWidth(maxWidth: 240) {
                 VStack(spacing: 1) {
                     if showsName {
                         Text(displayName)
@@ -248,8 +250,7 @@ struct AgentHeroHeader: View {
                             .accessibilityIdentifier(statusLine == nil ? "agent.hero.session-title" : "agent.hero.status")
                     }
                 }
-                // A long title stops short of the corner buttons.
-                .frame(maxWidth: 240)
+                }
                 .padding(.horizontal, BighelpTokens.space16)
                 .padding(.vertical, 6)
                 .frame(minHeight: 34)

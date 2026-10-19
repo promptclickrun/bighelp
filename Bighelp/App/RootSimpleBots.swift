@@ -25,6 +25,12 @@ extension RootShellView {
     /// are loaded, often a few seconds. The Noodle loader covers the whole wait, from the tap to
     /// the chat, so the screen never looks stuck; Cancel goes back to where the tap came from.
     @ViewBuilder var simpleBotsOpeningLoader: some View {
+        #if DEBUG
+        // Demo hosts can't be switched to; this shows the loader for screenshots.
+        if settings.simpleBotsEnabled, ProcessInfo.processInfo.arguments.contains("-test-simple-bots-opening") {
+            SimpleBotsOpeningOverlay(botName: "Mina Shah", gatewayName: "Studio Mac", onCancel: {})
+        }
+        #endif
         if simpleBotsMultiGatewayOn, let fleet, let pending = fleet.pendingOpen {
             SimpleBotsOpeningOverlay(
                 botName: pending.profileID.flatMap { fleet.agent(hostID: pending.hostID, profileID: $0)?.name },

@@ -867,6 +867,7 @@ struct ChatView: View {
         } label: {
             HStack(spacing: BighelpTokens.space8) {
                 SimpleBotFace(agentID: agentID, name: agentName, imageURL: participant?.imageURL, size: 28)
+                BighelpHuggingWidth(maxWidth: 220) {
                 VStack(alignment: .leading, spacing: 0) {
                     Text(agentName)
                         .font(.bighelp(.title3, weight: .semibold))
@@ -881,7 +882,7 @@ struct ChatView: View {
                             .accessibilityIdentifier("chat.identity.session-title")
                     }
                 }
-                .frame(maxWidth: 220, alignment: .leading)
+                }
             }
             .padding(.leading, BighelpTokens.space12)
             .padding(.trailing, BighelpTokens.space16)

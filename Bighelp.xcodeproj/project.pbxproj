@@ -166,6 +166,7 @@
 		1BA53E4F4E35D42F490C3529 /* AppearanceStudioView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 853942665777C89A188608DD /* AppearanceStudioView.swift */; };
 		1BB9BE49DC6285985C71019E /* BotModeRoomStore+NativeEvents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EEED5396B4A5CA08D8C5836 /* BotModeRoomStore+NativeEvents.swift */; };
 		1BC620974ED3EFD8FF672F0B /* ProviderHostSignIn.swift in Sources */ = {isa = PBXBuildFile; fileRef = 247690E7990F653E1F8B6F80 /* ProviderHostSignIn.swift */; };
+		1C2996EAD548C006AA2B48F3 /* NotificationErrorCodeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4501149A8FC90C58403E903D /* NotificationErrorCodeUITests.swift */; };
 		1C2BB4E83D031A33B376321C /* BighelpShortcutService+Actions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19D7160AE9C689BF3CA8ECC8 /* BighelpShortcutService+Actions.swift */; };
 		1C583C9DF419F0654D7CDC02 /* DevFactoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0434D211AF76E67D497A6E46 /* DevFactoryStore.swift */; };
 		1C763567CD9CCE8F93EA60F8 /* HostSignInMatrixUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37C85FB08FD771ED53292DB4 /* HostSignInMatrixUITests.swift */; };
@@ -2152,6 +2153,7 @@
 		4440411763E09D8DF72C65A9 /* BighelpCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpCardView.swift; sourceTree = "<group>"; };
 		44A6C6E3CF44927895F2574B /* BighelpNotificationIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpNotificationIdentity.swift; sourceTree = "<group>"; };
 		44CF3CAEB4FD4B78F984FF5E /* WikiRecoveryWork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WikiRecoveryWork.swift; sourceTree = "<group>"; };
+		4501149A8FC90C58403E903D /* NotificationErrorCodeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationErrorCodeUITests.swift; sourceTree = "<group>"; };
 		450238CDFF2A89D38360F2B4 /* NativeLiveVoiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeLiveVoiceTests.swift; sourceTree = "<group>"; };
 		453E3551DA8DC888E2F2FB05 /* VoiceModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceModel.swift; sourceTree = "<group>"; };
 		45591296B1B8DF4C7F8DF5E0 /* WorkspaceGrantedFilesClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceGrantedFilesClient.swift; sourceTree = "<group>"; };
@@ -4813,6 +4815,7 @@
 				890274CE80C4CC5D8A048163 /* NativeWorkspaceProductionUITests.swift */,
 				FC90F1E6006570C9305AFBF4 /* NewBotChatHostUITests.swift */,
 				E49CD214EF82602A9DBD0E24 /* NoodleUITests.swift */,
+				4501149A8FC90C58403E903D /* NotificationErrorCodeUITests.swift */,
 				9D43B98A57E0784696329BB4 /* PinnedAgentsWidgetUITests.swift */,
 				DC38D0D5259ADD3E10988468 /* PluginReleaseUpdateHostUITests.swift */,
 				76A9E790A09E41281C7CF8C7 /* ProjectsAndBoardHostUITests.swift */,
@@ -7685,6 +7688,7 @@
 				EDE0D703B5A96188D6357DAD /* NativeWorkspaceProductionUITests.swift in Sources */,
 				7BDCC2A37F808393A7DD8AE7 /* NewBotChatHostUITests.swift in Sources */,
 				12D7562A2C7A57416386F816 /* NoodleUITests.swift in Sources */,
+				1C2996EAD548C006AA2B48F3 /* NotificationErrorCodeUITests.swift in Sources */,
 				C8C3BFD6A8B48C6CDD9806E9 /* PinnedAgentsWidgetUITests.swift in Sources */,
 				31AE5D4F20F7FAC9AF75F21C /* PluginReleaseUpdateHostUITests.swift in Sources */,
 				6AF03C308DFFF1432E48DAD0 /* ProjectsAndBoardHostUITests.swift in Sources */,

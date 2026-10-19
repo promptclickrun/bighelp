@@ -99,7 +99,7 @@ Some problems do not go away when you try again. For these problems, bighelp doe
 | NS-208 | bighelp could not move your saved alert choices to the push service. | Try again. | If the problem continues, the code and its details. |
 | NS-209 | The registration of your device did not finish before the check. | Try again. | If the problem continues, the code and its details. |
 | NS-210 | The sign-in of your device with the push service stopped during setup. | Try again. | If the problem continues, the code and its details. |
-| NS-211 | Your device cannot connect to the push service. A VPN or a DNS filter can block it. | Make sure that your device is online. Let your VPN or filter allow the push service. Then try again. | If the problem continues, the code and its details. |
+| NS-211 | Your device cannot connect to the push service. A VPN or a DNS filter can block it. | Make sure that your device is online. Let your VPN or filter allow `api.buzzkit.dev` and Apple push notifications. Then try again. | If the problem continues, the code and its details. |
 | NS-212 | The push service did not accept the sign-in of your device. | Wait one minute. Then try again. | If the problem continues, the code and its details. |
 | NS-213 | The answer from the push service was not usable. | Try again later. | If the problem continues, the code and its details. |
 | NS-214 | The push service did not start in bighelp. | Close bighelp fully and open it again. | If the problem continues, the code and its details. |

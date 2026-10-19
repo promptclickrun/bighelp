@@ -240,6 +240,15 @@ final class HostNotificationSetupModel {
             failure = last.failure
             failureIsFromEarlierRun = true
         }
+        #if DEBUG
+        // Demo mode has no computer to set up, so a forced failure shows as soon as setup opens.
+        if enrollNotifications, let forced = Self.forcedFailure() {
+            failure = forced
+            failureIsFromEarlierRun = false
+            state = forced.state
+            BighelpNotificationLastFailure.save(forced, hostID: host.id, defaults: defaults)
+        }
+        #endif
     }
 
     /// A push service failure: setup shows it as an error, not a warning.

@@ -5,8 +5,8 @@ short sentences, one instruction in each step, and the active voice.
 
 ## 2.6.1
 
-This release adds an optional chat title and fixes problems with Chat Info, bots on other computers, and new Bot
-Chats.
+This release adds an optional chat title and error codes for notification setup. It also fixes problems with
+Chat Info, bots on other computers, new Bot Chats, Composio Apps, phone tools, and the Mac app.
 
 ### Show the title of the chat
 
@@ -15,6 +15,12 @@ You can show the title of the chat under the name of the agent. This setting is 
 1. Open **Settings**.
 2. Select **Chat**.
 3. Turn on **Session title**.
+
+### Error codes for notification setup
+
+If notification setup stops, the app shows a short code (for example **NS-102**) and a message that tells you what
+to do. Select **Copy Details** to copy the code and the step. Send them to us when you ask for help. The details
+do not include addresses, names or keys.
 
 ### Fixes
 
@@ -25,6 +31,13 @@ You can show the title of the chat under the name of the agent. This setting is 
   back to the computer that you used before and tells you.
 - **New Bot Chats:** If the connection stops while the app makes the first Bot Chat of an agent, the app tries
   again. You can always start new chats with that agent.
+- **Composio Apps:** The app tests that your agent can reach Composio before it shows "can use these apps". If the
+  test fails, select **Sign in for my agent**. Use your Composio apps in a new chat. A chat that was open before you
+  turned on Composio does not get them.
+- **Phone tools:** The app connects the phone tools only in chats with the agent that has the bighelp plugin.
+  **Settings** › **Permissions** tells you which agent that is.
+- **Mac:** The ☰ menu and the Settings rows show a highlight under the pointer. Settings uses switches. Sheets do
+  not show a drag bar.
 
 ## 2.6.0
 

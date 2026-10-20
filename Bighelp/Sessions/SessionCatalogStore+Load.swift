@@ -64,7 +64,9 @@ extension SessionCatalogStore {
         let loadGeneration = latestLoadGeneration
         var hasUsableLocalState = hasLoadedCatalogState || !records.isEmpty
         var changed = false
-        if let repository, !requireAuthoritativeRefresh {
+        // While a checkpoint is pending, the records are ahead of the saved copy: reading it back
+        // would return chats the host's last list no longer had (archived on another device).
+        if let repository, !requireAuthoritativeRefresh, !hasUnsavedChanges {
             do {
                 let cachedRecords = try repository.load()
                 repositoryAllowsWrites = true
@@ -72,7 +74,7 @@ extension SessionCatalogStore {
                 hasUsableLocalState = true
                 migratePinnedRecordsIfNeeded(cachedRecords)
                 let preferredCachedRecords = applyingPinPreferences(to: cachedRecords)
-                changed = adopt(hasUnsavedChanges || cachedRecords.contains(where: { !$0.isContentLoaded })
+                changed = adopt(cachedRecords.contains(where: { !$0.isContentLoaded })
                     ? SessionCatalogReconciliation.merged(local: records, incoming: preferredCachedRecords)
                     : SessionCatalogReconciliation.retained(preferredCachedRecords))
                 changed = applyKnownSubagentParents() || changed

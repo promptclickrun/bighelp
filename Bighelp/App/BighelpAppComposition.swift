@@ -542,6 +542,19 @@ struct BighelpAppComposition {
             )
         }
         #if DEBUG
+        // A tapped scheduled task alert that names a sample job ("job") or one that's gone ("gone"),
+        // handed over the way a real tap is (BighelpManagedNotificationComposition).
+        if usesFixtures, let index = arguments.firstIndex(of: "-test-scheduled-alert-tap"),
+           arguments.indices.contains(index + 1) {
+            let job = arguments[index + 1] == "job" ? "task-finance-brief" : "removed-job"
+            BighelpExternalSessionOpenCenter.shared.request(
+                profileID: "finance",
+                sessionReference: ManagedNotificationValidation.sessionReference(
+                    profile: "finance", session: BighelpScheduledAlertLinks.jobPrefix + job),
+                isScheduledRun: true)
+        }
+        #endif
+        #if DEBUG
         if usesFixtures, arguments.contains("-test-idle-replay") {
             IdleReplayAcceptanceFixture.start(features: featureStore, catalog: sessionCatalog)
         }

@@ -638,6 +638,33 @@ import UserNotifications
         #expect(fixture.hostAPI.workflowPuts.count == 1, "Sent only when it changes")
     }
 
+    /// A scheduled task's alert names the job's chat or the job only for phones that open those
+    /// links (#181). The phone says so once, and only to computers whose plugin has it.
+    @Test func scheduledLinksReachComputersThatHaveThem() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        let defaults = UserDefaults.standard
+        let keys = [BighelpPeerChatAlerts.key] + BighelpWorkflowAlerts.Kind.allCases.map(\.key)
+        let previous = keys.map { defaults.object(forKey: $0) }
+        defer { for (key, value) in zip(keys, previous) { defaults.set(value, forKey: key) } }
+        for key in keys { defaults.removeObject(forKey: key) }
+        fixture.hostAPI.peerChatPreference = true
+        _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+
+        // An older plugin refuses the field, so it never goes there.
+        await fixture.service.applyAlertPreferences()
+        #expect(fixture.hostAPI.peerChatPuts == [false])
+        #expect(fixture.hostAPI.scheduledLinkPuts.isEmpty)
+
+        fixture.hostAPI.scheduledLinksPreference = true
+        await fixture.service.applyAlertPreferences()
+        #expect(fixture.hostAPI.scheduledLinkPuts == [true])
+        #expect(fixture.ledger.record(host: fixture.host, profile: "default")?.scheduledLinksGrantID
+            == fixture.account.grant?.grantId)
+        await fixture.service.applyAlertPreferences()
+        #expect(fixture.hostAPI.scheduledLinkPuts == [true], "Sent once")
+    }
+
     /// Quiet Hours go to the computer when notifications turn on, again only when they change,
     /// and again when the device is in another time zone.
     @Test func quietHoursReachTheComputerOnEnrollmentAndWhenTheyChange() async throws {
@@ -888,6 +915,8 @@ import UserNotifications
         var workflowPreference = false
         var workflowPuts: [[String: Bool]] = []
         var peerChatPuts: [Bool] = []
+        var scheduledLinksPreference = false
+        var scheduledLinkPuts: [Bool] = []
         var quietHoursSupported = false
         var quietHoursPuts: [[String: BighelpJSONValue]] = []
         var recipientKeys: [String] = []
@@ -911,7 +940,8 @@ import UserNotifications
                 "richLiveActivitySupported":.boolean(true),
                 "sealedAlerts":sealedAlerts ? .object(["version":.integer(2)]) : .null,
                 "preferences":peerChatPreference ? .object(["peerChats":.boolean(true),
-                                                            "workflows":.boolean(workflowPreference)]) : .null,
+                                                            "workflows":.boolean(workflowPreference),
+                                                            "scheduledLinks":.boolean(scheduledLinksPreference)]) : .null,
                 "producerCapabilities":.object(["sessionCompletion":.boolean(producerLoaded),"sessionFailure":.boolean(producerLoaded),"richLiveActivity":.boolean(producerLoaded),"nativeApproval":.boolean(supportedEvents.contains("approval.required")),"nativeClarification":.boolean(false)])]) }
             if suffix.hasSuffix("/preferences"), method == "PUT", let wanted = body?["peerChats"]?.boolean {
                 peerChatPuts.append(wanted)
@@ -921,6 +951,14 @@ import UserNotifications
                     guard workflowPreference else { throw WorkspaceClientError.rejected(code: "invalid_request") }
                     workflowPuts.append(workflows.compactMapValues(\.boolean))
                     answer["workflows"] = .object(workflows)
+                }
+                // Like a plugin with scheduled links (#181): the choice is kept and sent back.
+                if let links = body?["scheduledLinks"] {
+                    guard scheduledLinksPreference, let wanted = links.boolean else {
+                        throw WorkspaceClientError.rejected(code: "invalid_request")
+                    }
+                    scheduledLinkPuts.append(wanted)
+                    answer["scheduledLinks"] = .boolean(wanted)
                 }
                 return .object(answer)
             }

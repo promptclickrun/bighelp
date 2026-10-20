@@ -25,6 +25,15 @@ In Simple Bot mode, with **Show reasoning** on, the notes that a bot writes befo
 - When the bot answers, the folder closes in the same place.
 - Tap the folder to open it or close it at any time.
 
+### Fixes
+
+- **Long chats:** long chats are fast again when you type, read a streamed answer, scroll and open them.
+- **Chat list:** new chats show again when an older chat has an invisible character in its preview.
+- **Chat header:** the messages no longer move when "Updating…" shows under the name of the agent.
+- **Scheduled task alerts:** a tap on the alert opens the chat where the agent made the task. If no chat has the
+  task, the tap opens the task in **Scheduled tasks**. This needs plugin 3.23.0 or later.
+- **Phone tools:** after the app restarts, a chat gets its phone tools back.
+
 ## 2.6.1
 
 This release adds an optional chat title and error codes for notification setup. It also fixes problems with

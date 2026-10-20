@@ -268,9 +268,11 @@ final class NativeWorkspaceInvalidationCoordinator {
     private var source: NativeWorkspaceEventSource?
     private var generation = UUID()
     private var pendingRefreshes = Set<Refresh>()
-    private var drainTask: Task<Void, Never>?
+    private var drainTasks: [Refresh: Task<Void, Never>] = [:]
     private var resumeFlights: [Data: ResumeFlight] = [:]
     private let minimumSessionsRefreshGap: Duration
+    private let now: @MainActor () -> ContinuousClock.Instant
+    private let sleep: @MainActor (Duration) async -> Void
     private var lastSessionsRefreshEnded: ContinuousClock.Instant?
 
     /// A host running scheduled tasks says `sessions.changed` after every run, every few seconds
@@ -284,13 +286,17 @@ final class NativeWorkspaceInvalidationCoordinator {
         refreshSessions: @escaping @MainActor (NativeWorkspaceEventSource) async -> Void,
         refreshScheduledTasks: @escaping @MainActor (NativeWorkspaceEventSource) async -> Void,
         publish: @escaping @MainActor (NativeWorkspaceEventSource, NativeWorkspaceInvalidationNotice) -> Void,
-        minimumSessionsRefreshGap: Duration = NativeWorkspaceInvalidationCoordinator.scheduledRunsRefreshGap
+        minimumSessionsRefreshGap: Duration = NativeWorkspaceInvalidationCoordinator.scheduledRunsRefreshGap,
+        now: @escaping @MainActor () -> ContinuousClock.Instant = { .now },
+        sleep: @escaping @MainActor (Duration) async -> Void = { try? await Task.sleep(for: $0) }
     ) {
         self.currentSource = currentSource
         self.refreshSessions = refreshSessions
         self.refreshScheduledTasks = refreshScheduledTasks
         self.publish = publish
         self.minimumSessionsRefreshGap = minimumSessionsRefreshGap
+        self.now = now
+        self.sleep = sleep
     }
 
     @discardableResult
@@ -319,8 +325,8 @@ final class NativeWorkspaceInvalidationCoordinator {
 
     func suspend() {
         generation = UUID()
-        drainTask?.cancel()
-        drainTask = nil
+        for task in drainTasks.values { task.cancel() }
+        drainTasks.removeAll()
         pendingRefreshes.removeAll(keepingCapacity: false)
         resumeFlights.removeAll(keepingCapacity: false)
         lastSessionsRefreshEnded = nil
@@ -335,33 +341,36 @@ final class NativeWorkspaceInvalidationCoordinator {
 
     private func enqueue(_ refresh: Refresh, source incoming: NativeWorkspaceEventSource) {
         pendingRefreshes.insert(refresh)
-        guard drainTask == nil else { return }
+        guard drainTasks[refresh] == nil else { return }
         let token = generation
-        drainTask = Task { @MainActor [weak self] in
+        drainTasks[refresh] = Task { @MainActor [weak self] in
             await Task.yield()
-            await self?.drain(source: incoming, token: token)
+            await self?.drain(refresh, source: incoming, token: token)
         }
     }
 
-    private func drain(source incoming: NativeWorkspaceEventSource, token: UUID) async {
+    private func drain(_ refresh: Refresh, source incoming: NativeWorkspaceEventSource, token: UUID) async {
         defer {
-            if generation == token { drainTask = nil }
+            if generation == token { drainTasks[refresh] = nil }
         }
         while generation == token, source == incoming, currentSource() == incoming, !Task.isCancelled {
-            let batch = pendingRefreshes
-            pendingRefreshes.removeAll(keepingCapacity: true)
-            guard !batch.isEmpty else { return }
-            if batch.contains(.sessions) {
+            guard pendingRefreshes.contains(refresh) else { return }
+            switch refresh {
+            case .sessions:
                 if let ended = lastSessionsRefreshEnded {
-                    let wait = minimumSessionsRefreshGap - (ContinuousClock.now - ended)
-                    if wait > .zero { try? await Task.sleep(for: wait) }
+                    let wait = minimumSessionsRefreshGap - (now() - ended)
+                    if wait > .zero { await sleep(wait) }
                     guard generation == token, source == incoming, currentSource() == incoming, !Task.isCancelled else { return }
                 }
+                // This read covers changes received during the cooldown. Only changes
+                // arriving after it starts need a trailing read.
+                pendingRefreshes.remove(refresh)
                 await refreshSessions(incoming)
-                lastSessionsRefreshEnded = .now
-            }
-            guard generation == token, source == incoming, currentSource() == incoming, !Task.isCancelled else { return }
-            if batch.contains(.scheduledTasks) {
+                guard generation == token, source == incoming, currentSource() == incoming, !Task.isCancelled else { return }
+                lastSessionsRefreshEnded = now()
+            case .scheduledTasks:
+                // Management reads have their own flight so a session cooldown cannot delay them.
+                pendingRefreshes.remove(refresh)
                 await refreshScheduledTasks(incoming)
             }
         }

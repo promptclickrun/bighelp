@@ -1698,6 +1698,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         }
         bindings[id] = binding
         bindingsVersion += 1
+        anchorIndexCache = nil
     }
 
     private func setBindings(_ next: [String: Binding]) {
@@ -1709,6 +1710,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         }
         bindings = next
         bindingsVersion += 1
+        anchorIndexCache = nil
     }
 
     /// Thousands of saved rows made the per-row lineage match quadratic; the index is

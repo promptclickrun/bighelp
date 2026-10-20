@@ -32,6 +32,8 @@ struct AgentStartPicker: View {
     let onBrowse: () -> Void
     @State private var renaming: SavedAgentTemplate?
     @State private var renameText = ""
+    /// The topic chip over the Templates rail.
+    @State private var railFilter = TemplateTopicFilter.all
 
     var body: some View {
         VStack(alignment: .leading, spacing: BighelpTokens.space12) {
@@ -48,8 +50,15 @@ struct AgentStartPicker: View {
             case .scratch:
                 note("Empty details. Write your agent's personality yourself in Instructions.")
             case .builtIn:
+                let catalog = AgentSoulTemplate.all
+                let topics = TemplateTopics.sections(catalog, topics: TemplateCategory.agentTopics, category: \.category)
+                    .compactMap(\.category)
+                if topics.count > 1 {
+                    TemplateTopicChips(filters: [.all] + topics.map { .topic($0) }, selection: $railFilter,
+                                       identifier: "agent.editor.templates", inset: 0)
+                }
                 carousel {
-                    ForEach(AgentSoulTemplate.all) { template in
+                    ForEach(railTemplates(catalog)) { template in
                         card(title: template.title, subtitle: template.cardRole, detail: template.cardStrength,
                              credit: template.isCommunity ? template.credit : nil,
                              systemImage: template.systemImage, selected: "builtin:\(template.id)",
@@ -131,6 +140,13 @@ struct AgentStartPicker: View {
                 renaming = nil
             }
         }
+    }
+
+    /// The rail keeps the catalog's order; a topic chip narrows it to that topic.
+    private func railTemplates(_ catalog: [AgentSoulTemplate]) -> [AgentSoulTemplate] {
+        guard case .topic(let topic) = railFilter else { return catalog }
+        let shown = catalog.filter { $0.category == topic }
+        return shown.isEmpty ? catalog : shown
     }
 
     private func pick(_ template: AgentSoulTemplate) {

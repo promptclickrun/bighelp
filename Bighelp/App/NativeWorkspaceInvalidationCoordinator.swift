@@ -270,17 +270,27 @@ final class NativeWorkspaceInvalidationCoordinator {
     private var pendingRefreshes = Set<Refresh>()
     private var drainTask: Task<Void, Never>?
     private var resumeFlights: [Data: ResumeFlight] = [:]
+    private let minimumSessionsRefreshGap: Duration
+    private var lastSessionsRefreshEnded: ContinuousClock.Instant?
+
+    /// A host running scheduled tasks says `sessions.changed` after every run, every few seconds
+    /// when many are due. One refresh per gap folds such a burst into one list read.
+    // atalho: 5 s is a guess until measured on a host with thousands of scheduled runs (#492);
+    // raise it if that host still refreshes back to back, lower it if the list lags behind.
+    static let scheduledRunsRefreshGap: Duration = .seconds(5)
 
     init(
         currentSource: @escaping @MainActor () -> NativeWorkspaceEventSource?,
         refreshSessions: @escaping @MainActor (NativeWorkspaceEventSource) async -> Void,
         refreshScheduledTasks: @escaping @MainActor (NativeWorkspaceEventSource) async -> Void,
-        publish: @escaping @MainActor (NativeWorkspaceEventSource, NativeWorkspaceInvalidationNotice) -> Void
+        publish: @escaping @MainActor (NativeWorkspaceEventSource, NativeWorkspaceInvalidationNotice) -> Void,
+        minimumSessionsRefreshGap: Duration = NativeWorkspaceInvalidationCoordinator.scheduledRunsRefreshGap
     ) {
         self.currentSource = currentSource
         self.refreshSessions = refreshSessions
         self.refreshScheduledTasks = refreshScheduledTasks
         self.publish = publish
+        self.minimumSessionsRefreshGap = minimumSessionsRefreshGap
     }
 
     @discardableResult
@@ -313,6 +323,7 @@ final class NativeWorkspaceInvalidationCoordinator {
         drainTask = nil
         pendingRefreshes.removeAll(keepingCapacity: false)
         resumeFlights.removeAll(keepingCapacity: false)
+        lastSessionsRefreshEnded = nil
         source = nil
     }
 
@@ -341,7 +352,13 @@ final class NativeWorkspaceInvalidationCoordinator {
             pendingRefreshes.removeAll(keepingCapacity: true)
             guard !batch.isEmpty else { return }
             if batch.contains(.sessions) {
+                if let ended = lastSessionsRefreshEnded {
+                    let wait = minimumSessionsRefreshGap - (ContinuousClock.now - ended)
+                    if wait > .zero { try? await Task.sleep(for: wait) }
+                    guard generation == token, source == incoming, currentSource() == incoming, !Task.isCancelled else { return }
+                }
                 await refreshSessions(incoming)
+                lastSessionsRefreshEnded = .now
             }
             guard generation == token, source == incoming, currentSource() == incoming, !Task.isCancelled else { return }
             if batch.contains(.scheduledTasks) {

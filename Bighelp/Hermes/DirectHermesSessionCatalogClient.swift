@@ -399,14 +399,16 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         guard listToken == token else { throw CancellationError() }
         if ownershipRevision != ownershipTicket { discovered = nil }
         var committed: [String: Binding] = [:]
-        let savedOrder = Dictionary(uniqueKeysWithValues: records.enumerated().map { ($0.element.id, $0.offset) })
+        let savedRecords = records
         records = []
         for profile in loaded {
-            var rows = pending.values.filter {
-                DirectHermesSessionValidation.same($0.coordinate.profileID, profile.id)
+            // The records already follow REST order. Reuse it instead of sorting
+            // thousands of dictionary entries again on the main actor.
+            var rows = savedRecords.compactMap { record -> Binding? in
+                guard let row = pending[record.id],
+                      DirectHermesSessionValidation.same(row.coordinate.profileID, profile.id) else { return nil }
+                return row
             }
-            // Preserve REST order (dictionary iteration must not reorder rows).
-            rows.sort { (savedOrder[$0.record.id] ?? Int.max) < (savedOrder[$1.record.id] ?? Int.max) }
             if let discovered {
                 rows = rows.map(removingLiveBinding)
                 let savedRows = rows
@@ -1677,11 +1679,13 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         var value = original
         // All coordinates are validated at construction; removing the optional
         // runtime cannot invalidate any of their unchanged stored fields.
-        value.coordinate = try! .init(owner: original.coordinate.owner,
-                                      profileID: original.coordinate.profileID,
-                                      sessionID: original.coordinate.sessionID,
-                                      storedSessionID: original.coordinate.storedSessionID,
-                                      runtimeSessionID: nil)
+        if original.coordinate.runtimeSessionID != nil {
+            value.coordinate = try! .init(owner: original.coordinate.owner,
+                                          profileID: original.coordinate.profileID,
+                                          sessionID: original.coordinate.sessionID,
+                                          storedSessionID: original.coordinate.storedSessionID,
+                                          runtimeSessionID: nil)
+        }
         value.runtimeSessionKey = nil
         value.ownership = nil
         value.record.isActive = false

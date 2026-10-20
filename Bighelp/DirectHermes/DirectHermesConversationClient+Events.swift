@@ -16,8 +16,11 @@ extension DirectHermesConversationClient {
             receiveReclaim(event)
             return
         }
-        guard connected, let eventSessionID = event.sessionID,
-              Data(eventSessionID.utf8) == Data(runtimeID.utf8) else { return }
+        guard connected, let eventSessionID = event.sessionID else { return }
+        guard Data(eventSessionID.utf8) == Data(runtimeID.utf8) else {
+            receiveSavedSessionReaction(event)
+            return
+        }
         if isHydrating {
             guard heldEvents.count < 16_384 else {
                 heldEventsOverflowed = true

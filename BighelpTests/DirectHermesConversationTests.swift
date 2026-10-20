@@ -1084,6 +1084,37 @@ struct DirectHermesConversationTests {
         turn.cancel()
     }
 
+    /// Hermes addresses an agent's `message.reaction` to the chat's saved
+    /// session ID, not the runtime's (Hermes 0.22, #80678). The app dropped it,
+    /// so the reaction showed only after the person reacted to that message.
+    @Test func agentReactionAddressedToTheSavedChatShowsLive() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let client = try DirectHermesConversationClient(rpc: DirectTestRPC(), hostIdentity: "host", profile: "default",
+            runtimeID: "runtime", storedID: "stored", title: "Native", epoch: "epoch", drafts: .init(root: root))
+        defer { client.suspend() }
+        let message = TimelineItem(id: "\(client.conversationID):row:8931", role: .human,
+                                   sender: .user(snapshot: .init(name: "You")), content: .message("It shipped!"),
+                                   metadata: .init(source: "Hermes", delivery: "Saved", sourceOrder: 1))
+        let model = ChatModel(conversationID: client.conversationID, client: client, initialItems: [message])
+        client.model = model
+        func reaction(to session: String, emoji: String) -> DirectHermesEvent {
+            .init(type: "message.reaction", sessionID: session, payload: [
+                "row_id": .integer(8_931), "role": .string("user"),
+                "reactions": .array([.object(["emoji": .string(emoji), "author": .string("agent"),
+                                              "at": .number(1_792_000_000)])]),
+            ], sequence: 412)
+        }
+        func shown() -> [String] { model.nativeMessageReactionPresentation(for: message).reactions.map(\.emoji) }
+
+        client.receive(reaction(to: "another-chat", emoji: "😂"))
+        #expect(shown().isEmpty)
+        client.receive(reaction(to: "stored", emoji: "❤️"))
+        #expect(shown() == ["❤️"])
+        // The saved session's event count is not this runtime's.
+        #expect(client.projection.lastSequence == 0)
+    }
+
     /// A turn Hermes runs on its own (a background process finished, another agent wrote in) streams
     /// only its answer: the message that started it never reaches this socket, and an agent's answer
     /// can be written by another Hermes process entirely. Once it ends, the chat reads what Hermes saved.

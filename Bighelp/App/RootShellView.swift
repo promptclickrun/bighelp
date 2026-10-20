@@ -196,6 +196,8 @@ struct RootShellView: View {
 
     var body: some View {
         agentHomeSheets(rootContent)
+        .modifier(AIDataConsentGate(inFirstSetup: presentsFirstRunOnboarding || hostRegistry?.isWorkspaceReady != true,
+                                    usesDemoData: usesWorkspaceFixtures))
         .modifier(CredentialVaultSheet(model: $credentialVault))
         .modifier(FleetSheets(
             fleet: fleet, gate: $fleetGateRequest, isNewChatPresented: $isFleetNewChatPresented,

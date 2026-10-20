@@ -84,6 +84,7 @@ enum BighelpShortcutServiceError: LocalizedError, Equatable {
     case gatewayUnavailable
     case gatewayUnreachable
     case agentNotOnGateway
+    case aiDataNotAgreed
 
     var errorDescription: String? {
         switch self {
@@ -131,6 +132,8 @@ enum BighelpShortcutServiceError: LocalizedError, Equatable {
             "bighelp couldn't reach that gateway. Check that it's online, then try again."
         case .agentNotOnGateway:
             "That agent isn't on the gateway this Shortcut uses. Pick the agent again."
+        case .aiDataNotAgreed:
+            "Open bighelp and agree to share data with your Hermes computer and its AI providers first."
         }
     }
 }
@@ -509,6 +512,8 @@ final class BighelpShortcutService: @unchecked Sendable {
     /// Simultaneous entity queries share one check, so their directory loads
     /// never supersede (and cancel) each other.
     func liveWorkspace() async throws -> BighelpShortcutWorkspace {
+        // Shortcuts, the Watch, CarPlay and the agent in the room share nothing before the agreement.
+        guard AIDataConsent.isAgreed() else { throw BighelpShortcutServiceError.aiDataNotAgreed }
         let requestedKey = nativeWorkspaceKey?()
         if let liveCheck {
             if Self.keysCanShare(liveCheck.key, requestedKey) { return try await liveCheck.task.value }

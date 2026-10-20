@@ -49,6 +49,10 @@ struct BighelpAppComposition {
            arguments.indices.contains(index + 1), let tab = AppTab(rawValue: arguments[index + 1]) {
             appState.select(tab)
         }
+        #if DEBUG
+        // A bighelp set up before the AI data agreement existed: tests forget the agreement.
+        if arguments.contains("-test-forget-ai-data-agreement") { defaults.removeObject(forKey: AIDataConsent.key) }
+        #endif
         let settings = SettingsStore(defaults: defaults)
         // Built once per launch: Open on picks one computer or all of them.
         settings.applyLaunchLandingToAllHostsMode()

@@ -613,9 +613,12 @@ New code uses Bighelp names. Don't "finish" the rename on this list.
 
 ### Secrets and access
 
-- The very first setup asks once to share data with the host and its AI providers (`AIDataConsent`, App Review
-  5.1.1(i)/5.1.2(i)), before any computer is connected. Never ask again: not after updates, not for new hosts. Never
-  rename its key, and keep its text short and free of company names.
+- Nobody shares data with the host and its AI providers before agreeing once (`AIDataConsent`, App Review
+  5.1.1(i)/5.1.2(i)). First setup asks before any computer is connected. Anyone else who hasn't agreed (a bighelp
+  set up before the agreement existed, likely why App Review rejected Vision Pro 2.3.0 and 2.6.2 under 5.1.1) is
+  asked when bighelp opens (`AIDataConsentGate`), and the Shortcuts path (`liveWorkspace`, also the Watch, CarPlay
+  and the agent in the room) sends nothing until then. After agreeing, never ask again: not after updates, not for
+  new hosts. Never rename its key, and keep its text short and free of company names.
 
 - Credentials live in the Keychain, never in `UserDefaults` or logs.
 - Proxy custom headers have their own Keychain service and a list of reserved header names they can't use.

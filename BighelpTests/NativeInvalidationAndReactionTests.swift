@@ -20,7 +20,8 @@ struct NativeInvalidationAndReactionTests {
         let coordinator = NativeWorkspaceInvalidationCoordinator(currentSource: { source }, refreshSessions: { _ in
             refreshes += 1
             if refreshes == 1 { await withCheckedContinuation { release = $0 } }
-        }, refreshScheduledTasks: { _ in Issue.record("Sessions event refreshed cron") }, publish: { _, _ in })
+        }, refreshScheduledTasks: { _ in Issue.record("Sessions event refreshed cron") }, publish: { _, _ in },
+            minimumSessionsRefreshGap: .zero)
         defer { coordinator.suspend() }
         let event = try decode(#"{"jsonrpc":"2.0","method":"event","params":{"type":"sessions.changed","session_id":"","payload":{}}}"#)
         #expect(coordinator.receive(event, source: source))
@@ -32,6 +33,28 @@ struct NativeInvalidationAndReactionTests {
         held.resume()
         for _ in 0..<100 where refreshes < 2 { await Task.yield() }
         #expect(refreshes == 2)
+    }
+
+    @Test func aBurstOfSessionChangesAfterARefreshWaitsForTheGapAndReadsOnce() async throws {
+        let source = try makeSource()
+        var started: [ContinuousClock.Instant] = []
+        var ended: [ContinuousClock.Instant] = []
+        let coordinator = NativeWorkspaceInvalidationCoordinator(currentSource: { source }, refreshSessions: { _ in
+            started.append(.now)
+            ended.append(.now)
+        }, refreshScheduledTasks: { _ in Issue.record("Sessions event refreshed cron") }, publish: { _, _ in },
+            minimumSessionsRefreshGap: .milliseconds(200))
+        defer { coordinator.suspend() }
+        let event = try decode(#"{"jsonrpc":"2.0","method":"event","params":{"type":"sessions.changed","session_id":"","payload":{}}}"#)
+        #expect(coordinator.receive(event, source: source))
+        for _ in 0..<100 where started.isEmpty { await Task.yield() }
+        #expect(started.count == 1, "The first change reads at once.")
+        for _ in 0..<3 { #expect(coordinator.receive(event, source: source)) }
+        try await Task.sleep(for: .milliseconds(80))
+        #expect(started.count == 1, "Runs finishing back to back don't each read the list.")
+        try await Task.sleep(for: .milliseconds(400))
+        #expect(started.count == 2, "The burst becomes one read after the gap.")
+        if started.count == 2 { #expect(started[1] - ended[0] >= .milliseconds(200)) }
     }
 
     @Test func resumeProgressIsExactSessionTransientStateNotCatalogWork() throws {

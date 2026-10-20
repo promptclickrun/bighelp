@@ -3,6 +3,28 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.2
+
+This release shows templates by category and puts the reasoning of a bot into one folder.
+
+### Templates by category
+
+The template lists now show the templates in groups by category. This applies to Agent Studio, **Browse all**,
+**New Bot** › **Templates** in Simple Bot mode, and the **Blueprints** of Feed, Ideas and Goals.
+
+- Type in the search field to find a template.
+- Tap a category chip to show only that category. Tap it again to show all.
+- Your own templates (**My Templates**) show first.
+- Use the **Sort** button to sort by **For you**, **Newest** or **Most used**.
+
+### Reasoning in one folder
+
+In Simple Bot mode, with **Show reasoning** on, the notes that a bot writes before its answer are in one folder.
+
+- The folder is open while the bot works.
+- When the bot answers, the folder closes in the same place.
+- Tap the folder to open it or close it at any time.
+
 ## 2.6.1
 
 This release adds an optional chat title and error codes for notification setup. It also fixes problems with

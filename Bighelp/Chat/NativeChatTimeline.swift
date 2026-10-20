@@ -96,6 +96,24 @@ enum ChatCanvasRow: Identifiable, Equatable {
 /// boundary. A hundred consecutive tools must not become one giant view tree.
 @MainActor
 enum ChatCanvasTranscriptProjection {
+    /// The lines a message wraps to at `columns` characters a line. One pass over its
+    /// Unicode scalars: splitting it into Characters was a long answer's cost again on
+    /// each streamed word (and every message's when a chat opens). An emoji made of
+    /// several scalars counts as several, which only makes the estimate a little taller.
+    static func wrappedLineCount(_ text: String, columns: CGFloat) -> CGFloat {
+        var lines: CGFloat = 0
+        var column = 0
+        for scalar in text.unicodeScalars {
+            if scalar == "\n" {
+                lines += max(1, ceil(CGFloat(column) / columns))
+                column = 0
+            } else {
+                column += 1
+            }
+        }
+        return lines + max(1, ceil(CGFloat(column) / columns))
+    }
+
     static func rows(from displayRows: [ChatTurnDisplayRow], disclosures: ChatActivityDisclosureStore,
                      isSending: Bool = false, readsAgentMessages: Bool = true) -> [ChatCanvasRow] {
         rows(from: displayRows[...], disclosures: disclosures, isSending: isSending,
@@ -710,9 +728,7 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
                 let font = UIFont.bighelp(.body, compatibleWith: tableView.traitCollection)
                 let width = max(80, min(tableView.bounds.width - 40, ChatCanvasLayout.regularLaneMaximumWidth))
                 let columns = max(10, width / (font.pointSize * 0.5))
-                let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
-                    .reduce(CGFloat.zero) { $0 + max(1, ceil(CGFloat($1.count) / columns)) }
-                return 110 + lines * font.lineHeight
+                return 110 + ChatCanvasTranscriptProjection.wrappedLineCount(text, columns: columns) * font.lineHeight
             default: return 120
             }
         }

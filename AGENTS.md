@@ -296,7 +296,10 @@ change in both repos.
   Never walk the ledger once per turn (`ChatLedgerIndex`) or insert into it one event at a time when building
   it (`ChatActivityLedger.init`). XCUITest queries build every row of a long chat (seconds, over 1 GB at
   300 turns), so time one with `ChatLoadSpeedUITests` (`BIGHELP_SPEED`, `BIGHELP_SPEED_TURNS`) or the DEBUG
-  autopilot and probe (`ChatPerformanceAutopilot`, `-test-chat-performance-probe`).
+  autopilot and probe (`ChatPerformanceAutopilot`, `-test-chat-performance-probe`). `-test-long-chat-heavy`
+  (`BIGHELP_SPEED_HEAVY`) makes every turn as big as a chat near half a million tokens. Work done for each
+  message as it's drawn must not grow with its text beyond the drawing itself: `MarkdownDocument`'s plain
+  text is worked out only when read.
 - **Type-checker timeouts:** very large `body`s (`RootShellView`, `BighelpApp`) time out the type checker. Pull
   pieces out into functions or named `ViewModifier`s.
 - **Text styling:** styled text in the composer must pass attributes and theme colors. Plain `String` replacements

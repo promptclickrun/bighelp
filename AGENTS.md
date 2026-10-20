@@ -519,6 +519,10 @@ Helpful, never a pile to clear (`BighelpNotificationGrouping`):
   name) and keeps the chat in `loopdy.sessionReference`, which the "chat on screen" check reads.
 - A newer reply for a chat removes that chat's earlier replies; questions and approvals stay until dealt with.
 - Helper (subagent) results arrive passive: Notification Center only, no banner or sound.
+- A scheduled task's alert opens the chat where its job was made, else the job in Scheduled tasks
+  (`BighelpScheduledAlertLinks`). The plugin names them `scheduled.chat.<session>` and `scheduled.job.<job>`, only
+  for phones that send `scheduledLinks` in their preferences; never a chat's own reference, because the run's text
+  isn't in that chat. Scheduled alerts never replace each other.
 - Opening a chat, or returning to the app on one, clears its delivered alerts (`BighelpVisibleChats`).
 - One Live Activity at a time: a new chat's card replaces the older one (`BighelpManagedNativeActivityRuntime`).
   Finished cards leave the Lock Screen about 30 seconds after the end (the Link service sends a dismissal date),

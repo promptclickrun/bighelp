@@ -371,7 +371,9 @@ final class BighelpManagedNotificationComposition: HostNotificationSetupServing 
            let host = integration.service.host(forEvent: open.eventID, eventType: type), let registry {
             if registry.selectedHostID != host.id { registry.select(host.id) }
             if registry.selectedHostID == host.id {
-                BighelpExternalSessionOpenCenter.shared.request(profileID: profile, sessionReference: reference)
+                BighelpExternalSessionOpenCenter.shared.request(
+                    profileID: profile, sessionReference: reference,
+                    isScheduledRun: BighelpScheduledAlertLinks.isScheduledRun(type))
                 return
             }
         }

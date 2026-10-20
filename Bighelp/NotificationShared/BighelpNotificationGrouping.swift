@@ -11,10 +11,10 @@ import UserNotifications
 /// - A helper (subagent) finishing arrives quietly, in Notification Center only.
 /// - Opening a chat clears its alerts, like Messages.
 enum BighelpNotificationGrouping {
-    /// Kinds a newer alert for the same chat replaces.
+    /// Kinds a newer alert for the same chat replaces. Not scheduled tasks: each alert is a run's
+    /// only copy of its result (the chat it names doesn't show it), and jobs made in one chat share it.
     static let replaceable: Set<String> = [
-        "session.completed", "session.failed", "scheduled.completed", "scheduled.failed",
-        "subagent.completed", "subagent.failed",
+        "session.completed", "session.failed", "subagent.completed", "subagent.failed",
     ]
     /// Kinds that don't need a banner or sound.
     static let quiet: Set<String> = ["subagent.completed", "subagent.failed"]

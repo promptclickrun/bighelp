@@ -1543,8 +1543,8 @@ struct RootShellView: View {
             guard BighelpExternalSessionOpenCenter.shared.consume(open) else { return }
             handleIncomingURL(BighelpWidgetSnapshot.chatURL(sessionID))
             return
-        case .reference(let profileID, let reference):
-            openNotifiedChat(open, profileID: profileID, reference: reference)
+        case .reference(let profileID, let reference, let isScheduledRun):
+            openNotifiedChat(open, profileID: profileID, reference: reference, isScheduledRun: isScheduledRun)
             return
         case .stored:
             break
@@ -1566,9 +1566,13 @@ struct RootShellView: View {
 
     /// A tapped alert's chat. Saved on the phone, it opens at once from its saved history and
     /// catches up when the host answers; a chat the phone hasn't seen yet waits for the host's list.
-    private func openNotifiedChat(_ open: BighelpExternalSessionOpen, profileID: String, reference: String) {
+    /// A scheduled run's alert can name its job's chat or the job (`BighelpScheduledAlertLinks`).
+    private func openNotifiedChat(_ open: BighelpExternalSessionOpen, profileID: String, reference: String,
+                                  isScheduledRun: Bool) {
         guard nativeRuntime != nil || usesDemoFixtures else { return }
-        if let record = SessionRecord.matching(reference: reference, profileID: profileID, in: sessionCatalog.records) {
+        if case .chat(let record)? = BighelpScheduledAlertLinks.place(
+            reference: reference, profileID: profileID, records: sessionCatalog.records, tasks: nil,
+            isScheduledRun: isScheduledRun) {
             guard BighelpExternalSessionOpenCenter.shared.consume(open) else { return }
             openSession(record.summary)
             return
@@ -1576,14 +1580,25 @@ struct RootShellView: View {
         guard acceptsIncomingLinks, BighelpExternalSessionOpenCenter.shared.consume(open) else { return }
         Task { @MainActor in
             // Workflow alerts point at a run, not a chat.
-            if await openNotifiedWorkflowRun(profileID: profileID, reference: reference) { return }
-            try? await sessionCatalog.load(requireAuthoritativeRefresh: true)
-            guard let record = SessionRecord.matching(reference: reference, profileID: profileID,
-                                                      in: sessionCatalog.records) else {
-                actionErrorMessage = "This conversation is no longer on your computer."
+            if !isScheduledRun, await openNotifiedWorkflowRun(profileID: profileID, reference: reference) { return }
+            let tasks = isScheduledRun ? await scheduledTasksForAlert() : nil
+            if case .task(let task)? = BighelpScheduledAlertLinks.place(
+                reference: reference, profileID: profileID, records: sessionCatalog.records, tasks: tasks,
+                isScheduledRun: isScheduledRun) {
+                openScheduledAlertTask(task)
                 return
             }
-            openSession(record.summary)
+            try? await sessionCatalog.load(requireAuthoritativeRefresh: true)
+            switch BighelpScheduledAlertLinks.place(reference: reference, profileID: profileID,
+                                                    records: sessionCatalog.records, tasks: tasks,
+                                                    isScheduledRun: isScheduledRun) {
+            case .chat(let record)?: openSession(record.summary)
+            case .task(let task)?: openScheduledAlertTask(task)
+            case .tasks(let agentID)?: openScheduledAlertTasks(agentID: agentID)
+            // Tasks that couldn't load: their screen says why and offers to try again.
+            case nil where isScheduledRun: openScheduledAlertTasks(agentID: profileID)
+            case nil: actionErrorMessage = "This conversation is no longer on your computer."
+            }
         }
     }
 

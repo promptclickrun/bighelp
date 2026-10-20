@@ -18,25 +18,28 @@ enum SessionCatalogReconciliation {
     }
 
     static func retained(_ records: [SessionRecord]) -> [SessionRecord] {
-        var retained = records
+        var retained = Index(records)
         for candidate in records {
             guard let storedID = candidate.remoteStoredID, candidate.id != storedID else { continue }
-            let aliases = retained.filter { isTransientActivityAlias($0, of: candidate) }
+            let aliases = retained.indices(id: storedID).filter {
+                isTransientActivityAlias(retained[$0], of: candidate)
+            }
             guard !aliases.isEmpty else { continue }
-            var canonical = retained.first(where: { $0.id == candidate.id }) ?? candidate
+            var canonical = retained.firstIndex(id: candidate.id).map { retained[$0] } ?? candidate
             for alias in aliases {
                 canonical = merged(
-                    local: promotedTransientAlias(alias, to: canonical),
+                    local: promotedTransientAlias(retained[alias], to: canonical),
                     incoming: canonical
                 )
             }
-            let aliasIDs = Set(aliases.map(\.id))
-            retained.removeAll { aliasIDs.contains($0.id) }
-            if let index = retained.firstIndex(where: { $0.id == canonical.id }) {
-                retained[index] = canonical
+            for index in retained.indices(id: storedID) {
+                retained.remove(at: index)
+            }
+            if let index = retained.firstIndex(id: canonical.id) {
+                retained.replace(at: index, with: canonical)
             }
         }
-        return retained.sorted(by: activitySort)
+        return retained.records.sorted(by: activitySort)
     }
 
     static func activitySort(_ lhs: SessionRecord, _ rhs: SessionRecord) -> Bool {
@@ -53,21 +56,22 @@ enum SessionCatalogReconciliation {
         local localRecords: [SessionRecord],
         authoritativeIncoming incomingRecords: [SessionRecord]
     ) -> [SessionRecord] {
+        let local = Index(localRecords)
         let incoming = incomingRecords.map { incoming in
-            matchingLocalRecords(for: incoming, in: localRecords).reduce(incoming) {
-                mergedMatchingLocal($1, incoming: $0)
+            local.matches(for: incoming).reduce(incoming) {
+                mergedMatchingLocal(local[$1], incoming: $0)
             }
         }
+        let incomingIDs = Set(incoming.map(\.id))
+        let incomingStoredIDs = Set(incoming.compactMap(\.remoteStoredID))
         // A new chat can be omitted until its first message reaches durable
         // host history. Retain its local reference draft/intent in this catalog.
         let retainedReferences = localRecords.filter { local in
             (local.isLocalPresentationDraft
                 || local.hasDeferredReferenceState || local.referenceState != nil
                 || ReferenceCodec.decode(local.draft).hasValidAppendix)
-                && !incoming.contains(where: { remote in
-                    remote.id == local.id || (local.remoteStoredID != nil
-                        && remote.remoteStoredID == local.remoteStoredID)
-                })
+                && !incomingIDs.contains(local.id)
+                && local.remoteStoredID.map { !incomingStoredIDs.contains($0) } ?? true
         }.map { local in
             var retained = local
             // A native live-only row can remain as the owner of a draft or an
@@ -85,38 +89,19 @@ enum SessionCatalogReconciliation {
         local localRecords: [SessionRecord],
         incoming incomingRecords: [SessionRecord]
     ) -> [SessionRecord] {
-        var mergedRecords = localRecords
+        var mergedRecords = Index(localRecords)
         for incomingRecord in incomingRecords {
-            let matchingIndices = matchingLocalIndices(for: incomingRecord, in: mergedRecords)
+            let matchingIndices = mergedRecords.matches(for: incomingRecord)
             var canonical = incomingRecord
             for index in matchingIndices {
                 canonical = mergedMatchingLocal(mergedRecords[index], incoming: canonical)
             }
-            for index in matchingIndices.sorted(by: >) {
+            for index in matchingIndices {
                 mergedRecords.remove(at: index)
             }
             mergedRecords.append(canonical)
         }
-        return retained(mergedRecords)
-    }
-
-    static func matchingLocalRecords(
-        for incoming: SessionRecord,
-        in records: [SessionRecord]
-    ) -> [SessionRecord] {
-        matchingLocalIndices(for: incoming, in: records).map { records[$0] }
-    }
-
-    static func matchingLocalIndices(
-        for incoming: SessionRecord,
-        in records: [SessionRecord]
-    ) -> [Int] {
-        records.indices.filter { index in
-            let local = records[index]
-            return local.id == incoming.id
-                || hasSameDurableIdentity(local, incoming)
-                || isTransientActivityAlias(local, of: incoming)
-        }
+        return retained(mergedRecords.records)
     }
 
     static func hasSameDurableIdentity(

@@ -55,6 +55,12 @@ final class SessionContentRepository: SessionCatalogRepository {
         var records: [SessionRecord] = []
     }
 
+    /// The manifest's revision alone. Committing checks the file is still the one the plan was
+    /// made from; decoding its thousands of rows for that took the main actor for most of a save.
+    private struct ManifestRevision: Codable, Sendable {
+        var revision: UUID?
+    }
+
     private struct Content: Codable, Equatable, Sendable {
         var draft: String
         var referenceState: ReferenceCanonicalState?
@@ -139,6 +145,7 @@ final class SessionContentRepository: SessionCatalogRepository {
 
     private let legacy: DemoRepository<[SessionRecord]>
     private let manifestRepository: DemoRepository<Manifest>
+    private let manifestRevisionRepository: DemoRepository<ManifestRevision>
     private let name: String
     private let seed: [SessionRecord]
     private var scope: String?
@@ -170,6 +177,7 @@ final class SessionContentRepository: SessionCatalogRepository {
         self.name = name
         self.seed = seed
         manifestRepository = legacy.child(name: "\(name)-catalog", seed: Manifest())
+        manifestRevisionRepository = legacy.child(name: "\(name)-catalog", seed: ManifestRevision())
     }
 
     func resetForAccountBoundary() {
@@ -264,13 +272,19 @@ final class SessionContentRepository: SessionCatalogRepository {
         guard prepared.scope == scope, prepared.epoch == epoch else {
             throw SessionContentRepositoryError.staleCheckpoint
         }
-        let current = try manifestRepository.loadExistingPreservingSource()
-        guard current?.revision == prepared.baseRevision else {
+        let currentRevision = try manifestRevisionRepository.loadExistingPreservingSource()?.revision
+        guard currentRevision == prepared.baseRevision else {
             throw SessionContentRepositoryError.staleCheckpoint
+        }
+        let currentRecords: [SessionRecord]
+        if let manifest, manifest.revision == currentRevision {
+            currentRecords = manifest.records
+        } else {
+            currentRecords = try manifestRepository.loadExistingPreservingSource()?.records ?? []
         }
         let candidate = plan.manifest
         try validate(candidate)
-        let currentRevisions = Set((current?.records ?? []).compactMap(\.localContentRevision))
+        let currentRevisions = Set(currentRecords.compactMap(\.localContentRevision))
         let writes = Set(prepared.writes.map(\.revision))
         guard writes.count == prepared.writes.count,
               writes.isDisjoint(with: currentRevisions),

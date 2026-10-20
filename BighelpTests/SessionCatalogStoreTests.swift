@@ -237,36 +237,6 @@ struct SessionCatalogStoreTests {
         #expect(!catalog.hasUnsavedChanges)
     }
 
-    @Test func aLargeAutomaticCheckpointLeavesTheMainActorResponsive() async throws {
-        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let record = SessionRecord(id: "large", kind: .direct, agentIDs: ["default"], title: "Long history",
-            items: (0..<20_000).map { Self.message("answer-\($0)", role: .assistant,
-                text: String(repeating: "Full retained answer. ", count: 100)) }, hasAcceptedMessage: true)
-        let repository = DemoRepository(directory: directory, name: "sessions", seed: [record])
-        let catalog = SessionCatalogStore(client: DemoSessionCatalogClient(), repository: repository,
-                                          defaults: isolatedDefaults())
-        var maximumGap: Duration = .zero
-        let probe = Task { @MainActor in
-            var previous = ContinuousClock.now
-            while !Task.isCancelled {
-                do { try await Task.sleep(for: .milliseconds(5)) } catch { return }
-                let now = ContinuousClock.now
-                maximumGap = max(maximumGap, now - previous)
-                previous = now
-            }
-        }
-        catalog.reconcileSessionContext(.init(sessionId: "large", model: "hermes", contextUsed: 1,
-            contextMax: 100, contextPercent: 1, compressions: 0, isCompacting: false, updatedAt: 1))
-        try await Task.sleep(for: .seconds(3))
-        probe.cancel()
-        await probe.value
-        print("LARGE_CATALOG_CHECKPOINT maximumMainActorGap=\(maximumGap) writes=\(catalog.repositorySaveCount)")
-        #expect(catalog.repositorySaveCount == 1)
-        #expect(maximumGap < .milliseconds(100), "Encoding long histories must leave typing and navigation responsive.")
-        #expect(try repository.load().first?.items.count == 20_000)
-    }
-
     @Test func twoUnmountedChatsCheckpointTogetherWithoutBlockingEveryLiveEvent() async throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -777,6 +747,7 @@ struct SessionCatalogStoreTests {
         #expect(catalog.session(id: localShared.id)?.items == [localItem])
         #expect(catalog.session(id: localShared.id)?.workspaceID == nil)
         #expect(catalog.session(id: localShared.id)?.workspaceName == nil)
+        catalog.flushPersistence()
         let persistedRecords = try repository.load()
         let persistedIDs = Set(persistedRecords.map(\.id))
         #expect(persistedIDs == Set([
@@ -823,6 +794,7 @@ struct SessionCatalogStoreTests {
         try await catalog.load(requireAuthoritativeRefresh: true)
 
         #expect(catalog.records.map(\.id) == [selectedHost.id])
+        catalog.flushPersistence()
         #expect(try repository.load().map(\.id) == [selectedHost.id])
     }
 

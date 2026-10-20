@@ -29,8 +29,8 @@ final class SessionCatalogStore {
             deferredPresentationRecords = nil
         }
     }
-    private(set) var loadErrorMessage: String? = nil
-    private(set) var refreshErrorMessage: String? = nil
+    var loadErrorMessage: String? = nil
+    var refreshErrorMessage: String? = nil
     var persistenceErrorMessage: String? = nil
     var hasUnsavedChanges = false
     @ObservationIgnored private(set) var lastChatMutationWorkCount = 0
@@ -51,16 +51,16 @@ final class SessionCatalogStore {
     let currentHostID: () -> String?
     var pinPreferences: [String: Bool] = [:]
     var repositoryAllowsWrites = true
-    private var hasLoadedCatalogState = false
+    var hasLoadedCatalogState = false
     var accountGeneration: UInt64 = 0
-    private var latestLoadGeneration: UInt64 = 0
-    private var loadInvalidationGeneration: UInt64 = 0
-    private struct AuthoritativeLoad {
+    var latestLoadGeneration: UInt64 = 0
+    var loadInvalidationGeneration: UInt64 = 0
+    struct AuthoritativeLoad {
         let id = UUID()
         let task: Task<Void, Error>
         var waiters = Set<UUID>()
     }
-    private var authoritativeLoad: AuthoritativeLoad?
+    var authoritativeLoad: AuthoritativeLoad?
     struct InitialHistoryLoad {
         let id = UUID()
         let task: Task<SessionRecord, Error>
@@ -115,125 +115,11 @@ final class SessionCatalogStore {
         rebuildSubagentParentIndex()
     }
 
-    func load(requireAuthoritativeRefresh: Bool = false) async throws {
-        guard requireAuthoritativeRefresh else {
-            try await performLoad(requireAuthoritativeRefresh: false)
-            return
-        }
-        try Task.checkCancellation()
-        let account = accountGeneration
-        let flight: AuthoritativeLoad
-        if let existing = authoritativeLoad {
-            flight = existing
-        } else {
-            let invalidation = loadInvalidationGeneration
-            flight = AuthoritativeLoad(task: Task { @MainActor in
-                while true {
-                    try Task.checkCancellation()
-                    guard account == self.accountGeneration else { throw CancellationError() }
-                    do {
-                        try await self.performLoad(requireAuthoritativeRefresh: true)
-                        return
-                    } catch SessionCatalogLoadOwnershipError.superseded {
-                        // A normal list may win while opening a session. Retry
-                        // once it yields; an accepted Stop must still fence us.
-                        guard invalidation == self.loadInvalidationGeneration else {
-                            throw SessionCatalogLoadOwnershipError.superseded
-                        }
-                    }
-                }
-            })
-            authoritativeLoad = flight
-        }
-        let waiter = UUID()
-        let flightID = flight.id
-        authoritativeLoad?.waiters.insert(waiter)
-        defer { releaseAuthoritativeWaiter(waiter, flightID: flightID) }
-        try await withTaskCancellationHandler {
-            try await flight.task.value
-        } onCancel: {
-            Task { @MainActor [weak self] in
-                self?.releaseAuthoritativeWaiter(waiter, flightID: flightID)
-            }
-        }
-        try Task.checkCancellation()
-        guard account == accountGeneration else { throw CancellationError() }
-    }
-
-    private func releaseAuthoritativeWaiter(_ waiter: UUID, flightID: UUID) {
-        guard authoritativeLoad?.id == flightID else { return }
-        authoritativeLoad?.waiters.remove(waiter)
-        if authoritativeLoad?.waiters.isEmpty == true {
-            let task = authoritativeLoad?.task
-            authoritativeLoad = nil
-            task?.cancel()
-        }
-    }
-
-    private func performLoad(requireAuthoritativeRefresh: Bool) async throws {
-        let generation = accountGeneration
-        loadPinPreferences()
-        latestLoadGeneration &+= 1
-        let loadGeneration = latestLoadGeneration
-        var hasUsableLocalState = hasLoadedCatalogState || !records.isEmpty
-        if let repository, !requireAuthoritativeRefresh {
-            do {
-                let cachedRecords = try repository.load()
-                repositoryAllowsWrites = true
-                hasLoadedCatalogState = true
-                hasUsableLocalState = true
-                migratePinnedRecordsIfNeeded(cachedRecords)
-                let preferredCachedRecords = applyingPinPreferences(to: cachedRecords)
-                records = hasUnsavedChanges || cachedRecords.contains(where: { !$0.isContentLoaded })
-                    ? SessionCatalogReconciliation.merged(local: records, incoming: preferredCachedRecords)
-                    : SessionCatalogReconciliation.retained(preferredCachedRecords)
-                applyKnownSubagentParents()
-            } catch {
-                repositoryAllowsWrites = false
-                hasUsableLocalState = hasLoadedCatalogState || !records.isEmpty
-            }
-        }
-
-        do {
-            let incomingRecords = try await BighelpLinkTransientRetry.perform {
-                try await self.client.list()
-            }
-            guard generation == accountGeneration else { throw CancellationError() }
-            guard loadGeneration == latestLoadGeneration else {
-                throw SessionCatalogLoadOwnershipError.superseded
-            }
-            let protectedIncoming = applyingPinPreferences(
-                to: incomingRecords.map(protectAcceptedStop)
-            )
-            records = (!requireAuthoritativeRefresh && (repository != nil || hasUnsavedChanges))
-                ? SessionCatalogReconciliation.merged(local: records, incoming: protectedIncoming)
-                : SessionCatalogReconciliation.reconciled(local: records, authoritativeIncoming: protectedIncoming)
-            applyKnownSubagentParents()
-            hasLoadedCatalogState = true
-            loadErrorMessage = nil
-            refreshErrorMessage = nil
-        } catch {
-            guard generation == accountGeneration else { throw CancellationError() }
-            guard loadGeneration == latestLoadGeneration else {
-                throw SessionCatalogLoadOwnershipError.superseded
-            }
-            if error is CancellationError {
-                throw CancellationError()
-            }
-            if hasUsableLocalState {
-                loadErrorMessage = nil
-                refreshErrorMessage = "Sessions could not be refreshed. Try again."
-                if !requireAuthoritativeRefresh {
-                    return
-                }
-                throw error
-            }
-            refreshErrorMessage = nil
-            loadErrorMessage = "Sessions could not be loaded. Try again."
-            throw error
-        }
-
-        persistChangesIfNeeded()
+    /// Reconciling can hand back the same list; assigning it would still count as a change to save.
+    func adopt(_ reconciled: [SessionRecord]) -> Bool {
+        guard reconciled != records else { return false }
+        records = reconciled
+        return true
     }
 
     func resetForAccountBoundary() {
@@ -1146,14 +1032,17 @@ final class SessionCatalogStore {
         }
     }
 
-    private func applyKnownSubagentParents() {
+    func applyKnownSubagentParents() -> Bool {
+        var changed = false
         for index in records.indices {
             let record = records[index]
             let parentSessionID = subagentParentBySessionID[record.id]
                 ?? record.remoteStoredID.flatMap { subagentParentBySessionID[$0] }
-            guard let parentSessionID else { continue }
+            guard let parentSessionID, record.parentSessionID != parentSessionID else { continue }
             records[index].parentSessionID = parentSessionID
+            changed = true
         }
+        return changed
     }
 
     func protectAcceptedStop(_ incoming: SessionRecord) -> SessionRecord {

@@ -404,6 +404,7 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
     final class Coordinator: NSObject, UITableViewDelegate {
         weak var controller: ChatTimelineController?
         private var dataSource: UITableViewDiffableDataSource<Int, String>!
+        private var rows: [ChatCanvasRow] = []
         private var rowsByID: [String: ChatCanvasRow] = [:]
         private var orderedIDs: [String] = []
         private var conversationID: String?
@@ -461,6 +462,9 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
         }
         private var style: Style?
         private var heights: [String: (width: CGFloat, height: CGFloat)] = [:]
+        /// UIKit asks every row's estimate whenever rows are added; working each out from its
+        /// text again made each new row of a long chat cost as much as reading the whole chat.
+        private var estimates: [String: (width: CGFloat, height: CGFloat)] = [:]
         private var publicationPending = false
         private var presentationGeneration = 0
         private var pendingUpdate: (parent: NativeChatTimeline, environment: EnvironmentValues)?
@@ -561,21 +565,55 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
                 table.followsTail = true
                 table.isAnimatingReturn = false
                 heights.removeAll()
+                estimates.removeAll()
                 hostedRows.removeAllObjects()
             }
+            // A long chat changes at its tail (a growing answer, a new tool). Only the rows
+            // between the unchanged ends are looked at: hashing and comparing every row of
+            // the history on each update made a long chat's streaming stutter.
+            let previous = rows
+            let next = parent.rows
+            rows = next
+            let shorter = min(previous.count, next.count)
+            var start = 0
+            while start < shorter, previous[start] == next[start] { start += 1 }
+            var end = 0
+            while end < shorter - start, previous[previous.count - 1 - end] == next[next.count - 1 - end] { end += 1 }
+            let removed = previous[start..<(previous.count - end)]
+            let inserted = next[start..<(next.count - end)]
+            guard reset || styleChanged || !removed.isEmpty || !inserted.isEmpty else {
+                table.setNeedsLayout()
+                return
+            }
             let previousRows = rowsByID
-            rowsByID = Dictionary(uniqueKeysWithValues: parent.rows.map { ($0.id, $0) })
-            let ids = parent.rows.map(\.id)
+            if reset {
+                rowsByID = Dictionary(uniqueKeysWithValues: next.map { ($0.id, $0) })
+            } else {
+                for row in removed { rowsByID[row.id] = nil }
+                for row in inserted { rowsByID[row.id] = row }
+            }
+            let insertedIDs = inserted.map(\.id)
+            let reordered = reset || !removed.map(\.id).elementsEqual(insertedIDs)
+            let ids = reordered
+                ? Array(orderedIDs.prefix(start)) + insertedIDs + Array(orderedIDs.suffix(end))
+                : orderedIDs
             let previousFirstID = orderedIDs.first
             if reset || styleChanged || previousFirstID != ids.first {
                 presentationGeneration &+= 1
             }
-            let changed = ids.filter {
-                styleChanged || previousRows[$0] != rowsByID[$0]
-                    || (previousFirstID != ids.first && ($0 == previousFirstID || $0 == ids.first))
+            var changed = styleChanged ? ids : insertedIDs.filter { previousRows[$0] != rowsByID[$0] }
+            if !styleChanged, previousFirstID != ids.first {
+                // The first row's top padding moves to the new first row.
+                for id in [previousFirstID, ids.first].compactMap({ $0 })
+                where rowsByID[id] != nil && !changed.contains(id) {
+                    changed.append(id)
+                }
             }
-            for id in changed { heights[id] = nil }
-            if ids != orderedIDs || reset {
+            for id in changed {
+                heights[id] = nil
+                estimates[id] = nil
+            }
+            if reordered {
                 orderedIDs = ids
                 heights = heights.filter { rowsByID[$0.key] != nil }
                 var snapshot = NSDiffableDataSourceSnapshot<Int, String>()
@@ -602,6 +640,7 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             } else {
                 // Unchanged history keeps its hosting views, text selection and
                 // measured layout. Offscreen changes are rendered on reuse.
+                let changed = Set(changed)
                 for index in table.indexPathsForVisibleRows ?? [] {
                     let id = ids[index.row]
                     if changed.contains(id), let cell = table.cellForRow(at: index) {
@@ -647,7 +686,15 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
         func tableView(_ tableView: UITableView, estimatedHeightForRowAt indexPath: IndexPath) -> CGFloat {
             guard orderedIDs.indices.contains(indexPath.row) else { return 120 }
             let id = orderedIDs[indexPath.row]
-            if let measurement = heights[id], measurement.width == tableView.bounds.width { return measurement.height }
+            let width = tableView.bounds.width
+            if let measurement = heights[id], measurement.width == width { return measurement.height }
+            if let estimate = estimates[id], estimate.width == width { return estimate.height }
+            let estimate = estimatedHeight(id: id, in: tableView)
+            estimates[id] = (width, estimate)
+            return estimate
+        }
+
+        private func estimatedHeight(id: String, in tableView: UITableView) -> CGFloat {
             // A uniform 120-point estimate makes a tall streamed message look
             // like several short rows, provoking speculative sizing around
             // every tail insertion. These are estimates only; UIKit measures

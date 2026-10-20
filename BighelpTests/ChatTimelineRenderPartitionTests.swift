@@ -155,8 +155,8 @@ struct ChatTimelineRenderPartitionTests {
 
     @Test func streamingTextEditsOnlyTheChangedSuffix() async throws {
         let originalText = "Ask @sage.\n\n" + String(repeating: "Already rendered paragraph.\n\n", count: 60)
-        func view(_ text: String) -> some View {
-            MessageBubble(role: .assistant, speakerName: "Agent", text: text,
+        func view(_ text: String, speaker: String = "Agent") -> some View {
+            MessageBubble(role: .assistant, speakerName: speaker, text: text,
                           delivery: "Streaming", isPendingSubmission: false, onFork: nil,
                           mentionIdentities: [.init(handle: "sage", name: "Sage Green")])
                 .environment(\.bighelpUIV3Enabled, true)
@@ -190,6 +190,10 @@ struct ChatTimelineRenderPartitionTests {
         #expect(textView.selectedRange == NSRange(location: 10, length: 8))
         #expect(textView.textStorage.attribute(.attachment, at: 4, effectiveRange: nil) as? ChatMentionAttachment === mention)
         #expect(ChatMentionRendering.plainText(textView.textStorage).hasPrefix(originalPlainText))
+        host.rootView = view(originalText + "One appended **formatted** paragraph.", speaker: "Renamed Agent")
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(textView.accessibilityLabel?.hasPrefix("Renamed Agent: Ask Sage Green.") == true)
+        #expect(textView.selectedRange == NSRange(location: 10, length: 8))
     }
 
     @Test func retainedIdealLayoutMatchesFullMeasurementAcrossTextAndFontEdits() {
@@ -201,6 +205,7 @@ struct ChatTimelineRenderPartitionTests {
             ("A short reply\nA second line with a family 👨‍👩‍👧‍👦", 17.0),
             ("A short reply\nA second line with a family 👨‍👩‍👧‍👦\nمرحبا بالعالم", 17.0),
             ("A completely different answer\nwith a larger font", 24.0),
+            (String(repeating: "A narrow line\n", count: 40), 17.0),
             ("Short again", 17.0),
             ("", 17.0),
         ] {
@@ -222,6 +227,27 @@ struct ChatTimelineRenderPartitionTests {
             #expect(abs(measured.height - ceil(expected.height)) <= 1)
             #expect(storage.string == source)
         }
+    }
+
+    @Test func naturalWidthStopsOnceTheBubbleMustUseItsMaximumWidth() throws {
+        let paragraph = String(repeating: "A complete answer with **formatting** and Unicode 👋🏽. ", count: 30)
+        let source = ([paragraph] + Array(repeating: "Another complete paragraph.", count: 500)).joined(separator: "\n")
+        let storage = NSTextStorage(string: source, attributes: [.font: UIFont.systemFont(ofSize: 17)])
+        let layout = ChatNativeMarkdownIdealLayout(textStorage: storage)
+        let measured = layout.size()
+        #expect(measured.width >= ChatBubbleLayoutMetrics.maximumAbsoluteWidth)
+        let manager = try #require(storage.layoutManagers.first)
+        #expect(manager.firstUnlaidCharacterIndex() < storage.length,
+                "Once a line fills every supported bubble, measuring its natural width must not lay out the rest of the answer.")
+        #expect(storage.string == source, "Only width measurement is bounded; the selectable answer stays complete.")
+
+        let short = NSAttributedString(string: "Short again", attributes: [.font: UIFont.systemFont(ofSize: 17)])
+        storage.setAttributedString(short)
+        let expected = short.boundingRect(with: CGSize(width: ChatNativeMarkdownIdealLayout.width,
+                                                       height: .greatestFiniteMagnitude),
+                                          options: [.usesLineFragmentOrigin, .usesFontLeading], context: nil)
+        #expect(abs(layout.size().width - ceil(expected.width)) <= 1,
+                "A shorter replacement must fit its text again instead of keeping a saturated width.")
     }
 
     @Test func recycledRowsStartWithTheirOwnLocalState() async throws {

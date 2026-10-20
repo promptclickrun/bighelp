@@ -28,9 +28,9 @@ enum ChatNativeTextStorageUpdater {
     }
 }
 
-/// A separate native layout measures the natural bubble width without rebuilding
-/// Core Text's glyph layout for the entire attributed string on every append.
-/// Both layouts receive the same incremental NSTextStorage edits.
+/// The bubble consumes only the width of this ideal proposal; its height is
+/// measured at the actual width. Stop once the text exceeds every supported
+/// bubble width, without laying out the rest of a long answer a second time.
 @MainActor
 final class ChatNativeMarkdownIdealLayout {
     static let width: CGFloat = 10_000
@@ -38,6 +38,8 @@ final class ChatNativeMarkdownIdealLayout {
     private let container = NSTextContainer(size: CGSize(width: width, height: .greatestFiniteMagnitude))
 
     init(textStorage: NSTextStorage) {
+        // Otherwise TextKit completes the whole container even for a small probe.
+        manager.allowsNonContiguousLayout = true
         container.lineFragmentPadding = 0
         container.lineBreakMode = .byWordWrapping
         manager.addTextContainer(container)
@@ -45,9 +47,17 @@ final class ChatNativeMarkdownIdealLayout {
     }
 
     func size() -> CGSize {
-        manager.ensureLayout(for: container)
-        let bounds = manager.usedRect(for: container)
-        return CGSize(width: ceil(bounds.width), height: ceil(bounds.height))
+        guard let storage = manager.textStorage else { return .zero }
+        var height: CGFloat = 256
+        while true {
+            manager.ensureLayout(forBoundingRect: CGRect(x: 0, y: 0, width: Self.width, height: height),
+                                 in: container)
+            let bounds = manager.usedRect(for: container)
+            let size = CGSize(width: ceil(bounds.width), height: ceil(bounds.height))
+            if size.width >= ChatBubbleLayoutMetrics.maximumAbsoluteWidth
+                || manager.firstUnlaidCharacterIndex() >= storage.length { return size }
+            height *= 2
+        }
     }
 }
 
@@ -156,8 +166,12 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
                 linksMarkdownFiles: opensHostFiles
             )
         )
-        view.accessibilityLabel = "\(speakerName): \(ChatMentionRendering.plainText(updatedText, usingNames: true))"
-        guard context.coordinator.renderedText?.isEqual(to: updatedText) != true else { return }
+        let textChanged = context.coordinator.renderedText?.isEqual(to: updatedText) != true
+        if textChanged || context.coordinator.accessibilitySpeakerName != speakerName {
+            view.accessibilityLabel = "\(speakerName): \(ChatMentionRendering.plainText(updatedText, usingNames: true))"
+            context.coordinator.accessibilitySpeakerName = speakerName
+        }
+        guard textChanged else { return }
 
         let previousSelection = view.selectedRange
         ChatNativeTextStorageUpdater.apply(updatedText, previous: context.coordinator.renderedText, to: view.textStorage)
@@ -181,11 +195,13 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
         guard let width = proposal.width, width.isFinite, width > 0 else {
             guard let idealLayout = context.coordinator.idealLayout else { return nil }
             return context.coordinator.renderCache.measure(width: ChatNativeMarkdownIdealLayout.width) { _ in
-                idealLayout.size()
+                ChatPerformanceProbe.measure("text.layout.ideal") { idealLayout.size() }
             }
         }
         let measured = context.coordinator.renderCache.measure(width: width) { width in
-            uiView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
+            ChatPerformanceProbe.measure("text.layout.constrained") {
+                uiView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
+            }
         }
         return CGSize(width: width, height: ceil(measured.height))
     }
@@ -196,6 +212,7 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
         let menu = ChatMessageMenuDriver()
         var idealLayout: ChatNativeMarkdownIdealLayout?
         var renderedText: NSAttributedString?
+        var accessibilitySpeakerName: String?
         var openURL: OpenURLAction
 
         init(openURL: OpenURLAction) {

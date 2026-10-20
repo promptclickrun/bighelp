@@ -132,6 +132,29 @@ final class ChatLoadSpeedUITests: BighelpUITestCase {
         XCTAssertEqual(input.value as? String, "Could you check the vendor invoices for this week, please?!")
     }
 
+    /// Opens the actual ellipsis menu, with the coordinate resolved before the
+    /// measured phase so a long transcript's accessibility snapshot is excluded.
+    @MainActor
+    func testOpeningOptionsInALongRealisticChat() throws {
+        let app = launchRealistic(label: "options", opensChat: true)
+        let options = app.buttons["chat.options"]
+        XCTAssertTrue(options.waitForExistence(timeout: 30))
+        let frame = options.frame
+        let tap = app.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: frame.midX, dy: frame.midY))
+        settle()
+        post(ChatPerformance.reset)
+        tap.tap()
+        settle()
+        post(ChatPerformance.read)
+        settle()
+        XCTAssertTrue(app.buttons["This chat"].waitForExistence(timeout: 5))
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = "long-chat-options-\(Self.turns)"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
     /// A tool turn and a growing answer at the bottom of a long chat.
     @MainActor
     func testStreamingInALongRealisticChat() throws {

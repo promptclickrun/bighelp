@@ -45,16 +45,69 @@ struct NativeInvalidationAndReactionTests {
         }, refreshScheduledTasks: { _ in Issue.record("Sessions event refreshed cron") }, publish: { _, _ in },
             minimumSessionsRefreshGap: .milliseconds(200))
         defer { coordinator.suspend() }
-        let event = try decode(#"{"jsonrpc":"2.0","method":"event","params":{"type":"sessions.changed","session_id":"","payload":{}}}"#)
+        let event = try sessionsChanged()
         #expect(coordinator.receive(event, source: source))
         for _ in 0..<100 where started.isEmpty { await Task.yield() }
         #expect(started.count == 1, "The first change reads at once.")
         for _ in 0..<3 { #expect(coordinator.receive(event, source: source)) }
         try await Task.sleep(for: .milliseconds(80))
         #expect(started.count == 1, "Runs finishing back to back don't each read the list.")
+        #expect(coordinator.receive(event, source: source), "A change during the wait")
         try await Task.sleep(for: .milliseconds(400))
-        #expect(started.count == 2, "The burst becomes one read after the gap.")
+        #expect(started.count == 2, "The burst, and what came during the wait, become one read after the gap.")
         if started.count == 2 { #expect(started[1] - ended[0] >= .milliseconds(200)) }
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(started.count == 2, "Nothing is read again for changes the last read already covered.")
+    }
+
+    @Test func aScheduledTaskChangeDoesNotWaitBehindTheSessionsGap() async throws {
+        let source = try makeSource()
+        var sessionReads: [ContinuousClock.Instant] = []
+        var cronReads: [ContinuousClock.Instant] = []
+        let coordinator = NativeWorkspaceInvalidationCoordinator(currentSource: { source },
+            refreshSessions: { _ in sessionReads.append(.now) },
+            refreshScheduledTasks: { _ in cronReads.append(.now) }, publish: { _, _ in },
+            minimumSessionsRefreshGap: .milliseconds(300))
+        defer { coordinator.suspend() }
+        #expect(coordinator.receive(try sessionsChanged(), source: source))
+        for _ in 0..<100 where sessionReads.isEmpty { await Task.yield() }
+        #expect(coordinator.receive(try sessionsChanged(), source: source))
+        try await Task.sleep(for: .milliseconds(50))
+        let cronAt = ContinuousClock.now
+        #expect(coordinator.receive(try decode(#"{"jsonrpc":"2.0","method":"event","params":{"type":"cron.changed","session_id":"","payload":{}}}"#), source: source))
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(cronReads.count == 1, "Scheduled tasks are read while the sessions gap is still running.")
+        if let read = cronReads.first { #expect(read - cronAt < .milliseconds(100)) }
+        #expect(sessionReads.count == 1)
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(sessionReads.count == 2, "The sessions read still comes, after its gap.")
+        if sessionReads.count == 2 { #expect(sessionReads[1] - sessionReads[0] >= .milliseconds(300)) }
+    }
+
+    @Test func aReadFinishingAfterAHostSwitchDoesNotDelayTheNewHostsFirstRead() async throws {
+        let first = try makeSource()
+        let second = try makeSource()
+        var current = first
+        var reads: [NativeWorkspaceEventSource] = []
+        var release: CheckedContinuation<Void, Never>?
+        let coordinator = NativeWorkspaceInvalidationCoordinator(currentSource: { current }, refreshSessions: { source in
+            if source == first { await withCheckedContinuation { release = $0 } }
+            reads.append(source)
+        }, refreshScheduledTasks: { _ in }, publish: { _, _ in }, minimumSessionsRefreshGap: .seconds(2))
+        defer { coordinator.suspend() }
+        #expect(coordinator.receive(try sessionsChanged(), source: first))
+        for _ in 0..<100 where release == nil { await Task.yield() }
+        guard let held = release else { Issue.record("The first host's read did not start"); return }
+        current = second
+        coordinator.suspend()
+        held.resume()
+        for _ in 0..<100 where reads.isEmpty { await Task.yield() }
+        #expect(reads == [first])
+        let asked = ContinuousClock.now
+        #expect(coordinator.receive(try sessionsChanged(), source: second))
+        for _ in 0..<100 where reads.count < 2 { await Task.yield() }
+        #expect(reads == [first, second], "The old read's late finish doesn't start a gap for the new host.")
+        #expect(ContinuousClock.now - asked < .milliseconds(500))
     }
 
     @Test func resumeProgressIsExactSessionTransientStateNotCatalogWork() throws {
@@ -104,6 +157,10 @@ struct NativeInvalidationAndReactionTests {
         let owner = WorkspaceOwner(authority: try .direct(endpointIdentity: "https://fixture.example.test", providerID: "test", userID: "invalidation"),
             authenticationGeneration: UUID(), connectionGeneration: UUID())
         return .init(hostID: UUID(), owner: owner, servingProfileID: "default")
+    }
+
+    private func sessionsChanged() throws -> DirectHermesEvent {
+        try decode(#"{"jsonrpc":"2.0","method":"event","params":{"type":"sessions.changed","session_id":"","payload":{}}}"#)
     }
 
     private func decode(_ text: String) throws -> DirectHermesEvent {

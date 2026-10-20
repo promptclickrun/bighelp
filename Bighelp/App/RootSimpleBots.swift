@@ -37,7 +37,51 @@ extension RootShellView {
                 gatewayName: fleet.hostName(pending.hostID),
                 onCancel: cancelPendingFleetOpen)
             .transition(.opacity)
+        } else if simpleBotsOn {
+            SimpleBotsChatOpeningLayer(opening: simpleBotsChatOpening,
+                                       readiness: { simpleBotsChatOpeningReadiness },
+                                       onCancel: cancelSimpleBotsChatOpening)
         }
+    }
+
+    /// Simple Bot mode: a chat opening from a list, a search, a profile or a link. Nil outside it.
+    func beginSimpleBotsChatOpening(_ session: SessionSummary) -> UUID? {
+        guard simpleBotsOn else { return nil }
+        let agentID = session.kind == .direct && session.agentIDs.count == 1 ? session.agentIDs[0] : nil
+        let name = agentID.flatMap { id in agents.profiles.first { $0.id == id }?.name } ?? session.title
+        return simpleBotsChatOpening.begin(agentID: agentID, name: name, originPath: appState.path)
+    }
+
+    /// After `openSession`: the chat is on screen (the loader waits for its messages if they aren't
+    /// there yet), or nothing opened and the loader has nothing to wait for.
+    func noteSimpleBotsChatOpened(_ opening: UUID, route: AppRoute) {
+        guard case .chat(let id) = route, appState.path.last == route else {
+            simpleBotsChatOpening.endIfNothingOpened(opening)
+            return
+        }
+        simpleBotsChatOpening.attach(opening, conversationID: id)
+        simpleBotsChatOpening.update(simpleBotsChatOpeningReadiness)
+    }
+
+    /// Ready once the chat on screen shows its messages: a saved copy, or the host's history once read.
+    var simpleBotsChatOpeningReadiness: SimpleBotsChatOpening.Readiness {
+        guard let opening = simpleBotsChatOpening.current else { return .waiting }
+        if actionErrorMessage != nil { return .failed }
+        guard let id = opening.conversationID else { return .waiting }
+        // Moved on from it: nothing left to cover.
+        guard appState.path.last == .chat(conversationID: id) else { return .failed }
+        guard let model = featureStore.preparedChatModel(id: id) else { return .ready }
+        return model.isHydratingHistory && model.transcriptEntries.isEmpty ? .waiting : .ready
+    }
+
+    /// Cancel on the opening loader: stop the lookup and go back to where the tap came from.
+    func cancelSimpleBotsChatOpening() {
+        guard let opening = simpleBotsChatOpening.cancel() else { return }
+        canonicalChatCoordinator.cancel()
+        guard opening.conversationID != nil, appState.path != opening.originPath else { return }
+        var instant = Transaction()
+        instant.disablesAnimations = true
+        withTransaction(instant) { appState.path = opening.originPath }
     }
 
     private var simpleBotsContext: SimpleBotsContext {

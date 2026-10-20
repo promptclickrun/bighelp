@@ -564,6 +564,7 @@
 		5A394E6D02D5BA8702A671C1 /* BighelpRailCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3839FB429704BEC09A1DF03 /* BighelpRailCard.swift */; };
 		5A7F5B7A17576449765C4124 /* SimpleBotsOpeningOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61AAED8CD39E8D3EBB6D9B8A /* SimpleBotsOpeningOverlay.swift */; };
 		5A8766E7C2251965026C4EAE /* BotModeRunTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C2051CDE611EC630D846F17 /* BotModeRunTests.swift */; };
+		5AABDC9FB87A5F78228292E0 /* SimpleBotsChatOpening.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1CCD48AB707E4FB6E740F7B /* SimpleBotsChatOpening.swift */; };
 		5AC0BB82A250434BD7BC12E5 /* PluginUpdateWorkspaceClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE5198D653522270B0E3E3BD /* PluginUpdateWorkspaceClientTests.swift */; };
 		5AE24602E4FF589C5AA8F4C8 /* ReferenceGitHubAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 980313B93032EA41F9C5B8FA /* ReferenceGitHubAdapter.swift */; };
 		5AEE02352685D4432493CBEB /* UsageLimitsComputersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E72EC67FC663AE543259A11 /* UsageLimitsComputersTests.swift */; };
@@ -1106,6 +1107,7 @@
 		AC2A8EF08F1DED57CCA24825 /* SimpleBotsReasoningFolderUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 647B2EF1A1EEDD68B5E773A8 /* SimpleBotsReasoningFolderUITests.swift */; };
 		AC48C66078736F6CC3B21B00 /* NativeWikiOwnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4941F32A0895F8230986EE1 /* NativeWikiOwnerTests.swift */; };
 		AC7E744EFCAF89C26C6DC853 /* KanbanBoardModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CC001C10AB31C7501A8D446 /* KanbanBoardModel.swift */; };
+		AC86DE0F4C10436C4E92DFFA /* SimpleBotsChatOpeningTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AC0441E6845576CAAF188D6 /* SimpleBotsChatOpeningTests.swift */; };
 		ACED824748FD8C4744F1BE49 /* UsageFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5ACE26EC046A497C12D4047 /* UsageFixtures.swift */; };
 		AD1F6796E6DD14E4645564A0 /* AgentBoardFileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40CF165A2874CBEC1ACA5FB6 /* AgentBoardFileTests.swift */; };
 		AD870EE5B6DC34D4B6A6F798 /* ReferenceHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A319B9E00DA53C7BB4B58F9 /* ReferenceHistoryView.swift */; };
@@ -2532,6 +2534,7 @@
 		7A2C5B05A71C60F1D56EA416 /* MemoryGraphView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryGraphView.swift; sourceTree = "<group>"; };
 		7A2C74040561C71B98995DB9 /* StockGitStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StockGitStore.swift; sourceTree = "<group>"; };
 		7A3009128EE3E5B181394C0F /* ChatTimelineRenderPartitionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatTimelineRenderPartitionTests.swift; sourceTree = "<group>"; };
+		7AC0441E6845576CAAF188D6 /* SimpleBotsChatOpeningTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimpleBotsChatOpeningTests.swift; sourceTree = "<group>"; };
 		7AD4D831AE3D6470D046BE65 /* SessionRuntimeControlModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRuntimeControlModel.swift; sourceTree = "<group>"; };
 		7B6DC6F01BFD5E1AE50EF6E4 /* BighelpCardValueResolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpCardValueResolverTests.swift; sourceTree = "<group>"; };
 		7B7F846E6B472F0B4D981E2E /* BighelpFoundationModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpFoundationModels.swift; sourceTree = "<group>"; };
@@ -3256,6 +3259,7 @@
 		F1838DDC1741CCC47DC84B86 /* bighelp-trick-squiggle.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "bighelp-trick-squiggle.json"; sourceTree = "<group>"; };
 		F18D8F3F64CB0FA578FE76CE /* ChatActivityEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatActivityEvent.swift; sourceTree = "<group>"; };
 		F19950FC182073DB19EF1F9D /* TeamCallSpeechPipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamCallSpeechPipeline.swift; sourceTree = "<group>"; };
+		F1CCD48AB707E4FB6E740F7B /* SimpleBotsChatOpening.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimpleBotsChatOpening.swift; sourceTree = "<group>"; };
 		F1DB559BCA138130360AAB97 /* KanbanBoardModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanbanBoardModelTests.swift; sourceTree = "<group>"; };
 		F1FF50374D94C106E4CE34A4 /* BighelpPinnedAgentsWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpPinnedAgentsWidget.swift; sourceTree = "<group>"; };
 		F2038A52DC5309296BB3CB20 /* NotificationPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationPresentationTests.swift; sourceTree = "<group>"; };
@@ -3847,6 +3851,7 @@
 				1E1BC6478B50BC01F0A39494 /* SimpleBotMark.swift */,
 				D51BF68C15E152807C58243B /* SimpleBotProfileExtras.swift */,
 				E2B0B12CCADA6D8292B64AFA /* SimpleBotProfileView.swift */,
+				F1CCD48AB707E4FB6E740F7B /* SimpleBotsChatOpening.swift */,
 				E2251A03C44FEE34DE17B789 /* SimpleBotsHomeView.swift */,
 				61AAED8CD39E8D3EBB6D9B8A /* SimpleBotsOpeningOverlay.swift */,
 				E870F072CBA0B66AC95493FB /* SimpleBotsSearchView.swift */,
@@ -4676,6 +4681,7 @@
 				07F4CF3C8735C83544AAD84F /* SettingsStoreTests.swift */,
 				EE5134A075FCBAC9ED508EB4 /* ShellFeatureStoreTests.swift */,
 				10808A9987A2E9F3F2358F19 /* SimpleBotFilesTests.swift */,
+				7AC0441E6845576CAAF188D6 /* SimpleBotsChatOpeningTests.swift */,
 				0E65BCE2663523166E5655A0 /* SimpleBotsTests.swift */,
 				BD236D3F2FCE5C233ACAFBFD /* SkillDocumentMutationTests.swift */,
 				34EF80804B4ED118D93BBBD0 /* SkillMutationLifecycleTests.swift */,
@@ -7101,6 +7107,7 @@
 				10006BC271D7C92540B570B2 /* SimpleBotTemplates.swift in Sources */,
 				41F83314C2CE35C83B984C1A /* SimpleBotTimeZonePicker.swift in Sources */,
 				4F4BFD5D7FE39BBA056987FA /* SimpleBotVoiceBar.swift in Sources */,
+				5AABDC9FB87A5F78228292E0 /* SimpleBotsChatOpening.swift in Sources */,
 				9439485E2A2FA9EC2B7ED47F /* SimpleBotsHomeView.swift in Sources */,
 				5A7F5B7A17576449765C4124 /* SimpleBotsOpeningOverlay.swift in Sources */,
 				78269EBC10C58BA4BFDAB67B /* SimpleBotsSearchView.swift in Sources */,
@@ -7678,6 +7685,7 @@
 				43F48EEDD559E98BF4D89792 /* SettingsStoreTests.swift in Sources */,
 				F92F1AC1D26135F63D3B5317 /* ShellFeatureStoreTests.swift in Sources */,
 				B29566B74DF4A8B08E2649B6 /* SimpleBotFilesTests.swift in Sources */,
+				AC86DE0F4C10436C4E92DFFA /* SimpleBotsChatOpeningTests.swift in Sources */,
 				6CFFF59952F66EEA85096248 /* SimpleBotsTests.swift in Sources */,
 				1AB516FA3EAED04152EDE089 /* SkillDocumentMutationTests.swift in Sources */,
 				9A762D8156FF1063F2B5BD58 /* SkillMutationLifecycleTests.swift in Sources */,

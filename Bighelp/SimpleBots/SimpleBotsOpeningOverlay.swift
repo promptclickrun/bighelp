@@ -1,10 +1,10 @@
 import SwiftUI
 
-/// Over Simple Bot mode's home while a bot on another gateway opens: the bighelp loader, what's
-/// opening and where, and Cancel.
+/// Over Simple Bot mode while a bot's chat opens: the bighelp loader, what's opening (and on which
+/// gateway, when it's another one), and Cancel.
 struct SimpleBotsOpeningOverlay: View {
     let botName: String?
-    let gatewayName: String
+    var gatewayName: String? = nil
     let onCancel: () -> Void
     @BighelpThemeReader private var theme
 
@@ -20,9 +20,11 @@ struct SimpleBotsOpeningOverlay: View {
                         .bighelpFont(.sectionTitle, weight: .semibold)
                         .foregroundStyle(theme.primaryText)
                         .multilineTextAlignment(.center)
-                    Text("On \(gatewayName)")
-                        .bighelpFont(.metadata)
-                        .foregroundStyle(theme.secondaryText)
+                    if let gatewayName {
+                        Text("On \(gatewayName)")
+                            .bighelpFont(.metadata)
+                            .foregroundStyle(theme.secondaryText)
+                    }
                 }
                 Button("Cancel", action: onCancel)
                     .bighelpFont(.label)
@@ -36,5 +38,24 @@ struct SimpleBotsOpeningOverlay: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("simple-bots.opening")
+    }
+}
+
+/// The loader for a chat opening on the gateway in use (`SimpleBotsChatOpening`). Only this view reads
+/// the opening chat, and only while one opens, so a chat's streaming never redraws the shell.
+struct SimpleBotsChatOpeningLayer: View {
+    let opening: SimpleBotsChatOpening
+    let readiness: () -> SimpleBotsChatOpening.Readiness
+    let onCancel: () -> Void
+
+    var body: some View {
+        let state = opening.current == nil ? .waiting : readiness()
+        ZStack {
+            if opening.isShowing, let current = opening.current {
+                SimpleBotsOpeningOverlay(botName: current.name, onCancel: onCancel)
+                    .transition(.opacity)
+            }
+        }
+        .onChange(of: state) { _, state in opening.update(state) }
     }
 }

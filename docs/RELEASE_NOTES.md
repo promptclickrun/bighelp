@@ -15,8 +15,8 @@ short sentences, one instruction in each step, and the active voice.
 
 ### Fixes
 
-- **Chat list:** a list with thousands of chats refreshes with less work on the main thread. The app saves changes
-  in the background and skips a save when the list has not changed.
+- **Chat list:** a list with thousands of chats refreshes with less work on the main thread. The app prepares large
+  saves in the background and skips a save when the list has not changed.
 - **Removed chats:** a refresh no longer brings a removed chat back from an older saved copy. Drafts and chat
   history stay intact.
 - **Long answers:** the app does less work to find the width of a long message. The full text remains available to

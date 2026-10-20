@@ -286,11 +286,17 @@ change in both repos.
 - **Chat row environment:** chat rows (`NativeChatTimeline`) copy selected environment values into each row. If a row
   acts stale (for example, animations frozen because it still thinks the app is inactive), check what the timeline
   copies and whether the representable reads it.
-- **Chat redraw cost:** `ChatView` rebuilds the whole transcript projection on every change, each streaming
-  delta included. Keep that work linear in the chat's length: never walk the activity ledger once per turn
-  (`ChatLedgerIndex`) or lay out every message to find something (`ChatCardMessageProjection.cardIDs(in:)`).
-  A quadratic step made a 300-turn chat take most of a second per redraw. `ChatLoadSpeedUITests`
-  (`BIGHELP_SPEED`) times a long chat.
+- **Chat redraw cost:** `ChatView` redraws for the keyboard, the message box, the header and each streaming
+  delta. Its transcript rows live in `ChatTranscriptCanvasCache`: built again only when something in its key
+  changes, and then only for the turns that changed (`ChatTranscriptTurn`; a tool event redoes just the turns
+  whose ledger events it touches). A new input to the rows goes in that key, and a new step works a turn at a
+  time or falls back to the whole chat, as agent talk does. `ChatLongHistoryTests` checks the kept rows match
+  `wholeCanvas`. Checks that run over every message must stay cheap: Foundation's `contains` on message text
+  was most of a 1,000-turn redraw (`ChatTextMarker`), and a link card PNG-encoded its picture in its body.
+  Never walk the ledger once per turn (`ChatLedgerIndex`) or insert into it one event at a time when building
+  it (`ChatActivityLedger.init`). XCUITest queries build every row of a long chat (seconds, over 1 GB at
+  300 turns), so time one with `ChatLoadSpeedUITests` (`BIGHELP_SPEED`, `BIGHELP_SPEED_TURNS`) or the DEBUG
+  autopilot and probe (`ChatPerformanceAutopilot`, `-test-chat-performance-probe`).
 - **Type-checker timeouts:** very large `body`s (`RootShellView`, `BighelpApp`) time out the type checker. Pull
   pieces out into functions or named `ViewModifier`s.
 - **Text styling:** styled text in the composer must pass attributes and theme colors. Plain `String` replacements

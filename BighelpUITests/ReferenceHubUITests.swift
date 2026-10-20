@@ -83,7 +83,7 @@ class BighelpUITestCase: XCTestCase {
         return true
     }
 
-    /// ⋯ › Advanced › Compact. A menu item can report its title instead of its identifier.
+    /// ⋯ › This chat › Compact. A menu item can report its title instead of its identifier.
     @MainActor
     func chatCompactItem(in app: XCUIApplication) -> XCUIElement {
         _ = chatMenuItem("chat.compact", in: app)
@@ -100,10 +100,11 @@ class BighelpUITestCase: XCTestCase {
         case "chat.session-controls", "chat.fast-mode": groups = ["chat.options.model-speed"]
         case "chat.context-window", "chat.provider-usage": groups = ["chat.options.more", "chat.options.usage"]
         case "chat.rename", "chat.appearance": groups = ["chat.options.this-chat", "chat.options.settings"]
-        case "chat.info", "chat.files", "chat.edit-current-agent", "chat.options.settings", "chat.new-bot-chat":
+        case "chat.info", "chat.files", "chat.edit-current-agent", "chat.options.settings", "chat.new-bot-chat",
+             "chat.compact":
             groups = ["chat.options.this-chat"]
         case "chat.options.usage", "chat.options.advanced", "chat.file-changes": groups = ["chat.options.more"]
-        case "chat.compact", "chat.force-refresh", "chat.options.display": groups = ["chat.options.more", "chat.options.advanced"]
+        case "chat.force-refresh", "chat.options.display": groups = ["chat.options.more", "chat.options.advanced"]
         case "chat.visibility.reasoning", "chat.visibility.tool-calls": groups = ["chat.options.more", "chat.options.advanced", "chat.options.display"]
         default: groups = []
         }

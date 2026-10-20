@@ -353,7 +353,7 @@ An opened "Worked for…" fold shows its tools directly, never a "Called N tools
 A file in a chat opens in the native preview with Save and Share. A Markdown file opens rendered
 (`MarkdownMessageView`, as chat messages are), with a Preview and Raw switch under its name.
 
-Compacting (⋯ › Advanced › Compact, or Hermes on its own when the context fills) shows `ChatCompactionRail` above the
+Compacting (⋯ › This chat › Compact, or Hermes on its own when the context fills) shows `ChatCompactionRail` above the
 message box: a chip whose four-step bar moves once a second (still with Reduce Motion), then Compacted with the tokens
 before and after for two seconds before it shrinks away. Hermes' own status starts and ends it.
 

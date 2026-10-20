@@ -1100,6 +1100,7 @@ struct ChatView: View {
             } else {
                 renameChatMenuItem
             }
+            compactMenuItem
             if let onNewBotChat {
                 Button("New Bot Chat", systemImage: "arrow.trianglehead.counterclockwise") {
                     dismissKeyboard()
@@ -1142,7 +1143,7 @@ struct ChatView: View {
         }
     }
 
-    /// Advanced › Compact: Hermes folds earlier messages into a summary; the rail above
+    /// This chat › Compact: Hermes folds earlier messages into a summary; the rail above
     /// the message box shows it working, then what it saved.
     private func compactChat(_ client: any CompactingConversationClient) {
         Task {
@@ -1188,18 +1189,24 @@ struct ChatView: View {
         }
     }
 
+    /// An everyday action, so it never waits for Nerd Mode: a person who left
+    /// Nerd Mode off on one device (it's kept per device) still has it there.
+    @ViewBuilder
+    private var compactMenuItem: some View {
+        if let compacting = model.client as? any CompactingConversationClient {
+            Button("Compact", systemImage: "arrow.down.right.and.arrow.up.left") {
+                dismissKeyboard()
+                compactChat(compacting)
+            }
+            .disabled(model.isSending || model.compaction != nil)
+            .accessibilityIdentifier("chat.compact")
+        }
+    }
+
     @ViewBuilder
     private var advancedMenu: some View {
         if nerdModeEnabled {
             Menu {
-                if let compacting = model.client as? any CompactingConversationClient {
-                    Button("Compact", systemImage: "arrow.down.right.and.arrow.up.left") {
-                        dismissKeyboard()
-                        compactChat(compacting)
-                    }
-                    .disabled(model.isSending || model.compaction != nil)
-                    .accessibilityIdentifier("chat.compact")
-                }
                 if dynamicTypeSize.isAccessibilitySize {
                     Menu {
                         displayMenuItems

@@ -207,9 +207,11 @@ enum DirectHermesSessionValidation {
     }
 
     static func text(_ value: String, maximum: Int, allowsEmpty: Bool = true) throws -> String {
+        // Only real controls (Cc). `CharacterSet.controlCharacters` also holds format characters (Cf):
+        // the word joiners in pasted text and the U+200D inside family emoji.
         guard value.utf8.count <= maximum, allowsEmpty || !value.isEmpty,
               !value.unicodeScalars.contains(where: {
-                  CharacterSet.controlCharacters.contains($0) && !"\n\r\t".unicodeScalars.contains($0)
+                  $0.properties.generalCategory == .control && !"\n\r\t".unicodeScalars.contains($0)
               }) else { throw WorkspaceClientError.invalidResponse }
         return value
     }

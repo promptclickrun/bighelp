@@ -230,38 +230,23 @@ struct AgentHeroHeader: View {
                 if !showsName { Button("Switch agent", action: onNameTap) }
             }
             if showsName || statusLine != nil || sessionTitle != nil {
+            ZStack(alignment: .top) {
+            // The chat's top inset is this header's height: room for a status line keeps
+            // the messages still while "Updating…" or an activity comes and goes.
+            if showsName {
+                namePillLabel(line: "Updating…").hidden()
+            }
             Button(action: onNameTap) {
-                // A long title stops short of the corner buttons; a short one keeps the chip snug.
-                BighelpHuggingWidth(maxWidth: 240) {
-                VStack(spacing: 1) {
-                    if showsName {
-                        Text(displayName)
-                            .font(.bighelp(.subheadline).weight(.semibold))
-                            .foregroundStyle(theme.primaryText)
-                            .lineLimit(1)
-                    }
-                    if let line = statusLine ?? sessionTitle {
-                        Text(line)
-                            .font(.bighelp(.caption2).weight(.medium))
-                            .foregroundStyle(theme.secondaryText)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                            .transition(.opacity)
-                            .accessibilityIdentifier(statusLine == nil ? "agent.hero.session-title" : "agent.hero.status")
-                    }
-                }
-                }
-                .padding(.horizontal, BighelpTokens.space16)
-                .padding(.vertical, 6)
-                .frame(minHeight: 34)
-                .contentShape(.capsule)
-                .bighelpNavigationGlass(in: Capsule(), isInteractive: true)
+                namePillLabel(line: statusLine ?? sessionTitle)
+                    .contentShape(.capsule)
+                    .bighelpNavigationGlass(in: Capsule(), isInteractive: true)
             }
             .buttonStyle(.plain)
             .accessibilityLabel(displayName)
             .accessibilityValue(statusLine ?? sessionTitle ?? "")
             .accessibilityHint("Switch agents or open a group chat.")
             .accessibilityIdentifier("agent.hero.name")
+            }
             .transition(.opacity)
             }
         }
@@ -269,6 +254,32 @@ struct AgentHeroHeader: View {
         .animation(.snappy, value: status)
         .animation(.snappy, value: sessionTitle)
         .animation(.snappy, value: avatarSize)
+    }
+
+    private func namePillLabel(line: String?) -> some View {
+        // A long title stops short of the corner buttons; a short one keeps the chip snug.
+        BighelpHuggingWidth(maxWidth: 240) {
+        VStack(spacing: 1) {
+            if showsName {
+                Text(displayName)
+                    .font(.bighelp(.subheadline).weight(.semibold))
+                    .foregroundStyle(theme.primaryText)
+                    .lineLimit(1)
+            }
+            if let line {
+                Text(line)
+                    .font(.bighelp(.caption2).weight(.medium))
+                    .foregroundStyle(theme.secondaryText)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .transition(.opacity)
+                    .accessibilityIdentifier(statusLine == nil ? "agent.hero.session-title" : "agent.hero.status")
+            }
+        }
+        }
+        .padding(.horizontal, BighelpTokens.space16)
+        .padding(.vertical, 6)
+        .frame(minHeight: 34)
     }
 
     private var statusLine: String? {

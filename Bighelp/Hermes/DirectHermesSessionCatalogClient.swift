@@ -282,6 +282,8 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         // is never inferred from the currently selected project.
         var projectAssociationsByCWD: [String: ProjectAssociation] = [:]
         var projectlessCWDs: Set<String> = []
+        var unreadableRows = 0
+        defer { Self.logUnreadableRows(unreadableRows) }
         for profile in loaded {
             var offset = 0
             var seen: Set<String> = []
@@ -323,7 +325,11 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
                         }
                         continue
                     }
-                    var binding = try catalogBinding(object, profile: profile)
+                    // A row the app can't read hides only itself, not every chat after it.
+                    guard var binding = try? catalogBinding(object, profile: profile) else {
+                        unreadableRows += 1
+                        continue
+                    }
                     if options.archived != .only { archivedKeys.subtract(identityKeys(binding)) }
                     binding = try coalescingSavedBinding(
                         binding,
@@ -2094,13 +2100,6 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
 
     /// Whether `/api/sessions` has another page. Hermes 0.21.x sends no `has_more` and adds
     /// pinned sessions past the limit, so the row count can't tell; `total` can.
-    static func pageHasMore(_ page: [String: BighelpJSONValue], offset: Int, rows: Int) -> Bool {
-        if let hasMore = page["has_more"]?.boolean { return hasMore }
-        let limit = page["limit"]?.integer ?? 100
-        if let total = page["total"]?.integer { return offset + limit < total }
-        return rows >= limit
-    }
-
     private func refreshedCatalogCoordinate(for binding: Binding) async throws -> DirectHermesCatalogCoordinate {
         let profile = try await requireProfile(binding.coordinate.profileID)
         var offset = 0
@@ -2152,23 +2151,6 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
     private func draftRecord(profile: Profile, storedID: String, title: String) throws -> SessionRecord {
         SessionRecord(id: try DirectHermesSessionIdentity.appID(owner: owner, profileID: profile.id, anchorID: storedID),
                       kind: .direct, agentIDs: [profile.id], title: title, remoteStoredID: storedID, createdAt: now())
-    }
-
-    private static func messageText(_ item: TimelineItem) -> String? {
-        guard case .message(let text) = item.content else { return nil }
-        return text
-    }
-
-    private static func historyRowID(_ item: TimelineItem) -> Int? {
-        guard let range = item.id.range(of: ":row:", options: .backwards),
-              let id = Int(item.id[range.upperBound...]), id > 0 else { return nil }
-        return id
-    }
-
-    private static func forkTitle(_ source: String) throws -> String {
-        let suffix = " · Fork"
-        let title = String(source.prefix(max(1, 240 - suffix.count))) + suffix
-        return try DirectHermesSessionValidation.text(title, maximum: 240, allowsEmpty: false)
     }
 
     private func beginCreation(key: String, profileID: String) throws {
@@ -2284,16 +2266,5 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         guard let sink = onCreationStateChange else { throw DirectHermesSessionError.creationPersistenceRequired }
         try sink(state)
         try requireOwner()
-    }
-
-    private func validate(_ options: DirectHermesSessionListOptions) throws {
-        guard options.sources.count <= 32, options.excludedSources.count <= 32 else {
-            throw WorkspaceClientError.invalidRequest
-        }
-        for source in options.sources + options.excludedSources {
-            try DirectHermesSessionValidation.coordinate(source, maximum: 128)
-            guard !source.contains(",") else { throw WorkspaceClientError.invalidRequest }
-        }
-        if let path = options.cwdPrefix { try DirectHermesSessionValidation.hostPath(path) }
     }
 }

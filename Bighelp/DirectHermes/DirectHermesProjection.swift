@@ -385,7 +385,7 @@ struct DirectHermesProjection {
             }(), human: old.role == .human, delivery: "Saved", order: old.metadata.sourceOrder ?? 0,
                 timestamp: row.metadata.timestamp?.timeIntervalSince1970 ?? old.metadata.timestamp?.timeIntervalSince1970,
                 turnDurationMilliseconds: row.metadata.turnDurationMilliseconds
-                    ?? old.metadata.turnDurationMilliseconds)
+                    ?? old.metadata.turnDurationMilliseconds, endsTurn: old.metadata.endsTurn)
         }
     }
 
@@ -655,7 +655,7 @@ struct DirectHermesProjection {
             }
             change.activities += finishReasoning()
             let final = p["text"]?.string ?? text
-            if !final.isEmpty { change.items = [publishText(final, eventKey: eventKey, complete: true)] }
+            if !final.isEmpty { change.items = [publishText(final, eventKey: eventKey, complete: true, endsTurn: true)] }
             // A bare message.complete also comes from child mirrors. It is a
             // segment final, not a turn final. session.info.running=false is the
             // stock prompt_turn.py finally-bookend after goal/loop evaluation.
@@ -903,7 +903,8 @@ struct DirectHermesProjection {
         return updated
     }
 
-    private mutating func publishText(_ value: String, eventKey: String, complete: Bool) -> TimelineItem {
+    private mutating func publishText(_ value: String, eventKey: String, complete: Bool,
+                                      endsTurn: Bool = false) -> TimelineItem {
         if segmentID == nil { segmentID = "\(storedID):live:\(turnID):\(segment):\(eventKey)" }
         let id = segmentID!
         lastTextLookupWorkCount = 1
@@ -919,7 +920,7 @@ struct DirectHermesProjection {
         let old = index.map { items[$0] }
         if old == nil { arrival += 1 }
         let row = item(id: id, text: value, human: false, delivery: complete ? "Received" : "Streaming",
-            order: old?.metadata.sourceOrder ?? arrival)
+            order: old?.metadata.sourceOrder ?? arrival, endsTurn: endsTurn)
         if let index { items[index] = row; segmentIndex = index }
         else { segmentIndex = items.count; items.append(row) }
         return row
@@ -1014,13 +1015,14 @@ struct DirectHermesProjection {
     }
 
     private func item(id: String, text: String, human: Bool, delivery: String, order: Int,
-        timestamp: Double? = nil, turnDurationMilliseconds: Int? = nil) -> TimelineItem {
+        timestamp: Double? = nil, turnDurationMilliseconds: Int? = nil, endsTurn: Bool = false) -> TimelineItem {
         TimelineItem(id: id, role: human ? .human : .assistant,
             sender: human ? .user(snapshot: .init(name: "You")) : .agent(id: profile, snapshot: .init(name: "Hermes")),
             content: .message(text), metadata: .init(source: "Direct Hermes", delivery: delivery,
                 timestamp: timestamp.map { Date(timeIntervalSince1970: $0) }, sourceOrder: order,
-                turnDurationMilliseconds: turnDurationMilliseconds))
+                turnDurationMilliseconds: turnDurationMilliseconds, endsTurn: endsTurn))
     }
+
 
     private func withMetadata(_ item: TimelineItem, timestamp: Date? = nil,
                               turnDurationMilliseconds: Int? = nil) -> TimelineItem {
@@ -1030,7 +1032,8 @@ struct DirectHermesProjection {
                 sourceOrder: item.metadata.sourceOrder,
                 platformMessageID: item.metadata.platformMessageID,
                 turnDurationMilliseconds: turnDurationMilliseconds ?? item.metadata.turnDurationMilliseconds,
-                contentReference: item.metadata.contentReference), attachments: item.attachments)
+                contentReference: item.metadata.contentReference, endsTurn: item.metadata.endsTurn),
+            attachments: item.attachments)
     }
 
     private static func durationMilliseconds(_ value: BighelpJSONValue?) -> Int? {

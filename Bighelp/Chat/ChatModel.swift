@@ -682,7 +682,8 @@ final class ChatModel {
                 sourceOrder: existing.metadata.sourceOrder,
                 platformMessageID: existing.metadata.platformMessageID,
                 turnDurationMilliseconds: item.metadata.turnDurationMilliseconds ?? existing.metadata.turnDurationMilliseconds,
-                contentReference: existing.metadata.contentReference), attachments: existing.attachments)
+                contentReference: existing.metadata.contentReference,
+                endsTurn: existing.metadata.endsTurn || item.metadata.endsTurn), attachments: existing.attachments)
         updateProjectedMessage(items[index])
         persistSession()
     }

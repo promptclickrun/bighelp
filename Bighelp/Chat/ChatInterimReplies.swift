@@ -6,7 +6,9 @@ import SwiftUI
 /// Every message stays in place and fully readable; only its look changes.
 /// A message is interim when the agent kept working after it (tools or
 /// thinking), including work the chat hides. In a finished turn the last
-/// message is always the answer.
+/// message is always the answer, and a message Hermes sent as its turn's
+/// answer (`endsTurn`) stays one: Hermes can still save a memory or review
+/// the turn after it, or run a turn of its own with no message from the person.
 @MainActor
 enum ChatInterimReplies {
     /// `activityEvents` is all of the chat's work, shown or hidden: with tool
@@ -60,7 +62,7 @@ enum ChatInterimReplies {
             } ?? false
             let workFollows = shownWorkFollows || hiddenWorkFollows
             let interim = workFollows && (inFlight || index < lastReply)
-            guard interim, case .message(let item) = entries[index] else { continue }
+            guard interim, case .message(let item) = entries[index], !item.metadata.endsTurn else { continue }
             entries[index] = .message(item.markedInterim())
         }
     }

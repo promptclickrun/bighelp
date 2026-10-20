@@ -56,6 +56,22 @@ extension DirectHermesConversationClient {
         return true
     }
 
+    /// Hermes sends an agent's reaction (`message.reaction`) to the chat's saved
+    /// session, not to this runtime, so the runtime route dropped it and the
+    /// reaction showed only when the person's own reaction read the list back.
+    /// Its `seq` counts the saved session's events, so it never enters the
+    /// runtime's sequence.
+    @discardableResult
+    func receiveSavedSessionReaction(_ event: DirectHermesEvent) -> Bool {
+        guard connected, event.type == "message.reaction", let sessionID = event.sessionID,
+              !storedID.isEmpty, Data(sessionID.utf8) == Data(storedID.utf8),
+              Data(sessionID.utf8) != Data(runtimeID.utf8),
+              let reaction = try? DirectHermesMessageReaction(event: event) else { return false }
+        retainNativeMessageReaction(reaction)
+        model?.reconcileNativeMessageReaction(reaction, from: self)
+        return true
+    }
+
     func resetNativeMessageReactionsForEpochChange() {
         retainedMessageReactions.removeAll()
         model?.resetNativeMessageReactions(from: self)

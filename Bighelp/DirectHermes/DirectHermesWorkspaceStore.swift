@@ -798,7 +798,8 @@ final class DirectHermesWorkspaceStore {
             self.securePromptStore.acceptLegacyEvent(event, connection: promptConnection)
             self.connectorCardStore.accept(event, connection: promptConnection)
             if self.isOpening { self.earlyEvents.append(event) }
-            for chat in self.chats.values where event.type == "session.reclaimed" || chat.client.runtimeID == event.sessionID {
+            for chat in self.chats.values where event.type == "session.reclaimed" || chat.client.runtimeID == event.sessionID
+                || (event.type == "message.reaction" && chat.client.storedID == event.sessionID) {
                 // Reclaim is a global envelope; the client validates both exact
                 // runtime and durable payload identities before revoking itself.
                 chat.client.receive(event)

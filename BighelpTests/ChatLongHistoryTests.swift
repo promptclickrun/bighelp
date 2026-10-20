@@ -9,6 +9,36 @@ import UIKit
 /// without changing what they find.
 @Suite(.serialized) @MainActor
 struct ChatLongHistoryTests {
+    /// The row estimate counts lines in one pass over the text; it must come to what
+    /// splitting the text into lines of Characters came to.
+    @Test func wrappedLineCountMatchesCharacterLines() {
+        let texts = [
+            "", "one line", "two\nlines", "trailing\n", "\n\nleading", "a\n\n\nb",
+            String(repeating: "Settled history. ", count: 400),
+            "```python\n" + (0..<300).map { "    total += row[\($0)]  # week \($0)" }.joined(separator: "\n") + "\n```",
+            "café ok\n" + String(repeating: "ü", count: 95),
+        ]
+        for columns: CGFloat in [10, 37.5, 80] {
+            for text in texts {
+                let split: CGFloat = text.split(separator: "\n", omittingEmptySubsequences: false)
+                    .reduce(0) { $0 + max(1, ceil(CGFloat($1.count) / columns)) }
+                let counted: CGFloat = ChatCanvasTranscriptProjection.wrappedLineCount(text, columns: columns)
+                #expect(counted == split, "\(text.prefix(20)) at \(columns)")
+            }
+        }
+    }
+
+    /// Plain text is worked out when read, and documents compare by their blocks as before.
+    @Test func markdownPlainTextIsTheSameWhenRead() {
+        let source = "### Week 4\n\n- **6 invoices** from `w4.csv`\n- [ ] Ask about PO-41\n\n"
+            + "| Vendor | Amount |\n|---|---:|\n| *Parcel Bay* | $12.00 |\n\n```swift\nlet a = 1\n```\n\n> Nothing is late."
+        let document = MarkdownDocument(source)
+        #expect(document.visiblePlainText
+            == "Week 4\n\n6 invoices from w4.csv\nAsk about PO-41\n\nVendor\tAmount\nParcel Bay\t$12.00\n\nlet a = 1\n\nNothing is late.")
+        #expect(document == MarkdownDocument(source))
+        #expect(document != MarkdownDocument(source + "!"))
+    }
+
     @Test func markerSearchFindsEverythingContainsFinds() {
         let markers = ["```loopdy-card", "```loopdy-references-", "hermes"]
         let texts = [

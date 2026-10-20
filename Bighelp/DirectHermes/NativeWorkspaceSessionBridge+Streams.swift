@@ -58,6 +58,15 @@ extension NativeWorkspaceSessionBridge {
             }
         }
         guard let runtimeID = event.sessionID else { return }
+        // An agent's reaction comes addressed to the chat's saved session.
+        if event.type == "message.reaction" {
+            var delivered = false
+            for id in Array(streams.keys) {
+                guard let stream = streams[id], stream.owner == owner else { continue }
+                if stream.client.receiveSavedSessionReaction(event) { delivered = true }
+            }
+            if delivered { return }
+        }
         for id in Array(streams.keys) {
             guard var stream = streams[id], stream.owner == owner,
                   DirectHermesSessionValidation.same(stream.client.runtimeID, runtimeID) else { continue }

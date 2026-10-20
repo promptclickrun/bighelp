@@ -136,6 +136,10 @@ struct TimelineMetadata: Codable, Equatable, Sendable {
     /// Display only, never saved: an agent message written on the way to the
     /// answer (more work followed in the same turn). See ChatInterimReplies.
     var isInterimReply = false
+    /// Live only, never saved: Hermes sent this message as its turn's answer
+    /// (`message.complete`), so it never becomes an interim note, whatever
+    /// lands after it. Saved history ends each turn with its answer anyway.
+    var endsTurn = false
 
     private enum CodingKeys: String, CodingKey {
         case source, freshness, delivery, timestamp, turnDurationMilliseconds, sourceOrder,
@@ -150,8 +154,10 @@ struct TimelineMetadata: Codable, Equatable, Sendable {
         sourceOrder: Int? = nil,
         platformMessageID: String? = nil,
         turnDurationMilliseconds: Int? = nil,
-        contentReference: CanonicalContentReference? = nil
+        contentReference: CanonicalContentReference? = nil,
+        endsTurn: Bool = false
     ) {
+        self.endsTurn = endsTurn
         self.contentReference = contentReference
         self.turnDurationMilliseconds = turnDurationMilliseconds
         self.platformMessageID = platformMessageID
@@ -368,6 +374,13 @@ struct TimelineItem: Identifiable, Codable, Equatable, Sendable {
     func markedInterim() -> TimelineItem {
         var item = self
         item.metadata.isInterimReply = true
+        return item
+    }
+
+    /// The same message as the answer Hermes ended its turn with (live only).
+    func endingTurn() -> TimelineItem {
+        var item = self
+        item.metadata.endsTurn = true
         return item
     }
 

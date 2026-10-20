@@ -53,6 +53,24 @@ struct ChatInterimRepliesTests {
         #expect(interimIDs(ChatInterimReplies.marking([human("q"), reply("a"), reply("b")], isSending: true, isBotMode: false)).isEmpty)
     }
 
+    /// Hermes' own answer (`message.complete`) stays the answer when work lands after it, while the
+    /// turn finishes or in a turn Hermes runs with no message from the person. Notes keep their look.
+    @Test func theAnswerHermesEndedATurnWithIsNeverANote() {
+        func answer(_ id: String) -> ChatTranscriptEntry {
+            guard case .message(let item) = reply(id) else { return reply(id) }
+            return .message(item.endingTurn())
+        }
+        let finishing = [human("q"), reply("note"), work("w1"), answer("answer"), work("memory")]
+        #expect(interimIDs(ChatInterimReplies.marking(finishing, isSending: true, isBotMode: false)) == ["note"])
+        let ownTurn = [human("q"), answer("answer"), work("w2"), answer("follow-up")]
+        #expect(interimIDs(ChatInterimReplies.marking(ownTurn, isSending: false, isBotMode: false)).isEmpty)
+        let rows = ChatInterimReplies.groupingForSimpleBots(
+            ChatCompletedTurnProjection.rows(from: ChatInterimReplies.marking(ownTurn, isSending: false, isBotMode: false),
+                                             isSending: false, enabled: false, interimReplies: .inline),
+            agentName: "Avery", showsReasoning: false)
+        #expect(rows.map(\.id) == ["message:q", "message:answer", "activity:w2", "message:follow-up"])
+    }
+
     @Test func roomRepliesAreEachAgentsAnswer() {
         let entries = [human("q"), reply("a"), work("w"), reply("b")]
         #expect(interimIDs(ChatInterimReplies.marking(entries, isSending: false, isBotMode: true)).isEmpty)

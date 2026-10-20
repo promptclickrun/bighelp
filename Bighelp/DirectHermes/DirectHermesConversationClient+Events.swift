@@ -16,8 +16,11 @@ extension DirectHermesConversationClient {
             receiveReclaim(event)
             return
         }
-        guard connected, let eventSessionID = event.sessionID,
-              Data(eventSessionID.utf8) == Data(runtimeID.utf8) else { return }
+        guard connected, let eventSessionID = event.sessionID else { return }
+        guard Data(eventSessionID.utf8) == Data(runtimeID.utf8) else {
+            receiveSavedSessionReaction(event)
+            return
+        }
         if isHydrating {
             guard heldEvents.count < 16_384 else {
                 heldEventsOverflowed = true
@@ -143,6 +146,7 @@ extension DirectHermesConversationClient {
             if let model { model.acceptExternal([item], isLiveAssistantText: change.sideTaskResult == nil) }
             else if let draftSink, pendingTurnID == projection.turnID, !terminalSeen { draftSink(item) }
         }
+        if let settled = change.settledAnswer { model?.updateNativeMetadata(settled, from: self) }
         for activity in change.activities { _ = model?.acceptActivity(activity) }
         if let todoSnapshot = change.todoSnapshot { publishTodoSnapshot(todoSnapshot) }
         if let control = change.controlSnapshot {

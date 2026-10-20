@@ -67,7 +67,13 @@ enum MarkdownTaskItem {
 
 struct MarkdownDocument: Equatable, Sendable {
     let blocks: [MarkdownBlock]
-    let visiblePlainText: String
+
+    /// Worked out when asked (copying, VoiceOver, previews), never while drawing: it runs
+    /// Foundation's Markdown parser over every paragraph, and making it with each document
+    /// was most of the work of laying out a long message, again on each streamed word.
+    var visiblePlainText: String {
+        blocks.map(Self.plainText).joined(separator: "\n\n")
+    }
 
     init(_ source: String) {
         self.init(blocks: Self.parse(source))
@@ -75,7 +81,6 @@ struct MarkdownDocument: Equatable, Sendable {
 
     init(blocks: [MarkdownBlock]) {
         self.blocks = blocks
-        visiblePlainText = blocks.map(Self.plainText).joined(separator: "\n\n")
     }
 
     private static func parse(_ source: String) -> [MarkdownBlock] {

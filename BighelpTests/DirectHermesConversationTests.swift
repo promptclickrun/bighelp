@@ -1084,6 +1084,37 @@ struct DirectHermesConversationTests {
         turn.cancel()
     }
 
+    /// Hermes addresses an agent's `message.reaction` to the chat's saved
+    /// session ID, not the runtime's (Hermes 0.22, #80678). The app dropped it,
+    /// so the reaction showed only after the person reacted to that message.
+    @Test func agentReactionAddressedToTheSavedChatShowsLive() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let client = try DirectHermesConversationClient(rpc: DirectTestRPC(), hostIdentity: "host", profile: "default",
+            runtimeID: "runtime", storedID: "stored", title: "Native", epoch: "epoch", drafts: .init(root: root))
+        defer { client.suspend() }
+        let message = TimelineItem(id: "\(client.conversationID):row:8931", role: .human,
+                                   sender: .user(snapshot: .init(name: "You")), content: .message("It shipped!"),
+                                   metadata: .init(source: "Hermes", delivery: "Saved", sourceOrder: 1))
+        let model = ChatModel(conversationID: client.conversationID, client: client, initialItems: [message])
+        client.model = model
+        func reaction(to session: String, emoji: String) -> DirectHermesEvent {
+            .init(type: "message.reaction", sessionID: session, payload: [
+                "row_id": .integer(8_931), "role": .string("user"),
+                "reactions": .array([.object(["emoji": .string(emoji), "author": .string("agent"),
+                                              "at": .number(1_792_000_000)])]),
+            ], sequence: 412)
+        }
+        func shown() -> [String] { model.nativeMessageReactionPresentation(for: message).reactions.map(\.emoji) }
+
+        client.receive(reaction(to: "another-chat", emoji: "😂"))
+        #expect(shown().isEmpty)
+        client.receive(reaction(to: "stored", emoji: "❤️"))
+        #expect(shown() == ["❤️"])
+        // The saved session's event count is not this runtime's.
+        #expect(client.projection.lastSequence == 0)
+    }
+
     /// A turn Hermes runs on its own (a background process finished, another agent wrote in) streams
     /// only its answer: the message that started it never reaches this socket, and an agent's answer
     /// can be written by another Hermes process entirely. Once it ends, the chat reads what Hermes saved.
@@ -2114,6 +2145,137 @@ struct DirectHermesConversationTests {
         }
         #expect(answer.content == .message("The lights are off."))
         #expect(!answer.metadata.isInterimReply)
+    }
+
+    /// One chat fed Hermes' events in their real order, read the way the chat shows it: normal,
+    /// and Simple Bot mode with Show reasoning off and on.
+    @MainActor
+    private final class LandedAnswerReplay {
+        let model: ChatModel
+        let client: DirectHermesConversationClient
+        private let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        private var sequence = 0
+        private let caches = [ChatTranscriptCanvasCache(), ChatTranscriptCanvasCache(), ChatTranscriptCanvasCache()]
+
+        init() throws {
+            client = try DirectHermesConversationClient(
+                rpc: DirectTestRPC(), hostIdentity: "host", profile: "default", runtimeID: "runtime",
+                storedID: "stored", title: "Native", epoch: "epoch", drafts: DirectHermesDraftStore(root: root))
+            model = ChatModel(conversationID: client.conversationID, client: client, initialItems: [],
+                              initialActivityVisibility: .init(showReasoning: true, showToolCalls: true))
+            client.model = model
+        }
+
+        deinit { try? FileManager.default.removeItem(at: root) }
+
+        func receive(_ type: String, _ payload: [String: BighelpJSONValue] = [:]) {
+            sequence += 1
+            client.receive(.init(type: type, sessionID: "runtime", payload: payload, sequence: sequence))
+        }
+
+        /// The agent messages each way of showing the chat puts on screen, with their look.
+        func shown() -> [(mode: String, texts: [String], interim: [String])] {
+            let modes: [(String, ChatTranscriptCanvasCache.SimpleBotsReasoning?)] = [
+                ("normal", nil),
+                ("simple bot, reasoning off", .init(agentName: "Avery", showsReasoning: false)),
+                ("simple bot, reasoning on", .init(agentName: "Avery", showsReasoning: true)),
+            ]
+            return zip(modes, caches).map { mode, cache in
+                let context = ChatTranscriptCanvasCache.DisplayContext(
+                    ledgerRevision: model.activityLedgerRevision, isSending: model.isSending, isBotMode: false,
+                    foldsCompletedTurns: true,
+                    interimReplies: mode.1 == nil ? .following(model.activityVisibility) : .inline,
+                    simpleBotsReasoning: mode.1)
+                let rows = cache.buildCanvas(from: model.transcriptEntries,
+                                             activityEvents: { self.model.activityLedger.allEvents },
+                                             context: context, disclosures: model.activityDisclosures,
+                                             readsAgentMessages: true).rows
+                let messages = rows.compactMap { row -> TimelineItem? in
+                    guard case .transcript(.entry(.message(let item))) = row, item.role == .assistant else { return nil }
+                    return item
+                }
+                return (mode.0, messages.compactMap(Self.text), messages.filter(\.metadata.isInterimReply).compactMap(Self.text))
+            }
+        }
+
+        static func text(_ item: TimelineItem) -> String? {
+            guard case .message(let text) = item.content else { return nil }
+            return text
+        }
+
+        /// The answer is on screen once, in every mode, and reads as the answer.
+        func expectAnswerShown(_ answer: String, after step: String, sourceLocation: SourceLocation = #_sourceLocation) {
+            for view in shown() {
+                #expect(view.texts.filter { $0 == answer }.count == 1,
+                        "\(view.mode), after \(step): \(view.texts)", sourceLocation: sourceLocation)
+                #expect(!view.interim.contains(answer),
+                        "\(view.mode), after \(step): the answer turned into a note", sourceLocation: sourceLocation)
+            }
+        }
+    }
+
+    /// Hermes keeps working after it sends the answer: the final's own reasoning (a provider that
+    /// gives it only with the final), then its background review, before the turn's closing
+    /// session.info. Once the answer has landed it stays the answer, in every mode.
+    @Test func anAnswerStaysTheAnswerWhileHermesFinishesTheTurn() throws {
+        let replay = try LandedAnswerReplay()
+        let answer = "17 times 23 is 391. I saved 391 as your test lucky number."
+        // The order a real host sent (gpt-6-luna on openai-codex, a turn that saved a memory).
+        replay.receive("message.start")
+        replay.receive("message.interim", ["text": .string("17 times 23 is 391."), "already_streamed": .boolean(false)])
+        replay.receive("tool.start", ["tool_id": .string("call_memory"), "name": .string("memory")])
+        replay.receive("tool.complete", ["tool_id": .string("call_memory"), "name": .string("memory")])
+        replay.receive("message.delta", ["text": .string("\n\n17 times 23 is 391.")])
+        replay.receive("message.delta", ["text": .string(" I saved 391 as your test lucky number.")])
+        replay.receive("message.complete", ["text": .string(answer), "status": .string("complete"),
+                                            "reasoning": .string("Saved the number to memory.")])
+        replay.expectAnswerShown(answer, after: "message.complete")
+        replay.receive("review.summary", ["text": .string("💾 Memory updated")])
+        replay.expectAnswerShown(answer, after: "the background review")
+        replay.receive("session.info", ["running": .boolean(false)])
+        #expect(!replay.model.isSending)
+        replay.expectAnswerShown(answer, after: "the turn ended")
+    }
+
+    /// Hermes reuses the answer it already sent when the model ends with an empty reply after a
+    /// housekeeping tool (memory, todo), and says so (`response_reused`, `response_previewed`).
+    /// The chat settles the copy it shows: one answer, never a second copy that turns the first
+    /// into a note.
+    @Test func aReusedAnswerSettlesTheCopyAlreadyShown() throws {
+        let replay = try LandedAnswerReplay()
+        let answer = "Paris is the capital of France."
+        replay.receive("message.start")
+        replay.receive("message.delta", ["text": .string(answer)])
+        replay.receive("message.interim", ["text": .string(answer), "already_streamed": .boolean(true)])
+        replay.receive("tool.start", ["tool_id": .string("call_memory"), "name": .string("memory")])
+        replay.receive("tool.complete", ["tool_id": .string("call_memory"), "name": .string("memory")])
+        replay.receive("message.complete", ["text": .string(answer), "status": .string("complete"),
+                                            "response_previewed": .boolean(true), "response_reused": .boolean(true)])
+        replay.expectAnswerShown(answer, after: "message.complete")
+        replay.receive("session.info", ["running": .boolean(false)])
+        replay.expectAnswerShown(answer, after: "the turn ended")
+        #expect(replay.model.items.filter { LandedAnswerReplay.text($0) == answer }.count == 1)
+    }
+
+    /// Hermes can run a turn of its own right after the person's (a goal's next step, a finished
+    /// background process): it starts with message.start and no message from the person. The
+    /// person's answer stays an answer, and doesn't move into the bot's reasoning.
+    @Test func aTurnHermesRunsOnItsOwnLeavesTheEarlierAnswerAlone() throws {
+        let replay = try LandedAnswerReplay()
+        let answer = "The lights are off."
+        replay.receive("message.start")
+        replay.receive("message.delta", ["text": .string(answer)])
+        replay.receive("message.complete", ["text": .string(answer), "status": .string("complete")])
+        replay.receive("session.info", ["running": .boolean(false)])
+        replay.expectAnswerShown(answer, after: "the person's turn")
+        replay.receive("message.start")
+        replay.receive("tool.start", ["tool_id": .string("t2"), "name": .string("process")])
+        replay.receive("tool.complete", ["tool_id": .string("t2"), "name": .string("process")])
+        replay.receive("message.delta", ["text": .string("The backup finished.")])
+        replay.receive("message.complete", ["text": .string("The backup finished."), "status": .string("complete")])
+        replay.receive("session.info", ["running": .boolean(false)])
+        replay.expectAnswerShown(answer, after: "Hermes' own turn")
+        replay.expectAnswerShown("The backup finished.", after: "Hermes' own turn")
     }
 
     @Test(arguments: [false, true])

@@ -239,6 +239,8 @@ struct DirectHermesProjection {
     private var reasoningSegment = 0
     private var reasoningSealed = false
     private var segmentID: String?
+    /// This turn's last message sealed by `message.interim`: a final Hermes reuses is that message.
+    private var sealedSegmentID: String?
     private var segmentIndex: Int?
     private var activityIndex: Int?
     private(set) var lastTextLookupWorkCount = 0
@@ -385,7 +387,7 @@ struct DirectHermesProjection {
             }(), human: old.role == .human, delivery: "Saved", order: old.metadata.sourceOrder ?? 0,
                 timestamp: row.metadata.timestamp?.timeIntervalSince1970 ?? old.metadata.timestamp?.timeIntervalSince1970,
                 turnDurationMilliseconds: row.metadata.turnDurationMilliseconds
-                    ?? old.metadata.turnDurationMilliseconds)
+                    ?? old.metadata.turnDurationMilliseconds, endsTurn: old.metadata.endsTurn)
         }
     }
 
@@ -497,6 +499,8 @@ struct DirectHermesProjection {
 
     struct Change {
         var items: [TimelineItem] = []
+        /// A message already shown that Hermes made its turn's answer (a reused final).
+        var settledAnswer: TimelineItem?
         var activities: [ChatActivityEvent] = []
         var todoSnapshot: SessionTodoSnapshot?
         var nativeSubagent: NativeSubagentRailItem?
@@ -620,6 +624,7 @@ struct DirectHermesProjection {
             reasoningSealed = false
             segment = 0
             segmentID = nil
+            sealedSegmentID = nil
         case "message.delta":
             if p["text"]?.string?.isEmpty == false { change.activities += finishReasoning() }
             running = true
@@ -628,7 +633,10 @@ struct DirectHermesProjection {
         case "message.interim":
             change.activities += finishReasoning()
             let interim = p["text"]?.string ?? ""
-            if !interim.isEmpty { change.items = [publishText(interim, eventKey: eventKey, complete: true)] }
+            if !interim.isEmpty {
+                change.items = [publishText(interim, eventKey: eventKey, complete: true)]
+                sealedSegmentID = segmentID
+            }
             text = ""
             reasoning = ""
             segment += 1
@@ -646,6 +654,7 @@ struct DirectHermesProjection {
                 reasoningSealed = false
                 segment = 0
                 segmentID = nil
+                sealedSegmentID = nil
                 change.terminal = true
                 change.failedBeforeStart = true
             }
@@ -655,7 +664,15 @@ struct DirectHermesProjection {
             }
             change.activities += finishReasoning()
             let final = p["text"]?.string ?? text
-            if !final.isEmpty { change.items = [publishText(final, eventKey: eventKey, complete: true)] }
+            // The turn's answer. When the model ended with an empty reply after a housekeeping
+            // tool, Hermes reuses the message it already sent and says so: settle that one
+            // rather than paint a second copy, which would turn the first into a note.
+            let reused = p["response_reused"]?.boolean == true || p["response_previewed"]?.boolean == true
+            if !final.isEmpty, reused, segmentID == nil, let settled = settleSealedAnswer(final) {
+                change.settledAnswer = settled
+            } else if !final.isEmpty {
+                change.items = [publishText(final, eventKey: eventKey, complete: true, endsTurn: true)]
+            }
             // A bare message.complete also comes from child mirrors. It is a
             // segment final, not a turn final. session.info.running=false is the
             // stock prompt_turn.py finally-bookend after goal/loop evaluation.
@@ -903,7 +920,8 @@ struct DirectHermesProjection {
         return updated
     }
 
-    private mutating func publishText(_ value: String, eventKey: String, complete: Bool) -> TimelineItem {
+    private mutating func publishText(_ value: String, eventKey: String, complete: Bool,
+                                      endsTurn: Bool = false) -> TimelineItem {
         if segmentID == nil { segmentID = "\(storedID):live:\(turnID):\(segment):\(eventKey)" }
         let id = segmentID!
         lastTextLookupWorkCount = 1
@@ -919,7 +937,7 @@ struct DirectHermesProjection {
         let old = index.map { items[$0] }
         if old == nil { arrival += 1 }
         let row = item(id: id, text: value, human: false, delivery: complete ? "Received" : "Streaming",
-            order: old?.metadata.sourceOrder ?? arrival)
+            order: old?.metadata.sourceOrder ?? arrival, endsTurn: endsTurn)
         if let index { items[index] = row; segmentIndex = index }
         else { segmentIndex = items.count; items.append(row) }
         return row
@@ -1014,12 +1032,26 @@ struct DirectHermesProjection {
     }
 
     private func item(id: String, text: String, human: Bool, delivery: String, order: Int,
-        timestamp: Double? = nil, turnDurationMilliseconds: Int? = nil) -> TimelineItem {
+        timestamp: Double? = nil, turnDurationMilliseconds: Int? = nil, endsTurn: Bool = false) -> TimelineItem {
         TimelineItem(id: id, role: human ? .human : .assistant,
             sender: human ? .user(snapshot: .init(name: "You")) : .agent(id: profile, snapshot: .init(name: "Hermes")),
             content: .message(text), metadata: .init(source: "Direct Hermes", delivery: delivery,
                 timestamp: timestamp.map { Date(timeIntervalSince1970: $0) }, sourceOrder: order,
-                turnDurationMilliseconds: turnDurationMilliseconds))
+                turnDurationMilliseconds: turnDurationMilliseconds, endsTurn: endsTurn))
+    }
+
+    /// The message this turn sealed with `message.interim`, made the turn's answer, when it says
+    /// exactly what Hermes' reused final says. It becomes the segment the turn's timing goes to.
+    private mutating func settleSealedAnswer(_ final: String) -> TimelineItem? {
+        guard let id = sealedSegmentID, let index = items.firstIndex(where: { $0.id == id }),
+              items[index].role == .assistant, case .message(let shown) = items[index].content,
+              shown.trimmingCharacters(in: .whitespacesAndNewlines)
+                == final.trimmingCharacters(in: .whitespacesAndNewlines) else { return nil }
+        let settled = items[index].endingTurn()
+        items[index] = settled
+        segmentID = id
+        segmentIndex = index
+        return settled
     }
 
     private func withMetadata(_ item: TimelineItem, timestamp: Date? = nil,
@@ -1030,7 +1062,8 @@ struct DirectHermesProjection {
                 sourceOrder: item.metadata.sourceOrder,
                 platformMessageID: item.metadata.platformMessageID,
                 turnDurationMilliseconds: turnDurationMilliseconds ?? item.metadata.turnDurationMilliseconds,
-                contentReference: item.metadata.contentReference), attachments: item.attachments)
+                contentReference: item.metadata.contentReference, endsTurn: item.metadata.endsTurn),
+            attachments: item.attachments)
     }
 
     private static func durationMilliseconds(_ value: BighelpJSONValue?) -> Int? {

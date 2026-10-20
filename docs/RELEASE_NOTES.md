@@ -3,6 +3,28 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.5
+
+### Simplified Chinese
+
+- The app has a first set of Simplified Chinese text. It covers setup, main navigation, core chat controls and
+  the top level of Settings.
+- Other screens can still show English. The Chinese text is a draft for community review.
+- The app uses the language selected in the device settings. Your messages, names and saved settings do not change.
+- Contributors can add translations through the new String Catalog. See `docs/LOCALIZATION.md` for the steps.
+
+### Fixes
+
+- **Chat list:** a list with thousands of chats refreshes with less work on the main thread. The app saves changes
+  in the background and skips a save when the list has not changed.
+- **Removed chats:** a refresh no longer brings a removed chat back from an older saved copy. Drafts and chat
+  history stay intact.
+- **Long answers:** the app does less work to find the width of a long message. The full text remains available to
+  read, select and copy.
+- **Avatars:** the built-in catalog includes the approved Pocket Curios set for first launch and offline use.
+
+This build does not need a new plugin update.
+
 ## 2.6.4
 
 This release fixes agent reactions, answers that went away, and the loader in Simple Bot mode. It also makes heavy

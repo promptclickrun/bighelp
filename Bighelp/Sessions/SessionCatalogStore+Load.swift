@@ -70,12 +70,16 @@ extension SessionCatalogStore {
                 repositoryAllowsWrites = true
                 hasLoadedCatalogState = true
                 hasUsableLocalState = true
-                migratePinnedRecordsIfNeeded(cachedRecords)
-                let preferredCachedRecords = applyingPinPreferences(to: cachedRecords)
-                changed = adopt(hasUnsavedChanges || cachedRecords.contains(where: { !$0.isContentLoaded })
-                    ? SessionCatalogReconciliation.merged(local: records, incoming: preferredCachedRecords)
-                    : SessionCatalogReconciliation.retained(preferredCachedRecords))
-                changed = applyKnownSubagentParents() || changed
+                // A deferred checkpoint can include authoritative removals. The older saved
+                // copy must not bring those rows back while the current catalog awaits saving.
+                if !hasUnsavedChanges {
+                    migratePinnedRecordsIfNeeded(cachedRecords)
+                    let preferredCachedRecords = applyingPinPreferences(to: cachedRecords)
+                    changed = adopt(cachedRecords.contains(where: { !$0.isContentLoaded })
+                        ? SessionCatalogReconciliation.merged(local: records, incoming: preferredCachedRecords)
+                        : SessionCatalogReconciliation.retained(preferredCachedRecords))
+                    changed = applyKnownSubagentParents() || changed
+                }
             } catch {
                 repositoryAllowsWrites = false
                 hasUsableLocalState = hasLoadedCatalogState || !records.isEmpty

@@ -1020,6 +1020,7 @@
 		9EF3242F11C72B1B8BC6A585 /* runs-get-text-runner.json in Resources */ = {isa = PBXBuildFile; fileRef = 2A6627D24E25B0628052F268 /* runs-get-text-runner.json */; };
 		9F0B22DB4E3F1ACA4D8C9F21 /* BighelpShortcutConnectionWaitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F344194DC2E343482742E57 /* BighelpShortcutConnectionWaitTests.swift */; };
 		9F26221BAB2D3EAFD5804CE2 /* BighelpLandingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F0E6A28B2BDF60EFA57809 /* BighelpLandingTests.swift */; };
+		9F87DCFCDB10B5C309B78A16 /* SessionCatalogCacheAuthorityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58AB3FB19EEBEC30769CFB84 /* SessionCatalogCacheAuthorityTests.swift */; };
 		9F8C7698EC8F18414DA2B525 /* DeviceAppearanceToolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EEB8BFBFA2836E26C774C0C /* DeviceAppearanceToolTests.swift */; };
 		9F908C3330098ED5E0F42F33 /* AgentRuntimeDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = 732B24883CC1D3F35E2F66BF /* AgentRuntimeDefaults.swift */; };
 		9FB7CEB004BD3C5164C5915B /* DirectHermesProjection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7595C27FD5A0E590DBF1FF6C /* DirectHermesProjection.swift */; };
@@ -2327,6 +2328,7 @@
 		5839EBC64D344E43871E5958 /* ChatAttributionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatAttributionTests.swift; sourceTree = "<group>"; };
 		58625F7B2E999825B55E3351 /* ProviderUsageUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderUsageUITests.swift; sourceTree = "<group>"; };
 		5877EBCE70707C4A168CE6E9 /* ChatEdgeBlurUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatEdgeBlurUITests.swift; sourceTree = "<group>"; };
+		58AB3FB19EEBEC30769CFB84 /* SessionCatalogCacheAuthorityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionCatalogCacheAuthorityTests.swift; sourceTree = "<group>"; };
 		58CC03D60404D1A5A53E65FE /* DirectHermesKanbanTransportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectHermesKanbanTransportTests.swift; sourceTree = "<group>"; };
 		58DFB0DDBF1AAC78CB27C0B4 /* KanbanSpatialDrag.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanbanSpatialDrag.swift; sourceTree = "<group>"; };
 		58E8AFFA03F01F636DD2D3EA /* HermesLogCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesLogCodec.swift; sourceTree = "<group>"; };
@@ -4687,6 +4689,7 @@
 				4CA565F0CEECC8289EB2F045 /* ScratchpadFormattingTests.swift */,
 				BA05741EB064F6B409A50395 /* ScriptedHermes.swift */,
 				FE9007091EA5BB283EA53C1D /* SessionAppearanceTests.swift */,
+				58AB3FB19EEBEC30769CFB84 /* SessionCatalogCacheAuthorityTests.swift */,
 				F972D8331BE114EEEEE074F0 /* SessionCatalogLargeWorkspaceTests.swift */,
 				AACDD67B5DC504EDCABB804B /* SessionCatalogStoreTests.swift */,
 				12DB23F855205AE60F84F5AD /* SessionContentRepositoryTests.swift */,
@@ -6131,15 +6134,15 @@
 			projectRoot = "";
 			targets = (
 				7CE09B77A448A8E7D15C0A23 /* Bighelp */,
-				C114D08ED479D2C418AD1539 /* BighelpWatch */,
-				7C1FA35F1F84117EC6A80A31 /* BighelpNotificationService */,
 				A66FE6642245F7E09F86421A /* BighelpLiveActivity */,
-				D17D965678E81BFD18979A98 /* BighelpMacUpdater */,
 				2136C8E00479F350BF823226 /* BighelpMac */,
 				21DF24D438EDB555CB66254C /* BighelpMacTests */,
+				D17D965678E81BFD18979A98 /* BighelpMacUpdater */,
+				7C1FA35F1F84117EC6A80A31 /* BighelpNotificationService */,
 				6030931B97EA021016557A7B /* BighelpTests */,
 				A3EAA77788E8D84CF0437C12 /* BighelpUITests */,
 				D6857BF3EF7434B1CC635174 /* BighelpVisionUITests */,
+				C114D08ED479D2C418AD1539 /* BighelpWatch */,
 				31936358D8184A143F70128E /* BighelpWatchUITests */,
 			);
 		};
@@ -7697,6 +7700,7 @@
 				F169CBC388CACBBE3FE7EF56 /* ScratchpadFormattingTests.swift in Sources */,
 				5315631D46643BB5C77A7ED1 /* ScriptedHermes.swift in Sources */,
 				E78C21C9358E6AFAE38B8168 /* SessionAppearanceTests.swift in Sources */,
+				9F87DCFCDB10B5C309B78A16 /* SessionCatalogCacheAuthorityTests.swift in Sources */,
 				0286FBC6D97E10D963F43C78 /* SessionCatalogLargeWorkspaceTests.swift in Sources */,
 				937480A7273A81C4A9269DC5 /* SessionCatalogStoreTests.swift in Sources */,
 				14A6207C227938283D537F3F /* SessionContentRepositoryTests.swift in Sources */,

@@ -562,13 +562,23 @@ struct BighelpAppComposition {
         } else {
             subagentStreamAcceptanceFixture = nil
         }
+        #if DEBUG
+        // Listens for XCTest's readings from launch (`ChatLoadSpeedUITests`).
+        _ = ChatPerformanceRecorder.shared
+        let startsLongChat = arguments.contains(LongChatPerformanceFixture.startArgument)
+        #else
+        let startsLongChat = false
+        #endif
         if usesFixtures,
            subagentStreamAcceptanceFixture == nil,
            arguments.contains("-start-chat")
                || arguments.contains("-start-chat-mid-session")
-               || arguments.contains("-start-long-transcript") {
+               || arguments.contains("-start-long-transcript")
+               || startsLongChat {
             let conversationID: String
-            if arguments.contains("-start-long-transcript") {
+            if startsLongChat {
+                conversationID = "demo-long-chat-1"
+            } else if arguments.contains("-start-long-transcript") {
                 conversationID = "demo-long-transcript"
             } else if arguments.contains("-start-chat-mid-session") {
                 conversationID = "demo-finance-mid-session"

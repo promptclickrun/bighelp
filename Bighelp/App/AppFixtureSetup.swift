@@ -14,6 +14,9 @@ enum AppFixtureSetup {
         if usesFixtures, arguments.contains("-test-session-organization") {
             initialSessions = SessionOrganizationAcceptanceFixture.records
         }
+        if usesFixtures {
+            initialSessions = LongChatPerformanceFixture.records(arguments: arguments) + initialSessions
+        }
         #endif
         if usesFixtures, arguments.contains("-preview-ui-v3"),
            let index = initialSessions.firstIndex(where: { $0.id == "demo-finance" }) {

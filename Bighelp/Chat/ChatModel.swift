@@ -28,6 +28,8 @@ final class ChatModel {
     @ObservationIgnored var responseHapticsStopped = false
     @ObservationIgnored var responseHapticsRetired = false
 
+    deinit { ChatPerformanceProbe.live("live.chat-model", -1) }
+
     func retireResponseHaptics() {
         responseHapticsRetired = true
         nativeSessionResumeProgress.retire()
@@ -311,6 +313,7 @@ final class ChatModel {
         onBotModeCollapse: ((String, String, [TimelineItem]) -> Bool)? = nil,
         onReferenceStateChange: ((String, ReferenceCanonicalState?) throws -> Void)? = nil
     ) {
+        ChatPerformanceProbe.live("live.chat-model", 1)
         self.conversationID = conversationID
         self.client = client
         self.sleeper = sleeper

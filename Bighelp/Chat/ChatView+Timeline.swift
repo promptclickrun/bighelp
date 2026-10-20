@@ -49,11 +49,12 @@ extension ChatView {
         return rows
     }
     var timeline: some View {
-        let rows = canvasRows
-        let activeLoader = ChatCanvasTranscriptProjection.activeLoaderID(in: rows, isSending: model.isSending)
+        let (rows, activeLoader, groupedIDs, continuedIDs) = ChatPerformanceProbe.measure("chat.projection") {
+            let rows = canvasRows
+            return (rows, ChatCanvasTranscriptProjection.activeLoaderID(in: rows, isSending: model.isSending),
+                    Self.groupedMessageRowIDs(rows), Self.continuedMessageRowIDs(rows))
+        }
         let firstID = rows.first?.id
-        let groupedIDs = Self.groupedMessageRowIDs(rows)
-        let continuedIDs = Self.continuedMessageRowIDs(rows)
         return NativeChatTimeline(conversationID: model.conversationID, ownerID: ObjectIdentifier(model), rows: rows,
                            controller: timelineController, entryCount: model.transcriptEntries.count,
                            contentInsets: UIEdgeInsets(

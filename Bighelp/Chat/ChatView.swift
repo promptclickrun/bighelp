@@ -280,6 +280,7 @@ struct ChatView: View {
     @Environment(\.nerdModeEnabled) private var nerdModeEnabled
 
     var body: some View {
+        let _ = ChatPerformanceProbe.count("chat.body")
         let _ = model.botModeRoomStore?.rooms
         // Track the connection capability stamp in the presenting view, not
         // only inside the retained pop-up, so a reconnect updates it.

@@ -79,7 +79,10 @@ final class ChatMessageContentCache {
             cardProjection = ChatCardMessageProjection(source: references.prose, role: role, isStreaming: isStreaming)
             self.role = role
             self.isStreaming = isStreaming
+            ChatPerformanceProbe.live("live.message-projection", 1)
         }
+
+        deinit { ChatPerformanceProbe.live("live.message-projection", -1) }
     }
 
     private var current: Projection?
@@ -89,7 +92,9 @@ final class ChatMessageContentCache {
            current.source.utf8.elementsEqual(source.utf8) {
             return current
         }
-        let projection = Projection(source, role: role, isStreaming: isStreaming)
+        let projection = ChatPerformanceProbe.measure("message.parse") {
+            Projection(source, role: role, isStreaming: isStreaming)
+        }
         current = projection
         return projection
     }

@@ -71,6 +71,11 @@ final class BighelpVisibleChats {
         Set(entries.values.compactMap { $0.model?.conversationID })
     }
 
+    #if DEBUG
+    /// The chats on screen, for the speed checks' autopilot (`ChatPerformanceAutopilot`).
+    var models: [ChatModel] { entries.values.compactMap(\.model) }
+    #endif
+
     /// Whether an alert with this thread belongs to a chat that's on screen.
     func isShowing(thread: String) -> Bool {
         !thread.isEmpty && threadIdentifiers.contains(thread)

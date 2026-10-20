@@ -370,7 +370,10 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             self.row = row
             self.render = render
             self.generation = generation
+            ChatPerformanceProbe.live("live.hosted-row", 1)
         }
+
+        deinit { ChatPerformanceProbe.live("live.hosted-row", -1) }
     }
 
     private struct HostedRow: View {
@@ -381,6 +384,7 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             // message here (rather than in the UIKit configuration closure)
             // keeps pending state, mode changes and sender stores live even
             // when the transcript item's value itself has not changed.
+            let _ = ChatPerformanceProbe.count("row.body")
             state.render(state.row).id(state.row.id)
         }
     }
@@ -477,7 +481,9 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
                 self.updateScheduled = false
                 guard let table, let update = self.pendingUpdate else { return }
                 self.pendingUpdate = nil
-                self.update(update.parent, environment: update.environment, table: table)
+                ChatPerformanceProbe.measure("timeline.update") {
+                    self.update(update.parent, environment: update.environment, table: table)
+                }
                 table.applyCustomContentInsets(update.parent.contentInsets)
                 table.accessibilityValue = "\(update.parent.entryCount) conversation entries"
             }
@@ -488,6 +494,7 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
         }
 
         private func configure(_ cell: UITableViewCell, id: String) {
+            ChatPerformanceProbe.count("row.configure")
             guard let row = rowsByID[id], let rowContent else { return }
             if let state = hostedRows.object(forKey: cell), state.row.id == id,
                state.generation == presentationGeneration {

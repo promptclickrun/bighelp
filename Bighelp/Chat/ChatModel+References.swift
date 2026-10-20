@@ -375,7 +375,9 @@ extension ChatModel {
             ? items
             : items.filter { !pendingIndependentMessageIDs.contains($0.id) }
         let savedDraft = persistedDraft
-        onSessionChange?(savedDraft, acceptedItems, activityLedger, chosenActivityVisibility)
+        ChatPerformanceProbe.measure("chat.persist") {
+            onSessionChange?(savedDraft, acceptedItems, activityLedger, chosenActivityVisibility)
+        }
         if referencePersistenceNeeded, let onReferenceStateChange, !referenceOwnerRetired {
             let draftBytes = Data(savedDraft.utf8)
             let state = referenceState

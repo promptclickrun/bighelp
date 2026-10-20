@@ -64,23 +64,42 @@ final class ChatBubbleMenuAnchor {
 }
 
 enum ChatMessageMenuStyle {
-    /// iPhone and iPad float the reactions over the lifted message. The Mac,
-    /// Vision Pro and VoiceOver get them as the menu's first row, where a
-    /// pointer, a pinch or a swipe reaches them.
+    /// iPhone and iPad float the reactions over the lifted message. The Mac
+    /// (the Mac app and the iPad app on a Mac), Vision Pro and VoiceOver get them
+    /// as the menu's first row, where a pointer, a pinch or a swipe reaches them.
     @MainActor
     static var floatsReactions: Bool {
-        #if os(iOS) && !targetEnvironment(macCatalyst)
-        !UIAccessibility.isVoiceOverRunning
+        #if os(iOS)
+        floatsReactions(showsMacMenus: showsMacMenus, isVoiceOverRunning: UIAccessibility.isVoiceOverRunning)
         #else
         false
         #endif
     }
 
+    static func floatsReactions(showsMacMenus: Bool, isVoiceOverRunning: Bool) -> Bool {
+        !showsMacMenus && !isVoiceOverRunning
+    }
+
     static var liftsBubble: Bool {
-        #if os(iOS) && !targetEnvironment(macCatalyst)
-        true
+        #if os(iOS)
+        !showsMacMenus
         #else
         false
+        #endif
+    }
+
+    /// A right-click on a Mac opens a Mac menu, which takes every click until it
+    /// closes: a bar floating beside it could never be clicked. The iPad app on a
+    /// Mac is built for iOS, so only `isiOSAppOnMac` tells it apart from an iPad.
+    static var showsMacMenus: Bool {
+        showsMacMenus(isiOSAppOnMac: ProcessInfo.processInfo.isiOSAppOnMac)
+    }
+
+    static func showsMacMenus(isiOSAppOnMac: Bool) -> Bool {
+        #if targetEnvironment(macCatalyst)
+        true
+        #else
+        isiOSAppOnMac
         #endif
     }
 }
@@ -293,7 +312,7 @@ final class ChatMessageMenuDriver: NSObject, UIContextMenuInteractionDelegate {
         activeInteraction?.dismissMenu()
     }
 
-    private func menu(floatsReactions: Bool) -> UIMenu? {
+    func menu(floatsReactions: Bool) -> UIMenu? {
         guard let actions else { return nil }
         var elements: [UIMenuElement] = []
         if !floatsReactions, let reactions = actions.reactions {

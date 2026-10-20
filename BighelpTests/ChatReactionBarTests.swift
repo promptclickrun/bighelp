@@ -99,6 +99,26 @@ struct ChatReactionBarTests {
         #expect(ChatReactionBarMetrics.slot(choiceCount: 7, availableWidth: 200) == ChatReactionBarMetrics.minimumSlot)
     }
 
+    /// A Mac menu takes every click until it closes, so the iPad app on a Mac puts
+    /// the reactions in the menu, as the Mac app does, instead of floating them.
+    @Test func onAMacTheReactionsAreInTheMenuNotFloatingBesideIt() {
+        #expect(ChatMessageMenuStyle.showsMacMenus(isiOSAppOnMac: true))
+        #expect(!ChatMessageMenuStyle.showsMacMenus(isiOSAppOnMac: false))
+        #expect(!ChatMessageMenuStyle.floatsReactions(showsMacMenus: true, isVoiceOverRunning: false))
+        #expect(!ChatMessageMenuStyle.floatsReactions(showsMacMenus: false, isVoiceOverRunning: true))
+        #expect(ChatMessageMenuStyle.floatsReactions(showsMacMenus: false, isVoiceOverRunning: false))
+
+        let driver = ChatMessageMenuDriver()
+        driver.actions = ChatMessageMenuActions(
+            copyActionLabel: "Copy to clipboard", onCopy: {}, onSelect: {}, onFork: {}, onReply: {},
+            reactions: ChatMessageReactionActions(selectedEmoji: nil, onSelect: { _ in }, onMore: {}))
+        let row = driver.menu(floatsReactions: false)?.children.first as? UIMenu
+        #expect(row?.options.contains(.displayAsPalette) == true)
+        let floating = driver.menu(floatsReactions: true)?.children ?? []
+        #expect(!floating.contains { ($0 as? UIMenu)?.options.contains(.displayAsPalette) == true })
+        #expect((floating.first as? UIAction)?.title == "Reply")
+    }
+
     @Test func menuRowOffersEachReactionByNameWithTheChosenOneOn() {
         let palette = ChatMessageMenuDriver.reactionPalette(ChatMessageReactionActions(
             selectedEmoji: "👍", onSelect: { _ in }, onMore: {}))

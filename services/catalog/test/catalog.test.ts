@@ -103,6 +103,18 @@ const blueprint = {
   text: "Add a goal to my Goals: walk [8,000] steps a day. Check in each evening.",
 };
 
+describe("agent topics", () => {
+  it("takes the ten topics and refuses the retired ones", async () => {
+    const topics = ["productivity", "business", "coding", "science", "education", "health", "creative", "personal", "leadership", "security"];
+    for (const category of topics) expect((await submit(agent, { category })).status, category).toBe(201);
+    for (const category of ["work", "learning", "research", "support", "fun"]) {
+      const response = await submit(agent, { category });
+      expect(response.status, category).toBe(400);
+      expect(await response.json()).toMatchObject({ field: "category" });
+    }
+  });
+});
+
 describe("submissions", () => {
   it("needs a name, username, email and a passed person check", async () => {
     expect((await submit(agent, { turnstileToken: "bot" })).status).toBe(403);

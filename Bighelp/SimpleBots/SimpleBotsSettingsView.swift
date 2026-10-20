@@ -211,6 +211,7 @@ struct SimpleBotsSettingsView: View {
             .frame(maxWidth: .infinity)
         }
         .background(theme.canvas.ignoresSafeArea())
+        .bighelpSwitches()
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -486,6 +487,9 @@ struct SimpleBotsSettingsView: View {
                 .foregroundStyle(theme.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
         }
+        // The Mac's switch takes only its label's width; the text claims the row so the
+        // switch sits at the trailing edge, in line with the other rows' accessories.
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// With the automatic time zone on, coming back after travel moves the bots' clock too.
@@ -538,44 +542,6 @@ private struct SimpleBotRulesEditor: View {
                     }
                     .disabled(host.isSaving)
                 }
-            }
-        }
-    }
-}
-
-/// Every time zone, searchable.
-@MainActor
-private struct SimpleBotTimeZonePicker: View {
-    let current: String
-    let onPick: (String) -> Void
-    @State private var query = ""
-    @Environment(\.dismiss) private var dismiss
-
-    private var zones: [String] {
-        let all = TimeZone.knownTimeZoneIdentifiers
-        let words = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !words.isEmpty else { return all }
-        return all.filter { $0.replacingOccurrences(of: "_", with: " ").localizedCaseInsensitiveContains(words) }
-    }
-
-    var body: some View {
-        NavigationStack {
-            List(zones, id: \.self) { zone in
-                Button { onPick(zone) } label: {
-                    HStack {
-                        Text(zone.replacingOccurrences(of: "_", with: " "))
-                        Spacer()
-                        if zone == current { Image(systemName: "checkmark") }
-                    }
-                    .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
-            }
-            .searchable(text: $query)
-            .navigationTitle("Time Zone")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
             }
         }
     }

@@ -7,7 +7,10 @@ export const BLUEPRINT_CATEGORIES = ["productivity", "marketing", "content", "pe
 export const GOAL_CATEGORIES = [
   "health", "relationships", "finance", "career", "interests", "productivity", "other",
 ] as const;
-export const AGENT_CATEGORIES = ["work", "personal", "learning", "creative", "research", "support", "fun"] as const;
+/** Topics for agent templates. The site's topic filter and submit form list the same ids. */
+export const AGENT_CATEGORIES = [
+  "productivity", "business", "coding", "science", "education", "health", "creative", "personal", "leadership", "security",
+] as const;
 
 export type Board = (typeof BOARDS)[number];
 export type BlueprintCategory = (typeof BLUEPRINT_CATEGORIES)[number];

@@ -367,38 +367,13 @@ struct SettingsView: View {
         }
     }
 
-    private func settingsMenuGroup(sections: [SettingsMenuSection]) -> some View {
-        Section {
-            ForEach(sections) { section in
-                NavigationLink {
-                    settingsDone(destination(for: section))
-                } label: {
-                    settingsMenuRow(section)
-                }
-                .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
-                .accessibilityValue(section == .appearance ? appearanceSummary : "")
-                .accessibilityIdentifier(section.accessibilityIdentifier)
-            }
-        }
-        .listRowBackground(theme.surface)
-    }
-
     /// "Lavender bubbles · Cream · Graphite"
     var appearanceSummary: String {
         "\(settings.bubbleColorName) bubbles · "
             + "\(settings.lightBackground.name) · \(settings.darkBackground.name)"
     }
 
-    private func menuDetail(_ section: SettingsMenuSection) -> String {
-        switch section {
-        case .appearance: appearanceSummary
-        case .voice: settings.voiceConversationMode == .codexLive
-            ? "GPT Live 1 · a live conversation" : "TTS · reads replies aloud"
-        default: section.detail
-        }
-    }
-
-    private var selectedHostPluginUpdate: HostPluginUpdateModel? {
+    var selectedHostPluginUpdate: HostPluginUpdateModel? {
         guard let hostID = hostRegistry?.selectedHostID else { return nil }
         if let hostPluginUpdate, hostPluginUpdate.hostID == hostID { return hostPluginUpdate }
         return HostPluginUpdateModel.existingModel(for: hostID)
@@ -406,30 +381,6 @@ struct SettingsView: View {
 
     private var selectedHostPluginCheckKey: String {
         "\(hostRegistry?.selectedHostID?.uuidString ?? "none"):\(hostRegistry?.selectedWorkspace?.isConnected == true)"
-    }
-
-    private func settingsMenuRow(_ section: SettingsMenuSection) -> some View {
-        HStack(spacing: BighelpTokens.space12) {
-            BighelpIconTile(systemName: section.systemImage, tint: section.tintHex.map { Color(hex: $0) })
-            VStack(alignment: .leading, spacing: 2) {
-                Text(section.title)
-                    .bighelpFont(.body)
-                    .foregroundStyle(theme.primaryText)
-                if section == .connectivityAndNotifications, let attention = selectedHostPluginUpdate?.attentionTitle {
-                    Text(attention)
-                        .bighelpFont(.metadata)
-                        .foregroundStyle(theme.action)
-                        .accessibilityIdentifier("settings.menu.plugin-update")
-                } else {
-                    Text(menuDetail(section))
-                        .bighelpFont(.metadata)
-                        .foregroundStyle(theme.secondaryText)
-                        .lineLimit(1)
-                }
-            }
-            Spacer(minLength: BighelpTokens.space8)
-        }
-        .frame(minHeight: 52)
     }
 
     /// One page of Settings on its own, for Simple Bot mode's short Settings. Built in `body`, like
@@ -463,7 +414,7 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
-    private func destination(for section: SettingsMenuSection) -> some View {
+    func destination(for section: SettingsMenuSection) -> some View {
         switch section {
         case .workspace:
             settingsPage(title: section.title) {

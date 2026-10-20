@@ -96,7 +96,7 @@ private struct BighelpFormSurfaceModifier: ViewModifier {
         if appearance.simpleBots {
             form.toggleStyle(SimpleBotsSwitchStyle())
         } else {
-            form
+            form.toggleStyle(BighelpFormSwitchStyle())
         }
     }
 }
@@ -105,7 +105,27 @@ private struct BighelpFormSurfaceModifier: ViewModifier {
 /// white. Its switches are green, as on its own Settings page.
 private struct SimpleBotsSwitchStyle: ToggleStyle {
     func makeBody(configuration: Configuration) -> some View {
-        Toggle(configuration).toggleStyle(.automatic).tint(SimpleBotColor.green.color)
+        Toggle(configuration).toggleStyle(BighelpFormSwitchStyle()).tint(SimpleBotColor.green.color)
+    }
+}
+
+extension View {
+    /// The toggles in this view are switches on the Mac too (`BighelpFormSwitchStyle`).
+    /// `bighelpFormSurface` already does this; use it on pages built outside a Form.
+    func bighelpSwitches() -> some View {
+        toggleStyle(BighelpFormSwitchStyle())
+    }
+}
+
+/// The platform's switch. Catalyst draws a Form's toggle as a checkbox before the label on the
+/// Mac; a switch after it is what the Mac's own Settings show.
+struct BighelpFormSwitchStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        #if targetEnvironment(macCatalyst)
+        Toggle(configuration).toggleStyle(.switch)
+        #else
+        Toggle(configuration).toggleStyle(.automatic)
+        #endif
     }
 }
 

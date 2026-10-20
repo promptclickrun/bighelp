@@ -27,8 +27,9 @@ extension SettingsView {
                 } label: {
                     rowLabel("Apps", detail: "Let agents use your email, notes and more",
                              symbol: "app.connected.to.app.below.fill", tint: Color(hex: "3A7BD5"))
+                        .bighelpSettingsLinkLabel()
                 }
-                .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+                .bighelpSettingsLink()
                 .accessibilityIdentifier("settings.apps")
             } else if let connectorApps, let apps = connectorApps() {
                 NavigationLink {
@@ -36,23 +37,24 @@ extension SettingsView {
                 } label: {
                     rowLabel("Apps", detail: "Let agents use your email, notes and more",
                              symbol: "app.connected.to.app.below.fill", tint: Color(hex: "3A7BD5"))
+                        .bighelpSettingsLinkLabel()
                 }
-                .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+                .bighelpSettingsLink()
                 .accessibilityIdentifier("settings.apps")
             }
             if let teamworkModel {
                 TeamworkToggle(model: teamworkModel) { detail in
-                    rowLabel("Teamwork", detail: detail, symbol: "person.3.fill", tint: Color(hex: "2E9E6B"))
+                    rowLabel("Teamwork", detail: detail, symbol: "person.3.fill", tint: Color(hex: "2E9E6B"),
+                             showsChevron: false)
                 }
-                .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+                .bighelpSettingsRowInsets()
             }
             Button {
                 isPersonalitiesPresented = true
             } label: {
                 rowLabel("Personalities", detail: personalityDetail, symbol: "theatermasks.fill", tint: Color(hex: "B7356F"))
             }
-            .buttonStyle(.plain)
-            .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+            .bighelpSettingsButton()
             .accessibilityIdentifier("profile.personalities")
         } header: {
             Text("Assistants")
@@ -74,7 +76,9 @@ extension SettingsView {
                     BighelpIconTile(systemName: "wrench.adjustable.fill", tint: .gray)
                     settingLabel("Nerd Mode", detail: "Hermes tools and extra chat settings")
                 }
+                .padding(.horizontal, BighelpMenuRowLayout.labelInset)
             }
+            .bighelpMacSettingsRowInsets()
             .accessibilityIdentifier("settings.nerd-mode")
         }
         .listRowBackground(theme.surface)
@@ -101,8 +105,7 @@ extension SettingsView {
         Button(action: action) {
             rowLabel(title, detail: detail, symbol: symbol, tint: tint)
         }
-        .buttonStyle(.plain)
-        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+        .bighelpSettingsButton()
         .accessibilityIdentifier(identifier)
     }
 
@@ -128,5 +131,55 @@ extension SettingsView {
         }
         .frame(minHeight: 52)
         .contentShape(.rect)
+        .padding(.horizontal, BighelpMenuRowLayout.labelInset)
+    }
+}
+
+extension View {
+    /// A Settings row with an icon tile that runs an action. On the Mac it takes the click
+    /// across the row and lights up under the pointer, with the ☰ menu's row layout;
+    /// elsewhere it's a plain button with the page's row insets.
+    func bighelpSettingsButton() -> some View {
+        bighelpPlainButtonStyle(BighelpMenuRowLayout.outline, padding: BighelpMenuRowLayout.highlightPadding)
+            .bighelpSettingsRowInsets()
+    }
+
+    /// A Settings row that is a `NavigationLink`: the link keeps its own style (a button style
+    /// doesn't reach it), so the Mac's hover goes on its label with `bighelpSettingsLinkLabel`.
+    /// On the Mac the List's own chevron, outside the row, gives way to the label's, in line
+    /// with the button rows' (`BighelpPlatform.drawsOwnLinkChevron`).
+    @ViewBuilder
+    func bighelpSettingsLink() -> some View {
+        #if targetEnvironment(macCatalyst) && compiler(>=6.2)
+        // In the iOS 26 SDK; available from Catalyst 17, so no runtime check.
+        bighelpSettingsRowInsets().navigationLinkIndicatorVisibility(.hidden)
+        #else
+        bighelpSettingsRowInsets()
+        #endif
+    }
+
+    /// The label of a `bighelpSettingsLink` row: on the Mac it lights up under the pointer
+    /// and takes the click across the row, like `bighelpSettingsButton`.
+    func bighelpSettingsLinkLabel() -> some View {
+        bighelpPointer(BighelpMenuRowLayout.outline, padding: BighelpMenuRowLayout.highlightPadding)
+    }
+
+    /// The row insets of a Settings row with an icon tile; on the Mac, the ☰ menu's.
+    func bighelpSettingsRowInsets() -> some View {
+        listRowInsets(BighelpPlatform.isMac
+            ? BighelpMenuRowLayout.insets
+            : EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+    }
+
+    /// The ☰ menu's row insets on the Mac, so a toggle's or the profile row's icon lines up
+    /// with the other rows'. Elsewhere the row keeps the List's own: these labels set no
+    /// height, and without the List's room their wrapped text touched the card's edges.
+    @ViewBuilder
+    func bighelpMacSettingsRowInsets() -> some View {
+        #if targetEnvironment(macCatalyst)
+        listRowInsets(BighelpMenuRowLayout.insets)
+        #else
+        self
+        #endif
     }
 }

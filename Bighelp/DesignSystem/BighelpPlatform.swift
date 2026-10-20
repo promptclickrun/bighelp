@@ -49,6 +49,16 @@ extension View {
 
 enum BighelpPlatform {
     /// The Mac app (Mac Catalyst, "Optimize for Mac").
+    /// The Mac's Settings links hide the List's chevron and draw their own, in line with the
+    /// button rows'; the two go together, so a Settings link never shows two or none.
+    static var drawsOwnLinkChevron: Bool {
+        #if targetEnvironment(macCatalyst) && compiler(>=6.2)
+        true
+        #else
+        false
+        #endif
+    }
+
     static var isMac: Bool {
         #if targetEnvironment(macCatalyst)
         true

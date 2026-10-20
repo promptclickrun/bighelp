@@ -38,7 +38,7 @@ extension View {
     func bighelpSheet<Content: View>(isPresented: Binding<Bool>, onDismiss: (() -> Void)? = nil,
                                      @ViewBuilder content: @escaping () -> Content) -> some View {
         #if targetEnvironment(macCatalyst)
-        sheet(isPresented: isPresented, onDismiss: onDismiss) { content().bighelpPresentedAppearance() }
+        sheet(isPresented: isPresented, onDismiss: onDismiss) { content().bighelpPresentedAppearance().bighelpMacSheetChrome() }
             .background { BighelpMacSheetCloser(token: isPresented.wrappedValue ? AnyHashable(true) : nil) }
         #else
         sheet(isPresented: isPresented, onDismiss: onDismiss) { content().bighelpPresentedAppearance() }
@@ -48,7 +48,7 @@ extension View {
     func bighelpSheet<Item: Identifiable, Content: View>(item: Binding<Item?>, onDismiss: (() -> Void)? = nil,
                                                          @ViewBuilder content: @escaping (Item) -> Content) -> some View {
         #if targetEnvironment(macCatalyst)
-        sheet(item: item, onDismiss: onDismiss) { content($0).bighelpPresentedAppearance() }
+        sheet(item: item, onDismiss: onDismiss) { content($0).bighelpPresentedAppearance().bighelpMacSheetChrome() }
             .background { BighelpMacSheetCloser(token: item.wrappedValue.map { AnyHashable($0.id) }) }
         #else
         sheet(item: item, onDismiss: onDismiss) { content($0).bighelpPresentedAppearance() }
@@ -81,6 +81,16 @@ extension View {
     func bighelpPopoverDismissal(isPresented: Binding<Bool>) -> some View {
         #if targetEnvironment(macCatalyst)
         background { BighelpMacPopoverDismissal(isPresented: isPresented) }
+        #else
+        self
+        #endif
+    }
+
+    /// A Mac sheet is a panel: the drag indicator the iPhone and iPad show to pull a
+    /// sheet down does nothing there, so it stays hidden whatever the content asks for.
+    func bighelpMacSheetChrome() -> some View {
+        #if targetEnvironment(macCatalyst)
+        presentationDragIndicator(.hidden)
         #else
         self
         #endif

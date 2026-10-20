@@ -35,6 +35,11 @@ extension SettingsView {
                     .onSubmit(saveDisplayName)
                     .accessibilityIdentifier("profile.display-name")
             }
+            // Mac: room above and below the 52-point photo, which the menu's 4-point insets don't
+            // give; the photo lines up with the other rows' icon tiles.
+            .padding(.vertical, BighelpPlatform.isMac ? BighelpTokens.space8 : 0)
+            .padding(.horizontal, BighelpMenuRowLayout.labelInset)
+            .bighelpMacSettingsRowInsets()
             if canSaveDisplayName {
                 Button(action: saveDisplayName) {
                     Text(isRemovingName ? "Remove name" : "Save name")

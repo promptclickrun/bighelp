@@ -57,8 +57,11 @@ struct AgentHomeDrawer: View {
                     fleetChats.open(chat)
                 } label: {
                     FleetChatRow(chat: chat, fleet: fleetChats.fleet, compact: true)
+                        .padding(.horizontal, BighelpMenuRowLayout.labelInset)
                 }
-                .bighelpPlainButtonStyle(.rounded(BighelpTokens.radius12), padding: BighelpTokens.space4)
+                .bighelpPlainButtonStyle(BighelpMenuRowLayout.outline, padding: BighelpMenuRowLayout.highlightPadding)
+                .listRowInsets(BighelpPlatform.isMac ? BighelpMenuRowLayout.insets : nil)
+                .bighelpMenuRowSeparator()
                 .accessibilityIdentifier("menu.fleet-chat.\(chat.title)")
             }
         } else {
@@ -73,8 +76,11 @@ struct AgentHomeDrawer: View {
                 onOpen(chat)
             } label: {
                 BighelpMenuChatRow(chat: chat, agent: agent)
+                    .padding(.horizontal, BighelpMenuRowLayout.labelInset)
             }
-            .bighelpPlainButtonStyle(.rounded(BighelpTokens.radius12), padding: BighelpTokens.space4)
+            .bighelpPlainButtonStyle(BighelpMenuRowLayout.outline, padding: BighelpMenuRowLayout.highlightPadding)
+            .listRowInsets(BighelpPlatform.isMac ? BighelpMenuRowLayout.insets : nil)
+            .bighelpMenuRowSeparator()
             .accessibilityIdentifier("menu.chat.\(chat.id)")
         }
     }

@@ -9,14 +9,18 @@ extension SettingsView {
                     BighelpIconTile(systemName: "circle.hexagongrid")
                     settingLabel("Simple Bot mode", detail: "Just your bots and their chats, nothing else.")
                 }
+                .padding(.horizontal, BighelpMenuRowLayout.labelInset)
             }
+            .bighelpMacSettingsRowInsets()
             .accessibilityIdentifier("settings.simple-bots")
             Toggle(isOn: $settings.codeModeEnabled) {
                 HStack(spacing: BighelpTokens.space12) {
                     BighelpIconTile(systemName: "chevron.left.forwardslash.chevron.right")
                     settingLabel("Bighelp IDE", detail: "Fire off coding sessions against your projects.")
                 }
+                .padding(.horizontal, BighelpMenuRowLayout.labelInset)
             }
+            .bighelpMacSettingsRowInsets()
             .accessibilityIdentifier("settings.code-mode")
             if settings.codeModeEnabled {
                 Picker("Open in", selection: $settings.startExperience) {

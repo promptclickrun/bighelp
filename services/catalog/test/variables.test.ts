@@ -27,7 +27,7 @@ const agent = {
   vibe: "Confident, practical, quick",
   description: "Turns intent into owners, milestones and decision points.",
   instructions,
-  category: "work",
+  category: "productivity",
   variables,
 };
 

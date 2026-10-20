@@ -233,7 +233,7 @@ struct BighelpMenu<Recent: View>: View {
     }
 
     /// Compact rows, so the whole first screen fits without scrolling.
-    private static var rowInsets: EdgeInsets { EdgeInsets(top: 2, leading: 16, bottom: 2, trailing: 16) }
+    private static var rowInsets: EdgeInsets { BighelpMenuRowLayout.insets }
 
     /// New chat, its own button at the top right. Group chats start from its own picker ("Group chat").
     private var newChatButton: some View {
@@ -389,9 +389,11 @@ struct BighelpMenu<Recent: View>: View {
                      action: @escaping () -> Void) -> some View {
         Button { choose(action) } label: {
             BighelpMenuRowLabel(title: title, detail: detail, symbol: symbol, trailing: isNew ? .new : .none)
+                .padding(.horizontal, BighelpMenuRowLayout.labelInset)
         }
-        .bighelpPlainButtonStyle(.rounded(BighelpTokens.radius12), padding: BighelpTokens.space4)
+        .bighelpPlainButtonStyle(BighelpMenuRowLayout.outline, padding: BighelpMenuRowLayout.highlightPadding)
         .listRowInsets(Self.rowInsets)
+        .bighelpMenuRowSeparator()
         .accessibilityIdentifier(id)
     }
 
@@ -401,149 +403,6 @@ struct BighelpMenu<Recent: View>: View {
     }
 
     @BighelpThemeReader private var theme
-}
-
-/// A branded menu row: icon tile, title, optional detail, and a trailing mark.
-struct BighelpMenuRowLabel: View {
-    enum Trailing { case chevron, selected, none, new }
-
-    let title: String
-    var detail: String?
-    let symbol: String
-    var trailing: Trailing = .chevron
-
-    var body: some View {
-        HStack(spacing: BighelpTokens.space12) {
-            BighelpIconTile(systemName: symbol)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .bighelpFont(.body)
-                    .foregroundStyle(theme.primaryText)
-                    .lineLimit(2)
-                if let detail {
-                    Text(detail)
-                        .bighelpFont(.metadata)
-                        .foregroundStyle(theme.secondaryText)
-                        .lineLimit(2)
-                }
-            }
-            Spacer(minLength: BighelpTokens.space8)
-            switch trailing {
-            case .chevron:
-                Image(systemName: "chevron.right")
-                    .font(.bighelp(.footnote).weight(.semibold))
-                    .foregroundStyle(theme.tertiaryText)
-                    .accessibilityHidden(true)
-            case .selected:
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.bighelp(.title3))
-                    .foregroundStyle(theme.action)
-                    .accessibilityHidden(true)
-            case .none:
-                EmptyView()
-            case .new:
-                // Like the bottom bar's dot: something here hasn't been seen.
-                Circle()
-                    .fill(theme.action)
-                    .frame(width: 8, height: 8)
-                    .accessibilityLabel("New")
-            }
-        }
-        .frame(minHeight: BighelpTokens.hitTarget)
-        .contentShape(.rect)
-        .accessibilityElement(children: .combine)
-    }
-
-    @BighelpThemeReader private var theme
-}
-
-/// A recent chat in the menu: who it's with, its title and when it last moved.
-struct BighelpMenuChatRow: View {
-    let chat: SessionSummary
-    let agent: (String) -> (name: String, imageURL: URL?)?
-
-    var body: some View {
-        let lead = chat.kind == .direct ? chat.agentIDs.first.flatMap(agent) : nil
-        HStack(spacing: BighelpTokens.space12) {
-            if let lead, let id = chat.agentIDs.first {
-                AvatarView(stableID: id, displayName: lead.name, imageURL: lead.imageURL, size: 30)
-            } else {
-                Image(systemName: "person.3.fill")
-                    .font(.bighelp(.caption))
-                    .foregroundStyle(theme.action)
-                    .frame(width: 30, height: 30)
-                    .background(Circle().fill(theme.action.opacity(0.14)))
-            }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(chat.title.isEmpty ? "New chat" : chat.title)
-                    .bighelpFont(.body)
-                    .foregroundStyle(theme.primaryText)
-                    .lineLimit(1)
-                Text(lead?.name ?? "Group chat")
-                    .bighelpFont(.metadata)
-                    .foregroundStyle(theme.secondaryText)
-                    .lineLimit(1)
-            }
-            Spacer(minLength: BighelpTokens.space8)
-            if chat.isActive {
-                Circle().fill(theme.action).frame(width: 8, height: 8)
-                    .accessibilityLabel("Working")
-            }
-            Text(chat.updatedAt, format: .relative(presentation: .named, unitsStyle: .narrow))
-                .font(.bighelp(.caption))
-                .foregroundStyle(theme.secondaryText)
-        }
-        .frame(minHeight: 44)
-        .contentShape(.rect)
-        .accessibilityElement(children: .combine)
-    }
-
-    @BighelpThemeReader private var theme
-}
-
-/// The bighelp lockup in the top bar. Touch and hold it to switch hosts; on
-/// the Mac, click it.
-struct BighelpHostSwitcherLockup: View {
-    var demoHosts: DemoHosts?
-    @Environment(\.bighelpHostRegistry) private var registry
-
-    var body: some View {
-        let hosts = BighelpMenuHosts.current(registry: registry, demoHosts: demoHosts)
-        if hosts.hosts.count + (hosts.add == nil ? 0 : 1) > 0 {
-            #if targetEnvironment(macCatalyst)
-            // A click that does nothing reads as broken on a Mac, where holding is rare.
-            Menu { hostItems(hosts) } label: { BighelpWordmark(height: 26) }
-                .accessibilityLabel(BighelpBrand.appName)
-                .accessibilityHint("Switch hosts.")
-                .accessibilityIdentifier("brand.host-switcher")
-            #else
-            Menu { hostItems(hosts) } label: {
-                BighelpWordmark(height: 26)
-            } primaryAction: {}
-            .accessibilityLabel(BighelpBrand.appName)
-            .accessibilityHint("Touch and hold to switch hosts.")
-            .accessibilityIdentifier("brand.host-switcher")
-            #endif
-        } else {
-            BighelpWordmark(height: 26)
-        }
-    }
-
-    @ViewBuilder
-    private func hostItems(_ hosts: BighelpMenuHosts) -> some View {
-        Section("Switch host") {
-            ForEach(hosts.hosts) { host in
-                Button { hosts.select(host.id) } label: {
-                    if host.isSelected { Label(host.name, systemImage: "checkmark") } else { Text(host.name) }
-                }
-                .accessibilityIdentifier("brand.host.\(host.id)")
-            }
-        }
-        if let add = hosts.add {
-            Button(action: add) { Label("Add host", systemImage: "plus") }
-                .accessibilityIdentifier("brand.host.add")
-        }
-    }
 }
 
 extension View {

@@ -340,17 +340,17 @@ struct MarkdownDocument: Equatable, Sendable {
 }
 
 enum ChatInlineMarkdown {
+    /// Making a link detector costs more than running it over a message, and every run of
+    /// text in every message drawn needs one; a detector is safe to share.
+    private static let linkDetector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+
     static func attributedText(_ markdown: String) -> AttributedString {
         var attributed = (try? AttributedString(
             markdown: markdown,
             options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
         )) ?? AttributedString(markdown)
         let visibleText = String(attributed.characters)
-        guard
-            let detector = try? NSDataDetector(
-                types: NSTextCheckingResult.CheckingType.link.rawValue
-            )
-        else { return attributed }
+        guard let detector = linkDetector else { return attributed }
 
         let matches = detector.matches(
             in: visibleText,

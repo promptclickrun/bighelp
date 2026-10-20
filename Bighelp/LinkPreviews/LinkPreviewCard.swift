@@ -56,8 +56,11 @@ struct LinkPreviewCard: View {
             } label: {
                 Label("Copy Link", systemImage: "doc.on.doc")
             }
-            if let png = picture?.pngData() {
+            // The menu is built with the card, so the picture is encoded only when it's copied:
+            // encoding it here ran on every redraw and was most of a long chat's scrolling.
+            if let picture {
                 Button {
+                    guard let png = picture.pngData() else { return }
                     UIPasteboard.general.setItems(ChatPictureClipboard.items(data: png, mimeType: "image/png"))
                     BighelpHaptics.success()
                 } label: {

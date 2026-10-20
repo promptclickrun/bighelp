@@ -162,11 +162,21 @@ final class ChatModel {
     var isLoadingPreviousHistory = false
     var previousHistoryErrorMessage: String?
     var previousHistoryRevealID: String?
-    var activityLedger: ChatActivityLedger
+    var activityLedger: ChatActivityLedger {
+        didSet { activityLedgerRevision &+= 1 }
+    }
+    /// Bumped by every change to the ledger, so the chat's rows can be kept until it changes.
+    private(set) var activityLedgerRevision: UInt64 = 0
     var transcriptEntries: [ChatTranscriptEntry] = [] {
         didSet { transcriptRevision &+= 1 }
     }
     var transcriptRevision: UInt64 = 0
+    /// The transcript's canvas rows between redraws (`ChatTranscriptCanvasCache`).
+    @ObservationIgnored let transcriptCanvas = ChatTranscriptCanvasCache()
+    /// What every redraw reads from the whole ledger, kept until it changes
+    /// (`agentTalkCalls`, `companionActivityIDs`).
+    @ObservationIgnored var ledgerReadings: (revision: UInt64, agentTalkCalls: [ChatActivityEvent],
+                                             running: Set<String>, succeeded: Set<String>)?
 
     struct NativeMessageReactionSnapshot: Equatable {
         let rowID: Int

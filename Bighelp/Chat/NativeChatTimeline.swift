@@ -98,12 +98,23 @@ enum ChatCanvasRow: Identifiable, Equatable {
 enum ChatCanvasTranscriptProjection {
     static func rows(from displayRows: [ChatTurnDisplayRow], disclosures: ChatActivityDisclosureStore,
                      isSending: Bool = false, readsAgentMessages: Bool = true) -> [ChatCanvasRow] {
+        rows(from: displayRows[...], disclosures: disclosures, isSending: isSending,
+             tailEntryID: tailEntryID(of: displayRows[...], isSending: isSending),
+             talk: ChatAgentTalkIndex(displayRows, readsAgentMessages: readsAgentMessages))
+    }
+
+    /// While a turn runs, the folder at its tail is the work in progress:
+    /// the agent hasn't moved on to text, thinking or another folder yet.
+    static func tailEntryID(of displayRows: ArraySlice<ChatTurnDisplayRow>, isSending: Bool) -> String? {
+        guard isSending, case .entry(let entry)? = displayRows.last, case .activity = entry else { return nil }
+        return entry.id
+    }
+
+    /// `rows(from:…)` for some of the display rows (`ChatTranscriptCanvasCache` projects a turn at
+    /// a time), with the chat's tail and agent talk worked out from all of them.
+    static func rows(from displayRows: ArraySlice<ChatTurnDisplayRow>, disclosures: ChatActivityDisclosureStore,
+                     isSending: Bool, tailEntryID: String?, talk: ChatAgentTalkIndex) -> [ChatCanvasRow] {
         var result: [ChatCanvasRow] = []
-        // While a turn runs, the folder at its tail is the work in progress:
-        // the agent hasn't moved on to text, thinking or another folder yet.
-        var tailEntryID: String?
-        if isSending, case .entry(let entry)? = displayRows.last, case .activity = entry { tailEntryID = entry.id }
-        let talk = ChatAgentTalkIndex(displayRows, readsAgentMessages: readsAgentMessages)
         func appendTalk(_ piece: ChatAgentTalk.Piece) {
             // Messages back to back read as one exchange.
             if case .agentTalk(var previous)? = result.last {

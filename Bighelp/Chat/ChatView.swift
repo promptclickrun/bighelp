@@ -447,15 +447,11 @@ struct ChatView: View {
     }
 
     private var companionSignal: CompanionChatSignal {
-        let events = model.activityLedger.allEvents
-        var runningIDs = Set(events.filter { $0.lifecycle == .running }.map(\.id))
+        let ledger = model.ledgerReading
+        var runningIDs = ledger.running
         if model.isSending { runningIDs.insert("sending:\(model.conversationID)") }
 
-        var successIDs = Set(events.compactMap { event -> String? in
-            guard event.lifecycle == .succeeded,
-                  event.kind == .subagent || event.kind == .botHandoff else { return nil }
-            return event.id
-        })
+        var successIDs = ledger.succeeded
         if let taskDrawer = model.taskDrawer {
             for task in taskDrawer.items {
                 let id = "task:\(model.conversationID):\(taskDrawer.turnID):\(task.id)"

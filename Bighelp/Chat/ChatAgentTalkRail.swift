@@ -233,6 +233,27 @@ struct ChatAgentTalkIndex {
         }
     }
 
+    /// Whether these rows hold anything the index links: a call to another agent, or a
+    /// message one sent in. Rows without any read the same on their own.
+    static func mayLink(_ rows: some Sequence<ChatTurnDisplayRow>) -> Bool {
+        func links(_ entry: ChatTranscriptEntry) -> Bool {
+            switch entry {
+            case .activity(let turn):
+                return turn.events.contains { $0.agentTalkCall != nil }
+            case .message(let item):
+                guard item.role == .human, case .message(let text) = item.content else { return false }
+                return AgentTalkDelivery.parse(text) != nil || AgentTalkIncomingMessage.parse(text) != nil
+            }
+        }
+        return rows.contains { row in
+            switch row {
+            case .entry(let entry): links(entry)
+            case .completed(let turn): turn.entries.contains(where: links)
+            case .reasoning(let group): group.entries.contains(where: links)
+            }
+        }
+    }
+
     /// The rail piece a message is, when another agent wrote it.
     func piece(for item: TimelineItem) -> ChatAgentTalk.Piece? { piecesByItem[item.id] }
 

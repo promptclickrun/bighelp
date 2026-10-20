@@ -6,6 +6,11 @@ enum ChatCardTranscriptProjection {
     static func removingSupersededLiveCards(
         from entries: [ChatTranscriptEntry]
     ) -> [ChatTranscriptEntry] {
+        removingLiveCards(durableCardIDs(in: entries), from: entries)
+    }
+
+    /// The cards the chat's assistant messages carry.
+    static func durableCardIDs(in entries: [ChatTranscriptEntry]) -> Set<String> {
         var durableCardIDs = Set<String>()
         for entry in entries {
             guard case .message(let item) = entry,
@@ -13,6 +18,13 @@ enum ChatCardTranscriptProjection {
                   case .message(let text) = item.content else { continue }
             durableCardIDs.formUnion(ChatCardMessageProjection.cardIDs(in: ReferenceCodec.decode(text).prose))
         }
+        return durableCardIDs
+    }
+
+    /// The entries without the live cards a message already carries (`durableCardIDs`).
+    static func removingLiveCards(
+        _ durableCardIDs: Set<String>, from entries: [ChatTranscriptEntry]
+    ) -> [ChatTranscriptEntry] {
         guard !durableCardIDs.isEmpty else { return entries }
         return entries.filter { entry in
             guard case .message(let item) = entry else { return true }

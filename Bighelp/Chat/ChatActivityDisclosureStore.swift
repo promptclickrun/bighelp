@@ -13,7 +13,11 @@ final class ChatActivityDisclosureStore {
         let identity: String
     }
 
-    private var completedTurnChoices: [String: Bool] = [:]
+    private var completedTurnChoices: [String: Bool] = [:] {
+        didSet { revision &+= 1 }
+    }
+    /// Bumped by every choice, so the chat's rows can be kept until one changes.
+    private(set) var revision: UInt64 = 0
 
     func isCompletedTurnExpanded(_ id: String) -> Bool {
         completedTurnChoices[id] ?? false
@@ -25,7 +29,9 @@ final class ChatActivityDisclosureStore {
 
     /// Simple Bot reasoning folders, by folder and by whether its turn was running: a choice made while
     /// the bot works ends with the turn, so the folder always closes in place when the answer comes.
-    private var reasoningFolderChoices: [String: Bool] = [:]
+    private var reasoningFolderChoices: [String: Bool] = [:] {
+        didSet { revision &+= 1 }
+    }
 
     func isExpanded(_ reasoning: ChatInterimReasoning) -> Bool {
         reasoningFolderChoices[Self.choiceKey(reasoning)] ?? reasoning.isLive
@@ -39,8 +45,12 @@ final class ChatActivityDisclosureStore {
         "\(reasoning.id)|\(reasoning.isLive ? "live" : "done")"
     }
 
-    private var eventChoices: [Key: Bool] = [:]
-    private var trailChoices: [Key: Bool] = [:]
+    private var eventChoices: [Key: Bool] = [:] {
+        didSet { revision &+= 1 }
+    }
+    private var trailChoices: [Key: Bool] = [:] {
+        didSet { revision &+= 1 }
+    }
 
     func isExpanded(_ event: ChatActivityEvent) -> Bool {
         eventChoices[key(for: event)] ?? (event.kind == .reasoning && event.lifecycle == .running)

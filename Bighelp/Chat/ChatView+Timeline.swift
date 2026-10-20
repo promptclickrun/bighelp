@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 
 extension ChatView {
-    private var canvasRows: [ChatCanvasRow] {
+    private func canvasRows(transcript: () -> [ChatCanvasRow]) -> [ChatCanvasRow] {
         var rows: [ChatCanvasRow] = []
         if model.hasPreviousHistory {
             rows.append(.previousHistory(model.isLoadingPreviousHistory, model.previousHistoryErrorMessage))
@@ -17,8 +17,7 @@ extension ChatView {
             if model.isBotMode, model.timelineEvents.contains(where: { $0.kind == .botModeStarted }) {
                 rows.append(.divider("Group chat started"))
             }
-            rows += ChatCanvasTranscriptProjection.rows(from: displayedTranscriptRows, disclosures: model.activityDisclosures,
-                                                        isSending: model.isSending, readsAgentMessages: !model.isBotMode)
+            rows += transcript()
         }
         if let status = model.botModeStatus { rows.append(.botStatus(status)) }
         rows += model.pendingBotModeApprovals.map(ChatCanvasRow.botApproval)
@@ -48,12 +47,33 @@ extension ChatView {
         rows.append(.bottom)
         return rows
     }
-    var timeline: some View {
-        let (rows, activeLoader, groupedIDs, continuedIDs) = ChatPerformanceProbe.measure("chat.projection") {
-            let rows = canvasRows
-            return (rows, ChatCanvasTranscriptProjection.activeLoaderID(in: rows, isSending: model.isSending),
-                    Self.groupedMessageRowIDs(rows), Self.continuedMessageRowIDs(rows))
+    /// The transcript's rows, built again only when something they're made from changes.
+    private var transcriptCanvas: ChatTranscriptCanvasCache.Canvas {
+        let key = ChatTranscriptCanvasCache.Key(
+            transcriptRevision: model.transcriptRevision, ledgerRevision: model.activityLedgerRevision,
+            disclosureRevision: model.activityDisclosures.revision, isSending: model.isSending,
+            isBotMode: model.isBotMode, foldsCompletedTurns: foldCompletedTurns,
+            isSimpleBots: homeChrome.isSimpleBots, visibility: model.activityVisibility, agentName: agentName)
+        return model.transcriptCanvas.canvas(for: key) {
+            ChatPerformanceProbe.measure("chat.projection") {
+                model.transcriptCanvas.buildCanvas(from: model.transcriptEntries,
+                                                   activityEvents: { model.activityLedger.allEvents },
+                                                   context: transcriptDisplayContext,
+                                                   disclosures: model.activityDisclosures,
+                                                   readsAgentMessages: !model.isBotMode)
+            }
         }
+    }
+    var timeline: some View {
+        var transcript: ChatTranscriptCanvasCache.Canvas?
+        let rows = canvasRows {
+            transcript = transcriptCanvas
+            return transcript?.rows ?? []
+        }
+        // Only transcript messages group, and nothing around the transcript is one.
+        let groupedIDs = transcript?.groupedIDs ?? []
+        let continuedIDs = transcript?.continuedIDs ?? []
+        let activeLoader = ChatCanvasTranscriptProjection.activeLoaderID(in: rows, isSending: model.isSending)
         let firstID = rows.first?.id
         return NativeChatTimeline(conversationID: model.conversationID, ownerID: ObjectIdentifier(model), rows: rows,
                            controller: timelineController, entryCount: model.transcriptEntries.count,
@@ -269,26 +289,18 @@ extension ChatView {
         let prompts = (model.nativeConversationClient ?? directHermesClient)?.prompts ?? []
         return ChatActivityWaiting.resolve(prompts: prompts, events: turn.events)
     }
-    private var displayedTranscriptRows: [ChatTurnDisplayRow] {
+    private var transcriptDisplayContext: ChatTranscriptCanvasCache.DisplayContext {
         // Simple Bot mode keeps interim messages out of the "Worked for" fold: they go under the
         // bot's own reasoning row instead (`groupingForSimpleBots`).
         let simpleBots = homeChrome.isSimpleBots && !model.isBotMode
-        let rows = ChatCompletedTurnProjection.rows(
-            from: ChatInterimReplies.marking(
-                ChatCardTranscriptProjection.removingSupersededLiveCards(from: model.transcriptEntries),
-                isSending: model.isSending,
-                isBotMode: model.isBotMode,
-                activityEvents: model.activityLedger.allEvents
-            ),
+        return ChatTranscriptCanvasCache.DisplayContext(
+            ledgerRevision: model.activityLedgerRevision,
             isSending: model.isSending,
-            enabled: foldCompletedTurns,
-            activityEvents: model.activityLedger.allEvents,
-            interimReplies: simpleBots ? .inline : .following(model.activityVisibility)
-        )
-        guard simpleBots else { return rows }
-        return ChatInterimReplies.groupingForSimpleBots(rows, agentName: agentName,
-                                                        showsReasoning: model.activityVisibility.showReasoning,
-                                                        isSending: model.isSending)
+            isBotMode: model.isBotMode,
+            foldsCompletedTurns: foldCompletedTurns,
+            interimReplies: simpleBots ? .inline : .following(model.activityVisibility),
+            simpleBotsReasoning: simpleBots
+                ? .init(agentName: agentName, showsReasoning: model.activityVisibility.showReasoning) : nil)
     }
     @ViewBuilder
     private func transcriptRow(_ row: ChatTurnDisplayRow) -> some View {

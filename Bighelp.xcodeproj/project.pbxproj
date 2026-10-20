@@ -1295,6 +1295,7 @@
 		C9E0B72F9792853E6C3D5DEC /* PetdexFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 554C29D85773C730ECA6358B /* PetdexFixtures.swift */; };
 		CA4FB90E5AC22CD9F560E338 /* ChatMessageGroupingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB935DC7106AD70D15BFF877 /* ChatMessageGroupingTests.swift */; };
 		CA7C9B89C261EB43B25BC078 /* DirectHermesFileAttachments.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B40CF01292786E98BB37CE5 /* DirectHermesFileAttachments.swift */; };
+		CABED41D685A8EC3843D7B40 /* ChatTranscriptCanvasCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = D08151AC5B7909855D3D5CF9 /* ChatTranscriptCanvasCache.swift */; };
 		CACD83D4E9CE48A53447437D /* ProfileLifecycleStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB08330B2C6BB34444CAE4B9 /* ProfileLifecycleStore.swift */; };
 		CAD5A93103A9B633034C702A /* BighelpThinkingOrbTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 579F050808B1CE8C5147D10F /* BighelpThinkingOrbTests.swift */; };
 		CAEC2B7532EFEF010A7C0CF0 /* DirectHermesAchievementsClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A165878C3209946E72E421B1 /* DirectHermesAchievementsClient.swift */; };
@@ -3055,6 +3056,7 @@
 		D04DCAF7F90EF8190BB0B2A2 /* UsageStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageStore.swift; sourceTree = "<group>"; };
 		D06C24D87C372A65A26A919F /* YouTubeVideo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YouTubeVideo.swift; sourceTree = "<group>"; };
 		D07FA523BB682E8AC4A5E3DB /* ReferenceComposerTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReferenceComposerTextView.swift; sourceTree = "<group>"; };
+		D08151AC5B7909855D3D5CF9 /* ChatTranscriptCanvasCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatTranscriptCanvasCache.swift; sourceTree = "<group>"; };
 		D0BD4E22E511ADD515F2DC3E /* ChatImageStackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatImageStackTests.swift; sourceTree = "<group>"; };
 		D0C6A4CDB962B1DA3DD81BEC /* DirectHermesUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectHermesUITests.swift; sourceTree = "<group>"; };
 		D0C82269EEA0CD3C277F0B56 /* ClarificationFallbackFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClarificationFallbackFixture.swift; sourceTree = "<group>"; };
@@ -5673,6 +5675,7 @@
 				E6241B3C68880AD101042260 /* ChatToolDetailText.swift */,
 				91D4F8D182EE30C5C7CDB870 /* ChatToolPhrase.swift */,
 				A574AF8E9AC1BDB9730BEF0B /* ChatToolReadableDetail.swift */,
+				D08151AC5B7909855D3D5CF9 /* ChatTranscriptCanvasCache.swift */,
 				A423C5225CB5578027A4A41D /* ChatTranscriptProjection.swift */,
 				C8D36C2E6E629486BCF40734 /* ChatTurnFailure.swift */,
 				B81E4D55F5AC3C4CBA3A8728 /* ChatTurnFailureCard.swift */,
@@ -6592,6 +6595,7 @@
 				25AFF76DBCE649A20FBB638A /* ChatToolDetailText.swift in Sources */,
 				B3F9F117624746C5AF0CEC6B /* ChatToolPhrase.swift in Sources */,
 				9C5524E08F58B108162490CC /* ChatToolReadableDetail.swift in Sources */,
+				CABED41D685A8EC3843D7B40 /* ChatTranscriptCanvasCache.swift in Sources */,
 				83DCA7C086C3F1BBE6D2A359 /* ChatTranscriptProjection.swift in Sources */,
 				2EBE86A0242564C52C6CF1DD /* ChatTurnFailure.swift in Sources */,
 				6DF422D8B0F7D141914018B4 /* ChatTurnFailureCard.swift in Sources */,

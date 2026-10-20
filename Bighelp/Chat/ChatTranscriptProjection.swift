@@ -58,6 +58,33 @@ enum ChatTranscriptEntry: Identifiable, Equatable {
     }
 }
 
+/// One turn of a transcript: a question and everything after it up to the next
+/// question (or, first, anything before the first question). Folds, interim notes
+/// and Simple Bot reasoning each work a turn at a time, so a long chat can keep the
+/// rows of every turn that didn't change (`ChatTranscriptCanvasCache`).
+struct ChatTranscriptTurn: Equatable {
+    let range: Range<Int>
+    /// The next turn's question's order; nil for the last turn or a question without one.
+    let nextQuestionOrder: Int?
+    let isLast: Bool
+
+    static func isQuestion(_ entry: ChatTranscriptEntry) -> Bool {
+        if case .message(let item) = entry, item.role == .human { return true }
+        return false
+    }
+
+    static func split(_ entries: [ChatTranscriptEntry]) -> [ChatTranscriptTurn] {
+        var starts = entries.indices.filter { $0 == 0 || isQuestion(entries[$0]) }
+        starts.append(entries.count)
+        return zip(starts, starts.dropFirst()).map { start, end in
+            let isLast = end == entries.count
+            var nextOrder: Int?
+            if !isLast, case .message(let question) = entries[end] { nextOrder = question.metadata.sourceOrder }
+            return ChatTranscriptTurn(range: start..<end, nextQuestionOrder: nextOrder, isLast: isLast)
+        }
+    }
+}
+
 /// Canonical source-ordered transcript projection shared by the active chat,
 /// restored sessions, and child-session drawers. Keeping this pure prevents a
 /// secondary surface from regrouping Hermes activity differently than chat.

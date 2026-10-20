@@ -15,10 +15,31 @@ extension ChatModel {
     /// the feed again then (and keeps reading while one runs).
     var agentTalkFollowKey: String {
         guard !isBotMode else { return "" }
-        let calls = activityLedger.allEvents.filter { $0.agentTalkCall != nil }
+        let calls = ledgerReading.agentTalkCalls
         guard !calls.isEmpty else { return "" }
         let running = calls.filter { $0.lifecycle == .running }.map(\.id).joined(separator: ",")
         return "\(conversationID)|\(calls.count)|\(running)|\(agentTalkAwaitingDeliveries.count)"
+    }
+
+    /// Calls to other agents, and the ledger's running and finished helpers (for the
+    /// companion), read once per change to the ledger: each redraw of the chat asks.
+    var ledgerReading: (agentTalkCalls: [ChatActivityEvent], running: Set<String>, succeeded: Set<String>) {
+        let revision = activityLedgerRevision
+        if let reading = ledgerReadings, reading.revision == revision {
+            return (reading.agentTalkCalls, reading.running, reading.succeeded)
+        }
+        let events = activityLedger.allEvents
+        let reading = (
+            agentTalkCalls: events.filter { $0.agentTalkCall != nil },
+            running: Set(events.filter { $0.lifecycle == .running }.map(\.id)),
+            succeeded: Set(events.compactMap { event -> String? in
+                guard event.lifecycle == .succeeded,
+                      event.kind == .subagent || event.kind == .botHandoff else { return nil }
+                return event.id
+            })
+        )
+        ledgerReadings = (revision, reading.agentTalkCalls, reading.running, reading.succeeded)
+        return reading
     }
 
     /// `message_agent` messages whose delivery hasn't ended yet. Each ends with Hermes' notice in this chat,

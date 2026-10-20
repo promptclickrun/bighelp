@@ -18,21 +18,28 @@ enum ChatInterimReplies {
     ) -> [ChatTranscriptEntry] {
         // In a room several agents answer at once; each reply is someone's answer.
         guard !isBotMode else { return entries }
-        let turnStarts = entries.indices.filter {
-            if case .message(let item) = entries[$0], item.role == .human { return true }
-            return false
+        let workOrders = workOrders(in: activityEvents)
+        return ChatTranscriptTurn.split(entries).flatMap { turn in
+            marking(turn: entries[turn.range], nextQuestionOrder: turn.nextQuestionOrder,
+                    inFlight: turn.isLast && isSending, workOrders: workOrders)
         }
-        let workOrders = activityEvents.filter(\.isPresentable).compactMap(\.sourceOrder).sorted()
-        var result = entries
-        var start = 0
-        for (index, end) in (turnStarts + [entries.count]).enumerated() {
-            let isLastTurn = index == turnStarts.count
-            let lower = start > 0 ? order(of: entries[start - 1]) : nil
-            let upper = end < entries.count ? order(of: entries[end]) : nil
-            let hiddenWork = lastOrder(in: workOrders, after: lower, before: upper)
-            markTurn(&result, range: start..<end, inFlight: isLastTurn && isSending, lastHiddenWork: hiddenWork)
-            start = end + 1
-        }
+    }
+
+    /// The order of each piece of the chat's work, sorted, for `marking(turn:…)`.
+    static func workOrders(in activityEvents: [ChatActivityEvent]) -> [Int] {
+        activityEvents.filter(\.isPresentable).compactMap(\.sourceOrder).sorted()
+    }
+
+    /// One turn's part of `marking` (`ChatTranscriptTurn`): what follows its question, up to the
+    /// next question, whose order is `nextQuestionOrder`. `inFlight`: the turn is being answered.
+    static func marking(
+        turn entries: ArraySlice<ChatTranscriptEntry>, nextQuestionOrder: Int?, inFlight: Bool, workOrders: [Int]
+    ) -> [ChatTranscriptEntry] {
+        var result = Array(entries)
+        let asks = result.first.map(ChatTranscriptTurn.isQuestion) ?? false
+        let lower = asks ? order(of: result[0]) : nil
+        let hiddenWork = lastOrder(in: workOrders, after: lower, before: nextQuestionOrder)
+        markTurn(&result, range: (asks ? 1 : 0)..<result.count, inFlight: inFlight, lastHiddenWork: hiddenWork)
         return result
     }
 

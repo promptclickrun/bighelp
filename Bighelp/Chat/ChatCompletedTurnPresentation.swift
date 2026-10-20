@@ -71,12 +71,46 @@ enum ChatInterimReplyPlacement: Equatable, Sendable {
 
 @MainActor
 enum ChatCompletedTurnProjection {
+    /// Every turn finds its steps and timed reasoning in the chat's ledger. Sort those out
+    /// and index them once per redraw: walking the whole ledger for each turn made a long
+    /// chat full of tool calls take a second or more to redraw.
+    @MainActor
+    struct Ledger {
+        let chatSteps: ChatLedgerIndex
+        let timedReasoning: ChatLedgerIndex
+
+        init(_ activityEvents: [ChatActivityEvent]) {
+            chatSteps = ChatLedgerIndex(activityEvents.filter(ChatCompletedTurnProjection.isStep))
+            timedReasoning = ChatLedgerIndex(activityEvents.filter { event in
+                event.kind == .reasoning && event.lifecycle != .running
+                    && event.durationMilliseconds.map { (0...86_400_000).contains($0) } == true
+            })
+        }
+    }
+
     static func rows(
         from entries: [ChatTranscriptEntry],
         isSending: Bool,
         enabled: Bool,
         activityEvents: [ChatActivityEvent] = [],
         interimReplies: ChatInterimReplyPlacement = .inline
+    ) -> [ChatTurnDisplayRow] {
+        let ledger = Ledger(enabled ? activityEvents : [])
+        return ChatTranscriptTurn.split(entries).flatMap { turn in
+            rows(ofTurn: entries[turn.range], endOrder: turn.nextQuestionOrder, isActive: turn.isLast && isSending,
+                 enabled: enabled, ledger: ledger, interimReplies: interimReplies)
+        }
+    }
+
+    /// One turn (`ChatTranscriptTurn`): its question, then what it did, folded once it's done.
+    /// `endOrder` is the next question's order; `isActive`, the turn is still being delivered.
+    static func rows(
+        ofTurn entries: ArraySlice<ChatTranscriptEntry>,
+        endOrder: Int?,
+        isActive: Bool,
+        enabled: Bool,
+        ledger: Ledger,
+        interimReplies: ChatInterimReplyPlacement
     ) -> [ChatTurnDisplayRow] {
         // Incremental activity updates can leave a terminal reasoning marker
         // in the cached transcript after its content has been settled away.
@@ -93,115 +127,104 @@ enum ChatCompletedTurnProjection {
             }
         }
         guard enabled else { return presentableEntries.map(ChatTurnDisplayRow.entry) }
-        // Every turn finds its steps and timed reasoning in the chat's ledger. Sort those out
-        // and index them once per redraw: walking the whole ledger for each turn made a long
-        // chat full of tool calls take a second or more to redraw.
-        let chatSteps = ChatLedgerIndex(activityEvents.filter(isStep))
-        let timedReasoning = ChatLedgerIndex(activityEvents.filter { event in
-            event.kind == .reasoning && event.lifecycle != .running
-                && event.durationMilliseconds.map { (0...86_400_000).contains($0) } == true
-        })
         var rows: [ChatTurnDisplayRow] = []
-        var work: [ChatTranscriptEntry] = []
+        var work = presentableEntries[...]
         var startedAt: Date?
         var startOrder: Int?
-
-        func flush(isActive: Bool, endOrder: Int? = nil) {
-            defer { work.removeAll(keepingCapacity: true) }
-            let hasUnsettledContent = work.contains { entry in
-                switch entry {
-                case .message(let item): item.metadata.delivery == "Streaming"
-                case .activity(let turn): turn.events.contains { $0.lifecycle == .running }
-                }
-            }
-            guard !isActive, !hasUnsettledContent, !work.isEmpty else {
-                rows.append(contentsOf: work.map(ChatTurnDisplayRow.entry))
-                return
-            }
-            // Assistant text has no trustworthy "disposable progress" marker.
-            // A reply before clarify or verification can be the useful answer,
-            // so every message that isn't an interim note stays visible, in
-            // order. All of the turn's reasoning and tool calls go into one
-            // fold, in order, placed where the work began; interim notes join
-            // it or leave with Show reasoning (`ChatInterimReplyPlacement`).
-            var folded: [ChatTranscriptEntry] = []
-            var turnRows: [ChatTurnDisplayRow] = []
-            var foldPosition: Int?
-            for entry in work {
-                switch entry {
-                case .activity(let turn):
-                    // Generated output is conversation content. Folding its
-                    // completed tool would hide the image exactly when the
-                    // animation is replaced, including after a reopen.
-                    if turn.events.contains(where: { GeneratedMediaProjection.kind(for: $0) != nil }) {
-                        turnRows.append(.entry(entry))
-                    } else if turn.events.contains(where: { $0.agentTalkCall != nil }) {
-                        // Agents messaging each other is conversation too: each
-                        // message stays out where it happened, the work around it folds.
-                        var work: [ChatActivityEvent] = []
-                        func foldWork() {
-                            guard let first = work.first else { return }
-                            if foldPosition == nil { foldPosition = turnRows.count }
-                            folded.append(.activity(ChatActivityTurn(
-                                id: first.id == turn.events.first?.id ? turn.id : "\(turn.id):work:\(first.id)",
-                                events: work)))
-                            work.removeAll()
-                        }
-                        for event in turn.events {
-                            if event.agentTalkCall != nil {
-                                foldWork()
-                                turnRows.append(.entry(.activity(ChatActivityTurn(
-                                    id: "agent-talk:\(event.id)", events: [event]))))
-                            } else {
-                                work.append(event)
-                            }
-                        }
-                        foldWork()
-                    } else {
-                        if foldPosition == nil { foldPosition = turnRows.count }
-                        folded.append(entry)
-                    }
-                case .message(let item):
-                    switch item.metadata.isInterimReply ? interimReplies : .inline {
-                    case .inline:
-                        turnRows.append(.entry(entry))
-                    case .fold:
-                        if foldPosition == nil { foldPosition = turnRows.count }
-                        folded.append(entry)
-                    case .hidden:
-                        break
-                    }
-                }
-            }
-            if let foldPosition, let first = folded.first {
-                let elapsed = elapsed(work, startedAt: startedAt, startOrder: startOrder, endOrder: endOrder,
-                                      timedReasoning: timedReasoning)
-                let steps = steps(folded, startOrder: startOrder, endOrder: endOrder, chatSteps: chatSteps)
-                turnRows.insert(.completed(ChatCompletedTurn(
-                    id: "completed-turn:\(first.id)",
-                    entries: folded,
-                    elapsedSeconds: elapsed,
-                    stepCount: steps.count,
-                    // Only a turn without a real time needs the words.
-                    summary: elapsed == nil ? ChatToolSummary.summary(of: steps) : nil
-                )), at: foldPosition)
-            }
-            rows.append(contentsOf: turnRows)
-        }
-
-        for entry in presentableEntries {
-            if case .message(let item) = entry, item.role == .human {
-                flush(isActive: false, endOrder: item.metadata.sourceOrder)
-                rows.append(.entry(entry))
-                startedAt = item.metadata.timestamp
-                startOrder = item.metadata.sourceOrder
-            } else {
-                work.append(entry)
-            }
+        if case .message(let item)? = work.first, item.role == .human {
+            rows.append(.entry(.message(item)))
+            startedAt = item.metadata.timestamp
+            startOrder = item.metadata.sourceOrder
+            work = work.dropFirst()
         }
         // Never fold the turn being delivered, including gaps between batches.
-        flush(isActive: isSending)
+        rows += fold(Array(work), isActive: isActive, startedAt: startedAt, startOrder: startOrder,
+                     endOrder: endOrder, ledger: ledger, interimReplies: interimReplies)
         return rows
+    }
+
+    private static func fold(
+        _ work: [ChatTranscriptEntry], isActive: Bool, startedAt: Date?, startOrder: Int?, endOrder: Int?,
+        ledger: Ledger, interimReplies: ChatInterimReplyPlacement
+    ) -> [ChatTurnDisplayRow] {
+        let hasUnsettledContent = work.contains { entry in
+            switch entry {
+            case .message(let item): item.metadata.delivery == "Streaming"
+            case .activity(let turn): turn.events.contains { $0.lifecycle == .running }
+            }
+        }
+        guard !isActive, !hasUnsettledContent, !work.isEmpty else {
+            return work.map(ChatTurnDisplayRow.entry)
+        }
+        // Assistant text has no trustworthy "disposable progress" marker.
+        // A reply before clarify or verification can be the useful answer,
+        // so every message that isn't an interim note stays visible, in
+        // order. All of the turn's reasoning and tool calls go into one
+        // fold, in order, placed where the work began; interim notes join
+        // it or leave with Show reasoning (`ChatInterimReplyPlacement`).
+        var folded: [ChatTranscriptEntry] = []
+        var turnRows: [ChatTurnDisplayRow] = []
+        var foldPosition: Int?
+        for entry in work {
+            switch entry {
+            case .activity(let turn):
+                // Generated output is conversation content. Folding its
+                // completed tool would hide the image exactly when the
+                // animation is replaced, including after a reopen.
+                if turn.events.contains(where: { GeneratedMediaProjection.kind(for: $0) != nil }) {
+                    turnRows.append(.entry(entry))
+                } else if turn.events.contains(where: { $0.agentTalkCall != nil }) {
+                    // Agents messaging each other is conversation too: each
+                    // message stays out where it happened, the work around it folds.
+                    var work: [ChatActivityEvent] = []
+                    func foldWork() {
+                        guard let first = work.first else { return }
+                        if foldPosition == nil { foldPosition = turnRows.count }
+                        folded.append(.activity(ChatActivityTurn(
+                            id: first.id == turn.events.first?.id ? turn.id : "\(turn.id):work:\(first.id)",
+                            events: work)))
+                        work.removeAll()
+                    }
+                    for event in turn.events {
+                        if event.agentTalkCall != nil {
+                            foldWork()
+                            turnRows.append(.entry(.activity(ChatActivityTurn(
+                                id: "agent-talk:\(event.id)", events: [event]))))
+                        } else {
+                            work.append(event)
+                        }
+                    }
+                    foldWork()
+                } else {
+                    if foldPosition == nil { foldPosition = turnRows.count }
+                    folded.append(entry)
+                }
+            case .message(let item):
+                switch item.metadata.isInterimReply ? interimReplies : .inline {
+                case .inline:
+                    turnRows.append(.entry(entry))
+                case .fold:
+                    if foldPosition == nil { foldPosition = turnRows.count }
+                    folded.append(entry)
+                case .hidden:
+                    break
+                }
+            }
+        }
+        if let foldPosition, let first = folded.first {
+            let elapsed = elapsed(work, startedAt: startedAt, startOrder: startOrder, endOrder: endOrder,
+                                  timedReasoning: ledger.timedReasoning)
+            let steps = steps(folded, startOrder: startOrder, endOrder: endOrder, chatSteps: ledger.chatSteps)
+            turnRows.insert(.completed(ChatCompletedTurn(
+                id: "completed-turn:\(first.id)",
+                entries: folded,
+                elapsedSeconds: elapsed,
+                stepCount: steps.count,
+                // Only a turn without a real time needs the words.
+                summary: elapsed == nil ? ChatToolSummary.summary(of: steps) : nil
+            )), at: foldPosition)
+        }
+        return turnRows
     }
 
     /// A tool call or helper the fold counts; pictures and agents talking stay out in the chat.

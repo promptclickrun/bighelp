@@ -476,6 +476,7 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
         if loaded.supportsPeerChatPreference {
             try await syncAlertPreferences(host: host, profile: profile, grant: grant, client: client,
                                            workflows: loaded.supportsWorkflowAlertPreferences,
+                                           scheduledLinks: loaded.supportsScheduledAlertLinks,
                                            isCurrent: { (try? self.requireCurrent(host, credentials: credentials)) != nil })
             try requireCurrent(host, credentials: credentials)
         }
@@ -499,28 +500,35 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
     }
 
     /// Peer chats (agents talking to each other) alert this phone only when it turned them on; each
-    /// kind of workflow alert unless it turned that off (hosts with `preferences.workflows`).
+    /// kind of workflow alert unless it turned that off (hosts with `preferences.workflows`). Hosts with
+    /// `preferences.scheduledLinks` hear that this phone opens a scheduled task's alert in its job's
+    /// chat or on the job (`BighelpScheduledAlertLinks`).
     /// Sent only when the host's confirmed choices differ from this phone's.
     private func syncAlertPreferences(host: BighelpConfiguredHost, profile: String, grant: BighelpManagedGrant,
-                                      client: any DirectHostNotificationServing, workflows: Bool,
+                                      client: any DirectHostNotificationServing, workflows: Bool, scheduledLinks: Bool,
                                       isCurrent: @escaping @MainActor () -> Bool) async throws {
         let wanted = BighelpPeerChatAlerts.isOn
         let wantedWorkflows = workflows ? BighelpWorkflowAlerts.current : nil
         let record = ledger.record(host: host, profile: profile)
-        guard record?.peerChatsAlert != wanted
+        // Asked once per grant: a new grant on the host starts without it.
+        let sendsLinks = scheduledLinks && record?.scheduledLinksGrantID != grant.grantId
+        guard record?.peerChatsAlert != wanted || sendsLinks
                 || (wantedWorkflows != nil && record?.workflowAlertsSent != wantedWorkflows) else { return }
         var body: [String: BighelpJSONValue] = ["version": .integer(1), "peerChats": .boolean(wanted)]
         if let wantedWorkflows { body["workflows"] = .object(wantedWorkflows.mapValues(BighelpJSONValue.boolean)) }
+        if scheduledLinks { body["scheduledLinks"] = .boolean(true) }
         let value = try await client.request("/enrollments/\(grant.grantId)/preferences", method: "PUT", body: body,
                                              isCurrent: isCurrent)
         let confirmed = value.object?["workflows"]?.object?.compactMapValues(\.boolean)
         guard isCurrent(), value.object?["peerChats"]?.boolean == wanted,
               wantedWorkflows == nil || confirmed == wantedWorkflows,
+              !scheduledLinks || value.object?["scheduledLinks"]?.boolean == true,
               var current = ledger.record(host: host, profile: profile), current.grant == grant else {
             throw DirectHermesError.invalidResponse
         }
         current.peerChatsAlert = wanted
         if let wantedWorkflows { current.workflowAlertsSent = wantedWorkflows }
+        if scheduledLinks { current.scheduledLinksGrantID = grant.grantId }
         try ledger.save(current)
     }
 
@@ -539,7 +547,8 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
                   let loaded = try? ManagedNotificationValidation.decode(BighelpManagedCapabilities.self, from: raw),
                   loaded.supportsPeerChatPreference else { continue }
             try? await syncAlertPreferences(host: host, profile: record.profile, grant: grant, client: client,
-                                            workflows: loaded.supportsWorkflowAlertPreferences, isCurrent: isCurrent)
+                                            workflows: loaded.supportsWorkflowAlertPreferences,
+                                            scheduledLinks: loaded.supportsScheduledAlertLinks, isCurrent: isCurrent)
         }
     }
 

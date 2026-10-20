@@ -10,8 +10,9 @@ struct BighelpExternalSessionOpen: Equatable, Sendable {
         case stored(profileID: String, storedSessionID: String)
         /// A shell catalog session ID (bighelp Link notifications).
         case catalog(sessionID: String)
-        /// A notification's chat by its reference, found in the saved chat list.
-        case reference(profileID: String, sessionReference: String)
+        /// A notification's chat by its reference, found in the saved chat list. A scheduled run's
+        /// alert can name its job's chat or the job instead (`BighelpScheduledAlertLinks`).
+        case reference(profileID: String, sessionReference: String, isScheduledRun: Bool)
     }
     let id = UUID()
     let target: Target
@@ -28,8 +29,9 @@ final class BighelpExternalSessionOpenCenter {
         pending = BighelpExternalSessionOpen(target: .stored(profileID: profileID, storedSessionID: storedSessionID))
     }
 
-    func request(profileID: String, sessionReference: String) {
-        pending = BighelpExternalSessionOpen(target: .reference(profileID: profileID, sessionReference: sessionReference))
+    func request(profileID: String, sessionReference: String, isScheduledRun: Bool = false) {
+        pending = BighelpExternalSessionOpen(target: .reference(profileID: profileID, sessionReference: sessionReference,
+                                                               isScheduledRun: isScheduledRun))
     }
 
     func request(catalogSessionID: String) {

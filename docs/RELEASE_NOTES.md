@@ -3,6 +3,25 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.4
+
+This release fixes agent reactions, answers that went away, and the loader in Simple Bot mode. It also makes heavy
+chats smoother.
+
+### Fixes
+
+- **Reactions:** when an agent reacts to a message, the reaction shows in the open chat at once. This needs plugin
+  3.24.0 or later.
+- **Answers:** an answer of an agent stays in the chat when the agent continues to work after it. The answer no
+  longer goes away or changes into a note.
+- **Simple Bot mode:** when you open the chat of an agent, the loader shows until the chat is ready. This applies to
+  all agents.
+- **Heavy chats:** chats with very long history stream and scroll more smoothly.
+- **Mac:** **Compact** is under **Usage** in the chat menu without Nerd Mode. In the iPad app on a Mac, right-click a
+  message to react to it.
+- **Data agreement:** if you did not agree to share data with your Hermes computer and its AI providers, bighelp
+  asks you one time when it opens. bighelp sends nothing until you agree.
+
 ## 2.6.3
 
 This release makes long chats fast again and fixes alerts of scheduled tasks, phone tools, the chat list and the

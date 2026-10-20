@@ -44,7 +44,8 @@ struct ChatCardMessageProjection: Equatable, Sendable {
     /// The cards an assistant message names. Most messages have none, and laying each one
     /// out to find out made a long chat parse every message on every redraw.
     static func cardIDs(in source: String) -> Set<String> {
-        guard source.contains("```\(fenceLanguage)") else { return [] }
+        guard ChatTextMarker.mayContain("```\(fenceLanguage)", in: source),
+              source.contains("```\(fenceLanguage)") else { return [] }
         return ChatCardMessageProjection(source: source, role: .assistant).cardIDs
     }
 

@@ -75,19 +75,34 @@ struct ChatActivityEvent: Identifiable, Codable, Equatable, Sendable {
 
     var reasoningText: String? {
         guard kind == .reasoning else { return nil }
-        let emptyLifecycleLabels = [
-            "",
-            "preparing a response",
-            "response ready",
-            "response stopped",
-            "reasoning completed",
-        ]
         for value in [detail, summary] {
-            guard let value,
-                  !emptyLifecycleLabels.contains(value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()) else { continue }
+            guard let value, !Self.isEmptyLifecycleLabel(value) else { continue }
             return value
         }
         return nil
+    }
+
+    private static let emptyLifecycleLabels: Set<String> = [
+        "",
+        "preparing a response",
+        "response ready",
+        "response stopped",
+        "reasoning completed",
+    ]
+    private static let longestEmptyLifecycleLabel = 20
+
+    /// `value`, trimmed and lowercased, is a lifecycle label rather than reasoning. Every
+    /// redraw of a long chat asks this of each thought, so longer text (lowercasing never
+    /// shortens it) is ruled out without copying it.
+    private static func isEmptyLifecycleLabel(_ value: String) -> Bool {
+        let whitespace = CharacterSet.whitespacesAndNewlines
+        let scalars = value.unicodeScalars
+        if let first = scalars.firstIndex(where: { !whitespace.contains($0) }),
+           let last = scalars.lastIndex(where: { !whitespace.contains($0) }),
+           scalars.index(first, offsetBy: longestEmptyLifecycleLabel, limitedBy: last) != nil {
+            return false
+        }
+        return emptyLifecycleLabels.contains(value.trimmingCharacters(in: whitespace).lowercased())
     }
 
     /// Plain words for the work, from the shared tool catalog: "Running a

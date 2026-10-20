@@ -80,7 +80,8 @@ enum ReferenceCodec: Sendable {
     /// no network, no side effects. Always retain `source` for copy/export/send.
     static func decode(_ source: String) -> ReferenceDecodedMessage {
         do {
-            guard source.contains("```loopdy-references-") else {
+            guard ChatTextMarker.mayContain("```loopdy-references-", in: source),
+                  source.contains("```loopdy-references-") else {
                 return fallback(source, failure: nil)
             }
             guard let range = source.range(of: appendixPrefix, options: .literal),

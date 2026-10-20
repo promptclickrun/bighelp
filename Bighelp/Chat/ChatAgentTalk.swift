@@ -39,7 +39,8 @@ struct AgentTalkCall: Equatable, Sendable {
             return AgentTalkCall(targetID: target, message: nonempty(object["message"] as? String), route: .message)
         case "terminal":
             // Cheap first: most commands never mention Hermes.
-            guard arguments.contains("hermes"), let object = jsonObject(arguments),
+            guard ChatTextMarker.mayContain("hermes", in: arguments), arguments.contains("hermes"),
+                  let object = jsonObject(arguments),
                   let command = object["command"] as? String,
                   let commands = AgentTalkShellWords.commands(in: command) else { return nil }
             for words in commands {

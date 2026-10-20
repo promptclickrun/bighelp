@@ -26,6 +26,11 @@ struct AgentEditorView: View {
     /// A new agent's first look in the creator, picked once per editor. Also the
     /// character page for an agent that wears something else.
     @State private var surpriseLook = AvatarCreatorModel.surprise()
+    /// Templates › Browse all, presented from the form's root so its search gets the keyboard.
+    @State private var isBrowsingTemplates = false
+    /// Picked in Browse all; applied once that sheet has closed, since a template's form opens as
+    /// a sheet of its own.
+    @State private var browsedTemplate: AgentSoulTemplate?
     @FocusState private var focusedField: AgentEditorModel.Field?
     @Environment(\.dismiss) private var dismiss
 
@@ -269,6 +274,14 @@ struct AgentEditorView: View {
             #endif
             // The Mac: wide enough for the character beside the choices.
             .bighelpSheetSize(.large)
+        }
+        .bighelpSheet(isPresented: $isBrowsingTemplates, onDismiss: {
+            guard let template = browsedTemplate else { return }
+            browsedTemplate = nil
+            AgentStartPicker.pick(template, into: model)
+        }) {
+            AgentTemplateBrowser { browsedTemplate = $0 }
+                .bighelpSheetSize(.large)
         }
         .agentTemplateForm(model)
         // Modal ownership must outlive the lazy sections while a picker is presented.
@@ -793,7 +806,7 @@ struct AgentEditorView: View {
         VStack(spacing: BighelpTokens.space20) {
             hero(model: model)
             if !model.isEditing {
-                AgentStartPicker(model: model, library: templateLibrary)
+                AgentStartPicker(model: model, library: templateLibrary) { isBrowsingTemplates = true }
             }
         }
     }

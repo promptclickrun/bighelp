@@ -15,14 +15,16 @@ struct BoardBlueprint: Identifiable, Hashable, Sendable {
     var isOfficial = true
     /// When the catalog last changed it; nil for bundled ones.
     var updatedAt: Date? = nil
-    /// Its group (productivity, marketing…), for the category filter.
-    var category = ""
+    /// Its topic (Productivity, Marketing…); Other when the catalog names none the app knows.
+    var category: TemplateCategory = .other
 }
 
+/// One topic's blueprints on a page.
 struct BoardBlueprintGroup: Identifiable, Equatable, Sendable {
-    let id: String
-    let title: String
+    let category: TemplateCategory
     let blueprints: [BoardBlueprint]
+    var id: String { category.id }
+    var title: String { category.title }
 }
 
 /// The bundled blueprints, `Resources/BoardBlueprints.json`: the 45 starter prompts on
@@ -31,7 +33,8 @@ struct BoardBlueprintGroup: Identifiable, Equatable, Sendable {
 /// that page with the same ids, keeping each goal blueprint's `goalCategory`. Bundled so they
 /// work offline and cost nothing until tapped.
 struct BoardBlueprintCatalog: Sendable {
-    private let pages: [AgentBoardItem.Kind: [BoardBlueprintGroup]]
+    /// Each page's blueprints in the catalog's order.
+    private let pages: [AgentBoardItem.Kind: [BoardBlueprint]]
 
     /// The catalog's blueprints when there are some, otherwise the bundled ones. Observed, so a
     /// refresh shows without a relaunch.
@@ -45,57 +48,39 @@ struct BoardBlueprintCatalog: Sendable {
         return try BoardBlueprintCatalog(data: Data(contentsOf: url))
     }
 
-    private init(pages: [AgentBoardItem.Kind: [BoardBlueprintGroup]]) { self.pages = pages }
+    private init(pages: [AgentBoardItem.Kind: [BoardBlueprint]]) { self.pages = pages }
 
     /// Lenient like host data: unknown pages and keys are ignored, blank prompts and empty
-    /// groups dropped, and an unknown goal category is none.
+    /// groups dropped, and an unknown goal category is none. A group's ID is its topic.
     init(data: Data) throws {
         guard data.count <= 1_048_576 else { throw CocoaError(.fileReadTooLarge) }
         let file = try JSONDecoder().decode(File.self, from: data)
-        var pages: [AgentBoardItem.Kind: [BoardBlueprintGroup]] = [:]
+        var pages: [AgentBoardItem.Kind: [BoardBlueprint]] = [:]
         for page in file.pages {
-            let kind: AgentBoardItem.Kind? = switch page.page {
-            case "feed": .feed
-            case "ideas": .idea
-            case "goals": .goal
-            default: nil
-            }
-            guard let kind else { continue }
-            let groups = (page.groups ?? []).compactMap { group -> BoardBlueprintGroup? in
-                let blueprints = (group.prompts ?? []).compactMap { prompt -> BoardBlueprint? in
+            guard let kind = Self.kind(page.page) else { continue }
+            for group in page.groups ?? [] {
+                guard group.id != nil else { continue }
+                pages[kind, default: []] += (group.prompts ?? []).compactMap { prompt -> BoardBlueprint? in
                     let text = prompt.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                     guard let id = prompt.id, !id.isEmpty, !text.isEmpty else { return nil }
                     return BoardBlueprint(id: id, text: text,
                                           goalCategory: prompt.goalCategory.flatMap(GoalCategory.init(stored:)),
-                                          credit: Self.credit(prompt.credit), category: group.id ?? "")
+                                          credit: Self.credit(prompt.credit), category: .blueprint(group.id))
                 }
-                guard let id = group.id, !blueprints.isEmpty else { return nil }
-                return BoardBlueprintGroup(id: id, title: group.title ?? id, blueprints: blueprints)
             }
-            pages[kind, default: []] += groups
         }
         self.pages = pages
     }
 
-    /// `/v1/catalog.json`'s flat `blueprints` (board, category, source and updatedAt on each), grouped
-    /// like the bundled file. Leniently: an item that doesn't read is dropped.
+    /// `/v1/catalog.json`'s flat `blueprints` (board, category, source and updatedAt on each).
+    /// Leniently: an item that doesn't read is dropped.
     init(catalogRows rows: [Any]) {
-        var order: [AgentBoardItem.Kind: [String]] = [:]
-        var items: [AgentBoardItem.Kind: [String: [BoardBlueprint]]] = [:]
+        var pages: [AgentBoardItem.Kind: [BoardBlueprint]] = [:]
         var seen = Set<String>()
         for value in rows.prefix(2_000) {
             guard let row = value as? [String: Any], let blueprint = Self.blueprint(row),
                   seen.insert(blueprint.id).inserted, let kind = Self.kind(row["board"] as? String) else { continue }
-            if items[kind, default: [:]][blueprint.category] == nil { order[kind, default: []].append(blueprint.category) }
-            items[kind, default: [:]][blueprint.category, default: []].append(blueprint)
-        }
-        var pages: [AgentBoardItem.Kind: [BoardBlueprintGroup]] = [:]
-        for (kind, categories) in order {
-            pages[kind] = categories.compactMap { category in
-                items[kind]?[category].map {
-                    BoardBlueprintGroup(id: category, title: Self.groupTitle(category), blueprints: $0)
-                }
-            }
+            pages[kind, default: []].append(blueprint)
         }
         self.pages = pages
     }
@@ -113,22 +98,11 @@ struct BoardBlueprintCatalog: Sendable {
         guard let id = row["id"] as? String, !id.isEmpty, id.count <= 64,
               let text = (row["text"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
               !text.isEmpty, text.count <= 2_000 else { return nil }
-        let category = (row["category"] as? String).flatMap { $0.isEmpty || $0.count > 40 ? nil : $0 } ?? "other"
         let goalCategory = (row["goalCategory"] as? String).flatMap(GoalCategory.init(stored:))
         return BoardBlueprint(id: id, text: text, goalCategory: goalCategory, credit: credit(row["credit"] as? String),
                               isOfficial: (row["source"] as? String) != "community",
-                              updatedAt: TemplateCatalogDate.parse(row["updatedAt"] as? String), category: category)
-    }
-
-    static func groupTitle(_ category: String) -> String {
-        switch category {
-        case "productivity": "Productivity"
-        case "marketing": "Marketing"
-        case "content": "Content creation"
-        case "personal": "Personal life"
-        case "research": "Research"
-        default: category.prefix(1).uppercased() + category.dropFirst()
-        }
+                              updatedAt: TemplateCatalogDate.parse(row["updatedAt"] as? String),
+                              category: .blueprint(row["category"] as? String))
     }
 
     /// A community username ("@sam" or "sam"), or nil when it isn't one.
@@ -138,14 +112,21 @@ struct BoardBlueprintCatalog: Sendable {
         return name.range(of: "^[A-Za-z0-9_.-]{1,39}$", options: .regularExpression) == nil ? nil : name
     }
 
-    func groups(for kind: AgentBoardItem.Kind) -> [BoardBlueprintGroup] { pages[kind] ?? [] }
+    /// A page's blueprints by topic, in the topics' fixed order with Other last.
+    func groups(for kind: AgentBoardItem.Kind) -> [BoardBlueprintGroup] {
+        TemplateTopics.sections(blueprints(for: kind), topics: TemplateCategory.blueprintTopics, category: \.category)
+            .compactMap { section in section.category.map { BoardBlueprintGroup(category: $0, blueprints: section.items) } }
+    }
+
+    /// A page's blueprints in the catalog's order.
+    func blueprints(for kind: AgentBoardItem.Kind) -> [BoardBlueprint] { pages[kind] ?? [] }
 
     /// Goals blueprints for one category, for its Create a goal row.
     func blueprints(for category: GoalCategory) -> [BoardBlueprint] {
         groups(for: .goal).flatMap(\.blueprints).filter { $0.goalCategory == category }
     }
 
-    var count: Int { pages.values.joined().map(\.blueprints.count).reduce(0, +) }
+    var count: Int { pages.values.map(\.count).reduce(0, +) }
 
     private struct File: Decodable {
         let pages: [Page]
@@ -156,9 +137,9 @@ struct BoardBlueprintCatalog: Sendable {
         let groups: [Group]?
     }
 
+    /// Its `title` isn't read: the topic's name comes from `TemplateCategory`.
     private struct Group: Decodable {
         let id: String?
-        let title: String?
         let prompts: [Prompt]?
     }
 
@@ -260,66 +241,78 @@ struct BoardBlueprintsButton: View {
     @BighelpThemeReader private var theme
 }
 
-/// One board's blueprints by topic. A pick opens its fill-in page.
+/// One board's blueprints by topic: search, topic chips and Sort. A pick opens its fill-in page.
 struct BoardBlueprintsSheet: View {
     let kind: AgentBoardItem.Kind
     let agentName: String
-    let groups: [BoardBlueprintGroup]
+    let blueprints: [BoardBlueprint]
     let onSend: (String) -> Void
     let onEdit: (String) -> Void
     @State private var filling: BoardBlueprint?
     @State private var search = ""
-    @State private var order = BlueprintOrder.forYou
+    @State private var filter = TemplateTopicFilter.all
+    @State private var order = TemplateOrder.forYou
     @State private var officialOnly = false
-    @State private var category: String?
     @Environment(\.dismiss) private var dismiss
 
-    enum BlueprintOrder: String, CaseIterable, Identifiable {
-        case forYou, newest, mostUsed
-        var id: Self { self }
-        var title: String {
-            switch self {
-            case .forYou: "For you"
-            case .newest: "Newest"
-            case .mostUsed: "Most used"
-            }
-        }
-    }
-
     var body: some View {
+        let offersOfficialOnly = blueprints.contains { !$0.isOfficial }
+        let listing = BlueprintBrowsing.listing(blueprints, search: search, officialOnly: officialOnly && offersOfficialOnly,
+                                                filter: filter, order: order, usage: TemplateUsage.shared)
         NavigationStack {
             List {
-                controls
-                let shown = BlueprintBrowsing.filter(groups.flatMap(\.blueprints), search: search,
-                                                     officialOnly: officialOnly, category: category)
-                if shown.isEmpty {
-                    ContentUnavailableView.search(text: search)
-                        .listRowBackground(Color.clear)
-                } else if order == .forYou, search.isEmpty {
-                    ForEach(groups) { group in
-                        let items = shown.filter { $0.category == group.id }
-                        if !items.isEmpty { section(group.title, items) }
+                Section {
+                    BighelpSearchField(text: $search, prompt: "Search blueprints", accessibilityLabel: "Search blueprints",
+                                       accessibilityIdentifier: "board.blueprints.search")
+                        .bighelpListSearchRow()
+                    TemplateTopicChips(filters: listing.filters, selection: $filter, identifier: "board.blueprints")
+                        .templateChipsRow()
+                } footer: {
+                    Text("Pick one, fill in the blanks, and send it to \(agentName). Nothing runs until you send it.")
+                        .font(.bighelp(.footnote))
+                        .foregroundStyle(theme.secondaryText)
+                }
+                ForEach(listing.sections) { section in
+                    Section {
+                        ForEach(section.items) { blueprint in
+                            Button { filling = blueprint } label: {
+                                row(blueprint, showsCategory: section.category == nil, showsSource: offersOfficialOnly)
+                            }
+                            .bighelpPlainButtonStyle()
+                            .listRowBackground(theme.surface)
+                            .accessibilityIdentifier("board.blueprint.\(blueprint.id)")
+                        }
+                    } header: {
+                        TemplateSectionHeader(title: section.title, systemImage: section.category?.systemImage,
+                                              count: section.items.count,
+                                              identifier: "board.blueprints.section.\(section.id)")
                     }
-                } else {
-                    section(search.isEmpty ? order.title : "Results",
-                            BlueprintBrowsing.sorted(shown, by: order, usage: TemplateUsage.shared), showsCategory: true)
+                }
+                if listing.isEmpty {
+                    TemplateEmptyView(state: TemplateEmptyState(search: search, filter: listing.filter, noun: "blueprints"),
+                                      identifier: "board.blueprints.empty") { filter = .all }
+                        .listRowBackground(Color.clear)
                 }
                 Section {
                     Link(destination: TemplateCatalogPolicy.submitURL) {
                         Label("Share yours", systemImage: "square.and.arrow.up")
+                            .font(.bighelp(.body))
                     }
                     .listRowBackground(theme.surface)
                     .accessibilityIdentifier("board.blueprints.share")
                 } footer: {
                     Text("Send a blueprint on bighelp.app. Approved ones show up here for everyone.")
+                        .font(.bighelp(.footnote))
+                        .foregroundStyle(theme.secondaryText)
                 }
             }
             .scrollContentBackground(.hidden)
             .background(theme.canvas.ignoresSafeArea())
-            .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search blueprints")
+            .environment(\.defaultMinListRowHeight, BighelpTokens.hitTarget)
+            .dismissesKeyboardOnScroll(true)
+            .animation(.snappy, value: filter)
             .animation(.snappy, value: order)
             .animation(.snappy, value: officialOnly)
-            .animation(.snappy, value: category)
             .navigationDestination(item: $filling) { blueprint in
                 BlueprintFillView(blueprint: blueprint, agentName: agentName,
                                   onSend: { TemplateUsage.shared.recordUse(blueprint.id); onSend($0) },
@@ -328,68 +321,19 @@ struct BoardBlueprintsSheet: View {
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { dismiss() }
+                        .bighelpToolbarText()
                         .accessibilityIdentifier("board.blueprints.done")
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    TemplateSortMenu(order: $order, officialOnly: $officialOnly, offersOfficialOnly: offersOfficialOnly,
+                                     identifier: "board.blueprints.sort")
                 }
             }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("board.blueprints.sheet")
-    }
-
-    /// Order, bighelp-only and the categories, above the list.
-    private var controls: some View {
-        Section {
-            VStack(alignment: .leading, spacing: BighelpTokens.space12) {
-                Text("Pick one, fill in the blanks, and send it to \(agentName). Nothing runs until you send it.")
-                    .font(.bighelp(.subheadline))
-                    .foregroundStyle(theme.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-                Picker("Order", selection: $order) {
-                    ForEach(BlueprintOrder.allCases) { Text($0.title).tag($0) }
-                }
-                .bighelpSegmentedPicker()
-                .accessibilityIdentifier("board.blueprints.order")
-                ScrollView(.horizontal) {
-                    HStack(spacing: BighelpTokens.space8) {
-                        BlueprintChip(title: "bighelp only", systemImage: "checkmark.seal.fill", isOn: officialOnly,
-                                      identifier: "board.blueprints.official") { officialOnly.toggle() }
-                        Divider().frame(height: 22)
-                        BlueprintChip(title: "All", isOn: category == nil, identifier: "board.blueprints.category.all") {
-                            category = nil
-                        }
-                        ForEach(groups) { group in
-                            BlueprintChip(title: group.title, isOn: category == group.id,
-                                          identifier: "board.blueprints.category.\(group.id)") {
-                                category = category == group.id ? nil : group.id
-                            }
-                        }
-                    }
-                    .padding(.vertical, 2)
-                }
-                .scrollIndicators(.hidden)
-            }
-            .listRowBackground(Color.clear)
-            .listRowInsets(EdgeInsets(top: 0, leading: BighelpTokens.space16, bottom: 0, trailing: BighelpTokens.space16))
-        }
-    }
-
-    private func section(_ title: String, _ items: [BoardBlueprint], showsCategory: Bool = false) -> some View {
-        Section {
-            ForEach(items) { blueprint in
-                Button { filling = blueprint } label: { row(blueprint, showsCategory: showsCategory) }
-                    .bighelpPlainButtonStyle()
-                    .listRowBackground(theme.surface)
-                    .accessibilityIdentifier("board.blueprint.\(blueprint.id)")
-            }
-        } header: {
-            Text(title.uppercased())
-                .font(.bighelp(.caption).weight(.bold))
-                .tracking(1)
-                .foregroundStyle(theme.secondaryText)
-                .accessibilityAddTraits(.isHeader)
-        }
     }
 
     private var title: String {
@@ -400,9 +344,17 @@ struct BoardBlueprintsSheet: View {
         }
     }
 
-    private func row(_ blueprint: BoardBlueprint, showsCategory: Bool) -> some View {
+    /// The prompt, then only what tells it apart: whose it is (when some are the community's), its
+    /// topic in a ranked list, and how often it was used.
+    private func row(_ blueprint: BoardBlueprint, showsCategory: Bool, showsSource: Bool) -> some View {
         let uses = TemplateUsage.shared.count(blueprint.id)
-        return VStack(alignment: .leading, spacing: BighelpTokens.space8) {
+        var details: [String] = []
+        if showsSource {
+            details.append(blueprint.isOfficial ? "bighelp" : blueprint.credit.map { "by @\($0)" } ?? "Community")
+        }
+        if showsCategory { details.append(blueprint.category.title) }
+        if uses > 0 { details.append(uses == 1 ? "Used once" : "Used \(uses) times") }
+        return VStack(alignment: .leading, spacing: BighelpTokens.space4) {
             HStack(alignment: .top, spacing: BighelpTokens.space12) {
                 Text(Self.highlighted(blueprint.text, placeholder: theme.action))
                     .font(.bighelp(.body))
@@ -415,27 +367,12 @@ struct BoardBlueprintsSheet: View {
                     .padding(.top, 3)
                     .accessibilityHidden(true)
             }
-            HStack(spacing: BighelpTokens.space8) {
-                if blueprint.isOfficial {
-                    Label("bighelp", systemImage: "checkmark.seal.fill")
-                        .foregroundStyle(theme.action)
-                } else if let credit = blueprint.credit {
-                    Text(verbatim: "by @\(credit)")
-                } else {
-                    Text("Community")
-                }
-                if showsCategory, !blueprint.category.isEmpty {
-                    Text("·")
-                    Text(BoardBlueprintCatalog.groupTitle(blueprint.category))
-                }
-                if uses > 0 {
-                    Text("·")
-                    Text(uses == 1 ? "Used once" : "Used \(uses) times")
-                }
+            if !details.isEmpty {
+                Text(verbatim: details.joined(separator: " · "))
+                    .font(.bighelp(.caption).weight(.medium))
+                    .foregroundStyle(theme.tertiaryText)
+                    .lineLimit(1)
             }
-            .font(.bighelp(.caption).weight(.medium))
-            .foregroundStyle(theme.tertiaryText)
-            .labelStyle(.titleAndIcon)
         }
         .padding(.vertical, BighelpTokens.space8)
         .contentShape(.rect)
@@ -459,57 +396,33 @@ struct BoardBlueprintsSheet: View {
     @BighelpThemeReader private var theme
 }
 
-/// A filter or category pill above the blueprints.
-private struct BlueprintChip: View {
-    let title: String
-    var systemImage: String?
-    let isOn: Bool
-    let identifier: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Label {
-                Text(title)
-            } icon: {
-                if let systemImage { Image(systemName: systemImage) }
-            }
-            .labelStyle(.titleAndIcon)
-            .font(.bighelp(.subheadline).weight(.semibold))
-            .foregroundStyle(isOn ? theme.actionForeground : theme.primaryText)
-            .padding(.horizontal, BighelpTokens.space12)
-            .frame(minHeight: 36)
-            .background(isOn ? theme.action : theme.surface, in: .capsule)
-            .overlay { Capsule().strokeBorder(isOn ? .clear : theme.border) }
-            .contentShape(.capsule)
+/// Search, bighelp-only, topic and order for blueprints.
+enum BlueprintBrowsing {
+    /// Every word of the search somewhere in its text, topic or credit.
+    private static func matches(_ blueprint: BoardBlueprint, words: [String]) -> Bool {
+        words.allSatisfy { word in
+            blueprint.text.lowercased().contains(word)
+                || blueprint.category.title.lowercased().contains(word)
+                || (blueprint.credit?.lowercased().contains(word) ?? false)
         }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(isOn ? [.isButton, .isSelected] : .isButton)
-        .accessibilityIdentifier(identifier)
     }
 
-    @BighelpThemeReader private var theme
-}
-
-/// Search, bighelp-only, category and order for blueprints and agent templates.
-enum BlueprintBrowsing {
-    static func filter(_ items: [BoardBlueprint], search: String, officialOnly: Bool, category: String?) -> [BoardBlueprint] {
-        let words = search.lowercased().split(separator: " ").map(String.init)
-        return items.filter { blueprint in
-            (!officialOnly || blueprint.isOfficial)
-                && (category == nil || blueprint.category == category)
-                && words.allSatisfy { word in
-                    blueprint.text.lowercased().contains(word)
-                        || BoardBlueprintCatalog.groupTitle(blueprint.category).lowercased().contains(word)
-                        || (blueprint.credit?.lowercased().contains(word) ?? false)
-                }
-        }
+    /// What the sheet shows: the page's blueprints by topic, or ranked for Newest and Most used.
+    @MainActor
+    static func listing(_ items: [BoardBlueprint], search: String, officialOnly: Bool, filter: TemplateTopicFilter,
+                        order: TemplateOrder, usage: TemplateUsage) -> TemplateListing<BoardBlueprint> {
+        let words = TemplateTopics.words(search)
+        let ranked: (title: String, sort: ([BoardBlueprint]) -> [BoardBlueprint])? = order == .forYou ? nil
+            : (order.title, { sorted($0, by: order, usage: usage) })
+        return TemplateTopics.listing(catalog: officialOnly ? items.filter(\.isOfficial) : items,
+                                      topics: TemplateCategory.blueprintTopics, filter: filter, category: \.category,
+                                      matches: { matches($0, words: words) }, ranked: ranked)
     }
 
     /// Newest by the catalog's date (bundled ones last), most used by this device's count; ties keep
     /// the catalog's order.
     @MainActor
-    static func sorted(_ items: [BoardBlueprint], by order: BoardBlueprintsSheet.BlueprintOrder,
+    static func sorted(_ items: [BoardBlueprint], by order: TemplateOrder,
                        usage: TemplateUsage) -> [BoardBlueprint] {
         let indexed = Array(items.enumerated())
         switch order {
@@ -679,7 +592,7 @@ private struct BoardBlueprintsPresenter: ViewModifier {
             outcome.perform(in: context)
         }) {
             BoardBlueprintsSheet(kind: kind, agentName: context.agentName,
-                                 groups: BoardBlueprintCatalog.shared.groups(for: kind),
+                                 blueprints: BoardBlueprintCatalog.shared.blueprints(for: kind),
                                  onSend: { finish(.send($0)) }, onEdit: { finish(.edit($0)) })
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)

@@ -1,61 +1,74 @@
 import SwiftUI
 
-/// Every agent template from the catalog: search, newest or most used, and bighelp's own only.
-/// Picking one fills in the editor like the Templates rail.
+/// Every agent template from the catalog, by topic: search, topic chips, My Templates first, and
+/// Sort (For you, Newest, Most used; bighelp only when there are community ones). Picking one fills
+/// in the editor like the Templates rail.
 struct AgentTemplateBrowser: View {
     var title = "Agent templates"
     var myTemplates: MyTemplatesStore = .shared
     let onPick: (AgentSoulTemplate) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var search = ""
-    @State private var order = BoardBlueprintsSheet.BlueprintOrder.forYou
+    @State private var filter = TemplateTopicFilter.all
+    @State private var order = TemplateOrder.forYou
     @State private var officialOnly = false
 
     var body: some View {
-        let shown = AgentTemplateBrowsing.sorted(
-            AgentTemplateBrowsing.filter(AgentSoulTemplate.all, search: search, officialOnly: officialOnly),
-            by: order, usage: TemplateUsage.shared)
-        // The person's own come first, newest first as the computer lists them.
-        let mine = AgentTemplateBrowsing.filter(myTemplates.templates, search: search, officialOnly: officialOnly)
-        let showsMine = !mine.isEmpty || (myTemplates.skipped > 0 && search.isEmpty && !officialOnly)
+        let catalog = AgentSoulTemplate.all
+        let offersOfficialOnly = catalog.contains(where: \.isCommunity)
+        let hasMine = !myTemplates.templates.isEmpty || myTemplates.skipped > 0
+        let listing = AgentTemplateBrowsing.listing(
+            catalog: catalog, mine: myTemplates.templates, hasMine: hasMine, search: search,
+            officialOnly: officialOnly && offersOfficialOnly, filter: filter, order: order, usage: TemplateUsage.shared)
+        let showsSkipped = myTemplates.skipped > 0 && search.isEmpty && (listing.filter == .all || listing.filter == .mine)
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: BighelpTokens.space16) {
-                    if showsMine {
-                        myTemplatesSection(mine)
-                        sectionTitle("All templates")
-                            .padding(.top, BighelpTokens.space8)
-                    }
-                    HStack(spacing: BighelpTokens.space12) {
-                        Picker("Order", selection: $order) {
-                            ForEach(BoardBlueprintsSheet.BlueprintOrder.allCases) { Text($0.title).tag($0) }
+            List {
+                Section {
+                    BighelpSearchField(text: $search, prompt: "Search templates", accessibilityLabel: "Search templates",
+                                       accessibilityIdentifier: "agent.templates.search")
+                        .bighelpListSearchRow()
+                    TemplateTopicChips(filters: listing.filters, selection: $filter, identifier: "agent.templates")
+                        .templateChipsRow()
+                }
+                if !listing.mine.isEmpty || showsSkipped {
+                    myTemplatesSection(listing.mine, showsSkipped: showsSkipped)
+                }
+                ForEach(listing.sections) { section in
+                    Section {
+                        ForEach(section.items) { template in
+                            row(template, showsTopic: section.category == nil, showsSource: offersOfficialOnly)
                         }
-                        .bighelpSegmentedPicker()
-                        .accessibilityIdentifier("agent.templates.order")
+                    } header: {
+                        TemplateSectionHeader(title: section.title, systemImage: section.category?.systemImage,
+                                              count: section.items.count,
+                                              identifier: "agent.templates.section.\(section.id)")
                     }
-                    Toggle(isOn: $officialOnly) {
-                        Label("bighelp only", systemImage: "checkmark.seal.fill")
-                            .font(.bighelp(.subheadline).weight(.semibold))
-                    }
-                    .tint(theme.action)
-                    .accessibilityIdentifier("agent.templates.official")
-                    if shown.isEmpty, mine.isEmpty {
-                        ContentUnavailableView.search(text: search)
-                    } else {
-                        grid(shown)
-                    }
+                }
+                if listing.isEmpty, !showsSkipped {
+                    TemplateEmptyView(state: TemplateEmptyState(search: search, filter: listing.filter, noun: "templates"),
+                                      identifier: "agent.templates.empty") { filter = .all }
+                        .listRowBackground(Color.clear)
+                }
+                Section {
                     Link(destination: TemplateCatalogPolicy.submitURL) {
                         Label("Share yours", systemImage: "square.and.arrow.up")
-                            .font(.bighelp(.subheadline).weight(.semibold))
+                            .font(.bighelp(.body))
                     }
+                    .listRowBackground(theme.surface)
                     .accessibilityIdentifier("agent.templates.share")
+                } footer: {
+                    Text("Send a template on bighelp.app. Approved ones show up here for everyone.")
+                        .font(.bighelp(.footnote))
+                        .foregroundStyle(theme.secondaryText)
                 }
-                .padding(BighelpTokens.space16)
-                .animation(.snappy, value: order)
-                .animation(.snappy, value: officialOnly)
             }
+            .scrollContentBackground(.hidden)
             .background(theme.canvas.ignoresSafeArea())
-            .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search templates")
+            .environment(\.defaultMinListRowHeight, BighelpTokens.hitTarget)
+            .dismissesKeyboardOnScroll(true)
+            .animation(.snappy, value: filter)
+            .animation(.snappy, value: order)
+            .animation(.snappy, value: officialOnly)
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -64,6 +77,10 @@ struct AgentTemplateBrowser: View {
                         .bighelpToolbarText()
                         .accessibilityIdentifier("agent.templates.done")
                 }
+                ToolbarItem(placement: .primaryAction) {
+                    TemplateSortMenu(order: $order, officialOnly: $officialOnly, offersOfficialOnly: offersOfficialOnly,
+                                     identifier: "agent.templates.sort")
+                }
             }
         }
         .accessibilityIdentifier("agent.templates.browser")
@@ -71,102 +88,44 @@ struct AgentTemplateBrowser: View {
     }
 
     /// My Templates: bots the person saved as templates on their computer. Hold one to delete it.
-    private func myTemplatesSection(_ mine: [AgentSoulTemplate]) -> some View {
-        VStack(alignment: .leading, spacing: BighelpTokens.space8) {
-            sectionTitle("My Templates")
-            Text("Saved on your computer. Hold one to delete it.")
-                .font(.bighelp(.footnote))
-                .foregroundStyle(theme.secondaryText)
-            if myTemplates.skipped > 0 {
-                Text(myTemplates.skipped == 1 ? "One saved template couldn't be opened, so it's hidden."
-                                              : "\(myTemplates.skipped) saved templates couldn't be opened, so they're hidden.")
-                    .font(.bighelp(.footnote))
-                    .foregroundStyle(theme.tertiaryText)
-                    .accessibilityIdentifier("agent.templates.mine.skipped")
-            }
-            grid(mine)
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("agent.templates.mine")
-    }
-
-    private func sectionTitle(_ text: String) -> some View {
-        Text(text)
-            .font(.bighelp(.title3, weight: .semibold))
-            .foregroundStyle(theme.primaryText)
-            .accessibilityAddTraits(.isHeader)
-    }
-
-    private func grid(_ templates: [AgentSoulTemplate]) -> some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: BighelpTokens.space12)],
-                  spacing: BighelpTokens.space12) {
-            ForEach(templates) { template in
-                if template.isMine {
-                    card(template)
-                        .contextMenu {
-                            Button("Delete", systemImage: "trash", role: .destructive) {
-                                Task { await myTemplates.delete(template) }
-                            }
+    private func myTemplatesSection(_ mine: [AgentSoulTemplate], showsSkipped: Bool) -> some View {
+        Section {
+            ForEach(mine) { template in
+                row(template, showsTopic: false, showsSource: false)
+                    .contextMenu {
+                        Button("Delete", systemImage: "trash", role: .destructive) {
+                            Task { await myTemplates.delete(template) }
                         }
-                } else {
-                    card(template)
+                    }
+            }
+        } header: {
+            TemplateSectionHeader(title: "My Templates", systemImage: "person.fill", count: mine.count,
+                                  identifier: "agent.templates.mine")
+        } footer: {
+            VStack(alignment: .leading, spacing: BighelpTokens.space4) {
+                Text("Saved on your computer. Hold one to delete it.")
+                    .foregroundStyle(theme.secondaryText)
+                if showsSkipped {
+                    Text(myTemplates.skipped == 1 ? "One saved template couldn't be opened, so it's hidden."
+                                                  : "\(myTemplates.skipped) saved templates couldn't be opened, so they're hidden.")
+                        .foregroundStyle(theme.tertiaryText)
+                        .accessibilityIdentifier("agent.templates.mine.skipped")
                 }
             }
+            .font(.bighelp(.footnote))
         }
     }
 
-    private func card(_ template: AgentSoulTemplate) -> some View {
-        let uses = TemplateUsage.shared.count(AgentTemplateBrowsing.usageID(template))
-        return Button {
+    private func row(_ template: AgentSoulTemplate, showsTopic: Bool, showsSource: Bool) -> some View {
+        Button {
             onPick(template)
             dismiss()
         } label: {
-            VStack(alignment: .leading, spacing: BighelpTokens.space4) {
-                Image(systemName: template.systemImage)
-                    .font(.bighelp(.title3))
-                    .foregroundStyle(theme.action)
-                    .frame(height: 28)
-                    .accessibilityHidden(true)
-                Text(verbatim: template.title)
-                    .font(.bighelp(.headline))
-                    .foregroundStyle(theme.primaryText)
-                    .lineLimit(1)
-                Text(verbatim: template.cardRole)
-                    .font(.bighelp(.subheadline).weight(.medium))
-                    .foregroundStyle(theme.secondaryText)
-                    .lineLimit(2)
-                if !template.strength.isEmpty {
-                    Text(verbatim: template.cardStrength)
-                        .font(.bighelp(.caption))
-                        .foregroundStyle(theme.secondaryText)
-                        .lineLimit(3)
-                }
-                Spacer(minLength: BighelpTokens.space4)
-                HStack(spacing: BighelpTokens.space4) {
-                    if template.isMine {
-                        Label("Yours", systemImage: "person.fill").foregroundStyle(theme.action)
-                    } else if !template.isCommunity {
-                        Label("bighelp", systemImage: "checkmark.seal.fill").foregroundStyle(theme.action)
-                    } else if let credit = template.credit {
-                        Text(verbatim: "by @\(credit)")
-                    } else {
-                        Text("Community")
-                    }
-                    if uses > 0 { Text(uses == 1 ? "· Used once" : "· Used \(uses) times") }
-                }
-                .font(.bighelp(.caption2).weight(.medium))
-                .foregroundStyle(theme.tertiaryText)
-                .labelStyle(.titleAndIcon)
-            }
-            .padding(BighelpTokens.space12)
-            .frame(maxWidth: .infinity, minHeight: 190, alignment: .topLeading)
-            .background(theme.surface, in: .rect(cornerRadius: BighelpTokens.radius20))
-            .overlay {
-                RoundedRectangle(cornerRadius: BighelpTokens.radius20).strokeBorder(theme.border)
-            }
-            .contentShape(.rect(cornerRadius: BighelpTokens.radius20))
+            AgentTemplateRow(template: template, uses: TemplateUsage.shared.count(AgentTemplateBrowsing.usageID(template)),
+                             showsTopic: showsTopic, showsSource: showsSource)
         }
-        .buttonStyle(.plain)
+        .bighelpPlainButtonStyle()
+        .listRowBackground(theme.surface)
         .accessibilityLabel("\(template.title), \(template.cardRole)")
         .accessibilityIdentifier("agent.templates.\(template.id)")
     }
@@ -174,20 +133,99 @@ struct AgentTemplateBrowser: View {
     @BighelpThemeReader private var theme
 }
 
+/// One agent template in a picker: its icon, name, role and what it's good at.
+struct AgentTemplateRow: View {
+    let template: AgentSoulTemplate
+    let uses: Int
+    /// In a ranked list (Newest, Most used), which topic it's from.
+    let showsTopic: Bool
+    /// The catalog holds community templates too, so each says whose it is.
+    let showsSource: Bool
+    @BighelpThemeReader private var theme
+
+    var body: some View {
+        HStack(alignment: .top, spacing: BighelpTokens.space12) {
+            Image(systemName: template.systemImage)
+                .font(.bighelp(.body).weight(.semibold))
+                .foregroundStyle(theme.action)
+                .frame(width: BighelpTokens.scaled(40), height: BighelpTokens.scaled(40))
+                .background(theme.action.opacity(0.12), in: .rect(cornerRadius: BighelpTokens.radius12, style: .continuous))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: template.title)
+                    .font(.bighelp(.headline))
+                    .foregroundStyle(theme.primaryText)
+                    .lineLimit(1)
+                if !template.profile.isEmpty {
+                    Text(verbatim: template.cardRole)
+                        .font(.bighelp(.subheadline).weight(.medium))
+                        .foregroundStyle(theme.secondaryText)
+                        .lineLimit(2)
+                }
+                if !template.strength.isEmpty {
+                    Text(verbatim: template.cardStrength)
+                        .font(.bighelp(.footnote))
+                        .foregroundStyle(theme.secondaryText)
+                        .lineLimit(2)
+                }
+                if !details.isEmpty {
+                    Text(verbatim: details.joined(separator: " · "))
+                        .font(.bighelp(.caption).weight(.medium))
+                        .foregroundStyle(theme.tertiaryText)
+                        .lineLimit(1)
+                        .padding(.top, 2)
+                }
+            }
+            .multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.vertical, BighelpTokens.space4)
+        .contentShape(.rect)
+    }
+
+    /// Whose it is, its topic and how often it was used: only what tells this one apart.
+    private var details: [String] {
+        var parts: [String] = []
+        if showsSource {
+            if !template.isCommunity { parts.append("bighelp") }
+            else if let credit = template.credit { parts.append("by @\(credit)") }
+            else { parts.append("Community") }
+        }
+        if showsTopic { parts.append(template.category.title) }
+        if uses > 0 { parts.append(uses == 1 ? "Used once" : "Used \(uses) times") }
+        return parts
+    }
+}
+
 enum AgentTemplateBrowsing {
     static func usageID(_ template: AgentSoulTemplate) -> String { "agent:" + template.id }
 
-    static func filter(_ items: [AgentSoulTemplate], search: String, officialOnly: Bool) -> [AgentSoulTemplate] {
-        let words = search.lowercased().split(separator: " ").map(String.init)
-        return items.filter { template in
-            let text = [template.title, template.profile, template.voice, template.strength, template.credit ?? ""]
-                .joined(separator: " ").lowercased()
-            return (!officialOnly || !template.isCommunity) && words.allSatisfy { text.contains($0) }
-        }
+    /// Every word of the search somewhere in its name, role, vibe, strength, credit or topic.
+    private static func matches(_ template: AgentSoulTemplate, words: [String]) -> Bool {
+        guard !words.isEmpty else { return true }
+        let text = [template.title, template.profile, template.voice, template.strength, template.credit ?? "",
+                    template.isMine ? "" : template.category.title]
+            .joined(separator: " ").lowercased()
+        return words.allSatisfy { text.contains($0) }
+    }
+
+    /// What the picker shows: My Templates first, then the catalog by topic, or ranked for
+    /// Newest and Most used.
+    @MainActor
+    static func listing(catalog: [AgentSoulTemplate], mine: [AgentSoulTemplate], hasMine: Bool, search: String,
+                        officialOnly: Bool, filter: TemplateTopicFilter, order: TemplateOrder,
+                        usage: TemplateUsage) -> TemplateListing<AgentSoulTemplate> {
+        let words = TemplateTopics.words(search)
+        let offered = officialOnly ? catalog.filter { !$0.isCommunity } : catalog
+        let ranked: (title: String, sort: ([AgentSoulTemplate]) -> [AgentSoulTemplate])? = order == .forYou ? nil
+            : (order.title, { sorted($0, by: order, usage: usage) })
+        return TemplateTopics.listing(catalog: offered, mine: mine, hasMine: hasMine,
+                                      topics: TemplateCategory.agentTopics, filter: filter, category: \.category,
+                                      matches: { matches($0, words: words) }, ranked: ranked)
     }
 
     @MainActor
-    static func sorted(_ items: [AgentSoulTemplate], by order: BoardBlueprintsSheet.BlueprintOrder,
+    static func sorted(_ items: [AgentSoulTemplate], by order: TemplateOrder,
                        usage: TemplateUsage) -> [AgentSoulTemplate] {
         let indexed = Array(items.enumerated())
         switch order {

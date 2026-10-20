@@ -13,6 +13,8 @@ struct AgentSoulTemplate: Identifiable, Equatable, Sendable {
     /// The hard case it's written to handle well, shown on its card.
     let strength: String
     let systemImage: String
+    /// Its topic in the pickers; Other when the catalog names none the app knows.
+    var category: TemplateCategory = .other
     /// A catalog template's personality text, carried inline; bundled ones read their file.
     var inlineSoul: String? = nil
     /// Who shared a community template, shown as "by @credit".
@@ -55,55 +57,56 @@ struct AgentSoulTemplate: Identifiable, Equatable, Sendable {
     /// The catalog's templates when there are some, otherwise the bundled ones.
     @MainActor static var all: [AgentSoulTemplate] { TemplateCatalogStore.shared.agentTemplates }
 
+    /// Each with the topic the catalog gives it, so the fallback sorts the same way.
     static let bundled: [AgentSoulTemplate] = [
         .init(id: "anchor", title: "Anchor", profile: "Everyday generalist", voice: "Warm, direct, adaptable",
               strength: "Helps with vague requests without turning simple tasks into an interview.",
-              systemImage: "sun.max"),
+              systemImage: "sun.max", category: .agent("personal")),
         .init(id: "compass", title: "Compass", profile: "Chief-of-staff partner", voice: "Concise, discreet, decisive",
               strength: "Sorts out conflicting priorities without inventing authority or commitments.",
-              systemImage: "safari"),
+              systemImage: "safari", category: .agent("productivity")),
         .init(id: "spark", title: "Spark", profile: "Focus companion", voice: "Gentle, concrete, encouraging",
               strength: "Helps you get started, and start again after a gap, without shame.",
-              systemImage: "bolt"),
+              systemImage: "bolt", category: .agent("productivity")),
         .init(id: "lumen", title: "Lumen", profile: "Learning partner", voice: "Patient, curious, accessible",
               strength: "Explains things another way when the first one doesn't land, at any age.",
-              systemImage: "lightbulb"),
+              systemImage: "lightbulb", category: .agent("education")),
         .init(id: "lens", title: "Lens", profile: "Research partner", voice: "Measured, precise, inquisitive",
               strength: "Resists confirmation bias and says when evidence is missing, not disproved.",
-              systemImage: "magnifyingglass"),
+              systemImage: "magnifyingglass", category: .agent("science")),
         .init(id: "forge", title: "Forge", profile: "Engineering partner", voice: "Candid, pragmatic, technical",
               strength: "Keeps a plausible fix, passing checks and a working result apart.",
-              systemImage: "hammer"),
+              systemImage: "hammer", category: .agent("coding")),
         .init(id: "beacon", title: "Beacon", profile: "Incident partner", voice: "Calm, brief, factual",
               strength: "Communicates under pressure without false certainty or early all-clears.",
-              systemImage: "light.beacon.max"),
+              systemImage: "light.beacon.max", category: .agent("coding")),
         .init(id: "counterpoint", title: "Counterpoint", profile: "Strategy challenger",
               voice: "Independent, fair, incisive",
               strength: "Challenges big assumptions without becoming reflexively contrarian.",
-              systemImage: "arrow.left.arrow.right"),
+              systemImage: "arrow.left.arrow.right", category: .agent("leadership")),
         .init(id: "muse", title: "Muse", profile: "Creative collaborator", voice: "Inventive, vivid, playful",
               strength: "Takes a real new direction after a no, and keeps fiction apart from fact.",
-              systemImage: "paintpalette"),
+              systemImage: "paintpalette", category: .agent("creative")),
         .init(id: "quill", title: "Quill", profile: "Editor and writing partner", voice: "Clear, attentive, restrained",
               strength: "Improves your writing without changing its meaning, voice or promises.",
-              systemImage: "pencil.line"),
+              systemImage: "pencil.line", category: .agent("creative")),
         .init(id: "bridge", title: "Bridge", profile: "Support and resolution partner",
               voice: "Patient, courteous, firm",
               strength: "Handles anger and demands for guarantees without fake fixes or scripted empathy.",
-              systemImage: "bubble.left.and.bubble.right"),
+              systemImage: "bubble.left.and.bubble.right", category: .agent("business")),
         .init(id: "hearth", title: "Hearth", profile: "Household companion", voice: "Warm, practical, considerate",
               strength: "Handles a shared home: different people, preferences and private things.",
-              systemImage: "house"),
+              systemImage: "house", category: .agent("personal")),
         .init(id: "harbor", title: "Harbor", profile: "Reflective companion", voice: "Gentle, attentive, grounded",
               strength: "Offers support without encouraging dependence or claiming human feelings.",
-              systemImage: "heart"),
+              systemImage: "heart", category: .agent("health")),
         .init(id: "waypoint", title: "Waypoint", profile: "Consequential-information guide",
               voice: "Careful, plainspoken, calm",
               strength: "Explains sensitive matters without posing as a professional or promising outcomes.",
-              systemImage: "signpost.right"),
+              systemImage: "signpost.right", category: .agent("personal")),
         .init(id: "fable", title: "Fable", profile: "Playful storyteller", voice: "Imaginative, lightly theatrical",
               strength: "Stays in character for fun, and drops it the moment you need it plain.",
-              systemImage: "book"),
+              systemImage: "book", category: .agent("creative")),
     ]
 
     @MainActor static func template(_ id: String) -> AgentSoulTemplate? { all.first { $0.id == id } }

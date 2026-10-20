@@ -9,6 +9,7 @@ extension AgentSoulTemplate {
         voice: "Confident, practical, quick",
         strength: "Turns what you want into owners, steps and decision points.",
         systemImage: "flag.checkered",
+        category: .agent("leadership"),
         inlineSoul: """
             # {{agent_name}}
 

@@ -224,6 +224,7 @@ extension AgentSoulTemplate {
             return AgentSoulTemplate(
                 id: id, title: name, profile: role, voice: text("vibe", max: 160) ?? "",
                 strength: text("description", max: 400) ?? "", systemImage: symbol ?? "person.crop.square",
+                category: .agent(row["category"] as? String),
                 inlineSoul: instructions, credit: credit, isCommunity: (row["source"] as? String) == "community",
                 updatedAt: TemplateCatalogDate.parse(row["updatedAt"] as? String),
                 variables: TemplateVariables.parse(row["variables"])

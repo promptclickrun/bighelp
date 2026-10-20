@@ -128,7 +128,7 @@ struct BoardBlueprintAndGoalCategoryTests {
         let catalog = try BoardBlueprintCatalog(data: Data(json.utf8))
         #expect(catalog.count == 2)
         #expect(catalog.groups(for: .feed).flatMap(\.blueprints).map(\.id) == ["one"])
-        #expect(catalog.groups(for: .goal).map(\.id) == ["c"], "Empty groups don't show")
+        #expect(catalog.groups(for: .goal).map(\.id) == ["other"], "Empty groups don't show; an unknown topic is Other")
         #expect(catalog.groups(for: .goal)[0].blueprints[0].goalCategory == nil)
         #expect(catalog.groups(for: .idea).isEmpty)
         #expect(throws: (any Error).self) { try BoardBlueprintCatalog(data: Data("[]".utf8)) }

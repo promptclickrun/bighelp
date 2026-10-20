@@ -64,6 +64,7 @@ struct TemplateCatalogStoreTests {
         #expect(community.updatedAt != nil)
         #expect(AgentNamePlaceholder.fill(community.soul ?? "", name: "Juniper") == "# Juniper\n\nPlan hikes as Juniper.")
         #expect(!templates[0].isCommunity)
+        #expect(templates[0].category.title == "Personal" && community.category == .other, "\"fun\" isn't a topic")
     }
 
     @Test func catalogBlueprintsGroupByBoardAndCategory() {
@@ -72,7 +73,7 @@ struct TemplateCatalogStoreTests {
         #expect(catalog.count == 3, "Blank and unknown-board items are dropped")
         let idea = catalog.groups(for: .idea).first?.blueprints.first
         #expect(catalog.groups(for: .idea).map(\.title) == ["Personal life"])
-        #expect(idea?.isOfficial == false && idea?.credit == "sam_hikes" && idea?.category == "personal")
+        #expect(idea?.isOfficial == false && idea?.credit == "sam_hikes" && idea?.category.id == "personal")
         #expect(catalog.blueprints(for: .health).map(\.id) == ["goals-health-1"])
         #expect(catalog.groups(for: .feed).first?.blueprints.first?.isOfficial == true)
     }
@@ -135,11 +136,14 @@ struct TemplateCatalogStoreTests {
         let rows = try! JSONSerialization.jsonObject(with: Data("[\(blueprintRows)]".utf8)) as! [Any]
         let all = BoardBlueprintCatalog(catalogRows: rows).groups(for: .idea).flatMap(\.blueprints)
             + BoardBlueprintCatalog(catalogRows: rows).groups(for: .feed).flatMap(\.blueprints)
-        #expect(BlueprintBrowsing.filter(all, search: "weekend", officialOnly: false, category: nil).map(\.id) == ["ideas-fun-1"])
-        #expect(BlueprintBrowsing.filter(all, search: "", officialOnly: true, category: nil).map(\.id) == ["feed-productivity-1"])
-        #expect(BlueprintBrowsing.filter(all, search: "", officialOnly: false, category: "productivity").map(\.id)
-                == ["feed-productivity-1"])
         let usage = TemplateUsage(defaults: defaults())
+        func shown(_ search: String, officialOnly: Bool = false, filter: TemplateTopicFilter = .all) -> [String] {
+            BlueprintBrowsing.listing(all, search: search, officialOnly: officialOnly, filter: filter, order: .forYou,
+                                      usage: usage).sections.flatMap(\.items).map(\.id)
+        }
+        #expect(shown("weekend") == ["ideas-fun-1"])
+        #expect(shown("", officialOnly: true) == ["feed-productivity-1"])
+        #expect(shown("", filter: .topic(.blueprint("productivity"))) == ["feed-productivity-1"])
         #expect(BlueprintBrowsing.sorted(all, by: .newest, usage: usage).first?.id == "ideas-fun-1", "Newest first")
         usage.recordUse("feed-productivity-1")
         usage.recordUse("feed-productivity-1")

@@ -27,12 +27,11 @@ struct AgentStartPicker: View {
     let model: AgentEditorModel
     @Bindable var library: AgentTemplateLibrary
     var myTemplates: MyTemplatesStore = .shared
+    /// Opens Browse all. The editor presents it from its form's root: this picker sits in a
+    /// section header, and a sheet hung there never gets the keyboard for its search.
+    let onBrowse: () -> Void
     @State private var renaming: SavedAgentTemplate?
     @State private var renameText = ""
-    @State private var isBrowsingTemplates = false
-    /// Picked in Browse all; applied once that sheet has closed, since a template's form opens as
-    /// a sheet of its own.
-    @State private var browsedTemplate: AgentSoulTemplate?
 
     var body: some View {
         VStack(alignment: .leading, spacing: BighelpTokens.space12) {
@@ -64,9 +63,7 @@ struct AgentStartPicker: View {
                      ? "Its personality is in Instructions below, with your agent's name filled in."
                      : "Each is a full personality. Pick one, then give your agent its name.")
                 HStack {
-                    Button {
-                        isBrowsingTemplates = true
-                    } label: {
+                    Button(action: onBrowse) {
                         Label("Browse all \(AgentSoulTemplate.all.count)", systemImage: "square.grid.2x2")
                             .font(.bighelp(.footnote).weight(.semibold))
                     }
@@ -126,14 +123,6 @@ struct AgentStartPicker: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .task { await myTemplates.refresh() }
-        .bighelpSheet(isPresented: $isBrowsingTemplates, onDismiss: {
-            guard let browsedTemplate else { return }
-            self.browsedTemplate = nil
-            pick(browsedTemplate)
-        }) {
-            AgentTemplateBrowser { browsedTemplate = $0 }
-                .bighelpSheetSize(.large)
-        }
         .alert("Rename template", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
             TextField("Name", text: $renameText)
             Button("Cancel", role: .cancel) { renaming = nil }
@@ -145,6 +134,11 @@ struct AgentStartPicker: View {
     }
 
     private func pick(_ template: AgentSoulTemplate) {
+        Self.pick(template, into: model)
+    }
+
+    /// Fills the editor from a template and counts it toward Most used.
+    static func pick(_ template: AgentSoulTemplate, into model: AgentEditorModel) {
         TemplateUsage.shared.recordUse(AgentTemplateBrowsing.usageID(template))
         model.startFrom(template)
     }

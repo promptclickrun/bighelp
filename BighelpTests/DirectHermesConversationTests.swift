@@ -2206,6 +2206,26 @@ struct DirectHermesConversationTests {
         replay.expectAnswerShown(answer, after: "the turn ended")
     }
 
+    /// Hermes reuses the answer it already sent when the model ends with an empty reply after a
+    /// housekeeping tool (memory, todo), and says so (`response_reused`, `response_previewed`).
+    /// The chat settles the copy it shows: one answer, never a second copy that turns the first
+    /// into a note.
+    @Test func aReusedAnswerSettlesTheCopyAlreadyShown() throws {
+        let replay = try LandedAnswerReplay()
+        let answer = "Paris is the capital of France."
+        replay.receive("message.start")
+        replay.receive("message.delta", ["text": .string(answer)])
+        replay.receive("message.interim", ["text": .string(answer), "already_streamed": .boolean(true)])
+        replay.receive("tool.start", ["tool_id": .string("call_memory"), "name": .string("memory")])
+        replay.receive("tool.complete", ["tool_id": .string("call_memory"), "name": .string("memory")])
+        replay.receive("message.complete", ["text": .string(answer), "status": .string("complete"),
+                                            "response_previewed": .boolean(true), "response_reused": .boolean(true)])
+        replay.expectAnswerShown(answer, after: "message.complete")
+        replay.receive("session.info", ["running": .boolean(false)])
+        replay.expectAnswerShown(answer, after: "the turn ended")
+        #expect(replay.model.items.filter { LandedAnswerReplay.text($0) == answer }.count == 1)
+    }
+
     /// Hermes can run a turn of its own right after the person's (a goal's next step, a finished
     /// background process): it starts with message.start and no message from the person. The
     /// person's answer stays an answer, and doesn't move into the bot's reasoning.

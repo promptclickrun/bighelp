@@ -143,6 +143,7 @@ extension DirectHermesConversationClient {
             if let model { model.acceptExternal([item], isLiveAssistantText: change.sideTaskResult == nil) }
             else if let draftSink, pendingTurnID == projection.turnID, !terminalSeen { draftSink(item) }
         }
+        if let settled = change.settledAnswer { model?.updateNativeMetadata(settled, from: self) }
         for activity in change.activities { _ = model?.acceptActivity(activity) }
         if let todoSnapshot = change.todoSnapshot { publishTodoSnapshot(todoSnapshot) }
         if let control = change.controlSnapshot {

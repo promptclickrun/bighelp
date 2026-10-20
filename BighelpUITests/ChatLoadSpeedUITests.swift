@@ -90,6 +90,27 @@ final class ChatLoadSpeedUITests: BighelpUITestCase {
         settle()
     }
 
+    /// Flicks through the chat with real touches but no element queries: a query reads every
+    /// row of a long chat into the accessibility tree first, which would change what's measured.
+    @MainActor
+    func testFlickingThroughALongRealisticChat() throws {
+        let app = launchRealistic(label: "flick", opensChat: true)
+        Thread.sleep(forTimeInterval: 10)
+        let top = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3))
+        let bottom = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75))
+        post(ChatPerformance.reset)
+        let options = XCTMeasureOptions()
+        options.invocationOptions = [.manuallyStop]
+        options.iterationCount = 5
+        measure(metrics: [XCTOSSignpostMetric.scrollingAndDecelerationMetric], options: options) {
+            for _ in 0..<3 { top.press(forDuration: 0.01, thenDragTo: bottom, withVelocity: .fast, thenHoldForDuration: 0) }
+            stopMeasuring()
+            for _ in 0..<3 { bottom.press(forDuration: 0.01, thenDragTo: top, withVelocity: .fast, thenHoldForDuration: 0) }
+        }
+        post(ChatPerformance.read)
+        settle()
+    }
+
     /// What each key typed in the message box costs while a long chat is open.
     @MainActor
     func testTypingInALongRealisticChat() throws {

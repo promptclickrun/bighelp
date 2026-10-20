@@ -59,6 +59,7 @@ struct RootShellView: View {
     @State var sessionRestoreRequest: SessionRestoreRequest?
     @State var sessionRestoreTask: Task<Void, Never>?
     @State var canonicalChatCoordinator = CanonicalChatCoordinator()
+    @State var simpleBotsChatOpening = SimpleBotsChatOpening()
     @State var managementStore: WorkspaceManagementStore?
     /// Host pages open in the stack, one per destination (`WorkspaceOpenScreens`).
     @State var capabilitiesPresentations = WorkspaceOpenScreens<NativeCapabilitiesPresentation>()
@@ -380,6 +381,7 @@ struct RootShellView: View {
         .overlay {
             ZStack { simpleBotsOpeningLoader }
                 .animation(.snappy, value: fleet?.pendingOpen != nil)
+                .animation(.snappy, value: simpleBotsChatOpening.isShowing)
         }
     }
 
@@ -1634,6 +1636,8 @@ struct RootShellView: View {
 
     func openSession(_ session: SessionSummary) {
         let route = AppRoute.chat(conversationID: session.id)
+        let simpleBotsOpening = beginSimpleBotsChatOpening(session)
+        defer { if let simpleBotsOpening { noteSimpleBotsChatOpened(simpleBotsOpening, route: route) } }
         // On screen already (a notification or link about it): keep it as it is, any load it
         // has under way included, and catch up from the host.
         if appState.path.last == route, featureStore.preparedModel(for: route) != nil {

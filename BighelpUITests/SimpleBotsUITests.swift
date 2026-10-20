@@ -434,12 +434,46 @@ final class SimpleBotsUITests: BighelpUITestCase {
         XCTAssertFalse(app.descendants(matching: .any)["simple-bots.home"].exists)
     }
 
+    /// A bot whose chat is slow to open (the demo's Bot Chat lookup takes as long as a slow computer's):
+    /// the opening loader shows with its name and Cancel, Cancel stays on the home, and the next tap
+    /// opens the chat once it's ready, with the loader gone.
     @MainActor
-    private func launch(appearance: String) -> XCUIApplication {
+    func testASlowChatOpensUnderTheLoader() throws {
+        for appearance in ["light", "dark"] {
+            let app = launch(appearance: appearance, extra: ["-test-simple-bots-open-delay-ms", "3000"])
+            let home = app.descendants(matching: .any)["simple-bots.home"]
+            XCTAssertTrue(home.waitForExistence(timeout: 15))
+            let bot = app.buttons["simple-bots.bot.travel"]
+            XCTAssertTrue(bot.waitForExistence(timeout: 5))
+            let loader = app.descendants(matching: .any)["simple-bots.opening"]
+            let chat = app.buttons["chat.identity"]
+
+            // Cancel: the lookup stops and the home stays.
+            bot.tap()
+            XCTAssertTrue(loader.waitForExistence(timeout: 2.5), "The loader shows while the chat is slow to open")
+            XCTAssertTrue(app.staticTexts["Opening Mina Shah…"].exists)
+            app.buttons["simple-bots.opening.cancel"].tap()
+            XCTAssertTrue(loader.waitForNonExistence(timeout: 2))
+            XCTAssertFalse(chat.waitForExistence(timeout: 4), "A cancelled open never shows the chat")
+            XCTAssertTrue(home.exists)
+
+            // Again, to the chat.
+            bot.tap()
+            XCTAssertTrue(loader.waitForExistence(timeout: 2.5))
+            save("simple-opening-\(appearance)", app)
+            XCTAssertTrue(chat.waitForExistence(timeout: 10), "The chat opens once it's ready")
+            XCTAssertTrue(loader.waitForNonExistence(timeout: 3), "The loader goes with the chat on screen")
+            save("simple-opened-\(appearance)", app)
+            app.terminate()
+        }
+    }
+
+    @MainActor
+    private func launch(appearance: String, extra: [String] = []) -> XCUIApplication {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
                                "-bighelp.settings.simple-bots", "YES",
-                               "-loopdy.demo.appearance", appearance]
+                               "-loopdy.demo.appearance", appearance] + extra
         app.launch()
         return app
     }

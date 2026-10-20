@@ -131,17 +131,26 @@ extension RootShellView {
             actionErrorMessage = "Connect to this computer to open the agent’s chat."
             return
         }
+        // Simple Bot mode: the opening loader covers the lookup and the chat's first load if they're slow.
+        let opening = simpleBotsOn
+            ? simpleBotsChatOpening.begin(agentID: profileID, name: agents.profiles.first { $0.id == profileID }?.name,
+                                          originPath: appState.path)
+            : nil
         // A Bot Chat opened before is saved here: open it at once (its chat loads from
         // Hermes as usual) rather than wait a second or two on the lookup.
         if let saved = sessionCatalog.records.first(where: { $0.isBotChat && $0.agentIDs == [profileID] }) {
             showAgentChat(saved, fromList: fromList, startsVoice: startsVoice)
+            if let opening { simpleBotsChatOpening.endIfNothingOpened(opening) }
             return
         }
         let originTab = appState.selectedTab
         let originPath = appState.path
-        canonicalChatCoordinator.open(profileID: profileID, owner: owner, resolve: { profile, expectedOwner in
+        let lookup = canonicalChatCoordinator.open(profileID: profileID, owner: owner, resolve: { profile, expectedOwner in
             // Demo data only when no real computer is selected (tests add real ones to a demo launch).
             if usesWorkspaceFixtures, workspaceConnections?.isDirectSelected != true {
+                #if DEBUG
+                try await SimpleBotsChatOpening.demoLookupDelay()
+                #endif
                 return try DemoSessionCatalogClient.canonicalID(profileID: profile, records: sessionCatalog.records)
             }
             let ready = try await connectedOwner(signedInAs: expectedOwner)
@@ -160,6 +169,12 @@ extension RootShellView {
         }, failed: {
             openLatestAgentChat(profileID, fromList: fromList, startsVoice: startsVoice)
         })
+        if let opening {
+            Task { @MainActor in
+                await lookup.value
+                simpleBotsChatOpening.endIfNothingOpened(opening)
+            }
+        }
     }
 
     private func showAgentChat(_ record: SessionRecord, fromList: Bool, startsVoice: Bool) {

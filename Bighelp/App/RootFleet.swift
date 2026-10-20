@@ -400,7 +400,10 @@ extension RootShellView {
         guard let fleet, let pending = fleet.pendingOpen, pending.hostID == fleet.selectedHostID,
               isFleetHostReady else { return }
         fleet.pendingOpen = nil
+        // Simple Bot mode: the chat's own opening loader takes over from the gateway's, with no gap.
+        simpleBotsChatOpening.showsNextAtOnce = simpleBotsOn
         performFleetOpen(pending.open)
+        simpleBotsChatOpening.showsNextAtOnce = false
     }
 
     /// The selected host is connected and its chats are on hand. That's the

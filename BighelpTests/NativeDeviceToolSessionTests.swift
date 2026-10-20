@@ -126,6 +126,7 @@ struct NativeDeviceToolSessionTests {
         #expect(quiet.pollInterval == .seconds(8))
         try await quiet.pollOnce()
         #expect(fixture.handled == 1)
+        await quiet.close()
         let busy = fixture.session(enabled: [.calendar, .appearance])
         try await busy.connect()
         #expect(fixture.http.connectedEnabled == ["appearance", "calendar"])
@@ -211,6 +212,100 @@ struct NativeDeviceToolSessionTests {
         #expect(fixture.http.paths == ["context", "device-tools/connect"])
     }
 
+    // MARK: One chat, one phone (#461)
+
+    /// The plugin's refusals carry its code and no ETag. A refused connect opened nothing, so the
+    /// phone sends no close for it: the plugin would only refuse that too (`channel_not_found`).
+    @Test func aRefusedConnectKeepsThePluginsReasonAndSendsNoClose() async throws {
+        let fixture = try Fixture()
+        fixture.http.hold(device: "f3a1c7d2-0b6e-4c55-9e1a-2d7b8c9e0f13")
+        await #expect(throws: WorkspaceClientError.rejected(code: "channel_ambiguous")) { try await fixture.session().run() }
+        #expect(fixture.http.paths == ["context", "device-tools/connect"])
+        #expect(fixture.http.refusals == ["channel_ambiguous"])
+    }
+
+    /// The app closed before its close reached the host, or the close was lost on a reconnect. An older
+    /// plugin keeps that channel until its 30-second lease ends and refuses this phone's next
+    /// connect for the chat. The chat gets its phone tools back once the lease can have ended, with no
+    /// need to leave it and come back.
+    @Test func aChannelLeftBehindIsWaitedOutAndTheChatConnectsAgain() async throws {
+        let fixture = try Fixture()
+        fixture.http.closeFails = true
+        let earlier = fixture.session()
+        try await earlier.connect()
+        await earlier.close()
+        #expect(fixture.http.openChannels == 1)
+        fixture.http.closeFails = false
+        var waits: [Duration] = []
+        var waiting = 0
+        var connected = 0
+        try await NativeDeviceToolSession.runReopeningWhileHeld(
+            sleep: { waits.append($0); fixture.http.advance($0) },
+            makeSession: { fixture.session() },
+            onConnected: { _ in connected += 1; fixture.available = false },
+            onWaiting: { waiting += 1 })
+        #expect(connected == 1 && waiting == 1)
+        #expect(waits.count == 1 && waits.allSatisfy { $0 > .seconds(30) })
+        #expect(fixture.http.refusals == ["channel_ambiguous"])
+        #expect(fixture.http.openChannels == 0)
+    }
+
+    /// A newer plugin lets the same phone replace its own channel, so the chat connects at once.
+    @Test func aNewerPluginLetsThisPhoneReplaceItsChannelAtOnce() async throws {
+        let fixture = try Fixture()
+        fixture.http.replacesSamePhone = true
+        fixture.http.closeFails = true
+        let earlier = fixture.session()
+        try await earlier.connect()
+        await earlier.close()
+        fixture.http.closeFails = false
+        var waits = 0
+        try await NativeDeviceToolSession.runReopeningWhileHeld(
+            sleep: { _ in waits += 1 }, makeSession: { fixture.session() },
+            onConnected: { _ in fixture.available = false })
+        #expect(waits == 0)
+        #expect(fixture.http.refusals.isEmpty)
+    }
+
+    /// Another phone keeps the chat: one chat shares one phone's data, and the plugin never picks one by
+    /// which came last. This phone stops after a few tries and never takes the chat from it.
+    @Test func anotherPhoneKeepsTheChatSoTheTriesStop() async throws {
+        let fixture = try Fixture()
+        fixture.http.replacesSamePhone = true
+        let other = fixture.http.hold(device: "f3a1c7d2-0b6e-4c55-9e1a-2d7b8c9e0f13")
+        var waits = 0
+        await #expect(throws: WorkspaceClientError.rejected(code: "channel_ambiguous")) {
+            try await NativeDeviceToolSession.runReopeningWhileHeld(
+                sleep: { waits += 1; fixture.http.advance($0); fixture.http.keepAlive(other) },
+                makeSession: { fixture.session() })
+        }
+        #expect(waits == 3)
+        #expect(fixture.http.refusals == Array(repeating: "channel_ambiguous", count: 4))
+        #expect(fixture.http.openChannels == 1)
+    }
+
+    /// Leaving the chat, or any other change, cancels the wait; nothing connects after it.
+    @Test func leavingTheChatCancelsTheWait() async throws {
+        let fixture = try Fixture()
+        fixture.http.hold(device: "f3a1c7d2-0b6e-4c55-9e1a-2d7b8c9e0f13")
+        let task = Task { @MainActor in
+            try await NativeDeviceToolSession.runReopeningWhileHeld(makeSession: { fixture.session() })
+        }
+        for _ in 0..<1_000 where fixture.http.refusals.isEmpty { await Task.yield() }
+        task.cancel()
+        await #expect(throws: CancellationError.self) { try await task.value }
+        #expect(fixture.http.paths.filter { $0 == "device-tools/connect" }.count == 1)
+    }
+
+    @Test func deviceAccessSaysAnotherDeviceHasTheChatNotThatThePluginIsMissing() {
+        #expect(DeviceToolChannelNote.reconnecting(enabled: [.calendar, .appearance])
+            == "Device access connects again in a moment.")
+        #expect(DeviceToolChannelNote.heldElsewhere(enabled: [.calendar, .appearance])
+            == "Another device uses this chat’s shared data. Close the chat there, then open it again here.")
+        #expect(DeviceToolChannelNote.reconnecting(enabled: [.appearance]) == nil)
+        #expect(DeviceToolChannelNote.heldElsewhere(enabled: [.appearance]) == nil)
+    }
+
     @MainActor private final class Fixture {
         let http = HTTP()
         let owner: WorkspaceOwner
@@ -254,16 +349,39 @@ struct NativeDeviceToolSessionTests {
         var beforePollReply: () -> Void = {}
         var beforeConnectReply: () -> Void = {}
         var duplicateRequest = false
-        /// Like the plugin: it serves one Hermes profile and knows the channels it opened.
+        /// Like the plugin: it serves one Hermes profile and holds one phone's channel per agent and chat,
+        /// for 30 seconds after its last poll. A second phone for the chat is refused (`channel_ambiguous`);
+        /// a newer plugin lets the same phone replace its own channel.
         let servingProfile = "default"
-        var channels: Set<String> = []
+        struct Held { let device: String; let agent: String; let session: String; var expires: TimeInterval }
+        var channels: [String: Held] = [:]
+        var retired: Set<String> = []
+        var now: TimeInterval = 1_000
+        var replacesSamePhone = false
+        /// The close never reaches the host (the app was closing, or the connection dropped).
+        var closeFails = false
         /// The codes the plugin would answer and log (`bighelp native request rejected: …`).
         var refusals: [String] = []
+        var openChannels: Int { purge(); return channels.count }
+
+        @discardableResult
+        func hold(device: String) -> String {
+            let id = UUID().uuidString.lowercased()
+            channels[id] = Held(device: device, agent: servingProfile, session: "session", expires: now + 30)
+            return id
+        }
+        func keepAlive(_ id: String) { channels[id]?.expires = now + 30 }
+        func advance(_ duration: Duration) { now += TimeInterval(duration.components.seconds) }
+        private func purge() {
+            for (id, held) in channels where held.expires <= now { channels[id] = nil; retired.insert(id) }
+        }
+
         func nativeResponse(_ request: DirectHermesHTTPRequest, requestGuard: DirectHermesNativeRequestGuard?) async throws -> DirectHermesHTTP.Response {
             let path = String(request.path.dropFirst("/api/plugins/loopdy/native/".count))
             paths.append(path)
             let channel = request.body?["channelId"] ?? .null
             let value: [String: BighelpJSONValue]
+            purge()
             switch path {
             case "context": value = ["schemaVersion": .integer(1), "pluginVersion": .string("test"),
                 "runtimeId": .string("runtime"), "servingProfileId": .string(servingProfile), "principal": .null,
@@ -272,11 +390,22 @@ struct NativeDeviceToolSessionTests {
                 guard request.body?["agentId"] == .string(servingProfile) else {
                     return try refusal("profile_not_served", status: 403, request: request, requestGuard: requestGuard)
                 }
+                guard let id = channel.string, let device = request.body?["deviceId"]?.string,
+                      let session = request.body?["sessionId"]?.string else { throw WorkspaceClientError.invalidRequest }
+                let held = channels.filter { $0.value.agent == servingProfile && $0.value.session == session }
+                if !held.isEmpty {
+                    guard replacesSamePhone, held.values.allSatisfy({ $0.device == device }) else {
+                        return try refusal("channel_ambiguous", status: 409, request: request, requestGuard: requestGuard)
+                    }
+                    for old in held.keys { channels[old] = nil; retired.insert(old) }
+                }
                 connectedEnabled = request.body?["enabled"]?.array?.compactMap(\.string) ?? []
                 beforeConnectReply()
-                if let id = channel.string { channels.insert(id) }
+                channels[id] = Held(device: device, agent: servingProfile, session: session, expires: now + 30)
                 value = ["channelId": channel, "connected": .boolean(true)]
             case "device-tools/poll":
+                if let refused = try gone(channel, request: request, requestGuard: requestGuard) { return refused }
+                if let id = channel.string { keepAlive(id) }
                 beforePollReply()
                 let count = duplicateRequest ? 2 : 1
                 value = ["channelId": channel, "next": .integer(count),
@@ -285,9 +414,9 @@ struct NativeDeviceToolSessionTests {
                 if let result = request.body?["result"]?.object { results.append(result) }
                 value = ["accepted": .boolean(true)]
             case "device-tools/close":
-                guard let id = channel.string, channels.remove(id) != nil else {
-                    return try refusal("channel_not_found", status: 409, request: request, requestGuard: requestGuard)
-                }
+                if closeFails { throw URLError(.networkConnectionLost) }
+                if let refused = try gone(channel, request: request, requestGuard: requestGuard) { return refused }
+                if let id = channel.string { channels[id] = nil; retired.insert(id) }
                 value = ["closed": .boolean(true)]
             default: throw WorkspaceClientError.invalidRequest
             }
@@ -296,6 +425,14 @@ struct NativeDeviceToolSessionTests {
             let response = try #require(HTTPURLResponse(url: URL(string: "https://host.example:9119" + request.path)!,
                                                        statusCode: 200, httpVersion: nil, headerFields: headers))
             return .init(http: response, body: try JSONEncoder().encode(BighelpJSONValue.object(value)))
+        }
+
+        /// The plugin's `_get`: a channel it retired is `phone_unavailable`, one it never had `channel_not_found`.
+        private func gone(_ channel: BighelpJSONValue, request: DirectHermesHTTPRequest,
+                          requestGuard: DirectHermesNativeRequestGuard?) throws -> DirectHermesHTTP.Response? {
+            guard let id = channel.string, channels[id] == nil else { return nil }
+            return try refusal(retired.contains(id) ? "phone_unavailable" : "channel_not_found", status: 409,
+                               request: request, requestGuard: requestGuard)
         }
 
         /// The plugin's `_error_response`: no ETag, the request ID echoed.

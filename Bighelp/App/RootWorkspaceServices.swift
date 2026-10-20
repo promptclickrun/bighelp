@@ -133,31 +133,41 @@ extension RootShellView {
             return
         }
         let revision = permissions.revision
-        let session = NativeDeviceToolSession(http: direct, owner: owner, currentOwner: { currentWorkspaceOwner },
-            scope: scope, agentID: coordinate.profileID,
-            sessionID: coordinate.storedSessionID ?? coordinate.runtimeSessionID ?? coordinate.sessionID,
-            enabled: enabled, isAvailable: {
-                permissions.scope == scope && permissions.revision == revision
-                    && scenePhase == .active && UIApplication.shared.isProtectedDataAvailable
-                    && appState.activeConversationID == conversationID
-            }, handle: handler)
+        var session: NativeDeviceToolSession?
         permissionCenter.nativeDeviceToolStatus = nil
         do {
-            try await session.run(onConnected: {
+            try await NativeDeviceToolSession.runReopeningWhileHeld(makeSession: {
+                let next = NativeDeviceToolSession(http: direct, owner: owner, currentOwner: { currentWorkspaceOwner },
+                    scope: scope, agentID: coordinate.profileID,
+                    sessionID: coordinate.storedSessionID ?? coordinate.runtimeSessionID ?? coordinate.sessionID,
+                    enabled: enabled, isAvailable: {
+                        permissions.scope == scope && permissions.revision == revision
+                            && scenePhase == .active && UIApplication.shared.isProtectedDataAvailable
+                            && appState.activeConversationID == conversationID
+                    }, handle: handler)
+                session = next
+                return next
+            }, onConnected: { connected in
                 permissionCenter.nativeDeviceToolStatus = DeviceToolChannelNote.connected(
-                    needsNewerPlugin: session.needsNewerPlugin)
+                    needsNewerPlugin: connected.needsNewerPlugin)
+            }, onWaiting: {
+                permissionCenter.nativeDeviceToolStatus = DeviceToolChannelNote.reconnecting(enabled: enabled)
             })
         } catch {
             guard !Task.isCancelled, currentWorkspaceOwner == owner,
                   permissions.revision == revision else { return }
-            if let served = session.servingAgentID {
+            if let served = session?.servingAgentID {
                 let name = agents.resolvedAgent(explicitID: served)?.name ?? ""
                 permissionCenter.nativeDeviceToolStatus = DeviceToolChannelNote.otherAgent(
                     enabled: enabled, servingAgentName: name.isEmpty ? "your default agent" : name)
                 return
             }
+            if NativeDeviceToolSession.isChatHeld(error) {
+                permissionCenter.nativeDeviceToolStatus = DeviceToolChannelNote.heldElsewhere(enabled: enabled)
+                return
+            }
             permissionCenter.nativeDeviceToolStatus = DeviceToolChannelNote.failed(
-                enabled: enabled, needsNewerPlugin: session.needsNewerPlugin)
+                enabled: enabled, needsNewerPlugin: session?.needsNewerPlugin ?? [])
         }
     }
 

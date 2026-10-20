@@ -102,10 +102,17 @@ final class NativeDeviceToolSession {
             closeCleanup = { await cleanup.close() }
         }
         connectionAttempted = true
-        let result = try await request("connect", ["channelId": .string(channelID),
-            "deviceId": .string(scope.deviceID), "hostId": .string(scope.hostID),
-            "authorizationEpoch": .integer(scope.authorizationEpoch), "agentId": .string(agentID),
-            "sessionId": .string(sessionID), "enabled": .array(enabled.map(\.rawValue).sorted().map(BighelpJSONValue.string))])
+        let result: [String: BighelpJSONValue]
+        do {
+            result = try await request("connect", ["channelId": .string(channelID),
+                "deviceId": .string(scope.deviceID), "hostId": .string(scope.hostID),
+                "authorizationEpoch": .integer(scope.authorizationEpoch), "agentId": .string(agentID),
+                "sessionId": .string(sessionID), "enabled": .array(enabled.map(\.rawValue).sorted().map(BighelpJSONValue.string))])
+        } catch WorkspaceClientError.rejected(let code?, let message) where Self.refusedBeforeOpening.contains(code) {
+            // The plugin opened nothing; a close would only be refused too (`channel_not_found`).
+            connectionAttempted = false
+            throw WorkspaceClientError.rejected(code: code, message: message)
+        }
         guard result["channelId"] == .string(channelID), result["connected"] == .boolean(true) else {
             throw WorkspaceClientError.invalidResponse
         }
@@ -204,15 +211,69 @@ final class NativeDeviceToolSession {
         if !closing { try check() }
         guard currentOwner() == owner else { throw WorkspaceClientError.ownerChanged }
         guard response.body.count <= 262_144,
-              DirectHermesNativeRequestGuard.contextTag(response.http.value(forHTTPHeaderField: "ETag")) == guardValue.etag,
               response.http.value(forHTTPHeaderField: "X-Loopdy-Request-ID") == guardValue.requestIDHeader else {
             throw WorkspaceClientError.invalidResponse
         }
+        // The plugin's refusals carry no ETag; their code says why.
         guard response.http.statusCode == 200 else {
-            throw WorkspaceClientError.rejected(code: nil)
+            throw WorkspaceClientError.rejected(code: Self.refusalCode(response))
+        }
+        guard DirectHermesNativeRequestGuard.contextTag(response.http.value(forHTTPHeaderField: "ETag")) == guardValue.etag else {
+            throw WorkspaceClientError.invalidResponse
         }
         return try response.object()
     }
+
+    /// Runs the chat's channel, and opens a new one when the plugin says another channel holds the chat.
+    /// That channel is this phone's own when its app closed before the close arrived (killed, relaunched,
+    /// or the close was lost on a reconnect): an older plugin keeps it until its 30-second lease ends,
+    /// so the next try waits a little longer than that. A newer plugin lets the same phone replace its
+    /// own channel at once. Another device keeps the chat, so this stops after a few tries; any change
+    /// to the chat or connection cancels the wait.
+    static func runReopeningWhileHeld(
+        attempts: Int = 4, wait: Duration = .seconds(32),
+        sleep: @MainActor (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
+        makeSession: @MainActor () -> NativeDeviceToolSession,
+        onConnected: @MainActor (NativeDeviceToolSession) -> Void = { _ in },
+        onWaiting: @MainActor () -> Void = {}
+    ) async throws {
+        var attempt = 1
+        while true {
+            let session = makeSession()
+            do {
+                try await session.run(onConnected: { onConnected(session) })
+                return
+            } catch where isChatHeld(error) && attempt < attempts {
+                onWaiting()
+                try await sleep(wait)
+                attempt += 1
+            }
+        }
+    }
+
+    /// The plugin's code when another channel holds this chat.
+    static let chatHeldCode = "channel_ambiguous"
+
+    static func isChatHeld(_ error: any Error) -> Bool {
+        guard case WorkspaceClientError.rejected(let code, _) = error else { return false }
+        return code == chatHeldCode
+    }
+
+    /// Connect refusals that leave no channel on the host, so there is nothing to close.
+    private static let refusedBeforeOpening: Set<String> = [
+        chatHeldCode, "profile_not_served", "session_not_found", "channel_capacity", "channel_id_consumed",
+    ]
+
+    /// The plugin's own reason for a refusal: a short code, or nil.
+    private static func refusalCode(_ response: DirectHermesHTTP.Response) -> String? {
+        guard let code = (try? response.object())?["error"]?.object?["code"]?.string,
+              (1...64).contains(code.utf8.count),
+              code.utf8.allSatisfy({ (97...122).contains($0) || (48...57).contains($0) || $0 == 95 }) else {
+            return nil
+        }
+        return code
+    }
+
     private func owns() -> Bool { currentOwner() == owner && isAvailable() && !Task.isCancelled }
     private func check() throws { guard owns() else { throw WorkspaceClientError.ownerChanged } }
 }
@@ -229,6 +290,17 @@ enum DeviceToolChannelNote {
     static func otherAgent(enabled: Set<DeviceToolCapability>, servingAgentName: String) -> String? {
         enabled.contains(where: \.sharesPersonalData)
             ? "Open a chat with \(servingAgentName) to use this iPhone’s shared data." : nil
+    }
+
+    /// The chat's channel waits for an earlier one to end (`NativeDeviceToolSession.runReopeningWhileHeld`).
+    static func reconnecting(enabled: Set<DeviceToolCapability>) -> String? {
+        enabled.contains(where: \.sharesPersonalData) ? "Device access connects again in a moment." : nil
+    }
+
+    /// Another device keeps this chat's channel: one chat uses one device's data at a time.
+    static func heldElsewhere(enabled: Set<DeviceToolCapability>) -> String? {
+        enabled.contains(where: \.sharesPersonalData)
+            ? "Another device uses this chat’s shared data. Close the chat there, then open it again here." : nil
     }
 
     static func connected(needsNewerPlugin: Set<DeviceToolCapability>) -> String? {

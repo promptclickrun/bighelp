@@ -9,13 +9,13 @@ extension ChatModel {
 
     var pdfPagesAvailability: ChatPDFPagesAttachmentAvailability {
         guard !isBotMode, nativeConversationClient != nil else {
-            return .unavailable(reason: "PDF pages require a current native Hermes conversation.")
+            return .unavailable(reason: String(localized: "PDF pages require a current native Hermes conversation."))
         }
         guard !isPDFDraftSendInFlight else {
-            return .unavailable(reason: "Wait for the current PDF-page send to finish.")
+            return .unavailable(reason: String(localized: "Wait for the current PDF-page send to finish."))
         }
         guard pdfAttachmentTarget != nil else {
-            return .unavailable(reason: "Reconnect this native conversation before adding PDF pages.")
+            return .unavailable(reason: String(localized: "Reconnect this native conversation before adding PDF pages."))
         }
         return .available
     }

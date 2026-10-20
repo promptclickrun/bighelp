@@ -167,7 +167,7 @@ struct ChatActionMenuSheet: View {
             if !allowsImages {
                 Section {
                     Text(allowsFiles ? DirectHermesFileAttachments.imagesUnavailable
-                         : "Attachments are unavailable on this connection.")
+                         : String(localized: "Attachments are unavailable on this connection."))
                         .font(.bighelp(.footnote))
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier("chat.attachments.images-unavailable")
@@ -219,7 +219,7 @@ struct ChatActionMenuSheet: View {
     private func nativeActionRow(_ action: ChatActionMenuAction) -> some View {
         Button { open(action) } label: {
             actionLabel(
-                title: action == .voice ? "Voice mode" : rowTitle(for: action).isEmpty
+                title: rowTitle(for: action).isEmpty
                     ? mediaTitle(for: action) : rowTitle(for: action),
                 detail: actionDetail(action),
                 symbol: action == .voice ? "waveform" : symbol(for: action),
@@ -243,9 +243,9 @@ struct ChatActionMenuSheet: View {
     private var nativePDFPagesRow: some View {
         Button(action: openPDFPages) {
             actionLabel(
-                title: "PDF as pages",
+                title: String(localized: "PDF as pages"),
                 detail: pdfPagesAvailability.unavailableReason
-                    ?? "Render up to 25 selected pages for image understanding",
+                    ?? String(localized: "Render up to 25 selected pages for image understanding"),
                 symbol: "doc.richtext"
             )
         }
@@ -374,7 +374,7 @@ struct ChatActionMenuSheet: View {
     private var pdfPagesAvailability: ChatPDFPagesAttachmentAvailability {
         guard let model = ChatPDFPagesDraftRegistry.model(for: sessionID),
               ChatPDFPagesDraftRegistry.owns(model, sessionID: sessionID) else {
-            return .unavailable(reason: "Open this action from the current native conversation.")
+            return .unavailable(reason: String(localized: "Open this action from the current native conversation."))
         }
         return model.pdfPagesAvailability
     }
@@ -424,8 +424,8 @@ struct ChatActionMenuSheet: View {
     }
 
     private var scannerUnavailableReason: String? {
-        if !allowsFiles { return "Attachments are unavailable on this connection." }
-        return ChatDocumentScanner.isSupported ? nil : "Document scanning requires a supported camera device."
+        if !allowsFiles { return String(localized: "Attachments are unavailable on this connection.") }
+        return ChatDocumentScanner.isSupported ? nil : String(localized: "Document scanning requires a supported camera device.")
     }
 
     private func rowUnavailableReason(_ action: ChatActionMenuAction) -> String? {

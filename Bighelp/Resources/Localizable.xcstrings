@@ -119,6 +119,23 @@
         }
       }
     },
+    "Add": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "添加"
+          }
+        }
+      }
+    },
     "Add from %@": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -1066,6 +1083,23 @@
         }
       }
     },
+    "Close this picker and reopen PDF pages from the current native conversation.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close this picker and reopen PDF pages from the current native conversation."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "请关闭此选择器，然后在当前原生会话中重新打开 PDF 页面。"
+          }
+        }
+      }
+    },
     "Cloudflare Access": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -1264,6 +1298,23 @@
         }
       }
     },
+    "Conversation changed": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conversation changed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "会话已更改"
+          }
+        }
+      }
+    },
     "Coral": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -1413,6 +1464,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "开发工厂"
+          }
+        }
+      }
+    },
+    "Document scanning requires a supported camera device.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Document scanning requires a supported camera device."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "扫描文稿需要支持相机的设备。"
           }
         }
       }
@@ -2775,6 +2843,23 @@
         }
       }
     },
+    "Open this action from the current native conversation.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open this action from the current native conversation."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "请从当前原生会话中打开此操作。"
+          }
+        }
+      }
+    },
     "Open voice chat": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -2854,6 +2939,40 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "这是可选步骤。插件会为电脑上的 Hermes 添加更多功能。你也可以稍后在设置中安装。"
+          }
+        }
+      }
+    },
+    "PDF as pages": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PDF as pages"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "PDF 页面"
+          }
+        }
+      }
+    },
+    "PDF pages require a current native Hermes conversation.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PDF pages require a current native Hermes conversation."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "需要先打开一个 Hermes 原生会话，才能添加 PDF 页面。"
           }
         }
       }
@@ -3264,6 +3383,23 @@
         }
       }
     },
+    "Reconnect this native conversation before adding PDF pages.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconnect this native conversation before adding PDF pages."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "请重新连接此原生会话后再添加 PDF 页面。"
+          }
+        }
+      }
+    },
     "Remove name": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -3309,6 +3445,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "重命名聊天"
+          }
+        }
+      }
+    },
+    "Render up to 25 selected pages for image understanding": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Render up to 25 selected pages for image understanding"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "最多将 25 个所选页面转为图像，以供智能体理解"
           }
         }
       }
@@ -4873,6 +5026,23 @@
         }
       }
     },
+    "Wait for the current PDF-page send to finish.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wait for the current PDF-page send to finish."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "请等待当前 PDF 页面发送完成。"
+          }
+        }
+      }
+    },
     "Wait for the live turn to finish, then send this as the next message.": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -5379,6 +5549,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "群组"
+          }
+        }
+      }
+    },
+    "hermes.example.com or 192.168.1.20": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "hermes.example.com or 192.168.1.20"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "hermes.example.com 或 192.168.1.20"
           }
         }
       }

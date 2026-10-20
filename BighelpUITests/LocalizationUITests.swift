@@ -90,6 +90,8 @@ final class LocalizationUITests: BighelpUITestCase {
             let appearanceRow = settingsRow("settings.themes", in: app)
             XCTAssertTrue(appearanceRow.waitForExistence(timeout: 5))
             XCTAssertTrue(appearanceRow.label.contains(language == "en" ? "Appearance" : "外观"))
+            // Hittable can include a row just below a Form's viewport; reveal the lower rows for evidence.
+            app.descendants(matching: .any)["settings.screen"].firstMatch.swipeUp()
             capture("settings", language, appearance)
             app.terminate()
 
@@ -113,6 +115,8 @@ final class LocalizationUITests: BighelpUITestCase {
             let camera = app.buttons["chat.action.camera"]
             XCTAssertTrue(camera.waitForExistence(timeout: 5))
             XCTAssertTrue(camera.label.contains(language == "en" ? "Camera" : "相机"))
+            XCTAssertTrue(app.buttons["chat.action.voice"].label.contains(language == "en" ? "Voice mode" : "语音模式"))
+            XCTAssertTrue(app.buttons["chat.action.pdf-pages"].label.contains(language == "en" ? "PDF as pages" : "PDF 页面"))
             capture("chat-actions", language, appearance)
             app.terminate()
         }

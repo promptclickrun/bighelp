@@ -594,7 +594,7 @@ struct RootShellView: View {
                     Image(systemName: "line.3.horizontal").bighelpToolbarIcon()
                         .bighelpMenuDot(menuHasUnread)
                 }
-                .bighelpIconLabel("Chats and menu", shortcut: "⌃⌘S")
+                .bighelpIconLabel(String(localized: "Chats and menu"), shortcut: "⌃⌘S")
                 .accessibilityIdentifier("home.drawer.open")
             }
             // Ember lives only in chrome: the brand bar on root screens.
@@ -790,22 +790,22 @@ struct RootShellView: View {
 
     private var rootNavigationTitle: String {
         switch appState.selectedTab {
-        case .sessions: fleetModeOn ? "All agents" : "Sessions"
-        case .agents: "Agents"
+        case .sessions: fleetModeOn ? String(localized: "All agents") : String(localized: "Sessions")
+        case .agents: String(localized: "Agents")
         // Its tab's name: the long one didn't fit beside its buttons.
-        case .scheduledTasks: "Tasks"
-        case .home, .inbox: "Activity"
-        case .workspace: "Hermes Tools"
-        case .profile: "Settings"
-        case .feed: "Feed"
-        case .ideas: "Ideas"
-        case .goals: "Goals"
-        case .apps: "Apps"
-        case .projects: "Projects"
-        case .kanban: "Kanban"
-        case .workflows: "Workflows"
-        case .usage: "Usage"
-        case .code: "Code"
+        case .scheduledTasks: String(localized: "Tasks")
+        case .home, .inbox: String(localized: "Activity")
+        case .workspace: String(localized: "Hermes Tools")
+        case .profile: String(localized: "Settings")
+        case .feed: String(localized: "Feed")
+        case .ideas: String(localized: "Ideas")
+        case .goals: String(localized: "Goals")
+        case .apps: String(localized: "Apps")
+        case .projects: String(localized: "Projects")
+        case .kanban: String(localized: "Kanban")
+        case .workflows: String(localized: "Workflows")
+        case .usage: String(localized: "Usage")
+        case .code: String(localized: "Code")
         }
     }
 
@@ -1186,7 +1186,7 @@ struct RootShellView: View {
                         } label: {
                             Image(systemName: "line.3.horizontal").bighelpToolbarIcon()
                         }
-                        .bighelpIconLabel("Menu")
+                        .bighelpIconLabel(String(localized: "Menu"))
                         .accessibilityIdentifier("workspace.menu")
                     }
                 }

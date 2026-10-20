@@ -1,0 +1,5422 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "%@ bubbles · %@ · %@": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ bubbles · %@ · %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@气泡 · %@ · %@"
+          }
+        }
+      }
+    },
+    "%@ is active for this chat": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is active for this chat"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "当前聊天使用的智能体是%@"
+          }
+        }
+      }
+    },
+    "%@. %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@. %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@。%@"
+          }
+        }
+      }
+    },
+    "2m ago": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2m ago"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "2 分钟前"
+          }
+        }
+      }
+    },
+    "AI providers": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI providers"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "AI 服务商"
+          }
+        }
+      }
+    },
+    "Access token": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Access token"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "访问令牌"
+          }
+        }
+      }
+    },
+    "Activity": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activity"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "活动"
+          }
+        }
+      }
+    },
+    "Add from %@": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add from %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "从%@添加"
+          }
+        }
+      }
+    },
+    "Add host": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add host"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "添加电脑"
+          }
+        }
+      }
+    },
+    "Add the bighelp plugin": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add the bighelp plugin"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "添加 bighelp 插件"
+          }
+        }
+      }
+    },
+    "Add to chat": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add to chat"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "添加到聊天"
+          }
+        }
+      }
+    },
+    "Agents": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agents"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "智能体"
+          }
+        }
+      }
+    },
+    "Agents & Personalities": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agents & Personalities"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "智能体与个性"
+          }
+        }
+      }
+    },
+    "Agree and continue": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agree and continue"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "同意并继续"
+          }
+        }
+      }
+    },
+    "Alerts": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alerts"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "提醒"
+          }
+        }
+      }
+    },
+    "Alerts from your agents": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alerts from your agents"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "来自智能体的提醒"
+          }
+        }
+      }
+    },
+    "All agents": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All agents"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "所有智能体"
+          }
+        }
+      }
+    },
+    "All hosts": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All hosts"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "所有电脑"
+          }
+        }
+      }
+    },
+    "Appearance": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Appearance"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "外观"
+          }
+        }
+      }
+    },
+    "Appearance options": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Appearance options"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "外观选项"
+          }
+        }
+      }
+    },
+    "Appearance · Optional": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Appearance · Optional"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "外观 · 可选"
+          }
+        }
+      }
+    },
+    "Apple Watch": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Watch"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Apple Watch"
+          }
+        }
+      }
+    },
+    "Apps": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apps"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "应用"
+          }
+        }
+      }
+    },
+    "Ask %@": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "问问%@"
+          }
+        }
+      }
+    },
+    "Assistants": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Assistants"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "助手"
+          }
+        }
+      }
+    },
+    "Attachments and actions": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Attachments and actions"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "附件与操作"
+          }
+        }
+      }
+    },
+    "Attachments are unavailable on this connection.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Attachments are unavailable on this connection."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "当前连接不支持附件。"
+          }
+        }
+      }
+    },
+    "Automatic": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "自动"
+          }
+        }
+      }
+    },
+    "Available": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Available"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "可用"
+          }
+        }
+      }
+    },
+    "Back": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "返回"
+          }
+        }
+      }
+    },
+    "Bighelp Chat": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bighelp Chat"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Bighelp 聊天"
+          }
+        }
+      }
+    },
+    "Bighelp IDE": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bighelp IDE"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Bighelp IDE"
+          }
+        }
+      }
+    },
+    "Black": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Black"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "纯黑色"
+          }
+        }
+      }
+    },
+    "Bots": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bots"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "机器人"
+          }
+        }
+      }
+    },
+    "Browser sign-in": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Browser sign-in"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "浏览器登录"
+          }
+        }
+      }
+    },
+    "Bubble color": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bubble color"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "气泡颜色"
+          }
+        }
+      }
+    },
+    "Camera": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Camera"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "相机"
+          }
+        }
+      }
+    },
+    "Camera capture is unavailable on this device.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Camera capture is unavailable on this device."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "此设备无法拍摄照片。"
+          }
+        }
+      }
+    },
+    "Cancel": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "取消"
+          }
+        }
+      }
+    },
+    "Capabilities on this Hermes host": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Capabilities on this Hermes host"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "此 Hermes 电脑上的功能"
+          }
+        }
+      }
+    },
+    "Change it anytime in Settings": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change it anytime in Settings"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "随时可在设置中更改"
+          }
+        }
+      }
+    },
+    "Change model": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change model"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "更换模型"
+          }
+        }
+      }
+    },
+    "Change your photo": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change your photo"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "更换照片"
+          }
+        }
+      }
+    },
+    "Character, motion and agent": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Character, motion and agent"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "角色、动作和智能体"
+          }
+        }
+      }
+    },
+    "Chat": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chat"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "聊天"
+          }
+        }
+      }
+    },
+    "Chat appearance": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chat appearance"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "聊天外观"
+          }
+        }
+      }
+    },
+    "Chat files": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chat files"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "聊天文件"
+          }
+        }
+      }
+    },
+    "Chat info": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chat info"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "聊天信息"
+          }
+        }
+      }
+    },
+    "Chat with %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chat with %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "与%@聊天"
+          }
+        }
+      }
+    },
+    "Chat with the Hermes agents running on your computer. No separate bighelp account required.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chat with the Hermes agents running on your computer. No separate bighelp account required."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "与电脑上运行的 Hermes 智能体聊天，无需另建 bighelp 账户。"
+          }
+        }
+      }
+    },
+    "Chats and menu": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chats and menu"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "聊天和菜单"
+          }
+        }
+      }
+    },
+    "Chats that stay put": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chats that stay put"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "聊天持续保留"
+          }
+        }
+      }
+    },
+    "Checking…": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checking…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "正在检查…"
+          }
+        }
+      }
+    },
+    "Choose a host": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a host"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "选择电脑"
+          }
+        }
+      }
+    },
+    "Choose agent": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose agent"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "选择智能体"
+          }
+        }
+      }
+    },
+    "Choose an accent and appearance. You can change both anytime in Settings.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose an accent and appearance. You can change both anytime in Settings."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "选择主题色和外观。之后随时可以在设置中更改。"
+          }
+        }
+      }
+    },
+    "Choose camera, photo, file, voice, or chat actions.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose camera, photo, file, voice, or chat actions."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "选择相机、照片、文件、语音或聊天操作。"
+          }
+        }
+      }
+    },
+    "Choose your mode": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose your mode"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "选择使用模式"
+          }
+        }
+      }
+    },
+    "Clean, bright white": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clean, bright white"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "干净明亮的白色"
+          }
+        }
+      }
+    },
+    "Click sends with %@. Choose a one-time alternative below.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Click sends with %@. Choose a one-time alternative below."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "点击会以“%@”方式发送。你可以在下方选择仅用于本次的其他方式。"
+          }
+        }
+      }
+    },
+    "Client ID": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Client ID"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "客户端 ID"
+          }
+        }
+      }
+    },
+    "Client secret": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Client secret"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "客户端密钥"
+          }
+        }
+      }
+    },
+    "Close": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "关闭"
+          }
+        }
+      }
+    },
+    "Cloudflare Access": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cloudflare Access"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Cloudflare Access"
+          }
+        }
+      }
+    },
+    "Code": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Code"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "编程"
+          }
+        }
+      }
+    },
+    "Colors, light and dark, chat layout": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Colors, light and dark, chat layout"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "颜色、浅色与深色模式、聊天布局"
+          }
+        }
+      }
+    },
+    "Companion pet": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Companion pet"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "伙伴宠物"
+          }
+        }
+      }
+    },
+    "Connect": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "连接"
+          }
+        }
+      }
+    },
+    "Connect to your computer first, then add the plugin in Settings.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect to your computer first, then add the plugin in Settings."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "请先连接电脑，再到设置中添加插件。"
+          }
+        }
+      }
+    },
+    "Connect to your computer to change this.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect to your computer to change this."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "连接电脑后即可更改。"
+          }
+        }
+      }
+    },
+    "Connect your computer": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect your computer"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "连接你的电脑"
+          }
+        }
+      }
+    },
+    "Connected": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connected"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "已连接"
+          }
+        }
+      }
+    },
+    "Connecting…": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connecting…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "正在连接…"
+          }
+        }
+      }
+    },
+    "Connection details": {
+      "comment": "This deeper Settings surface is intentionally English-only in the first stage.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connection details"
+          }
+        }
+      }
+    },
+    "Continue": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "继续"
+          }
+        }
+      }
+    },
+    "Coral": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Coral"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "珊瑚色"
+          }
+        }
+      }
+    },
+    "Cream": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cream"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "奶油色"
+          }
+        }
+      }
+    },
+    "Custom": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Custom"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "自定义"
+          }
+        }
+      }
+    },
+    "Custom headers": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Custom headers"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "自定义请求头"
+          }
+        }
+      }
+    },
+    "Dark": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dark"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "深色"
+          }
+        }
+      }
+    },
+    "Dashboard session token": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dashboard session token"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "控制面板会话令牌"
+          }
+        }
+      }
+    },
+    "Default during this active turn: %@": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Default during this active turn: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "本轮回复期间的默认操作：%@"
+          }
+        }
+      }
+    },
+    "Default model": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Default model"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "默认模型"
+          }
+        }
+      }
+    },
+    "Dev Factory": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dev Factory"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "开发工厂"
+          }
+        }
+      }
+    },
+    "Done": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "完成"
+          }
+        }
+      }
+    },
+    "Empty": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Empty"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "空白"
+          }
+        }
+      }
+    },
+    "Every chat, tool and setting in the full bighelp app.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every chat, tool and setting in the full bighelp app."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "使用 bighelp 的全部聊天、工具和设置。"
+          }
+        }
+      }
+    },
+    "Expand message editor": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Expand message editor"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "展开消息编辑器"
+          }
+        }
+      }
+    },
+    "Experience": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Experience"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "使用模式"
+          }
+        }
+      }
+    },
+    "Feed": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Feed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "动态"
+          }
+        }
+      }
+    },
+    "Feed, Ideas and Goals": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Feed, Ideas and Goals"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "动态、灵感和目标"
+          }
+        }
+      }
+    },
+    "File": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "File"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "文件"
+          }
+        }
+      }
+    },
+    "Files": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Files"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "文件"
+          }
+        }
+      }
+    },
+    "Files and cards": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Files and cards"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "文件和卡片"
+          }
+        }
+      }
+    },
+    "Files, skills, memory, logs and more": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Files, skills, memory, logs and more"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "文件、技能、记忆、日志等"
+          }
+        }
+      }
+    },
+    "Finding your agents…": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finding your agents…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "正在查找智能体…"
+          }
+        }
+      }
+    },
+    "Fire off coding sessions against your projects.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fire off coding sessions against your projects."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "为你的项目启动编程会话。"
+          }
+        }
+      }
+    },
+    "Folder": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Folder"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "文件夹"
+          }
+        }
+      }
+    },
+    "GPT Live 1 · a live conversation": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GPT Live 1 · a live conversation"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "GPT Live 1 · 实时对话"
+          }
+        }
+      }
+    },
+    "Get Started": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Get Started"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "开始使用"
+          }
+        }
+      }
+    },
+    "Get an alert when your agents reply, finish something, or have a question for you.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Get an alert when your agents reply, finish something, or have a question for you."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "智能体回复、完成工作或有问题要问你时，收到提醒。"
+          }
+        }
+      }
+    },
+    "Goals": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Goals"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "目标"
+          }
+        }
+      }
+    },
+    "Grape": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grape"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "葡萄紫"
+          }
+        }
+      }
+    },
+    "Graphite": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Graphite"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "石墨色"
+          }
+        }
+      }
+    },
+    "Group chat": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Group chat"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "群聊"
+          }
+        }
+      }
+    },
+    "Help & feedback": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Help & feedback"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "帮助与反馈"
+          }
+        }
+      }
+    },
+    "Hermes Tools": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hermes Tools"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Hermes 工具"
+          }
+        }
+      }
+    },
+    "Hermes tools": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hermes tools"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Hermes 工具"
+          }
+        }
+      }
+    },
+    "Hermes tools and extra chat settings": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hermes tools and extra chat settings"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Hermes 工具和更多聊天设置"
+          }
+        }
+      }
+    },
+    "Host URL or IP address": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Host URL or IP address"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "电脑的网址或 IP 地址"
+          }
+        }
+      }
+    },
+    "Host: %@": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Host: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "电脑：%@"
+          }
+        }
+      }
+    },
+    "How agents sound": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How agents sound"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "智能体的表达风格"
+          }
+        }
+      }
+    },
+    "How to make a service token": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How to make a service token"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "如何创建服务令牌"
+          }
+        }
+      }
+    },
+    "How voice chats sound": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How voice chats sound"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "语音聊天的声音设置"
+          }
+        }
+      }
+    },
+    "I found three flights under $400. Should I book one?": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I found three flights under $400. Should I book one?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "我找到了三个低于 400 美元的航班。要预订一个吗？"
+          }
+        }
+      }
+    },
+    "Ideas": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ideas"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "灵感"
+          }
+        }
+      }
+    },
+    "Inbox": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inbox"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "收件箱"
+          }
+        }
+      }
+    },
+    "Ink": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ink"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "墨色"
+          }
+        }
+      }
+    },
+    "Install Plugin": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Install Plugin"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "安装插件"
+          }
+        }
+      }
+    },
+    "Installed. Restart Hermes on your computer to finish, then turn on alerts in Settings.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installed. Restart Hermes on your computer to finish, then turn on alerts in Settings."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "已安装。请在电脑上重启 Hermes 以完成设置，然后在设置中开启提醒。"
+          }
+        }
+      }
+    },
+    "Installing…": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installing…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "正在安装…"
+          }
+        }
+      }
+    },
+    "Interrupt and Send": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interrupt and Send"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "中断并发送"
+          }
+        }
+      }
+    },
+    "It asks for a username and password": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "It asks for a username and password"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "需要用户名和密码"
+          }
+        }
+      }
+    },
+    "It's behind Cloudflare Access": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "It's behind Cloudflare Access"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "使用了 Cloudflare Access 保护"
+          }
+        }
+      }
+    },
+    "Just your bots and their chats, nothing else.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Just your bots and their chats, nothing else."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "只显示你的机器人和聊天。"
+          }
+        }
+      }
+    },
+    "Kanban": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kanban"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "看板"
+          }
+        }
+      }
+    },
+    "Know when your agents reply, finish a task, or need you.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Know when your agents reply, finish a task, or need you."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "智能体回复、完成任务或需要你时，及时收到提醒。"
+          }
+        }
+      }
+    },
+    "Lavender": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lavender"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "薰衣草紫"
+          }
+        }
+      }
+    },
+    "Let agents use your email, notes and more": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Let agents use your email, notes and more"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "让智能体使用你的邮件、笔记等应用"
+          }
+        }
+      }
+    },
+    "Light": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Light"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "浅色"
+          }
+        }
+      }
+    },
+    "Lime": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lime"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "青柠绿"
+          }
+        }
+      }
+    },
+    "Live voice": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live voice"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "实时语音"
+          }
+        }
+      }
+    },
+    "Make bighelp feel like yours": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make bighelp feel like yours"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "让 bighelp 更合你心意"
+          }
+        }
+      }
+    },
+    "Manage how Hermes agents present themselves": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manage how Hermes agents present themselves"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "管理 Hermes 智能体的形象与表达方式"
+          }
+        }
+      }
+    },
+    "Menu": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Menu"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "菜单"
+          }
+        }
+      }
+    },
+    "Message": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Message"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "消息"
+          }
+        }
+      }
+    },
+    "Message %@": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Message %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "给%@发消息"
+          }
+        }
+      }
+    },
+    "Microphone, camera, photos and more": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Microphone, camera, photos and more"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "麦克风、相机、照片等"
+          }
+        }
+      }
+    },
+    "Mint": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mint"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "薄荷绿"
+          }
+        }
+      }
+    },
+    "Mode": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mode"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "模式"
+          }
+        }
+      }
+    },
+    "Model & reasoning": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Model & reasoning"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "模型与推理"
+          }
+        }
+      }
+    },
+    "More": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "更多"
+          }
+        }
+      }
+    },
+    "More options": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More options"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "更多选项"
+          }
+        }
+      }
+    },
+    "Name (optional)": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Name (optional)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "名称（可选）"
+          }
+        }
+      }
+    },
+    "Name removed.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Name removed."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "已移除名字。"
+          }
+        }
+      }
+    },
+    "Name saved.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Name saved."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "已保存名字。"
+          }
+        }
+      }
+    },
+    "Name saved. You have unsaved changes.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Name saved. You have unsaved changes."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "已保存名字。你还有未保存的更改。"
+          }
+        }
+      }
+    },
+    "Need help connecting?": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Need help connecting?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "连接遇到困难？"
+          }
+        }
+      }
+    },
+    "Nerd Mode": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nerd Mode"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "极客模式"
+          }
+        }
+      }
+    },
+    "New": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "新内容"
+          }
+        }
+      }
+    },
+    "New Bot Chat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Bot Chat"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "新机器人聊天"
+          }
+        }
+      }
+    },
+    "New Chat": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Chat"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "新聊天"
+          }
+        }
+      }
+    },
+    "New chat": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New chat"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "新聊天"
+          }
+        }
+      }
+    },
+    "New chat with %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New chat with %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "与%@开始新聊天"
+          }
+        }
+      }
+    },
+    "New items": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New items"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "有新内容"
+          }
+        }
+      }
+    },
+    "New session": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New session"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "新会话"
+          }
+        }
+      }
+    },
+    "No sign-in": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No sign-in"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无需登录"
+          }
+        }
+      }
+    },
+    "Not encrypted. Use plain HTTP only on a network you trust.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not encrypted. Use plain HTTP only on a network you trust."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "此连接未加密。仅在可信网络中使用普通 HTTP。"
+          }
+        }
+      }
+    },
+    "Notifications": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notifications"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "通知"
+          }
+        }
+      }
+    },
+    "OK": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "好"
+          }
+        }
+      }
+    },
+    "Ocean": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ocean"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "海蓝色"
+          }
+        }
+      }
+    },
+    "On. Make another agent and they'll work together.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On. Make another agent and they'll work together."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "已开启。再创建一个智能体，它们就能一起协作。"
+          }
+        }
+      }
+    },
+    "Onboarding step": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Onboarding step"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "设置步骤"
+          }
+        }
+      }
+    },
+    "Open in": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open in"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "启动模式"
+          }
+        }
+      }
+    },
+    "Open voice chat": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open voice chat"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "打开语音聊天"
+          }
+        }
+      }
+    },
+    "Opens People and Chat details": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens People and Chat details"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "打开成员和聊天详情"
+          }
+        }
+      }
+    },
+    "Opens agent and chat details": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens agent and chat details"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "打开智能体和聊天详情"
+          }
+        }
+      }
+    },
+    "Optional appearance settings": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Optional appearance settings"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "可选的外观设置"
+          }
+        }
+      }
+    },
+    "Optional. It adds extras to Hermes on your computer. You can add it later in Settings.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Optional. It adds extras to Hermes on your computer. You can add it later in Settings."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这是可选步骤。插件会为电脑上的 Hermes 添加更多功能。你也可以稍后在设置中安装。"
+          }
+        }
+      }
+    },
+    "Pairing and connection": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pairing and connection"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "配对与连接"
+          }
+        }
+      }
+    },
+    "Paper": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paper"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "纸白色"
+          }
+        }
+      }
+    },
+    "Password": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Password"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "密码"
+          }
+        }
+      }
+    },
+    "Password needed": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Password needed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "需要密码"
+          }
+        }
+      }
+    },
+    "Paste an access token from your sign-in provider.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paste an access token from your sign-in provider."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "粘贴登录服务商提供的访问令牌。"
+          }
+        }
+      }
+    },
+    "Paste the dashboard's session token (HERMES_DASHBOARD_SESSION_TOKEN).": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paste the dashboard's session token (HERMES_DASHBOARD_SESSION_TOKEN)."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "粘贴控制面板的会话令牌（HERMES_DASHBOARD_SESSION_TOKEN）。"
+          }
+        }
+      }
+    },
+    "Permissions": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permissions"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "权限"
+          }
+        }
+      }
+    },
+    "Personalities": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Personalities"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "个性"
+          }
+        }
+      }
+    },
+    "Photo": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Photo"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "照片"
+          }
+        }
+      }
+    },
+    "Pictures, files and handy cards right in your chats.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pictures, files and handy cards right in your chats."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "在聊天中直接查看图片、文件和实用卡片。"
+          }
+        }
+      }
+    },
+    "Plugin": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plugin"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "插件"
+          }
+        }
+      }
+    },
+    "Port (optional)": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Port (optional)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "端口（可选）"
+          }
+        }
+      }
+    },
+    "Press and hold for 1 second to unlock %@.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Press and hold for 1 second to unlock %@."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "按住 1 秒即可选择%@。"
+          }
+        }
+      }
+    },
+    "Preview of %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preview of %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@的预览"
+          }
+        }
+      }
+    },
+    "Primary navigation": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Primary navigation"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "主导航"
+          }
+        }
+      }
+    },
+    "Privacy policy": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacy policy"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "隐私政策"
+          }
+        }
+      }
+    },
+    "Private by design · Connected directly": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Private by design · Connected directly"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "注重隐私 · 直接连接"
+          }
+        }
+      }
+    },
+    "Projects": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Projects"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "项目"
+          }
+        }
+      }
+    },
+    "Provider": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Provider"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "服务商"
+          }
+        }
+      }
+    },
+    "Pull requests": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pull requests"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "拉取请求"
+          }
+        }
+      }
+    },
+    "Queue attachment": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Queue attachment"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "排队发送附件"
+          }
+        }
+      }
+    },
+    "Queued": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Queued"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "排队发送"
+          }
+        }
+      }
+    },
+    "Queues the attachment after the current turn without interrupting it.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Queues the attachment after the current turn without interrupting it."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "在本轮回复结束后发送附件，不中断当前回复。"
+          }
+        }
+      }
+    },
+    "Recent sessions": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recent sessions"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "最近的会话"
+          }
+        }
+      }
+    },
+    "Remove name": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove name"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "移除名字"
+          }
+        }
+      }
+    },
+    "Rename": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rename"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "重命名"
+          }
+        }
+      }
+    },
+    "Rename chat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rename chat"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "重命名聊天"
+          }
+        }
+      }
+    },
+    "Report a problem, guides and version": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Report a problem, guides and version"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "问题反馈、使用指南和版本"
+          }
+        }
+      }
+    },
+    "Return to latest": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Return to latest"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "回到最新消息"
+          }
+        }
+      }
+    },
+    "Rose": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rose"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "玫瑰色"
+          }
+        }
+      }
+    },
+    "Sample alerts from your agents": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sample alerts from your agents"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "智能体通知示例"
+          }
+        }
+      }
+    },
+    "Save": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "保存"
+          }
+        }
+      }
+    },
+    "Save name": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save name"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "保存名字"
+          }
+        }
+      }
+    },
+    "Saving photo": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saving photo"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "正在保存照片"
+          }
+        }
+      }
+    },
+    "Scan document": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan document"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "扫描文稿"
+          }
+        }
+      }
+    },
+    "Scan paper pages into a PDF attachment": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan paper pages into a PDF attachment"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "将纸质页面扫描为 PDF 附件"
+          }
+        }
+      }
+    },
+    "Scheduled Tasks": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scheduled Tasks"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "定时任务"
+          }
+        }
+      }
+    },
+    "Scheduled tasks": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scheduled tasks"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "定时任务"
+          }
+        }
+      }
+    },
+    "Secure credential vault": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Secure credential vault"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "安全凭据库"
+          }
+        }
+      }
+    },
+    "See all": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "See all"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "查看全部"
+          }
+        }
+      }
+    },
+    "See all sessions": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "See all sessions"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "查看所有会话"
+          }
+        }
+      }
+    },
+    "Send another way": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send another way"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "选择其他发送方式"
+          }
+        }
+      }
+    },
+    "Send context into the live turn so the agent can adjust its response.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send context into the live turn so the agent can adjust its response."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "在本轮回复中补充信息，让智能体调整回答。"
+          }
+        }
+      }
+    },
+    "Send how?": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send how?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "如何发送？"
+          }
+        }
+      }
+    },
+    "Send message": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send message"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "发送消息"
+          }
+        }
+      }
+    },
+    "Sending": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sending"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "正在发送"
+          }
+        }
+      }
+    },
+    "Sending message": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sending message"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "正在发送消息"
+          }
+        }
+      }
+    },
+    "Session actions": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Session actions"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "会话操作"
+          }
+        }
+      }
+    },
+    "Session token": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Session token"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "会话令牌"
+          }
+        }
+      }
+    },
+    "Sessions": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sessions"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "会话"
+          }
+        }
+      }
+    },
+    "Sessions, scheduled tasks, and gestures": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sessions, scheduled tasks, and gestures"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "会话、定时任务和手势"
+          }
+        }
+      }
+    },
+    "Settings": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "设置"
+          }
+        }
+      }
+    },
+    "Settings…": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "设置…"
+          }
+        }
+      }
+    },
+    "Show": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "显示"
+          }
+        }
+      }
+    },
+    "Show all hosts": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show all hosts"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "显示所有电脑"
+          }
+        }
+      }
+    },
+    "Show one host": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show one host"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "显示一台电脑"
+          }
+        }
+      }
+    },
+    "Shows a preview": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shows a preview"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "显示预览"
+          }
+        }
+      }
+    },
+    "Shows every agent on every host in one list.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shows every agent on every host in one list."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "在一个列表中显示所有电脑上的智能体。"
+          }
+        }
+      }
+    },
+    "Shows the selected host's agents and chats again.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shows the selected host's agents and chats again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "重新显示所选电脑的智能体和聊天。"
+          }
+        }
+      }
+    },
+    "Sign in again": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in again"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "重新登录"
+          }
+        }
+      }
+    },
+    "Sign in on your Hermes sign-in page in %@, then come back here.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in on your Hermes sign-in page in %@, then come back here."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "在 %@ 中打开 Hermes 登录页面并登录，然后回到这里。"
+          }
+        }
+      }
+    },
+    "Sign in to Hermes": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in to Hermes"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "登录 Hermes"
+          }
+        }
+      }
+    },
+    "Sign in to model providers or add API keys": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in to model providers or add API keys"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "登录模型服务商或添加 API 密钥"
+          }
+        }
+      }
+    },
+    "Sign in with": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in with"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "登录方式"
+          }
+        }
+      }
+    },
+    "Sign in with %@ in %@, then come back here.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in with %@ in %@, then come back here."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "使用 %@ 在 %@ 中登录，然后回到这里。"
+          }
+        }
+      }
+    },
+    "Simple Bot mode": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Simple Bot mode"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "简易机器人模式"
+          }
+        }
+      }
+    },
+    "Simple chats with your bots, like texting friends.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Simple chats with your bots, like texting friends."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "轻松和机器人聊天，就像给朋友发消息。"
+          }
+        }
+      }
+    },
+    "Simple mode": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Simple mode"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "简易模式"
+          }
+        }
+      }
+    },
+    "Skills & Plugins": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skills & Plugins"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "技能与插件"
+          }
+        }
+      }
+    },
+    "Skip": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skip"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "跳过"
+          }
+        }
+      }
+    },
+    "Sky": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sky"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "天蓝色"
+          }
+        }
+      }
+    },
+    "Soft charcoal, easy on the eyes": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Soft charcoal, easy on the eyes"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "柔和的炭灰色，看着更舒适"
+          }
+        }
+      }
+    },
+    "Start chatting": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start chatting"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "开始聊天"
+          }
+        }
+      }
+    },
+    "Start coding tasks on your projects and review the changes.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start coding tasks on your projects and review the changes."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "为项目启动编程任务，并查看改动。"
+          }
+        }
+      }
+    },
+    "Start fresh with %@": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start fresh with %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "与%@开始新聊天"
+          }
+        }
+      }
+    },
+    "Steer": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Steer"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "引导"
+          }
+        }
+      }
+    },
+    "Step 1 of 4 · Welcome": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Step 1 of 4 · Welcome"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "第 1 步，共 4 步 · 欢迎"
+          }
+        }
+      }
+    },
+    "Step 2 of 4 · Connect": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Step 2 of 4 · Connect"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "第 2 步，共 4 步 · 连接"
+          }
+        }
+      }
+    },
+    "Step 3 of 4 · Notifications · Optional": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Step 3 of 4 · Notifications · Optional"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "第 3 步，共 4 步 · 通知 · 可选"
+          }
+        }
+      }
+    },
+    "Step 3 of 4 · Plugin · Optional": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Step 3 of 4 · Plugin · Optional"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "第 3 步，共 4 步 · 插件 · 可选"
+          }
+        }
+      }
+    },
+    "Step 4 of 4 · Your mode": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Step 4 of 4 · Your mode"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "第 4 步，共 4 步 · 选择模式"
+          }
+        }
+      }
+    },
+    "Stop response": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop response"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "停止回复"
+          }
+        }
+      }
+    },
+    "Stop the live turn and immediately continue with this message.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop the live turn and immediately continue with this message."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "停止本轮回复，立即继续处理这条消息。"
+          }
+        }
+      }
+    },
+    "Stopping": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stopping"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "正在停止"
+          }
+        }
+      }
+    },
+    "Stopping response": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stopping response"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "正在停止回复"
+          }
+        }
+      }
+    },
+    "Sunflower": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sunflower"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "向日葵黄"
+          }
+        }
+      }
+    },
+    "Switch host": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switch host"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "切换电脑"
+          }
+        }
+      }
+    },
+    "Switch hosts or add one.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switch hosts or add one."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "切换或添加电脑。"
+          }
+        }
+      }
+    },
+    "System": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "System"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "系统"
+          }
+        }
+      }
+    },
+    "TTS · reads replies aloud": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "TTS · reads replies aloud"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "TTS · 朗读回复"
+          }
+        }
+      }
+    },
+    "Talk with %@": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Talk with %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "与%@对话"
+          }
+        }
+      }
+    },
+    "Talk with your agents and hear them answer right away.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Talk with your agents and hear them answer right away."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "与智能体说话，即时听到回答。"
+          }
+        }
+      }
+    },
+    "Tangerine": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tangerine"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "橘色"
+          }
+        }
+      }
+    },
+    "Tap sends with %@. Choose a one-time alternative below.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap sends with %@. Choose a one-time alternative below."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "轻点会以“%@”方式发送。你可以在下方选择仅用于本次的其他方式。"
+          }
+        }
+      }
+    },
+    "Tasks": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tasks"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "任务"
+          }
+        }
+      }
+    },
+    "Teal": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Teal"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "蓝绿色"
+          }
+        }
+      }
+    },
+    "Teamwork": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Teamwork"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "团队协作"
+          }
+        }
+      }
+    },
+    "The bighelp plugin is on": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The bighelp plugin is on"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bighelp 插件已启用"
+          }
+        }
+      }
+    },
+    "The model new chats start with": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The model new chats start with"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "新聊天使用的模型"
+          }
+        }
+      }
+    },
+    "This address asks for a username and password before Hermes.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This address asks for a username and password before Hermes."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "此地址要求先输入用户名和密码，才能访问 Hermes。"
+          }
+        }
+      }
+    },
+    "This address is protected by Cloudflare Access. Enter its service token.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This address is protected by Cloudflare Access. Enter its service token."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "此地址受 Cloudflare Access 保护。请输入服务令牌。"
+          }
+        }
+      }
+    },
+    "This chat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This chat"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "当前聊天"
+          }
+        }
+      }
+    },
+    "This computer doesn't need a sign-in.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This computer doesn't need a sign-in."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "此电脑无需登录。"
+          }
+        }
+      }
+    },
+    "True black, saves battery on OLED": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "True black, saves battery on OLED"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "纯黑色，可为 OLED 屏幕省电"
+          }
+        }
+      }
+    },
+    "Try Again": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try Again"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "重试"
+          }
+        }
+      }
+    },
+    "Turn On Notifications": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn On Notifications"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "开启通知"
+          }
+        }
+      }
+    },
+    "Turn on notifications?": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn on notifications?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "开启通知？"
+          }
+        }
+      }
+    },
+    "Turning On…": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turning On…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "正在开启…"
+          }
+        }
+      }
+    },
+    "Unavailable": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unavailable"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "不可用"
+          }
+        }
+      }
+    },
+    "Unavailable, %@": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unavailable, %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "不可用，%@"
+          }
+        }
+      }
+    },
+    "Update the bighelp plugin on this computer to use this.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update the bighelp plugin on this computer to use this."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "请更新这台电脑上的 bighelp 插件，以使用此功能。"
+          }
+        }
+      }
+    },
+    "Updates and plans your agents make for you.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Updates and plans your agents make for you."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "智能体为你准备的进展和计划。"
+          }
+        }
+      }
+    },
+    "Usage": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usage"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "用量"
+          }
+        }
+      }
+    },
+    "Use %@": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "使用%@"
+          }
+        }
+      }
+    },
+    "Use your Hermes username and password.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use your Hermes username and password."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "使用你的 Hermes 用户名和密码。"
+          }
+        }
+      }
+    },
+    "Username": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Username"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "用户名"
+          }
+        }
+      }
+    },
+    "Username & password": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Username & password"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "用户名和密码"
+          }
+        }
+      }
+    },
+    "Voice": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voice"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "语音"
+          }
+        }
+      }
+    },
+    "Voice mode": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voice mode"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "语音模式"
+          }
+        }
+      }
+    },
+    "Wait for the live turn to finish, then send this as the next message.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wait for the live turn to finish, then send this as the next message."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "等待本轮回复结束，再将此内容作为下一条消息发送。"
+          }
+        }
+      }
+    },
+    "Warm and soft": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Warm and soft"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "温暖柔和"
+          }
+        }
+      }
+    },
+    "Welcome": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Welcome"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "欢迎"
+          }
+        }
+      }
+    },
+    "Where is Hermes running?": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Where is Hermes running?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Hermes 在哪里运行？"
+          }
+        }
+      }
+    },
+    "Where it opens, haptics and reactions": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Where it opens, haptics and reactions"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "打开方式、触感反馈和表情回应"
+          }
+        }
+      }
+    },
+    "Where it opens, reactions and Return": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Where it opens, reactions and Return"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "打开方式、表情回应和回车键"
+          }
+        }
+      }
+    },
+    "Workflows": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Workflows"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "工作流"
+          }
+        }
+      }
+    },
+    "Working": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Working"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "正在处理"
+          }
+        }
+      }
+    },
+    "Workspace": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Workspace"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "工作区"
+          }
+        }
+      }
+    },
+    "Worktrees": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Worktrees"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "工作树"
+          }
+        }
+      }
+    },
+    "You can change this later": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can change this later"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "之后可以更改"
+          }
+        }
+      }
+    },
+    "You can switch modes any time from ☰.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can switch modes any time from ☰."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "随时可以通过 ☰ 切换模式。"
+          }
+        }
+      }
+    },
+    "Your %lld agents know each other and ask each other for help.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Your %lld agent can ask other agents for help."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Your %lld agents know each other and ask each other for help."
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "你的 %lld 个智能体会了解彼此，并相互寻求帮助。"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Your October budget is ready.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your October budget is ready."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "你的十月预算已准备好。"
+          }
+        }
+      }
+    },
+    "Your agent is still working. Press 1–%lld, or Return to %@.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your agent is still working. Press 1–%lld, or Return to %@."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "智能体仍在工作。按 1–%lld 选择，或按回车键执行“%@”。"
+          }
+        }
+      }
+    },
+    "Your agents are ready to chat.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your agents are ready to chat."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "智能体已准备好，可以开始聊天。"
+          }
+        }
+      }
+    },
+    "Your agents bring each other in to get things done.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your agents bring each other in to get things done."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "智能体会邀请彼此协作，一起完成任务。"
+          }
+        }
+      }
+    },
+    "Your agents learn about each other and ask each other for help.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your agents learn about each other and ask each other for help."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "智能体会了解彼此，并相互寻求帮助。"
+          }
+        }
+      }
+    },
+    "Your agents, right at home.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your agents, right at home."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "你的智能体，随时在身边。"
+          }
+        }
+      }
+    },
+    "Your chats show up here.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your chats show up here."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "你的聊天会显示在这里。"
+          }
+        }
+      }
+    },
+    "Your chats stay open when your phone sleeps.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your chats stay open when your phone sleeps."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "手机休眠后，聊天仍会保持开启。"
+          }
+        }
+      }
+    },
+    "Your computer already has it. Here's what it adds.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your computer already has it. Here's what it adds."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "你的电脑已安装此插件。它带来了以下功能。"
+          }
+        }
+      }
+    },
+    "Your computers, Hermes updates and restarts": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your computers, Hermes updates and restarts"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "你的电脑、Hermes 更新与重启"
+          }
+        }
+      }
+    },
+    "Your data and AI": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your data and AI"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "你的数据与 AI"
+          }
+        }
+      }
+    },
+    "Your name": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your name"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "你的名字"
+          }
+        }
+      }
+    },
+    "Your name and photo show on your messages. Your agents see your name, so they know who they're talking with.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your name and photo show on your messages. Your agents see your name, so they know who they're talking with."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "你的消息会显示你的名字和照片。智能体也能看到你的名字，知道正在和谁交谈。"
+          }
+        }
+      }
+    },
+    "bighelp and its colorful agent companions": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "bighelp and its colorful agent companions"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bighelp 和多彩的智能体伙伴"
+          }
+        }
+      }
+    },
+    "bighelp sends what you share (messages, files, photos, voice, and location if you turn it on) to your Hermes computer and the AI providers you set up on it.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "bighelp sends what you share (messages, files, photos, voice, and location if you turn it on) to your Hermes computer and the AI providers you set up on it."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bighelp 会将你分享的内容（消息、文件、照片、语音，以及启用后的位置）发送到运行 Hermes 的电脑和你在该电脑上配置的 AI 服务商。"
+          }
+        }
+      }
+    },
+    "group": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "group"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "群组"
+          }
+        }
+      }
+    },
+    "now": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "now"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "现在"
+          }
+        }
+      }
+    },
+    "your browser": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "your browser"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "浏览器"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

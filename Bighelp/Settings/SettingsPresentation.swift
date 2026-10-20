@@ -17,41 +17,41 @@ enum SettingsMenuSection: String, CaseIterable, Identifiable, Equatable, Sendabl
 
     var title: String {
         switch self {
-        case .workspace: "Workspace"
-        case .agentsAndPersonalities: "Agents & Personalities"
-        case .chat: "Chat"
-        case .voice: "Voice"
-        case .notifications: "Notifications"
-        case .appearance: "Appearance"
-        case .permissions: "Permissions"
-        case .connectivityAndNotifications: "System"
-        case .companion: "Companion pet"
-        case .help: "Help & feedback"
-        case .watch: "Apple Watch"
+        case .workspace: String(localized: "Workspace")
+        case .agentsAndPersonalities: String(localized: "Agents & Personalities")
+        case .chat: String(localized: "Chat")
+        case .voice: String(localized: "Voice")
+        case .notifications: String(localized: "Notifications")
+        case .appearance: String(localized: "Appearance")
+        case .permissions: String(localized: "Permissions")
+        case .connectivityAndNotifications: String(localized: "System")
+        case .companion: String(localized: "Companion pet")
+        case .help: String(localized: "Help & feedback")
+        case .watch: String(localized: "Apple Watch")
         }
     }
 
     var detail: String {
         switch self {
-        case .workspace: "Sessions, scheduled tasks, and gestures"
-        case .agentsAndPersonalities: "Manage how Hermes agents present themselves"
+        case .workspace: String(localized: "Sessions, scheduled tasks, and gestures")
+        case .agentsAndPersonalities: String(localized: "Manage how Hermes agents present themselves")
         case .chat: Self.chatDetail
-        case .voice: "How voice chats sound"
-        case .notifications: "Alerts from your agents"
-        case .appearance: "Colors, light and dark, chat layout"
-        case .permissions: "Microphone, camera, photos and more"
-        case .connectivityAndNotifications: "Your computers, Hermes updates and restarts"
-        case .companion: "Character, motion and agent"
-        case .help: "Report a problem, guides and version"
-        case .watch: "Pairing and connection"
+        case .voice: String(localized: "How voice chats sound")
+        case .notifications: String(localized: "Alerts from your agents")
+        case .appearance: String(localized: "Colors, light and dark, chat layout")
+        case .permissions: String(localized: "Microphone, camera, photos and more")
+        case .connectivityAndNotifications: String(localized: "Your computers, Hermes updates and restarts")
+        case .companion: String(localized: "Character, motion and agent")
+        case .help: String(localized: "Report a problem, guides and version")
+        case .watch: String(localized: "Pairing and connection")
         }
     }
 
     private static var chatDetail: String {
         #if targetEnvironment(macCatalyst) // A Mac has no haptics or Dynamic Island.
-        "Where it opens, reactions and Return"
+        String(localized: "Where it opens, reactions and Return")
         #else
-        "Where it opens, haptics and reactions"
+        String(localized: "Where it opens, haptics and reactions")
         #endif
     }
 

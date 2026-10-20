@@ -65,15 +65,7 @@ struct BighelpShellActions {
 extension AppTab {
     /// The bottom bar's tabs by name, for the menu bar.
     var commandTitle: String {
-        switch self {
-        case .sessions: "Chat"
-        case .feed: "Feed"
-        case .ideas: "Ideas"
-        case .goals: "Goals"
-        case .apps: "Files"
-        case .scheduledTasks: "Scheduled Tasks"
-        default: rawValue.capitalized
-        }
+        self == .scheduledTasks ? String(localized: "Scheduled Tasks") : title
     }
 }
 

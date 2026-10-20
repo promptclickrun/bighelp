@@ -284,9 +284,9 @@ struct ChatActionMenuSheet: View {
     private func actionDetail(_ action: ChatActionMenuAction) -> String {
         switch action {
         case .camera, .photo, .file:
-            return unavailableReason(action) ?? "Add from \(mediaTitle(for: action).lowercased())"
+            return unavailableReason(action) ?? String(localized: "Add from \(mediaTitle(for: action).lowercased())")
         case .voice:
-            return "Talk with \(agentName)"
+            return String(localized: "Talk with \(agentName)")
         case .changeModel:
             return runtimeControls?.modelDisplayName
                 ?? ModelNameCatalogStore.shared.displayName(for: currentModelName)
@@ -306,50 +306,50 @@ struct ChatActionMenuSheet: View {
 
     private var pageTitle: String {
         switch page {
-        case .main: "Add to chat"
-        case .agents: "Choose agent"
-        case .skillsAndTools: "Skills & Plugins"
-        case .modelAndReasoning: "Model & reasoning"
-        case .workspaces: "Workspace"
+        case .main: String(localized: "Add to chat")
+        case .agents: String(localized: "Choose agent")
+        case .skillsAndTools: String(localized: "Skills & Plugins")
+        case .modelAndReasoning: String(localized: "Model & reasoning")
+        case .workspaces: String(localized: "Workspace")
         }
     }
 
     private func mediaTitle(for action: ChatActionMenuAction) -> String {
         switch action {
-        case .camera: "Camera"
-        case .photo: "Photo"
-        case .file: "File"
+        case .camera: String(localized: "Camera")
+        case .photo: String(localized: "Photo")
+        case .file: String(localized: "File")
         default: ""
         }
     }
 
     private func mediaUnavailableReason(_ action: ChatActionMenuAction) -> String? {
-        if action == .file, !allowsFiles { return "Attachments are unavailable on this connection." }
+        if action == .file, !allowsFiles { return String(localized: "Attachments are unavailable on this connection.") }
         if !allowsImages, action == .camera || action == .photo { return DirectHermesFileAttachments.imagesUnavailable }
-        if action == .camera, !isCameraAvailable { return "Camera capture is unavailable on this device." }
+        if action == .camera, !isCameraAvailable { return String(localized: "Camera capture is unavailable on this device.") }
         return nil
     }
 
     private func rowTitle(for action: ChatActionMenuAction) -> String {
         switch action {
-        case .scanDocument: "Scan document"
-        case .voice: "Voice mode"
-        case .startSession: "New chat"
-        case .chooseAgent: "Choose agent"
-        case .skillsAndTools: "Skills & Plugins"
-        case .workspace: "Workspace"
-        case .changeModel: "Change model"
+        case .scanDocument: String(localized: "Scan document")
+        case .voice: String(localized: "Voice mode")
+        case .startSession: String(localized: "New chat")
+        case .chooseAgent: String(localized: "Choose agent")
+        case .skillsAndTools: String(localized: "Skills & Plugins")
+        case .workspace: String(localized: "Workspace")
+        case .changeModel: String(localized: "Change model")
         default: ""
         }
     }
 
     private func rowSubtitle(for action: ChatActionMenuAction) -> String {
         switch action {
-        case .scanDocument: scannerUnavailableReason ?? "Scan paper pages into a PDF attachment"
-        case .voice: "Talk with \(agentName)"
-        case .startSession: "Start fresh with \(effectiveAgentName)"
-        case .chooseAgent: "\(effectiveAgentName) is active for this chat"
-        case .skillsAndTools: "Capabilities on this Hermes host"
+        case .scanDocument: scannerUnavailableReason ?? String(localized: "Scan paper pages into a PDF attachment")
+        case .voice: String(localized: "Talk with \(agentName)")
+        case .startSession: String(localized: "Start fresh with \(effectiveAgentName)")
+        case .chooseAgent: String(localized: "\(effectiveAgentName) is active for this chat")
+        case .skillsAndTools: String(localized: "Capabilities on this Hermes host")
         case .workspace: activeWorkspaceName
         case .changeModel: currentModelName
         default: ""

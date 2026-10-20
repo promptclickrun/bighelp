@@ -832,7 +832,7 @@ extension RootShellView {
     /// Where the ☰ menu goes. Every menu entry point opens this one menu.
     var menuDestinations: BighelpMenuDestinations {
         BighelpMenuDestinations(
-            newChatTitle: homeAgent.map { "New chat with \($0.name)" } ?? "New chat",
+            newChatTitle: homeAgent.map { String(localized: "New chat with \($0.name)") } ?? String(localized: "New chat"),
             onNewChat: {
                 afterClosingHomeSheets {
                     if appState.selectedTab != .sessions { appState.select(.sessions) }

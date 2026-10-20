@@ -286,33 +286,34 @@ struct AdaptiveComposerActionButton: View {
     }
 
     private var accessibilityLabel: String {
-        if isBusy { return effectiveAction == .stop ? "Stopping response" : "Sending message" }
+        if isBusy { return effectiveAction == .stop ? String(localized: "Stopping response") : String(localized: "Sending message") }
         return switch effectiveAction {
-        case .voice: "Open voice chat"
-        case .send: isQueueingAttachments ? "Queue attachment" : "Send message"
-        case .stop: "Stop response"
+        case .voice: String(localized: "Open voice chat")
+        case .send: isQueueingAttachments ? String(localized: "Queue attachment") : String(localized: "Send message")
+        case .stop: String(localized: "Stop response")
         }
     }
 
     private var accessibilityValue: String {
-        if isBusy { return effectiveAction == .stop ? "Stopping" : "Sending" }
+        if isBusy { return effectiveAction == .stop ? String(localized: "Stopping") : String(localized: "Sending") }
         if let defaultMidSessionBehavior, effectiveAction == .send {
-            let base = "Default during this active turn: \(defaultMidSessionBehavior.title)"
+            let base = String(localized: "Default during this active turn: \(defaultMidSessionBehavior.title)")
             guard holdObservationEnabled else { return base }
             return base
                 + " thresholdReached=\(holdThresholdReached)"
                 + " optionsAppeared=\(optionsAppeared)"
                 + " touchActiveWhenOptionsAppeared=\(touchActiveWhenOptionsAppeared)"
         }
-        if isEnabled { return "Available" }
-        if effectiveAction == .send, let unavailableReason { return "Unavailable, " + unavailableReason }
-        return "Unavailable"
+        if isEnabled { return String(localized: "Available") }
+        if effectiveAction == .send, let unavailableReason { return String(localized: "Unavailable, \(unavailableReason)") }
+        return String(localized: "Unavailable")
     }
 
     private var accessibilityHint: String {
-        if isQueueingAttachments { return "Queues the attachment after the current turn without interrupting it." }
+        if isQueueingAttachments { return String(localized: "Queues the attachment after the current turn without interrupting it.") }
         guard !midSessionAlternatives.isEmpty else { return "" }
-        return "Press and hold for 1 second to unlock \(midSessionAlternatives.map(\.title).joined(separator: " or "))."
+        let choices = midSessionAlternatives.map(\.title).formatted(.list(type: .or))
+        return String(localized: "Press and hold for 1 second to unlock \(choices).")
     }
 
     private var midSessionAlternatives: [MidSessionChatBehavior] {
@@ -386,12 +387,14 @@ private struct MidSessionSendOptionsSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: BighelpTokens.space16) {
             VStack(alignment: .leading, spacing: BighelpTokens.space4) {
-                Text(fromKeyboard ? "Send how?" : "Send another way")
+                Text(fromKeyboard ? String(localized: "Send how?") : String(localized: "Send another way"))
                     .bighelpFont(.sectionTitle, weight: .semibold)
                     .foregroundStyle(theme.primaryText)
                 Text(fromKeyboard
-                     ? "Your agent is still working. Press 1–\(choices.count), or Return to \(defaultBehavior.title.lowercased())."
-                     : "\(BighelpPlatform.isMac ? "Click" : "Tap") sends with \(defaultBehavior.title). Choose a one-time alternative below.")
+                     ? String(localized: "Your agent is still working. Press 1–\(choices.count), or Return to \(defaultBehavior.title.lowercased()).")
+                     : (BighelpPlatform.isMac
+                        ? String(localized: "Click sends with \(defaultBehavior.title). Choose a one-time alternative below.")
+                        : String(localized: "Tap sends with \(defaultBehavior.title). Choose a one-time alternative below.")))
                     .bighelpFont(.metadata)
                     .foregroundStyle(theme.secondaryText)
             }

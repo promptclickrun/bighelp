@@ -142,15 +142,15 @@ final class TeamworkModel {
     /// One line under the switch, in plain words.
     var detail: String {
         switch load {
-        case .needsPluginUpdate: return "Update the bighelp plugin on this computer to use this."
-        case .unavailable: return "Connect to your computer to change this."
+        case .needsPluginUpdate: return String(localized: "Update the bighelp plugin on this computer to use this.")
+        case .unavailable: return String(localized: "Connect to your computer to change this.")
         case .idle, .loading, .loaded:
             if let errorMessage { return errorMessage }
             let count = status?.agents.count ?? 0
-            guard isOn else { return "Your agents learn about each other and ask each other for help." }
+            guard isOn else { return String(localized: "Your agents learn about each other and ask each other for help.") }
             return count > 1
-                ? "Your \(count) agents know each other and ask each other for help."
-                : "On. Make another agent and they'll work together."
+                ? String(localized: "Your \(count) agents know each other and ask each other for help.")
+                : String(localized: "On. Make another agent and they'll work together.")
         }
     }
 }

@@ -12,11 +12,11 @@ extension SettingsView {
     var assistantBasics: some View {
         Section {
             if let onOpenWorkspaceDestination {
-                routeRow("Default model", detail: "The model new chats start with",
+                routeRow(String(localized: "Default model"), detail: String(localized: "The model new chats start with"),
                          symbol: "cpu", identifier: "settings.default-model") {
                     onOpenWorkspaceDestination(.models)
                 }
-                routeRow("AI providers", detail: "Sign in to model providers or add API keys",
+                routeRow(String(localized: "AI providers"), detail: String(localized: "Sign in to model providers or add API keys"),
                          symbol: "key.fill", tint: Color(hex: "F28B32"), identifier: "settings.providers") {
                     onOpenWorkspaceDestination(.keys)
                 }
@@ -25,7 +25,7 @@ extension SettingsView {
                 NavigationLink {
                     settingsDone(AppsHubView(native: connectorApps?() ?? nil, composio: composio))
                 } label: {
-                    rowLabel("Apps", detail: "Let agents use your email, notes and more",
+                    rowLabel(String(localized: "Apps"), detail: String(localized: "Let agents use your email, notes and more"),
                              symbol: "app.connected.to.app.below.fill", tint: Color(hex: "3A7BD5"))
                         .bighelpSettingsLinkLabel()
                 }
@@ -35,7 +35,7 @@ extension SettingsView {
                 NavigationLink {
                     settingsDone(ConnectorAppsView(model: apps))
                 } label: {
-                    rowLabel("Apps", detail: "Let agents use your email, notes and more",
+                    rowLabel(String(localized: "Apps"), detail: String(localized: "Let agents use your email, notes and more"),
                              symbol: "app.connected.to.app.below.fill", tint: Color(hex: "3A7BD5"))
                         .bighelpSettingsLinkLabel()
                 }
@@ -44,7 +44,7 @@ extension SettingsView {
             }
             if let teamworkModel {
                 TeamworkToggle(model: teamworkModel) { detail in
-                    rowLabel("Teamwork", detail: detail, symbol: "person.3.fill", tint: Color(hex: "2E9E6B"),
+                    rowLabel(String(localized: "Teamwork"), detail: detail, symbol: "person.3.fill", tint: Color(hex: "2E9E6B"),
                              showsChevron: false)
                 }
                 .bighelpSettingsRowInsets()
@@ -52,7 +52,7 @@ extension SettingsView {
             Button {
                 isPersonalitiesPresented = true
             } label: {
-                rowLabel("Personalities", detail: personalityDetail, symbol: "theatermasks.fill", tint: Color(hex: "B7356F"))
+                rowLabel(String(localized: "Personalities"), detail: personalityDetail, symbol: "theatermasks.fill", tint: Color(hex: "B7356F"))
             }
             .bighelpSettingsButton()
             .accessibilityIdentifier("profile.personalities")
@@ -65,7 +65,7 @@ extension SettingsView {
     }
 
     private var personalityDetail: String {
-        guard let active = personalities.catalog?.activeName, !active.isEmpty else { return "How agents sound" }
+        guard let active = personalities.catalog?.activeName, !active.isEmpty else { return String(localized: "How agents sound") }
         return active.capitalized
     }
 
@@ -74,7 +74,7 @@ extension SettingsView {
             Toggle(isOn: $settings.nerdModeEnabled) {
                 HStack(spacing: BighelpTokens.space12) {
                     BighelpIconTile(systemName: "wrench.adjustable.fill", tint: .gray)
-                    settingLabel("Nerd Mode", detail: "Hermes tools and extra chat settings")
+                    settingLabel(String(localized: "Nerd Mode"), detail: String(localized: "Hermes tools and extra chat settings"))
                 }
                 .padding(.horizontal, BighelpMenuRowLayout.labelInset)
             }
@@ -89,7 +89,7 @@ extension SettingsView {
     var hermesSection: some View {
         Section {
             if let onOpenRoute {
-                routeRow("Hermes tools", detail: "Files, skills, memory, logs and more",
+                routeRow(String(localized: "Hermes tools"), detail: String(localized: "Files, skills, memory, logs and more"),
                          symbol: "square.grid.2x2.fill", identifier: "settings.hermes-tools") {
                     onOpenRoute(.workspaceHub)
                 }

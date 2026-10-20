@@ -58,7 +58,7 @@ struct HostSetupView: View {
     var allowsDismiss = true
     var hostToAuthenticate: BighelpConfiguredHost? = nil
     var firstRunPresentation = false
-    var completionActionTitle = "Start chatting"
+    var completionActionTitle = String(localized: "Start chatting")
     /// First-run onboarding offers notifications as a step of its own, after the plugin.
     var showsNotificationSetup = true
     var retainedDraft: Binding<HostSetupDraft>? = nil
@@ -271,21 +271,21 @@ struct HostSetupView: View {
 
     private var headerTitle: String {
         switch step {
-        case .address: hostToAuthenticate == nil ? "Connect your computer" : "Sign in again"
-        case .protection(.cloudflareAccess): "Cloudflare Access"
-        case .protection(.password): "Password needed"
-        case .signIn: hostToAuthenticate == nil ? "Sign in to Hermes" : "Sign in again"
-        case .connected: "Connected"
+        case .address: hostToAuthenticate == nil ? String(localized: "Connect your computer") : String(localized: "Sign in again")
+        case .protection(.cloudflareAccess): String(localized: "Cloudflare Access")
+        case .protection(.password): String(localized: "Password needed")
+        case .signIn: hostToAuthenticate == nil ? String(localized: "Sign in to Hermes") : String(localized: "Sign in again")
+        case .connected: String(localized: "Connected")
         }
     }
 
     private var headerDetail: String {
         switch step {
-        case .address: hostToAuthenticate?.name ?? "Where is Hermes running?"
-        case .protection(.cloudflareAccess): "This address is protected by Cloudflare Access. Enter its service token."
-        case .protection(.password): "This address asks for a username and password before Hermes."
+        case .address: hostToAuthenticate?.name ?? String(localized: "Where is Hermes running?")
+        case .protection(.cloudflareAccess): String(localized: "This address is protected by Cloudflare Access. Enter its service token.")
+        case .protection(.password): String(localized: "This address asks for a username and password before Hermes.")
         case .signIn(let discovery): signInDetail(discovery)
-        case .connected: "Your agents are ready to chat."
+        case .connected: String(localized: "Your agents are ready to chat.")
         }
     }
 
@@ -469,8 +469,8 @@ struct HostSetupView: View {
 
     private var connectionAction: some View {
         primaryAction(
-            isWorking ? (discovery == nil ? "Finding your agents…" : "Connecting…")
-                      : (discovery == nil ? "Continue" : "Connect"),
+            isWorking ? (discovery == nil ? String(localized: "Finding your agents…") : String(localized: "Connecting…"))
+                      : (discovery == nil ? String(localized: "Continue") : String(localized: "Connect")),
             identifier: "host-setup.connect-host",
             disabled: isWorking || !stepIsFilledIn
         ) {
@@ -501,13 +501,13 @@ struct HostSetupView: View {
             if offeredMethods(discovery) > 1 {
                 Picker("Sign in with", selection: $method) {
                     if discovery.supportsDashboard { Text("No sign-in").tag(Method.dashboard) }
-                    if discovery.supportsToken { Text(discovery.requiresAuthentication ? "Access token" : "Session token").tag(Method.token) }
+                    if discovery.supportsToken { Text(discovery.requiresAuthentication ? String(localized: "Access token") : String(localized: "Session token")).tag(Method.token) }
                     if discovery.supportsPassword { Text("Username & password").tag(Method.password) }
                     if discovery.nativePKCE { Text("Browser sign-in").tag(Method.browser) }
                 }.accessibilityIdentifier("direct-hermes.auth-picker")
             }
             if method == .token && discovery.supportsToken {
-                SecureField(discovery.requiresAuthentication ? "Access token" : "Dashboard session token", text: $token)
+                SecureField(discovery.requiresAuthentication ? String(localized: "Access token") : String(localized: "Dashboard session token"), text: $token)
                     .textInputAutocapitalization(.never).autocorrectionDisabled()
                     .accessibilityIdentifier("direct-hermes.token")
             } else if method == .browser && discovery.nativePKCE {
@@ -547,18 +547,18 @@ struct HostSetupView: View {
     private func signInDetail(_ discovery: HostAuthenticationDiscovery) -> String {
         switch method {
         case .dashboard:
-            "This computer doesn't need a sign-in."
+            String(localized: "This computer doesn't need a sign-in.")
         case .token where discovery.requiresAuthentication:
-            "Paste an access token from your sign-in provider."
+            String(localized: "Paste an access token from your sign-in provider.")
         case .token:
-            "Paste the dashboard's session token (HERMES_DASHBOARD_SESSION_TOKEN)."
+            String(localized: "Paste the dashboard's session token (HERMES_DASHBOARD_SESSION_TOKEN).")
         case .password:
-            "Use your Hermes username and password."
+            String(localized: "Use your Hermes username and password.")
         case .browser:
             if discovery.providers.count == 1, let only = discovery.providers.first {
-                "Sign in with \(only.name) in \(Self.signInBrowser), then come back here."
+                String(localized: "Sign in with \(only.name) in \(Self.signInBrowser), then come back here.")
             } else {
-                "Sign in on your Hermes sign-in page in \(Self.signInBrowser), then come back here."
+                String(localized: "Sign in on your Hermes sign-in page in \(Self.signInBrowser), then come back here.")
             }
         }
     }
@@ -656,7 +656,7 @@ struct HostSetupView: View {
 
     /// TLS failing or nothing answering on HTTPS can mean the computer serves plain HTTP.
     /// Where browser sign-in opens: the Mac uses your default browser.
-    private static var signInBrowser: String { BighelpPlatform.isMac ? "your browser" : "Safari" }
+    private static var signInBrowser: String { BighelpPlatform.isMac ? String(localized: "your browser") : "Safari" }
 
     private static func mayBePlainHTTP(_ error: DirectHermesError) -> Bool {
         error == .tlsRequired || error == .connectionFailed

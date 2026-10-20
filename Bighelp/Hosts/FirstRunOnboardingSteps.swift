@@ -13,8 +13,8 @@ enum FirstRunOnboarding {
 /// One step: a friendly icon, a title, a line under it, the step's content, and its buttons at the bottom.
 private struct FirstRunStepLayout<Content: View>: View {
     let systemImage: String
-    let title: String
-    let subtitle: String
+    let title: LocalizedStringKey
+    let subtitle: LocalizedStringKey
     let primaryTitle: String
     let primaryIdentifier: String
     var isWorking = false
@@ -80,8 +80,8 @@ private struct FirstRunStepLayout<Content: View>: View {
 /// A row of what something does: a small colored icon, a name, and one line.
 private struct FirstRunFeatureRow: View {
     let systemImage: String
-    let title: String
-    let detail: String
+    let title: LocalizedStringKey
+    let detail: LocalizedStringKey
     let tint: Color
     @BighelpThemeReader private var theme
 
@@ -119,10 +119,10 @@ struct FirstRunPluginStep: View {
     @BighelpThemeReader private var theme
 
     private var primaryTitle: String {
-        if needsRestart { return "Continue" }
-        if alreadyInstalled { return "Continue" }
-        guard setup?.isWorking == true else { return "Install Plugin" }
-        return setup?.state == .checking ? "Checking…" : "Installing…"
+        if needsRestart { return String(localized: "Continue") }
+        if alreadyInstalled { return String(localized: "Continue") }
+        guard setup?.isWorking == true else { return String(localized: "Install Plugin") }
+        return setup?.state == .checking ? String(localized: "Checking…") : String(localized: "Installing…")
     }
 
     var body: some View {
@@ -182,7 +182,7 @@ struct FirstRunPluginStep: View {
 
     private func install() {
         guard let host = registry.selectedHost else {
-            outcome = "Connect to your computer first, then add the plugin in Settings."
+            outcome = String(localized: "Connect to your computer first, then add the plugin in Settings.")
             return
         }
         let model = setup ?? HostNotificationSetupModel(host: host, registry: registry, enrollNotifications: false)
@@ -195,7 +195,7 @@ struct FirstRunPluginStep: View {
                 onInstalled()
             case .backendRestartRequired:
                 needsRestart = true
-                outcome = "Installed. Restart Hermes on your computer to finish, then turn on alerts in Settings."
+                outcome = String(localized: "Installed. Restart Hermes on your computer to finish, then turn on alerts in Settings.")
             default:
                 outcome = model.message
             }
@@ -217,9 +217,9 @@ struct FirstRunNotificationsStep: View {
     private var retryCannotHelp: Bool { outcome != nil && setup?.offersRetry == false }
 
     private var primaryTitle: String {
-        if setup?.isWorking == true { return "Turning On…" }
-        if retryCannotHelp { return "Continue" }
-        return outcome == nil ? "Turn On Notifications" : "Try Again"
+        if setup?.isWorking == true { return String(localized: "Turning On…") }
+        if retryCannotHelp { return String(localized: "Continue") }
+        return outcome == nil ? String(localized: "Turn On Notifications") : String(localized: "Try Again")
     }
 
     var body: some View {
@@ -268,8 +268,8 @@ struct FirstRunNotificationsStep: View {
 /// A sample alert, drawn like the system's banner, so people can see what they'd get.
 private struct FirstRunAlertPreview: View {
     let name: String
-    let message: String
-    let time: String
+    let message: LocalizedStringKey
+    let time: LocalizedStringKey
     @BighelpThemeReader private var theme
 
     var body: some View {
@@ -306,17 +306,17 @@ enum FirstRunMode: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .bots: "Bots"
-        case .sessions: "Sessions"
-        case .code: "Code"
+        case .bots: String(localized: "Bots")
+        case .sessions: String(localized: "Sessions")
+        case .code: String(localized: "Code")
         }
     }
 
     var detail: String {
         switch self {
-        case .bots: "Simple chats with your bots, like texting friends."
-        case .sessions: "Every chat, tool and setting in the full bighelp app."
-        case .code: "Start coding tasks on your projects and review the changes."
+        case .bots: String(localized: "Simple chats with your bots, like texting friends.")
+        case .sessions: String(localized: "Every chat, tool and setting in the full bighelp app.")
+        case .code: String(localized: "Start coding tasks on your projects and review the changes.")
         }
     }
 

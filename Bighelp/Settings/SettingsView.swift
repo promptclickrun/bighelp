@@ -369,8 +369,7 @@ struct SettingsView: View {
 
     /// "Lavender bubbles · Cream · Graphite"
     var appearanceSummary: String {
-        "\(settings.bubbleColorName) bubbles · "
-            + "\(settings.lightBackground.name) · \(settings.darkBackground.name)"
+        String(localized: "\(settings.bubbleColorName) bubbles · \(settings.lightBackground.name) · \(settings.darkBackground.name)")
     }
 
     var selectedHostPluginUpdate: HostPluginUpdateModel? {

@@ -42,7 +42,7 @@ extension SettingsView {
             .bighelpMacSettingsRowInsets()
             if canSaveDisplayName {
                 Button(action: saveDisplayName) {
-                    Text(isRemovingName ? "Remove name" : "Save name")
+                    Text(isRemovingName ? String(localized: "Remove name") : String(localized: "Save name"))
                         .frame(maxWidth: .infinity, minHeight: BighelpTokens.hitTarget, alignment: .leading)
                 }
                 .accessibilityIdentifier("profile.save-name")
@@ -106,8 +106,8 @@ extension SettingsView {
         }
         let removed = userIdentity.identity.name.isEmpty
         nameSaveStatus = displayNameDraft == displayNameBaseline
-            ? (removed ? "Name removed." : "Name saved.")
-            : "Name saved. You have unsaved changes."
+            ? (removed ? String(localized: "Name removed.") : String(localized: "Name saved."))
+            : String(localized: "Name saved. You have unsaved changes.")
     }
 
     private func importAvatar(_ selection: PhotosPickerItem) {

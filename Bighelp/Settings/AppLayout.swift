@@ -10,17 +10,17 @@ enum BighelpPlace: String, CaseIterable, Codable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .feed: "Feed"
-        case .ideas: "Ideas"
-        case .goals: "Goals"
-        case .files: "Files"
-        case .agents: "Agents"
-        case .projects: "Projects"
-        case .kanban: "Kanban"
-        case .workflows: "Workflows"
-        case .scheduledTasks: "Scheduled tasks"
-        case .usage: "Usage"
-        case .settings: "Settings"
+        case .feed: String(localized: "Feed")
+        case .ideas: String(localized: "Ideas")
+        case .goals: String(localized: "Goals")
+        case .files: String(localized: "Files")
+        case .agents: String(localized: "Agents")
+        case .projects: String(localized: "Projects")
+        case .kanban: String(localized: "Kanban")
+        case .workflows: String(localized: "Workflows")
+        case .scheduledTasks: String(localized: "Scheduled tasks")
+        case .usage: String(localized: "Usage")
+        case .settings: String(localized: "Settings")
         }
     }
 

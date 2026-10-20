@@ -6,8 +6,8 @@ enum BighelpLightBackground: String, CaseIterable, Identifiable, Sendable {
     case cream, paper
 
     var id: String { rawValue }
-    var name: String { self == .cream ? "Cream" : "Paper" }
-    var detail: String { self == .cream ? "Warm and soft" : "Clean, bright white" }
+    var name: String { self == .cream ? String(localized: "Cream") : String(localized: "Paper") }
+    var detail: String { self == .cream ? String(localized: "Warm and soft") : String(localized: "Clean, bright white") }
     var neutral: BighelpTheme { self == .cream ? .light : .paperLight }
 }
 
@@ -16,8 +16,8 @@ enum BighelpDarkBackground: String, CaseIterable, Identifiable, Sendable {
     case graphite, black
 
     var id: String { rawValue }
-    var name: String { self == .graphite ? "Graphite" : "Black" }
-    var detail: String { self == .graphite ? "Soft charcoal, easy on the eyes" : "True black, saves battery on OLED" }
+    var name: String { self == .graphite ? String(localized: "Graphite") : String(localized: "Black") }
+    var detail: String { self == .graphite ? String(localized: "Soft charcoal, easy on the eyes") : String(localized: "True black, saves battery on OLED") }
     var neutral: BighelpTheme { self == .graphite ? .graphiteDark : .blackDark }
 }
 
@@ -30,18 +30,18 @@ enum BighelpBubbleColor: String, CaseIterable, Identifiable, Sendable {
 
     var name: String {
         switch self {
-        case .lavender: "Lavender"
-        case .grape: "Grape"
-        case .ocean: "Ocean"
-        case .sky: "Sky"
-        case .teal: "Teal"
-        case .mint: "Mint"
-        case .lime: "Lime"
-        case .sunflower: "Sunflower"
-        case .tangerine: "Tangerine"
-        case .coral: "Coral"
-        case .rose: "Rose"
-        case .graphite: "Ink"
+        case .lavender: String(localized: "Lavender")
+        case .grape: String(localized: "Grape")
+        case .ocean: String(localized: "Ocean")
+        case .sky: String(localized: "Sky")
+        case .teal: String(localized: "Teal")
+        case .mint: String(localized: "Mint")
+        case .lime: String(localized: "Lime")
+        case .sunflower: String(localized: "Sunflower")
+        case .tangerine: String(localized: "Tangerine")
+        case .coral: String(localized: "Coral")
+        case .rose: String(localized: "Rose")
+        case .graphite: String(localized: "Ink")
         }
     }
 

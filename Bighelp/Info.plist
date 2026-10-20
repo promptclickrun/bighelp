@@ -8,6 +8,8 @@
     <string>https://api.buzzkit.dev</string>
     <key>CFBundleDisplayName</key>
     <string>bighelp</string>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>$(DEVELOPMENT_LANGUAGE)</string>
     <key>CFBundleExecutable</key>
     <string>$(EXECUTABLE_NAME)</string>
     <key>CFBundleIdentifier</key>

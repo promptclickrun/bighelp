@@ -440,7 +440,9 @@ struct ChatComposer: View {
         )
         .overlay(alignment: .topLeading) {
             if composerText.wrappedValue.isEmpty {
-                Text(homeChrome.isSimpleBots && !model.isBotMode ? "Ask \(placeholderName)" : "Message \(placeholderName)")
+                Text(homeChrome.isSimpleBots && !model.isBotMode
+                     ? String(localized: "Ask \(placeholderName)")
+                     : String(localized: "Message \(placeholderName)"))
                     .bighelpFont(.body)
                     .foregroundStyle(theme.secondaryText)
                     .allowsHitTesting(false)
@@ -448,7 +450,7 @@ struct ChatComposer: View {
             }
         }
         .accessibilityLabel("Message")
-        .accessibilityValue(composerText.wrappedValue.isEmpty ? "Empty" : composerText.wrappedValue)
+        .accessibilityValue(composerText.wrappedValue.isEmpty ? String(localized: "Empty") : composerText.wrappedValue)
     }
 
     @Environment(\.agentHomeChrome) private var homeChrome
@@ -456,7 +458,7 @@ struct ChatComposer: View {
     private var placeholderName: String {
         guard model.isBotMode else { return agentName }
         let title = model.botModeRoomTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        return title.isEmpty ? "group" : title
+        return title.isEmpty ? String(localized: "group") : title
     }
 
     private var composerText: Binding<String> {

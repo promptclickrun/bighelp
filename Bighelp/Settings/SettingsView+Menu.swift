@@ -22,7 +22,7 @@ extension SettingsView {
         switch section {
         case .appearance: appearanceSummary
         case .voice: settings.voiceConversationMode == .codexLive
-            ? "GPT Live 1 · a live conversation" : "TTS · reads replies aloud"
+            ? String(localized: "GPT Live 1 · a live conversation") : String(localized: "TTS · reads replies aloud")
         default: section.detail
         }
     }

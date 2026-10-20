@@ -1,6 +1,8 @@
 name: Bighelp
 options:
   minimumXcodeGenVersion: 2.43.0
+  developmentLanguage: en
+  useBaseInternationalization: false
 # Team ID and service keys come from Config/Local.xcconfig (git-ignored).
 configFiles:
   Debug: Config/Signing.xcconfig
@@ -74,6 +76,8 @@ targets:
         # The Mac menu bar and Finder show the product name: bighelp.app, "bighelp".
         PRODUCT_NAME[sdk=macosx*]: bighelp
         PRODUCT_MODULE_NAME: Bighelp
+        SWIFT_EMIT_LOC_STRINGS: YES
+        LOCALIZATION_PREFERS_STRING_CATALOGS: YES
         # Surface snapping and room persistence for the spatial avatar need 26.
         XROS_DEPLOYMENT_TARGET: "26.0"
         # The Vision Pro simulator runs only on Apple silicon; LiveKit ships no Intel slice.

@@ -53,7 +53,7 @@ struct BighelpMenuDestinations {
     /// The all-hosts view's list, its home while it's on. When set, ☰'s Agents opens it
     /// and the one-host places (Projects, Kanban, Workflows) stay out of the menu.
     var onAllAgents: (() -> Void)? = nil
-    var newChatTitle = "New chat"
+    var newChatTitle = String(localized: "New chat")
     var onNewChat: () -> Void
     var onAllChats: () -> Void
     /// Projects: related chats and folders together.
@@ -162,9 +162,9 @@ struct BighelpMenu<Recent: View>: View {
         switch place {
         case .agents:
             if let onAllAgents = destinations.onAllAgents {
-                row("Agents", symbol: place.symbol, id: "menu.all-agents", action: onAllAgents)
+                row(String(localized: "Agents"), symbol: place.symbol, id: "menu.all-agents", action: onAllAgents)
             } else {
-                row("Agents", symbol: place.symbol, id: "menu.agents", action: destinations.onAgents)
+                row(String(localized: "Agents"), symbol: place.symbol, id: "menu.agents", action: destinations.onAgents)
             }
         case .projects:
             if let onProjects = destinations.onProjects {
@@ -216,18 +216,18 @@ struct BighelpMenu<Recent: View>: View {
     /// Projects, Kanban and Settings.
     @ViewBuilder
     private func codeRows(_ code: BighelpMenuDestinations.Code) -> some View {
-        row("Sessions", symbol: "chevron.left.forwardslash.chevron.right", id: "menu.code.sessions", action: code.onNewSession)
+        row(String(localized: "Sessions"), symbol: "chevron.left.forwardslash.chevron.right", id: "menu.code.sessions", action: code.onNewSession)
         if let onProjects = destinations.onProjects {
             row(BighelpPlace.projects.title, symbol: BighelpPlace.projects.symbol, id: "menu.projects", action: onProjects)
         }
         if let onPullRequests = code.onPullRequests {
-            row("Pull requests", symbol: "arrow.triangle.pull", id: "menu.code.pull-requests", action: onPullRequests)
+            row(String(localized: "Pull requests"), symbol: "arrow.triangle.pull", id: "menu.code.pull-requests", action: onPullRequests)
         }
         if let onWorktrees = code.onWorktrees {
-            row("Worktrees", symbol: "square.stack.3d.up", id: "menu.code.worktrees", action: onWorktrees)
+            row(String(localized: "Worktrees"), symbol: "square.stack.3d.up", id: "menu.code.worktrees", action: onWorktrees)
         }
         if let onDevFactory = code.onDevFactory {
-            row("Dev Factory", symbol: "hammer", id: "menu.code.dev-factory", action: onDevFactory)
+            row(String(localized: "Dev Factory"), symbol: "hammer", id: "menu.code.dev-factory", action: onDevFactory)
         }
         ForEach(destinations.places.filter { [.kanban, .settings].contains($0) }) { place in placeRow(place) }
     }
@@ -248,15 +248,15 @@ struct BighelpMenu<Recent: View>: View {
         }
         .bighelpPlainButtonStyle(.circle)
         .textCase(nil)
-        .bighelpHelp(destinations.code == nil ? destinations.newChatTitle : "New session", shortcut: "⌘N")
-        .accessibilityLabel(destinations.code == nil ? destinations.newChatTitle : "New session")
+        .bighelpHelp(destinations.code == nil ? destinations.newChatTitle : String(localized: "New session"), shortcut: "⌘N")
+        .accessibilityLabel(destinations.code == nil ? destinations.newChatTitle : String(localized: "New session"))
         .accessibilityIdentifier("menu.new-chat")
     }
 
     /// The host you're on, as one row. Hosts and Add host are one tap away.
     private var hostSwitcher: some View {
         Menu {
-            Section(hosts.allHosts?.isOn == true ? "Show" : "Switch host") {
+            Section(hosts.allHosts?.isOn == true ? String(localized: "Show") : String(localized: "Switch host")) {
                 if let allHosts = hosts.allHosts, allHosts.isOn {
                     Button { choose(allHosts.showAll) } label: {
                         if allHosts.isFocused { Text("All hosts") } else { Label("All hosts", systemImage: "checkmark") }
@@ -297,9 +297,9 @@ struct BighelpMenu<Recent: View>: View {
 
     private var hostTitle: String {
         if let allHosts = hosts.allHosts, allHosts.isOn {
-            return allHosts.isFocused ? hosts.hosts.first(where: \.isSelected)?.name ?? "All hosts" : "All hosts"
+            return allHosts.isFocused ? hosts.hosts.first(where: \.isSelected)?.name ?? String(localized: "All hosts") : String(localized: "All hosts")
         }
-        return hosts.hosts.first(where: \.isSelected)?.name ?? "Choose a host"
+        return hosts.hosts.first(where: \.isSelected)?.name ?? String(localized: "Choose a host")
     }
 
     /// Shows every agent on every host in one list, or just this host's.
@@ -318,7 +318,7 @@ struct BighelpMenu<Recent: View>: View {
         }
         .bighelpPointerButtonStyle(.borderless, outline: .circle)
         .textCase(nil)
-        .bighelpIconLabel(allHosts.isOn ? "Show one host" : "Show all hosts")
+        .bighelpIconLabel(allHosts.isOn ? String(localized: "Show one host") : String(localized: "Show all hosts"))
         .accessibilityHint(allHosts.isOn
             ? "Shows the selected host's agents and chats again."
             : "Shows every agent on every host in one list.")
@@ -361,15 +361,15 @@ struct BighelpMenu<Recent: View>: View {
         if destinations.onCredentialVault != nil || destinations.folder != nil || isVision {
             Section("More") {
                 #if os(visionOS)
-                row("Simple mode", symbol: "figure.stand", id: "menu.simple-mode") {
+                row(String(localized: "Simple mode"), symbol: "figure.stand", id: "menu.simple-mode") {
                     SpatialSimpleMode.enter(spatialAvatar, openWindow: openWindow)
                 }
                 #endif
                 if let onCredentialVault = destinations.onCredentialVault {
-                    row("Secure credential vault", symbol: "lock.shield", id: "menu.vault", action: onCredentialVault)
+                    row(String(localized: "Secure credential vault"), symbol: "lock.shield", id: "menu.vault", action: onCredentialVault)
                 }
                 if let folder = destinations.folder {
-                    row("Folder", detail: folder.name, symbol: "folder.badge.gearshape", id: "menu.folder",
+                    row(String(localized: "Folder"), detail: folder.name, symbol: "folder.badge.gearshape", id: "menu.folder",
                         action: folder.open)
                 }
             }

@@ -57,7 +57,7 @@ final class SettingsStore {
 
     /// "Custom" or the built-in color's name.
     var bubbleColorName: String {
-        customBubbleHex != nil ? "Custom" : (bubbleColor ?? .lavender).name
+        customBubbleHex != nil ? String(localized: "Custom") : (bubbleColor ?? .lavender).name
     }
 
     /// One of the built-in colors, replacing a custom one.

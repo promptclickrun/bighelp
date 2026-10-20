@@ -72,11 +72,11 @@ struct BighelpMenuChatRow: View {
                     .background(Circle().fill(theme.action.opacity(0.14)))
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(chat.title.isEmpty ? "New chat" : chat.title)
+                Text(chat.title.isEmpty ? String(localized: "New chat") : chat.title)
                     .bighelpFont(.body)
                     .foregroundStyle(theme.primaryText)
                     .lineLimit(1)
-                Text(lead?.name ?? "Group chat")
+                Text(lead?.name ?? String(localized: "Group chat"))
                     .bighelpFont(.metadata)
                     .foregroundStyle(theme.secondaryText)
                     .lineLimit(1)

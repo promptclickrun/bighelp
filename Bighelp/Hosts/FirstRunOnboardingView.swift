@@ -32,12 +32,12 @@ struct FirstRunOnboardingView: View {
 
         var progressLabel: String {
             switch self {
-            case .welcome: "Step 1 of 4 · Welcome"
-            case .appearance: "Appearance · Optional"
-            case .host: "Step 2 of 4 · Connect"
-            case .plugin: "Step 3 of 4 · Plugin · Optional"
-            case .notifications: "Step 3 of 4 · Notifications · Optional"
-            case .mode: "Step 4 of 4 · Your mode"
+            case .welcome: String(localized: "Step 1 of 4 · Welcome")
+            case .appearance: String(localized: "Appearance · Optional")
+            case .host: String(localized: "Step 2 of 4 · Connect")
+            case .plugin: String(localized: "Step 3 of 4 · Plugin · Optional")
+            case .notifications: String(localized: "Step 3 of 4 · Notifications · Optional")
+            case .mode: String(localized: "Step 4 of 4 · Your mode")
             }
         }
 
@@ -64,12 +64,12 @@ struct FirstRunOnboardingView: View {
 
         var accessibilityTitle: String {
             switch self {
-            case .welcome: "Welcome"
-            case .appearance: "Appearance"
-            case .host: "Connect"
-            case .plugin: "Plugin"
-            case .notifications: "Notifications"
-            case .mode: "Mode"
+            case .welcome: String(localized: "Welcome")
+            case .appearance: String(localized: "Appearance")
+            case .host: String(localized: "Connect")
+            case .plugin: String(localized: "Plugin")
+            case .notifications: String(localized: "Notifications")
+            case .mode: String(localized: "Mode")
             }
         }
 
@@ -152,7 +152,7 @@ struct FirstRunOnboardingView: View {
             .frame(maxWidth: .infinity)
             .accessibilityElement(children: .combine)
             .accessibilityLabel(step == .appearance ? "Optional appearance settings" : "Onboarding step")
-            .accessibilityValue(step.accessibilityValue)
+            .accessibilityValue(step.accessibilityTitle)
             .accessibilityIdentifier("onboarding.step")
 
             Group {
@@ -191,7 +191,7 @@ struct FirstRunOnboardingView: View {
                 registry: registry,
                 allowsDismiss: false,
                 firstRunPresentation: true,
-                completionActionTitle: "Continue",
+                completionActionTitle: String(localized: "Continue"),
                 showsNotificationSetup: false,
                 retainedDraft: $hostDraft,
                 onConnectionCommitted: { _ in
@@ -364,7 +364,7 @@ struct FirstRunOnboardingView: View {
     }
 
     private func actionFooter(
-        title: String,
+        title: LocalizedStringKey,
         identifier: String,
         action: @escaping () -> Void
     ) -> some View {
@@ -520,9 +520,9 @@ private struct FirstRunCompanionConstellation: View {
 private extension AppAppearance {
     var firstRunTitle: String {
         switch self {
-        case .system: "System"
-        case .light: "Light"
-        case .dark: "Dark"
+        case .system: String(localized: "System")
+        case .light: String(localized: "Light")
+        case .dark: String(localized: "Dark")
         }
     }
 

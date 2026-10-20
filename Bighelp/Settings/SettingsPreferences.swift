@@ -194,20 +194,20 @@ enum MidSessionChatBehavior: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .steer: "Steer"
-        case .queued: "Queued"
-        case .interruptAndSend: "Interrupt and Send"
+        case .steer: String(localized: "Steer")
+        case .queued: String(localized: "Queued")
+        case .interruptAndSend: String(localized: "Interrupt and Send")
         }
     }
 
     var detail: String {
         switch self {
         case .steer:
-            "Send context into the live turn so the agent can adjust its response."
+            String(localized: "Send context into the live turn so the agent can adjust its response.")
         case .queued:
-            "Wait for the live turn to finish, then send this as the next message."
+            String(localized: "Wait for the live turn to finish, then send this as the next message.")
         case .interruptAndSend:
-            "Stop the live turn and immediately continue with this message."
+            String(localized: "Stop the live turn and immediately continue with this message.")
         }
     }
 }
@@ -249,8 +249,8 @@ enum BighelpExperience: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .bighelp: "Bighelp Chat"
-        case .code: "Bighelp IDE"
+        case .bighelp: String(localized: "Bighelp Chat")
+        case .code: String(localized: "Bighelp IDE")
         }
     }
 }

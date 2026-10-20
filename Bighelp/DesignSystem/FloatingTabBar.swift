@@ -26,7 +26,7 @@ enum FloatingTabBarBackgroundSurface: Equatable, Sendable {
 
 struct FloatingTabBar: View {
     static let newChatVisibleLabel = "New chat"
-    static let newChatAccessibilityLabel = "New chat"
+    static let newChatAccessibilityLabel = String(localized: "New chat")
     static let selectionShape = RoundedRectangle(cornerRadius: 18, style: .continuous)
 
     static func newChatPresentation(for _: BighelpThemeID) -> FloatingTabBarActionPresentation {
@@ -436,29 +436,29 @@ extension AppTab {
     }
 }
 
-private extension AppTab {
+extension AppTab {
     var title: String {
         switch self {
-        case .home: "Activity"
-        case .agents: "Agents"
-        case .sessions: "Chat"
-        case .inbox: "Inbox"
-        case .profile: "Settings"
-        case .scheduledTasks: "Tasks"
-        case .workspace: "Workspace"
-        case .feed: "Feed"
-        case .ideas: "Ideas"
-        case .goals: "Goals"
-        case .apps: "Files"
-        case .projects: "Projects"
-        case .kanban: "Kanban"
-        case .workflows: "Workflows"
-        case .usage: "Usage"
-        case .code: "Code"
+        case .home: String(localized: "Activity")
+        case .agents: String(localized: "Agents")
+        case .sessions: String(localized: "Chat")
+        case .inbox: String(localized: "Inbox")
+        case .profile: String(localized: "Settings")
+        case .scheduledTasks: String(localized: "Tasks")
+        case .workspace: String(localized: "Workspace")
+        case .feed: String(localized: "Feed")
+        case .ideas: String(localized: "Ideas")
+        case .goals: String(localized: "Goals")
+        case .apps: String(localized: "Files")
+        case .projects: String(localized: "Projects")
+        case .kanban: String(localized: "Kanban")
+        case .workflows: String(localized: "Workflows")
+        case .usage: String(localized: "Usage")
+        case .code: String(localized: "Code")
         }
     }
 
-    func systemImage(selected: Bool) -> String {
+    fileprivate func systemImage(selected: Bool) -> String {
         switch (self, selected) {
         case (.home, true): "waveform.path"
         case (.home, false): "waveform.path"

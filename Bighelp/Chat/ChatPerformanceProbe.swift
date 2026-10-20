@@ -211,12 +211,13 @@ final class ChatPerformanceAutopilot: NSObject {
     }
 
     /// Up through history at a fling's speed for four seconds (one reading), then
-    /// back down to the newest message (another).
+    /// back down to the newest message (another). `BIGHELP_PERF_SCROLL_SPEED` (points a
+    /// second) goes faster: a heavy chat's answers are so tall that 3,000 passes few rows.
     private func scroll(_ recorder: ChatPerformanceRecorder) {
         guard let table = Self.view(ChatTimelineTableView.self, where: { _ in true }) else { return }
         table.followsTail = false
         recorder.reset()
-        let speed: CGFloat = 3_000
+        let speed = CGFloat(Double(ProcessInfo.processInfo.environment["BIGHELP_PERF_SCROLL_SPEED"] ?? "") ?? 3_000)
         var elapsed: CFTimeInterval = 0
         var goingUp = true
         animate { dt in

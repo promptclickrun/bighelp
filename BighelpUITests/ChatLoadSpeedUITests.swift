@@ -6,7 +6,8 @@ import CoreFoundation
 /// simulator; the numbers aren't an iPhone's. Set BIGHELP_SPEED (TEST_RUNNER_…) to run.
 ///
 /// The `Realistic` checks use `-test-long-chat` (questions, thinking, tools and Markdown
-/// answers; BIGHELP_SPEED_TURNS turns, 300 unless set). The app's DEBUG probe
+/// answers; BIGHELP_SPEED_TURNS turns, 300 unless set; BIGHELP_SPEED_HEAVY makes each turn as
+/// big as a chat near half a million tokens, `-test-long-chat-heavy`). The app's DEBUG probe
 /// (`ChatPerformanceRecorder`) is reset and read with Darwin notifications around each
 /// phase, so nothing polls the accessibility tree while it's measured; each reading is
 /// written to the app's Documents as `chat-performance-<label>-<n>.json`.
@@ -16,6 +17,7 @@ final class ChatLoadSpeedUITests: BighelpUITestCase {
     private static var turns: Int {
         ProcessInfo.processInfo.environment["BIGHELP_SPEED_TURNS"].flatMap(Int.init) ?? 300
     }
+    private static var isHeavy: Bool { ProcessInfo.processInfo.environment["BIGHELP_SPEED_HEAVY"] != nil }
 
     override func setUpWithError() throws {
         try super.setUpWithError()
@@ -253,7 +255,8 @@ final class ChatLoadSpeedUITests: BighelpUITestCase {
 
     private func realisticArguments(opensChat: Bool) -> [String] {
         ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3", "-test-long-chat", "\(Self.turns)",
-         "-test-chat-performance-probe"] + (opensChat ? ["-start-long-chat"] : [])
+         "-test-chat-performance-probe"] + (Self.isHeavy ? ["-test-long-chat-heavy"] : [])
+            + (opensChat ? ["-start-long-chat"] : [])
     }
 
     @MainActor

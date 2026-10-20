@@ -48,12 +48,13 @@ enum ChatTurnDisplayRow: Identifiable {
     }
 }
 
-/// The messages a bot wrote on the way to a turn's answer, in Simple Bot mode: one row named for the bot,
-/// its messages under it in reasoning's quiet look.
+/// The messages a bot wrote on the way to a turn's answer, in Simple Bot mode: one folder named for the bot,
+/// its messages under it in reasoning's quiet look. Open while the turn runs (`isLive`), closed once it ends.
 struct ChatInterimReasoning: Identifiable, Equatable {
     let id: String
     let agentName: String
     var entries: [ChatTranscriptEntry]
+    var isLive = false
 }
 
 /// Where a finished turn's interim notes go. For Claude they're the only

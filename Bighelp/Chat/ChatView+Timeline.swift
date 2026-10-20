@@ -286,7 +286,8 @@ extension ChatView {
         )
         guard simpleBots else { return rows }
         return ChatInterimReplies.groupingForSimpleBots(rows, agentName: agentName,
-                                                        showsReasoning: model.activityVisibility.showReasoning)
+                                                        showsReasoning: model.activityVisibility.showReasoning,
+                                                        isSending: model.isSending)
     }
     @ViewBuilder
     private func transcriptRow(_ row: ChatTurnDisplayRow) -> some View {
@@ -303,7 +304,14 @@ extension ChatView {
             }
             .id(row.id)
         case .reasoning(let group):
-            ChatInterimReasoningHeader(agentName: group.agentName)
+            let disclosures = model.activityDisclosures
+            ChatInterimReasoningHeader(
+                agentName: group.agentName,
+                isExpanded: Binding(get: { disclosures.isExpanded(group) },
+                                    set: { disclosures.setExpanded($0, for: group) }),
+                onDisclosureChange: beginDisclosureReview
+            )
+            .id(row.id)
         }
     }
     @ViewBuilder

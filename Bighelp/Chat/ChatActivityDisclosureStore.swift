@@ -23,6 +23,22 @@ final class ChatActivityDisclosureStore {
         completedTurnChoices[id] = expanded
     }
 
+    /// Simple Bot reasoning folders, by folder and by whether its turn was running: a choice made while
+    /// the bot works ends with the turn, so the folder always closes in place when the answer comes.
+    private var reasoningFolderChoices: [String: Bool] = [:]
+
+    func isExpanded(_ reasoning: ChatInterimReasoning) -> Bool {
+        reasoningFolderChoices[Self.choiceKey(reasoning)] ?? reasoning.isLive
+    }
+
+    func setExpanded(_ expanded: Bool, for reasoning: ChatInterimReasoning) {
+        reasoningFolderChoices[Self.choiceKey(reasoning)] = expanded
+    }
+
+    private static func choiceKey(_ reasoning: ChatInterimReasoning) -> String {
+        "\(reasoning.id)|\(reasoning.isLive ? "live" : "done")"
+    }
+
     private var eventChoices: [Key: Bool] = [:]
     private var trailChoices: [Key: Bool] = [:]
 

@@ -152,6 +152,8 @@ final class CanvasStreamingFixtureClient: ConversationFixtureClient, StreamingCo
                 : nil
             _ = model.acceptActivity(event.updating(lifecycle: .succeeded, summary: "Source inspected", detail: result, occurredAt: index * 2 + 1))
         }
+        // `-test-tool-stream-slow`: the turn stays live long enough for a screenshot of its notes.
+        if args.contains("-test-tool-stream-slow") { try await Task.sleep(for: .seconds(8)) }
         var tail = "LIVE TOOL STREAM TAIL\n"
         monitor.beginAnswerUpdates()
         let tailID = "\(prefix)-tail"

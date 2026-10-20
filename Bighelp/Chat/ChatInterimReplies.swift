@@ -76,11 +76,12 @@ enum ChatInterimReplies {
         return lower.map { candidate > $0 } ?? true ? candidate : nil
     }
 
-    /// Simple Bot mode: each turn's interim messages move under one "{Agent}'s reasoning" row, where the
-    /// first of them was. With Show reasoning on it's open, filling in as the bot works; off, they're
-    /// hidden. The message that ends a turn is its answer and always shows as a message.
+    /// Simple Bot mode: each turn's interim messages move under one "{Agent}'s reasoning" folder, where
+    /// the first of them was. With Show reasoning on it fills in as the bot works and closes in place
+    /// when the turn ends (`isLive`); off, they're hidden. The message that ends a turn is its answer and
+    /// always shows as a message.
     static func groupingForSimpleBots(_ rows: [ChatTurnDisplayRow], agentName: String,
-                                      showsReasoning: Bool) -> [ChatTurnDisplayRow] {
+                                      showsReasoning: Bool, isSending: Bool = false) -> [ChatTurnDisplayRow] {
         var result: [ChatTurnDisplayRow] = []
         var group: Int?
         for row in rows {
@@ -104,6 +105,11 @@ enum ChatInterimReplies {
             } else {
                 result.append(row)
             }
+        }
+        // Only the turn being answered is live: its folder is the one after the last question.
+        if isSending, let index = group, case .reasoning(var reasoning) = result[index] {
+            reasoning.isLive = true
+            result[index] = .reasoning(reasoning)
         }
         return result
     }
@@ -138,26 +144,58 @@ struct ChatInterimReplyStyle: ViewModifier {
     }
 }
 
-/// Simple Bot mode's "{Agent}'s reasoning" row: the bot's interim messages follow it in the same quiet
-/// look, on the same line down their left.
+/// Simple Bot mode's "{Agent}'s reasoning" folder: the bot's interim messages follow it in the same quiet
+/// look, on the same line down their left, while it's open. It opens while the bot works and closes in
+/// place when the turn ends; a tap opens or closes it any time.
 struct ChatInterimReasoningHeader: View {
     let agentName: String
+    @Binding var isExpanded: Bool
+    var onDisclosureChange: () -> Void = {}
     @BighelpThemeReader private var theme
+    @BighelpLoaderMotionReader private var motion
+    @State private var isHovered = false
 
     var body: some View {
-        Label {
-            Text("\(agentName)\u{2019}s reasoning")
-                .font(.bighelp(.subheadline, weight: .medium))
-        } icon: {
-            Image(systemName: "brain")
-                .font(.bighelp(.footnote))
+        Button {
+            onDisclosureChange()
+            withAnimation(motion.moves ? BighelpLoaderCurve.site.animation(duration: BighelpTokens.transitionDuration)
+                                       : .easeOut(duration: BighelpTokens.stateDuration)) {
+                isExpanded.toggle()
+            }
+        } label: {
+            HStack(spacing: BighelpTokens.space8) {
+                Image(systemName: "brain")
+                    .font(.bighelp(.footnote))
+                Text("\(agentName)\u{2019}s reasoning")
+                    .font(.bighelp(.subheadline, weight: .medium))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Image(systemName: "chevron.right")
+                    .font(.bighelp(.caption, weight: .bold))
+                    .foregroundStyle(theme.tertiaryText)
+                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(theme.secondaryText)
+            .padding(.horizontal, BighelpTokens.space4)
+            .frame(maxWidth: .infinity, minHeight: minHeight, alignment: .leading)
+            .background {
+                RoundedRectangle(cornerRadius: BighelpTokens.radius8, style: .continuous)
+                    .fill(theme.primaryText.opacity(isHovered ? (theme.isDarkPalette ? 0.10 : 0.06) : 0))
+            }
+            .contentShape(.rect)
+            .modifier(BighelpActivityHover(isHovered: $isHovered))
         }
-        .foregroundStyle(theme.secondaryText)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.leading, BighelpTokens.space8)
-        .padding(.vertical, BighelpTokens.space4)
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isHeader)
+        .buttonStyle(BighelpActivityHeaderPressStyle())
+        .padding(.leading, BighelpTokens.space4)
+        .accessibilityLabel("\(agentName)\u{2019}s reasoning")
+        .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
+        .accessibilityHint(isExpanded ? "Hides the reasoning." : "Shows the reasoning.")
         .accessibilityIdentifier("chat.reasoning.header")
+    }
+
+    /// Touch needs a full target; a mouse on the Mac is happy with less, as on the other folders.
+    private var minHeight: CGFloat {
+        BighelpPlatform.isMac ? BighelpTokens.scaled(32) : BighelpTokens.hitTarget
     }
 }

@@ -64,6 +64,7 @@ enum ChatCanvasRow: Identifiable, Equatable {
     static func == (lhs: Self, rhs: Self) -> Bool {
         switch (lhs, rhs) {
         case (.transcript(.entry(let a)), .transcript(.entry(let b))): a == b
+        case (.transcript(.reasoning(let a)), .transcript(.reasoning(let b))): a == b
         case (.transcript(.completed(let a)), .transcript(.completed(let b))):
             a.id == b.id && a.entries == b.entries && a.elapsedSeconds == b.elapsedSeconds && a.stepCount == b.stepCount
                 && a.summary == b.summary
@@ -165,10 +166,11 @@ enum ChatCanvasTranscriptProjection {
                     turn.expandedEntries.forEach { append($0, inOpenedTurn: true) }
                 }
             case .reasoning(let group):
-                // The row names the bot; its messages follow as their own rows, in reasoning's look.
+                // The folder names the bot; while it's open its messages follow as their own rows, in
+                // reasoning's look. It closes in place when the turn ends.
                 result.append(.transcript(.reasoning(ChatInterimReasoning(id: group.id, agentName: group.agentName,
-                                                                         entries: []))))
-                group.entries.forEach { append($0) }
+                                                                         entries: [], isLive: group.isLive))))
+                if disclosures.isExpanded(group) { group.entries.forEach { append($0) } }
             }
         }
         return result

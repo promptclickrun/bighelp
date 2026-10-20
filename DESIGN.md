@@ -387,7 +387,10 @@ text is SF Pro, as everywhere.
 - **Chat**: Back, the bot's name (its profile) and ⋯; no New chat button. Voice is a bar over the chat, under
   its header (`SimpleBotVoiceBar`), and the chat stays in use: the bot's face, a visualizer from the real audio
   levels (your voice in the page's ink, the bot's in its color, dots while nobody speaks), voice choices (live
-  or TTS, the bot's voice on or off), the microphone and End.
+  or TTS, the bot's voice on or off), the microphone and End. With Show reasoning on, the notes the bot writes
+  on the way to its answer go into one "{Bot}'s reasoning" folder (`ChatInterimReasoningHeader`): open while the
+  bot works, closed in place when the turn ends, and a tap opens or closes it any time. It never becomes a
+  second folder; the answer always shows.
 - **Swipes**: from the left edge back to your bots; from the right, this bot's profile (the primary bot's on
   the home). The full app's swipe choices lead to places this mode hides, so they don't apply here.
 - **Profile**: the mark, name and role, then Info (Character, Instructions, Default Model, Routines) and

@@ -519,7 +519,7 @@ struct BighelpActivityGlyphView: View {
 }
 
 /// A row header's press: a slight dim, never a color change.
-private struct BighelpActivityHeaderPressStyle: ButtonStyle {
+struct BighelpActivityHeaderPressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .opacity(configuration.isPressed ? BighelpButtonPress.opacity : 1)
@@ -529,7 +529,7 @@ private struct BighelpActivityHeaderPressStyle: ButtonStyle {
 
 /// Pointer feedback for the header: a soft wash under the Mac's pointer, the
 /// system highlight for an iPad pointer and for looking at it on Vision Pro.
-private struct BighelpActivityHover: ViewModifier {
+struct BighelpActivityHover: ViewModifier {
     @Binding var isHovered: Bool
 
     func body(content: Content) -> some View {

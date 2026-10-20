@@ -181,6 +181,13 @@ posts (plugin 2.19.0).
 **Blueprints** (beside the page title, and in the empty state) are the 45 starter prompts from
 bighelp.app/quick-start, bundled (`BoardBlueprints.json`), 15 per page in five topics. A tap opens a new chat
 with that agent and the prompt in the message box to fill in its [brackets]; nothing runs until Send.
+Every template picker (Blueprints, Agents' Browse all, New Bot's Templates) is one list by topic: the search row,
+topic chips under it (All, My Templates when there are some, then each topic that has templates, with its icon), a
+section per topic with its icon and count, and Sort in the top bar (For you; Newest and Most used rank everything
+in one list; bighelp only when the catalog has community ones). My Templates come first. Topics are the catalog's
+`category` with fixed names and order (`TemplateCategory`); one the app doesn't know is Other, never hidden. New
+agent's Templates rail has the same chips over it. A search that finds nothing says so, with Search all when a
+chip narrowed it.
 **Goals** shows Tracking (the active goals by category: Health, Relationships, Finance, Career, Interests,
 Productivity, Other; "Nothing is being tracked yet" when empty), Done, then **Create a goal**: one row per
 category with a +, which starts a chat asking the agent to plan a goal in that category (touch and hold for that

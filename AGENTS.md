@@ -592,6 +592,10 @@ New code uses Bighelp names. Don't "finish" the rename on this list.
   [services/catalog/docs/TEMPLATE_VARIABLES.md](services/catalog/docs/TEMPLATE_VARIABLES.md).
 - The app's side is `TemplateVariables` (parse, check and fill in one pass) and `AgentTemplateFillView`, the
   short form that opens when someone starts an agent from a template that has fields.
+- Pickers group templates and blueprints by the catalog's `category` (`TemplateCategory`: the ten agent topics
+  and five blueprint topics, in a fixed order; unknown or missing is Other). They share the search row, topic
+  chips, section headers and Sort (`TemplatePickerParts.swift`) and one listing (`TemplateTopics.listing`). A new
+  catalog topic needs an app build to get its own name; until then it shows under Other.
 - My Templates are bots saved as templates on the person's computer (a Simple Bot profile's Share), through the
   plugin's `my-templates` routes (`native-my-templates-v1`, `MyTemplatesStore`) in the catalog's agent shape. They
   show first in every template picker, including New Bot's Templates (`SimpleBotCreation`). A saved template

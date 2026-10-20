@@ -8,7 +8,7 @@ import Testing
 struct DirectHermesCatalogListScaleTests {
     private static let rowCount = 4_350
 
-    @Test func relistingThousandsOfBoundChatsStaysCheap() async throws {
+    @Test func relistingThousandsOfBoundChatsLeavesTheMainActorResponsive() async throws {
         let workspace = try SessionWorkspaceStub()
         let rows: [BighelpJSONValue] = (0..<Self.rowCount).map { index in
             var row = DirectHermesSessionCatalogClientTests.session(id: "run-\(index)").object!
@@ -20,6 +20,8 @@ struct DirectHermesCatalogListScaleTests {
             switch operation {
             case .profilesList: return DirectHermesSessionCatalogClientTests.profiles()
             case .sessionsList:
+                // Real RPC pages suspend for network I/O. Preserve that boundary in the fake.
+                await Task.yield()
                 let offset = payload["offset"]?.integer ?? 0
                 let page = Array(rows.dropFirst(offset).prefix(100))
                 return ["sessions": .array(page), "total": .integer(rows.count), "offset": .integer(offset),
@@ -32,13 +34,31 @@ struct DirectHermesCatalogListScaleTests {
         #expect(first.count == Self.rowCount)
         let pagesBefore = workspace.calls.filter { $0.operation == .sessionsList }.count
 
+        var lastWake = ContinuousClock.now
+        var maximumGap: Duration = .zero
+        let probe = Task { @MainActor in
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .milliseconds(5)) } catch { return }
+                let now = ContinuousClock.now
+                maximumGap = max(maximumGap, now - lastWake)
+                lastWake = now
+            }
+        }
+        defer { probe.cancel() }
         let start = ContinuousClock.now
         let second = try await client.list()
         let elapsed = ContinuousClock.now - start
+        maximumGap = max(maximumGap, ContinuousClock.now - lastWake)
+        probe.cancel()
+        await probe.value
         let pages = workspace.calls.filter { $0.operation == .sessionsList }.count - pagesBefore
-        print("CATALOG_RELIST rows=\(second.count) pages=\(pages) elapsed=\(elapsed)")
+        print("CATALOG_RELIST rows=\(second.count) pages=\(pages) elapsed=\(elapsed) maximumMainActorGap=\(maximumGap)")
         #expect(second.count == Self.rowCount)
-        #expect(elapsed < .milliseconds(500), "Binding the host's rows must be linear in the number of chats.")
+        #expect(pages == 44)
+        #expect(second.map(\.id) == first.map(\.id))
+        // Total elapsed time includes all 44 requests and varies by build and machine.
+        // The user-visible regression is a long uninterrupted stall while binding a page.
+        #expect(maximumGap < .milliseconds(100), "Binding each page must leave typing and menus responsive.")
     }
 
     @Test func anchorIndexMatchesTheByteExactScan() throws {

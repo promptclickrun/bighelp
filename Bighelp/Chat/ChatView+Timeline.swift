@@ -379,7 +379,8 @@ extension ChatView {
         #endif
     }
     private var usesNativeReactionAcceptanceFixture: Bool {
-        #if DEBUG && targetEnvironment(simulator)
+        // The Mac's demo copy (Scripts/mac-dev-run.sh) is a Debug build, not a simulator.
+        #if DEBUG && (targetEnvironment(simulator) || targetEnvironment(macCatalyst))
         let arguments = ProcessInfo.processInfo.arguments
         return arguments.contains("-use-demo-fixtures")
             && arguments.contains("-test-native-reaction-ui")

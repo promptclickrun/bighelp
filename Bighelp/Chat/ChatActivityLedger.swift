@@ -11,9 +11,15 @@ struct ChatActivityLedger: Equatable, Sendable {
     private var orderedTurnIDs: [String] = []
     private var turnIndexByID: [String: Int] = [:]
     private(set) var lastMutationWorkCount = 0
+    /// While `init` takes a whole history: keys still go in order one by one, exactly as
+    /// `receive` would place them, but the ordered events, their positions and the turn
+    /// order are laid out once at the end. Keeping those current through each insert made
+    /// reopening a long chat (saved thinking first, then the host's tools) quadratic.
+    private var isBuilding = false
 
     init(sessionID: String, events: [ChatActivityEvent] = []) {
         self.sessionID = sessionID
+        isBuilding = true
         for event in events where event.sessionID == sessionID {
             if entriesByID[event.id] == nil {
                 insert(event, key: event.id)
@@ -21,6 +27,10 @@ struct ChatActivityLedger: Equatable, Sendable {
                 _ = receive(event)
             }
         }
+        isBuilding = false
+        orderedEvents = orderedIDs.compactMap { entriesByID[$0] }
+        eventIndexByID = Dictionary(uniqueKeysWithValues: orderedIDs.enumerated().map { ($1, $0) })
+        rebuildTurnOrder()
     }
 
     /// Bound a background projection to the same canonical suffix as its store.
@@ -104,21 +114,24 @@ struct ChatActivityLedger: Equatable, Sendable {
         if let identity = event.semanticIdentity, keyBySemanticIdentity[identity] == nil {
             keyBySemanticIdentity[identity] = key
         }
-        let appendsGlobally = orderedEvents.last.map {
-            !Self.isCanonicallyBefore(event, key: key, than: $0, key: orderedIDs.last ?? "")
+        // `entriesByID` holds the same (merged) events as `orderedEvents`, including while building.
+        let appendsGlobally = orderedIDs.last.flatMap { lastID in
+            entriesByID[lastID].map { !Self.isCanonicallyBefore(event, key: key, than: $0, key: lastID) }
         } ?? true
         let globalIndex = appendsGlobally
-            ? orderedEvents.endIndex
-            : insertionIndex(for: event, key: key, in: orderedEvents, ids: orderedIDs)
+            ? orderedIDs.endIndex
+            : insertionIndex(for: event, key: key, in: orderedIDs)
         orderedIDs.insert(key, at: globalIndex)
-        orderedEvents.insert(event, at: globalIndex)
-        if globalIndex == orderedEvents.count - 1 {
-            eventIndexByID[key] = globalIndex
-            lastMutationWorkCount += 1
-        } else {
-            for index in globalIndex..<orderedIDs.count {
-                eventIndexByID[orderedIDs[index]] = index
+        if !isBuilding {
+            orderedEvents.insert(event, at: globalIndex)
+            if globalIndex == orderedEvents.count - 1 {
+                eventIndexByID[key] = globalIndex
                 lastMutationWorkCount += 1
+            } else {
+                for index in globalIndex..<orderedIDs.count {
+                    eventIndexByID[orderedIDs[index]] = index
+                    lastMutationWorkCount += 1
+                }
             }
         }
 
@@ -139,6 +152,7 @@ struct ChatActivityLedger: Equatable, Sendable {
             lastMutationWorkCount += turnIDs.count
         }
 
+        guard !isBuilding else { return }
         if turnIndexByID[event.turnID] == nil, appendsGlobally {
             turnIndexByID[event.turnID] = orderedTurnIDs.count
             orderedTurnIDs.append(event.turnID)
@@ -146,26 +160,6 @@ struct ChatActivityLedger: Equatable, Sendable {
         } else if !appendsGlobally || turnIndexByID[event.turnID] == nil {
             rebuildTurnOrder()
         }
-    }
-
-    private mutating func insertionIndex(
-        for event: ChatActivityEvent,
-        key: String,
-        in events: [ChatActivityEvent],
-        ids: [String]
-    ) -> Int {
-        var lower = 0
-        var upper = events.count
-        while lower < upper {
-            lastMutationWorkCount += 1
-            let middle = lower + (upper - lower) / 2
-            if Self.isCanonicallyBefore(event, key: key, than: events[middle], key: ids[middle]) {
-                upper = middle
-            } else {
-                lower = middle + 1
-            }
-        }
-        return lower
     }
 
     private mutating func insertionIndex(

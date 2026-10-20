@@ -1,6 +1,6 @@
 import XCTest
 
-/// ⋯ › This chat › Compact on a real Hermes host with the bighelp plugin
+/// ⋯ › Usage › Compact on a real Hermes host with the bighelp plugin
 /// (Scripts/HostSignInMatrixProbe.py --modes features, or a probe file naming any open
 /// host). A new chat of its own gets two short turns, then Compact reaches Hermes and ends
 /// without an error. Two turns are too few to fold, so Hermes declines at once and the rail
@@ -43,7 +43,7 @@ final class CompactHostUITests: BighelpUITestCase {
             Thread.sleep(forTimeInterval: 1)
             compact = chatCompactItem(in: app)
         }
-        XCTAssertTrue(compact.isEnabled, "This chat has Compact on a real chat")
+        XCTAssertTrue(compact.isEnabled, "Usage has Compact on a real chat")
         save("compact-menu", app)
         compact.tap()
 

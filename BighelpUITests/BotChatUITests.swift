@@ -46,7 +46,7 @@ final class BotChatUITests: BighelpUITestCase {
         }
     }
 
-    /// ⋯ › This chat › Compact shows a chip above the message box, then Done with what it saved.
+    /// ⋯ › Usage › Compact shows a chip above the message box, then Done with what it saved.
     @MainActor
     func testCompactShowsTheRailThenFinishes() {
         for appearance in ["light", "dark"] {
@@ -56,7 +56,7 @@ final class BotChatUITests: BighelpUITestCase {
             app.launch()
             XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 15))
             let compact = chatCompactItem(in: app)
-            XCTAssertTrue(compact.waitForExistence(timeout: 5), "This chat has Compact")
+            XCTAssertTrue(compact.waitForExistence(timeout: 5), "Usage has Compact")
             save("compact-menu-\(appearance)", app)
             compact.tap()
             let running = app.descendants(matching: .any).matching(NSPredicate(

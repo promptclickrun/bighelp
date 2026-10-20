@@ -83,11 +83,10 @@ class BighelpUITestCase: XCTestCase {
         return true
     }
 
-    /// ⋯ › This chat › Compact. A menu item can report its title instead of its identifier.
+    /// ⋯ › Usage › Compact. A menu item can report its title instead of its identifier.
     @MainActor
     func chatCompactItem(in app: XCUIApplication) -> XCUIElement {
-        _ = chatMenuItem("chat.compact", in: app)
-        return app.buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@", "chat.compact", "Compact")).firstMatch
+        chatMenuItem("chat.compact", in: app)
     }
 
     /// Opens the chat's ⋯ menu when it's closed and returns one of its items.
@@ -98,10 +97,10 @@ class BighelpUITestCase: XCTestCase {
         let groups: [String]
         switch identifier {
         case "chat.session-controls", "chat.fast-mode": groups = ["chat.options.model-speed"]
-        case "chat.context-window", "chat.provider-usage": groups = ["chat.options.more", "chat.options.usage"]
+        case "chat.context-window", "chat.provider-usage", "chat.compact":
+            groups = ["chat.options.more", "chat.options.usage"]
         case "chat.rename", "chat.appearance": groups = ["chat.options.this-chat", "chat.options.settings"]
-        case "chat.info", "chat.files", "chat.edit-current-agent", "chat.options.settings", "chat.new-bot-chat",
-             "chat.compact":
+        case "chat.info", "chat.files", "chat.edit-current-agent", "chat.options.settings", "chat.new-bot-chat":
             groups = ["chat.options.this-chat"]
         case "chat.options.usage", "chat.options.advanced", "chat.file-changes": groups = ["chat.options.more"]
         case "chat.force-refresh", "chat.options.display": groups = ["chat.options.more", "chat.options.advanced"]
@@ -127,7 +126,7 @@ class BighelpUITestCase: XCTestCase {
         let titles: [String: String] = [
             "chat.info": "Chat info", "chat.rename": "Rename chat", "chat.appearance": "Chat appearance",
             "chat.files": "Chat files", "chat.edit-current-agent": "Edit this agent",
-            "chat.new-bot-chat": "New Bot Chat",
+            "chat.new-bot-chat": "New Bot Chat", "chat.compact": "Compact",
         ]
         guard let title = titles[identifier] else { return app.buttons[identifier].firstMatch }
         return app.buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@", identifier, title)).firstMatch

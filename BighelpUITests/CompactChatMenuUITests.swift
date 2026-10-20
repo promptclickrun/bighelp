@@ -56,12 +56,12 @@ final class CompactChatMenuUITests: BighelpUITestCase {
                 ["chat.options.settings", "chat.files", "chat.edit-current-agent"],
                 ["chat.rename", "chat.appearance"],
                 ["chat.file-changes", "chat.options.usage", "chat.options.advanced"],
-                ["chat.provider-usage", "chat.context-window"],
+                ["chat.provider-usage", "chat.context-window", "chat.compact"],
                 ["chat.options.display"],
                 ["chat.visibility.reasoning", "chat.visibility.tool-calls"]
             ] : [
                 ["chat.rename", "chat.files", "chat.appearance", "chat.edit-current-agent"],
-                ["chat.provider-usage", "chat.context-window"],
+                ["chat.provider-usage", "chat.context-window", "chat.compact"],
                 ["chat.visibility.reasoning", "chat.visibility.tool-calls"]
             ]
             for identifiers in submenus {
@@ -69,7 +69,7 @@ final class CompactChatMenuUITests: BighelpUITestCase {
                 _ = chatMenuItem(identifiers[0], in: app)
                 evidence("submenu-\(identifiers[0])-\(appearance)")
                 for identifier in identifiers {
-                    let item = app.buttons[identifier].firstMatch
+                    let item = chatMenuElement(identifier, in: app)
                     XCTAssertTrue(item.exists && item.isHittable, "\(identifier) must not need scrolling")
                     if item.exists { XCTAssertTrue(app.windows.firstMatch.frame.contains(item.frame)) }
                 }
@@ -79,9 +79,9 @@ final class CompactChatMenuUITests: BighelpUITestCase {
     }
 
     /// Nerd Mode is kept per device, so a Mac or an iPad can have it off while the
-    /// iPhone has it on. Compact is an everyday action: ⋯ › This chat has it there too.
+    /// iPhone has it on. Compact is an everyday action: ⋯ › Usage has it there too.
     @MainActor
-    func testThisChatHasCompactWithNerdModeOff() {
+    func testUsageHasCompactWithNerdModeOff() {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-start-chat",
                                "-loopdy.settings.nerd-mode", "NO"]
@@ -89,14 +89,14 @@ final class CompactChatMenuUITests: BighelpUITestCase {
         let options = app.buttons["chat.options"].firstMatch
         XCTAssertTrue(options.waitForExistence(timeout: 20))
         options.tap()
-        let thisChat = app.buttons["chat.options.this-chat"].firstMatch
-        XCTAssertTrue(thisChat.waitForExistence(timeout: 5))
+        let usage = app.buttons["chat.options.usage"].firstMatch
+        XCTAssertTrue(usage.waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["chat.options.advanced"].exists, "Advanced stays Nerd Mode's")
-        thisChat.tap()
-        let compact = app.buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@",
-                                                       "chat.compact", "Compact")).firstMatch
-        XCTAssertTrue(compact.waitForExistence(timeout: 5), "This chat has Compact without Nerd Mode")
-        evidence("this-chat-nerd-off")
+        usage.tap()
+        let compact = chatMenuElement("chat.compact", in: app)
+        XCTAssertTrue(compact.waitForExistence(timeout: 5), "Usage has Compact without Nerd Mode")
+        XCTAssertFalse(app.buttons["chat.context-window"].exists, "The context window stays Nerd Mode's")
+        evidence("usage-nerd-off")
         compact.tap()
         let running = app.descendants(matching: .any)["chat.compaction.running"].firstMatch
         XCTAssertTrue(running.waitForExistence(timeout: 15), "Compact works without Nerd Mode")

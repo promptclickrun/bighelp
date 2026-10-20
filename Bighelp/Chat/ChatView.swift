@@ -1021,7 +1021,8 @@ struct ChatView: View {
             }
             thisChatMenu
             if dynamicTypeSize.isAccessibilitySize {
-                if projectChangesSummary != nil || offersContextWindow || providerUsage?.isAvailable == true || nerdModeEnabled {
+                if projectChangesSummary != nil || canCompact || offersContextWindow
+                    || providerUsage?.isAvailable == true || nerdModeEnabled {
                     Menu {
                         fileChangesMenuItem
                         usageMenu
@@ -1100,7 +1101,6 @@ struct ChatView: View {
             } else {
                 renameChatMenuItem
             }
-            compactMenuItem
             if let onNewBotChat {
                 Button("New Bot Chat", systemImage: "arrow.trianglehead.counterclockwise") {
                     dismissKeyboard()
@@ -1143,7 +1143,7 @@ struct ChatView: View {
         }
     }
 
-    /// This chat › Compact: Hermes folds earlier messages into a summary; the rail above
+    /// Usage › Compact: Hermes folds earlier messages into a summary; the rail above
     /// the message box shows it working, then what it saved.
     private func compactChat(_ client: any CompactingConversationClient) {
         Task {
@@ -1178,10 +1178,11 @@ struct ChatView: View {
 
     @ViewBuilder
     private var usageMenu: some View {
-        if offersContextWindow || providerUsage?.isAvailable == true {
+        if offersContextWindow || providerUsage?.isAvailable == true || canCompact {
             Menu {
                 providerUsageMenuItem
                 contextWindowMenuItem
+                compactMenuItem
             } label: {
                 Label("Usage", systemImage: "gauge.with.dots.needle.50percent")
             }
@@ -1189,8 +1190,10 @@ struct ChatView: View {
         }
     }
 
-    /// An everyday action, so it never waits for Nerd Mode: a person who left
-    /// Nerd Mode off on one device (it's kept per device) still has it there.
+    private var canCompact: Bool { model.client is any CompactingConversationClient }
+
+    /// Beside the context window it frees, and an everyday action, so it never
+    /// waits for Nerd Mode: Nerd Mode is kept per device, and a new install has it off.
     @ViewBuilder
     private var compactMenuItem: some View {
         if let compacting = model.client as? any CompactingConversationClient {

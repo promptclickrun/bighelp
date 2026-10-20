@@ -313,7 +313,8 @@ Settings › Chat. Everyday controls must never live only behind it.
 
 The chat's ⋯ menu has at most five rows: File changes when available, Model & speed, This chat, Usage and
 Nerd Mode's Advanced. Model & speed contains Model & reasoning and Fast Mode. This chat contains Rename chat,
-Compact, New Bot Chat (in an agent's Bot Chat), Chat files, Chat appearance and Edit this agent. Usage contains provider usage and Nerd Mode's Context window.
+New Bot Chat (in an agent's Bot Chat), Chat files, Chat appearance and Edit this agent. Usage contains provider usage,
+Nerd Mode's Context window and Compact, which never needs Nerd Mode.
 Existing technical controls stay in Advanced. Keep every level short enough to navigate without scrolling.
 At accessibility text sizes, keep the full font size: the top level is Model & speed, This chat and More.
 More holds File changes, Usage and Advanced; This chat groups Rename and Appearance under Settings, and
@@ -353,7 +354,7 @@ An opened "Worked for…" fold shows its tools directly, never a "Called N tools
 A file in a chat opens in the native preview with Save and Share. A Markdown file opens rendered
 (`MarkdownMessageView`, as chat messages are), with a Preview and Raw switch under its name.
 
-Compacting (⋯ › This chat › Compact, or Hermes on its own when the context fills) shows `ChatCompactionRail` above the
+Compacting (⋯ › Usage › Compact, or Hermes on its own when the context fills) shows `ChatCompactionRail` above the
 message box: a chip whose four-step bar moves once a second (still with Reduce Motion), then Compacted with the tokens
 before and after for two seconds before it shrinks away. Hermes' own status starts and ends it.
 

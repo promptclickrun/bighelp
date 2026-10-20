@@ -241,8 +241,8 @@ final class SimpleBotsUITests: BighelpUITestCase {
             XCTAssertTrue(app.staticTexts["agent.templates.mine.skipped"].exists, "The broken one is hidden, not the list")
             let saved = app.buttons["agent.templates.mine-3d2b7c1e-5a4f-4b6d-9e8c-1f2a3b4c5d6e"]
             XCTAssertTrue(saved.exists)
-            XCTAssertTrue(app.buttons["agent.templates.lens"].exists || app.buttons["agent.templates.anchor"].exists,
-                          "The catalog's templates are still there")
+            XCTAssertTrue(app.descendants(matching: .any)["agent.templates.section.productivity"].exists,
+                          "The catalog's templates are still there, by topic")
             save("templates-picker-\(appearance)", app)
             saved.tap()
 

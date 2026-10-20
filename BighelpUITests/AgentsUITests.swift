@@ -271,7 +271,7 @@ final class AgentsUITests: BighelpUITestCase {
             XCTAssertTrue(anchor.waitForExistence(timeout: 3))
             XCTAssertTrue(app.buttons["agent.editor.template.fable"].exists, "All fifteen are offered")
             anchor.tap()
-            XCTAssertEqual(app.textFields["agent.editor.role"].value as? String, "Everyday generalist")
+            XCTAssertEqual(editorRole(app).value as? String, "Everyday generalist")
             name.tap()
             name.typeText("Kai")
             let instructions = app.textViews["agent.editor.instructions"]
@@ -293,6 +293,8 @@ final class AgentsUITests: BighelpUITestCase {
                     .firstMatch
                 XCTAssertTrue(savedCard.waitForExistence(timeout: 3))
                 savedCard.tap()
+                // Two rails of saved templates can leave Name below the fold.
+                for _ in 0..<3 where !name.exists { app.swipeUp() }
                 XCTAssertEqual(name.value as? String, "Kai", "A typed name is kept")
                 evidence("my-templates", app)
                 app.swipeUp()
@@ -303,7 +305,7 @@ final class AgentsUITests: BighelpUITestCase {
                 for _ in 0..<4 { app.swipeDown() }
 
                 start.buttons["Scratch"].tap()
-                XCTAssertEqual(app.textFields["agent.editor.role"].value as? String, "e.g. Travel planner",
+                XCTAssertEqual(editorRole(app).value as? String, "e.g. Travel planner",
                                "Scratch clears what the template filled in")
             }
             app.buttons["agent.editor.cancel"].tap()
@@ -312,6 +314,15 @@ final class AgentsUITests: BighelpUITestCase {
             XCTAssertTrue(name.waitForNonExistence(timeout: 3))
             app.terminate()
         }
+    }
+
+    /// The editor's Role field. The form builds its rows as they scroll in, and the template
+    /// rail with its topic chips can leave Role just below the fold.
+    @MainActor
+    private func editorRole(_ app: XCUIApplication) -> XCUIElement {
+        let role = app.textFields["agent.editor.role"]
+        for _ in 0..<3 where !role.exists || !role.isHittable { app.swipeUp() }
+        return role
     }
 
     @MainActor

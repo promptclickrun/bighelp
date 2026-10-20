@@ -85,6 +85,17 @@ chat is open (`NativeDeviceToolSession.servingAgentID`). Another agent's chat
 sends nothing after the context check, and Device access names the agent that
 can use the shared data.
 
+One chat has one phone. The plugin refuses a second channel for a chat
+(`channel_ambiguous`) and never picks a phone by which one came last. A channel
+can outlive its app: killed or relaunched (an Xcode run, a crash), or with its
+close lost on a reconnect, it stays until its 30-second lease ends. A newer
+plugin lets the same phone (the same person, `deviceId` and `hostId`) replace
+its own channel at once. With an older one, the phone sends no close for the
+refused channel and tries again after the lease, up to three more times 32
+seconds apart (`NativeDeviceToolSession.runReopeningWhileHeld`); any change to
+the chat or connection cancels the wait. While it waits, Device access says it
+connects again in a moment; if another device keeps the chat, it says so.
+
 ## Transport and ownership
 
 The existing encrypted Link connection carries version-1

@@ -25,11 +25,14 @@ enum LongChatPerformanceFixture {
 
     static func records(arguments: [String]) -> [SessionRecord] {
         guard let turns = turns(in: arguments) else { return [] }
-        let count = arguments.firstIndex(of: countArgument)
+        let photo = photoAttachment()
+        return (1...count(in: arguments)).map { record(index: $0, turns: turns, photo: photo) }
+    }
+
+    static func count(in arguments: [String]) -> Int {
+        arguments.firstIndex(of: countArgument)
             .flatMap { arguments.indices.contains($0 + 1) ? Int(arguments[$0 + 1]) : nil }
             .map { min(max($0, 1), 8) } ?? 1
-        let photo = photoAttachment()
-        return (1...count).map { record(index: $0, turns: turns, photo: photo) }
     }
 
     /// The newest answer's last line, for tests waiting on the bottom of the chat.

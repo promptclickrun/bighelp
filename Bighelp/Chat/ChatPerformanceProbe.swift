@@ -179,11 +179,14 @@ final class ChatPerformanceAutopilot: NSObject {
     nonisolated static let typeNotification = "app.loopdy.fixture.chat-performance.type"
     nonisolated static let sendNotification = "app.loopdy.fixture.chat-performance.send"
     nonisolated static let openNotification = "app.loopdy.fixture.chat-performance.open"
-    nonisolated static let notifications = [scrollNotification, typeNotification, sendNotification, openNotification]
+    nonisolated static let listNotification = "app.loopdy.fixture.chat-performance.list"
+    nonisolated static let notifications = [scrollNotification, typeNotification, sendNotification, openNotification,
+                                            listNotification]
 
     private var link: CADisplayLink?
     private var lastFrame: CFTimeInterval?
     private var tick: ((CFTimeInterval) -> Bool)?
+    private var opened = 0
 
     func run(_ name: String, recorder: ChatPerformanceRecorder) {
         switch name {
@@ -192,12 +195,17 @@ final class ChatPerformanceAutopilot: NSObject {
         case Self.sendNotification: send(recorder)
         case Self.openNotification:
             // The way a widget or Shortcut opens a chat; reads once it has had time to settle.
+            // Each open takes the next long chat (`-test-long-chat-count`), then starts over.
             recorder.reset()
-            BighelpIncomingLinkCenter.shared.open(BighelpShortcutLinks.chat("demo-long-chat-1"))
+            opened = opened % LongChatPerformanceFixture.count(in: ProcessInfo.processInfo.arguments) + 1
+            BighelpIncomingLinkCenter.shared.open(BighelpShortcutLinks.chat(LongChatPerformanceFixture.sessionID(opened)))
             Task { @MainActor in
                 try? await Task.sleep(for: .seconds(5))
                 recorder.read()
             }
+        case Self.listNotification:
+            // Back to the chat list, the way a link to it goes.
+            BighelpIncomingLinkCenter.shared.open(URL(string: "loopdy://sessions")!)
         default: break
         }
     }

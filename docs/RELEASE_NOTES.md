@@ -3,6 +3,21 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.8
+
+### Fixes
+
+- **Chat:** bighelp no longer closes when you open a chat. This mostly occurred when you opened an agent on a
+  different gateway in Simple Bot mode.
+- **New agents:** **Create** finishes as soon as your computer makes the agent. The plugin links the plugins of the new
+  agent in the background.
+
+### Settings
+
+- **Simple Bot mode:** Settings has a **Chat** row. It opens the same page as **All Settings** › **Chat**.
+- **Manage all gateways:** with more than one gateway, a new switch in **Settings** › **System** shows all your
+  gateways. You can update Hermes and the bighelp plugin, and restart the gateway, on all of them at once.
+
 ## 2.6.7
 
 ### Agents

@@ -1,0 +1,62 @@
+name: Template Catalog
+
+# catalog/ holds every template in the bighelp Template Catalog. A pull request that touches it is checked;
+# once it is merged to main, the catalog is updated to match. See catalog/README.md.
+
+on:
+  pull_request:
+    paths:
+      - catalog/**
+      - services/catalog/**
+      - .github/workflows/catalog.yml
+  push:
+    branches: [main]
+    paths:
+      - catalog/**
+  workflow_dispatch:
+    inputs:
+      prune:
+        description: Also unpublish live templates that catalog/ doesn't list (reversible)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: services/catalog
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: services/catalog/package-lock.json
+      - run: npm ci
+      # Every file in catalog/ goes through the Worker's own template checks, and the Worker's tests run.
+      - run: npm test
+      - run: python3 scripts/catalog-sync.py check
+
+  # Only runs on main, never on a pull request, so a pull request can't reach the secrets.
+  publish:
+    needs: validate
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Two merges in a row publish one after the other, each from its own commit.
+    concurrency:
+      group: catalog-publish
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update the catalog to match catalog/
+        env:
+          CATALOG_REVIEW_CLIENT_ID: ${{ secrets.CATALOG_REVIEW_CLIENT_ID }}
+          CATALOG_REVIEW_CLIENT_SECRET: ${{ secrets.CATALOG_REVIEW_CLIENT_SECRET }}
+          PRUNE: ${{ inputs.prune && '--prune' || '' }}
+        run: python3 services/catalog/scripts/catalog-sync.py sync --apply $PRUNE

@@ -118,6 +118,23 @@ struct ReferenceNativeEditorAcceptanceTests {
         #expect(view.isFirstResponder)
     }
 
+    @Test func wrappedDraftKeepsTheExpandButtonWhileTyping() async throws {
+        let fixture = try EditorFixture()
+        fixture.source += String(repeating: " and a few more words", count: 8)
+        let reports = ExpansionReports()
+        let mounted = try await MountedEditor(root: ComposerRowSurface(fixture: fixture, reports: reports))
+        defer { mounted.close() }
+        let view = try #require(mounted.textView())
+        for word in ["one", "two", "three", "four", "five"] {
+            view.insertText(" " + word)
+            await mounted.settle()
+        }
+
+        #expect(reports.values.last == true)
+        #expect(reports.values.drop(while: { !$0 }).allSatisfy { $0 },
+            "SwiftUI also measures at infinite width, where any draft fits one line; reporting that hides the button and the box shakes.")
+    }
+
     @Test func proseKeyboardTraitsReturnAfterLiteralSlashTokenWithoutReplacingNativeState() async throws {
         let fixture = try EditorFixture()
         fixture.source = "Please summarize "
@@ -737,14 +754,50 @@ struct ReferenceNativeEditorAcceptanceTests {
     }
 }
 
+@MainActor private final class ExpansionReports {
+    var values: [Bool] = []
+}
+
+/// The chat composer's row: the editor shares a bottom-aligned HStack with Send,
+/// and the expand button beside the box narrows it once the draft wraps.
+@MainActor private struct ComposerRowSurface: View {
+    @Bindable var fixture: EditorFixture
+    let reports: ExpansionReports
+    @State private var focused = true
+    @State private var showsExpandButton = false
+    var body: some View {
+        HStack(spacing: 8) {
+            HStack(alignment: .bottom, spacing: 4) {
+                ReferenceComposerTextView(text: $fixture.source, hub: fixture.hub, session: fixture.session,
+                    focus: $focused, isEnabled: true,
+                    onExpansionAvailabilityChange: { value in
+                        reports.values.append(value)
+                        showsExpandButton = value
+                    })
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(minHeight: 44)
+                    .overlay(alignment: .topLeading) { if fixture.source.isEmpty { Text("Message") } }
+                Color.clear.frame(width: 44, height: 44)
+            }
+            if showsExpandButton { Color.clear.frame(width: 44, height: 44) }
+        }
+        .padding()
+        .environment(\.appAppearance, BighelpAppearanceContext(appearance: .light, bubbleColor: nil))
+        .environment(\.colorScheme, .light)
+    }
+}
+
 @MainActor private final class MountedEditor {
     let window: UIWindow
-    init(_ fixture: EditorFixture) async throws {
+    convenience init(_ fixture: EditorFixture) async throws {
+        try await self.init(root: EditorAcceptanceSurface(fixture: fixture))
+    }
+    init(root: some View) async throws {
         let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
         window = UIWindow(windowScene: scene)
         window.frame = scene.coordinateSpace.bounds
         window.windowLevel = .alert + 1
-        window.rootViewController = UIHostingController(rootView: EditorAcceptanceSurface(fixture: fixture))
+        window.rootViewController = UIHostingController(rootView: root)
         window.makeKeyAndVisible()
         await settle()
         _ = textView()?.becomeFirstResponder()

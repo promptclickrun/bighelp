@@ -154,7 +154,10 @@ struct ReferenceComposerTextView: UIViewRepresentable {
         // the expand button shows beside the box from there.
         let overflowing = DraftFieldSizing.shouldOfferExpandedEditor(hasText: !uiView.text.isEmpty,
             measuredHeight: measured.height, lineHeight: lineHeight, thresholdLines: 2)
-        if isSurfaceActive { context.coordinator.reportOverflow(overflowing) }
+        // Only a real width decides: SwiftUI also probes at infinite width, where
+        // any draft fits one line, and reporting that flips the expand button
+        // (and the box's width) on every pass, so the box shakes.
+        if isSurfaceActive, width.isFinite { context.coordinator.reportOverflow(overflowing) }
         // A compact editor has a real native viewport, not merely a clipped
         // SwiftUI frame. Keep enough room for UIKit's caret and line leading.
         return CGSize(width: width, height: viewportHeight ?? DraftFieldSizing.height(

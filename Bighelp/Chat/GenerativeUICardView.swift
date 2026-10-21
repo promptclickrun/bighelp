@@ -1009,6 +1009,7 @@ private struct GenerativeUIFormSheet: View {
         let options: [Option]
         let maximumSelected: Int?
         let defaultValue: BighelpJSONValue?
+        let limits: GenerativeUIFormFieldLimits
 
         init?(_ value: BighelpJSONValue) {
             guard
@@ -1033,6 +1034,7 @@ private struct GenerativeUIFormSheet: View {
             }
             maximumSelected = object["max_selected"]?.integer
             defaultValue = object["default"]
+            limits = (try? GenerativeUIFormFieldLimits(object, kind: kind)) ?? GenerativeUIFormFieldLimits()
         }
     }
 
@@ -1065,7 +1067,7 @@ private struct GenerativeUIFormSheet: View {
                 )
             case "date":
                 text[field.id] = field.defaultValue?.string
-                    ?? Date.now.formatted(.iso8601.year().month().day().dateSeparator(.dash))
+                    ?? field.limits.clamped(date: Date.now.formatted(.iso8601.year().month().day().dateSeparator(.dash)))
             default:
                 text[field.id] = field.defaultValue?.displayText ?? ""
             }
@@ -1187,13 +1189,9 @@ private struct GenerativeUIFormSheet: View {
                     .keyboardType(.decimalPad)
                     .textFieldStyle(.roundedBorder)
             case "date":
-                DatePicker(
-                    field.label,
-                    selection: dateBinding(field.id),
-                    displayedComponents: .date
-                )
-                .labelsHidden()
-                .tint(theme.action)
+                datePicker(field)
+                    .labelsHidden()
+                    .tint(theme.action)
             default:
                 TextField("Enter a response", text: textBinding(field.id))
                     .textFieldStyle(.roundedBorder)
@@ -1203,6 +1201,27 @@ private struct GenerativeUIFormSheet: View {
                     .bighelpFont(.metadata)
                     .foregroundStyle(theme.secondaryText)
             }
+            if let hint = field.limits.hint {
+                Text(hint)
+                    .bighelpFont(.metadata)
+                    .foregroundStyle(theme.secondaryText)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func datePicker(_ field: Field) -> some View {
+        let earliest = field.limits.earliestDate.flatMap(Self.formDate)
+        let latest = field.limits.latestDate.flatMap(Self.formDate)
+        switch (earliest, latest) {
+        case let (earliest?, latest?):
+            DatePicker(field.label, selection: dateBinding(field.id), in: earliest...latest, displayedComponents: .date)
+        case let (earliest?, nil):
+            DatePicker(field.label, selection: dateBinding(field.id), in: earliest..., displayedComponents: .date)
+        case let (nil, latest?):
+            DatePicker(field.label, selection: dateBinding(field.id), in: ...latest, displayedComponents: .date)
+        case (nil, nil):
+            DatePicker(field.label, selection: dateBinding(field.id), displayedComponents: .date)
         }
     }
 
@@ -1241,12 +1260,14 @@ private struct GenerativeUIFormSheet: View {
             case "integer":
                 let raw = (textValues[field.id] ?? "").trimmingCharacters(in: .whitespaces)
                 if raw.isEmpty, !field.required { continue }
-                guard let value = Int(raw) else { throw BighelpLinkWireError.invalidValue }
+                guard let value = Int(raw), field.limits.admits(number: Double(value)) else {
+                    throw BighelpLinkWireError.invalidValue
+                }
                 result[field.id] = .integer(value)
             case "decimal":
                 let raw = (textValues[field.id] ?? "").trimmingCharacters(in: .whitespaces)
                 if raw.isEmpty, !field.required { continue }
-                guard let value = Double(raw), value.isFinite else {
+                guard let value = Double(raw), value.isFinite, field.limits.admits(number: value) else {
                     throw BighelpLinkWireError.invalidValue
                 }
                 result[field.id] = .number(value)
@@ -1256,6 +1277,12 @@ private struct GenerativeUIFormSheet: View {
                 guard !value.isEmpty || !field.required else {
                     throw BighelpLinkWireError.invalidValue
                 }
+                let admitted = switch field.kind {
+                case "text", "textarea": field.limits.admits(text: value)
+                case "date": field.limits.admits(date: value)
+                default: true
+                }
+                guard admitted else { throw BighelpLinkWireError.invalidValue }
                 result[field.id] = .string(value)
             }
         }
@@ -1277,15 +1304,24 @@ private struct GenerativeUIFormSheet: View {
     }
 
     private func dateBinding(_ id: String) -> Binding<Date> {
+        let formatter = Self.formDateFormatter()
+        return Binding(
+            get: { formatter.date(from: textValues[id] ?? "") ?? .now },
+            set: { textValues[id] = formatter.string(from: $0) }
+        )
+    }
+
+    private static func formDate(_ text: String) -> Date? {
+        formDateFormatter().date(from: text)
+    }
+
+    private static func formDateFormatter() -> DateFormatter {
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = TimeZone(secondsFromGMT: 0)
         formatter.dateFormat = "yyyy-MM-dd"
-        return Binding(
-            get: { formatter.date(from: textValues[id] ?? "") ?? .now },
-            set: { textValues[id] = formatter.string(from: $0) }
-        )
+        return formatter
     }
 
     private func selected(_ option: String, in field: Field) -> Bool {

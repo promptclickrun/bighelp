@@ -362,7 +362,7 @@ struct GenerativeUICard: Codable, Equatable, Sendable, Identifiable {
             Set(field.keys).isSubset(of: Set([
                 "id", "kind", "label", "required", "help_text", "options",
                 "max_selected", "default",
-            ])),
+            ]).union(GenerativeUIFormFieldLimits.keys)),
             let id = field["id"]?.string,
             let kind = field["kind"]?.string,
             let label = field["label"]?.string,
@@ -394,6 +394,16 @@ struct GenerativeUICard: Codable, Equatable, Sendable, Identifiable {
             optionIDs: Set(options),
             maximumSelected: maximumSelected
         )
+        let limits = try GenerativeUIFormFieldLimits(field, kind: kind)
+        if let value = field["default"] {
+            let admitted = switch kind {
+            case "text", "textarea": value.string.map { limits.admits(text: $0) } ?? false
+            case "integer", "decimal": value.number.map { limits.admits(number: $0) } ?? false
+            case "date": value.string.map { limits.admits(date: $0) } ?? false
+            default: true
+            }
+            guard admitted else { throw GenerativeUICardError.invalidValue }
+        }
         let defaultValue = switch kind {
         case "toggle": field["default"] ?? .boolean(false)
         case "multi_select": field["default"] ?? .array([])
@@ -497,7 +507,7 @@ struct GenerativeUICard: Codable, Equatable, Sendable, Identifiable {
         else { throw GenerativeUICardError.invalidValue }
     }
 
-    private static func isFormDate(_ value: String) -> Bool {
+    static func isFormDate(_ value: String) -> Bool {
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -526,6 +536,124 @@ struct GenerativeUICard: Codable, Equatable, Sendable, Identifiable {
         guard !value.isEmpty, value.count <= maximum, !value.contains("\0") else {
             throw GenerativeUICardError.invalidValue
         }
+    }
+}
+
+/// A form field's limits, as the bighelp plugin's form tool offers them: a length
+/// on text, a range and step on numbers, a range on dates. The plugin refuses
+/// limits that contradict each other or the field's default; so does this.
+struct GenerativeUIFormFieldLimits: Equatable, Sendable {
+    static let keys: Set<String> = ["min_length", "max_length", "min", "max", "step"]
+
+    var minimumLength: Int?
+    var maximumLength: Int?
+    var minimum: Double?
+    var maximum: Double?
+    /// Accepted so the card shows; answers aren't held to it.
+    var step: Double?
+    var earliestDate: String?
+    var latestDate: String?
+
+    /// Counted in Unicode scalars, as the plugin counts, so both agree on a length.
+    func admits(text: String) -> Bool {
+        let length = text.unicodeScalars.count
+        return length >= (minimumLength ?? 0) && length <= (maximumLength ?? .max)
+    }
+
+    func admits(number: Double) -> Bool {
+        number >= (minimum ?? -.infinity) && number <= (maximum ?? .infinity)
+    }
+
+    /// Form dates are `yyyy-MM-dd`, so they compare as text.
+    func admits(date: String) -> Bool {
+        date >= (earliestDate ?? date) && date <= (latestDate ?? date)
+    }
+
+    func clamped(date: String) -> String {
+        if let earliestDate, date < earliestDate { return earliestDate }
+        if let latestDate, date > latestDate { return latestDate }
+        return date
+    }
+
+    /// Shown under the field, so a refused answer isn't a puzzle.
+    var hint: String? {
+        let shortest = (minimumLength ?? 0) > 0 ? minimumLength : nil
+        switch (shortest, maximumLength) {
+        case let (low?, high?): return "\(low) to \(high) characters"
+        case let (low?, nil): return "At least \(low) \(low == 1 ? "character" : "characters")"
+        case let (nil, high?): return "Up to \(high) \(high == 1 ? "character" : "characters")"
+        case (nil, nil): break
+        }
+        let format = FloatingPointFormatStyle<Double>.number.precision(.fractionLength(0...6))
+        switch (minimum, maximum) {
+        case let (low?, high?): return "Between \(low.formatted(format)) and \(high.formatted(format))"
+        case let (low?, nil): return "\(low.formatted(format)) or more"
+        case let (nil, high?): return "\(high.formatted(format)) or less"
+        case (nil, nil): return nil
+        }
+    }
+}
+
+extension GenerativeUIFormFieldLimits {
+    init(_ field: [String: BighelpJSONValue], kind: String) throws {
+        let offered: Set<String> = switch kind {
+        case "text", "textarea": ["min_length", "max_length"]
+        case "integer", "decimal": ["min", "max", "step"]
+        case "date": ["min", "max"]
+        default: []
+        }
+        guard Self.keys.intersection(field.keys).isSubset(of: offered) else {
+            throw GenerativeUICardError.invalidValue
+        }
+        switch kind {
+        case "text", "textarea":
+            let longest = kind == "text" ? 500 : 2_000
+            minimumLength = try Self.integer(field["min_length"], in: 0...longest)
+            maximumLength = try Self.integer(field["max_length"], in: 1...longest)
+            if let minimumLength, let maximumLength, minimumLength > maximumLength {
+                throw GenerativeUICardError.invalidValue
+            }
+        case "integer":
+            let bound = 1_000_000_000_000
+            minimum = try Self.integer(field["min"], in: -bound...bound).map(Double.init)
+            maximum = try Self.integer(field["max"], in: -bound...bound).map(Double.init)
+            step = try Self.integer(field["step"], in: 1...1_000_000_000).map(Double.init)
+        case "decimal":
+            minimum = try Self.number(field["min"], in: -1e12...1e12)
+            maximum = try Self.number(field["max"], in: -1e12...1e12)
+            step = try Self.number(field["step"], in: 0.000001...1e9)
+        case "date":
+            earliestDate = try Self.date(field["min"])
+            latestDate = try Self.date(field["max"])
+            if let earliestDate, let latestDate, earliestDate > latestDate {
+                throw GenerativeUICardError.invalidValue
+            }
+        default:
+            break
+        }
+        if let minimum, let maximum, minimum > maximum {
+            throw GenerativeUICardError.invalidValue
+        }
+    }
+
+    private static func integer(_ value: BighelpJSONValue?, in range: ClosedRange<Int>) throws -> Int? {
+        guard let value else { return nil }
+        guard let integer = value.integer, range.contains(integer) else { throw GenerativeUICardError.invalidValue }
+        return integer
+    }
+
+    private static func number(_ value: BighelpJSONValue?, in range: ClosedRange<Double>) throws -> Double? {
+        guard let value else { return nil }
+        guard let number = value.number, range.contains(number) else { throw GenerativeUICardError.invalidValue }
+        return number
+    }
+
+    private static func date(_ value: BighelpJSONValue?) throws -> String? {
+        guard let value else { return nil }
+        guard let date = value.string, date.count == 10, GenerativeUICard.isFormDate(date) else {
+            throw GenerativeUICardError.invalidValue
+        }
+        return date
     }
 }
 

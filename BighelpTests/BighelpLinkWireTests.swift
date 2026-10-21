@@ -868,6 +868,90 @@ struct BighelpLinkWireTests {
         }
     }
 
+    /// The plugin's form tool offers these limits, so a card that uses them must show.
+    @Test func generativeUIV2FormsAcceptTheFieldLimitsThePluginAllows() throws {
+        let data = try Self.formCardData(fields: [
+            ["id": "goal_name", "kind": "text", "label": "Goal", "required": true,
+             "min_length": 3, "max_length": 80, "default": "Run a 10k"],
+            ["id": "why", "kind": "textarea", "label": "Why it matters", "required": false, "max_length": 600],
+            ["id": "sessions", "kind": "integer", "label": "Sessions a week", "required": true,
+             "min": 1, "max": 7, "step": 1, "default": 3],
+            ["id": "hours", "kind": "decimal", "label": "Hours a session", "required": false,
+             "min": 0.5, "max": 4, "step": 0.25],
+            ["id": "target_date", "kind": "date", "label": "Target date", "required": true,
+             "min": "2026-11-01", "max": "2027-12-31", "default": "2027-03-01"],
+        ])
+
+        let card = try JSONDecoder().decode(GenerativeUICard.self, from: data)
+
+        let fields = try #require(card.data["fields"]?.array?.compactMap(\.object))
+        let goal = try GenerativeUIFormFieldLimits(fields[0], kind: "text")
+        #expect(goal.minimumLength == 3 && goal.maximumLength == 80)
+        let sessions = try GenerativeUIFormFieldLimits(fields[2], kind: "integer")
+        #expect(sessions.minimum == 1 && sessions.maximum == 7 && sessions.step == 1)
+        let target = try GenerativeUIFormFieldLimits(fields[4], kind: "date")
+        #expect(target.earliestDate == "2026-11-01" && target.latestDate == "2027-12-31")
+    }
+
+    /// The same checks as the plugin's: a limit on the wrong kind, out of range, or
+    /// contradicting another limit or the default is refused.
+    @Test func generativeUIV2FormsRejectFieldLimitsThePluginRefuses() throws {
+        let invalid: [[String: Any]] = [
+            ["id": "a", "kind": "integer", "label": "A", "required": true, "min_length": 1],
+            ["id": "a", "kind": "text", "label": "A", "required": true, "min": 1],
+            ["id": "a", "kind": "date", "label": "A", "required": true, "step": 1],
+            ["id": "a", "kind": "select", "label": "A", "required": true, "max": 2,
+             "options": [["id": "x", "label": "X"]]],
+            ["id": "a", "kind": "text", "label": "A", "required": true, "max_length": 0],
+            ["id": "a", "kind": "text", "label": "A", "required": true, "max_length": 501],
+            ["id": "a", "kind": "textarea", "label": "A", "required": true, "min_length": 2_001],
+            ["id": "a", "kind": "text", "label": "A", "required": true, "min_length": 10, "max_length": 5],
+            ["id": "a", "kind": "text", "label": "A", "required": true, "min_length": "3"],
+            ["id": "a", "kind": "text", "label": "A", "required": true, "max_length": 3, "default": "Four"],
+            ["id": "a", "kind": "text", "label": "A", "required": true, "min_length": 5, "default": "Four"],
+            ["id": "a", "kind": "integer", "label": "A", "required": true, "min": 5, "max": 1],
+            ["id": "a", "kind": "integer", "label": "A", "required": true, "min": 1.5],
+            ["id": "a", "kind": "integer", "label": "A", "required": true, "step": 0],
+            ["id": "a", "kind": "integer", "label": "A", "required": true, "max": 2_000_000_000_000],
+            ["id": "a", "kind": "integer", "label": "A", "required": true, "min": 2, "default": 1],
+            ["id": "a", "kind": "decimal", "label": "A", "required": true, "step": 0],
+            ["id": "a", "kind": "decimal", "label": "A", "required": true, "max": 1.5, "default": 2],
+            ["id": "a", "kind": "date", "label": "A", "required": true, "min": "2027-01-01", "max": "2026-01-01"],
+            ["id": "a", "kind": "date", "label": "A", "required": true, "min": "next week"],
+            ["id": "a", "kind": "date", "label": "A", "required": true, "min": "2027-01-01", "default": "2026-12-31"],
+            ["id": "a", "kind": "date", "label": "A", "required": true, "max": "2027-01-01", "default": "2027-01-02"],
+        ]
+        for field in invalid {
+            let data = try Self.formCardData(fields: [field])
+            #expect(throws: (any Error).self, "\(field)") {
+                try JSONDecoder().decode(GenerativeUICard.self, from: data)
+            }
+        }
+    }
+
+    @Test func formFieldLimitsDecideWhichAnswersCanBeSent() throws {
+        let text = try GenerativeUIFormFieldLimits(["min_length": .integer(2), "max_length": .integer(4)], kind: "text")
+        #expect(!text.admits(text: "a"))
+        #expect(text.admits(text: "ab") && text.admits(text: "abcd"))
+        #expect(!text.admits(text: "abcde"))
+        // Counted like the plugin counts (Unicode scalars), so both sides agree.
+        #expect(!text.admits(text: "👍🏽👍🏽👍🏽"))
+        #expect(text.hint == "2 to 4 characters")
+
+        let number = try GenerativeUIFormFieldLimits(["min": .integer(1), "max": .integer(7)], kind: "integer")
+        #expect(!number.admits(number: 0) && number.admits(number: 1) && number.admits(number: 7))
+        #expect(!number.admits(number: 8))
+        #expect(number.hint == "Between 1 and 7")
+
+        let date = try GenerativeUIFormFieldLimits(["min": .string("2026-11-01")], kind: "date")
+        #expect(!date.admits(date: "2026-10-31") && date.admits(date: "2026-11-01"))
+        #expect(date.clamped(date: "2026-10-21") == "2026-11-01")
+
+        let none = try GenerativeUIFormFieldLimits([:], kind: "text")
+        #expect(none.admits(text: String(repeating: "x", count: 2_000)))
+        #expect(none.hint == nil)
+    }
+
     @Test func generativeUIV2NonFormCardsRemainValidWithoutAnAction() throws {
         let data = Data(
             """
@@ -1455,6 +1539,34 @@ struct BighelpLinkWireTests {
                 from: try Self.hermesSizedAvatarResultData(operation: "agents.list")
             )
         }
+    }
+
+    private static func formCardData(fields: [[String: Any]]) throws -> Data {
+        let payload: [String: Any] = [
+            "schema": "loopdy.generative_ui",
+            "version": 2,
+            "component": "form",
+            "title": "Set a new goal",
+            "data": [
+                "description": "A few quick answers.",
+                "submit_label": "Send answers",
+                "fields": fields,
+            ],
+            "content_hash": String(repeating: "b", count: 64),
+            "created_at": "2026-08-29T12:00:00Z",
+            "origin": "live",
+            "card_id": String(repeating: "a", count: 32),
+            "action": [
+                "kind": "submit_form",
+                "request_id": String(repeating: "a", count: 32),
+                "owner": [
+                    "profile": "personal",
+                    "session_id": "session_fixture_0001",
+                ],
+                "expires_at": "2026-08-29T12:05:00Z",
+            ],
+        ]
+        return try JSONSerialization.data(withJSONObject: payload)
     }
 
     private static func hermesSizedAvatarPayload() -> [String: BighelpJSONValue] {

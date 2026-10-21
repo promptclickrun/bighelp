@@ -142,6 +142,7 @@ final class DirectHermesAgentDirectoryClient: AgentDirectoryClient, AgentListPla
             uncertainCreationID = id
             throw WorkspaceClientError.outcomeUnknown
         }
+        if draft.cloneSourceProfileID != nil { await service.sharePlugins(profileID: id) }
         let initial: DirectHermesAgentProfileSnapshot
         do {
             initial = try await service.snapshot(id: id)

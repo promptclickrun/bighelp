@@ -407,6 +407,10 @@ final class DirectHermesNativePluginClient {
             // Sent before each message; a slow host never holds a message for long.
             return Route(path: "people/speaking", feature: "native-people-v1", isMutation: true,
                          maximumResponseBytes: 16_384, timeout: 5)
+        case .agentPluginsShare:
+            // Compares each copied plugin with the default agent's before linking it; up to 10 s waiting on an install.
+            return Route(path: "agents/plugins/share", feature: DirectHermesAgentProfileService.pluginSharingFeature,
+                         isMutation: true, maximumResponseBytes: 32_768, timeout: 30)
         // The host holds a listen up to 25 seconds; the rest is the trip there and back.
         case .liveAlertsListen:
             return Route(path: "alerts/listen", feature: BighelpLiveAlertListener.feature, isMutation: false,

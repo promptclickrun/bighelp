@@ -78,6 +78,7 @@ final class DirectHermesAgentProfileCloneClient: AgentProfileCloneClient {
             return .unconfirmed
         }
         guard response["ok"]?.boolean == true, response["name"]?.string == destination else { return .unconfirmed }
+        await service.sharePlugins(profileID: destination)
         let receipt = AgentProfileMutationReceipt(profileID: destination)
         var incomplete: Set<String> = []
         if let mirrored = response["mirrored"]?.object {

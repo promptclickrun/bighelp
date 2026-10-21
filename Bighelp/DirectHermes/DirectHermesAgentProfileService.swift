@@ -57,6 +57,22 @@ final class DirectHermesAgentProfileService {
         return response
     }
 
+    static let pluginSharingFeature = "native-agent-plugin-links-v1"
+
+    /// Hermes copies the source agent's plugins into a clone, and two copies of one plugin package stop every
+    /// later plugin install on the computer, the bighelp plugin's updates included. The plugin swaps exact copies
+    /// for links to the default agent's. Best effort: with an older plugin, or on any failure, the plugin's own
+    /// pass links them when the app next connects, and the new agent is fine either way.
+    func sharePlugins(profileID: String) async {
+        let payload: [String: BighelpJSONValue] = ["agentId": .string(profileID)]
+        do {
+            _ = try await workspace.perform(.agentPluginsShare, payload: payload, owner: owner)
+        } catch WorkspaceClientError.conflict {
+            // The plugin's context changed (412): the next call loads it again. Once.
+            _ = try? await workspace.perform(.agentPluginsShare, payload: payload, owner: owner)
+        } catch {}
+    }
+
     func requireCapability(_ capability: WorkspaceCapability, profileID: String? = nil) throws {
         try requireOwner()
         let availability = workspace.capabilities.availability(for: capability, owner: owner, profileID: profileID)

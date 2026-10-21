@@ -485,6 +485,51 @@ struct DirectHermesAgentAdapterTests {
         #expect(try JSONDecoder().decode(AgentDraft.self, from: JSONEncoder().encode(draft)) == draft)
     }
 
+    /// Hermes copies the source agent's plugins into a clone; two copies of one plugin package stop every later
+    /// plugin install on the computer. Right after a clone, the plugin links the exact copies.
+    @Test func aClonedAgentSharesTheDefaultAgentsPluginsAndAFreshOneDoesNot() async throws {
+        for source in [String?.none, String?.some("studio")] {
+            let workspace = try AgentNativeWorkspace()
+            let profile = try await directory(workspace).create(AgentDraft(
+                name: "Ralph", role: "Helper", summary: "A distinct purpose", instructions: "Help.\n",
+                avatar: workspace.image, isDefault: false, cloneSourceProfileID: source, skipBundledSkills: false
+            ))
+            let operations = workspace.calls.map(\.operation)
+            let shares = workspace.calls.filter { $0.operation == .agentPluginsShare }
+            if source == nil {
+                #expect(shares.isEmpty, "A fresh agent has no copied plugins")
+            } else {
+                #expect(shares.map(\.payload) == [["agentId": .string(profile.id)]])
+                let cloned = try #require(operations.firstIndex(of: .profilesClone))
+                #expect(cloned < operations.firstIndex(of: .agentPluginsShare)!)
+            }
+        }
+    }
+
+    @Test func anOlderPluginOrAFailedShareNeverFailsTheNewAgent() async throws {
+        for failure in [WorkspaceClientError.unavailable(.unsupportedOperation), .transportUnavailable, .conflict] {
+            let workspace = try AgentNativeWorkspace()
+            workspace.shareFailure = failure
+            let profile = try await directory(workspace).create(AgentDraft(
+                name: "Ralph", role: "Helper", summary: "A distinct purpose", instructions: "Help.\n",
+                avatar: workspace.image, isDefault: false, cloneSourceProfileID: "studio", skipBundledSkills: false
+            ))
+            #expect(profile.id == "ralph")
+            let shares = workspace.calls.filter { $0.operation == .agentPluginsShare }.count
+            #expect(shares == (failure == .conflict ? 2 : 1), "A changed plugin context is read again once")
+        }
+    }
+
+    @Test func theCloneScreenAlsoSharesPlugins() async throws {
+        let workspace = try AgentNativeWorkspace()
+        let owner = try #require(workspace.owner)
+        let client = DirectHermesAgentProfileCloneClient(workspace: workspace, owner: owner, currentOwner: { workspace.owner })
+        let plan = try await client.prepareClone(sourceProfileID: "studio", destinationProfileID: "studio-copy", owner: owner)
+        _ = try await client.clone(plan)
+        #expect(workspace.calls.filter { $0.operation == .agentPluginsShare }.map(\.payload)
+                    == [["agentId": .string("studio-copy")]])
+    }
+
     @Test func nativeCloneReviewsSensitiveScopeAndUsesOneExactCreate() async throws {
         let workspace = try AgentNativeWorkspace()
         workspace.avatars["studio"] = workspace.image
@@ -720,6 +765,7 @@ private final class AgentNativeWorkspace: WorkspaceOperationPerforming {
     let initialOwner: WorkspaceOwner
     var owner: WorkspaceOwner?
     var calls: [Call] = []
+    var shareFailure: WorkspaceClientError?
     var rows: [String: [String: BighelpJSONValue]]
     var souls: [String: String] = ["studio": "Exact instructions.\n"]
     var avatars: [String: AgentAvatar] = [:]
@@ -859,6 +905,9 @@ private final class AgentNativeWorkspace: WorkspaceOperationPerforming {
         case .petThumb:
             guard let uri = petThumbURI else { return ["ok": .boolean(false), "slug": payload["slug"] ?? .null] }
             return ["ok": .boolean(true), "slug": payload["slug"] ?? .null, "dataUri": .string(uri)]
+        case .agentPluginsShare:
+            if let shareFailure { throw shareFailure }
+            return ["linked": .array([.string("weather")]), "kept": .array([])]
         case .profilesDescribe:
             return ["name": .string(id), "model": .object(["provider": .string(mainProvider), "default": .string(mainModel)])]
         case .modelOptions:

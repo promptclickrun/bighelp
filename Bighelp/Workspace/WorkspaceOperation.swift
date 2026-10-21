@@ -168,6 +168,8 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     /// Hours of the day, messages and models per day for the Usage page (plugin, `native-usage-activity-v1`).
     case usageActivity = "usage.activity"
     case peopleSpeaking = "people.speaking"
+    /// After a clone, link the new agent's exact copies of the default agent's plugins (plugin, `native-agent-plugin-links-v1`).
+    case agentPluginsShare = "agents.plugins.share"
     /// Other agents' runs a chat started, and what they're doing (plugin, `native-agent-talk-v1`).
     case agentTalkRuns = "agents.talk"
     /// Whether another Hermes process is running a chat now, and stopping that run (plugin, `native-chat-activity-v1`).

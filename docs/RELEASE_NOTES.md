@@ -3,6 +3,18 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.7
+
+### Agents
+
+- **Agents that work together:** when an agent asks another agent for help, the work continues after you close
+  bighelp. Before, the other agent stopped about 20 seconds after you left the app.
+- **Plugin installs:** a new agent shares the plugins of your default agent. Before, it got copies of them. Two copies
+  of one plugin package stopped all plugin installs on the computer, including bighelp plugin updates. The plugin
+  also repairs agents that already have copies.
+
+These fixes need bighelp plugin 3.26.0 or later. Update the plugin in bighelp.
+
 ## 2.6.6
 
 ### Chat

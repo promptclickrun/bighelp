@@ -12,7 +12,7 @@ short sentences, one instruction in each step, and the active voice.
 - **Expand tool calls:** a new switch in **Settings** › **Chat**. While a turn runs, the folders of tool calls stay
   open. Each tool call stays closed until you open it. The switch shows only when **Show tool calls** is on.
 - Both switches are off by default. To see them, turn on **Nerd Mode**.
-- When the turn ends, **Fold at completion** folds the turn as before.
+- When the turn ends, **Fold finished turns** folds the turn as before.
 
 This build does not need a new plugin update.
 

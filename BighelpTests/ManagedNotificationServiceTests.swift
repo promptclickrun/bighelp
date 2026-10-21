@@ -665,6 +665,51 @@ import UserNotifications
         #expect(fixture.hostAPI.scheduledLinkPuts == [true], "Sent once")
     }
 
+    /// Channels: the device's rules go only to computers whose plugin has them, once, and again
+    /// only when they change. The Choose list comes from what each computer reports.
+    @Test func channelRulesReachComputersThatHaveThem() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        let defaults = UserDefaults.standard
+        let keys = [BighelpPeerChatAlerts.key, BighelpChannelAlerts.modeKey, BighelpChannelAlerts.otherKey,
+                    BighelpChannelAlerts.choicesKey] + BighelpWorkflowAlerts.Kind.allCases.map(\.key)
+        let previous = keys.map { defaults.object(forKey: $0) }
+        defer { for (key, value) in zip(keys, previous) { defaults.set(value, forKey: key) } }
+        for key in keys { defaults.removeObject(forKey: key) }
+        fixture.hostAPI.peerChatPreference = true
+        _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+
+        // An older plugin never gets the field, and lists no channels.
+        defaults.set(BighelpChannelAlerts.Mode.bighelp.rawValue, forKey: BighelpChannelAlerts.modeKey)
+        await fixture.service.applyAlertPreferences()
+        #expect(fixture.hostAPI.channelPuts.isEmpty)
+        #expect(await fixture.service.notificationChannels().isEmpty)
+        #expect(fixture.hostAPI.channelListReads == 0)
+
+        fixture.hostAPI.channelsPreference = true
+        await fixture.service.applyAlertPreferences()
+        #expect(fixture.hostAPI.channelPuts == [.init(other: false, choices: [:])], "Only bighelp")
+        #expect(fixture.ledger.record(host: fixture.host, profile: "default")?.channelAlertsSent
+            == .init(other: false, choices: [:]))
+        await fixture.service.applyAlertPreferences()
+        #expect(fixture.hostAPI.channelPuts.count == 1, "Sent only when it changes")
+
+        defaults.set(BighelpChannelAlerts.Mode.choose.rawValue, forKey: BighelpChannelAlerts.modeKey)
+        defaults.set(false, forKey: BighelpChannelAlerts.otherKey)
+        defaults.set(BighelpChannelAlerts.json(["imsg": false, "telegram": true]), forKey: BighelpChannelAlerts.choicesKey)
+        await fixture.service.applyAlertPreferences()
+        #expect(fixture.hostAPI.channelPuts.last == .init(other: false, choices: ["imsg": false, "telegram": true]))
+
+        defaults.set(BighelpChannelAlerts.Mode.all.rawValue, forKey: BighelpChannelAlerts.modeKey)
+        await fixture.service.applyAlertPreferences()
+        #expect(fixture.hostAPI.channelPuts.last == .init(other: true, choices: [:]), "All channels goes back")
+
+        fixture.hostAPI.reportedChannels = [["id": "telegram", "name": "Telegram"], ["id": "imsg", "name": "iMessage"],
+                                            ["id": "bighelp", "name": "bighelp"], ["id": "Bad Name", "name": "Nope"]]
+        #expect(await fixture.service.notificationChannels().map(\.id) == ["imsg", "telegram"],
+                "By name, without bighelp or names that aren't channels")
+    }
+
     /// Quiet Hours go to the computer when notifications turn on, again only when they change,
     /// and again when the device is in another time zone.
     @Test func quietHoursReachTheComputerOnEnrollmentAndWhenTheyChange() async throws {
@@ -917,6 +962,10 @@ import UserNotifications
         var peerChatPuts: [Bool] = []
         var scheduledLinksPreference = false
         var scheduledLinkPuts: [Bool] = []
+        var channelsPreference = false
+        var channelPuts: [BighelpChannelAlerts.Rules] = []
+        var reportedChannels: [[String: String]] = []
+        var channelListReads = 0
         var quietHoursSupported = false
         var quietHoursPuts: [[String: BighelpJSONValue]] = []
         var recipientKeys: [String] = []
@@ -941,7 +990,8 @@ import UserNotifications
                 "sealedAlerts":sealedAlerts ? .object(["version":.integer(2)]) : .null,
                 "preferences":peerChatPreference ? .object(["peerChats":.boolean(true),
                                                             "workflows":.boolean(workflowPreference),
-                                                            "scheduledLinks":.boolean(scheduledLinksPreference)]) : .null,
+                                                            "scheduledLinks":.boolean(scheduledLinksPreference),
+                                                            "channels":.boolean(channelsPreference)]) : .null,
                 "producerCapabilities":.object(["sessionCompletion":.boolean(producerLoaded),"sessionFailure":.boolean(producerLoaded),"richLiveActivity":.boolean(producerLoaded),"nativeApproval":.boolean(supportedEvents.contains("approval.required")),"nativeClarification":.boolean(false)])]) }
             if suffix.hasSuffix("/preferences"), method == "PUT", let wanted = body?["peerChats"]?.boolean {
                 peerChatPuts.append(wanted)
@@ -960,7 +1010,21 @@ import UserNotifications
                     scheduledLinkPuts.append(wanted)
                     answer["scheduledLinks"] = .boolean(wanted)
                 }
+                // Like plugin 3.27.0: channel rules are kept and sent back; an older plugin refuses them.
+                if let channels = body?["channels"] {
+                    guard channelsPreference, let rules = BighelpChannelAlerts.Rules(channels) else {
+                        throw WorkspaceClientError.rejected(code: "invalid_request")
+                    }
+                    channelPuts.append(rules)
+                    answer["channels"] = channels
+                }
                 return .object(answer)
+            }
+            if suffix.hasSuffix("/channels"), method == "GET" {
+                guard channelsPreference else { throw WorkspaceClientError.rejected(code: "not_found") }
+                channelListReads += 1
+                return .object(["version": .integer(1), "profile": .string("default"),
+                                "channels": .array(reportedChannels.map { .object($0.mapValues(BighelpJSONValue.string)) })])
             }
             if suffix.hasSuffix("/recipient-key"), method == "PUT", let key = body?["publicKey"]?.string {
                 recipientKeys.append(key)

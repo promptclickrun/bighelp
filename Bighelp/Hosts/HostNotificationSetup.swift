@@ -25,11 +25,14 @@ protocol HostNotificationSetupServing {
     func applyAlertPreferences() async
     /// Gives this device's Quiet Hours to every computer with notifications on.
     func applyQuietHours() async -> BighelpQuietHoursSyncResult
+    /// The channels every computer with notifications on reports, for Settings › Notifications › Channels.
+    func notificationChannels() async -> [BighelpChannelAlerts.Channel]
 }
 
 extension HostNotificationSetupServing {
     func resetHost(_ host: BighelpConfiguredHost) async {}
     func applyAlertPreferences() async {}
+    func notificationChannels() async -> [BighelpChannelAlerts.Channel] { [] }
     func applyQuietHours() async -> BighelpQuietHoursSyncResult { BighelpQuietHoursSyncResult() }
 }
 
@@ -71,6 +74,143 @@ enum BighelpWorkflowAlerts {
     static var current: [String: Bool] {
         Dictionary(uniqueKeysWithValues: Kind.allCases.map { ($0.rawValue, isOn($0)) })
     }
+}
+
+/// Settings › Notifications › Channels: which channels this device gets alerts from (plugin 3.27.0,
+/// `preferences.channels`). A channel is where people talk with their agents: iMessage, Telegram, a
+/// terminal. bighelp itself always alerts. Every computer gets the same rules for this device.
+enum BighelpChannelAlerts {
+    enum Mode: String, CaseIterable, Identifiable {
+        case all, bighelp, choose
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .all: "All channels"
+            case .bighelp: "Only bighelp"
+            case .choose: "Choose"
+            }
+        }
+    }
+
+    /// A channel a computer reported, for the Choose list.
+    struct Channel: Codable, Hashable, Identifiable, Sendable {
+        let id: String
+        let name: String
+
+        /// Only channel names a computer may report: never bighelp itself, and short.
+        init?(id: String, name: String) {
+            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard BighelpChannelAlerts.isChannel(id), !trimmed.isEmpty, trimmed.count <= 40 else { return nil }
+            self.id = id
+            self.name = trimmed
+        }
+    }
+
+    /// What a computer keeps for this device: a choice for each channel it has seen, and `other` for the rest.
+    struct Rules: Codable, Equatable, Sendable {
+        var other: Bool
+        var choices: [String: Bool]
+
+        var body: BighelpJSONValue {
+            .object(["other": .boolean(other), "choices": .object(choices.mapValues(BighelpJSONValue.boolean))])
+        }
+
+        init(other: Bool, choices: [String: Bool]) {
+            self.other = other
+            self.choices = choices
+        }
+
+        /// A computer's answer, read strictly: anything else isn't a confirmation.
+        init?(_ value: BighelpJSONValue?) {
+            guard let object = value?.object, Set(object.keys) == ["other", "choices"],
+                  let other = object["other"]?.boolean, let raw = object["choices"]?.object else { return nil }
+            var choices: [String: Bool] = [:]
+            for (key, value) in raw {
+                guard let allowed = value.boolean else { return nil }
+                choices[key] = allowed
+            }
+            self.init(other: other, choices: choices)
+        }
+    }
+
+    static let maximumChoices = 64
+    static let modeKey = "bighelp.notifications.channels.mode"
+    static let otherKey = "bighelp.notifications.channels.other"
+    static let choicesKey = "bighelp.notifications.channels.choices"
+    static let knownKey = "bighelp.notifications.channels.known"
+
+    /// The plugin's channel names: lowercase ASCII letters, digits, `_` and `-`, starting with a letter or digit.
+    static func isChannel(_ id: String) -> Bool {
+        let scalars = Array(id.unicodeScalars)
+        func plain(_ scalar: Unicode.Scalar) -> Bool { ("a"..."z").contains(scalar) || ("0"..."9").contains(scalar) }
+        guard id != "bighelp", (1...40).contains(scalars.count), plain(scalars[0]) else { return false }
+        return scalars.allSatisfy { plain($0) || $0 == "_" || $0 == "-" }
+    }
+
+    static func mode(_ defaults: UserDefaults = .standard) -> Mode {
+        defaults.string(forKey: modeKey).flatMap(Mode.init(rawValue:)) ?? .all
+    }
+
+    static func choices(from json: String) -> [String: Bool] {
+        guard let data = json.data(using: .utf8),
+              let decoded = try? JSONDecoder().decode([String: Bool].self, from: data) else { return [:] }
+        return decoded.filter { isChannel($0.key) }
+    }
+
+    static func json(_ choices: [String: Bool]) -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        return (try? encoder.encode(choices)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
+    }
+
+    /// The rules every computer gets for this device.
+    static func current(_ defaults: UserDefaults = .standard) -> Rules {
+        switch mode(defaults) {
+        case .all:
+            return Rules(other: true, choices: [:])
+        case .bighelp:
+            return Rules(other: false, choices: [:])
+        case .choose:
+            let other = defaults.object(forKey: otherKey) as? Bool ?? true
+            let saved = choices(from: defaults.string(forKey: choicesKey) ?? "")
+            let kept = saved.keys.sorted().prefix(maximumChoices).map { ($0, saved[$0] ?? other) }
+            return Rules(other: other, choices: Dictionary(uniqueKeysWithValues: kept))
+        }
+    }
+
+    static func known(from json: String) -> [Channel] {
+        guard let data = json.data(using: .utf8),
+              let decoded = try? JSONDecoder().decode([Channel].self, from: data) else { return [] }
+        return decoded.compactMap { Channel(id: $0.id, name: $0.name) }
+    }
+
+    /// Channels from every computer, one each, by name; the first name a computer gave wins.
+    static func merged(_ lists: [[Channel]]) -> [Channel] {
+        var seen: [String: Channel] = [:]
+        for channel in lists.joined() where seen[channel.id] == nil { seen[channel.id] = channel }
+        return seen.values.sorted { ($0.name.lowercased(), $0.id) < ($1.name.lowercased(), $1.id) }
+            .prefix(maximumChoices).map { $0 }
+    }
+}
+
+/// How Settings › Notifications › Channels reaches the computers: the list to choose from, and the rules.
+struct BighelpChannelAlertsSync {
+    let channels: @MainActor () async -> [BighelpChannelAlerts.Channel]
+    let apply: @MainActor () async -> Void
+
+    @MainActor
+    static func live(_ registry: BighelpHostRegistry?) -> Self {
+        Self(channels: { [weak registry] in await registry?.notificationSetup?.notificationChannels() ?? [] },
+             apply: { [weak registry] in await registry?.notificationSetup?.applyAlertPreferences() })
+    }
+
+    #if DEBUG
+    /// Demo mode: the demo computers report a few made-up channels.
+    static let demo = Self(channels: {
+        [("imsg", "iMessage"), ("telegram", "Telegram"), ("terminal", "Terminal")]
+            .compactMap { BighelpChannelAlerts.Channel(id: $0.0, name: $0.1) }
+    }, apply: {})
+    #endif
 }
 
 enum HostNotificationSetupResult: Sendable {

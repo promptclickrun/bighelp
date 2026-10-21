@@ -3,6 +3,22 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.9
+
+### Notifications
+
+- **Channels:** a new section in **Settings** › **Notifications**. Pick the channels that send you notifications:
+  - **All channels:** chats on iMessage, Telegram, a terminal and the other channels of your agents notify you too.
+    This is the default, and it is the same as before.
+  - **Only bighelp:** only your chats in bighelp notify you.
+  - **Choose:** turn each channel on or off. **New channels** sets the channels that your agents start to use later.
+- Chats in bighelp always notify you.
+- Questions and approvals follow their channel. A question in iMessage stays in iMessage when iMessage is off.
+- A scheduled task follows the place where it delivers its result.
+- All your computers get the same choice for this device.
+
+This feature needs bighelp plugin 3.27.0 or later. Update the plugin in bighelp.
+
 ## 2.6.8
 
 ### Fixes

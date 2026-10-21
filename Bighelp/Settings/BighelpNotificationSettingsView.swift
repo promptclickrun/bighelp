@@ -37,6 +37,7 @@ struct BighelpNotificationSettingsView: View {
     let sendTest: (@MainActor () async throws -> BighelpNotificationTestReceipt)?
     let turnOff: BighelpNotificationTurnOff?
     let quietHoursSync: BighelpQuietHoursSync
+    let channelAlertsSync: BighelpChannelAlertsSync
     let isCurrent: @MainActor () -> Bool
 
     @State private var preferences: [BighelpBuzzKitPreference] = []
@@ -77,6 +78,7 @@ struct BighelpNotificationSettingsView: View {
         sendTest: (@MainActor () async throws -> BighelpNotificationTestReceipt)? = nil,
         turnOff: BighelpNotificationTurnOff? = nil,
         quietHoursSync: BighelpQuietHoursSync? = nil,
+        channelAlertsSync: BighelpChannelAlertsSync? = nil,
         isCurrent: @escaping @MainActor () -> Bool = { true }
     ) {
         self.permissionCenter = permissionCenter
@@ -88,6 +90,7 @@ struct BighelpNotificationSettingsView: View {
         self.sendTest = sendTest
         self.turnOff = turnOff
         self.quietHoursSync = quietHoursSync ?? .live(hostRegistry)
+        self.channelAlertsSync = channelAlertsSync ?? .live(hostRegistry)
         self.isCurrent = isCurrent
         _runtime = State(initialValue: runtimeSource())
         if let hostRegistry, let host = hostRegistry.selectedHost {
@@ -130,6 +133,7 @@ struct BighelpNotificationSettingsView: View {
                 }
             }
             topicsSection
+            BighelpChannelAlertsSection(loadChannels: channelAlertsSync.channels, apply: channelAlertsSync.apply)
             BighelpWorkflowAlertsSection(apply: { await hostRegistry?.notificationSetup?.applyAlertPreferences() })
             quietHoursSection
             turnOffSection
@@ -439,7 +443,7 @@ struct BighelpNotificationSettingsView: View {
                     Text("Agents messaging each other")
                         .bighelpFont(.body)
                         .foregroundStyle(theme.primaryText)
-                    Text("For example, an agent's answer to work another agent gave it. The alert shows the agent that wrote it. Questions and approvals always notify you.")
+                    Text("For example, an agent's answer to work another agent gave it. The alert shows the agent that wrote it. Questions and approvals still notify you.")
                         .bighelpFont(.metadata)
                         .foregroundStyle(theme.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1092,6 +1096,143 @@ struct BighelpPluginCapabilitiesSection: View {
         let status: String
         let detail: String
         let isAvailable: Bool
+    }
+}
+
+/// Channels: which channels this device gets alerts from. bighelp's own chats always alert.
+struct BighelpChannelAlertsSection: View {
+    let loadChannels: () async -> [BighelpChannelAlerts.Channel]
+    let apply: () async -> Void
+    @AppStorage(BighelpChannelAlerts.modeKey) private var modeRaw = BighelpChannelAlerts.Mode.all.rawValue
+    @AppStorage(BighelpChannelAlerts.otherKey) private var other = true
+    @AppStorage(BighelpChannelAlerts.choicesKey) private var choicesJSON = ""
+    @AppStorage(BighelpChannelAlerts.knownKey) private var knownJSON = ""
+    @State private var isLoading = false
+    @BighelpThemeReader private var theme
+
+    private var mode: BighelpChannelAlerts.Mode { BighelpChannelAlerts.Mode(rawValue: modeRaw) ?? .all }
+    private var choices: [String: Bool] { BighelpChannelAlerts.choices(from: choicesJSON) }
+    private var known: [BighelpChannelAlerts.Channel] { BighelpChannelAlerts.known(from: knownJSON) }
+
+    var body: some View {
+        Section {
+            ForEach(BighelpChannelAlerts.Mode.allCases) { option in
+                Button {
+                    select(option)
+                } label: {
+                    HStack(spacing: BighelpTokens.space12) {
+                        VStack(alignment: .leading, spacing: BighelpTokens.space4) {
+                            Text(option.title)
+                                .bighelpFont(.body)
+                                .foregroundStyle(theme.primaryText)
+                            Text(detail(option))
+                                .bighelpFont(.metadata)
+                                .foregroundStyle(theme.secondaryText)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: BighelpTokens.space8)
+                        Image(systemName: "checkmark")
+                            .font(.bighelp(.body).weight(.semibold))
+                            .foregroundStyle(theme.action)
+                            .opacity(mode == option ? 1 : 0)
+                            .accessibilityHidden(true)
+                    }
+                    .padding(.vertical, BighelpTokens.space4)
+                    .frame(minHeight: BighelpTokens.hitTarget)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(mode == option ? .isSelected : [])
+                .accessibilityIdentifier("settings.notifications.channels.\(option.rawValue)")
+            }
+
+            if mode == .choose {
+                ForEach(known) { channel in
+                    Toggle(isOn: Binding(get: { choices[channel.id] ?? other },
+                                         set: { allowed in set(channel.id, allowed) })) {
+                        Text(channel.name)
+                            .bighelpFont(.body)
+                            .foregroundStyle(theme.primaryText)
+                    }
+                    .accessibilityValue((choices[channel.id] ?? other) ? "On" : "Off")
+                    .accessibilityIdentifier("settings.notifications.channels.channel.\(channel.id)")
+                }
+                Toggle(isOn: Binding(get: { other }, set: { setOther($0) })) {
+                    VStack(alignment: .leading, spacing: BighelpTokens.space4) {
+                        Text(known.isEmpty ? "Other channels" : "New channels")
+                            .bighelpFont(.body)
+                            .foregroundStyle(theme.primaryText)
+                        Text(known.isEmpty
+                             ? "Every channel but bighelp. Your channels show here once your computer reports them."
+                             : "Channels your agents start to use later.")
+                            .bighelpFont(.metadata)
+                            .foregroundStyle(theme.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.vertical, BighelpTokens.space4)
+                }
+                .accessibilityValue(other ? "On" : "Off")
+                .accessibilityIdentifier("settings.notifications.channels.other")
+                if isLoading {
+                    ProgressView("Loading channels…")
+                        .accessibilityIdentifier("settings.notifications.channels.loading")
+                }
+            }
+        } header: {
+            Text("Channels")
+        } footer: {
+            Text("Chats in bighelp always notify you. Questions and approvals follow their channel. A scheduled task follows where it delivers. Needs bighelp plugin 3.27.0 or later.")
+                .bighelpFont(.metadata)
+                .foregroundStyle(theme.secondaryText)
+        }
+        .listRowBackground(theme.surface)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("settings.notifications.channels")
+        .task(id: mode) {
+            guard mode == .choose else { return }
+            await refreshChannels()
+        }
+    }
+
+    private func detail(_ option: BighelpChannelAlerts.Mode) -> String {
+        switch option {
+        case .all: "Chats on iMessage, Telegram, a terminal and every other channel notify you too."
+        case .bighelp: "Only chats in bighelp notify you."
+        case .choose: "Pick the channels that notify you."
+        }
+    }
+
+    private func select(_ option: BighelpChannelAlerts.Mode) {
+        guard option != mode else { return }
+        modeRaw = option.rawValue
+        Task { await apply() }
+    }
+
+    private func set(_ channel: String, _ allowed: Bool) {
+        var updated = choices
+        updated[channel] = allowed
+        choicesJSON = BighelpChannelAlerts.json(updated)
+        Task { await apply() }
+    }
+
+    /// Channels already in the list keep what they show, so this switch changes only the rest.
+    private func setOther(_ allowed: Bool) {
+        var updated = choices
+        for channel in known where updated[channel.id] == nil { updated[channel.id] = other }
+        choicesJSON = BighelpChannelAlerts.json(updated)
+        other = allowed
+        Task { await apply() }
+    }
+
+    private func refreshChannels() async {
+        isLoading = true
+        defer { isLoading = false }
+        let found = await loadChannels()
+        guard !Task.isCancelled, !found.isEmpty else { return }
+        let merged = BighelpChannelAlerts.merged([found, known])
+        if let data = try? JSONEncoder().encode(merged), let json = String(data: data, encoding: .utf8) {
+            knownJSON = json
+        }
     }
 }
 

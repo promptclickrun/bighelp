@@ -26,6 +26,8 @@ struct BighelpManagedEnrollmentRecord: Codable, Equatable {
     var quietHoursSent: BighelpQuietHours.Sent? = nil
     /// The grant whose host confirmed that this phone opens scheduled task alerts by their job's chat or job.
     var scheduledLinksGrantID: String? = nil
+    /// The channel rules the host last confirmed for this grant.
+    var channelAlertsSent: BighelpChannelAlerts.Rules? = nil
 }
 
 extension BighelpManagedEnrollmentRecord {
@@ -33,6 +35,7 @@ extension BighelpManagedEnrollmentRecord {
         case accountScope, accountID, hostConnectionID, profile, creationBody, enrollmentID
         case grant, richLiveActivitySupported, enabled, revokePending, subscriptions, retiredRelayState
         case sealedRecipientKeyID, peerChatsAlert, quietHoursSent, workflowAlertsSent, scheduledLinksGrantID
+        case channelAlertsSent
     }
 
     init(from decoder: Decoder) throws {
@@ -53,6 +56,7 @@ extension BighelpManagedEnrollmentRecord {
         workflowAlertsSent = try? values.decodeIfPresent([String: Bool].self, forKey: .workflowAlertsSent)
         quietHoursSent = try? values.decodeIfPresent(BighelpQuietHours.Sent.self, forKey: .quietHoursSent)
         scheduledLinksGrantID = try? values.decodeIfPresent(String.self, forKey: .scheduledLinksGrantID)
+        channelAlertsSent = try? values.decodeIfPresent(BighelpChannelAlerts.Rules.self, forKey: .channelAlertsSent)
         if let raw = try values.decodeIfPresent(BighelpJSONValue.self, forKey: .grant),
            let object = raw.object, Self.isLegacyRelayGrant(object) {
             // The former provider used the same owners-v1 file but a different

@@ -91,12 +91,16 @@ struct BighelpManagedCapabilities: Decodable, Sendable {
     var supportsSealedAlerts: Bool { sealedAlerts?.version == 2 }
     /// Alert choices this phone can set on the host (plugin 3.4.9+).
     let preferences: Preferences?
-    struct Preferences: Decodable, Sendable { let peerChats: Bool?; let workflows: Bool?; let scheduledLinks: Bool? }
+    struct Preferences: Decodable, Sendable {
+        let peerChats: Bool?; let workflows: Bool?; let scheduledLinks: Bool?; let channels: Bool?
+    }
     var supportsPeerChatPreference: Bool { preferences?.peerChats == true }
     /// Workflow alert switches (plugin 3.7.0+).
     var supportsWorkflowAlertPreferences: Bool { preferences?.workflows == true }
     /// Scheduled task alerts can name the job's chat or the job (`BighelpScheduledAlertLinks`).
     var supportsScheduledAlertLinks: Bool { preferences?.scheduledLinks == true }
+    /// Settings › Notifications › Channels (plugin 3.27.0+, `BighelpChannelAlerts`).
+    var supportsChannelPreferences: Bool { preferences?.channels == true }
     var supportsCompletionEnrollment: Bool {
         guard let supportedEventTypes else { return false }
         return Set(supportedEventTypes).isSuperset(of: ManagedNotificationValidation.eventTypes)

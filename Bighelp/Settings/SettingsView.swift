@@ -459,6 +459,7 @@ struct SettingsView: View {
                 sendTest: notificationContext?.test,
                 turnOff: notificationTurnOff,
                 quietHoursSync: notificationQuietHoursSync,
+                channelAlertsSync: notificationChannelAlertsSync,
                 isCurrent: notificationContext?.isCurrent ?? notificationIsCurrent
             )
         case .permissions:
@@ -473,6 +474,14 @@ struct SettingsView: View {
     }
 
     private var notificationQuietHoursSync: BighelpQuietHoursSync? {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains("-use-demo-fixtures") ? .demo : nil
+        #else
+        nil
+        #endif
+    }
+
+    private var notificationChannelAlertsSync: BighelpChannelAlertsSync? {
         #if DEBUG
         ProcessInfo.processInfo.arguments.contains("-use-demo-fixtures") ? .demo : nil
         #else

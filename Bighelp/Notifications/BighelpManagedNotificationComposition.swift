@@ -189,6 +189,10 @@ final class BighelpManagedNotificationComposition: HostNotificationSetupServing 
         await integration?.service.applyAlertPreferences()
     }
 
+    func notificationChannels() async -> [BighelpChannelAlerts.Channel] {
+        await integration?.service.notificationChannels() ?? []
+    }
+
     func applyQuietHours() async -> BighelpQuietHoursSyncResult {
         await integration?.service.applyQuietHours() ?? BighelpQuietHoursSyncResult()
     }

@@ -130,9 +130,22 @@ struct ReferenceNativeEditorAcceptanceTests {
             await mounted.settle()
         }
 
-        #expect(reports.values.last == true)
-        #expect(reports.values.drop(while: { !$0 }).allSatisfy { $0 },
+        let typed = reports.values
+        #expect(typed.last == true)
+        #expect(typed.drop(while: { !$0 }).allSatisfy { $0 },
             "SwiftUI also measures at infinite width, where any draft fits one line; reporting that hides the button and the box shakes.")
+
+        // The button still goes away once the draft fits one line again.
+        view.selectedRange = NSRange(location: 0, length: view.text.utf16.count)
+        view.insertText("Short")
+        await mounted.settle()
+        #expect(reports.values.last == false)
+
+        view.selectedRange = NSRange(location: 0, length: view.text.utf16.count)
+        view.deleteBackward()
+        await mounted.settle()
+        #expect(view.text.isEmpty)
+        #expect(reports.values.last == false)
     }
 
     @Test func proseKeyboardTraitsReturnAfterLiteralSlashTokenWithoutReplacingNativeState() async throws {

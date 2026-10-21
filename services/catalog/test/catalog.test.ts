@@ -329,6 +329,32 @@ describe("reviewer-named ids", () => {
     expect(bad.status).toBe(400);
     expect(await bad.json()).toMatchObject({ field: "id" });
   });
+
+  // The shapes scripts/catalog-sync.py sends: every field, with null for the ones a file leaves out.
+  it("takes the sync script's bodies, with null for absent fields", async () => {
+    const jwt = await reviewer();
+    const pilot = { ...agent, symbol: null, variables: null, creditName: null };
+    const made = await call("/review/templates", { method: "POST", body: { ...pilot, id: "pilot-from-repo" }, jwt });
+    expect(made.status).toBe(201);
+    const edited = await call("/review/templates/pilot-from-repo", {
+      method: "PATCH", body: { ...pilot, description: null, symbol: "airplane" }, jwt,
+    });
+    expect(edited.status).toBe(200);
+    const row = await edited.json<Record<string, unknown>>();
+    expect(row).toMatchObject({ id: "pilot-from-repo", symbol: "airplane", status: "approved" });
+    expect(row.description ?? null).toBeNull();
+
+    const feed = {
+      kind: "blueprint", board: "feed", category: "personal", goalCategory: null, creditName: null,
+      text: "Every morning, post a short summary of [tech news] to my Feed.",
+    };
+    expect((await call("/review/templates", { method: "POST", body: { ...feed, id: "feed-from-repo" }, jwt })).status)
+      .toBe(201);
+    const feedEdit = await call("/review/templates/feed-from-repo", {
+      method: "PATCH", body: { ...feed, text: "Every evening, post a short summary of [tech news] to my Feed." }, jwt,
+    });
+    expect(feedEdit.status).toBe(200);
+  });
 });
 
 describe("public feed", () => {

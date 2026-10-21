@@ -378,7 +378,13 @@ async function reviewRoute(
       const body = await readJson(request);
       const template = parseTemplate(body, { allowSymbol: true });
       const creditName = isRecord(body) ? parseCreditName(body.creditName) : null;
-      const newID = newId(template.kind);
+      // A reviewer can name the template, so the repo's catalog/ keeps the same ids as the catalog.
+      const named = isRecord(body) ? body.id : undefined;
+      if (named !== undefined && (typeof named !== "string" || !/^[a-z0-9][a-z0-9-]{2,63}$/.test(named))) {
+        throw new ValidationError("id", "Use lowercase letters, digits and dashes, 3 to 64 characters.");
+      }
+      if (named !== undefined && await find(env.DB, named as string)) return error(409, "A template with that id exists.");
+      const newID = (named as string | undefined) ?? newId(template.kind);
       await insert(env.DB, {
         id: newID, template, status: "approved", source: "bighelp", creditName,
         now: now.toISOString(), reviewedBy: reviewer,

@@ -156,6 +156,13 @@ Raw HTTP works too: send the two `CF-Access-Client-Id` / `CF-Access-Client-Secre
 gets a 302 to the Access login, not a 401. The service token expires a year after it was made; rotate it in
 Zero Trust › Access › Service Tokens and update the env file.
 
+## Templates in the repo
+
+The repo's [catalog/](../../catalog/README.md) directory holds every template. Merging a change to it to `main`
+runs `.github/workflows/catalog.yml`, which publishes through the review API with `scripts/catalog-sync.py`.
+`POST /review/templates` takes an optional `id` (lowercase letters, digits and dashes) so the repo and the catalog
+keep the same ids; a taken id answers 409.
+
 ## App integration (not built yet)
 
 What the app needs, in the same style as `ProviderLogoStore`:

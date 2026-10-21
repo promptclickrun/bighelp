@@ -609,6 +609,9 @@ New code uses Bighelp names. Don't "finish" the rename on this list.
   and five blueprint topics, in a fixed order; unknown or missing is Other). They share the search row, topic
   chips, section headers and Sort (`TemplatePickerParts.swift`) and one listing (`TemplateTopics.listing`). A new
   catalog topic needs an app build to get its own name; until then it shows under Other.
+- Every catalog template is also a file in `catalog/` (see [catalog/README.md](catalog/README.md)). Merging a change
+  there to `main` publishes it (`.github/workflows/catalog.yml`). After approving a community submission, run
+  `services/catalog/scripts/catalog-sync.py export` and commit, so the repo keeps it.
 - My Templates are bots saved as templates on the person's computer (a Simple Bot profile's Share), through the
   plugin's `my-templates` routes (`native-my-templates-v1`, `MyTemplatesStore`) in the catalog's agent shape. They
   show first in every template picker, including New Bot's Templates (`SimpleBotCreation`). A saved template

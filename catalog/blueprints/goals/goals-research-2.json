@@ -1,0 +1,7 @@
+{
+  "id": "goals-research-2",
+  "board": "goals",
+  "category": "research",
+  "text": "Add a goal to my Goals under Finance to track the price of [item], and update the status when it drops below $[amount].",
+  "goalCategory": "finance"
+}

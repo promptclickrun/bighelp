@@ -317,6 +317,20 @@ describe("review", () => {
   });
 });
 
+describe("reviewer-named ids", () => {
+  it("keeps the id a reviewer gives, and refuses a taken or malformed one", async () => {
+    const jwt = await reviewer();
+    const created = await call("/review/templates", { method: "POST", body: { ...blueprint, id: "feed-mine-1" }, jwt });
+    expect(created.status).toBe(201);
+    expect(await created.json()).toMatchObject({ id: "feed-mine-1", status: "approved" });
+    const again = await call("/review/templates", { method: "POST", body: { ...blueprint, id: "feed-mine-1" }, jwt });
+    expect(again.status).toBe(409);
+    const bad = await call("/review/templates", { method: "POST", body: { ...blueprint, id: "Not OK!" }, jwt });
+    expect(bad.status).toBe(400);
+    expect(await bad.json()).toMatchObject({ field: "id" });
+  });
+});
+
 describe("public feed", () => {
   it("answers a matching ETag with 304", async () => {
     await call("/review/templates", { method: "POST", body: blueprint, jwt: await reviewer() });

@@ -1,4 +1,5 @@
 import Observation
+import os
 import SwiftUI
 import UIKit
 
@@ -335,6 +336,44 @@ final class ChatTimelineTableView: UITableView {
 }
 
 @MainActor
+/// A chat's rows keyed by ID, for the timeline. An item can reach the rows twice (two records of one tool
+/// call in an open folder, say); the first stays and the repeat is dropped, with a log line naming its kind
+/// so its source can be found.
+enum ChatCanvasRowIDs {
+    private static let log = Logger(subsystem: "app.loopdy.mobile", category: "ChatTimeline")
+
+    static func firstOfEach(_ rows: [ChatCanvasRow]) -> [ChatCanvasRow] {
+        var seen = Set<String>(minimumCapacity: rows.count)
+        var repeated: [String] = []
+        let kept = rows.filter { row in
+            if seen.insert(row.id).inserted { return true }
+            repeated.append(kind(row))
+            return false
+        }
+        guard !repeated.isEmpty else { return rows }
+        log.error("Dropped \(repeated.count, privacy: .public) repeated chat rows: \(Set(repeated).sorted().joined(separator: ", "), privacy: .public)")
+        return kept
+    }
+
+    /// Whether rows replacing `removed` repeat an ID: among themselves, or of a row that stays.
+    static func repeatsAnID(_ inserted: ArraySlice<ChatCanvasRow>, replacing removed: ArraySlice<ChatCanvasRow>,
+                            among current: [String: ChatCanvasRow]) -> Bool {
+        guard !inserted.isEmpty else { return false }
+        let leaving = Set(removed.lazy.map(\.id))
+        var seen = Set<String>(minimumCapacity: inserted.count)
+        for row in inserted {
+            let id = row.id
+            if !seen.insert(id).inserted || (current[id] != nil && !leaving.contains(id)) { return true }
+        }
+        return false
+    }
+
+    /// The case name only (`activityDetail`): row IDs and contents can carry messages and tool IDs.
+    private static func kind(_ row: ChatCanvasRow) -> String {
+        Mirror(reflecting: row).children.first?.label ?? String(describing: row)
+    }
+}
+
 struct NativeChatTimeline<Content: View>: UIViewRepresentable {
     let conversationID: String
     let ownerID: ObjectIdentifier
@@ -561,6 +600,16 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             }
         }
 
+        /// How many rows at the start and at the end didn't change.
+        private static func unchangedEnds(_ previous: [ChatCanvasRow], _ next: [ChatCanvasRow]) -> (Int, Int) {
+            let shorter = min(previous.count, next.count)
+            var start = 0
+            while start < shorter, previous[start] == next[start] { start += 1 }
+            var end = 0
+            while end < shorter - start, previous[previous.count - 1 - end] == next[next.count - 1 - end] { end += 1 }
+            return (start, end)
+        }
+
         func update(_ parent: NativeChatTimeline, environment: EnvironmentValues, table: ChatTimelineTableView) {
             // Preserve known visible heights before a structural update makes
             // UIKit estimate the old viewport again. Changed rows are still
@@ -590,13 +639,17 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             // between the unchanged ends are looked at: hashing and comparing every row of
             // the history on each update made a long chat's streaming stutter.
             let previous = rows
-            let next = parent.rows
+            // Each ID once: the index below and diffable snapshots trap on a repeat (2.6.7 crashed opening a
+            // chat that had one). A reset walks every row anyway; an update checks only the rows it changes.
+            var next = reset ? ChatCanvasRowIDs.firstOfEach(parent.rows) : parent.rows
+            var (start, end) = Self.unchangedEnds(previous, next)
+            if !reset, ChatCanvasRowIDs.repeatsAnID(next[start..<(next.count - end)],
+                                                    replacing: previous[start..<(previous.count - end)],
+                                                    among: rowsByID) {
+                next = ChatCanvasRowIDs.firstOfEach(next)
+                (start, end) = Self.unchangedEnds(previous, next)
+            }
             rows = next
-            let shorter = min(previous.count, next.count)
-            var start = 0
-            while start < shorter, previous[start] == next[start] { start += 1 }
-            var end = 0
-            while end < shorter - start, previous[previous.count - 1 - end] == next[next.count - 1 - end] { end += 1 }
             let removed = previous[start..<(previous.count - end)]
             let inserted = next[start..<(next.count - end)]
             guard reset || styleChanged || !removed.isEmpty || !inserted.isEmpty else {
@@ -605,7 +658,7 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             }
             let previousRows = rowsByID
             if reset {
-                rowsByID = Dictionary(uniqueKeysWithValues: next.map { ($0.id, $0) })
+                rowsByID = Dictionary(next.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
             } else {
                 for row in removed { rowsByID[row.id] = nil }
                 for row in inserted { rowsByID[row.id] = row }

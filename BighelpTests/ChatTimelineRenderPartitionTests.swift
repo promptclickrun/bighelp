@@ -291,6 +291,34 @@ struct ChatTimelineRenderPartitionTests {
         #expect(reusedForAnotherRow, "Exercise actual UIKit cell reuse.")
     }
 
+    /// 2.6.7 (147) crashed opening a chat whose rows repeated an ID: the reset built its index with
+    /// `Dictionary(uniqueKeysWithValues:)`, and a diffable snapshot refuses repeated items too. Each ID
+    /// shows once, the first kept, when the chat opens and when a later update repeats one.
+    @Test func repeatedRowIDsShowOnceAndNeverCrashTheTimeline() async throws {
+        let state = TimelineRowsProbe([.divider("A"), .divider("B"), .divider("A")])
+        let timeline = ChatTimelineController()
+        let host = UIHostingController(rootView: TimelineRowsHost(state: state, controller: timeline))
+        let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        window.frame = CGRect(x: 0, y: 0, width: 402, height: 874)
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+        func tables(_ view: UIView) -> [UITableView] {
+            (view as? UITableView).map { [$0] } ?? view.subviews.flatMap(tables)
+        }
+        try await Task.sleep(for: .milliseconds(300))
+        let table = try #require(tables(host.view).first)
+        #expect(table.numberOfRows(inSection: 0) == 2, "A repeated row on open shows once")
+
+        state.rows = [.divider("A"), .divider("B"), .divider("C"), .divider("B"), .divider("D")]
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(table.numberOfRows(inSection: 0) == 4, "A repeat streamed in later shows once too")
+        state.rows = [.divider("A"), .divider("B"), .divider("C"), .divider("D"), .divider("E")]
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(table.numberOfRows(inSection: 0) == 5, "Ordinary updates go on as before")
+    }
+
     @Test func livePresentationChangesUpdateAnOtherwiseUnchangedRow() async throws {
         let state = TimelinePresentationProbe()
         let timeline = ChatTimelineController()
@@ -721,4 +749,22 @@ private struct TimelineLocalStateProbe: View {
 @MainActor @Observable private final class TimelinePresentationProbe {
     var phase = "Pending"
     var lastAction = ""
+}
+
+@MainActor @Observable
+private final class TimelineRowsProbe {
+    var rows: [ChatCanvasRow]
+    init(_ rows: [ChatCanvasRow]) { self.rows = rows }
+}
+
+private struct TimelineRowsHost: View {
+    let state: TimelineRowsProbe
+    let controller: ChatTimelineController
+
+    var body: some View {
+        NativeChatTimeline(conversationID: "repeated-rows", ownerID: ObjectIdentifier(state), rows: state.rows,
+                           controller: controller, entryCount: state.rows.count) { row in
+            Text(row.id).frame(height: 44)
+        }
+    }
 }

@@ -3,6 +3,19 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.6
+
+### Chat
+
+- **Expand reasoning:** a new switch in **Settings** › **Chat**. While a turn runs, the reasoning folders stay open.
+  The switch shows only when **Show reasoning** is on.
+- **Expand tool calls:** a new switch in **Settings** › **Chat**. While a turn runs, the folders of tool calls stay
+  open. Each tool call stays closed until you open it. The switch shows only when **Show tool calls** is on.
+- Both switches are off by default. To see them, turn on **Nerd Mode**.
+- When the turn ends, **Fold at completion** folds the turn as before.
+
+This build does not need a new plugin update.
+
 ## 2.6.5
 
 ### Simplified Chinese

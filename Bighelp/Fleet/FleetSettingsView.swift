@@ -8,6 +8,8 @@ struct FleetSettingsView: View {
     let store: FleetMaintenanceStore
     /// This app's own pages (Appearance, Chat), the same ones Settings opens.
     var appPage: ((SettingsMenuSection) -> AnyView)?
+    /// A section above the rest (Settings › System's Manage all gateways).
+    var leading: AnyView?
     @State private var confirmation: Confirmation?
 
     private enum Confirmation: Identifiable {
@@ -32,6 +34,7 @@ struct FleetSettingsView: View {
 
     var body: some View {
         List {
+            if let leading { leading }
             hermesSection
             pluginSection
             gatewaySection

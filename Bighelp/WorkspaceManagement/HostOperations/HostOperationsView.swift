@@ -8,6 +8,8 @@ struct HostOperationsView<MoreLinks: View>: View {
     @Bindable var store: HostOperationsStore
     /// Other host pages, listed with Advanced.
     private let moreLinks: MoreLinks
+    /// A section above the computers (Settings › System's Manage all gateways).
+    private let leading: AnyView?
 
     @State private var gatewayCommand: HermesMessagingGatewayCommand?
     @State private var drainTarget: Bool?
@@ -17,13 +19,15 @@ struct HostOperationsView<MoreLinks: View>: View {
     @State private var pluginUpdate: HostPluginUpdateModel?
     @Environment(\.bighelpHostRegistry) private var hostRegistry
 
-    init(store: HostOperationsStore, @ViewBuilder moreLinks: () -> MoreLinks) {
+    init(store: HostOperationsStore, leading: AnyView? = nil, @ViewBuilder moreLinks: () -> MoreLinks) {
         _store = Bindable(wrappedValue: store)
+        self.leading = leading
         self.moreLinks = moreLinks()
     }
 
     var body: some View {
         List {
+            if let leading { leading }
             if let hostRegistry, !hostRegistry.hosts.isEmpty {
                 BighelpConfiguredHostsSection(registry: hostRegistry)
             }

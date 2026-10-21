@@ -1112,7 +1112,10 @@ struct RootShellView: View {
             },
             connectorApps: { connectorAppsModel() },
             composioApps: { composioAppsModel() },
-            teamwork: { teamworkModel() }
+            teamwork: { teamworkModel() },
+            fleet: fleet.map { fleet in
+                SettingsFleetAccess(maintenance: { fleet.maintenance() }, gatewayCount: { fleet.hosts.count })
+            }
         )
     }
 

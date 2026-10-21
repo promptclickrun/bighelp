@@ -282,6 +282,11 @@ final class SettingsStore {
         didSet { defaults.set(simpleBotsGatewayFilter, forKey: Keys.simpleBotsGatewayFilter) }
     }
 
+    /// Settings › System shows every gateway (Fleet settings) to update and restart them together.
+    var systemManagesAllGateways: Bool {
+        didSet { defaults.set(systemManagesAllGateways, forKey: Keys.systemManagesAllGateways) }
+    }
+
     /// Multi-gateway's primary bot (gateway and bot, `FleetID`), kept on this device so it stays put
     /// whichever gateway is in use.
     var simpleBotsMultiPrimary: String? {
@@ -460,6 +465,7 @@ final class SettingsStore {
         simpleBotsEnabled = defaults.bool(forKey: Keys.simpleBots, default: false)
         simpleBotsMultiGateway = defaults.bool(forKey: Keys.simpleBotsMultiGateway, default: false)
         simpleBotsGatewayFilter = defaults.bool(forKey: Keys.simpleBotsGatewayFilter, default: false)
+        systemManagesAllGateways = defaults.bool(forKey: Keys.systemManagesAllGateways, default: false)
         simpleBotsMultiPrimary = defaults.string(forKey: Keys.simpleBotsMultiPrimary)
         startExperience = start
         experience = codeMode ? start : .bighelp
@@ -773,6 +779,7 @@ private extension SettingsStore {
         static let simpleBots = "bighelp.settings.simple-bots"
         static let simpleBotsMultiGateway = "bighelp.simple-bots.multi-gateway"
         static let simpleBotsGatewayFilter = "bighelp.simple-bots.gateway-filter"
+        static let systemManagesAllGateways = "bighelp.settings.system.manages-all-gateways"
         static let simpleBotsMultiPrimary = "bighelp.simple-bots.multi-gateway.primary"
         static let sessionSectionPreferences = "loopdy.sessions.section-preferences.v1"
     }

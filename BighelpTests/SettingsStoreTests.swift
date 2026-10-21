@@ -6,6 +6,18 @@ import UIKit
 
 @MainActor
 struct SettingsStoreTests {
+    @Test func manageAllGatewaysIsOffUntilTurnedOnAndStays() {
+        let suiteName = #function
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let initial = SettingsStore(defaults: defaults)
+        #expect(!initial.systemManagesAllGateways)
+        initial.systemManagesAllGateways = true
+        #expect(SettingsStore(defaults: defaults).systemManagesAllGateways)
+    }
+
     @Test func activeTurnExpansionPreferencesPersistAndDefaultOff() {
         let suiteName = #function
         let defaults = UserDefaults(suiteName: suiteName)!

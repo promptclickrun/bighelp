@@ -494,6 +494,8 @@ struct DirectHermesAgentAdapterTests {
                 name: "Ralph", role: "Helper", summary: "A distinct purpose", instructions: "Help.\n",
                 avatar: workspace.image, isDefault: false, cloneSourceProfileID: source, skipBundledSkills: false
             ))
+            // In the background: making the agent never waits for it.
+            try await settle { source == nil || workspace.calls.contains { $0.operation == .agentPluginsShare } }
             let operations = workspace.calls.map(\.operation)
             let shares = workspace.calls.filter { $0.operation == .agentPluginsShare }
             if source == nil {
@@ -515,6 +517,8 @@ struct DirectHermesAgentAdapterTests {
                 avatar: workspace.image, isDefault: false, cloneSourceProfileID: "studio", skipBundledSkills: false
             ))
             #expect(profile.id == "ralph")
+            let expected = failure == .conflict ? 2 : 1
+            try await settle { workspace.calls.filter { $0.operation == .agentPluginsShare }.count >= expected }
             let shares = workspace.calls.filter { $0.operation == .agentPluginsShare }.count
             #expect(shares == (failure == .conflict ? 2 : 1), "A changed plugin context is read again once")
         }
@@ -526,6 +530,7 @@ struct DirectHermesAgentAdapterTests {
         let client = DirectHermesAgentProfileCloneClient(workspace: workspace, owner: owner, currentOwner: { workspace.owner })
         let plan = try await client.prepareClone(sourceProfileID: "studio", destinationProfileID: "studio-copy", owner: owner)
         _ = try await client.clone(plan)
+        try await settle { workspace.calls.contains { $0.operation == .agentPluginsShare } }
         #expect(workspace.calls.filter { $0.operation == .agentPluginsShare }.map(\.payload)
                     == [["agentId": .string("studio-copy")]])
     }
@@ -665,6 +670,11 @@ struct DirectHermesAgentAdapterTests {
         await #expect(throws: WorkspaceClientError.conflict) {
             try await client.saveDefaults(desired, agentID: "studio", confirmation: token)
         }
+    }
+
+    /// Up to a second for background work to land; a check that's already true returns at once.
+    private func settle(_ condition: () -> Bool) async throws {
+        for _ in 0..<100 where !condition() { try await Task.sleep(for: .milliseconds(10)) }
     }
 
     private func directory(_ workspace: AgentNativeWorkspace) -> DirectHermesAgentDirectoryClient {

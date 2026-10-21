@@ -920,6 +920,9 @@ struct BighelpLinkWireTests {
             ["id": "a", "kind": "date", "label": "A", "required": true, "min": "next week"],
             ["id": "a", "kind": "date", "label": "A", "required": true, "min": "2027-01-01", "default": "2026-12-31"],
             ["id": "a", "kind": "date", "label": "A", "required": true, "max": "2027-01-01", "default": "2027-01-02"],
+            ["id": "a", "kind": "date", "label": "A", "required": true, "min": "2026-1-1"],
+            ["id": "a", "kind": "date", "label": "A", "required": true, "max": "2026-02-30"],
+            ["id": "a", "kind": "date", "label": "A", "required": true, "default": "2026-01-1 "],
         ]
         for field in invalid {
             let data = try Self.formCardData(fields: [field])
@@ -927,6 +930,41 @@ struct BighelpLinkWireTests {
                 try JSONDecoder().decode(GenerativeUICard.self, from: data)
             }
         }
+    }
+
+    /// "2026-1-001" sorts after "2026-01-31" as text but is January 1: a card like this
+    /// reached the date picker as a reversed range, which traps.
+    @Test func generativeUIV2FormsRejectDateLimitsThatAreNotCanonical() throws {
+        let data = try Self.formCardData(fields: [
+            ["id": "target_date", "kind": "date", "label": "Target date", "required": true,
+             "min": "2026-01-31", "max": "2026-1-001"],
+        ])
+
+        #expect(throws: (any Error).self) {
+            try JSONDecoder().decode(GenerativeUICard.self, from: data)
+        }
+        #expect(GenerativeUIFormDate.date(from: "2026-1-001") == nil)
+        #expect(GenerativeUIFormDate.date(from: "2026-02-30") == nil)
+        #expect(GenerativeUIFormDate.date(from: "2026-01-31") != nil)
+    }
+
+    /// A form date is a day in UTC, and the picker shows UTC, so a one-day range is the
+    /// same day west of UTC too. Read in Los Angeles the same instant is the day before.
+    @Test func formDatesAreTheSameDayInEveryTimeZone() throws {
+        let data = try Self.formCardData(fields: [
+            ["id": "target_date", "kind": "date", "label": "Target date", "required": true,
+             "min": "2026-11-01", "max": "2026-11-01"],
+        ])
+        _ = try JSONDecoder().decode(GenerativeUICard.self, from: data)
+
+        let day = try #require(GenerativeUIFormDate.date(from: "2026-11-01"))
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = GenerativeUIFormDate.timeZone
+        #expect(utc.dateComponents([.year, .month, .day], from: day) == DateComponents(year: 2026, month: 11, day: 1))
+        #expect(GenerativeUIFormDate.text(from: day) == "2026-11-01")
+        var losAngeles = Calendar(identifier: .gregorian)
+        losAngeles.timeZone = try #require(TimeZone(identifier: "America/Los_Angeles"))
+        #expect(losAngeles.component(.day, from: day) == 31)
     }
 
     @Test func formFieldLimitsDecideWhichAnswersCanBeSent() throws {

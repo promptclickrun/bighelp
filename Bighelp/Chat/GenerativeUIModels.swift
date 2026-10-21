@@ -508,12 +508,7 @@ struct GenerativeUICard: Codable, Equatable, Sendable, Identifiable {
     }
 
     static func isFormDate(_ value: String) -> Bool {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.date(from: value) != nil
+        GenerativeUIFormDate.date(from: value) != nil
     }
 
     private static func validateChart(
@@ -650,10 +645,37 @@ extension GenerativeUIFormFieldLimits {
 
     private static func date(_ value: BighelpJSONValue?) throws -> String? {
         guard let value else { return nil }
-        guard let date = value.string, date.count == 10, GenerativeUICard.isFormDate(date) else {
+        guard let date = value.string, GenerativeUICard.isFormDate(date) else {
             throw GenerativeUICardError.invalidValue
         }
         return date
+    }
+}
+
+/// A form date is a day, written `yyyy-MM-dd`. Each one stands for midnight UTC,
+/// and the date picker shows UTC too, so a day reads the same in every time zone.
+enum GenerativeUIFormDate {
+    static let timeZone = TimeZone(secondsFromGMT: 0)!
+
+    /// Only the canonical spelling: the formatter alone also reads "2026-1-001"
+    /// as January 1 and "2026-02-30" as March 2, and limits compare as text.
+    static func date(from text: String) -> Date? {
+        let formatter = formatter()
+        guard let date = formatter.date(from: text), formatter.string(from: date) == text else { return nil }
+        return date
+    }
+
+    static func text(from date: Date) -> String {
+        formatter().string(from: date)
+    }
+
+    private static func formatter() -> DateFormatter {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = timeZone
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
     }
 }
 

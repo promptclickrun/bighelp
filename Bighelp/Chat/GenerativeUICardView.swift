@@ -1068,6 +1068,12 @@ private struct GenerativeUIFormSheet: View {
             case "date":
                 text[field.id] = field.defaultValue?.string
                     ?? field.limits.clamped(date: Date.now.formatted(.iso8601.year().month().day().dateSeparator(.dash)))
+            // Numbers as `Int`/`Double` read them back: the display text rounds to two
+            // places and groups thousands, so a default could fail its own range.
+            case "integer":
+                text[field.id] = field.defaultValue?.integer.map(String.init) ?? ""
+            case "decimal":
+                text[field.id] = field.defaultValue?.number.map { String($0) } ?? ""
             default:
                 text[field.id] = field.defaultValue?.displayText ?? ""
             }
@@ -1192,6 +1198,7 @@ private struct GenerativeUIFormSheet: View {
                 datePicker(field)
                     .labelsHidden()
                     .tint(theme.action)
+                    .environment(\.timeZone, GenerativeUIFormDate.timeZone)
             default:
                 TextField("Enter a response", text: textBinding(field.id))
                     .textFieldStyle(.roundedBorder)
@@ -1211,16 +1218,16 @@ private struct GenerativeUIFormSheet: View {
 
     @ViewBuilder
     private func datePicker(_ field: Field) -> some View {
-        let earliest = field.limits.earliestDate.flatMap(Self.formDate)
-        let latest = field.limits.latestDate.flatMap(Self.formDate)
+        let earliest = field.limits.earliestDate.flatMap(GenerativeUIFormDate.date(from:))
+        let latest = field.limits.latestDate.flatMap(GenerativeUIFormDate.date(from:))
         switch (earliest, latest) {
-        case let (earliest?, latest?):
+        case let (earliest?, latest?) where earliest <= latest:
             DatePicker(field.label, selection: dateBinding(field.id), in: earliest...latest, displayedComponents: .date)
         case let (earliest?, nil):
             DatePicker(field.label, selection: dateBinding(field.id), in: earliest..., displayedComponents: .date)
         case let (nil, latest?):
             DatePicker(field.label, selection: dateBinding(field.id), in: ...latest, displayedComponents: .date)
-        case (nil, nil):
+        default:
             DatePicker(field.label, selection: dateBinding(field.id), displayedComponents: .date)
         }
     }
@@ -1304,24 +1311,10 @@ private struct GenerativeUIFormSheet: View {
     }
 
     private func dateBinding(_ id: String) -> Binding<Date> {
-        let formatter = Self.formDateFormatter()
-        return Binding(
-            get: { formatter.date(from: textValues[id] ?? "") ?? .now },
-            set: { textValues[id] = formatter.string(from: $0) }
+        Binding(
+            get: { GenerativeUIFormDate.date(from: textValues[id] ?? "") ?? .now },
+            set: { textValues[id] = GenerativeUIFormDate.text(from: $0) }
         )
-    }
-
-    private static func formDate(_ text: String) -> Date? {
-        formDateFormatter().date(from: text)
-    }
-
-    private static func formDateFormatter() -> DateFormatter {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter
     }
 
     private func selected(_ option: String, in field: Field) -> Bool {

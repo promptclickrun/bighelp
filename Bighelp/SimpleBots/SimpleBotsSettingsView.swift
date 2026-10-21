@@ -170,7 +170,7 @@ struct SimpleBotsSettingsContext {
 }
 
 enum SimpleBotsSettingsPage: Hashable {
-    case you, appearance, notifications, apps
+    case you, appearance, notifications, apps, chat
 }
 
 /// Simple Bot mode's Settings: you, usage, apps, your primary bot's approvals
@@ -386,6 +386,12 @@ struct SimpleBotsSettingsView: View {
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("simple-bots.settings.notifications")
+            SimpleBotsDivider()
+            NavigationLink(value: SimpleBotsSettingsPage.chat) {
+                SimpleBotsRow(title: "Chat")
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("simple-bots.settings.chat")
             SimpleBotsDivider()
             NavigationLink(value: SimpleBotsSettingsPage.appearance) {
                 SimpleBotsRow(title: "Appearance", value: appearanceSummary)

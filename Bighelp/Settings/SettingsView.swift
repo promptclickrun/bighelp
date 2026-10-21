@@ -39,6 +39,8 @@ struct SettingsView: View {
     var composioApps: (@MainActor () -> ComposioAppsModel?)?
     /// Settings › Teamwork for the computer in use; nil hides the row.
     var teamwork: (@MainActor () -> TeamworkModel?)?
+    /// Every gateway, for Settings › System's Manage all gateways; nil hides that switch.
+    var fleet: SettingsFleetAccess?
     @State var teamworkModel: TeamworkModel?
     /// Shows just this page (Fleet settings links Appearance and Chat here, so there's one copy of each).
     private var openSection: SettingsMenuSection?
@@ -117,13 +119,15 @@ struct SettingsView: View {
         onOpenRoute: ((AppRoute) -> Void)? = nil,
         connectorApps: (@MainActor () -> ConnectorAppsModel?)? = nil,
         composioApps: (@MainActor () -> ComposioAppsModel?)? = nil,
-        teamwork: (@MainActor () -> TeamworkModel?)? = nil
+        teamwork: (@MainActor () -> TeamworkModel?)? = nil,
+        fleet: SettingsFleetAccess? = nil
     ) {
         self.onOpenWorkspaceDestination = onOpenWorkspaceDestination
         self.onOpenRoute = onOpenRoute
         self.connectorApps = connectorApps
         self.composioApps = composioApps
         self.teamwork = teamwork
+        self.fleet = fleet
         self.focusedDestination = focusedDestination
         _settings = Bindable(wrappedValue: settings)
         _userIdentity = Bindable(wrappedValue: userIdentity)
@@ -281,8 +285,9 @@ struct SettingsView: View {
     /// offline, so another can still be picked or added.
     @ViewBuilder
     private var systemPage: some View {
-        if let hostRegistry, hostRegistry.selectedHostID != nil {
-            SystemSettingsPage(registry: hostRegistry) {
+        if let hostRegistry {
+            SystemSettingsPage(registry: hostRegistry, managesAllGateways: $settings.systemManagesAllGateways,
+                               fleet: fleet) {
                 hostsPage
             } extras: {
                 if settings.nerdModeEnabled {
@@ -307,6 +312,10 @@ struct SettingsView: View {
     private var hostsPage: some View {
         let pluginUpdate = selectedHostPluginUpdate.flatMap { $0.state == .notInstalled ? nil : $0 }
         return settingsPage(title: SettingsMenuSection.connectivityAndNotifications.title) {
+            // Also while the computer in use is offline: the other gateways may still answer.
+            if fleet?.offersAllGateways == true {
+                SystemAllGatewaysSwitch(isOn: $settings.systemManagesAllGateways)
+            }
             if let hostRegistry {
                 BighelpConfiguredHostsSection(registry: hostRegistry)
                 if let pluginUpdate {
@@ -400,6 +409,8 @@ struct SettingsView: View {
             settingsDone(destination(for: .appearance))
         case .notifications:
             settingsDone(destination(for: .notifications))
+        case .chat:
+            settingsDone(destination(for: .chat))
         case .apps:
             if let composio = composioApps?() {
                 settingsDone(AppsHubView(native: connectorApps?() ?? nil, composio: composio))

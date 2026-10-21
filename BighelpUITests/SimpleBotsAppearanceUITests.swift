@@ -5,6 +5,25 @@ import XCTest
 /// bot's chat never shows ☰. Set BIGHELP_SIMPLE_BOTS_EVIDENCE (TEST_RUNNER_…) to a folder to save
 /// the screenshots.
 final class SimpleBotsAppearanceUITests: BighelpUITestCase {
+    /// Simple Bot mode's Settings opens Settings › Chat directly, the same page All Settings has.
+    @MainActor
+    func testSettingsOpensChatDirectly() throws {
+        let app = makeApp()
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
+                               "-bighelp.settings.simple-bots", "YES"]
+        app.launch()
+        XCTAssertTrue(app.buttons["simple-bots.settings"].waitForExistence(timeout: 15))
+        app.buttons["simple-bots.settings"].tap()
+        let chat = app.buttons["simple-bots.settings.chat"]
+        for _ in 0..<4 where !(chat.exists && chat.isHittable) { app.swipeUp() }
+        XCTAssertTrue(chat.isHittable, "Chat sits with Notifications and Appearance")
+        chat.tap()
+        XCTAssertTrue(app.navigationBars["Chat"].waitForExistence(timeout: 5), "Settings › Chat opens")
+        XCTAssertTrue(app.buttons["settings.landing.screen"].firstMatch.waitForExistence(timeout: 5),
+                      "Its own rows, as in All Settings")
+        save("simple-bots-chat-settings", app)
+    }
+
     @MainActor
     func testDarkModeRepaintsWhatIsOpen() throws {
         let app = makeApp()

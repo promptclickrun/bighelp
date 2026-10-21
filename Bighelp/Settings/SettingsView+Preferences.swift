@@ -323,6 +323,16 @@ extension SettingsView {
             }
             .accessibilityIdentifier("settings.chat.show-reasoning")
 
+            if settings.showReasoningByDefault {
+                Toggle(isOn: $settings.expandReasoningByDefault) {
+                    settingLabel(
+                        "Expand reasoning",
+                        detail: "Keep reasoning folders open while a turn runs."
+                    )
+                }
+                .accessibilityIdentifier("settings.chat.expand-reasoning")
+            }
+
             Toggle(isOn: $settings.showToolCallsByDefault) {
                 settingLabel(
                     "Show tool calls",
@@ -330,6 +340,16 @@ extension SettingsView {
                 )
             }
             .accessibilityIdentifier("settings.chat.show-tool-calls")
+
+            if settings.showToolCallsByDefault {
+                Toggle(isOn: $settings.expandToolCallsByDefault) {
+                    settingLabel(
+                        "Expand tool calls",
+                        detail: "Keep tool folder summaries open while a turn runs."
+                    )
+                }
+                .accessibilityIdentifier("settings.chat.expand-tool-calls")
+            }
         } header: {
             Text("Chat details")
         } footer: {

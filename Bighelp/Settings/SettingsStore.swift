@@ -1,6 +1,11 @@
 import Foundation
 import Observation
 
+enum ChatActiveTurnDisclosurePreferences {
+    static let expandReasoningKey = "loopdy.chat.expandReasoningByDefault"
+    static let expandToolCallsKey = "loopdy.chat.expandToolCallsByDefault"
+}
+
 private struct SessionSectionPreferenceCatalog: Codable {
     static let currentSchemaVersion = 1
 
@@ -138,6 +143,14 @@ final class SettingsStore {
 
     var showToolCallsByDefault: Bool {
         didSet { defaults.set(showToolCallsByDefault, forKey: Keys.showToolCallsByDefault) }
+    }
+
+    var expandReasoningByDefault: Bool {
+        didSet { defaults.set(expandReasoningByDefault, forKey: Keys.expandReasoningByDefault) }
+    }
+
+    var expandToolCallsByDefault: Bool {
+        didSet { defaults.set(expandToolCallsByDefault, forKey: Keys.expandToolCallsByDefault) }
     }
 
     var chatActivityVisibility: ChatActivityVisibility {
@@ -366,6 +379,14 @@ final class SettingsStore {
         showToolCallsByDefault = defaults.bool(
             forKey: Keys.showToolCallsByDefault,
             default: ChatActivityVisibility.default.showToolCalls
+        )
+        expandReasoningByDefault = defaults.bool(
+            forKey: Keys.expandReasoningByDefault,
+            default: false
+        )
+        expandToolCallsByDefault = defaults.bool(
+            forKey: Keys.expandToolCallsByDefault,
+            default: false
         )
         if defaults.object(forKey: Keys.interfaceVersion) != nil
             || defaults.object(forKey: Keys.uiV2Enabled) != nil {
@@ -724,6 +745,8 @@ private extension SettingsStore {
         static let notifications = "loopdy.demo.notifications"
         static let showReasoningByDefault = "loopdy.chat.showReasoningByDefault"
         static let showToolCallsByDefault = "loopdy.chat.showToolCallsByDefault"
+        static let expandReasoningByDefault = ChatActiveTurnDisclosurePreferences.expandReasoningKey
+        static let expandToolCallsByDefault = ChatActiveTurnDisclosurePreferences.expandToolCallsKey
         static let reflectiveVision = "loopdy.appearance.reflectiveVision"
         static let leftEdgeSwipeAction = "loopdy.workspace.leftEdgeSwipeAction"
         static let rightEdgeSwipeAction = "loopdy.workspace.rightEdgeSwipeAction"

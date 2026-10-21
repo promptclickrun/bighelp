@@ -19,6 +19,37 @@ final class ChatActivityDisclosureStore {
     /// Bumped by every choice, so the chat's rows can be kept until one changes.
     private(set) var revision: UInt64 = 0
 
+    private var activeTurnID: String?
+    private var isActiveTurn = false
+    private var expandReasoningDuringActiveTurn = false
+    private var expandToolCallsDuringActiveTurn = false
+    private var showsReasoning = true
+    private var showsToolCalls = true
+
+    func configureActiveTurn(
+        isSending: Bool,
+        turnID: String?,
+        expandReasoning: Bool = false,
+        expandToolCalls: Bool = false,
+        showReasoning: Bool = true,
+        showToolCalls: Bool = true
+    ) {
+        let changed = self.isActiveTurn != isSending
+            || activeTurnID != turnID
+            || expandReasoningDuringActiveTurn != expandReasoning
+            || expandToolCallsDuringActiveTurn != expandToolCalls
+            || showsReasoning != showReasoning
+            || showsToolCalls != showToolCalls
+        guard changed else { return }
+        isActiveTurn = isSending
+        activeTurnID = turnID
+        expandReasoningDuringActiveTurn = expandReasoning
+        expandToolCallsDuringActiveTurn = expandToolCalls
+        showsReasoning = showReasoning
+        showsToolCalls = showToolCalls
+        revision &+= 1
+    }
+
     func isCompletedTurnExpanded(_ id: String) -> Bool {
         completedTurnChoices[id] ?? false
     }
@@ -66,6 +97,10 @@ final class ChatActivityDisclosureStore {
         let choices = events.compactMap { eventChoices[key(for: $0)] }
         if choices.contains(true) { return true }
         if choices.contains(false) { return false }
+        if isActiveTurn, showsReasoning, expandReasoningDuringActiveTurn,
+           events.contains(where: { activeTurnID == $0.turnID }) {
+            return true
+        }
         return events.contains { $0.lifecycle == .running }
     }
 
@@ -82,6 +117,10 @@ final class ChatActivityDisclosureStore {
         // Event-keyed choices survive segment regrouping and canonical event-ID changes.
         if choices.contains(true) { return true }
         if choices.contains(false) { return false }
+        if isActiveTurn, showsToolCalls, expandToolCallsDuringActiveTurn,
+           (isLive || turn.events.contains(where: { activeTurnID == $0.turnID })) {
+            return true
+        }
         return isLive || turn.events.contains { isExpanded($0) }
     }
 

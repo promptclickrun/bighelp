@@ -10,6 +10,79 @@ struct ChatActivityDisclosureTests {
                           arguments: "{\"command\":\"pwd\"}", result: lifecycle == .running ? nil : "complete")
     }
 
+    private func reasoning(_ id: String, turnID: String, lifecycle: ChatActivityLifecycle = .running) -> ChatActivityEvent {
+        ChatActivityEvent(eventID: id, sessionID: "session", turnID: turnID, kind: .reasoning,
+                          lifecycle: lifecycle, title: "Thinking", summary: nil, detail: "Thought \(id)",
+                          occurredAt: 1)
+    }
+
+    @Test func activeTurnDefaultsExpandParentFoldersButNotIndividualTools() {
+        let store = ChatActivityDisclosureStore()
+        store.configureActiveTurn(isSending: true, turnID: "active-turn",
+                                  expandReasoning: true, expandToolCalls: true)
+
+        let activeReasoning = reasoning("active-reasoning", turnID: "active-turn", lifecycle: .succeeded)
+        let earlierReasoning = reasoning("earlier-reasoning", turnID: "earlier-turn", lifecycle: .succeeded)
+        #expect(store.isExpanded(reasoning: [activeReasoning]))
+        #expect(!store.isExpanded(reasoning: [earlierReasoning]))
+
+        let liveTool = event("active-tool", lifecycle: .succeeded)
+        let activeTool = ChatActivityEvent(eventID: liveTool.eventID, sessionID: liveTool.sessionID,
+                                           turnID: "active-turn", kind: .tool, lifecycle: .succeeded,
+                                           title: liveTool.title, summary: nil, detail: nil,
+                                           occurredAt: liveTool.occurredAt, toolCallID: liveTool.toolCallID,
+                                           toolName: liveTool.toolName, arguments: liveTool.arguments,
+                                           result: liveTool.result)
+        let trail = ChatActivityTurn(id: "active-trail", events: [activeTool])
+        #expect(store.isExpanded(trail, isLive: false))
+        #expect(!store.isExpanded(activeTool), "The parent setting does not open individual tool details")
+
+        let earlierTool = ChatActivityEvent(eventID: "earlier-tool", sessionID: "session",
+                                            turnID: "earlier-turn", kind: .tool, lifecycle: .succeeded,
+                                            title: "Tool", summary: nil, detail: nil, occurredAt: 1,
+                                            toolCallID: "earlier-call", toolName: "terminal")
+        let earlierTrail = ChatActivityTurn(id: "earlier-trail", events: [earlierTool])
+        #expect(!store.isExpanded(earlierTrail, isLive: false))
+    }
+
+    @Test func activeTurnDefaultsPreserveManualOverridesAndCompletion() {
+        let store = ChatActivityDisclosureStore()
+        store.configureActiveTurn(isSending: true, turnID: "active-turn",
+                                  expandReasoning: true, expandToolCalls: true)
+
+        let reasoningEvent = reasoning("manual-reasoning", turnID: "active-turn")
+        store.setExpanded(false, reasoning: [reasoningEvent])
+        #expect(!store.isExpanded(reasoning: [reasoningEvent]))
+
+        let tool = ChatActivityEvent(eventID: "manual-tool", sessionID: "session",
+                                     turnID: "active-turn", kind: .tool, lifecycle: .running,
+                                     title: "Tool", summary: nil, detail: nil, occurredAt: 1,
+                                     toolCallID: "manual-call", toolName: "terminal")
+        let trail = ChatActivityTurn(id: "manual-trail", events: [tool])
+        store.setExpanded(false, for: trail)
+        #expect(!store.isExpanded(trail, isLive: true))
+
+        store.configureActiveTurn(isSending: false, turnID: nil,
+                                  expandReasoning: true, expandToolCalls: true)
+        #expect(!store.isExpanded(trail, isLive: false))
+        #expect(!store.isExpanded(reasoning: [reasoning("finished-reasoning", turnID: "active-turn",
+                                                        lifecycle: .succeeded)]))
+
+        let simpleBotReasoning = ChatInterimReasoning(
+            id: "simple-bot-active", agentName: "Avery", entries: [], isLive: true
+        )
+        let simpleBotStore = ChatActivityDisclosureStore()
+        simpleBotStore.configureActiveTurn(isSending: true, turnID: "active-turn",
+                                           expandReasoning: true, expandToolCalls: false)
+        #expect(simpleBotStore.isExpanded(simpleBotReasoning))
+        simpleBotStore.setExpanded(false, for: simpleBotReasoning)
+        #expect(!simpleBotStore.isExpanded(simpleBotReasoning))
+        let finishedSimpleBotReasoning = ChatInterimReasoning(
+            id: "simple-bot-finished", agentName: "Avery", entries: [], isLive: false
+        )
+        #expect(!simpleBotStore.isExpanded(finishedSimpleBotReasoning))
+    }
+
     @Test func explicitChoiceSurvivesLifecycleAndCanonicalEventReplacement() {
         let store = ChatActivityDisclosureStore()
         let running = event()

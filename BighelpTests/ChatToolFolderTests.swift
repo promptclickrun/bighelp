@@ -71,6 +71,35 @@ struct ChatToolFolderTests {
         #expect(!store.isExpanded(grown, isLive: true), "…and as more calls arrive")
     }
 
+    @Test func activeToolSettingOpensParentWithoutOpeningIndividualCalls() {
+        let store = ChatActivityDisclosureStore()
+        store.configureActiveTurn(
+            isSending: true,
+            turnID: "active-turn",
+            expandReasoning: true,
+            expandToolCalls: true
+        )
+        let parentTool = ChatActivityEvent(
+            eventID: "active-parent", sessionID: "session", turnID: "active-turn",
+            kind: .tool, lifecycle: .running, title: "Read file", summary: nil, detail: nil,
+            occurredAt: 1, toolCallID: "active-call", toolName: "read_file",
+            arguments: #"{"path":"notes.md"}"#, result: nil
+        )
+        let trail = ChatActivityTurn(id: "active-trail", events: [parentTool])
+        let rows = ChatCanvasTranscriptProjection.rows(
+            from: [.entry(.activity(trail))],
+            disclosures: store,
+            isSending: true
+        )
+        #expect(rows.contains { if case .workTrailHeader(let projected, let isLive) = $0 {
+            projected.id == trail.id && isLive
+        } else { false } })
+        #expect(rows.contains { if case .activityDetail(let event) = $0 {
+            event.eventID == parentTool.eventID
+        } else { false } }, "The parent folder shows its summary rows")
+        #expect(!store.isExpanded(parentTool), "Terminal input/output stays collapsed")
+    }
+
     // MARK: The live tail
 
     @Test func onlyTheFolderAtTheTailOfARunningTurnIsLive() {

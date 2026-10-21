@@ -22,6 +22,8 @@ final class ChatTranscriptCanvasCache {
         let isSimpleBots: Bool
         let visibility: ChatActivityVisibility
         let agentName: String
+        let expandReasoningDuringActiveTurn: Bool
+        let expandToolCallsDuringActiveTurn: Bool
     }
 
     struct Canvas {

@@ -53,7 +53,9 @@ extension ChatView {
             transcriptRevision: model.transcriptRevision, ledgerRevision: model.activityLedgerRevision,
             disclosureRevision: model.activityDisclosures.revision, isSending: model.isSending,
             isBotMode: model.isBotMode, foldsCompletedTurns: foldCompletedTurns,
-            isSimpleBots: homeChrome.isSimpleBots, visibility: model.activityVisibility, agentName: agentName)
+            isSimpleBots: homeChrome.isSimpleBots, visibility: model.activityVisibility, agentName: agentName,
+            expandReasoningDuringActiveTurn: expandReasoningByDefault,
+            expandToolCallsDuringActiveTurn: expandToolCallsByDefault)
         return model.transcriptCanvas.canvas(for: key) {
             ChatPerformanceProbe.measure("chat.projection") {
                 model.transcriptCanvas.buildCanvas(from: model.transcriptEntries,

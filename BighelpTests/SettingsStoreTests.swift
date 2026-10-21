@@ -6,6 +6,24 @@ import UIKit
 
 @MainActor
 struct SettingsStoreTests {
+    @Test func activeTurnExpansionPreferencesPersistAndDefaultOff() {
+        let suiteName = #function
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let initial = SettingsStore(defaults: defaults)
+        #expect(!initial.expandReasoningByDefault)
+        #expect(!initial.expandToolCallsByDefault)
+
+        initial.expandReasoningByDefault = true
+        initial.expandToolCallsByDefault = true
+
+        let restored = SettingsStore(defaults: defaults)
+        #expect(restored.expandReasoningByDefault)
+        #expect(restored.expandToolCallsByDefault)
+    }
+
     @Test func everyStoredLegacyInterfaceUsesV3WithoutChangingAppearanceBytes() throws {
         for version in ["v1", "v2", "v3", "future-version"] {
             let name = "ui-release-migration-\(UUID().uuidString)"

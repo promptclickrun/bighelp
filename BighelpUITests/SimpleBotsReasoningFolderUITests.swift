@@ -10,6 +10,7 @@ final class SimpleBotsReasoningFolderUITests: BighelpUITestCase {
             app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
                                    "-bighelp.settings.simple-bots", "YES", "-loopdy.demo.appearance", appearance,
                                    "-loopdy.chat.showReasoningByDefault", "YES",
+                                   "-loopdy.chat.expandReasoningByDefault", "YES",
                                    "-test-tool-stream", "-test-tool-stream-two-turns", "-test-tool-stream-slow"]
             app.launch()
             XCTAssertTrue(app.buttons["simple-bots.primary"].waitForExistence(timeout: 15))

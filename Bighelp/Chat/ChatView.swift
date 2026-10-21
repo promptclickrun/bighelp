@@ -197,6 +197,10 @@ struct ChatView: View {
     @AppStorage(ChatLayoutPreferences.densityKey) var chatDensity: ChatDensity = .comfortable
     @AppStorage(ChatLayoutPreferences.showsSessionTitleKey)
     private var showsSessionTitle = ChatLayoutPreferences.showsSessionTitleByDefault
+    @AppStorage(ChatActiveTurnDisclosurePreferences.expandReasoningKey)
+    var expandReasoningByDefault = false
+    @AppStorage(ChatActiveTurnDisclosurePreferences.expandToolCallsKey)
+    var expandToolCallsByDefault = false
     @State var composerHeight: CGFloat = 0
 
     init(
@@ -279,6 +283,42 @@ struct ChatView: View {
 
     @Environment(\.nerdModeEnabled) private var nerdModeEnabled
 
+    private var activeActivityTurnID: String? {
+        guard model.isSending else { return nil }
+        if let nativeTurnID = model.nativeTurnID?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !nativeTurnID.isEmpty {
+            return nativeTurnID
+        }
+        // A Send with no adopted native turn yet: the activity after the latest human
+        // message, read from the end so a long chat stays cheap. Never borrow an older turn.
+        var turnID: String?
+        for entry in model.transcriptEntries.reversed() {
+            switch entry {
+            case .message(let item) where item.role == .human:
+                return turnID
+            case .activity(let turn):
+                if let id = turn.events.last?.turnID.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !id.isEmpty {
+                    turnID = id
+                }
+            default:
+                break
+            }
+        }
+        return nil
+    }
+
+    private func configureActiveTurnDisclosures() {
+        model.activityDisclosures.configureActiveTurn(
+            isSending: model.isSending,
+            turnID: activeActivityTurnID,
+            expandReasoning: expandReasoningByDefault,
+            expandToolCalls: expandToolCallsByDefault,
+            showReasoning: model.activityVisibility.showReasoning,
+            showToolCalls: model.activityVisibility.showToolCalls
+        )
+    }
+
     var body: some View {
         let _ = ChatPerformanceProbe.count("chat.body")
         let _ = model.botModeRoomStore?.rooms
@@ -313,6 +353,22 @@ struct ChatView: View {
             BighelpVisibleChats.shared.appeared(model)
             ChatPDFPagesDraftRegistry.mount(model)
             model.nativeSessionResumeProgress.mount()
+            configureActiveTurnDisclosures()
+        }
+        .onChange(of: model.isSending, initial: true) { _, _ in
+            configureActiveTurnDisclosures()
+        }
+        .onChange(of: activeActivityTurnID, initial: true) { _, _ in
+            configureActiveTurnDisclosures()
+        }
+        .onChange(of: expandReasoningByDefault) { _, _ in
+            configureActiveTurnDisclosures()
+        }
+        .onChange(of: expandToolCallsByDefault) { _, _ in
+            configureActiveTurnDisclosures()
+        }
+        .onChange(of: model.activityVisibility, initial: true) { _, _ in
+            configureActiveTurnDisclosures()
         }
         // The message box's model chip: every model is on the one Model & reasoning screen.
         .onChange(of: allModelsRequest) { _, request in

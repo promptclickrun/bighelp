@@ -47,6 +47,41 @@ struct LocalizationTests {
         }
     }
 
+    @Test func simpleBotModeTeamworkAndTheirSettingsHaveChinese() throws {
+        let chinese = try bundle("zh-Hans")
+        let english = try bundle("en")
+        let expected = [
+            ("Search bots", "搜索机器人"), ("Mark Unread", "标为未读"), ("Make Primary Bot", "设为主机器人"),
+            ("Rearrange", "重新排列"), ("Instructions", "指令"), ("Default Model", "默认模型"),
+            ("Routines", "例行任务"), ("Teamwork", "团队协作"), ("Agents messaging each other", "智能体之间的消息"),
+            ("Quiet Hours", "勿扰时段"), ("Chat layout", "聊天布局"), ("Multi-gateway", "多网关"),
+        ]
+        for (key, value) in expected {
+            #expect(chinese.localizedString(forKey: key, value: nil, table: nil) == value)
+            #expect(english.localizedString(forKey: key, value: nil, table: nil) == key)
+        }
+    }
+
+    @Test func teamworkLineKeepsNamesAndCountsInBothLanguages() throws {
+        let chinese = try bundle("zh-Hans")
+        let english = try bundle("en")
+        let zh = Locale(identifier: "zh-Hans")
+        let en = Locale(identifier: "en")
+        // Names are data: one that matches a catalog key still shows as written.
+        let name = "Settings / 海风"
+        #expect(String(localized: "Asked \(name)", bundle: chinese, locale: zh) == "已询问Settings / 海风")
+        #expect(String(localized: "Asked \(name)", bundle: english, locale: en) == "Asked Settings / 海风")
+        #expect(String(localized: "\(name) answered", bundle: chinese, locale: zh) == "Settings / 海风已回答")
+        let names = String(localized: "\("Mina Shah") and \(name)", bundle: chinese, locale: zh)
+        #expect(names == "Mina Shah和Settings / 海风")
+        for count in [1, 2, 4] {
+            #expect(String(localized: "\(count) messages with \(name)", bundle: english, locale: en)
+                    == (count == 1 ? "1 message with \(name)" : "\(count) messages with \(name)"))
+            #expect(String(localized: "\(count) messages with \(names)", bundle: chinese, locale: zh)
+                    == "与Mina Shah和Settings / 海风交流了 \(count) 条消息")
+        }
+    }
+
     @Test func localizedDisplayNamesDoNotChangeSavedNavigationOrSendBehavior() throws {
         let layout = BighelpAppLayout(pinned: [.agents, .feed], menuOrder: [.settings])
         let saved = try #require(layout.saved)

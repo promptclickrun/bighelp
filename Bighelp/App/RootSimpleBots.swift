@@ -174,7 +174,9 @@ extension RootShellView {
                 pinned += agents.pinnedAgentIDs.map { FleetID.make(host.id, $0) }
             } else {
                 for agent in fleet.agents(on: host.id) {
-                    bots.append(SimpleBotsBot(agent, imageURL: fleet.avatars.url(for: agent.avatarFile)))
+                    var bot = SimpleBotsBot(agent, imageURL: fleet.avatars.url(for: agent.avatarFile))
+                    bot.isOnGatewayInUse = host.id == selected
+                    bots.append(bot)
                     if let chat = fleet.latestChat(for: agent) {
                         latest[agent.id] = SimpleBotsLatest(preview: chat.preview, date: chat.updatedAt)
                     }

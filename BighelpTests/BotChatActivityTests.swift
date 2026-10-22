@@ -237,7 +237,7 @@ private final class Gateway {
 @MainActor
 private final class ScriptedReader: BotChatActivityReading {
     var next: [String: BotChatActivity]? = [:]
-    var onRead: (() -> Void)?
+    var onRead: (@MainActor () -> Void)?
     private(set) var reads = 0
 
     func activity(agentIDs: [String]) async -> [String: BotChatActivity]? {

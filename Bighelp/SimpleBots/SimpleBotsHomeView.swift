@@ -67,8 +67,13 @@ struct SimpleBotsBot: Identifiable, Equatable {
     /// On another gateway: the all-hosts copy, which Pin and Hide go through.
     var fleetAgent: FleetAgent? = nil
 
+    /// On the gateway in use, though shown from its all-hosts copy until its agents are known.
+    var isOnGatewayInUse = false
+
     /// Where its Bot Chat's state is kept: by profile on the gateway in use, by `FleetID` on another.
-    var activityKey: String { fleetAgent == nil ? BotChatActivityStore.liveKey(profileID) : id }
+    var activityKey: String {
+        fleetAgent == nil || isOnGatewayInUse ? BotChatActivityStore.liveKey(profileID) : id
+    }
 
     /// Its face's characters and marks on this device are kept per gateway (`CompanionSurfaceScope`).
     var faceScope: String? {

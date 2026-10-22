@@ -117,6 +117,17 @@ so a local and a peer `default` never share a voice).
 - Reopening or reconnecting replays durable history and reconciles running state.
   Screen dismissal and task cancellation do not stop Hermes work. Only the
   explicit Stop action sends `groups.stop`.
+- Stop saves its `cancel_id` with the room before it asks. Hermes writes one
+  `room.stop_requested` event per cancel ID (its `payload.cancel_id`; a repeat
+  returns the same event), and each new one ends every earlier message in the
+  room. So the saved ID stays until Hermes answers or the room log shows that
+  event, and Stop again reuses it. Stop again reads the log first and doesn't
+  ask when the stop is already there; a repeat would also cancel newer work.
+  Any answer to `groups.stop` is success: fields the app doesn't use are
+  ignored. The room shows a stop it couldn't confirm with one action, Stop
+  again. A saved ID never holds Send: the next message reads the log first,
+  and a stop that isn't there never reached Hermes. Only a stop still on its
+  way holds Send. Reconnecting reads the log for every room with a saved ID.
 - Show exact hosted-room approval requests from `driver_status.pending_actions`.
   Resolve only that task, execution generation and request through
   `groups.approve`, using Allow Once or Deny. Ordinary device approvals are a

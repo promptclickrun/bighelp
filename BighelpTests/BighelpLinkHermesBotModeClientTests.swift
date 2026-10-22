@@ -202,6 +202,26 @@ struct BighelpLinkHermesBotModeClientTests {
         currentOwner = nil
     }
 
+    /// Any answer to `groups.stop` means Hermes stopped the room. A field the
+    /// app doesn't use must not turn that into a failed stop (#517).
+    @Test(arguments: [
+        ["cancelled": BighelpJSONValue.integer(2), "cancel_id": .string("cancel-1")],
+        ["cancelled": .integer(0), "event_id": .string("room-stop:0123"), "stop_seq": .integer(64)],
+    ])
+    func groupsStopAcceptsAnAnswerWithFieldsItDoesNotUse(answer: [String: BighelpJSONValue]) async throws {
+        let owner = BighelpLinkHermesBotModeOwner(accountID: "account-1", hostID: "host-1", connectionID: "connection-1")
+        let messaging = HermesBotModeMessagingStub { request in
+            #expect(request.operation == .groupsStop)
+            return try Self.result(for: request, payload: answer)
+        }
+        let client = BighelpLinkHermesBotModeClient(workspace: BighelpLinkWorkspaceClient(messaging: messaging),
+                                                  owner: owner, currentOwner: { owner })
+
+        try await client.groupsStop(roomID: "room-1", cancelID: "cancel-1")
+
+        #expect(messaging.requests.count == 1)
+    }
+
     @Test
     func groupsClientDiscardsResultWhenAccountHostOrConnectionChangesDuringRequest() async throws {
         let owner = BighelpLinkHermesBotModeOwner(

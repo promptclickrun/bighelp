@@ -30,9 +30,9 @@ extension ChatModel {
     /// Hermes queues a message sent while members work behind the room's
     /// drive, so a running hosted room still takes new messages.
     var acceptsBotModeFollowUp: Bool {
-        guard !referenceOwnerRetired, !isStopping, let room = botModeRoom, room.isNativeWorking,
+        guard !referenceOwnerRetired, !isBotModeStopInFlight, let room = botModeRoom, room.isNativeWorking,
               botModeRoomStore?.nativeClient != nil, botModeExecutionEnabled,
-              room.nativePendingCancelID == nil, room.nativeRetryJournal == nil,
+              room.nativeRetryJournal == nil,
               room.nativeFollowUps.count < HermesBotModeFollowUp.maximumPending else { return false }
         return true
     }
@@ -154,9 +154,41 @@ extension ChatModel {
         if botModeRoom?.nativeRetryJournal?.awaitingReceipt.isEmpty == false {
             return "Hermes has not confirmed a retry. Refresh this room's status or explicitly stop it before sending again."
         }
-        if botModeRoom?.nativePendingCancelID != nil {
-            return "The stop request is unconfirmed. Check this room before continuing."
-        }
+        return nil
+    }
+
+    /// This chat's Stop, or another screen's for the same room, is waiting
+    /// for Hermes' answer.
+    var isBotModeStopInFlight: Bool {
+        guard let botModeRoomID else { return false }
+        return isStopping || botModeRoomStore?.nativeStopsInFlight.contains(botModeRoomID) == true
+    }
+
+    /// Stop was pressed but Hermes' answer was lost, so the room shows one
+    /// action: Stop again, with the same cancel ID. Hidden while the first
+    /// press is still on its way.
+    var showsUnconfirmedBotModeStop: Bool {
+        botModeRoom?.nativePendingCancelID != nil && (!isBotModeStopInFlight || isStoppingBotModeAgain)
+    }
+
+    /// Stop again from the unconfirmed-stop row. It stops the same way, and
+    /// the row keeps showing while it does.
+    func stopBotModeAgain() async {
+        guard showsUnconfirmedBotModeStop, !isStoppingBotModeAgain else { return }
+        isStoppingBotModeAgain = true
+        defer { isStoppingBotModeAgain = false }
+        await stop()
+    }
+
+    /// Why the room can't take the draft now, mirroring `canSend`'s room gates.
+    var botModeSendUnavailableReason: String? {
+        if isBotModeStopInFlight { return "the room is stopping" }
+        if !botModeExecutionEnabled { return "this room can't run on this connection" }
+        if botModeRoom?.nativeRetryJournal != nil { return "a retry is still being confirmed" }
+        if acceptsBotModeFollowUp || !orderedDraftAttachments.isEmpty { return nil }
+        if botModeRoom?.isRunning == true { return "the agents are still replying" }
+        if botModeRoom?.nativePendingEventID != nil { return "a message is still being sent" }
+        if hasNativeBotModeRetryActions { return "interrupted work is waiting for your decision" }
         return nil
     }
 

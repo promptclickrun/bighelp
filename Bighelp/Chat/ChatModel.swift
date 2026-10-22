@@ -134,6 +134,8 @@ final class ChatModel {
         }
     }
     var isStopping = false
+    /// Stop again from a group chat's unconfirmed-stop row is on its way.
+    var isStoppingBotModeAgain = false
     var pendingMidSessionSubmissions: [PendingMidSessionSubmission] = []
     var failureMessage: String?
     /// The last turn Hermes reported failed, with its fixes, until another turn starts.
@@ -461,7 +463,9 @@ final class ChatModel {
             guard botModeRoom?.isRunning != true else { return false }
             guard botModeRoom?.nativePendingEventID == nil, !hasNativeBotModeRetryActions else { return false }
         }
-        guard botModeRoom?.nativeRetryJournal == nil, botModeRoom?.nativePendingCancelID == nil else { return false }
+        // A stop whose answer was lost doesn't hold the room: the next
+        // message settles it first. Only a stop on its way does.
+        guard botModeRoom?.nativeRetryJournal == nil, !isBotModeStopInFlight else { return false }
         guard !richDraftRecovery.hasUnexportedChanges else { return false }
         let hasText = !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let attachmentsSupported = orderedDraftAttachments.isEmpty || (!isBotMode && orderedDraftAttachments.allSatisfy { value in
@@ -499,6 +503,7 @@ final class ChatModel {
         if orderedDraftAttachments.isEmpty && draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return nil
         }
+        if isBotMode, let reason = botModeSendUnavailableReason { return reason }
         if isSending { return "the agent is still replying" }
         return "this attachment can't be sent here"
     }

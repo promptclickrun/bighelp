@@ -332,17 +332,13 @@ final class BighelpLinkHermesBotModeClient: HermesBotModeCatalogClient, HermesBo
     func groupsStop(roomID: String, cancelID: String) async throws {
         try requireNonEmpty(roomID)
         try requireNonEmpty(cancelID)
+        // Any answer means Hermes stopped the room; the app doesn't use the
+        // count, so a field it doesn't know never turns a stop into a failure.
         _ = try await owned {
-            let payload = try await workspace.perform(.groupsStop, payload: [
+            try await workspace.perform(.groupsStop, payload: [
                 "room_id": .string(roomID),
                 "cancel_id": .string(cancelID),
             ])
-            guard Set(payload.keys) == Set(["cancelled"]),
-                  let cancelled = payload["cancelled"]?.integer,
-                  cancelled >= 0 else {
-                throw BighelpLinkWorkspaceClientError.invalidResponse
-            }
-            return payload
         }
     }
 

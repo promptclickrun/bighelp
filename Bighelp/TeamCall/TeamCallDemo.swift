@@ -89,6 +89,10 @@ final class TeamCallDemoInput: VoiceInputLevelSource {
 @MainActor
 final class TeamCallDemoGroupsClient: HermesBotModeCatalogClient {
     static let launchArgument = "-preview-team-call"
+    /// The first message's answers wait until the room is stopped, and the
+    /// first Stop's answer is lost before it reaches the room, so the chat
+    /// shows Stop again.
+    static let losesFirstStopArgument = "-preview-group-stop-lost"
     static let roomID = "team-call-demo"
     private static let gatewayID = "fixture-gateway"
     private static let members: [(profile: String, handle: String, name: String)] = [
@@ -111,8 +115,12 @@ final class TeamCallDemoGroupsClient: HermesBotModeCatalogClient {
     private var scheduled: [HermesBotModeEvent] = []
     private var round = 0
     private var nextSequence: Int { (events.last?.sequence ?? 0) + 1 }
+    private var holdsAnswersUntilStopped: Bool
+    private var losesNextStop: Bool
 
-    init() {
+    init(losesFirstStop: Bool = false) {
+        holdsAnswersUntilStopped = losesFirstStop
+        losesNextStop = losesFirstStop
         events = []
         events = [
             event(kind: "message.user", text: "Let's plan a relaxed Saturday for all of us.", member: nil, sequence: 1),
@@ -143,7 +151,7 @@ final class TeamCallDemoGroupsClient: HermesBotModeCatalogClient {
     func groupsLog(roomID: String, sinceSequence: Int, limit: Int, includeDisbanded: Bool) async throws -> HermesBotModeLogPage {
         guard roomID == Self.roomID else { throw BotModeRoomError.roomNotFound }
         // Members finish one at a time: each read lets the next answer land.
-        if !scheduled.isEmpty { events.append(scheduled.removeFirst()) }
+        if !scheduled.isEmpty, !holdsAnswersUntilStopped { events.append(scheduled.removeFirst()) }
         let page = Array(events.filter { $0.sequence > sinceSequence }.prefix(limit))
         let latest = events.last?.sequence ?? 0
         return .init(events: page, cursor: page.last?.sequence ?? max(sinceSequence, 0), latestSequence: latest,
@@ -182,8 +190,23 @@ final class TeamCallDemoGroupsClient: HermesBotModeCatalogClient {
         throw BotModeRoomError.executionUnavailable
     }
 
+    /// Like Hermes: one `room.stop_requested` per cancel ID, then the
+    /// members' work ends.
     func groupsStop(roomID: String, cancelID: String) async throws {
+        guard roomID == Self.roomID else { throw BotModeRoomError.roomNotFound }
+        if losesNextStop {
+            losesNextStop = false
+            throw WorkspaceClientError.transportUnavailable
+        }
+        holdsAnswersUntilStopped = false
         scheduled.removeAll()
+        guard !events.contains(where: { $0.kind == "room.stop_requested" && $0.payload["cancel_id"]?.string == cancelID })
+        else { return }
+        events.append(HermesBotModeEvent(
+            roomID: Self.roomID, sequence: nextSequence, eventID: "demo-stop-\(nextSequence)",
+            kind: "room.stop_requested", actor: ["kind": .string("gateway"), "id": .string(Self.gatewayID)],
+            authorityEpoch: 1, payload: ["cancel_id": .string(cancelID)], createdAt: Date().timeIntervalSince1970
+        ))
     }
 
     func groupsRetry(roomID: String, taskID: String) async throws -> HermesBotModeRetryResult {

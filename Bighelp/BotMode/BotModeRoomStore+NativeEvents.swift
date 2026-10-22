@@ -23,12 +23,20 @@ extension BotModeRoomStore {
         var supersededByNewerMessage = false
         var failures = room.memberFailures
         var changed = false
+        // Hermes logs this phone's stop even when its answer was lost. Every
+        // message before it is over, so later events in this page are no
+        // longer this turn's (a cancelled member isn't a failure).
+        var stopConfirmed = false
         for event in events.sorted(by: { $0.sequence < $1.sequence }) {
             if let rename = room.nativePendingRename,
                event.eventID == rename.eventID, event.kind == "room.renamed",
                event.payload["name"]?.string == rename.name {
                 room.setNativeRenameIntent(nil)
                 changed = true
+            }
+            if event.kind == "room.stop_requested", let cancelID = room.nativePendingCancelID,
+               event.payload["cancel_id"]?.string == cancelID {
+                stopConfirmed = true
             }
             if ["turn.settled", "turn.failed", "turn.cancelled", "turn.deferred"].contains(event.kind),
                let taskID = event.taskID, let generation = event.executionGeneration {
@@ -60,7 +68,9 @@ extension BotModeRoomStore {
                 false
             }
             let belongsToCurrentDiscussion: Bool
-            if expectedRetryReceipts != nil {
+            if stopConfirmed {
+                belongsToCurrentDiscussion = false
+            } else if expectedRetryReceipts != nil {
                 belongsToCurrentDiscussion = matchesRetryReceipt
             } else {
                 belongsToCurrentDiscussion = discussionEventID != nil
@@ -69,7 +79,7 @@ extension BotModeRoomStore {
             }
             // A message sent while the room worked is its own discussion,
             // queued behind this one; its failures count like this turn's.
-            let belongsToFollowUp = expectedRetryReceipts == nil
+            let belongsToFollowUp = !stopConfirmed && expectedRetryReceipts == nil
                 && event.discussionEventID.map { id in
                     room.nativeFollowUps.contains { $0.discussionEventID == id }
                 } == true
@@ -192,6 +202,11 @@ extension BotModeRoomStore {
                 }
             }
         }
+        if stopConfirmed {
+            room.settleNativeStop()
+            complete = true
+            changed = true
+        }
         if failures != room.memberFailures { changed = true }
         room.replaceFailures(with: failures)
         if room.nativeLogCursor < cursor { changed = true }
@@ -204,6 +219,10 @@ extension BotModeRoomStore {
             expectedOwner: expectedOwner
         ) else { throw BotModeRoomError.persistenceConflict }
         replaceStored(saved)
+        if stopConfirmed {
+            nativePendingRetryTaskIDsByRoom.removeValue(forKey: roomID)
+            nativeDriverWorkingByRoom.removeValue(forKey: roomID)
+        }
         return complete
     }
 }

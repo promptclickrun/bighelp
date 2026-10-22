@@ -3,6 +3,36 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.10
+
+### Group chats
+
+- **Stop:** if bighelp cannot confirm a Stop, the group chat no longer blocks **Send**. The chat shows **Stop again**.
+  bighelp sends the same stop again and reads the room log to confirm it. Before, the chat stayed blocked, also
+  after you closed and opened bighelp again.
+- **Hermes 0.22.4:** group chats work on computers with Hermes 0.22.4.
+- **Discard:** if a member task stops when the computer restarts, the member row shows **Discard**. Then the member
+  answers again.
+- **Who is typing:** on Hermes 0.22.4, the chat shows the names of the members that type. This needs bighelp plugin
+  3.28.0 or later.
+
+### Simple Bot mode
+
+- **Working:** each bot shows when it works on a turn, and **Needs you** when it waits for your approval. This also
+  shows when another agent asks the bot for help. This needs bighelp plugin 3.28.0 or later.
+
+### Fixes
+
+- **Chat box:** the chat box no longer shakes while you type a long message. Thank you, @sachsom95.
+- **Form cards:** forms with limits on a field show correctly. Before, they showed "This card couldn't be shown".
+  Date fields show and send the day that you see. Thank you, @sachsom95.
+- **Files:** in Bighelp Chat, **Files** shows the files of the agent that you selected. Before, it showed the files
+  of your default agent. Thank you, @jochenvoehringer.
+- **Notifications:** on iPhone and iPad, notification setup no longer stops when iOS asks for permission. If setup
+  stops for a different reason, it shows a code.
+
+Update the plugin in bighelp to get all of these features.
+
 ## 2.6.9
 
 ### Notifications

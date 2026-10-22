@@ -23,9 +23,30 @@ replacement context is exposed.
 Check ownership and cancellation around every await. A stale completion must
 never update a newly selected instance. Negotiate `groups.capabilities` after
 Link verification. Execution requires protocol 2, a running driver, an authority
-identifier, the necessary methods and typed-events/idempotent-send/monotonic-log/
-coordinator-fencing features. Advertising methods alone does not prove that the
-driver runs. Peer room-link enablement is not required for local hosted rooms.
+identifier, the necessary methods and the `room_identity` and `monotonic_log`
+features. Advertising methods alone does not prove that the driver runs. Peer
+room-link enablement is not required for local hosted rooms.
+
+Hermes answers `groups.*` on one of two paths, and the app goes by what each
+advertises, never by version. A dashboard started with `hermes serve` (every
+v0.22.2 host, and v0.22.4's standalone dashboard) uses the older path
+(`tui_gateway/methods_groups.py`). From v0.22.4 the gateway's own listener uses
+the session path (`gateway/session_group_controls.py`). The differences, recorded
+from a real v0.22.4 host in `BighelpTests/Fixtures/HermesGroups`:
+
+| | Older path | Session path |
+|---|---|---|
+| `features` | ten, incl. `typed_events`, `idempotent_send`, `coordinator_fencing` | `room_identity`, `monotonic_log`, `replayable_disband` |
+| `seatable_profiles` | absent: any profile | the profiles a new room may seat; New group chat lists only those |
+| RoomLink | `room_link.enabled`, `groups.peer.*` | `{enabled: false, reason: canonical_driver_required}`, no `groups.peer.*`: hidden |
+| retry action | `{kind: retry, task_id}` | `{kind: retry, member_id, task_id, execution_generation}` |
+| `groups.retry` | `room_id`, `task_id`; refuses any other key (4000) | also needs `member_id`, `execution_generation` (else `invalid_params`) |
+| `groups.discard` | absent | for a turn it lost track of, while it lists `{kind: discard, ...}` |
+| `groups.list` cursor | `offset + limit` | may skip rooms this connection can't see |
+
+Send, log events, stop (`{cancelled}` then `room.stop_requested` with the
+`cancel_id`), approvals and disband read the same on both. Every event carries
+an extra `idempotent` key; read-only replies ignore keys the app doesn't use.
 
 An older plugin or unavailable driver leaves saved rooms readable. Do not enable
 action controls that cannot execute, and do not silently fall back to local
@@ -126,14 +147,25 @@ so a local and a peer `default` never share a voice).
 - Retry eligible deferred/indeterminate tasks with their server task IDs through `groups.retry`.
   `driver_status.pending_actions` may advertise a retry before any failure event
   is available. Present that task action without inventing a member or failure.
-  Keep each retry receipt and match terminal events by task ID, execution
-  generation, thread ID and turn ID. All retried tasks must settle before the
+  Send back the attempt the host's action names (`member_id`,
+  `execution_generation`) only when it names one: each path refuses the other's
+  shape. Keep each retry receipt and match terminal events by task ID, thread ID
+  and turn ID, and by execution generation when the event names one: Hermes puts
+  it on `turn.deferred` only, so the retried attempt's `turn.settled` has none
+  (on both paths). All retried tasks must settle before the
   turn completes; unrelated room activity or the latest human message is not
   sufficient. A polling timeout is not an authoritative task failure. Preserve
   uncertain work until the host resolves it.
   Retain the batch, received task receipts and uncertain dispatches across
   relaunch. Hermes has no retry-idempotency token or public task-receipt lookup;
   a missing receipt is not permission to replay the batch.
+- A host that stops mid-turn leaves that turn uncertain. The older path lists it
+  as a retry and runs it again. The session path blocks the room and lists a
+  `discard` action for about a minute; Discard (`groups.discard` with the exact
+  listed attempt, after the person confirms) cancels it and the room goes on.
+  Past that window Hermes defers the turn and lists a retry it then refuses
+  (`unknown_execution`), and that agent can't answer in the room again, so the
+  Discard card shows as soon as Hermes lists it.
 - Show agent messages and supported activity from typed events. Do not invent
   tool calls or claim token streaming when the hosted-room log only provides
   completed member messages.
@@ -199,7 +231,7 @@ an unconfirmed close relies on the host's bounded inactivity lease.
 
 ## Verification and release
 
-Run `HermesBotModeContractTests`, `BighelpLinkHermesBotModeClientTests`,
+Run `HermesBotModeContractTests`, `HermesGroupsHostPathTests` (both paths' recorded replies), `BighelpLinkHermesBotModeClientTests`,
 `BighelpLinkHermesBotModeApprovalTests`, `BotModeRoomStoreTests` and
 `ChatBotModeIntegrationTests` along with the chat interaction regression gate.
 The Link client tests cover request shapes, cancelled/stale results, idempotency,

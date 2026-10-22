@@ -182,6 +182,10 @@ change in both repos.
   deletes ended chats idle past `retention_days`. Plugin 3.18.0 (`durable_sessions.py`) gives `bighelp`
   Desktop's treatment. In the app, a refresh never retires an open chat whose runtime ended: it resumes it
   (`onRetainedStreamsNeedResume`), and a chat route without its model reopens (`reopenChatRoute`).
+- **Group chats come on two paths:** a `hermes serve` dashboard answers `groups.*` on the older path,
+  v0.22.4's gateway listener on the session path; features, retry and discard, RoomLink and seatable
+  profiles differ. Go by what `groups.capabilities` and each pending action say, never the version
+  (docs/HERMES_BOT_MODE.md, vectors in `BighelpTests/Fixtures/HermesGroups`).
 - **Bot Chats are hidden in Hermes:** `GET /api/sessions` never returns them; the catalog list adds each
   agent's (`canonical_session`, `canonicalBotChat`) so a refresh can't drop it.
 - **Archived:** the catalog lists `archived=include` and keeps rows Hermes' idle sweep archived

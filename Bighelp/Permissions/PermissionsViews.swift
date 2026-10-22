@@ -195,13 +195,13 @@ struct PermissionRow: View {
 
             switch presentation.action {
             case .request:
-                Button(presentation.actionTitle ?? "Allow") {
+                Button(presentation.actionTitle ?? String(localized: "Allow")) {
                     Task { await center.request(kind) }
                 }
                 .disabled(center.requestInFlight != nil)
                 .accessibilityIdentifier("permissions.\(kind.rawValue).allow")
             case .openSystemSettings:
-                Button(presentation.actionTitle ?? "Open System Settings") {
+                Button(presentation.actionTitle ?? String(localized: "Open System Settings")) {
                     center.performRecoveryAction(for: kind)
                 }
                 .accessibilityIdentifier("permissions.\(kind.rawValue).open-settings")

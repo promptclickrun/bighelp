@@ -53,14 +53,14 @@ struct AppLayoutSettingsView: View {
                     .foregroundStyle(theme.tertiaryText)
                     .frame(width: BighelpTokens.hitTarget)
                     .accessibilityHidden(true)
-                label("Chat", symbol: "bubble.left")
+                label(String(localized: "Chat"), symbol: "bubble.left")
             }
             .moveDisabled(true)
             .accessibilityIdentifier("app-layout.bar.chat")
             ForEach(layout.pinned) { place in
                 HStack(spacing: BighelpTokens.space12) {
                     circleButton("minus.circle.fill", tint: theme.danger,
-                                 label: "Remove \(place.title) from the bottom bar",
+                                 label: String(localized: "Remove \(place.title) from the bottom bar"),
                                  id: "app-layout.remove.\(place.rawValue)") {
                         withAnimation { settings.appLayout.unpin(place) }
                     }
@@ -84,7 +84,7 @@ struct AppLayoutSettingsView: View {
             ForEach(BighelpPlace.allCases.filter { $0.canPin && !layout.isPinned($0) }) { place in
                 HStack(spacing: BighelpTokens.space12) {
                     circleButton("plus.circle.fill", tint: layout.canPinMore ? theme.success : theme.tertiaryText,
-                                 label: "Add \(place.title) to the bottom bar",
+                                 label: String(localized: "Add \(place.title) to the bottom bar"),
                                  id: "app-layout.add.\(place.rawValue)") {
                         withAnimation { settings.appLayout.pin(place) }
                     }

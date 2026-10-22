@@ -8,7 +8,7 @@ struct AppearanceSizeControls: View {
     var body: some View {
         VStack(alignment: .leading, spacing: BighelpTokens.space16) {
             VStack(alignment: .leading, spacing: BighelpTokens.space8) {
-                label("Text size", value: size.textSize.title)
+                label(String(localized: "Text size"), value: size.textSize.title)
                 Picker("Text size", selection: $size.textSize) {
                     ForEach(BighelpTextSize.allCases) { step in
                         Text(step.title).tag(step)
@@ -18,7 +18,7 @@ struct AppearanceSizeControls: View {
                 .accessibilityIdentifier("appearance.text-size")
             }
             VStack(alignment: .leading, spacing: BighelpTokens.space8) {
-                label("Button size", value: size.buttonSize.title)
+                label(String(localized: "Button size"), value: size.buttonSize.title)
                 Picker("Button size", selection: $size.buttonSize) {
                     ForEach(BighelpButtonSize.allCases) { step in
                         Text(step.title).tag(step)
@@ -46,9 +46,9 @@ struct AppearanceSizeControls: View {
 
     private var footnote: String {
         #if targetEnvironment(macCatalyst)
-        "Buttons include the message box and avatars. ⌘+ and ⌘− also change the text size."
+        String(localized: "Buttons include the message box and avatars. ⌘+ and ⌘− also change the text size.")
         #else
-        "Text size adds to your device's own text size. Buttons include the message box and avatars."
+        String(localized: "Text size adds to your device's own text size. Buttons include the message box and avatars.")
         #endif
     }
 }

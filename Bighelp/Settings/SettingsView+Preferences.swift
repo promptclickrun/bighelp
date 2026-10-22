@@ -8,7 +8,8 @@ extension SettingsView {
             NavigationLink {
                 settingsDone(ChatLayoutSettingsView())
             } label: {
-                AppearanceStudioRow(title: "Chat layout", detail: "Avatar, name, text size and spacing",
+                AppearanceStudioRow(title: String(localized: "Chat layout"),
+                                    detail: String(localized: "Avatar, name, text size and spacing"),
                                     systemImage: "text.bubble")
             }
             .buttonStyle(.plain)
@@ -16,7 +17,8 @@ extension SettingsView {
             NavigationLink {
                 settingsDone(AppLayoutSettingsView(settings: settings))
             } label: {
-                AppearanceStudioRow(title: "App layout", detail: "Bottom bar and menu order",
+                AppearanceStudioRow(title: String(localized: "App layout"),
+                                    detail: String(localized: "Bottom bar and menu order"),
                                     systemImage: "rectangle.bottomthird.inset.filled")
             }
             .buttonStyle(.plain)
@@ -36,7 +38,8 @@ extension SettingsView {
     /// How much of the room shows through bighelp's windows.
     private var transparency: some View {
         VStack(alignment: .leading, spacing: BighelpTokens.space8) {
-            settingLabel("Transparency", detail: "How much of your space shows through bighelp")
+            settingLabel(String(localized: "Transparency"),
+                         detail: String(localized: "How much of your space shows through bighelp"))
             HStack(spacing: BighelpTokens.space12) {
                 Image(systemName: "square.fill")
                     .foregroundStyle(theme.secondaryText)
@@ -71,7 +74,8 @@ extension SettingsView {
                     }
                 }
             )) {
-                settingLabel("Reflective Vision", detail: "Your blurred surroundings in a few accents. Uses the camera only while on.")
+                settingLabel(String(localized: "Reflective Vision"),
+                             detail: String(localized: "Your blurred surroundings in a few accents. Uses the camera only while on."))
             }
             .accessibilityIdentifier("settings.reflective-vision")
 
@@ -103,23 +107,23 @@ extension SettingsView {
 
     private var reflectiveVisionStatus: String {
         reflectiveVisionCamera?.state.statusText
-            ?? "The live reflection is available when bighelp is running on a device with camera access."
+            ?? String(localized: "The live reflection is available when bighelp is running on a device with camera access.")
     }
 
     var workspace: some View {
         Section("Chat list") {
             Toggle(isOn: $settings.organizeChatsByProjects) {
                 settingLabel(
-                    "Organize chats by project",
-                    detail: "Group chats by their Hermes project."
+                    String(localized: "Organize chats by project"),
+                    detail: String(localized: "Group chats by their Hermes project.")
                 )
             }
             .accessibilityIdentifier("settings.organize-chats-by-projects")
 
             Toggle(isOn: $settings.showCronSessions) {
                 settingLabel(
-                    "Show scheduled runs",
-                    detail: "Include scheduled task runs in Chats."
+                    String(localized: "Show scheduled runs"),
+                    detail: String(localized: "Include scheduled task runs in Chats.")
                 )
             }
             .accessibilityIdentifier("settings.show-cron-sessions")
@@ -200,7 +204,7 @@ extension SettingsView {
                     Text(choice.title).tag(choice)
                 }
             } label: {
-                settingLabel("Open on", detail: screen.detail)
+                settingLabel(String(localized: "Open on"), detail: screen.detail)
             }
             .accessibilityIdentifier("settings.landing.screen")
 
@@ -212,8 +216,9 @@ extension SettingsView {
                         Text(agent.name).tag(Optional(agent.id))
                     }
                 } label: {
-                    settingLabel("Start with", detail: startAgentID == nil
-                                 ? "The agent you used last." : "On this computer.")
+                    settingLabel(String(localized: "Start with"), detail: startAgentID == nil
+                                 ? String(localized: "The agent you used last.")
+                                 : String(localized: "On this computer."))
                 }
                 .accessibilityIdentifier("settings.landing.agent")
             }
@@ -233,15 +238,15 @@ extension SettingsView {
                     Text(choice.title).tag(choice)
                 }
             } label: {
-                settingLabel("Bot chat experience", detail: settings.botChatExperience.detail)
+                settingLabel(String(localized: "Bot chat experience"), detail: settings.botChatExperience.detail)
             }
             .accessibilityIdentifier("settings.chat.bot-chat-experience")
 
             #if !targetEnvironment(macCatalyst) // A Mac has no haptics.
             Toggle(isOn: $settings.responseHapticsEnabled) {
                 settingLabel(
-                    "Response haptics",
-                    detail: "A light tap as replies arrive."
+                    String(localized: "Response haptics"),
+                    detail: String(localized: "A light tap as replies arrive.")
                 )
             }
             .accessibilityIdentifier("settings.chat.response-haptics")
@@ -249,8 +254,8 @@ extension SettingsView {
 
             Toggle(isOn: $settings.reactionsReachAgent) {
                 settingLabel(
-                    "Agents see your reactions",
-                    detail: "Your agent sees them the next time you message it."
+                    String(localized: "Agents see your reactions"),
+                    detail: String(localized: "Your agent sees them the next time you message it.")
                 )
             }
             .accessibilityIdentifier("settings.chat.reactions-reach-agent")
@@ -258,20 +263,21 @@ extension SettingsView {
             #if !targetEnvironment(macCatalyst) // The island is an iPhone's.
             Toggle(isOn: $settings.agentIslandEnabled) {
                 settingLabel(
-                    "Agent in the Dynamic Island",
-                    detail: "Watch your agent work at the top of the screen."
+                    String(localized: "Agent in the Dynamic Island"),
+                    detail: String(localized: "Watch your agent work at the top of the screen.")
                 )
             }
             .accessibilityIdentifier("settings.chat.agent-island")
             #endif
 
             SessionTitleToggle {
-                settingLabel("Session title", detail: "Show the chat's title under the agent's name.")
+                settingLabel(String(localized: "Session title"),
+                             detail: String(localized: "Show the chat's title under the agent's name."))
             }
             .accessibilityIdentifier("settings.chat.session-title")
 
             ReturnSendsToggle {
-                settingLabel("Return sends", detail: Self.returnSendsDetail)
+                settingLabel(String(localized: "Return sends"), detail: Self.returnSendsDetail)
             }
             .accessibilityIdentifier("settings.chat.return-sends")
         }
@@ -279,11 +285,10 @@ extension SettingsView {
     }
 
     private static var returnSendsDetail: String {
-        let keys = "Shift-Return adds a line; Command-Return lets you pick how to send while your agent works."
         #if targetEnvironment(macCatalyst)
-        return keys
+        String(localized: "Shift-Return adds a line; Command-Return lets you pick how to send while your agent works.")
         #else
-        return "With a keyboard attached. " + keys
+        String(localized: "With a keyboard attached. Shift-Return adds a line; Command-Return lets you pick how to send while your agent works.")
         #endif
     }
 
@@ -314,16 +319,16 @@ extension SettingsView {
         Section {
             Toggle(isOn: $settings.foldCompletedTurns) {
                 settingLabel(
-                    "Fold finished turns",
-                    detail: "Tuck finished work away; answers stay."
+                    String(localized: "Fold finished turns"),
+                    detail: String(localized: "Tuck finished work away; answers stay.")
                 )
             }
             .accessibilityIdentifier("settings.chat.fold-completed-turns")
 
             Toggle(isOn: $settings.showReasoningByDefault) {
                 settingLabel(
-                    "Show reasoning",
-                    detail: "Thinking and notes between steps."
+                    String(localized: "Show reasoning"),
+                    detail: String(localized: "Thinking and notes between steps.")
                 )
             }
             .accessibilityIdentifier("settings.chat.show-reasoning")
@@ -331,8 +336,8 @@ extension SettingsView {
             if settings.showReasoningByDefault {
                 Toggle(isOn: $settings.expandReasoningByDefault) {
                     settingLabel(
-                        "Expand reasoning",
-                        detail: "Keep reasoning folders open while a turn runs."
+                        String(localized: "Expand reasoning"),
+                        detail: String(localized: "Keep reasoning folders open while a turn runs.")
                     )
                 }
                 .accessibilityIdentifier("settings.chat.expand-reasoning")
@@ -340,8 +345,8 @@ extension SettingsView {
 
             Toggle(isOn: $settings.showToolCallsByDefault) {
                 settingLabel(
-                    "Show tool calls",
-                    detail: "Show the work trail."
+                    String(localized: "Show tool calls"),
+                    detail: String(localized: "Show the work trail.")
                 )
             }
             .accessibilityIdentifier("settings.chat.show-tool-calls")
@@ -349,8 +354,8 @@ extension SettingsView {
             if settings.showToolCallsByDefault {
                 Toggle(isOn: $settings.expandToolCallsByDefault) {
                     settingLabel(
-                        "Expand tool calls",
-                        detail: "Keep tool folder summaries open while a turn runs."
+                        String(localized: "Expand tool calls"),
+                        detail: String(localized: "Keep tool folder summaries open while a turn runs.")
                     )
                 }
                 .accessibilityIdentifier("settings.chat.expand-tool-calls")
@@ -370,29 +375,29 @@ extension SettingsView {
 
                 Toggle(isOn: $settings.autoSuggestionsEnabled) {
                     settingLabel(
-                        "Auto suggestions",
-                        detail: "Show prompts that help begin a conversation."
+                        String(localized: "Auto suggestions"),
+                        detail: String(localized: "Show prompts that help begin a conversation.")
                     )
                 }
 
                 Toggle(isOn: $settings.messageActionsEnabled) {
                     settingLabel(
-                        "Message actions",
-                        detail: "Keep actions available alongside messages."
+                        String(localized: "Message actions"),
+                        detail: String(localized: "Keep actions available alongside messages.")
                     )
                 }
 
                 Toggle(isOn: $settings.inlineUIEnabled) {
                     settingLabel(
-                        "Inline UI",
-                        detail: "Show supported weather, task, budget, and approval cards."
+                        String(localized: "Inline UI"),
+                        detail: String(localized: "Show supported weather, task, budget, and approval cards.")
                     )
                 }
 
                 Toggle(isOn: $settings.showProjectChanges) {
                     settingLabel(
-                        "Project changes",
-                        detail: "Show file additions and deletions for a chat’s Hermes Project."
+                        String(localized: "Project changes"),
+                        detail: String(localized: "Show file additions and deletions for a chat’s Hermes Project.")
                     )
                 }
                 .accessibilityIdentifier("settings.chat.show-project-changes")

@@ -13,29 +13,29 @@ enum BighelpLandingScreen: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .agents: "Agents"
-        case .allAgents: "Agents (multi)"
-        case .lastChat: "Last chat"
-        case .sessions: "Sessions"
-        case .feed: "Feed"
-        case .ideas: "Ideas"
-        case .goals: "Goals"
-        case .kanban: "Kanban"
-        case .projects: "Projects"
+        case .agents: String(localized: "Agents")
+        case .allAgents: String(localized: "Agents (multi)")
+        case .lastChat: String(localized: "Last chat")
+        case .sessions: String(localized: "Sessions")
+        case .feed: String(localized: "Feed")
+        case .ideas: String(localized: "Ideas")
+        case .goals: String(localized: "Goals")
+        case .kanban: String(localized: "Kanban")
+        case .projects: String(localized: "Projects")
         }
     }
 
     var detail: String {
         switch self {
-        case .agents: "This computer's agents."
-        case .allAgents: "Every agent on every computer."
-        case .lastChat: "Your latest chat with the agent."
-        case .sessions: "All sessions, to pick a recent one."
-        case .feed: "The agent's Feed."
-        case .ideas: "The agent's Ideas."
-        case .goals: "The agent's Goals."
-        case .kanban: "The board, where this computer has Kanban."
-        case .projects: "This computer's projects."
+        case .agents: String(localized: "This computer's agents.")
+        case .allAgents: String(localized: "Every agent on every computer.")
+        case .lastChat: String(localized: "Your latest chat with the agent.")
+        case .sessions: String(localized: "All sessions, to pick a recent one.")
+        case .feed: String(localized: "The agent's Feed.")
+        case .ideas: String(localized: "The agent's Ideas.")
+        case .goals: String(localized: "The agent's Goals.")
+        case .kanban: String(localized: "The board, where this computer has Kanban.")
+        case .projects: String(localized: "This computer's projects.")
         }
     }
 

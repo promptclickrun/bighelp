@@ -28,10 +28,10 @@ enum ChatAvatarSize: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .automatic: "Auto"
-        case .small: "Small"
-        case .medium: "Medium"
-        case .large: "Large"
+        case .automatic: String(localized: "Auto")
+        case .small: String(localized: "Small")
+        case .medium: String(localized: "Medium")
+        case .large: String(localized: "Large")
         }
     }
 
@@ -65,11 +65,11 @@ enum ChatTextSize: Int, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .smaller: "Smaller"
-        case .small: "Small"
-        case .standard: "Medium"
-        case .large: "Large"
-        case .larger: "Larger"
+        case .smaller: String(localized: "Smaller")
+        case .small: String(localized: "Small")
+        case .standard: String(localized: "Medium")
+        case .large: String(localized: "Large")
+        case .larger: String(localized: "Larger")
         }
     }
 
@@ -93,8 +93,8 @@ enum ChatDensity: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .comfortable: "Comfortable"
-        case .compact: "Compact"
+        case .comfortable: String(localized: "Comfortable")
+        case .compact: String(localized: "Compact")
         }
     }
 
@@ -161,7 +161,7 @@ struct ChatLayoutSettingsView: View {
             } header: {
                 Text("Messages")
             } footer: {
-                Text("Text size: \(textSize.title). " + Self.messagesNote)
+                Text(String(localized: "Text size: \(textSize.title). \(Self.messagesNote)"))
             }
             .listRowBackground(theme.surface)
 
@@ -194,22 +194,30 @@ struct ChatLayoutSettingsView: View {
 
     private static var headerNote: String {
         #if targetEnvironment(macCatalyst)
-        "Auto uses the large avatar in tall windows and Medium in shorter ones. With the name hidden, click the "
-            + "avatar for the agent's profile, or click and hold it to switch agents."
+        String(localized: """
+            Auto uses the large avatar in tall windows and Medium in shorter ones. With the name hidden, click the \
+            avatar for the agent's profile, or click and hold it to switch agents.
+            """)
         #else
-        "Auto keeps the large avatar on the biggest iPhones and uses Medium on the rest. With the name hidden, "
-            + "tap the avatar for the agent's profile, or touch and hold it to switch agents."
+        String(localized: """
+            Auto keeps the large avatar on the biggest iPhones and uses Medium on the rest. With the name hidden, \
+            tap the avatar for the agent's profile, or touch and hold it to switch agents.
+            """)
         #endif
     }
 
     private static var messagesNote: String {
         #if targetEnvironment(macCatalyst)
         // Appearance has the app-wide text size; this one is for messages only.
-        "It sizes message text, on top of the text size in Appearance. Link previews show a web link's picture, "
-            + "title and summary in chats and the Feed. To make one, your Mac opens that page, without cookies."
+        String(localized: """
+            It sizes message text, on top of the text size in Appearance. Link previews show a web link's picture, \
+            title and summary in chats and the Feed. To make one, your Mac opens that page, without cookies.
+            """)
         #else
-        "It adds to your iPhone's own text size setting. Link previews show a web link's picture, title and "
-            + "summary in chats and the Feed. To make one, your iPhone opens that page, without cookies."
+        String(localized: """
+            It adds to your iPhone's own text size setting. Link previews show a web link's picture, title and \
+            summary in chats and the Feed. To make one, your iPhone opens that page, without cookies.
+            """)
         #endif
     }
 
@@ -246,9 +254,9 @@ private struct ChatLayoutPreview: View {
             .animation(.snappy, value: avatarSize)
             .animation(.snappy, value: showsAgentName)
 
-            bubble("Can you look over my notes before the meeting?", outgoing: true)
+            bubble(String(localized: "Can you look over my notes before the meeting?"), outgoing: true)
                 .padding(.bottom, density.messageSpacing)
-            bubble("Sure. I added two questions and fixed the dates.", outgoing: false)
+            bubble(String(localized: "Sure. I added two questions and fixed the dates."), outgoing: false)
         }
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .ignore)

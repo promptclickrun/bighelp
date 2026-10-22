@@ -16,11 +16,11 @@ enum BighelpTextSize: Int, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .small: "Small"
-        case .standard: "Default"
-        case .large: "Large"
-        case .larger: "Larger"
-        case .largest: "Largest"
+        case .small: String(localized: "Small")
+        case .standard: String(localized: "Default")
+        case .large: String(localized: "Large")
+        case .larger: String(localized: "Larger")
+        case .largest: String(localized: "Largest")
         }
     }
 
@@ -50,9 +50,9 @@ enum BighelpButtonSize: Int, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .standard: "Default"
-        case .large: "Large"
-        case .larger: "Larger"
+        case .standard: String(localized: "Default")
+        case .large: String(localized: "Large")
+        case .larger: String(localized: "Larger")
         }
     }
 

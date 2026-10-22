@@ -99,6 +99,9 @@ final class BotModeRoomStore {
     var nativeObservations: [String: Task<Void, Never>] = [:]
     var nativeObservationTokens: [String: UUID] = [:]
     var nativeActiveRunIDs: Set<String> = []
+    /// Rooms whose Stop is waiting for Hermes' answer. Memory only: after a
+    /// relaunch nothing is on its way, only a room's saved cancel ID.
+    var nativeStopsInFlight: Set<String> = []
     private var nextPresentationOrder: Int
     private var activityPresentationOrders: [String: Int] = [:]
     var roomObservers: [UUID: RoomObserver] = [:]

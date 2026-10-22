@@ -601,6 +601,7 @@
 		5FD498E823ABD9959D3BC275 /* DirectHermesWikiClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBF01F4ECD3990C4129E19B9 /* DirectHermesWikiClientTests.swift */; };
 		5FD9F0F18BD763BC16E0B9D1 /* AppStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E3EDB37FA6D8157237A2037 /* AppStateTests.swift */; };
 		5FFD77BE4D90A9010292FDA4 /* status-offline.json in Resources */ = {isa = PBXBuildFile; fileRef = 0663AEB0E7CD26EC96D3578C /* status-offline.json */; };
+		602ACF7A3D6AF109680A45D4 /* BotModeStopTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33E4EB272EA68374E3B3E748 /* BotModeStopTests.swift */; };
 		603FC67B556DE37D8454B4BF /* ProviderLogoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 293031E044AFE82E99329FEE /* ProviderLogoStore.swift */; };
 		60506EB81500AD3FCAC4394B /* DevFactoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F4B341DA5B55984E02BF119 /* DevFactoryTests.swift */; };
 		606B063BE2AB450E976BC394 /* BighelpSurfaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C3001BE0BE59F9103945CC0 /* BighelpSurfaceTests.swift */; };
@@ -2105,6 +2106,7 @@
 		33254D4EC0561796677A14F8 /* ClipboardAttachmentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardAttachmentTests.swift; sourceTree = "<group>"; };
 		335213208F41D9012118F4BD /* VoiceConfigurationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceConfigurationStore.swift; sourceTree = "<group>"; };
 		33553B8841D6F75CDEB02447 /* AIProviderBrand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIProviderBrand.swift; sourceTree = "<group>"; };
+		33E4EB272EA68374E3B3E748 /* BotModeStopTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BotModeStopTests.swift; sourceTree = "<group>"; };
 		33E9FF3390300F44BE3F8C60 /* BighelpSealedAlertPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpSealedAlertPresentation.swift; sourceTree = "<group>"; };
 		33F9EE654CBD35C5C2B5D853 /* AppleDeviceToolService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleDeviceToolService.swift; sourceTree = "<group>"; };
 		344FB8E575EFBAACC708770D /* BighelpManagedNotificationNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpManagedNotificationNavigation.swift; sourceTree = "<group>"; };
@@ -4480,6 +4482,7 @@
 				4DA121DC4F3462AA6F8C58F6 /* BoardBlueprintAndGoalCategoryTests.swift */,
 				7773C53167EE878A8E8CF470 /* BotModeRoomStoreTests.swift */,
 				2C2051CDE611EC630D846F17 /* BotModeRunTests.swift */,
+				33E4EB272EA68374E3B3E748 /* BotModeStopTests.swift */,
 				4325F750432EFB2A83F5FC52 /* BotScreenRFBTests.swift */,
 				3BEF307512389C0729BDF539 /* BotScreenStateTests.swift */,
 				8DB6440F33ABAC6FDFE144B3 /* BotScreenViewerModelTests.swift */,
@@ -7498,6 +7501,7 @@
 				10DBE7123EC87508A7FF5EDB /* BoardBlueprintAndGoalCategoryTests.swift in Sources */,
 				7842F1110DEB2F0851754D9E /* BotModeRoomStoreTests.swift in Sources */,
 				5A8766E7C2251965026C4EAE /* BotModeRunTests.swift in Sources */,
+				602ACF7A3D6AF109680A45D4 /* BotModeStopTests.swift in Sources */,
 				DDEFE05D3CD6FCA70C9D3256 /* BotScreenRFBTests.swift in Sources */,
 				3523846944DD383A6D161D7D /* BotScreenStateTests.swift in Sources */,
 				4D9A9A9A42BBF7B0BE00D9FD /* BotScreenViewerModelTests.swift in Sources */,

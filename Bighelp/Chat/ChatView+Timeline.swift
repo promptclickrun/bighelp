@@ -20,6 +20,7 @@ extension ChatView {
             rows += transcript()
         }
         if let status = model.botModeStatus { rows.append(.botStatus(status)) }
+        if model.showsUnconfirmedBotModeStop { rows.append(.botStopUnconfirmed(model.isStoppingBotModeAgain)) }
         rows += model.pendingBotModeApprovals.map(ChatCanvasRow.botApproval)
         if model.hasNativeBotModeRetryActions { rows.append(.botRetry) }
         rows += model.memberFailures.map(ChatCanvasRow.memberFailure)
@@ -178,6 +179,7 @@ extension ChatView {
                 .foregroundStyle(theme.action)
                 .frame(maxWidth: .infinity, alignment: .center)
                 .accessibilityIdentifier("chat.bot-mode-status")
+        case .botStopUnconfirmed(let isStoppingAgain): unconfirmedStop(isStoppingAgain: isStoppingAgain)
         case .botApproval(let approval):
             BotModeApprovalCard(
                 approvalID: approval.id,
@@ -524,6 +526,28 @@ extension ChatView {
                     }
                     .accessibilityIdentifier("chat.unsent-drafts")
                 }
+            }
+        }
+    }
+    /// The room's one way back from a stop Hermes didn't answer: the same
+    /// stop again, which Hermes treats as the one it may already have made.
+    private func unconfirmedStop(isStoppingAgain: Bool) -> some View {
+        BighelpCard {
+            VStack(alignment: .leading, spacing: BighelpTokens.space12) {
+                Text("Hermes did not confirm the stop.")
+                    .fixedSize(horizontal: false, vertical: true)
+                Button {
+                    Task { await model.stopBotModeAgain() }
+                } label: {
+                    if isStoppingAgain {
+                        ProgressView().controlSize(.small).accessibilityLabel("Stopping")
+                    } else {
+                        Text("Stop again")
+                    }
+                }
+                .buttonStyle(BighelpV2ButtonStyle(emphasis: .secondary))
+                .disabled(isStoppingAgain || !model.canStop)
+                .accessibilityIdentifier("chat.bot-mode.stop-again")
             }
         }
     }

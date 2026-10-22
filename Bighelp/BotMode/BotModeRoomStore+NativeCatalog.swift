@@ -22,10 +22,12 @@ extension BotModeRoomStore {
         // fenced out, so the replacement client must explicitly resume an
         // observer for every room with an unsettled send. Chat models can
         // survive the same transition and therefore cannot be the only place
-        // that starts this store-owned recovery loop.
+        // that starts this store-owned recovery loop. A stop whose answer was
+        // lost is read back from the room log the same way.
         if client != nil {
             for room in rooms where room.hasNativeRoom
-                && (room.isRunning || room.nativePendingEventID != nil || !room.nativeFollowUps.isEmpty) {
+                && (room.isRunning || room.nativePendingEventID != nil || !room.nativeFollowUps.isEmpty
+                    || room.nativePendingCancelID != nil) {
                 beginNativeRoomObservation(roomID: room.id)
             }
         }
@@ -395,33 +397,103 @@ extension BotModeRoomStore {
 
     /// Explicitly stops durable Hermes work for a room. Lifecycle cancellation
     /// of `send` deliberately does not call this operation.
+    ///
+    /// The cancel ID is saved first and kept until Hermes answers or its room
+    /// log shows the stop, so Stop again asks for the same stop: Hermes makes
+    /// one `room.stop_requested` per cancel ID, and every new one ends all
+    /// earlier messages in the room.
     func stopNativeRoom(roomID: String, cancelID: String = "loopdy-stop-\(UUID().uuidString)") async throws {
         try persistence?.prepareNativeStorage()
         guard let nativeClient else { throw BotModeRoomError.executionUnavailable }
         let boundary = nativeBoundaryGeneration
-        guard var room = room(id: roomID), room.nativeRoomID != nil else {
+        guard let initial = room(id: roomID), initial.nativeRoomID != nil else {
             throw BotModeRoomError.roomNotFound
         }
-        let resolvedCancelID = room.nativePendingCancelID ?? cancelID
-        room.setNativeCancelIntent(resolvedCancelID)
-        try persist(room: room)
-        try await nativeClient.groupsStop(roomID: roomID, cancelID: resolvedCancelID)
+        guard !nativeStopsInFlight.contains(roomID) else { throw BotModeRoomError.runAlreadyActive }
+        nativeStopsInFlight.insert(roomID)
+        defer { nativeStopsInFlight.remove(roomID) }
+        if initial.nativePendingCancelID != nil {
+            // An earlier answer was lost. When the log already shows that
+            // stop it's done; asking again would also stop newer work.
+            try? await syncNativeRoom(roomID: roomID, boundary: boundary)
+            try requireNativeBoundary(boundary)
+            guard self.room(id: roomID)?.nativePendingCancelID != nil else { return }
+        }
+        guard let current = room(id: roomID) else { throw BotModeRoomError.roomNotFound }
+        let resolvedCancelID = current.nativePendingCancelID ?? cancelID
+        if current.nativePendingCancelID == nil {
+            try updateNativeRoom(roomID) { room in
+                room.setNativeCancelIntent(resolvedCancelID)
+                return true
+            }
+        }
+        do {
+            try await nativeClient.groupsStop(roomID: roomID, cancelID: resolvedCancelID)
+        } catch {
+            // Hermes may have stopped the room before its answer was lost.
+            if boundary == nativeBoundaryGeneration {
+                try? await syncNativeRoom(roomID: roomID, boundary: boundary)
+            }
+            if boundary == nativeBoundaryGeneration,
+               self.room(id: roomID)?.nativePendingCancelID != resolvedCancelID {
+                return
+            }
+            throw error
+        }
         try requireNativeBoundary(boundary)
-        guard var current = self.room(id: roomID) else { return }
-        let expectedOwner = current.runOwner.map(BotModeRunOwnerExpectation.owner) ?? .noOwner
-        current.clearNativeTurn()
-        current.clearNativeFollowUps()
-        current.setNativeRetryJournal(nil)
-        current.setNativeCancelIntent(nil)
-        current.settleRun()
-        guard let saved = try compareAndSave(
-            current,
-            expectedRevision: current.persistenceRevision,
-            expectedOwner: expectedOwner
-        ) else { throw BotModeRoomError.persistenceConflict }
-        replaceStored(saved)
+        try confirmNativeStop(roomID: roomID, cancelID: resolvedCancelID)
+    }
+
+    /// Hermes applied this phone's stop, by its answer or its room log.
+    func confirmNativeStop(roomID: String, cancelID: String) throws {
+        let settled = try updateNativeRoom(roomID) { room in
+            guard room.nativePendingCancelID == cancelID else { return false }
+            room.settleNativeStop()
+            return true
+        }
+        guard settled else { return }
         nativePendingRetryTaskIDsByRoom.removeValue(forKey: roomID)
         nativeDriverWorkingByRoom.removeValue(forKey: roomID)
+    }
+
+    /// A message after a stop whose outcome isn't known. The room log either
+    /// shows the stop, which settles it, or the stop never reached Hermes;
+    /// either way a later Stop is a new one, for the new message.
+    func settleUnconfirmedNativeStop(roomID: String) async throws {
+        guard room(id: roomID)?.nativePendingCancelID != nil else { return }
+        guard !nativeStopsInFlight.contains(roomID) else { throw BotModeRoomError.runAlreadyActive }
+        let boundary = nativeBoundaryGeneration
+        try await syncNativeRoom(roomID: roomID, boundary: boundary)
+        try requireNativeBoundary(boundary)
+        guard let cancelID = room(id: roomID)?.nativePendingCancelID else { return }
+        try updateNativeRoom(roomID) { room in
+            guard room.nativePendingCancelID == cancelID else { return false }
+            room.setNativeCancelIntent(nil)
+            return true
+        }
+    }
+
+    /// Saves one change to a room. When another store saved the room
+    /// meanwhile, the change is made again on that newer copy instead of
+    /// being lost. `change` returns false when there is nothing to change.
+    @discardableResult
+    func updateNativeRoom(_ roomID: String, _ change: (inout BotModeRoom) -> Bool) throws -> Bool {
+        for attempt in 0..<3 {
+            guard var room = room(id: roomID) else { throw BotModeRoomError.roomNotFound }
+            let expectedOwner = room.runOwner.map(BotModeRunOwnerExpectation.owner) ?? .noOwner
+            guard change(&room) else { return false }
+            if let saved = try compareAndSave(room, expectedRevision: room.persistenceRevision,
+                                              expectedOwner: expectedOwner) {
+                replaceStored(saved)
+                return true
+            }
+            guard attempt < 2, let persistence,
+                  let newer = try persistence.load(recoveringRuns: false).first(where: { $0.id == roomID }) else {
+                break
+            }
+            replaceStored(newer)
+        }
+        throw BotModeRoomError.persistenceConflict
     }
 
     /// Resolves one exact Hermes approval action and immediately refreshes the

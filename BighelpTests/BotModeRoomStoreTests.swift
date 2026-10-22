@@ -1248,6 +1248,13 @@ enum NativeBotModeTestError: Error, Equatable {
     case timedOut
 }
 
+enum NativeBotModeStopFailure: Equatable {
+    /// The answer was lost before Hermes saw the request.
+    case beforeHost
+    /// Hermes applied the stop, then the answer was lost.
+    case afterHost
+}
+
 @MainActor
 final class NativeBotModeTestClient: HermesBotModeClient, HermesBotModeApprovalClient {
     var capabilities: HermesBotModeCapabilities
@@ -1279,6 +1286,12 @@ final class NativeBotModeTestClient: HermesBotModeClient, HermesBotModeApprovalC
     var driverStatusAfterRetry: [String: BighelpJSONValue]?
     var onSend: (() -> Void)?
     private(set) var stopped: [(roomID: String, cancelID: String)] = []
+    /// Cancel IDs Hermes has a `room.stop_requested` event for.
+    var loggedStopCancelIDs: [String] = []
+    var stopFailures: [NativeBotModeStopFailure] = []
+    var blockGroupsStop = false
+    private var blockedGroupsStopContinuations: [CheckedContinuation<Void, Never>] = []
+    private var servedLogSequence = 0
     private(set) var approvals: [(
         roomID: String,
         memberID: String,
@@ -1390,6 +1403,7 @@ final class NativeBotModeTestClient: HermesBotModeClient, HermesBotModeApprovalC
             throw NativeBotModeTestError.transport
         }
         let events = logPages.isEmpty ? [] : logPages.removeFirst()
+        servedLogSequence = max(servedLogSequence, events.last?.sequence ?? sinceSequence)
         return HermesBotModeLogPage(
             events: events,
             cursor: events.last?.sequence ?? sinceSequence,
@@ -1399,8 +1413,35 @@ final class NativeBotModeTestClient: HermesBotModeClient, HermesBotModeApprovalC
         )
     }
 
+    /// Like Hermes: `groups.stop` writes one `room.stop_requested` per cancel
+    /// ID (a repeat returns the same event) before it answers. A lost answer
+    /// can come before Hermes saw the request or after it applied it.
     func groupsStop(roomID: String, cancelID: String) async throws {
         stopped.append((roomID: roomID, cancelID: cancelID))
+        if blockGroupsStop {
+            await withCheckedContinuation { blockedGroupsStopContinuations.append($0) }
+        }
+        let failure = stopFailures.isEmpty ? nil : stopFailures.removeFirst()
+        if failure == .beforeHost { throw NativeBotModeTestError.transport }
+        if !loggedStopCancelIDs.contains(cancelID) {
+            loggedStopCancelIDs.append(cancelID)
+            let sequence = max(servedLogSequence, stateLatestSequence,
+                               logPages.joined().map(\.sequence).max() ?? 0) + 1
+            logPages.append([.fixture(roomID: roomID, sequence: sequence, eventID: "room-stop:\(cancelID)",
+                                      kind: "room.stop_requested", payload: ["cancel_id": .string(cancelID)])])
+        }
+        if failure == .afterHost { throw NativeBotModeTestError.transport }
+    }
+
+    func waitUntilGroupsStopStarts(count: Int) async {
+        while stopped.count < count { await Task.yield() }
+    }
+
+    func releaseBlockedGroupsStop() {
+        blockGroupsStop = false
+        let continuations = blockedGroupsStopContinuations
+        blockedGroupsStopContinuations.removeAll()
+        continuations.forEach { $0.resume() }
     }
 
     func waitUntilSendStarts() async {

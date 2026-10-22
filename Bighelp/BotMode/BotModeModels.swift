@@ -769,6 +769,16 @@ struct BotModeRoom: Identifiable, Codable, Equatable, Sendable {
         nativePendingCancelID = cancelID
     }
 
+    /// Hermes applied this phone's stop: the turn, the messages waiting
+    /// behind it and any retry it tracked are over.
+    mutating func settleNativeStop() {
+        clearNativeTurn()
+        clearNativeFollowUps()
+        nativeRetryJournal = nil
+        nativePendingCancelID = nil
+        settleRun()
+    }
+
     func member(id: String) -> BotModeMember? {
         members.first(where: { $0.id == id })
     }

@@ -117,6 +117,64 @@ final class AgentsUITests: BighelpUITestCase {
         add(shot)
     }
 
+    /// A Stop whose answer is lost leaves the group chat one way back, Stop
+    /// again, and never keeps the next message from going out (#517).
+    @MainActor
+    func testGroupStopAgainAfterALostStopAnswer() {
+        for appearance in ["light", "dark"] { checkGroupStopAgain(appearance: appearance) }
+    }
+
+    @MainActor
+    private func checkGroupStopAgain(appearance: String) {
+        XCUIDevice.shared.orientation = .portrait
+        let app = makeApp()
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-team-call",
+                               "-preview-group-stop-lost", "-loopdy.demo.appearance", appearance]
+        app.launch()
+        openAgents(in: app)
+        XCTAssertTrue(revealSearchField(agentSearch(in: app), in: app))
+        let search = agentSearch(in: app)
+        search.tap()
+        search.typeText("Weekend\n")
+        let group = app.buttons["agents.group.team-call-demo"]
+        XCTAssertTrue(group.waitForExistence(timeout: 8))
+        group.tap()
+        let composer = app.textViews["chat.composer.text"]
+        XCTAssertTrue(composer.waitForExistence(timeout: 10))
+
+        composer.tap()
+        composer.typeText("Any ideas for Saturday?")
+        app.buttons["chat.send"].tap()
+        let stop = app.buttons["chat.stop"]
+        XCTAssertTrue(stop.waitForExistence(timeout: 10))
+        stop.tap()
+        let again = app.buttons["chat.bot-mode.stop-again"]
+        XCTAssertTrue(again.waitForExistence(timeout: 10), "The lost stop leaves Stop again")
+        XCTAssertTrue(app.staticTexts["Hermes did not confirm the stop."].exists)
+        let unconfirmed = XCTAttachment(screenshot: app.screenshot())
+        unconfirmed.name = "group-stop-unconfirmed-\(appearance)"
+        unconfirmed.lifetime = .keepAlways
+        add(unconfirmed)
+
+        again.tap()
+        XCTAssertTrue(again.waitForNonExistence(timeout: 10), "Stop again settles the stop")
+        composer.tap()
+        composer.typeText("One idea each, please")
+        let send = app.buttons["chat.send"]
+        XCTAssertTrue(send.waitForExistence(timeout: 5))
+        XCTAssertTrue(send.isEnabled)
+        send.tap()
+        let answer = app.textViews.matching(NSPredicate(
+            format: "identifier == 'chat.message.inline-selection' AND label CONTAINS %@", "keep an eye on the budget"
+        )).firstMatch
+        XCTAssertTrue(answer.waitForExistence(timeout: 15), "The next message goes out and the room answers")
+        let recovered = XCTAttachment(screenshot: app.screenshot())
+        recovered.name = "group-stop-recovered-\(appearance)"
+        recovered.lifetime = .keepAlways
+        add(recovered)
+        app.terminate()
+    }
+
     /// On one computer every chat keeps the bottom bar, however Agents opened
     /// it: the pinned avatar, a new chat from the agent's row, or one of its
     /// existing chats. Every chat has ☰ (which goes back to Agents). Tapping an

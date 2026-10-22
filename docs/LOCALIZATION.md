@@ -19,26 +19,30 @@ not a claim that the whole app is translated.
 
 The second stage (#527) adds:
 
-- Simple Bot mode: the home (pinned bots, the list, search, the + menu, a bot's
-  long-press menu, Rearrange, the gateway filter), New Bot and its Templates sheet,
-  New Group Chat, a bot's profile (Info, Computer, Files and Media tabs, Instructions,
-  Default Model, Routines), the voice bar, the opening loader, and its short Settings.
+- Bots mode (Simple Bot mode before 2.6.11): the home (pinned bots, the list, search,
+  the + menu, a bot's long-press menu, Rearrange, the gateway filter), New Bot and its
+  Templates sheet, New Group Chat, a bot's profile (Info, Computer, Files and Media tabs,
+  Instructions, Default Model, Routines), the voice bar, the opening loader, and its
+  short Settings.
 - Teamwork: the line where agents talk to each other ("Asked …", "… answered",
   "N messages with …"), its sheet, the working and typing states, and the Teamwork
-  switch with its line. In Simple Bot mode the switch says bots in sentences of its own.
+  switch with its line. In Bots mode the switch says bots in sentences of its own.
 - The Settings pages these lead to: Experience, Assistants, Notifications (topics,
   "Agents messaging each other", channels, workflows, Quiet Hours, test and turn-off),
   Chat (with Nerd Mode's sections), and Appearance with Chat layout and App layout.
+- The modes after their 2.6.11 rename: Bots, Chat and Code, the Unified Mode Toggle,
+  and the mode edge swipes.
 
 The Chinese text is an AI-assisted draft and remains `needs_review` in
 the catalog. It has not received professional or fluent-speaker approval. Screenshots
 and automated checks establish rendering and lookup, not linguistic certification.
 Keep `bighelp`, `Hermes`, provider/model names, and product names intact. Terminology:
-Chat = 聊天, Sessions = 会话, Agents = 智能体, Bots = 机器人, Feed = 动态,
-Ideas = 灵感, Goals = 目标, host/computer = 电脑, Simple Bot mode = 简易机器人模式,
-Teamwork = 团队协作, primary bot = 主机器人, gateway = 网关, template = 模板,
-routine = 例行任务, pin = 置顶, Quiet Hours = 勿扰时段, channel = 渠道,
-Live Activities = 实时活动, Dynamic Island = 灵动岛.
+the modes are Bots = 机器人, Chat = 聊天 and Code = 代码 (Bots mode = 机器人模式,
+Code mode = 代码模式; the Chat mode was called Sessions before 2.6.11). A list of
+chats is still Sessions = 会话. Agents = 智能体, Feed = 动态, Ideas = 灵感,
+Goals = 目标, host/computer = 电脑, Teamwork = 团队协作, primary bot = 主机器人,
+gateway = 网关, template = 模板, routine = 例行任务, pin = 置顶, Quiet Hours = 勿扰时段,
+channel = 渠道, Live Activities = 实时活动, Dynamic Island = 灵动岛.
 
 ## Adding copy
 
@@ -79,7 +83,7 @@ existing "A, B and C" without a serial comma.
 A word swap can't be translated. When one screen says bots where another says
 agents, give it whole sentences of its own (Teamwork's `detail(saysBots:)`).
 When the same English means two things, give one of them its own key and keep the
-English with `defaultValue:` (the Simple Bot + button's "New" is not the unread
+English with `defaultValue:` (the Bots mode + button's "New" is not the unread
 badge's "New").
 
 ## Catalog and build workflow

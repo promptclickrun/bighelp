@@ -801,6 +801,23 @@
         }
       }
     },
+    "Add this project in Code to read its changes here.": {
+      "comment": "Simplified Chinese draft for the renamed modes (#527 after #528); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add this project in Code to read its changes here."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "在代码模式中添加此项目后，即可在这里查看它的改动。"
+          }
+        }
+      }
+    },
     "Add to chat": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -2413,6 +2430,23 @@
         }
       }
     },
+    "Chat mode": {
+      "comment": "Simplified Chinese draft for the renamed modes (#527 after #528); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chat mode"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "聊天模式"
+          }
+        }
+      }
+    },
     "Chat replies and completions": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -2984,7 +3018,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "编程"
+            "value": "代码"
           }
         }
       }
@@ -3001,7 +3035,24 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "编程模式"
+            "value": "代码模式"
+          }
+        }
+      }
+    },
+    "Code needs your computer": {
+      "comment": "Simplified Chinese draft for the renamed modes (#527 after #528); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Code needs your computer"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "代码模式需要你的电脑"
           }
         }
       }
@@ -5822,6 +5873,23 @@
         }
       }
     },
+    "Loading Code": {
+      "comment": "Simplified Chinese draft for the renamed modes (#527 after #528); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loading Code"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "正在载入代码模式"
+          }
+        }
+      }
+    },
     "Loading channels…": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -6806,6 +6874,23 @@
         }
       }
     },
+    "Next mode": {
+      "comment": "Simplified Chinese draft for the renamed modes (#527 after #528); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next mode"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "下一个模式"
+          }
+        }
+      }
+    },
     "No bots found": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -7601,6 +7686,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "启动模式"
+          }
+        }
+      }
+    },
+    "Open it from the menu in Code.": {
+      "comment": "Simplified Chinese draft for the renamed modes (#527 after #528); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open it from the menu in Code."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "请在代码模式的菜单中打开它。"
           }
         }
       }
@@ -11366,7 +11468,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "在每个主页顶部切换机器人、聊天和编程。"
+            "value": "在每个主页顶部切换机器人、聊天和代码。"
           }
         }
       }

@@ -55,6 +55,8 @@ struct LocalizationTests {
             ("Rearrange", "重新排列"), ("Instructions", "指令"), ("Default Model", "默认模型"),
             ("Routines", "例行任务"), ("Teamwork", "团队协作"), ("Agents messaging each other", "智能体之间的消息"),
             ("Quiet Hours", "勿扰时段"), ("Chat layout", "聊天布局"), ("Multi-gateway", "多网关"),
+            ("Bots", "机器人"), ("Chat", "聊天"), ("Code", "代码"), ("Bots mode", "机器人模式"),
+            ("Code mode", "代码模式"), ("Unified Mode Toggle", "统一模式切换"),
         ]
         for (key, value) in expected {
             #expect(chinese.localizedString(forKey: key, value: nil, table: nil) == value)

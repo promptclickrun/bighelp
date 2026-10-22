@@ -37,6 +37,9 @@ SIMPLE_BOTS_AND_TEAMWORK = {
     "Agents messaging each other", "Quiet Hours", "Notify Me About", "Send Test Notification",
     "Turn Off Notifications", "Channels", "Open on", "Return sends", "Bot chat experience",
     "Chat layout", "App layout", "Light mode", "Dark mode", "Text and buttons", "Bottom bar",
+    # The modes after their 2.6.11 rename (#528).
+    "Bots", "Chat", "Code", "Bots mode", "Chat mode", "Code mode", "Next mode", "Unified Mode Toggle",
+    "Switch between Bots, Chat and Code from the top of each home.",
 }
 PLURALS = {"Your %lld agents know each other and ask each other for help.",
            "Your %lld bots know each other and ask each other for help.", "%lld messages with %@"}

@@ -255,6 +255,27 @@ final class LocalizationUITests: BighelpUITestCase {
         }
     }
 
+    /// The Unified Mode Toggle's pill on Bots mode's home: Bots, Chat and Code (#528).
+    func testModePillInBothLanguagesAndAppearances() {
+        for (language, appearance) in variants {
+            let say = { (english: String, chinese: String) in language == "en" ? english : chinese }
+            let app = localizedApp(language, appearance, extra: [
+                "-bighelp.settings.simple-bots", "YES", "-bighelp.settings.unified-mode-toggle", "YES",
+                "-bighelp.settings.code-mode", "YES",
+            ])
+            app.launch()
+            let bots = app.buttons["mode.pill.bots"]
+            XCTAssertTrue(bots.waitForExistence(timeout: 20))
+            XCTAssertTrue(bots.isSelected)
+            XCTAssertEqual(bots.label, say("Bots", "机器人"))
+            XCTAssertEqual(app.buttons["mode.pill.chat"].label, say("Chat", "聊天"))
+            XCTAssertEqual(app.buttons["mode.pill.code"].label, say("Code", "代码"))
+            XCTAssertEqual(app.buttons["simple-bots.search"].label, say("Search bots", "搜索机器人"))
+            capture("mode-pill", language, appearance)
+            app.terminate()
+        }
+    }
+
     private func localizedApp(_ language: String, _ appearance: String, extra: [String] = []) -> XCUIApplication {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.settings.nerd-mode", "NO",

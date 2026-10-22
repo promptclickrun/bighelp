@@ -78,8 +78,8 @@ struct SimpleBotsSearchView: View {
             List(bots) { profile in
                 Button { onOpen(profile.id) } label: {
                     HStack(spacing: BighelpTokens.space16) {
-                        SimpleBotFace(agentID: profile.id, name: profile.name,
-                                      imageURL: context.agents.avatarURL(for: profile), size: 56)
+                        SimpleBotLiveFace(bot: SimpleBotsBot(profile, imageURL: context.agents.avatarURL(for: profile)),
+                                          size: 56, activity: context.activity)
                         VStack(alignment: .leading, spacing: 3) {
                             HStack {
                                 Text(profile.name)
@@ -114,6 +114,7 @@ struct SimpleBotsSearchView: View {
                         context.onOpenProfile(profile.id)
                     }
                 }
+                .modifier(SimpleBotActivityValue(key: BotChatActivityStore.liveKey(profile.id), activity: context.activity))
                 .accessibilityIdentifier("simple-bots.search.bot.\(profile.id)")
             }
             .listStyle(.plain)

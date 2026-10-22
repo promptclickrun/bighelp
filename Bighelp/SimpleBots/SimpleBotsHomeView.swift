@@ -23,6 +23,9 @@ struct SimpleBotsContext {
     let onRoutines: (String) -> Void
     /// Multi-gateway: every other gateway's bots too; nil when it's off.
     var gateways: SimpleBotsGateways? = nil
+    /// Which bots are working or need you, kept current while the home shows.
+    var activity: BotChatActivityStore? = nil
+    var activitySource: BotChatActivitySource? = nil
 }
 
 /// Simple Bot mode's Multi-gateway: every gateway's bots in one home, the gateway in use's live and the
@@ -63,6 +66,9 @@ struct SimpleBotsBot: Identifiable, Equatable {
     var profile: AgentProfile? = nil
     /// On another gateway: the all-hosts copy, which Pin and Hide go through.
     var fleetAgent: FleetAgent? = nil
+
+    /// Where its Bot Chat's state is kept: by profile on the gateway in use, by `FleetID` on another.
+    var activityKey: String { fleetAgent == nil ? BotChatActivityStore.liveKey(profileID) : id }
 
     /// Its face's characters and marks on this device are kept per gateway (`CompanionSurfaceScope`).
     var faceScope: String? {
@@ -362,6 +368,7 @@ struct SimpleBotsHomeView: View {
     private let order = SimpleBotsOrderStore.shared
     /// Filter by Gateway: the gateway shown (its ID), or every one (empty).
     @AppStorage("bighelp.simple-bots.gateway-filter.shown") private var shownGateway = ""
+    @Environment(\.scenePhase) private var scenePhase
     @BighelpThemeReader private var theme
 
     private var home: SimpleBotsHomeProjection.Home {
@@ -462,6 +469,7 @@ struct SimpleBotsHomeView: View {
         }
         .safeAreaInset(edge: .top, spacing: 0) { header }
         .background(theme.canvas.ignoresSafeArea())
+        .botChatActivityUpdates(context.activity, source: context.activitySource, isActive: scenePhase == .active)
         .bighelpSheet(item: $sheet) { sheet in sheetView(sheet) }
         .alert("Couldn't hide this bot", isPresented: Binding(get: { hideError != nil },
                                                              set: { if !$0 { hideError = nil } })) {
@@ -613,9 +621,7 @@ struct SimpleBotsHomeView: View {
             openBot(bot)
         } label: {
             VStack(spacing: BighelpTokens.space12) {
-                SimpleBotFace(agentID: bot.profileID, name: bot.name, imageURL: bot.imageURL,
-                              size: size, isPrimary: isPrimary, blinks: true)
-                    .companionScope(bot.faceScope)
+                SimpleBotLiveFace(bot: bot, size: size, isPrimary: isPrimary, blinks: true, activity: context.activity)
                 HStack(spacing: BighelpTokens.space4) {
                     Text(bot.name)
                         .font(.bighelp(.subheadline))
@@ -636,6 +642,7 @@ struct SimpleBotsHomeView: View {
                 .companionScope(bot.faceScope)
         }
         .accessibilityLabel(isPrimary ? "\(bot.name), your primary bot" : "\(bot.name), pinned")
+        .modifier(SimpleBotActivityValue(key: bot.activityKey, activity: context.activity))
         .accessibilityHint("Opens its chat")
         .accessibilityIdentifier(isPrimary ? "simple-bots.primary" : "simple-bots.pinned.\(bot.id)")
     }
@@ -672,7 +679,8 @@ struct SimpleBotsHomeView: View {
                 SimpleBotsRowLabel(
                     face: AnyView(botFace(bot, size: 56)),
                     title: bot.name, role: bot.role, preview: item.preview, date: item.date,
-                    isUnread: isUnread(bot), isPinned: item.isPinned)
+                    isUnread: isUnread(bot), isPinned: item.isPinned,
+                    activityKey: bot.activityKey, activity: context.activity)
             }
             .buttonStyle(.plain)
             .contextMenu {
@@ -681,6 +689,7 @@ struct SimpleBotsHomeView: View {
                 SimpleBotsPreview(agentID: bot.profileID, name: bot.name, imageURL: bot.imageURL, message: item.preview)
                     .companionScope(bot.faceScope)
             }
+            .modifier(SimpleBotActivityValue(key: bot.activityKey, activity: context.activity))
             .accessibilityIdentifier("simple-bots.bot.\(bot.id)")
         case .group(let summary):
             Button {
@@ -701,8 +710,7 @@ struct SimpleBotsHomeView: View {
     }
 
     private func botFace(_ bot: SimpleBotsBot, size: CGFloat) -> some View {
-        SimpleBotFace(agentID: bot.profileID, name: bot.name, imageURL: bot.imageURL, size: size)
-            .companionScope(bot.faceScope)
+        SimpleBotLiveFace(bot: bot, size: size, activity: context.activity)
     }
 
     private func groupFaces(_ summary: SessionSummary) -> some View {
@@ -955,6 +963,7 @@ struct SimpleBotsHomeView: View {
 }
 
 /// A home row: the face, the name and what the bot does over the latest message, and its time.
+/// While the bot's Bot Chat works or needs you, that takes the latest message's line.
 private struct SimpleBotsRowLabel: View {
     let face: AnyView
     let title: String
@@ -963,7 +972,15 @@ private struct SimpleBotsRowLabel: View {
     let date: Date?
     let isUnread: Bool
     let isPinned: Bool
+    var activityKey: String? = nil
+    var activity: BotChatActivityStore? = nil
     @BighelpThemeReader private var theme
+
+    /// Read here, so only this row redraws when its bot's state changes.
+    private var busy: BotChatActivity? {
+        guard let activityKey, let value = activity?.activity(activityKey), value.isBusy else { return nil }
+        return value
+    }
 
     var body: some View {
         HStack(spacing: BighelpTokens.space16) {
@@ -1003,7 +1020,14 @@ private struct SimpleBotsRowLabel: View {
                         Circle().fill(theme.information).frame(width: 9, height: 9).accessibilityLabel("Unread")
                     }
                 }
-                if let preview = preview.map(SessionPreviewText.plain), !preview.isEmpty {
+                if let busy, let line = busy.line {
+                    Text(line)
+                        .font(.bighelp(.body, weight: .medium))
+                        .foregroundStyle(busy == .waiting ? BighelpBrand.ember : theme.action)
+                        .lineLimit(1)
+                        // The row says it as its value.
+                        .accessibilityHidden(true)
+                } else if let preview = preview.map(SessionPreviewText.plain), !preview.isEmpty {
                     Text(preview)
                         .font(.bighelp(.body))
                         .foregroundStyle(theme.secondaryText)
@@ -1109,6 +1133,31 @@ private extension View {
             .shadow(color: .black.opacity(dragging == key ? 0.25 : 0), radius: 12, y: 6)
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(space)) } action: { frame($0) }
             .zIndex(dragging == key ? 1 : 0)
+    }
+}
+
+/// A bot's face with its Bot Chat state, read here so only this face redraws when it changes.
+struct SimpleBotLiveFace: View {
+    let bot: SimpleBotsBot
+    let size: CGFloat
+    var isPrimary = false
+    var blinks = false
+    let activity: BotChatActivityStore?
+
+    var body: some View {
+        SimpleBotFace(agentID: bot.profileID, name: bot.name, imageURL: bot.imageURL, size: size,
+                      isPrimary: isPrimary, blinks: blinks, activity: activity?.activity(bot.activityKey))
+            .companionScope(bot.faceScope)
+    }
+}
+
+/// VoiceOver says what a bot is doing after its name: the row's, tile's or result's value.
+struct SimpleBotActivityValue: ViewModifier {
+    let key: String
+    let activity: BotChatActivityStore?
+
+    func body(content: Content) -> some View {
+        content.accessibilityValue(activity?.activity(key)?.accessibilityLabel ?? "")
     }
 }
 

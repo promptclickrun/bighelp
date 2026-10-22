@@ -276,16 +276,18 @@ extension AgentDirectoryPresentation {
     }
 }
 
-/// Live states derived only from authoritative Hermes state. Agents have no
-/// per-profile activity feed yet, so the only agent-level signal is a Bot Mode
-/// approval waiting on one of that agent's group memberships; everything else
-/// stays `.idle` rather than inventing status.
+/// Live states derived only from authoritative Hermes state: what each agent's
+/// Bot Chat is doing (`BotChatActivityStore`), and a Bot Mode approval waiting on
+/// one of that agent's group memberships, which outranks working. Everything
+/// else stays `.idle` rather than inventing status.
 enum AgentLiveStatePresentation {
     static func agentStates(
         rooms: [HermesBotModeRoomSummary],
-        pendingApprovals: (String) -> [HermesBotModePendingApproval]
+        pendingApprovals: (String) -> [HermesBotModePendingApproval],
+        botChats: [String: BotChatActivity] = [:]
     ) -> [String: AgentLiveState] {
         var states: [String: AgentLiveState] = [:]
+        for (profile, activity) in botChats where activity.isBusy { states[profile] = activity.liveState }
         for room in rooms where !room.isDisbanded {
             for approval in pendingApprovals(room.roomID) {
                 guard let profile = room.members.first(where: { $0.memberID == approval.memberID })?.profile

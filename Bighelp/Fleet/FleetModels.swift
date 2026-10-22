@@ -49,6 +49,9 @@ struct FleetAgent: Codable, Equatable, Sendable, Identifiable {
     var activity: FleetActivity?
     /// Its section and whether it's hidden, as saved on its host.
     var placement: AgentListPlacement? = nil
+    /// What its Bot Chat was doing when its host was read; nil when that host's plugin can't say
+    /// (`native-agents-activity-v1`).
+    var botChat: FleetBotChat? = nil
 
     var id: String { FleetID.make(hostID, profileID) }
     var isHidden: Bool { placement?.isHidden == true }
@@ -67,6 +70,30 @@ struct FleetGroup: Codable, Equatable, Sendable, Identifiable {
     var canDelete: Bool
 
     var id: String { FleetID.make(hostID, "group/" + roomID) }
+}
+
+/// An agent's Bot Chat when its host was read, from the plugin's `agents/activity`.
+struct FleetBotChat: Codable, Equatable, Sendable {
+    enum State: String, Codable, Sendable { case idle, working, waiting }
+
+    var state: State
+    var tool: String? = nil
+
+    init(_ activity: BotChatActivity) {
+        switch activity {
+        case .idle: state = .idle
+        case .working(let tool): state = .working; self.tool = tool
+        case .waiting: state = .waiting
+        }
+    }
+
+    var activity: BotChatActivity {
+        switch state {
+        case .idle: .idle
+        case .working: .working(tool: tool)
+        case .waiting: .waiting
+        }
+    }
 }
 
 enum FleetActivity: String, Codable, Sendable {

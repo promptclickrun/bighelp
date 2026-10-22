@@ -214,6 +214,10 @@ final class RegistryFleetReader: FleetHostReading {
             else if live.values.contains("waiting") { activity[profile.id] = .waiting }
         }
 
+        // Each agent's Bot Chat in one read, where the host's plugin has it; otherwise the agents' chats above.
+        let botChats = await DirectHermesBotChatActivityClient(currentWorkspace: { workspace })
+            .activity(agentIDs: profiles.map(\.id)) ?? [:]
+
         let tasks = (try? await DirectHermesScheduledTasksClient(
             workspace: workspace, owner: owner, currentOwner: current, http: client
         ).list(agentID: nil)) ?? []
@@ -221,7 +225,8 @@ final class RegistryFleetReader: FleetHostReading {
         let agents = profiles.map { profile in
             FleetAgent(hostID: hostID, profileID: profile.id, name: profile.name, role: profile.role,
                        avatarFile: profile.avatar.flatMap { avatars.store($0) }, isPinned: pinned.contains(profile.id),
-                       isDefault: profile.isDefault, activity: activity[profile.id], placement: profile.placement)
+                       isDefault: profile.isDefault, activity: activity[profile.id], placement: profile.placement,
+                       botChat: botChats[profile.id].map(FleetBotChat.init))
         }
         // Codex and Claude Code chats on that computer; an older Hermes can't list them.
         let defaultProfile = profiles.first(where: \.isDefault)?.id ?? profiles.first?.id ?? "default"

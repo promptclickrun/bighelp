@@ -1009,6 +1009,7 @@ private struct GenerativeUIFormSheet: View {
         let options: [Option]
         let maximumSelected: Int?
         let defaultValue: BighelpJSONValue?
+        let limits: GenerativeUIFormFieldLimits
 
         init?(_ value: BighelpJSONValue) {
             guard
@@ -1033,6 +1034,7 @@ private struct GenerativeUIFormSheet: View {
             }
             maximumSelected = object["max_selected"]?.integer
             defaultValue = object["default"]
+            limits = (try? GenerativeUIFormFieldLimits(object, kind: kind)) ?? GenerativeUIFormFieldLimits()
         }
     }
 
@@ -1040,6 +1042,7 @@ private struct GenerativeUIFormSheet: View {
     /// Sends the finished answers to the agent; throws when the chat can't.
     let send: @MainActor (String) throws -> Void
     private let fields: [Field]
+    private let dates = GenerativeUIFormDate()
 
     @State private var textValues: [String: String]
     @State private var toggleValues: [String: Bool]
@@ -1064,8 +1067,13 @@ private struct GenerativeUIFormSheet: View {
                     (field.defaultValue?.array ?? []).compactMap(\.string)
                 )
             case "date":
-                text[field.id] = field.defaultValue?.string
-                    ?? Date.now.formatted(.iso8601.year().month().day().dateSeparator(.dash))
+                text[field.id] = field.defaultValue?.string ?? dates.today(within: field.limits)
+            // Numbers as `Int`/`Double` read them back: the display text rounds to two
+            // places and groups thousands, so a default could fail its own range.
+            case "integer":
+                text[field.id] = field.defaultValue?.integer.map(String.init) ?? ""
+            case "decimal":
+                text[field.id] = field.defaultValue?.number.map { String($0) } ?? ""
             default:
                 text[field.id] = field.defaultValue?.displayText ?? ""
             }
@@ -1187,13 +1195,10 @@ private struct GenerativeUIFormSheet: View {
                     .keyboardType(.decimalPad)
                     .textFieldStyle(.roundedBorder)
             case "date":
-                DatePicker(
-                    field.label,
-                    selection: dateBinding(field.id),
-                    displayedComponents: .date
-                )
-                .labelsHidden()
-                .tint(theme.action)
+                datePicker(field)
+                    .labelsHidden()
+                    .tint(theme.action)
+                    .environment(\.timeZone, dates.timeZone)
             default:
                 TextField("Enter a response", text: textBinding(field.id))
                     .textFieldStyle(.roundedBorder)
@@ -1203,6 +1208,27 @@ private struct GenerativeUIFormSheet: View {
                     .bighelpFont(.metadata)
                     .foregroundStyle(theme.secondaryText)
             }
+            if let hint = field.limits.hint {
+                Text(hint)
+                    .bighelpFont(.metadata)
+                    .foregroundStyle(theme.secondaryText)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func datePicker(_ field: Field) -> some View {
+        let earliest = field.limits.earliestDate.flatMap(dates.date(from:))
+        let latest = field.limits.latestDate.flatMap(dates.date(from:))
+        switch (earliest, latest) {
+        case let (earliest?, latest?) where earliest <= latest:
+            DatePicker(field.label, selection: dateBinding(field.id), in: earliest...latest, displayedComponents: .date)
+        case let (earliest?, nil):
+            DatePicker(field.label, selection: dateBinding(field.id), in: earliest..., displayedComponents: .date)
+        case let (nil, latest?):
+            DatePicker(field.label, selection: dateBinding(field.id), in: ...latest, displayedComponents: .date)
+        default:
+            DatePicker(field.label, selection: dateBinding(field.id), displayedComponents: .date)
         }
     }
 
@@ -1241,12 +1267,14 @@ private struct GenerativeUIFormSheet: View {
             case "integer":
                 let raw = (textValues[field.id] ?? "").trimmingCharacters(in: .whitespaces)
                 if raw.isEmpty, !field.required { continue }
-                guard let value = Int(raw) else { throw BighelpLinkWireError.invalidValue }
+                guard let value = Int(raw), field.limits.admits(number: Double(value)) else {
+                    throw BighelpLinkWireError.invalidValue
+                }
                 result[field.id] = .integer(value)
             case "decimal":
                 let raw = (textValues[field.id] ?? "").trimmingCharacters(in: .whitespaces)
                 if raw.isEmpty, !field.required { continue }
-                guard let value = Double(raw), value.isFinite else {
+                guard let value = Double(raw), value.isFinite, field.limits.admits(number: value) else {
                     throw BighelpLinkWireError.invalidValue
                 }
                 result[field.id] = .number(value)
@@ -1256,6 +1284,12 @@ private struct GenerativeUIFormSheet: View {
                 guard !value.isEmpty || !field.required else {
                     throw BighelpLinkWireError.invalidValue
                 }
+                let admitted = switch field.kind {
+                case "text", "textarea": field.limits.admits(text: value)
+                case "date": field.limits.admits(date: value)
+                default: true
+                }
+                guard admitted else { throw BighelpLinkWireError.invalidValue }
                 result[field.id] = .string(value)
             }
         }
@@ -1277,14 +1311,9 @@ private struct GenerativeUIFormSheet: View {
     }
 
     private func dateBinding(_ id: String) -> Binding<Date> {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "yyyy-MM-dd"
-        return Binding(
-            get: { formatter.date(from: textValues[id] ?? "") ?? .now },
-            set: { textValues[id] = formatter.string(from: $0) }
+        Binding(
+            get: { dates.date(from: textValues[id] ?? "") ?? .now },
+            set: { textValues[id] = dates.text(from: $0) }
         )
     }
 

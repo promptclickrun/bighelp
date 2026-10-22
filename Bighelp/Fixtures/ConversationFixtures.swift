@@ -287,11 +287,15 @@ enum ConversationFixtures {
                 "description": "A few details so I can book the right things.",
                 "submit_label": "Send",
                 "fields": [
-                    ["id": "travelers", "kind": "integer", "label": "Travelers", "required": true, "default": 2],
+                    ["id": "travelers", "kind": "integer", "label": "Travelers", "required": true,
+                     "min": 1, "max": 8, "default": 2],
+                    ["id": "leaving", "kind": "date", "label": "Leaving", "required": true,
+                     "min": "2026-11-06", "max": "2026-11-27"],
                     ["id": "pace", "kind": "select", "label": "Pace", "required": true,
                      "options": [["id": "slow", "label": "Slow and easy"], ["id": "packed", "label": "Packed"]]],
                     ["id": "pet", "kind": "toggle", "label": "Bringing the dog", "required": false],
-                    ["id": "notes", "kind": "textarea", "label": "Anything else", "required": false],
+                    ["id": "notes", "kind": "textarea", "label": "Anything else", "required": false,
+                     "max_length": 300],
                 ],
             ],
         ]) { $1 })

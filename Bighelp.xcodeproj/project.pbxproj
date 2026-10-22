@@ -1165,6 +1165,7 @@
 		B3F9F117624746C5AF0CEC6B /* ChatToolPhrase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91D4F8D182EE30C5C7CDB870 /* ChatToolPhrase.swift */; };
 		B44B30DBBAFA2B7EDB45621A /* SimpleBotsUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F0FDE4E094EF1BBFD3E82DD /* SimpleBotsUITests.swift */; };
 		B46FB0AC1F4E70E1C70B859E /* RichDraftMarkdown.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A37E1D59199BAE6514567D0 /* RichDraftMarkdown.swift */; };
+		B472C7AE7FE52D0A877D7887 /* valid-form.json in Resources */ = {isa = PBXBuildFile; fileRef = C092C3BB9D2A2FEE279DC7CF /* valid-form.json */; };
 		B480B5B9FCECB638734C0B2A /* ComposerReturnKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD099D1782E37EF7351F4BA0 /* ComposerReturnKey.swift */; };
 		B49607CCA26B13A8F4BC854C /* SpatialAvatarPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = C391D786C632E57338EFE988 /* SpatialAvatarPreview.swift */; };
 		B4A1A8290340F5953ED5876D /* BighelpLoaderGallery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 301F7F2D182A2BEC6F9B21B1 /* BighelpLoaderGallery.swift */; };
@@ -2996,6 +2997,7 @@
 		C02FFC8B5348F4DF43A16DCB /* DirectHermesProtocolParityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectHermesProtocolParityTests.swift; sourceTree = "<group>"; };
 		C06088DA834BA508A22F95A2 /* BotScreenDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BotScreenDemo.swift; sourceTree = "<group>"; };
 		C0895D54237F25417076950B /* SettingsView+LocalData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsView+LocalData.swift"; sourceTree = "<group>"; };
+		C092C3BB9D2A2FEE279DC7CF /* valid-form.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "valid-form.json"; sourceTree = "<group>"; };
 		C0AC1DBD645E9917893BC329 /* WorkspaceCapabilityWireModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceCapabilityWireModels.swift; sourceTree = "<group>"; };
 		C0D3B38A3BDBBA33B939C4C1 /* BighelpWorkflowsWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpWorkflowsWidget.swift; sourceTree = "<group>"; };
 		C182FC3EE18A2D2F534B52A8 /* bighelp-trick-infinity.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "bighelp-trick-infinity.json"; sourceTree = "<group>"; };
@@ -5107,6 +5109,7 @@
 				55564C451754194E0EF381FF /* inbox-card-workspace.json */,
 				4D5BB3FF93B2BFBE1309307F /* sealed-alert-v2-vector.json */,
 				C0CE1E19E9A636C4F4384691 /* CardExamples */,
+				FEB73B139567EA4146800F9E /* GenerativeUIV2 */,
 				16F1EA0C90EF4FF985CF9DE8 /* Workflows */,
 			);
 			path = Fixtures;
@@ -5866,6 +5869,14 @@
 			path = Workflows;
 			sourceTree = "<group>";
 		};
+		FEB73B139567EA4146800F9E /* GenerativeUIV2 */ = {
+			isa = PBXGroup;
+			children = (
+				C092C3BB9D2A2FEE279DC7CF /* valid-form.json */,
+			);
+			path = GenerativeUIV2;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -6225,6 +6236,7 @@
 				9B41521E8E403207449452D5 /* templates-use-yours.json in Resources */,
 				DA1FFAB77004F6B2F259E162 /* templates-use.json in Resources */,
 				73C02F89EE3653F5A0DF37A4 /* unarchive.json in Resources */,
+				B472C7AE7FE52D0A877D7887 /* valid-form.json in Resources */,
 				2D6695867A9C97F15A8DFB4B /* validate-v2.json in Resources */,
 				D5197A2ADE2728A19250FC7A /* validate.json in Resources */,
 			);

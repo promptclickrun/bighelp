@@ -125,7 +125,7 @@ enum ChatBrowserPreference: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .systemDefault: "System Default"
+        case .systemDefault: String(localized: "System Default")
         case .chrome: "Google Chrome"
         case .firefox: "Firefox"
         case .brave: "Brave"
@@ -224,17 +224,17 @@ enum BotChatExperience: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .botChat: "Persistent Bot Chat"
-        case .lastChat: "Open last chat"
-        case .newChat: "Open new chat"
+        case .botChat: String(localized: "Persistent Bot Chat")
+        case .lastChat: String(localized: "Open last chat")
+        case .newChat: String(localized: "Open new chat")
         }
     }
 
     var detail: String {
         switch self {
-        case .botChat: "Tapping an agent opens its one ongoing Bot Chat."
-        case .lastChat: "Tapping an agent opens your most recent chat with it."
-        case .newChat: "Tapping an agent starts a new chat with it."
+        case .botChat: String(localized: "Tapping an agent opens its one ongoing Bot Chat.")
+        case .lastChat: String(localized: "Tapping an agent opens your most recent chat with it.")
+        case .newChat: String(localized: "Tapping an agent starts a new chat with it.")
         }
     }
 }
@@ -325,18 +325,18 @@ enum WorkspaceSwipeAction: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .quickWorkspace: "Menu"
-        case .newChat: "New Chat"
-        case .sessions: "Sessions"
-        case .agents: "Agents"
-        case .home: "Home"
-        case .inbox: "Inbox"
-        case .profile: "Profile & Settings"
-        case .nextMode: "Next mode"
-        case .botsMode: "Bots mode"
-        case .chatMode: "Chat mode"
-        case .codeMode: "Code mode"
-        case .none: "Off"
+        case .quickWorkspace: String(localized: "Menu")
+        case .newChat: String(localized: "New Chat")
+        case .sessions: String(localized: "Sessions")
+        case .agents: String(localized: "Agents")
+        case .home: String(localized: "Home")
+        case .inbox: String(localized: "Inbox")
+        case .profile: String(localized: "Profile & Settings")
+        case .nextMode: String(localized: "Next mode")
+        case .botsMode: String(localized: "Bots mode")
+        case .chatMode: String(localized: "Chat mode")
+        case .codeMode: String(localized: "Code mode")
+        case .none: String(localized: "Off")
         }
     }
 

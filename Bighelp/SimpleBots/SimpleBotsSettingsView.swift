@@ -127,7 +127,7 @@ final class SimpleBotHostSettings {
             }
             apply(try await client.read(profile: profile))
         } catch {
-            errorMessage = "The computer didn't save that. Try again in a moment."
+            errorMessage = String(localized: "The computer didn't save that. Try again in a moment.")
         }
     }
 
@@ -276,7 +276,7 @@ struct SimpleBotsSettingsView: View {
             .accessibilityIdentifier("simple-bots.settings.you")
             SimpleBotsDivider()
             Button(action: context.onOpenUsage) {
-                SimpleBotsRow(title: "Usage", value: usagePercent.map { "\(Int($0.rounded()))%" })
+                SimpleBotsRow(title: String(localized: "Usage"), value: usagePercent.map { "\(Int($0.rounded()))%" })
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("simple-bots.settings.usage")
@@ -286,8 +286,9 @@ struct SimpleBotsSettingsView: View {
     private var appsCard: some View {
         SimpleBotsCard {
             NavigationLink(value: SimpleBotsSettingsPage.apps) {
-                SimpleBotsRow(title: "Connect apps",
-                              detail: "Tools and skills for \(primary?.name ?? "your bots")")
+                SimpleBotsRow(title: String(localized: "Connect apps"),
+                              detail: primary.map { String(localized: "Tools and skills for \($0.name)") }
+                                ?? String(localized: "Tools and skills for your bots"))
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("simple-bots.settings.apps")
@@ -297,14 +298,14 @@ struct SimpleBotsSettingsView: View {
     @ViewBuilder
     private var botSection: some View {
         VStack(alignment: .leading, spacing: BighelpTokens.space8) {
-            SimpleBotsSectionLabel(title: primary?.name ?? "Bot")
+            SimpleBotsSectionLabel(title: primary?.name ?? String(localized: "Bot"))
             SimpleBotsCard {
                 if let host = host, host.load == .loaded {
                     Toggle(isOn: Binding(get: { host.autoReview },
                                          set: { on in Task { await host.setAutoReview(on) } })) {
-                        rowText("Auto-review", detail: host.approvalsOff
-                                ? "Approvals are off on this computer: risky actions run without asking."
-                                : "A reviewer lets safe shell, MCP and computer actions through and asks you about risky ones.")
+                        rowText(String(localized: "Auto-review"), detail: host.approvalsOff
+                                ? String(localized: "Approvals are off on this computer: risky actions run without asking.")
+                                : String(localized: "A reviewer lets safe shell, MCP and computer actions through and asks you about risky ones."))
                     }
                     .tint(SimpleBotColor.green.color)
                     .disabled(host.isSaving)
@@ -313,7 +314,8 @@ struct SimpleBotsSettingsView: View {
                     .accessibilityIdentifier("simple-bots.settings.auto-review")
                     SimpleBotsDivider()
                     Button { isRulesPresented = true } label: {
-                        SimpleBotsRow(title: "Auto-review Rules", value: host.rules.isEmpty ? "None" : "Set")
+                        SimpleBotsRow(title: String(localized: "Auto-review Rules"),
+                                      value: host.rules.isEmpty ? String(localized: "None") : String(localized: "Set"))
                     }
                     .buttonStyle(.plain)
                     .disabled(!host.autoReview)
@@ -323,7 +325,8 @@ struct SimpleBotsSettingsView: View {
                         automaticTimeZone = on
                         if on { Task { await host.setTimeZone(TimeZone.current.identifier) } }
                     })) {
-                        rowText("Set Time Zone Automatically", detail: "Your bots' computer follows this device's time zone.")
+                        rowText(String(localized: "Set Time Zone Automatically"),
+                                detail: String(localized: "Your bots' computer follows this device's time zone."))
                     }
                     .tint(SimpleBotColor.green.color)
                     .padding(.horizontal, BighelpTokens.space20)
@@ -331,8 +334,8 @@ struct SimpleBotsSettingsView: View {
                     .accessibilityIdentifier("simple-bots.settings.auto-time-zone")
                     SimpleBotsDivider()
                     Button { isTimeZonePresented = true } label: {
-                        SimpleBotsRow(title: "Time Zone") {
-                            Text(host.timeZone.isEmpty ? "The computer's own" : host.timeZone)
+                        SimpleBotsRow(title: String(localized: "Time Zone")) {
+                            Text(host.timeZone.isEmpty ? String(localized: "The computer's own") : host.timeZone)
                                 .font(.bighelp(.body))
                                 .foregroundStyle(theme.secondaryText)
                                 .lineLimit(1)
@@ -360,9 +363,8 @@ struct SimpleBotsSettingsView: View {
                 }
                 if let teamwork {
                     SimpleBotsDivider()
-                    TeamworkToggle(model: teamwork) { detail in
-                        rowText("Teamwork", detail: detail.replacingOccurrences(of: "agents", with: "bots")
-                            .replacingOccurrences(of: "agent", with: "bot"))
+                    TeamworkToggle(model: teamwork, saysBots: true) { detail in
+                        rowText(String(localized: "Teamwork"), detail: detail)
                     }
                     .tint(SimpleBotColor.green.color)
                     .padding(.horizontal, BighelpTokens.space20)
@@ -370,7 +372,7 @@ struct SimpleBotsSettingsView: View {
                 }
                 SimpleBotsDivider()
                 Button { if let primary { context.onOpenComputer(primary.id) } } label: {
-                    SimpleBotsRow(title: "Bot Computer")
+                    SimpleBotsRow(title: String(localized: "Bot Computer"))
                 }
                 .buttonStyle(.plain)
                 .disabled(primary == nil)
@@ -382,19 +384,19 @@ struct SimpleBotsSettingsView: View {
     private var appCard: some View {
         SimpleBotsCard {
             NavigationLink(value: SimpleBotsSettingsPage.notifications) {
-                SimpleBotsRow(title: "Notifications")
+                SimpleBotsRow(title: String(localized: "Notifications"))
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("simple-bots.settings.notifications")
             SimpleBotsDivider()
             NavigationLink(value: SimpleBotsSettingsPage.chat) {
-                SimpleBotsRow(title: "Chat")
+                SimpleBotsRow(title: String(localized: "Chat"))
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("simple-bots.settings.chat")
             SimpleBotsDivider()
             NavigationLink(value: SimpleBotsSettingsPage.appearance) {
-                SimpleBotsRow(title: "Appearance", value: appearanceSummary)
+                SimpleBotsRow(title: String(localized: "Appearance"), value: appearanceSummary)
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("simple-bots.settings.appearance")
@@ -406,7 +408,8 @@ struct SimpleBotsSettingsView: View {
         SimpleBotsCard {
             Toggle(isOn: Binding(get: { context.settings.simpleBotsMultiGateway },
                                  set: { context.settings.simpleBotsMultiGateway = $0 })) {
-                rowText("Multi-gateway", detail: "Show, use and manage the bots on all your gateways.")
+                rowText(String(localized: "Multi-gateway"),
+                        detail: String(localized: "Show, use and manage the bots on all your gateways."))
             }
             .tint(SimpleBotColor.green.color)
             .padding(.horizontal, BighelpTokens.space20)
@@ -416,7 +419,8 @@ struct SimpleBotsSettingsView: View {
                 SimpleBotsDivider()
                 Toggle(isOn: Binding(get: { context.settings.simpleBotsGatewayFilter },
                                      set: { context.settings.simpleBotsGatewayFilter = $0 })) {
-                    rowText("Filter by Gateway", detail: "Adds a filter button beside Search, to show one gateway's bots.")
+                    rowText(String(localized: "Filter by Gateway"),
+                            detail: String(localized: "Adds a filter button beside Search, to show one gateway's bots."))
                 }
                 .tint(SimpleBotColor.green.color)
                 .padding(.horizontal, BighelpTokens.space20)
@@ -434,7 +438,7 @@ struct SimpleBotsSettingsView: View {
                         }
                     }
                 } label: {
-                    SimpleBotsRow(title: "Active gateway",
+                    SimpleBotsRow(title: String(localized: "Active gateway"),
                                   value: context.gateways.hosts.first(where: \.isSelected)?.name)
                 }
                 .buttonStyle(.plain)
@@ -447,7 +451,8 @@ struct SimpleBotsSettingsView: View {
         SimpleBotsCard {
             Toggle(isOn: Binding(get: { context.settings.simpleBotsEnabled },
                                  set: { context.settings.simpleBotsEnabled = $0 })) {
-                rowText("Bots mode", detail: "Turn off to see everything bighelp can do.")
+                rowText(String(localized: "Bots mode"),
+                        detail: String(localized: "Turn off to see everything bighelp can do."))
             }
             .tint(SimpleBotColor.green.color)
             .padding(.horizontal, BighelpTokens.space20)
@@ -460,7 +465,7 @@ struct SimpleBotsSettingsView: View {
                                       agentName: { id in context.agents.profiles.first { $0.id == id }?.name ?? id },
                                       onOpen: context.onOpenSession)
                 } label: {
-                    SimpleBotsRow(title: "Archived Chats")
+                    SimpleBotsRow(title: String(localized: "Archived Chats"))
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("simple-bots.settings.archived")
@@ -469,7 +474,7 @@ struct SimpleBotsSettingsView: View {
             NavigationLink {
                 context.allSettings()
             } label: {
-                SimpleBotsRow(title: "All Settings")
+                SimpleBotsRow(title: String(localized: "All Settings"))
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("simple-bots.settings.all")
@@ -479,9 +484,9 @@ struct SimpleBotsSettingsView: View {
     /// "System", "Light" or "Dark".
     private var appearanceSummary: String {
         switch context.settings.appearance {
-        case .system: "System"
-        case .light: "Light"
-        case .dark: "Dark"
+        case .system: String(localized: "System")
+        case .light: String(localized: "Light")
+        case .dark: String(localized: "Dark")
         }
     }
 

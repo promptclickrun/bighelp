@@ -17,12 +17,32 @@ not a claim that the whole app is translated.
 - Top-level Settings rows, identity controls, experience switches, appearance
   summary, assistant rows, and Nerd Mode entry.
 
-The initial Chinese text is an AI-assisted draft and remains `needs_review` in
+The second stage (#527) adds:
+
+- Bots mode (Simple Bot mode before 2.6.11): the home (pinned bots, the list, search,
+  the + menu, a bot's long-press menu, Rearrange, the gateway filter), New Bot and its
+  Templates sheet, New Group Chat, a bot's profile (Info, Computer, Files and Media tabs,
+  Instructions, Default Model, Routines), the voice bar, the opening loader, and its
+  short Settings.
+- Teamwork: the line where agents talk to each other ("Asked …", "… answered",
+  "N messages with …"), its sheet, the working and typing states, and the Teamwork
+  switch with its line. In Bots mode the switch says bots in sentences of its own.
+- The Settings pages these lead to: Experience, Assistants, Notifications (topics,
+  "Agents messaging each other", channels, workflows, Quiet Hours, test and turn-off),
+  Chat (with Nerd Mode's sections), and Appearance with Chat layout and App layout.
+- The modes after their 2.6.11 rename: Bots, Chat and Code, the Unified Mode Toggle,
+  and the mode edge swipes.
+
+The Chinese text is an AI-assisted draft and remains `needs_review` in
 the catalog. It has not received professional or fluent-speaker approval. Screenshots
 and automated checks establish rendering and lookup, not linguistic certification.
-Keep `bighelp`, `Hermes`, provider/model names, and product names intact. Initial
-terminology: Chat = 聊天, Sessions = 会话, Agents = 智能体, Bots = 机器人,
-Feed = 动态, Ideas = 灵感, Goals = 目标, host/computer = 电脑.
+Keep `bighelp`, `Hermes`, provider/model names, and product names intact. Terminology:
+the modes are Bots = 机器人, Chat = 聊天 and Code = 代码 (Bots mode = 机器人模式,
+Code mode = 代码模式; the Chat mode was called Sessions before 2.6.11). A list of
+chats is still Sessions = 会话. Agents = 智能体, Feed = 动态, Ideas = 灵感,
+Goals = 目标, host/computer = 电脑, Teamwork = 团队协作, primary bot = 主机器人,
+gateway = 网关, template = 模板, routine = 例行任务, pin = 置顶, Quiet Hours = 勿扰时段,
+channel = 渠道, Live Activities = 实时活动, Dynamic Island = 灵动岛.
 
 ## Adding copy
 
@@ -55,8 +75,16 @@ fragments. The catalog records interpolation as `%@`, `%lld`, etc.; retain every
 argument's type/count. Positional forms such as `%2$@` may reorder arguments.
 Use catalog plural variations for counts: English needs `one` and `other`, while
 Simplified Chinese uses `other`. The Teamwork summary is a working example.
-Use Foundation format styles for numbers, dates, and lists; do not hard-code
-English conjunctions or derive storage identifiers from display labels.
+Use Foundation format styles for numbers and dates; do not derive storage
+identifiers from display labels. Lists of names go through catalog keys
+(`%@ and %@`, `%@, %@ and %@`, the `, ` separator) because English keeps its
+existing "A, B and C" without a serial comma.
+
+A word swap can't be translated. When one screen says bots where another says
+agents, give it whole sentences of its own (Teamwork's `detail(saysBots:)`).
+When the same English means two things, give one of them its own key and keep the
+English with `defaultValue:` (the Bots mode + button's "New" is not the unread
+badge's "New").
 
 ## Catalog and build workflow
 
@@ -74,7 +102,9 @@ not included in Watch, widget, notification-extension, or fixture Mac targets.
    English-only entries are allowed and fall back to readable English.
 3. Run `python3 Scripts/check-localization.py`. It checks representative surface
    keys, source language, argument preservation, plural categories, and accidental
-   protocol/storage IDs. It is not an exhaustive scanner of every screen.
+   protocol/storage IDs. For the second stage's screens it also fails when bare
+   English reaches a plain-`String` helper (`SimpleBotsRow`, `settingLabel`, error and
+   status state, `?? "Fallback"`). It is not an exhaustive scanner of every screen.
 4. Run `xcodegen generate` whenever adding/removing resource or test files; commit
    the generated project. Never edit `project.pbxproj` by hand.
 5. Run `LocalizationTests` and `LocalizationUITests` with the `Bighelp` scheme on
@@ -92,11 +122,18 @@ names that happen to match catalog keys.
 
 ## Follow-up scope
 
-Deeper Settings pages, Simple Bot home/profile/settings, chat history/status/error
-copy, expanded chat tools and advanced model controls, host/proxy/plugin error
-messages, connection progress details, feature pages (Feed, Ideas, Goals, Files,
-Projects, Kanban, Workflows, Usage, IDE), and server-owned descriptions remain
-partially or wholly English. Onboarding mode-preview images still contain English
+Deeper Settings pages, chat history/status/error copy, expanded chat tools and
+advanced model controls, host/proxy/plugin error messages, connection progress
+details, feature pages (Feed, Ideas, Goals, Files, Projects, Kanban, Workflows,
+Usage, IDE), and server-owned descriptions remain partially or wholly English.
+Within the second stage's screens these stay English for now: the model and
+reasoning picker behind Default Model, a bot's screen (the Computer tab's
+contents), the routine editor, the avatar studio, Archived Chats, Apps, Usage,
+Notifications › Advanced › Provider details and the notification setup's status
+and error messages, catalog template text, and chat tool phrases (so a running
+agent-talk line reads "Nova：searching the web…"). The notification service names
+its topics in English; English shows those names and other languages show the
+app's own words for the same topics. Onboarding mode-preview images still contain English
 demo text; localize those assets in a later screenshot pass. A translated menu
 entry does not imply its entire destination is translated.
 

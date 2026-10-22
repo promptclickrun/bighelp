@@ -15,10 +15,10 @@ enum PermissionKind: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .notification: "Notifications"
-        case .camera: "Camera"
-        case .microphone: "Microphone"
-        case .speech: "Speech Recognition"
+        case .notification: String(localized: "Notifications")
+        case .camera: String(localized: "Camera")
+        case .microphone: String(localized: "Microphone")
+        case .speech: String(localized: "Speech Recognition")
         }
     }
 
@@ -34,13 +34,13 @@ enum PermissionKind: String, CaseIterable, Identifiable, Sendable {
     var purpose: String {
         switch self {
         case .notification:
-            "Receive proactive updates from your paired Hermes host."
+            String(localized: "Receive proactive updates from your paired Hermes host.")
         case .camera:
-            "Scan pairing codes, use Reflective Vision, and attach photos you choose to chats."
+            String(localized: "Scan pairing codes, use Reflective Vision, and attach photos you choose to chats.")
         case .microphone:
-            "Speak during a live voice conversation with your selected Hermes agent."
+            String(localized: "Speak during a live voice conversation with your selected Hermes agent.")
         case .speech:
-            "Turn speech into words for live voice conversations."
+            String(localized: "Turn speech into words for live voice conversations.")
         }
     }
 }
@@ -55,12 +55,12 @@ enum PermissionAuthorizationState: Equatable, Sendable {
 
     var statusTitle: String {
         switch self {
-        case .notDetermined: "Not Requested"
-        case .denied: "Denied"
-        case .restricted: "Restricted"
-        case .authorized: "Allowed"
-        case .provisional: "Provisional"
-        case .ephemeral: "Ephemeral"
+        case .notDetermined: String(localized: "Not Requested")
+        case .denied: String(localized: "Denied")
+        case .restricted: String(localized: "Restricted")
+        case .authorized: String(localized: "Allowed")
+        case .provisional: String(localized: "Provisional")
+        case .ephemeral: String(localized: "Ephemeral")
         }
     }
 
@@ -79,9 +79,9 @@ enum PermissionSettingState: Equatable, Sendable {
 
     var title: String {
         switch self {
-        case .enabled: "On"
-        case .disabled: "Off"
-        case .notSupported: "Not Supported"
+        case .enabled: String(localized: "On")
+        case .disabled: String(localized: "Off")
+        case .notSupported: String(localized: "Not Supported")
         }
     }
 }
@@ -382,15 +382,17 @@ struct PermissionRowPresentation: Equatable, Sendable {
 
     var actionTitle: String? {
         switch action {
-        case .request: "Allow " + kind.title
-        case .openSystemSettings: "Open System Settings"
+        case .request: String(localized: "Allow \(kind.title)")
+        case .openSystemSettings: String(localized: "Open System Settings")
         case .none: nil
         }
     }
 
     var detailText: String? {
         if let notification = status.notification {
-            return "Alerts \(notification.alert.title) · Sounds \(notification.sound.title) · Badges \(notification.badge.title)"
+            let alerts = notification.alert.title, sounds = notification.sound.title
+            let badges = notification.badge.title
+            return String(localized: "Alerts \(alerts) · Sounds \(sounds) · Badges \(badges)")
         }
         return nil
     }

@@ -12,9 +12,9 @@ struct SimpleBotsSearchView: View {
         var id: String { rawValue }
         var title: String {
             switch self {
-            case .all: "All bots"
-            case .pinned: "Pinned"
-            case .hidden: "Hidden"
+            case .all: String(localized: "All bots")
+            case .pinned: String(localized: "Pinned")
+            case .hidden: String(localized: "Hidden")
             }
         }
     }

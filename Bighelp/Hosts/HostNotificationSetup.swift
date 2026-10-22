@@ -53,18 +53,18 @@ enum BighelpWorkflowAlerts {
         var key: String { "bighelp.notifications.workflows.\(rawValue)" }
         var title: String {
             switch self {
-            case .needsYou: "Needs you"
-            case .succeeded: "Succeeded"
-            case .failed: "Failed"
-            case .cancelled: "Cancelled"
+            case .needsYou: String(localized: "Needs you")
+            case .succeeded: String(localized: "Succeeded")
+            case .failed: String(localized: "Failed")
+            case .cancelled: String(localized: "Cancelled")
             }
         }
         var detail: String {
             switch self {
-            case .needsYou: "A run waits for your sign-off, or needs a look."
-            case .succeeded: "A run finished."
-            case .failed: "A run stopped with a problem."
-            case .cancelled: "Someone cancelled a run."
+            case .needsYou: String(localized: "A run waits for your sign-off, or needs a look.")
+            case .succeeded: String(localized: "A run finished.")
+            case .failed: String(localized: "A run stopped with a problem.")
+            case .cancelled: String(localized: "Someone cancelled a run.")
             }
         }
     }
@@ -86,9 +86,9 @@ enum BighelpChannelAlerts {
         var id: String { rawValue }
         var title: String {
             switch self {
-            case .all: "All channels"
-            case .bighelp: "Only bighelp"
-            case .choose: "Choose"
+            case .all: String(localized: "All channels")
+            case .bighelp: String(localized: "Only bighelp")
+            case .choose: String(localized: "Choose")
             }
         }
     }
@@ -426,33 +426,35 @@ final class HostNotificationSetupModel {
         case .enabled:
             nil
         case .checking:
-            "Check Again"
+            String(localized: "Check Again")
         case .installing, .outcomeUnknown:
-            "Check Installed State"
+            String(localized: "Check Installed State")
         case .notConnected:
-            "Retry Connection"
+            String(localized: "Retry Connection")
         case .signInChanged:
-            "Check Setup Again"
+            String(localized: "Check Setup Again")
         case .installed:
-            enrollNotifications ? "Continue Notification Setup" : nil
+            enrollNotifications ? String(localized: "Continue Notification Setup") : nil
         case .verificationRequired:
-            enrollNotifications ? "Verify Notification Setup" : nil
+            enrollNotifications ? String(localized: "Verify Notification Setup") : nil
         case .notConfigured:
-            enrollNotifications ? "Enable Notifications" : "Install bighelp Plugin"
+            enrollNotifications ? String(localized: "Enable Notifications")
+                : String(localized: "Install bighelp Plugin")
         case .backendRestartRequired:
-            "Check After Backend Restart"
+            String(localized: "Check After Backend Restart")
         case .managementRejected:
-            "Retry Plugin Setup"
+            String(localized: "Retry Plugin Setup")
         case .permissionDenied:
-            "Check Host Permission Again"
+            String(localized: "Check Host Permission Again")
         case .unsupported:
-            "Check Host Support Again"
+            String(localized: "Check Host Support Again")
         case .replacementRequired:
-            "Check Installed Plugin Again"
+            String(localized: "Check Installed Plugin Again")
         case .releaseUnavailable:
-            "Try Again"
+            String(localized: "Try Again")
         case .prerequisitesRequired:
-            enrollNotifications ? "Try Notification Setup Again" : "Check Plugin Requirements Again"
+            enrollNotifications ? String(localized: "Try Notification Setup Again")
+                : String(localized: "Check Plugin Requirements Again")
         }
     }
 

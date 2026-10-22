@@ -292,7 +292,7 @@ struct SettingsView: View {
             } extras: {
                 if settings.nerdModeEnabled {
                     NavigationLink {
-                        settingsDone(settingsPage(title: "Connection") {
+                        settingsDone(settingsPage(title: String(localized: "Connection")) {
                             currentConnection
                             BighelpPluginCapabilitiesSection(connections: workspaceConnections,
                                                              permissionCenter: permissionCenter,
@@ -404,7 +404,7 @@ struct SettingsView: View {
     private func simpleBotsPageContent(_ page: SimpleBotsSettingsPage) -> some View {
         switch page {
         case .you:
-            settingsDone(settingsPage(title: "You") { localIdentity })
+            settingsDone(settingsPage(title: String(localized: "You")) { localIdentity })
         case .appearance:
             settingsDone(destination(for: .appearance))
         case .notifications:

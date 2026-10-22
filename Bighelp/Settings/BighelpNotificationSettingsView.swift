@@ -119,11 +119,11 @@ struct BighelpNotificationSettingsView: View {
                                 let receipt = try await sendTest()
                                 guard isCurrent(), token == operationToken else { return }
                                 testMessage = receipt.state == .accepted
-                                    ? "Test sent. Check your notifications."
-                                    : "Test failed. Try again."
+                                    ? String(localized: "Test sent. Check your notifications.")
+                                    : String(localized: "Test failed. Try again.")
                             } catch {
                                 guard isCurrent(), token == operationToken else { return }
-                                testMessage = "Couldn't confirm the test. Check your notifications before retrying."
+                                testMessage = String(localized: "Couldn't confirm the test. Check your notifications before retrying.")
                             }
                         }
                     }
@@ -255,21 +255,26 @@ struct BighelpNotificationSettingsView: View {
 
     private static func progressText(_ step: BighelpNotificationTurnOffStep) -> String {
         switch step {
-        case .hosts: "Removing this device from your computers…"
-        case .service: "Deleting it from the notification service…"
-        case .device: "Deleting notification data on this device…"
+        case .hosts: String(localized: "Removing this device from your computers…")
+        case .service: String(localized: "Deleting it from the notification service…")
+        case .device: String(localized: "Deleting notification data on this device…")
         }
     }
 
     private func awaitingCleanupMessage(_ turnOff: BighelpNotificationTurnOff) -> String? {
         let hosts = turnOff.hostsAwaitingCleanup()
         guard !hosts.isEmpty else { return nil }
-        return "Notifications are off. \(Self.list(hosts)) still \(hosts.count == 1 ? "has" : "have") a copy of this device's notification data. It can't send you anything, and bighelp removes it the next time it can reach \(hosts.count == 1 ? "it" : "them")."
+        let names = Self.list(hosts)
+        return hosts.count == 1
+            ? String(localized: "Notifications are off. \(names) still has a copy of this device's notification data. It can't send you anything, and bighelp removes it the next time it can reach it.")
+            : String(localized: "Notifications are off. \(names) still have a copy of this device's notification data. It can't send you anything, and bighelp removes it the next time it can reach them.")
     }
 
+    /// "Studio", "Studio and Laptop", "Studio, Laptop and Den".
     private static func list(_ names: [String]) -> String {
-        names.count < 3 ? names.joined(separator: " and ")
-            : names.dropLast().joined(separator: ", ") + " and " + names[names.count - 1]
+        guard let last = names.last, names.count > 1 else { return names.first ?? "" }
+        let head = names.dropLast().joined(separator: String(localized: ", ", comment: "Between names in a list"))
+        return String(localized: "\(head) and \(last)")
     }
 
     private func runTurnOff() async {
@@ -286,12 +291,12 @@ struct BighelpNotificationSettingsView: View {
             BighelpNotificationLastFailure.clear()
             if result.registrationLeftOnService {
                 // Honest about what wasn't done: the old key couldn't be read, so it wasn't cancelled.
-                turnOffMessage = "Notifications are off, and this device's notification data was deleted. bighelp couldn't read this device's old notification key, so the notification service may keep its old registration. If alerts still come, turn them off for bighelp in iOS Settings."
+                turnOffMessage = String(localized: "Notifications are off, and this device's notification data was deleted. bighelp couldn't read this device's old notification key, so the notification service may keep its old registration. If alerts still come, turn them off for bighelp in iOS Settings.")
             } else if result.unreachableHosts.isEmpty {
-                turnOffMessage = "Notifications are off, and this device's notification data was deleted. To stop bighelp asking iOS for alerts too, turn them off in iOS Settings."
+                turnOffMessage = String(localized: "Notifications are off, and this device's notification data was deleted. To stop bighelp asking iOS for alerts too, turn them off in iOS Settings.")
             } else {
                 turnOffMessage = awaitingCleanupMessage(turnOff)
-                    ?? "Notifications are off. Some computers couldn't be reached yet; bighelp will finish there later."
+                    ?? String(localized: "Notifications are off. Some computers couldn't be reached yet; bighelp will finish there later.")
             }
         } catch {
             turnOffStep = nil
@@ -321,9 +326,9 @@ struct BighelpNotificationSettingsView: View {
 
     private static var systemNotificationsTitle: String {
         #if targetEnvironment(macCatalyst)
-        "Mac notifications"
+        String(localized: "Mac notifications")
         #else
-        "iOS notifications"
+        String(localized: "iOS notifications")
         #endif
     }
 
@@ -532,11 +537,13 @@ struct BighelpNotificationSettingsView: View {
 
     private var quietHoursFooter: String {
         guard quietHours.enabled else {
-            return "Your computers send this device no notifications in these hours. Replies still wait in the chat."
+            return String(localized: "Your computers send this device no notifications in these hours. Replies still wait in the chat.")
         }
-        guard !quietHours.isEmpty else { return "Pick a different start and end time." }
-        let next = quietHours.crossesMidnight ? " the next day" : ""
-        return "From \(Self.clock(quietHours.startMinute)) to \(Self.clock(quietHours.endMinute))\(next), your computers send this device no notifications. Replies still wait in the chat."
+        guard !quietHours.isEmpty else { return String(localized: "Pick a different start and end time.") }
+        let start = Self.clock(quietHours.startMinute), end = Self.clock(quietHours.endMinute)
+        return quietHours.crossesMidnight
+            ? String(localized: "From \(start) to \(end) the next day, your computers send this device no notifications. Replies still wait in the chat.")
+            : String(localized: "From \(start) to \(end), your computers send this device no notifications. Replies still wait in the chat.")
     }
 
     private static func clock(_ minute: Int) -> String {
@@ -567,12 +574,21 @@ struct BighelpNotificationSettingsView: View {
         quietHoursNote = result.note
     }
 
+    /// The notification service names its topics in English. In another language the app's own
+    /// words for the same topic show instead; in English the service's name still wins.
+    private func topicName(_ preference: BighelpBuzzKitPreference?, _ topic: BighelpBuzzKitTopic) -> String {
+        guard let name = preference?.name, Bundle.main.preferredLocalizations.first == "en" else {
+            return topic.fallbackName
+        }
+        return name
+    }
+
     private func topicLabel(
         preference: BighelpBuzzKitPreference?,
         topic: BighelpBuzzKitTopic
     ) -> some View {
         VStack(alignment: .leading, spacing: BighelpTokens.space4) {
-            Text(preference?.name ?? topic.fallbackName)
+            Text(topicName(preference, topic))
                 .bighelpFont(.body)
                 .foregroundStyle(theme.primaryText)
 
@@ -669,8 +685,8 @@ struct BighelpNotificationSettingsView: View {
             guard owns(token) else { return }
             preferencesAreStale = !preferences.isEmpty
             preferenceError = preferences.isEmpty
-                ? "Couldn't load your notification preferences. Try again."
-                : "Couldn't refresh your preferences."
+                ? String(localized: "Couldn't load your notification preferences. Try again.")
+                : String(localized: "Couldn't refresh your preferences.")
         }
     }
 
@@ -710,7 +726,7 @@ struct BighelpNotificationSettingsView: View {
                 guard owns(token) else { return }
                 preferences = original
                 preferencesAreStale = true
-                preferenceError = "Couldn't confirm the change. Refresh before trying again."
+                preferenceError = String(localized: "Couldn't confirm the change. Refresh before trying again.")
             }
         }
     }
@@ -734,7 +750,7 @@ struct BighelpNotificationSettingsView: View {
         } catch {
             guard owns(token) else { return }
             runtime = runtimeSource()
-            runtimeError = "Couldn't check optional provider diagnostics."
+            runtimeError = String(localized: "Couldn't check optional provider diagnostics.")
         }
     }
 
@@ -848,10 +864,10 @@ private enum BighelpNotificationSettingsError: Error {
 private extension BighelpBuzzKitTopic {
     var fallbackName: String {
         switch self {
-        case .chatRepliesAndCompletions: "Chat replies and completions"
-        case .scheduledTasksAndDeliveries: "Scheduled tasks and deliveries"
-        case .questionsAndApprovals: "Questions and Approvals"
-        case .subagentCompletions: "Subagent Completions"
+        case .chatRepliesAndCompletions: String(localized: "Chat replies and completions")
+        case .scheduledTasksAndDeliveries: String(localized: "Scheduled tasks and deliveries")
+        case .questionsAndApprovals: String(localized: "Questions and Approvals")
+        case .subagentCompletions: String(localized: "Subagent Completions")
         }
     }
 
@@ -1196,9 +1212,9 @@ struct BighelpChannelAlertsSection: View {
 
     private func detail(_ option: BighelpChannelAlerts.Mode) -> String {
         switch option {
-        case .all: "Chats on iMessage, Telegram, a terminal and every other channel notify you too."
-        case .bighelp: "Only chats in bighelp notify you."
-        case .choose: "Pick the channels that notify you."
+        case .all: String(localized: "Chats on iMessage, Telegram, a terminal and every other channel notify you too.")
+        case .bighelp: String(localized: "Only chats in bighelp notify you.")
+        case .choose: String(localized: "Pick the channels that notify you.")
         }
     }
 

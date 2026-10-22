@@ -327,6 +327,26 @@ struct TeamworkTests {
         await model.set(true)
         #expect(model.detail == "The computer didn't save it for Nova. Try again.")
     }
+
+    /// Simple Bot mode's Settings says bots, in sentences of their own (a word swap can't be
+    /// translated), and leaves the agents' names as they are.
+    @Test func simpleBotModeSaysBots() async {
+        let model = TeamworkModel(client: DemoTeamworkClientForTests())
+        await model.refresh()
+        #expect(model.detail(saysBots: true) == "Your bots learn about each other and ask each other for help.")
+        await model.set(true)
+        #expect(model.detail(saysBots: true) == "Your 3 bots know each other and ask each other for help.")
+        let one = TeamworkModel(client: PartialTeamworkClient(agents: [.init(id: "default", name: "Gordie", role: "")],
+                                                             failed: []))
+        await one.set(true)
+        #expect(one.detail(saysBots: true) == "On. Make another bot and they'll work together.")
+        #expect(one.detail == "On. Make another agent and they'll work together.")
+        let missed = TeamworkModel(client: PartialTeamworkClient(agents: [
+            .init(id: "default", name: "Gordie", role: ""), .init(id: "nova", name: "Travel agent", role: ""),
+        ], failed: ["nova"]))
+        await missed.set(true)
+        #expect(missed.detail(saysBots: true) == "The computer didn't save it for Travel agent. Try again.")
+    }
 }
 
 @MainActor
@@ -344,9 +364,18 @@ private final class FailingTeamworkClient: TeamworkClient {
 
 @MainActor
 private final class PartialTeamworkClient: TeamworkClient {
+    let agents: [TeamworkStatus.Agent]
+    let failed: [String]
+
+    init(agents: [TeamworkStatus.Agent] = [.init(id: "default", name: "Gordie", role: ""),
+                                           .init(id: "nova", name: "Nova", role: "")],
+         failed: [String] = ["nova"]) {
+        self.agents = agents
+        self.failed = failed
+    }
+
     func team(enabled: Bool?) async throws -> TeamworkStatus {
-        TeamworkStatus(enabled: true, agents: [.init(id: "default", name: "Gordie", role: ""),
-                                               .init(id: "nova", name: "Nova", role: "")],
-                       reached: ["default"], failed: ["nova"])
+        TeamworkStatus(enabled: true, agents: agents, reached: agents.map(\.id).filter { !failed.contains($0) },
+                       failed: failed)
     }
 }

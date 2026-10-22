@@ -609,7 +609,8 @@ struct SimpleBotsHomeView: View {
         }
         .menuStyle(.button)
         .buttonStyle(.plain)
-        .accessibilityLabel("New")
+        // Its own key: "New" alone is also the unread badge, which another language words differently.
+        .accessibilityLabel(String(localized: "New bot or group chat", defaultValue: "New"))
         .accessibilityIdentifier("simple-bots.new")
     }
 
@@ -641,7 +642,8 @@ struct SimpleBotsHomeView: View {
         .menuStyle(.button)
         .buttonStyle(.plain)
         .accessibilityLabel("Filter by gateway")
-        .accessibilityValue(shown.flatMap { id in gateways.first { $0.id == id }?.name } ?? "All Gateways")
+        .accessibilityValue(shown.flatMap { id in gateways.first { $0.id == id }?.name }
+                            ?? String(localized: "All Gateways"))
         .accessibilityIdentifier("simple-bots.gateway-filter")
     }
 
@@ -984,7 +986,7 @@ struct SimpleBotsHomeView: View {
             do {
                 try await context.agents.setPlacement(placement, profileID: profile.id)
             } catch {
-                hideError = "This computer didn't save that. Try again in a moment."
+                hideError = String(localized: "This computer didn't save that. Try again in a moment.")
             }
         }
     }

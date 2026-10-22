@@ -25,23 +25,23 @@ enum AgentActivityKind: String, CaseIterable, Sendable {
 
     var label: String {
         switch self {
-        case .idle: "Here for you"
-        case .thinking: "Thinking"
-        case .replying: "Replying"
-        case .coding: "Writing code"
-        case .web: "Browsing the web"
-        case .images: "Making images"
-        case .seeing: "Taking a look"
-        case .memory: "Remembering"
-        case .scheduling: "Scheduling"
-        case .delegating: "Working with helpers"
-        case .files: "Working with files"
-        case .messaging: "Sending a message"
-        case .publishing: "Posting an update"
-        case .tools: "Using tools"
-        case .waiting: "Needs you"
-        case .done: "All done"
-        case .failed: "Hit a snag"
+        case .idle: String(localized: "Here for you")
+        case .thinking: String(localized: "Thinking")
+        case .replying: String(localized: "Replying")
+        case .coding: String(localized: "Writing code")
+        case .web: String(localized: "Browsing the web")
+        case .images: String(localized: "Making images")
+        case .seeing: String(localized: "Taking a look")
+        case .memory: String(localized: "Remembering")
+        case .scheduling: String(localized: "Scheduling")
+        case .delegating: String(localized: "Working with helpers")
+        case .files: String(localized: "Working with files")
+        case .messaging: String(localized: "Sending a message")
+        case .publishing: String(localized: "Posting an update")
+        case .tools: String(localized: "Using tools")
+        case .waiting: String(localized: "Needs you")
+        case .done: String(localized: "All done")
+        case .failed: String(localized: "Hit a snag")
         }
     }
 

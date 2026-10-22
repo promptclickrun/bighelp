@@ -161,8 +161,8 @@ struct SimpleBotCreateView: View {
                     if let attachedTemplate {
                         // Its role as filled in, fields and all.
                         let role = creator?.draft.role.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                        Text(verbatim: role.isEmpty ? "From \(attachedTemplate.title)"
-                                                    : "From \(attachedTemplate.title): \(role)")
+                        Text(role.isEmpty ? String(localized: "From \(attachedTemplate.title)")
+                                           : String(localized: "From \(attachedTemplate.title): \(role)"))
                             .font(.bighelp(.subheadline))
                             .foregroundStyle(theme.secondaryText)
                             .multilineTextAlignment(.center)
@@ -198,7 +198,7 @@ struct SimpleBotCreateView: View {
         .interactiveDismissDisabled(isCreating)
         .onAppear { if creator == nil { creator = makeCreator() } }
         .bighelpSheet(isPresented: $isPickingTemplate, onDismiss: attachPickedTemplate) {
-            AgentTemplateBrowser(title: "Templates") { pickedTemplate = $0 }
+            AgentTemplateBrowser(title: String(localized: "Templates")) { pickedTemplate = $0 }
                 .bighelpSheetSize(.large)
         }
         .agentTemplateForm(creator)
@@ -218,7 +218,7 @@ struct SimpleBotCreateView: View {
 
     private func create() async {
         guard let model = creator ?? makeCreator() else {
-            errorMessage = "This computer can't make new bots."
+            errorMessage = String(localized: "This computer can't make new bots.")
             return
         }
         creator = model
@@ -232,7 +232,8 @@ struct SimpleBotCreateView: View {
             SimpleBotMarkStore.shared.set(mark, scope: scope, agentID: profile.id)
             onCreated(profile)
         } catch {
-            errorMessage = model.saveError ?? "The bot couldn't be made. Check the computer, then try again."
+            errorMessage = model.saveError
+                ?? String(localized: "The bot couldn't be made. Check the computer, then try again.")
         }
     }
 }

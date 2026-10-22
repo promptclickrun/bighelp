@@ -148,11 +148,11 @@ struct TemplateCategoryTests {
     @Test func aSearchWithNoResultsSaysSo() {
         let none = listing(search: "zzz")
         #expect(none.isEmpty)
-        #expect(TemplateEmptyState(search: "zzz", filter: .all, noun: "templates").detail == "Nothing matches “zzz”.")
-        let inTopic = TemplateEmptyState(search: "zzz", filter: .topic(.agent("coding")), noun: "templates")
+        #expect(TemplateEmptyState(search: "zzz", filter: .all, noun: .templates).detail == "Nothing matches “zzz”.")
+        let inTopic = TemplateEmptyState(search: "zzz", filter: .topic(.agent("coding")), noun: .templates)
         #expect(inTopic.title == "No matching templates")
         #expect(inTopic.detail == "Nothing in Coding matches “zzz”." && inTopic.offersAll)
-        #expect(!TemplateEmptyState(search: "zzz", filter: .all, noun: "blueprints").offersAll)
+        #expect(!TemplateEmptyState(search: "zzz", filter: .all, noun: .blueprints).offersAll)
         #expect(!listing().isEmpty)
     }
 

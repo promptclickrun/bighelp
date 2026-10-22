@@ -68,8 +68,8 @@ struct TemplateTopicChips: View {
 
     static func title(_ filter: TemplateTopicFilter) -> String {
         switch filter {
-        case .all: "All"
-        case .mine: "My Templates"
+        case .all: String(localized: "All")
+        case .mine: String(localized: "My Templates")
         case .topic(let topic): topic.title
         }
     }

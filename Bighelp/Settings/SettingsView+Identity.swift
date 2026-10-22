@@ -122,7 +122,7 @@ extension SettingsView {
             }
             do {
                 guard let data = try await selection.loadTransferable(type: Data.self) else {
-                    avatarError = "We couldn’t read that photo. Choose a PNG, JPEG, or HEIF image and try again."
+                    avatarError = String(localized: "We couldn’t read that photo. Choose a PNG, JPEG, or HEIF image and try again.")
                     return
                 }
                 try Task.checkCancellation()
@@ -132,7 +132,7 @@ extension SettingsView {
             } catch is CancellationError {
                 return
             } catch {
-                avatarError = "We couldn’t save that photo. Choose a PNG, JPEG, or HEIF image and try again."
+                avatarError = String(localized: "We couldn’t save that photo. Choose a PNG, JPEG, or HEIF image and try again.")
             }
         }
     }

@@ -20,8 +20,10 @@ struct AppearanceStudioView<Extras: View>: View {
         ScrollView {
             VStack(alignment: .leading, spacing: BighelpTokens.space24) {
                 preview
-                section("Bubble color", caption: "Your messages and buttons") { AppearanceBubbleGrid(settings: settings) }
-                section("Light mode", caption: nil) {
+                section(String(localized: "Bubble color"), caption: String(localized: "Your messages and buttons")) {
+                    AppearanceBubbleGrid(settings: settings)
+                }
+                section(String(localized: "Light mode"), caption: nil) {
                     HStack(spacing: BighelpTokens.space12) {
                         ForEach(BighelpLightBackground.allCases) { choice in
                             backgroundTile(name: choice.name, detail: choice.detail,
@@ -33,7 +35,7 @@ struct AppearanceStudioView<Extras: View>: View {
                         }
                     }
                 }
-                section("Dark mode", caption: nil) {
+                section(String(localized: "Dark mode"), caption: nil) {
                     HStack(spacing: BighelpTokens.space12) {
                         ForEach(BighelpDarkBackground.allCases) { choice in
                             backgroundTile(name: choice.name, detail: choice.detail,
@@ -45,7 +47,7 @@ struct AppearanceStudioView<Extras: View>: View {
                         }
                     }
                 }
-                section("Show", caption: nil) {
+                section(String(localized: "Show"), caption: nil) {
                     Picker("Appearance", selection: $settings.appearance) {
                         Text("Automatic").tag(AppAppearance.system)
                         Text("Light").tag(AppAppearance.light)
@@ -54,7 +56,7 @@ struct AppearanceStudioView<Extras: View>: View {
                     .bighelpSegmentedPicker()
                     .accessibilityIdentifier("appearance.mode")
                 }
-                section("Text and buttons", caption: nil) { AppearanceSizeControls() }
+                section(String(localized: "Text and buttons"), caption: nil) { AppearanceSizeControls() }
                 VStack(spacing: BighelpTokens.space12) { extras }
             }
             .padding(.horizontal, BighelpTokens.space20)
@@ -76,13 +78,14 @@ struct AppearanceStudioView<Extras: View>: View {
 
     /// Both modes at once, so a change reads everywhere it applies.
     private var preview: some View {
-        HStack(spacing: BighelpTokens.space12) {
-            AppearancePreviewCard(theme: theme(.light), title: "Light")
-            AppearancePreviewCard(theme: theme(.dark), title: "Dark")
+        let light = settings.lightBackground.name, dark = settings.darkBackground.name
+        return HStack(spacing: BighelpTokens.space12) {
+            AppearancePreviewCard(theme: theme(.light), title: String(localized: "Light"))
+            AppearancePreviewCard(theme: theme(.dark), title: String(localized: "Dark"))
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Preview: \(settings.bubbleColorName) bubbles, "
-            + "\(settings.lightBackground.name) in light mode, \(settings.darkBackground.name) in dark mode")
+        .accessibilityLabel(String(localized:
+            "Preview: \(settings.bubbleColorName) bubbles, \(light) in light mode, \(dark) in dark mode"))
     }
 
     // MARK: Backgrounds
@@ -170,11 +173,11 @@ private struct AppearancePreviewCard: View {
             Text(title)
                 .font(.bighelp(.caption2).weight(.bold))
                 .foregroundStyle(theme.secondaryText)
-            bubble("Morning! Want today's plan?", fill: theme.incomingMessageBackground,
+            bubble(String(localized: "Morning! Want today's plan?"), fill: theme.incomingMessageBackground,
                    text: theme.primaryText, alignment: .leading)
-            bubble("Yes please ☀️", fill: theme.outgoingMessageBackground, text: theme.outgoingMessageForeground,
-                   alignment: .trailing)
-            bubble("On it. Three things…", fill: theme.incomingMessageBackground,
+            bubble(String(localized: "Yes please ☀️"), fill: theme.outgoingMessageBackground,
+                   text: theme.outgoingMessageForeground, alignment: .trailing)
+            bubble(String(localized: "On it. Three things…"), fill: theme.incomingMessageBackground,
                    text: theme.primaryText, alignment: .leading)
             HStack {
                 Capsule().fill(theme.surface).frame(height: 22)
@@ -261,7 +264,7 @@ struct AppearanceBubbleGrid: View {
         let custom = settings.customBubbleHex
         return Button {
             let start = Color(hex: custom ?? (selectedBubble ?? .lavender).swatchHex)
-            colorPicker.present(title: "Custom bubble color", color: UIColor(start)) { picked in
+            colorPicker.present(title: String(localized: "Custom bubble color"), color: UIColor(start)) { picked in
                 settings.customBubbleHex = BighelpCustomBubbleColor.hex(from: Color(uiColor: picked))
             }
         } label: {

@@ -150,13 +150,13 @@ final class SimpleBotFilesModel {
     var isAtTop: Bool { directory?.parent == nil }
     /// Where the list is, from the top folder: "Reports › 2026".
     var locationTitle: String {
-        guard let directory, !isAtTop else { return "All files" }
+        guard let directory, !isAtTop else { return String(localized: "All files") }
         return Self.location(of: directory.path, root: rootPath).joined(separator: " › ")
     }
     /// Where Back goes.
     var parentTitle: String {
-        guard let parent = directory?.parent else { return "All files" }
-        return Self.location(of: parent, root: rootPath).last ?? "All files"
+        guard let parent = directory?.parent else { return String(localized: "All files") }
+        return Self.location(of: parent, root: rootPath).last ?? String(localized: "All files")
     }
 
     /// Reloads the folder on screen (the top one the first time), keeping it shown meanwhile.
@@ -179,9 +179,9 @@ final class SimpleBotFilesModel {
             notice = nil
             playback = source.playback(agentID: agentID, file: file)
         case .empty:
-            notice = "\(file.name) is empty."
+            notice = String(localized: "\(file.name) is empty.")
         case .tooBig:
-            notice = "\(file.name) is too big to open here."
+            notice = String(localized: "\(file.name) is too big to open here.")
         case .preview:
             await download(file)
         }
@@ -227,7 +227,7 @@ final class SimpleBotFilesModel {
         } catch is CancellationError {
         } catch {
             guard request == generation, !Task.isCancelled else { return }
-            notice = "\(file.name) didn't open. Try again."
+            notice = String(localized: "\(file.name) didn't open. Try again.")
         }
     }
 
@@ -259,7 +259,7 @@ final class SimpleBotFilesModel {
         case let error as DirectHermesManagedFilesError:
             return .failed(error.localizedDescription)
         default:
-            return .failed("Files didn't load. Check that your computer is on, then try again.")
+            return .failed(String(localized: "Files didn't load. Check that your computer is on, then try again."))
         }
     }
 

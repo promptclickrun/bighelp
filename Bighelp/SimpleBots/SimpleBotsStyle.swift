@@ -4,7 +4,8 @@ import SwiftUI
 /// with full-width rows, and quiet section labels, all in the system font.
 struct SimpleBotsCircleButton: View {
     let systemImage: String
-    let label: String
+    /// App copy only, so it's looked up in the catalog.
+    let label: LocalizedStringKey
     let identifier: String
     var action: () -> Void
 

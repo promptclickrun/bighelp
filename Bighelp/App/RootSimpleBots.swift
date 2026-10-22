@@ -212,7 +212,7 @@ extension RootShellView {
                 guard let agent = bot.fleetAgent else { return }
                 Task { @MainActor in
                     do { try await fleet.setHidden(agent, true) } catch {
-                        actionErrorMessage = "\(agent.name) couldn't be hidden. Try again."
+                        actionErrorMessage = String(localized: "\(agent.name) couldn't be hidden. Try again.")
                     }
                 }
             },

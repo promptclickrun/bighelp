@@ -72,7 +72,7 @@ struct SimpleBotDefaultModelSheet: View {
         let selection = defaults.draft[.mainChats]
         let reasoningUnavailable = defaults.support.reasoningUnavailableReasons[.mainChats]
         BighelpModelPickerSheet(
-            title: "Default Model",
+            title: String(localized: "Default Model"),
             scopeLabel: botName,
             providers: defaults.providers,
             currentProviderID: selection.modelID.isEmpty ? nil : selection.providerID,
@@ -92,8 +92,8 @@ struct SimpleBotDefaultModelSheet: View {
             currentReasoningValue: selection.reasoningEffort,
             modelUnavailableReason: defaults.support.modelUnavailableReasons[.mainChats],
             reasoningUnavailableReason: reasoningUnavailable,
-            applyTitle: "Save",
-            defaultModelTitle: "Default model",
+            applyTitle: String(localized: "Save"),
+            defaultModelTitle: String(localized: "Default model"),
             onApply: { draft in save(draft, current: selection) }
         )
         .task { await defaults.loadIfNeeded() }

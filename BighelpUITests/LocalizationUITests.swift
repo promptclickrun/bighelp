@@ -122,6 +122,160 @@ final class LocalizationUITests: BighelpUITestCase {
         }
     }
 
+    /// #527: Simple Bot mode's home, a bot's menu with More, Rearrange, search, New Bot with Templates, and a profile.
+    func testSimpleBotHomeMenuAndProfileInBothLanguagesAndAppearances() {
+        for (language, appearance) in variants {
+            let say = { (english: String, chinese: String) in language == "en" ? english : chinese }
+            let app = localizedApp(language, appearance, extra: ["-bighelp.settings.simple-bots", "YES"])
+            app.launch()
+            XCTAssertTrue(app.descendants(matching: .any)["simple-bots.home"].waitForExistence(timeout: 20))
+            let search = app.buttons["simple-bots.search"]
+            XCTAssertTrue(search.waitForExistence(timeout: 5))
+            XCTAssertEqual(search.label, say("Search bots", "搜索机器人"))
+            capture("simple-home", language, appearance)
+
+            app.buttons["simple-bots.bot.travel"].press(forDuration: 1.2)
+            let unread = app.buttons[say("Mark Unread", "标为未读")]
+            XCTAssertTrue(unread.waitForExistence(timeout: 5))
+            XCTAssertTrue(app.buttons[say("Make Primary Bot", "设为主机器人")].exists)
+            capture("simple-menu", language, appearance)
+            app.buttons[say("Rearrange", "重新排列")].tap()
+            let save = app.buttons["simple-bots.rearrange.save"]
+            XCTAssertTrue(save.waitForExistence(timeout: 5))
+            XCTAssertEqual(save.label, say("Save", "保存"))
+            XCTAssertEqual(app.buttons["simple-bots.rearrange.cancel"].label, say("Cancel", "取消"))
+            capture("simple-rearrange", language, appearance)
+            app.buttons["simple-bots.rearrange.cancel"].tap()
+
+            search.tap()
+            let close = app.buttons["simple-bots.search.close"]
+            XCTAssertTrue(close.waitForExistence(timeout: 5))
+            XCTAssertEqual(close.label, say("Close", "关闭"))
+            capture("simple-search", language, appearance)
+            close.tap()
+
+            app.buttons["simple-bots.new"].tap()
+            let newBot = app.buttons[say("New Bot", "新建机器人")]
+            XCTAssertTrue(newBot.waitForExistence(timeout: 5))
+            newBot.tap()
+            XCTAssertTrue(app.textFields["simple-bots.create.name"].waitForExistence(timeout: 5))
+            XCTAssertEqual(app.buttons["simple-bots.create.submit"].label, say("Create", "创建"))
+            capture("simple-create", language, appearance)
+            app.buttons["simple-bots.create.templates"].tap()
+            XCTAssertTrue(app.navigationBars[say("Templates", "模板")].waitForExistence(timeout: 5))
+            XCTAssertEqual(app.buttons["agent.templates.done"].label, say("Done", "完成"))
+            capture("simple-templates", language, appearance)
+            app.buttons["agent.templates.done"].tap()
+            app.buttons["simple-bots.create.close"].tap()
+
+            app.buttons["simple-bots.bot.travel"].press(forDuration: 1.2)
+            let more = app.buttons[say("More", "更多")]
+            XCTAssertTrue(more.waitForExistence(timeout: 5))
+            more.tap()
+            let profile = app.buttons[say("Bot Profile", "机器人资料")]
+            XCTAssertTrue(profile.waitForExistence(timeout: 5))
+            XCTAssertTrue(app.buttons[say("Routines", "例行任务")].exists)
+            capture("simple-menu-more", language, appearance)
+            profile.tap()
+            XCTAssertTrue(app.descendants(matching: .any)["simple-bots.profile"].waitForExistence(timeout: 10))
+            XCTAssertTrue(app.staticTexts[say("Instructions", "指令")].waitForExistence(timeout: 5))
+            XCTAssertTrue(app.staticTexts[say("Default Model", "默认模型")].exists)
+            capture("simple-profile", language, appearance)
+            app.swipeUp()
+            capture("simple-profile-lower", language, appearance)
+            app.terminate()
+        }
+    }
+
+    /// #527: Simple Bot mode's Settings with Teamwork, and the Notifications, Chat and Appearance pages it opens.
+    func testSimpleBotSettingsAndItsPagesInBothLanguagesAndAppearances() {
+        for (language, appearance) in variants {
+            let say = { (english: String, chinese: String) in language == "en" ? english : chinese }
+            let app = localizedApp(language, appearance, extra: ["-bighelp.settings.simple-bots", "YES"])
+            app.launch()
+            let person = app.buttons["simple-bots.settings"]
+            XCTAssertTrue(person.waitForExistence(timeout: 20))
+            person.tap()
+            let teamwork = app.switches["settings.teamwork"]
+            XCTAssertTrue(teamwork.waitForExistence(timeout: 10))
+            XCTAssertTrue(teamwork.label.contains(say("Teamwork", "团队协作")), teamwork.label)
+            XCTAssertTrue(teamwork.label.contains(say("Your bots learn about each other", "机器人会了解彼此")),
+                          teamwork.label)
+            capture("simple-settings", language, appearance)
+            app.swipeUp()
+            capture("simple-settings-lower", language, appearance)
+            app.swipeDown()
+
+            for (identifier, title) in [("notifications", say("Notifications", "通知")), ("chat", say("Chat", "聊天")),
+                                        ("appearance", say("Appearance", "外观"))] {
+                let row = app.buttons["simple-bots.settings.\(identifier)"]
+                for _ in 0..<3 where !row.isHittable { app.swipeUp() }
+                row.tap()
+                XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 5), title)
+                capture("settings-\(identifier)", language, appearance)
+                if identifier == "notifications" {
+                    let peers = app.staticTexts[say("Agents messaging each other", "智能体之间的消息")]
+                    for _ in 0..<5 where !peers.exists { app.swipeUp() }
+                    XCTAssertTrue(peers.exists)
+                    capture("settings-notifications-lower", language, appearance)
+                }
+                app.navigationBars[title].buttons.element(boundBy: 0).tap()
+            }
+            app.terminate()
+        }
+    }
+
+    /// #527: agents talking to each other, as a line in a Simple Bot mode chat and in its sheet.
+    func testTeamworkLineAndSheetInBothLanguagesAndAppearances() {
+        for (language, appearance) in variants {
+            let say = { (english: String, chinese: String) in language == "en" ? english : chinese }
+            let app = localizedApp(language, appearance, extra: [
+                "-bighelp.settings.simple-bots", "YES", "-start-chat", "-preview-ui-v3", "-test-agent-talk",
+                "-loopdy.chat.foldCompletedTurns", "YES",
+            ])
+            app.launch()
+            let timeline = app.tables["chat.timeline"]
+            XCTAssertTrue(timeline.waitForExistence(timeout: 20))
+            let label = say("4 messages with Mina Shah and Jordan Lee", "与Mina Shah和Jordan Lee交流了 4 条消息")
+            let line = app.descendants(matching: .any).matching(NSPredicate(
+                format: "identifier BEGINSWITH %@ AND label == %@", "chat.agent-talk.", label)).firstMatch
+            for _ in 0..<8 where !(line.exists && line.isHittable) {
+                if line.exists, line.frame.minY > timeline.frame.midY { timeline.swipeUp(velocity: .slow) }
+                else { timeline.swipeDown(velocity: .slow) }
+            }
+            XCTAssertTrue(line.isHittable, label)
+            capture("teamwork-line", language, appearance)
+            line.tap()
+            let done = app.buttons["chat.agent-talk.done"]
+            XCTAssertTrue(done.waitForExistence(timeout: 5))
+            XCTAssertEqual(done.label, say("Done", "完成"))
+            capture("teamwork-sheet", language, appearance)
+            done.tap()
+            app.terminate()
+        }
+    }
+
+    /// The Unified Mode Toggle's pill on Bots mode's home: Bots, Chat and Code (#528).
+    func testModePillInBothLanguagesAndAppearances() {
+        for (language, appearance) in variants {
+            let say = { (english: String, chinese: String) in language == "en" ? english : chinese }
+            let app = localizedApp(language, appearance, extra: [
+                "-bighelp.settings.simple-bots", "YES", "-bighelp.settings.unified-mode-toggle", "YES",
+                "-bighelp.settings.code-mode", "YES",
+            ])
+            app.launch()
+            let bots = app.buttons["mode.pill.bots"]
+            XCTAssertTrue(bots.waitForExistence(timeout: 20))
+            XCTAssertTrue(bots.isSelected)
+            XCTAssertEqual(bots.label, say("Bots", "机器人"))
+            XCTAssertEqual(app.buttons["mode.pill.chat"].label, say("Chat", "聊天"))
+            XCTAssertEqual(app.buttons["mode.pill.code"].label, say("Code", "代码"))
+            XCTAssertEqual(app.buttons["simple-bots.search"].label, say("Search bots", "搜索机器人"))
+            capture("mode-pill", language, appearance)
+            app.terminate()
+        }
+    }
+
     private func localizedApp(_ language: String, _ appearance: String, extra: [String] = []) -> XCUIApplication {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.settings.nerd-mode", "NO",

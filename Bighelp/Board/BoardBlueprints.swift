@@ -289,7 +289,7 @@ struct BoardBlueprintsSheet: View {
                     }
                 }
                 if listing.isEmpty {
-                    TemplateEmptyView(state: TemplateEmptyState(search: search, filter: listing.filter, noun: "blueprints"),
+                    TemplateEmptyView(state: TemplateEmptyState(search: search, filter: listing.filter, noun: .blueprints),
                                       identifier: "board.blueprints.empty") { filter = .all }
                         .listRowBackground(Color.clear)
                 }

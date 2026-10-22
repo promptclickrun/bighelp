@@ -8,29 +8,29 @@ struct TemplateCategory: Identifiable, Hashable, Sendable {
     let title: String
     let systemImage: String
 
-    static let other = TemplateCategory(id: "other", title: "Other", systemImage: "ellipsis.circle")
+    static let other = TemplateCategory(id: "other", title: String(localized: "Other"), systemImage: "ellipsis.circle")
 
     /// Agent templates' topics, in the order the pickers list them.
     static let agentTopics: [TemplateCategory] = [
-        .init(id: "productivity", title: "Productivity", systemImage: "checklist"),
-        .init(id: "business", title: "Business", systemImage: "briefcase"),
-        .init(id: "coding", title: "Coding", systemImage: "chevron.left.forwardslash.chevron.right"),
-        .init(id: "science", title: "Science", systemImage: "flask"),
-        .init(id: "education", title: "Education", systemImage: "graduationcap"),
-        .init(id: "health", title: "Health", systemImage: "heart"),
-        .init(id: "creative", title: "Creative", systemImage: "paintpalette"),
-        .init(id: "personal", title: "Personal", systemImage: "person"),
-        .init(id: "leadership", title: "Leadership", systemImage: "flag"),
-        .init(id: "security", title: "Security", systemImage: "lock.shield"),
+        .init(id: "productivity", title: String(localized: "Productivity"), systemImage: "checklist"),
+        .init(id: "business", title: String(localized: "Business"), systemImage: "briefcase"),
+        .init(id: "coding", title: String(localized: "Coding"), systemImage: "chevron.left.forwardslash.chevron.right"),
+        .init(id: "science", title: String(localized: "Science"), systemImage: "flask"),
+        .init(id: "education", title: String(localized: "Education"), systemImage: "graduationcap"),
+        .init(id: "health", title: String(localized: "Health"), systemImage: "heart"),
+        .init(id: "creative", title: String(localized: "Creative"), systemImage: "paintpalette"),
+        .init(id: "personal", title: String(localized: "Personal"), systemImage: "person"),
+        .init(id: "leadership", title: String(localized: "Leadership"), systemImage: "flag"),
+        .init(id: "security", title: String(localized: "Security"), systemImage: "lock.shield"),
     ]
 
     /// Feed, Ideas and Goals blueprints' topics.
     static let blueprintTopics: [TemplateCategory] = [
-        .init(id: "productivity", title: "Productivity", systemImage: "checklist"),
-        .init(id: "marketing", title: "Marketing", systemImage: "megaphone"),
-        .init(id: "content", title: "Content creation", systemImage: "pencil.line"),
-        .init(id: "personal", title: "Personal life", systemImage: "person"),
-        .init(id: "research", title: "Research", systemImage: "magnifyingglass"),
+        .init(id: "productivity", title: String(localized: "Productivity"), systemImage: "checklist"),
+        .init(id: "marketing", title: String(localized: "Marketing"), systemImage: "megaphone"),
+        .init(id: "content", title: String(localized: "Content creation"), systemImage: "pencil.line"),
+        .init(id: "personal", title: String(localized: "Personal life"), systemImage: "person"),
+        .init(id: "research", title: String(localized: "Research"), systemImage: "magnifyingglass"),
     ]
 
     /// An agent template's `category`, leniently.
@@ -60,9 +60,9 @@ enum TemplateOrder: String, CaseIterable, Identifiable, Sendable {
     var id: Self { self }
     var title: String {
         switch self {
-        case .forYou: "For you"
-        case .newest: "Newest"
-        case .mostUsed: "Most used"
+        case .forYou: String(localized: "For you")
+        case .newest: String(localized: "Newest")
+        case .mostUsed: String(localized: "Most used")
         }
     }
 }
@@ -138,20 +138,29 @@ struct TemplateEmptyState: Equatable {
     /// A chip narrowed it: offer to look everywhere.
     let offersAll: Bool
 
-    init(search: String, filter: TemplateTopicFilter, noun: String) {
-        title = "No matching \(noun)"
+    /// What the picker lists, for whole sentences in every language.
+    enum Noun { case templates, blueprints }
+
+    init(search: String, filter: TemplateTopicFilter, noun: Noun) {
+        let templates = noun == .templates
+        title = templates ? String(localized: "No matching templates") : String(localized: "No matching blueprints")
         let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
         let quoted = "\u{201C}\(query)\u{201D}"
         switch filter {
         case .all:
-            detail = query.isEmpty ? "There are no \(noun) here yet." : "Nothing matches \(quoted)."
+            detail = !query.isEmpty ? String(localized: "Nothing matches \(quoted).")
+                : templates ? String(localized: "There are no templates here yet.")
+                : String(localized: "There are no blueprints here yet.")
             offersAll = false
         case .mine:
-            detail = query.isEmpty ? "You haven't saved any \(noun) yet." : "None of yours match \(quoted)."
+            detail = !query.isEmpty ? String(localized: "None of yours match \(quoted).")
+                : templates ? String(localized: "You haven't saved any templates yet.")
+                : String(localized: "You haven't saved any blueprints yet.")
             offersAll = !query.isEmpty
         case .topic(let topic):
-            detail = query.isEmpty ? "There are no \(noun) in \(topic.title) yet."
-                                   : "Nothing in \(topic.title) matches \(quoted)."
+            detail = !query.isEmpty ? String(localized: "Nothing in \(topic.title) matches \(quoted).")
+                : templates ? String(localized: "There are no templates in \(topic.title) yet.")
+                : String(localized: "There are no blueprints in \(topic.title) yet.")
             offersAll = true
         }
     }

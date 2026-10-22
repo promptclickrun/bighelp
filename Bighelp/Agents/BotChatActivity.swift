@@ -147,7 +147,7 @@ final class BotChatActivityStore {
     }
 
     /// The route takes at most this many agents in one request.
-    static let maximumAgents = 64
+    nonisolated static let maximumAgents = 64
     static let busyInterval: Duration = .seconds(3)
     static let idleInterval: Duration = .seconds(6)
     static let othersRefreshInterval: Duration = .seconds(FleetStore.freshness)
@@ -167,7 +167,7 @@ final class BotChatActivityStore {
     }
 
     /// A bot on the gateway in use, by profile ID.
-    static func liveKey(_ profileID: String) -> String { "live|" + profileID }
+    nonisolated static func liveKey(_ profileID: String) -> String { "live|" + profileID }
 
     /// A bot on the gateway in use by profile ID, or on another gateway by its `FleetID`.
     func activity(_ key: String) -> BotChatActivity? {
@@ -273,13 +273,23 @@ final class BotChatActivityStore {
     }
 }
 
-extension View {
-    /// Keeps `store` current while this screen is on screen and the app is active; nothing runs otherwise.
-    func botChatActivityUpdates(_ store: BotChatActivityStore?, source: BotChatActivitySource?,
-                                isActive: Bool) -> some View {
-        task(id: store != nil && source != nil && isActive) {
+/// Keeps a store current while its screen is on screen and the app is active; nothing runs otherwise.
+private struct BotChatActivityUpdates: ViewModifier {
+    let store: BotChatActivityStore?
+    let source: BotChatActivitySource?
+    let isActive: Bool
+
+    func body(content: Content) -> some View {
+        content.task(id: store != nil && source != nil && isActive) {
             guard isActive, let store, let source else { return }
             await store.watch(source)
         }
+    }
+}
+
+extension View {
+    func botChatActivityUpdates(_ store: BotChatActivityStore?, source: BotChatActivitySource?,
+                                isActive: Bool) -> some View {
+        modifier(BotChatActivityUpdates(store: store, source: source, isActive: isActive))
     }
 }

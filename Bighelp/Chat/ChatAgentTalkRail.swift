@@ -319,27 +319,30 @@ enum ChatAgentTalkPresentation {
         let messages = talk.messages(chatAgentID: chatAgentID)
         if let running = talk.runningCalls.last, let call = running.agentTalkCall {
             let name = name(for: call.targetID, fallback: call.fallbackTargetName, resolver: resolver)
-            return working(name, live[running.id]) ?? "Asking \(name)…"
+            return working(name, live[running.id]) ?? String(localized: "Asking \(name)…")
         }
         // A `message_agent` message comes back later; the plugin can still say what's happening.
         for piece in talk.pieces.reversed() {
             guard case .call(let event, .none) = piece, let call = event.agentTalkCall, call.route == .message,
                   let activity = live[event.id], activity.isWorking else { continue }
             let name = name(for: call.targetID, fallback: call.fallbackTargetName, resolver: resolver)
-            return working(name, activity) ?? "\(name) is working on it…"
+            return working(name, activity) ?? String(localized: "\(name) is working on it…")
         }
         // A `message_agent` message and its answer are two rows, each where it happened: say which.
         if talk.pieces.count == 1 {
             switch talk.pieces[0] {
             case .call(let event, let answer?):
                 if event.agentTalkReply?.outcome == .queued, let call = event.agentTalkCall {
-                    return "Asked \(name(for: answer.agentID ?? call.targetID, fallback: call.fallbackTargetName, resolver: resolver))"
+                    let asked = name(for: answer.agentID ?? call.targetID, fallback: call.fallbackTargetName,
+                                     resolver: resolver)
+                    return String(localized: "Asked \(asked)")
                 }
             case .answer(_, let answer, let event):
                 let call = event?.agentTalkCall
                 let who = name(for: answer.agentID ?? call?.targetID ?? "agent",
                                fallback: answer.fallbackName ?? call?.fallbackTargetName, resolver: resolver)
-                return answer.text == nil ? "\(who) didn't answer" : "\(who) answered"
+                return answer.text == nil ? String(localized: "\(who) didn't answer")
+                    : String(localized: "\(who) answered")
             default:
                 break
             }
@@ -347,8 +350,8 @@ enum ChatAgentTalkPresentation {
         if let last = messages.last, last.agentID != chatAgentID {
             let name = name(for: last.agentID, fallback: last.fallbackName, resolver: resolver)
             switch last.state {
-            case .noAnswer: return "\(name) didn't answer"
-            case .waiting: return "Waiting for \(name)"
+            case .noAnswer: return String(localized: "\(name) didn't answer")
+            case .waiting: return String(localized: "Waiting for \(name)")
             default: break
             }
         }
@@ -358,15 +361,16 @@ enum ChatAgentTalkPresentation {
             ? [name(for: chatAgentID, fallback: nil, resolver: resolver)]
             : Array(others)
         let count = messages.filter(\.isMessage).count
-        let noun = count == 1 ? "1 message" : "\(count) messages"
-        return "\(noun) with \(list(names))"
+        return String(localized: "\(count) messages with \(list(names))")
     }
 
     /// "Nova is searching the web…", from the tool the plugin saw it running.
     static func working(_ name: String, _ activity: AgentTalkLiveActivity?) -> String? {
         guard let tool = activity?.toolName else { return nil }
         let phrase = ChatToolPhrase.phrase(forTool: tool, arguments: nil).live
-        return "\(name) is \(phrase.prefix(1).lowercased() + phrase.dropFirst())"
+        let doing = phrase.prefix(1).lowercased() + phrase.dropFirst()
+        return String(localized: "\(name) is \(doing)",
+                      comment: "An agent's name, then what it's doing now: “Nova is searching the web…”")
     }
 
     /// "Nova", "Nova and Havok", "Nova, Havok and Sage", "Nova, Havok and 2 more".
@@ -374,9 +378,9 @@ enum ChatAgentTalkPresentation {
         switch names.count {
         case 0: return ""
         case 1: return names[0]
-        case 2: return "\(names[0]) and \(names[1])"
-        case 3: return "\(names[0]), \(names[1]) and \(names[2])"
-        default: return "\(names[0]), \(names[1]) and \(names.count - 2) more"
+        case 2: return String(localized: "\(names[0]) and \(names[1])")
+        case 3: return String(localized: "\(names[0]), \(names[1]) and \(names[2])")
+        default: return String(localized: "\(names[0]), \(names[1]) and \(names.count - 2) more")
         }
     }
 
@@ -618,14 +622,14 @@ private struct ChatAgentTalkBubble: View {
                 .background(isChatAgent ? theme.action.opacity(0.14) : theme.incomingMessageBackground,
                             in: .rect(cornerRadius: BighelpTokens.radius16))
         case .sentFromFile:
-            note("Sent a message from a file")
+            note(String(localized: "Sent a message from a file"))
         case .working:
             TypingBubble()
                 .accessibilityLabel("\(name) is working on it")
         case .waiting:
-            note("Waiting for \(name)'s answer")
+            note(String(localized: "Waiting for \(name)'s answer"))
         case .noAnswer:
-            note("\(name) didn't answer")
+            note(String(localized: "\(name) didn't answer"))
         }
     }
 

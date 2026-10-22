@@ -128,28 +128,39 @@ final class TeamworkModel {
             load = .loaded
             if !status.failed.isEmpty {
                 let names = status.failed.map { id in status.agents.first { $0.id == id }?.name ?? id }
-                errorMessage = "The computer didn't save it for \(ChatAgentTalkPresentation.list(names)). Try again."
+                let list = ChatAgentTalkPresentation.list(names)
+                errorMessage = String(localized: "The computer didn't save it for \(list). Try again.")
             }
         } catch WorkspaceClientError.unavailable(.unsupportedOperation),
                 WorkspaceClientError.unavailable(.pluginRequired) {
             load = .needsPluginUpdate
         } catch {
             if status == nil { load = .unavailable }
-            errorMessage = enabled == nil ? nil : "The computer didn't save that. Try again in a moment."
+            errorMessage = enabled == nil ? nil
+                : String(localized: "The computer didn't save that. Try again in a moment.")
         }
     }
 
     /// One line under the switch, in plain words.
-    var detail: String {
+    var detail: String { detail(saysBots: false) }
+
+    /// Simple Bot mode calls agents bots. Whole sentences of their own, so each language words them its own way.
+    func detail(saysBots: Bool) -> String {
         switch load {
         case .needsPluginUpdate: return String(localized: "Update the bighelp plugin on this computer to use this.")
         case .unavailable: return String(localized: "Connect to your computer to change this.")
         case .idle, .loading, .loaded:
             if let errorMessage { return errorMessage }
             let count = status?.agents.count ?? 0
-            guard isOn else { return String(localized: "Your agents learn about each other and ask each other for help.") }
-            return count > 1
-                ? String(localized: "Your \(count) agents know each other and ask each other for help.")
+            guard isOn else {
+                return saysBots ? String(localized: "Your bots learn about each other and ask each other for help.")
+                    : String(localized: "Your agents learn about each other and ask each other for help.")
+            }
+            if count > 1 {
+                return saysBots ? String(localized: "Your \(count) bots know each other and ask each other for help.")
+                    : String(localized: "Your \(count) agents know each other and ask each other for help.")
+            }
+            return saysBots ? String(localized: "On. Make another bot and they'll work together.")
                 : String(localized: "On. Make another agent and they'll work together.")
         }
     }
@@ -158,11 +169,13 @@ final class TeamworkModel {
 /// The Teamwork switch, for Settings and Bots mode's Settings.
 struct TeamworkToggle<Label: View>: View {
     let model: TeamworkModel
+    /// Simple Bot mode's Settings: the line says bots.
+    var saysBots = false
     @ViewBuilder let label: (String) -> Label
 
     var body: some View {
         Toggle(isOn: Binding(get: { model.isOn }, set: { on in Task { await model.set(on) } })) {
-            label(model.detail)
+            label(model.detail(saysBots: saysBots))
         }
         .disabled(model.load != .loaded || model.isSaving)
         .task { if model.load == .idle { await model.refresh() } }

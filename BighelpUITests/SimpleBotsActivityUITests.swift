@@ -81,6 +81,7 @@ final class SimpleBotsActivityUITests: BighelpUITestCase {
         save("agents-light", app)
     }
 
+    @MainActor
     private func launch(appearance: String, extra: [String] = []) -> XCUIApplication {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",

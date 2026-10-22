@@ -321,9 +321,8 @@ struct BighelpConfiguredHostView: View {
             notificationModel?.cancel()
         }
         .onChange(of: scenePhase) { _, phase in
-            guard phase == .background else { return }
-            pluginModel?.cancel()
-            notificationModel?.cancel()
+            pluginModel?.sceneChanged(to: phase)
+            notificationModel?.sceneChanged(to: phase)
         }
     }
 }

@@ -166,8 +166,8 @@ struct BighelpNotificationSettingsView: View {
         }
         .task(id: quietHours) { await applyQuietHours() }
         .onChange(of: scenePhase) { _, phase in
+            notificationSetup?.sceneChanged(to: phase)
             guard phase == .active else {
-                notificationSetup?.cancel()
                 operationToken = UUID()
                 return
             }

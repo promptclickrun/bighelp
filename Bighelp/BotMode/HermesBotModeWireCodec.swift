@@ -35,7 +35,8 @@ enum HermesBotModeWireCodec {
         guard identifier(value.authorityGatewayID), (1...500).contains(value.maxLogLimit),
               value.methods.count <= 128, value.features.count <= 128,
               value.methods.allSatisfy({ label($0, maximum: 128) }),
-              value.features.allSatisfy({ label($0, maximum: 128) }) else {
+              value.features.allSatisfy({ label($0, maximum: 128) }),
+              value.seatableProfiles.map({ $0.count <= 512 && $0.allSatisfy { label($0, maximum: 128) } }) ?? true else {
             throw BighelpLinkWorkspaceClientError.invalidResponse
         }
     }

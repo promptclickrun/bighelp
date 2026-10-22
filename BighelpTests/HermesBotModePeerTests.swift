@@ -326,7 +326,7 @@ private final class PeerHomeClient: HermesBotModeClient, HermesBotModePeerRegist
 
     func groupsStop(roomID: String, cancelID: String) async throws {}
 
-    func groupsRetry(roomID: String, taskID: String) async throws -> HermesBotModeRetryResult {
+    func groupsRetry(roomID: String, taskID: String, attempt: HermesBotModeRetryAttempt?) async throws -> HermesBotModeRetryResult {
         throw BotModeRoomError.executionUnavailable
     }
 }

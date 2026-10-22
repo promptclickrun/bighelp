@@ -84,6 +84,9 @@ final class BotModeRoomStore {
     var catalogRefreshID: UUID?
     var nativePendingApprovalsByRoom: [String: [String: HermesBotModePendingApproval]] = [:]
     var nativePendingRetryTaskIDsByRoom: [String: Set<String>] = [:]
+    /// The attempt each listed retry names, by room and task, for hosts that name one.
+    var nativeRetryAttemptsByRoom: [String: [String: HermesBotModeRetryAttempt]] = [:]
+    var nativePendingDiscardsByRoom: [String: [HermesBotModePendingDiscard]] = [:]
     var nativeDriverWorkingByRoom: [String: Bool] = [:]
     /// Other saved computers, for group chats with their agents (RoomLink).
     var peerHosts: (any HermesBotModePeerHosts)?
@@ -248,6 +251,8 @@ final class BotModeRoomStore {
         nativeObservationTokens.removeValue(forKey: roomID)
         nativePendingApprovalsByRoom.removeValue(forKey: roomID)
         nativePendingRetryTaskIDsByRoom.removeValue(forKey: roomID)
+        nativeRetryAttemptsByRoom.removeValue(forKey: roomID)
+        nativePendingDiscardsByRoom.removeValue(forKey: roomID)
         nativeDriverWorkingByRoom.removeValue(forKey: roomID)
         if let persistence, try !persistence.remove(roomID: roomID) {
             throw BotModeRoomError.persistenceConflict

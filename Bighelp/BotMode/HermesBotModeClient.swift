@@ -54,14 +54,12 @@ final class BighelpLinkHermesBotModeClient: HermesBotModeCatalogClient, HermesBo
     func groupsCapabilities() async throws -> HermesBotModeCapabilities {
         try await owned {
             let payload = try await workspace.perform(.groupsCapabilities, payload: [:])
-            let result = try decode(HermesBotModeCapabilities.self, from: payload, exactKeys: [
-                "protocol_version", "driver", "persistent_process", "authority_gateway_id",
-                "room_link", "features", "methods", "max_log_limit",
-            ])
+            // Read-only: hosts add keys (the session path's `seatable_profiles`);
+            // every key the app reads is still required and checked.
+            let result = try decode(HermesBotModeCapabilities.self, from: payload)
             try HermesBotModeWireCodec.capabilities(result)
             return result
         }
-
     }
 
     /// One agent's RoomLink offer on this computer, for a room homed on another.
@@ -69,10 +67,7 @@ final class BighelpLinkHermesBotModeClient: HermesBotModeCatalogClient, HermesBo
         try requireNonEmpty(profile)
         return try await owned {
             let payload = try await workspace.perform(.groupsCapabilities, payload: ["profile": .string(profile)])
-            let result = try decode(HermesBotModeCapabilities.self, from: payload, exactKeys: [
-                "protocol_version", "driver", "persistent_process", "authority_gateway_id",
-                "room_link", "features", "methods", "max_log_limit",
-            ])
+            let result = try decode(HermesBotModeCapabilities.self, from: payload)
             try HermesBotModeWireCodec.capabilities(result)
             guard result.protocolVersion == 2, result.supports("groups.peer.invite") else {
                 throw HermesBotModeRoomLink.Problem.unavailable("unsupported")
@@ -141,9 +136,11 @@ final class BighelpLinkHermesBotModeClient: HermesBotModeCatalogClient, HermesBo
                 "rooms", "next_offset",
             ])
             try page.rooms.forEach(HermesBotModeWireCodec.room)
-            let next = offset.addingReportingOverflow(limit)
+            // The session path pages the rooms this connection may see, so its
+            // cursor can skip rooms past `offset + limit`; it only moves forward.
+            let next = offset.addingReportingOverflow(page.rooms.count)
             guard !next.overflow, page.rooms.count <= limit,
-                  page.nextOffset == nil || page.nextOffset == next.partialValue,
+                  page.nextOffset.map({ $0 >= next.partialValue && $0 > offset }) ?? true,
                   page.nextOffset == nil || page.rooms.count == limit,
                   Set(page.rooms.map(\.roomID)).count == page.rooms.count else {
                 throw BighelpLinkWorkspaceClientError.invalidResponse
@@ -346,14 +343,24 @@ final class BighelpLinkHermesBotModeClient: HermesBotModeCatalogClient, HermesBo
         }
     }
 
-    func groupsRetry(roomID: String, taskID: String) async throws -> HermesBotModeRetryResult {
+    /// `attempt` is what the host's own retry action named. Each Hermes path
+    /// refuses the other's shape, so only a host that listed it gets it back.
+    func groupsRetry(
+        roomID: String,
+        taskID: String,
+        attempt: HermesBotModeRetryAttempt?
+    ) async throws -> HermesBotModeRetryResult {
         try requireNonEmpty(roomID)
         try requireNonEmpty(taskID)
+        var request: [String: BighelpJSONValue] = ["room_id": .string(roomID), "task_id": .string(taskID)]
+        if let attempt {
+            try requireNonEmpty(attempt.memberID)
+            guard attempt.executionGeneration > 0 else { throw BighelpLinkWorkspaceClientError.invalidRequest }
+            request["member_id"] = .string(attempt.memberID)
+            request["execution_generation"] = .integer(attempt.executionGeneration)
+        }
         return try await owned {
-            let payload = try await workspace.perform(.groupsRetry, payload: [
-                "room_id": .string(roomID),
-                "task_id": .string(taskID),
-            ])
+            let payload = try await workspace.perform(.groupsRetry, payload: request)
             let result = try decode(HermesBotModeRetryResult.self, from: payload, exactKeys: [
                 "retried", "task",
             ])
@@ -368,6 +375,33 @@ final class BighelpLinkHermesBotModeClient: HermesBotModeCatalogClient, HermesBo
                 throw BighelpLinkWorkspaceClientError.invalidResponse
             }
             return result
+        }
+    }
+
+    /// Ends one turn Hermes lost track of, exactly as its discard action named it.
+    func groupsDiscard(roomID: String, discard: HermesBotModePendingDiscard) async throws -> HermesBotModeTaskReceipt {
+        try requireNonEmpty(roomID)
+        try requireNonEmpty(discard.memberID)
+        try requireNonEmpty(discard.taskID)
+        guard discard.roomID == roomID, discard.executionGeneration > 0 else {
+            throw BighelpLinkWorkspaceClientError.invalidRequest
+        }
+        return try await owned {
+            let payload = try await workspace.perform(.groupsDiscard, payload: [
+                "room_id": .string(roomID),
+                "member_id": .string(discard.memberID),
+                "task_id": .string(discard.taskID),
+                "execution_generation": .integer(discard.executionGeneration),
+            ])
+            let result = try decode(HermesBotModeDiscardResult.self, from: payload, exactKeys: ["discarded", "task"])
+            guard result.discarded,
+                  result.task.roomID == roomID,
+                  result.task.taskID == discard.taskID,
+                  result.task.status == "cancelled",
+                  result.task.executionGeneration == discard.executionGeneration else {
+                throw BighelpLinkWorkspaceClientError.invalidResponse
+            }
+            return result.task
         }
     }
 

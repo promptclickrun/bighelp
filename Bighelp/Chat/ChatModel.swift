@@ -284,6 +284,8 @@ final class ChatModel {
     var sessionSubagentUpdatedAt = 0
     var botModeApprovalSubmissions: Set<String> = []
     var botModeApprovalErrors: [String: String] = [:]
+    var botModeDiscardSubmissions: Set<String> = []
+    var botModeDiscardErrors: [String: String] = [:]
     var botModeRoomObservation: UUID?
     let generatedMediaResolver: (any GeneratedMediaResolving)?
     var generatedMediaResolutionTasks: [String: Task<Void, Never>] = [:]

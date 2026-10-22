@@ -52,8 +52,11 @@ extension BotModeRoomStore {
                 changed = true
             }
             let retryReceipt = event.taskID.flatMap { expectedRetryReceipts?[$0] }
+            // Hermes names the generation on `turn.deferred` only. The retried
+            // attempt's terminal event carries none; the attempt before it ended
+            // deferred under its own, older generation.
             let matchesRetryReceipt = if let retryReceipt {
-                event.executionGeneration == retryReceipt.executionGeneration
+                (event.executionGeneration.map { $0 == retryReceipt.executionGeneration } ?? true)
                     && event.threadID == retryReceipt.threadID
                     && event.turnID == retryReceipt.turnID
             } else {

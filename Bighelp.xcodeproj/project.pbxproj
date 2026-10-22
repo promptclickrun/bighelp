@@ -76,6 +76,7 @@
 		0A3554DA51329F075B247793 /* ReferenceNativeEditorAcceptanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 110327E861D3E832B5032BF2 /* ReferenceNativeEditorAcceptanceTests.swift */; };
 		0A691D79FC5660769876D0DB /* DirectHermesScheduledTaskCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09B1710AD58F8254E86D3E44 /* DirectHermesScheduledTaskCodec.swift */; };
 		0A72754300CD6BE0F0B4346D /* NativeWorkspaceSelectionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F99853BC40C48C560475D54A /* NativeWorkspaceSelectionStore.swift */; };
+		0A946DC969DB99FEB9C01AE8 /* HermesGroupsHostUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59CE897F445CA638FA3897BE /* HermesGroupsHostUITests.swift */; };
 		0AF64F4A689AA476676FC18D /* WorktreeManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D074072376DAC19ECF4B94A /* WorktreeManagementView.swift */; };
 		0B052B4786F98E874F2E9CC5 /* DirectHermesConversationClient+Projection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F3AEBA8A19D05BA108BDA6 /* DirectHermesConversationClient+Projection.swift */; };
 		0C09C5541A9A6C7B8A1D5B2A /* ChatTurnFailureFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D4C9EE1A7BD9BFCAB93F2CA /* ChatTurnFailureFixture.swift */; };
@@ -201,6 +202,7 @@
 		20CE312554EB23D3DB5B6C67 /* NativeSessionControlsModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7EBD6D4D292595F47067DF4 /* NativeSessionControlsModel.swift */; };
 		20CE7EA5A544D7AB5A4F42E3 /* ScheduledTaskEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81C56021662277890DE4C559 /* ScheduledTaskEditorView.swift */; };
 		20FD9BA0DFCCB3EACA883169 /* AvatarImageProcessorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AC06A224EDED86627B32ECD /* AvatarImageProcessorTests.swift */; };
+		21168033E7EE4FDB95EB3100 /* BotModeDiscardCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C6F519E7C6F3B6B9D409724 /* BotModeDiscardCard.swift */; };
 		213AF4500013854447A6F8E1 /* CompanionSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BF389D0E37C21E2F445B802 /* CompanionSettingsView.swift */; };
 		217ABA9C66E68586284DE77A /* BighelpLinkWireTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80CD30850183086D6DF9D6CF /* BighelpLinkWireTests.swift */; };
 		2182E7115AB77A083DDC0AFE /* ChatLoadSpeedUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC4ECCB96131813416639588 /* ChatLoadSpeedUITests.swift */; };
@@ -365,6 +367,7 @@
 		3A137298CA51606AC6972405 /* card-catalog-index.json in Resources */ = {isa = PBXBuildFile; fileRef = D6CD0DEFA89A000590BF9837 /* card-catalog-index.json */; };
 		3A1938056AC1833ACD2140F6 /* WatchWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DFC0469859FF2F766A0F9A5 /* WatchWire.swift */; };
 		3A4C3BD63F9AD9122450E4A5 /* BighelpBoardWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E3F7BC4DE0D166012849DBB /* BighelpBoardWidgets.swift */; };
+		3A594C9B53EBF9F00712E1BE /* session-path.json in Resources */ = {isa = PBXBuildFile; fileRef = 172B7497F44AA26F893DD141 /* session-path.json */; };
 		3AABEACF3DF7C6022828FB53 /* BighelpLinkPushEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE129246716CE44864F927A5 /* BighelpLinkPushEnvironment.swift */; };
 		3AB6DDD20A75CEB013581D39 /* NativeWorkspaceSessionBridge+Prompts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5467FAB05B10A607ED9DBE3C /* NativeWorkspaceSessionBridge+Prompts.swift */; };
 		3AC380D2C6ED5E6C41E85C5A /* BighelpV3MessageStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F7281B7E7971EE34A73716B /* BighelpV3MessageStyle.swift */; };
@@ -834,6 +837,7 @@
 		81E8A31E76A3D6764A275CD3 /* AgentSelectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CF7C685B0AB5D146A3A9831 /* AgentSelectionView.swift */; };
 		81F4515DE6FD011FA76CD44F /* PersonalityWireModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73A11354869D7210B3F78458 /* PersonalityWireModels.swift */; };
 		81F798CFC5B41CDC8991B6B3 /* soul-lumen.md in Resources */ = {isa = PBXBuildFile; fileRef = 5D9C7AC41A4CA4FA52110611 /* soul-lumen.md */; };
+		81F9AED75BB1C38543D0209B /* HermesBotModeDiscard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 202658CF9273949C9534F73C /* HermesBotModeDiscard.swift */; };
 		8205203956BFABCEABE9CCB1 /* LinkPreviewStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6429B1FDB55AEF47256F94B /* LinkPreviewStore.swift */; };
 		82081D53132456713ECD8A44 /* MentionParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B096F962476F8F58B191844 /* MentionParser.swift */; };
 		8213B622C7788B8869CD3832 /* ChatCardTranscriptProjection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F892D8D79520DF44F46C0C4 /* ChatCardTranscriptProjection.swift */; };
@@ -986,6 +990,7 @@
 		9A3925E936C60295380BCD77 /* ComposioAppsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C49614460DC42040B9A9760 /* ComposioAppsView.swift */; };
 		9A668F194906CF7290192E91 /* VoiceHoldMusic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F8BF318C1BCE640F33A4775 /* VoiceHoldMusic.swift */; };
 		9A762D8156FF1063F2B5BD58 /* SkillMutationLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34EF80804B4ED118D93BBBD0 /* SkillMutationLifecycleTests.swift */; };
+		9A92976A43CA7504E11702A7 /* legacy-path.json in Resources */ = {isa = PBXBuildFile; fileRef = E6FEE53772A0FCED9D5BA70C /* legacy-path.json */; };
 		9AADAB540E2060246F178570 /* UsageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01085590690393D7B1FF73F /* UsageView.swift */; };
 		9B0BD91B6F3C44646FC9E7B4 /* TeamCallBargeIn.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05423F0CCD093BC481067692 /* TeamCallBargeIn.swift */; };
 		9B1B65F13ACA195CCB76EF87 /* BotScreenStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C6FE0F1A8A91F91B7AA3F73 /* BotScreenStatus.swift */; };
@@ -1075,6 +1080,7 @@
 		A5A506094873E5A9C79E5935 /* soul-lens.md in Resources */ = {isa = PBXBuildFile; fileRef = 4C6DBCCBBC55CBBA9186BEF1 /* soul-lens.md */; };
 		A5ABFA183304F3F2C7B33174 /* NotificationErrorCodeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B84DEB699D5F14D678A55A5 /* NotificationErrorCodeTests.swift */; };
 		A5F1CA216DBB2489904CB112 /* ChatCanvasGeometryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C563DE2C670A96AC2D4E48B2 /* ChatCanvasGeometryTests.swift */; };
+		A64A719778D24A3FF5BF5C38 /* HermesGroupsHostPathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BBEF3DFBAB691CE1CD31DD9 /* HermesGroupsHostPathTests.swift */; };
 		A67BD6DE12B2587A514228AA /* NativeMessageReactionMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C781788DB7B1B5C134F323A /* NativeMessageReactionMapping.swift */; };
 		A6B1FE4A12E128F9220C193D /* WorkflowEditorModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B34624743AF44BDE0DCCF68C /* WorkflowEditorModel.swift */; };
 		A6C905A7A7426DA8BCD412AE /* DirectHermesHistoryProjectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B514B0875F7F274E6189C77B /* DirectHermesHistoryProjectionTests.swift */; };
@@ -1925,6 +1931,7 @@
 		16BC6394A3F94E6E7EE52007 /* SessionOrganizationAcceptanceFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionOrganizationAcceptanceFixture.swift; sourceTree = "<group>"; };
 		171E2DAFB37938E59B631D44 /* ReferenceHubTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReferenceHubTests.swift; sourceTree = "<group>"; };
 		171EC4C4FCD5B6442AB8A2E0 /* BighelpRuntimeConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpRuntimeConfiguration.swift; sourceTree = "<group>"; };
+		172B7497F44AA26F893DD141 /* session-path.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "session-path.json"; sourceTree = "<group>"; };
 		17675B00C0F92D64834A179E /* WorkspaceEdgeSwipeResolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceEdgeSwipeResolverTests.swift; sourceTree = "<group>"; };
 		178ADE648ECB385AB8FDE335 /* NativeWorkspaceInvalidationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeWorkspaceInvalidationCoordinator.swift; sourceTree = "<group>"; };
 		178F4FA69267B7FEE2EB6D73 /* BighelpShimmer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpShimmer.swift; sourceTree = "<group>"; };
@@ -1989,6 +1996,7 @@
 		1F884DEFD2F7102F5E457009 /* SessionCatalogStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionCatalogStore.swift; sourceTree = "<group>"; };
 		1FE7AD88375964FEF9532906 /* DirectHermesAuthentication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectHermesAuthentication.swift; sourceTree = "<group>"; };
 		2007B746E9AB0E6276E8303F /* BighelpCardValidatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpCardValidatorTests.swift; sourceTree = "<group>"; };
+		202658CF9273949C9534F73C /* HermesBotModeDiscard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesBotModeDiscard.swift; sourceTree = "<group>"; };
 		20A42272BA6790C0A7BFC99E /* NativeManagementInvalidationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeManagementInvalidationTests.swift; sourceTree = "<group>"; };
 		20F62CA5A9FEC6B5580D7020 /* SessionRuntimeSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRuntimeSelection.swift; sourceTree = "<group>"; };
 		213011EE2B164EFFD4BC36A6 /* MessagingOnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagingOnboardingView.swift; sourceTree = "<group>"; };
@@ -2155,6 +2163,7 @@
 		3B84B943BBAB63CBF3543D7A /* CodeBranchName.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeBranchName.swift; sourceTree = "<group>"; };
 		3BEF307512389C0729BDF539 /* BotScreenStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BotScreenStateTests.swift; sourceTree = "<group>"; };
 		3C3BC46F417B6D78CAB68273 /* templates-use-yours.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "templates-use-yours.json"; sourceTree = "<group>"; };
+		3C6F519E7C6F3B6B9D409724 /* BotModeDiscardCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BotModeDiscardCard.swift; sourceTree = "<group>"; };
 		3C86D9728A87BCA80883BBB0 /* templates-use.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "templates-use.json"; sourceTree = "<group>"; };
 		3CAC3D993B2C6404E9FD7484 /* LocalizationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationUITests.swift; sourceTree = "<group>"; };
 		3CDABE72B40973455A986015 /* CredentialVaultUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialVaultUITests.swift; sourceTree = "<group>"; };
@@ -2343,6 +2352,7 @@
 		594B7D3DF0CA444270F48A14 /* DeviceToolCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceToolCoordinatorTests.swift; sourceTree = "<group>"; };
 		59960A13516AE5293A1C8836 /* BighelpLiveActivityBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpLiveActivityBundle.swift; sourceTree = "<group>"; };
 		59C1D022528FB63E037C7B28 /* PetdexGallery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetdexGallery.swift; sourceTree = "<group>"; };
+		59CE897F445CA638FA3897BE /* HermesGroupsHostUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesGroupsHostUITests.swift; sourceTree = "<group>"; };
 		59DC6DF119E780C3D98AA087 /* AllHostsUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllHostsUITests.swift; sourceTree = "<group>"; };
 		59E02588694976F1229F33CB /* SkillsAndToolsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkillsAndToolsStore.swift; sourceTree = "<group>"; };
 		59E46C55A3F95C6B1D58E9C7 /* BighelpReasoningPickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpReasoningPickerSheet.swift; sourceTree = "<group>"; };
@@ -2355,6 +2365,7 @@
 		5B0785096973D80EF19E0723 /* WorkspaceFoundationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceFoundationTests.swift; sourceTree = "<group>"; };
 		5B6E8F02A6376ED091905B6E /* ChatMentionTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMentionTextView.swift; sourceTree = "<group>"; };
 		5BB86C8B123D60AAB0F17D91 /* ChatAgentTalkRail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatAgentTalkRail.swift; sourceTree = "<group>"; };
+		5BBEF3DFBAB691CE1CD31DD9 /* HermesGroupsHostPathTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesGroupsHostPathTests.swift; sourceTree = "<group>"; };
 		5C32A60BD7362DA924D7B454 /* DeviceLocationTool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceLocationTool.swift; sourceTree = "<group>"; };
 		5C48E1229E738D4127EA78BB /* WorkflowCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowCanvasView.swift; sourceTree = "<group>"; };
 		5C5A96A65684AF604BE15BCA /* BotModeRoomStore+NativePeers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BotModeRoomStore+NativePeers.swift"; sourceTree = "<group>"; };
@@ -3222,6 +3233,7 @@
 		E6A8DCAEDD9803080A9D1BAF /* ChatTurnFailureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatTurnFailureTests.swift; sourceTree = "<group>"; };
 		E6B07EC6B775EE897F1611EF /* SessionRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRow.swift; sourceTree = "<group>"; };
 		E6CE286DA9BDD6839D991E10 /* RootWorkspaceServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootWorkspaceServices.swift; sourceTree = "<group>"; };
+		E6FEE53772A0FCED9D5BA70C /* legacy-path.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "legacy-path.json"; sourceTree = "<group>"; };
 		E705F4D224CB3B48D1C0A8CA /* DirectHermesPairingClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectHermesPairingClient.swift; sourceTree = "<group>"; };
 		E7173F836ECF6E4D13740E1B /* generation-preview.mp4 */ = {isa = PBXFileReference; path = "generation-preview.mp4"; sourceTree = "<group>"; };
 		E728546967FA8A1B5B5D6E37 /* ReferenceChatComposition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReferenceChatComposition.swift; sourceTree = "<group>"; };
@@ -3937,6 +3949,7 @@
 				B0DE05E6C5C380E5B3B7D1C9 /* BotModeApprovalCard.swift */,
 				52F5FEDC372FADF6E0C549AD /* BotModeCatalogFixtureClient.swift */,
 				242E8827AB2BB2BCDAB8DBDC /* BotModeCreateRoomView.swift */,
+				3C6F519E7C6F3B6B9D409724 /* BotModeDiscardCard.swift */,
 				71C18B8C5A5094B92668A5EE /* BotModeFixtureClient.swift */,
 				5476B018071A5E47915D89A1 /* BotModeModels.swift */,
 				3804996F38C55F49E94E091B /* BotModeObservedToolView.swift */,
@@ -3954,6 +3967,7 @@
 				DC147D5463924B17D6DD72DC /* HermesBotModeApproval.swift */,
 				867B5FA4CFB7A2BC768EF04E /* HermesBotModeCatalog.swift */,
 				FDF59A73834035F0B3F45A03 /* HermesBotModeClient.swift */,
+				202658CF9273949C9534F73C /* HermesBotModeDiscard.swift */,
 				60DF39244D8CED519D7972C5 /* HermesBotModeRoomLink.swift */,
 				971A8322A4FE7AC616941DCB /* HermesBotModeWireCodec.swift */,
 				4B096F962476F8F58B191844 /* MentionParser.swift */,
@@ -3962,6 +3976,15 @@
 				697F187D461EE22EC0F78C2A /* PeopleAndChatView.swift */,
 			);
 			path = BotMode;
+			sourceTree = "<group>";
+		};
+		683787982A643F47A7E2874A /* HermesGroups */ = {
+			isa = PBXGroup;
+			children = (
+				E6FEE53772A0FCED9D5BA70C /* legacy-path.json */,
+				172B7497F44AA26F893DD141 /* session-path.json */,
+			);
+			path = HermesGroups;
 			sourceTree = "<group>";
 		};
 		699C0BD143E8695C95D0ECDA /* Kanban */ = {
@@ -4609,6 +4632,7 @@
 				C9D6F0E7E2FC8979E2416036 /* HermesBotModePersistenceTests.swift */,
 				D6EDE4E1F1CB7E447EB31ECC /* HermesFacesTests.swift */,
 				936605189C269CB66A3AAAF9 /* HermesFolderPathTests.swift */,
+				5BBEF3DFBAB691CE1CD31DD9 /* HermesGroupsHostPathTests.swift */,
 				4D88AAE29CD127FD229FF04B /* HermesLogsTests.swift */,
 				1C1110763B724D51E070E0B1 /* HermesUserMessageDisplayTests.swift */,
 				CFF0176BACFC11059D4F8A6F /* HostActivityRenderTests.swift */,
@@ -4924,6 +4948,7 @@
 				E4F8D65E674D386650BAB8E8 /* FeedPostFilesUITests.swift */,
 				17E85F9A6AACB46250206A20 /* FirstRunOnboardingUITests.swift */,
 				2BD21A8FBBCA9AF95D546F15 /* FleetSettingsUITests.swift */,
+				59CE897F445CA638FA3897BE /* HermesGroupsHostUITests.swift */,
 				E894A75421815361196871C4 /* HostOnboardingUITestSupport.swift */,
 				37C85FB08FD771ED53292DB4 /* HostSignInMatrixUITests.swift */,
 				130FF53809B8390E95869DC2 /* LandingScreenUITests.swift */,
@@ -5107,6 +5132,7 @@
 				55564C451754194E0EF381FF /* inbox-card-workspace.json */,
 				4D5BB3FF93B2BFBE1309307F /* sealed-alert-v2-vector.json */,
 				C0CE1E19E9A636C4F4384691 /* CardExamples */,
+				683787982A643F47A7E2874A /* HermesGroups */,
 				16F1EA0C90EF4FF985CF9DE8 /* Workflows */,
 			);
 			path = Fixtures;
@@ -6190,6 +6216,7 @@
 				513297F6FDA8D6B566816196 /* home-work-completion-workspace.json in Resources */,
 				B64D060B1FD84DA788BE7BB2 /* inbox-card-workspace.json in Resources */,
 				C1B8811FE39B6EA95B8A0E78 /* invalid-private-url.json in Resources */,
+				9A92976A43CA7504E11702A7 /* legacy-path.json in Resources */,
 				516E75BCCFB1BA2F2DEBA372 /* list-v2.json in Resources */,
 				EEEB50E2DBF4AE5BFD0254F5 /* list.json in Resources */,
 				531218F4716EDFC727F9FA0E /* live-bitcoin.json in Resources */,
@@ -6212,6 +6239,7 @@
 				4673B7CC0F30B2287B32517A /* runs-start-code.json in Resources */,
 				00650F92F1A4783405619969 /* runs-start.json in Resources */,
 				2A811F391A35F3D5B99B13AD /* sealed-alert-v2-vector.json in Resources */,
+				3A594C9B53EBF9F00712E1BE /* session-path.json in Resources */,
 				9E007F87658B975FD9828BEE /* static-metrics.json in Resources */,
 				5FFD77BE4D90A9010292FDA4 /* status-offline.json in Resources */,
 				142F9375293DC17B5E1CEFCA /* status-v2.json in Resources */,
@@ -6542,6 +6570,7 @@
 				BBB4B5382B941F7779CF9548 /* BotModeApprovalCard.swift in Sources */,
 				AE61062391F2AF1D5431F7FE /* BotModeCatalogFixtureClient.swift in Sources */,
 				865BFC4226DB5B31D481C198 /* BotModeCreateRoomView.swift in Sources */,
+				21168033E7EE4FDB95EB3100 /* BotModeDiscardCard.swift in Sources */,
 				582C615E816FECBEB56B6D4C /* BotModeFixtureClient.swift in Sources */,
 				30EA43BDF3387F6084925431 /* BotModeModels.swift in Sources */,
 				D5E1168C73C3D7AF347C66A1 /* BotModeObservedToolView.swift in Sources */,
@@ -6882,6 +6911,7 @@
 				C497810FDB7B8B2890714C6F /* HermesBotModeApproval.swift in Sources */,
 				8B0AD9715D9FCF459DB03B37 /* HermesBotModeCatalog.swift in Sources */,
 				46CAE47D3692C279975A92E1 /* HermesBotModeClient.swift in Sources */,
+				81F9AED75BB1C38543D0209B /* HermesBotModeDiscard.swift in Sources */,
 				F53E2C7337A93F884CE843CC /* HermesBotModeRoomLink.swift in Sources */,
 				C4A4B7F2D827ED33013A5F65 /* HermesBotModeWireCodec.swift in Sources */,
 				4165623A768286F93DE2D72B /* HermesFaceViews.swift in Sources */,
@@ -7627,6 +7657,7 @@
 				F77ABE015480C97708EC96B1 /* HermesBotModePersistenceTests.swift in Sources */,
 				12BE755854921ECA455D8D6E /* HermesFacesTests.swift in Sources */,
 				00D1268694BC6A40BB87DC11 /* HermesFolderPathTests.swift in Sources */,
+				A64A719778D24A3FF5BF5C38 /* HermesGroupsHostPathTests.swift in Sources */,
 				439C7B1833A69D5C7785AC14 /* HermesLogsTests.swift in Sources */,
 				AA4BE7095FA7772DE048864D /* HermesUserMessageDisplayTests.swift in Sources */,
 				3E57E5E4628907AED11947A9 /* HostActivityRenderTests.swift in Sources */,
@@ -7846,6 +7877,7 @@
 				5984D86628B04C7B3534E338 /* FeedPostFilesUITests.swift in Sources */,
 				AF7FE22D884A130746B614BA /* FirstRunOnboardingUITests.swift in Sources */,
 				6FB368A14E2F3F813298EDAA /* FleetSettingsUITests.swift in Sources */,
+				0A946DC969DB99FEB9C01AE8 /* HermesGroupsHostUITests.swift in Sources */,
 				7D9C86F6D2677088CE860A69 /* HostOnboardingUITestSupport.swift in Sources */,
 				1C763567CD9CCE8F93EA60F8 /* HostSignInMatrixUITests.swift in Sources */,
 				70E1B64353DF6CE7F82E9FB6 /* LandingScreenUITests.swift in Sources */,

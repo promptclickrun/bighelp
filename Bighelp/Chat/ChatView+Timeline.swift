@@ -21,6 +21,7 @@ extension ChatView {
         }
         if let status = model.botModeStatus { rows.append(.botStatus(status)) }
         rows += model.pendingBotModeApprovals.map(ChatCanvasRow.botApproval)
+        rows += model.pendingBotModeDiscards.map(ChatCanvasRow.botDiscard)
         if model.hasNativeBotModeRetryActions { rows.append(.botRetry) }
         rows += model.memberFailures.map(ChatCanvasRow.memberFailure)
         if dashboardModel != nil { rows += chatClarifications.map(ChatCanvasRow.clarification) }
@@ -191,6 +192,15 @@ extension ChatView {
                 errorMessage: model.botModeApprovalErrors[approval.id],
                 onAllowOnce: { Task { await model.resolveBotModeApproval(approval, choice: .once) } },
                 onDeny: { Task { await model.resolveBotModeApproval(approval, choice: .deny) } }
+            )
+        case .botDiscard(let discard):
+            BotModeDiscardCard(
+                discardID: discard.id,
+                agentName: model.nativeRoomParticipants.first(where: { $0.memberID == discard.memberID })?.displayName
+                    ?? model.memberProfiles.first(where: { $0.id == discard.memberID })?.name ?? discard.memberID,
+                isSubmitting: model.botModeDiscardSubmissions.contains(discard.id),
+                errorMessage: model.botModeDiscardErrors[discard.id],
+                onDiscard: { Task { await model.discardBotModeTurn(discard) } }
             )
         case .botObservedTool(let tool, let expanded):
             BotModeObservedToolView(

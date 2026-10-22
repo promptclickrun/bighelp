@@ -369,16 +369,28 @@ extension BotModeRoomStore {
         guard let rawActions = driverStatus?["pending_actions"],
               case .array(let actions) = rawActions else {
             nativePendingRetryTaskIDsByRoom.removeValue(forKey: roomID)
+            nativeRetryAttemptsByRoom.removeValue(forKey: roomID)
+            if nativePendingDiscardsByRoom[roomID] != nil { nativePendingDiscardsByRoom.removeValue(forKey: roomID) }
             return
         }
+        // Set only on a change: the chat reads these, and this runs on every room poll.
+        let discards = HermesBotModePendingDiscard.decode(roomID: roomID, driverStatus: driverStatus)
+        if nativePendingDiscardsByRoom[roomID, default: []] != discards { nativePendingDiscardsByRoom[roomID] = discards }
+        var attempts: [String: HermesBotModeRetryAttempt] = [:]
         let retryTaskIDs = actions.compactMap { rawAction -> String? in
             guard case .object(let action) = rawAction,
                   action["kind"]?.string == "retry" else { return nil }
             guard let taskID = action["task_id"]?.string,
                   !taskID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+            // The session path names the exact attempt it will retry.
+            if let memberID = action["member_id"]?.string, HermesBotModeWireCodec.identifier(memberID),
+               let generation = action["execution_generation"]?.integer, generation > 0 {
+                attempts[taskID] = HermesBotModeRetryAttempt(memberID: memberID, executionGeneration: generation)
+            }
             return taskID
         }
         nativePendingRetryTaskIDsByRoom[roomID] = Set(retryTaskIDs)
+        if nativeRetryAttemptsByRoom[roomID, default: [:]] != attempts { nativeRetryAttemptsByRoom[roomID] = attempts }
         guard !retryTaskIDs.isEmpty else { return }
         guard var room = room(id: roomID), expectedOwner.matches(room) else { return }
         var failures = room.memberFailures

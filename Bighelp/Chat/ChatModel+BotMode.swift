@@ -222,6 +222,30 @@ extension ChatModel {
         return botModeRoomStore?.pendingApprovals(roomID: botModeRoomID) ?? []
     }
 
+    var pendingBotModeDiscards: [HermesBotModePendingDiscard] {
+        guard !referenceOwnerRetired, let botModeRoomID else { return [] }
+        return botModeRoomStore?.pendingNativeDiscards(roomID: botModeRoomID) ?? []
+    }
+
+    func discardBotModeTurn(_ discard: HermesBotModePendingDiscard) async {
+        guard !referenceOwnerRetired, let botModeRoomStore, let botModeRoomID,
+              discard.roomID == botModeRoomID,
+              pendingBotModeDiscards.contains(discard),
+              !botModeDiscardSubmissions.contains(discard.id) else { return }
+        let generation = ownerGeneration
+        botModeDiscardSubmissions.insert(discard.id)
+        botModeDiscardErrors[discard.id] = nil
+        defer { botModeDiscardSubmissions.remove(discard.id) }
+        do {
+            try await botModeRoomStore.discardNative(roomID: botModeRoomID, discard: discard)
+        } catch is CancellationError {
+            return
+        } catch {
+            guard isCurrentOwner(generation) else { return }
+            botModeDiscardErrors[discard.id] = "The answer could not be discarded. Check the connection and try again."
+        }
+    }
+
     var hasNativeBotModeRetryActions: Bool {
         guard let botModeRoomID, botModeExecutionEnabled else { return false }
         guard botModeRoom?.nativeRetryJournal?.awaitingReceipt.isEmpty != false else { return false }

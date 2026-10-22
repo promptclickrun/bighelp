@@ -19,6 +19,8 @@ enum ChatCanvasRow: Identifiable, Equatable {
     case welcome, quickActions, bottom, botRetry
     case botStatus(String)
     case botApproval(HermesBotModePendingApproval)
+    /// A member turn Hermes lost track of when its host stopped (session path).
+    case botDiscard(HermesBotModePendingDiscard)
     case botObservedTool(BotModeObservedTool, Bool)
     case botActivityNotice(String)
     case memberFailure(BotModeMemberFailure)
@@ -49,6 +51,7 @@ enum ChatCanvasRow: Identifiable, Equatable {
         case .botRetry: "chat.bot-retry"
         case .botStatus: "chat.bot-mode-status"
         case .botApproval(let approval): "chat.bot-approval:\(approval.id)"
+        case .botDiscard(let discard): "chat.bot-discard:\(discard.id)"
         case .botObservedTool(let tool, _): "chat.bot-observed-tool:\(tool.id)"
         case .botActivityNotice: "chat.bot-activity-notice"
         case .memberFailure(let failure): "failure:\(failure.memberID)"
@@ -78,6 +81,7 @@ enum ChatCanvasRow: Identifiable, Equatable {
         case (.previousHistory(let a, let b), .previousHistory(let c, let d)): a == c && b == d
         case (.memberFailure(let a), .memberFailure(let b)): a == b
         case (.botApproval(let a), .botApproval(let b)): a == b
+        case (.botDiscard(let a), .botDiscard(let b)): a == b
         case (.botObservedTool(let a, let expandedA), .botObservedTool(let b, let expandedB)):
             a == b && expandedA == expandedB
         case (.botActivityNotice(let a), .botActivityNotice(let b)): a == b

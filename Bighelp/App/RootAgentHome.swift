@@ -457,7 +457,7 @@ extension RootShellView {
             case .feed: AgentFeedView(context: context)
             case .ideas: AgentIdeasView(context: context)
             case .goals: AgentGoalsView(context: context)
-            default: AgentAppsView(context: context, media: agentMedia) { appsArtifacts }
+            default: AgentAppsView(context: context, media: agentMedia) { appsArtifacts(agentID: agent.id) }
             }
         } else {
             ContentUnavailableView("No agent yet", systemImage: "person.crop.circle.badge.questionmark",
@@ -492,29 +492,32 @@ extension RootShellView {
         ]
     }
 
-    /// Picks the agent's workspace folder when Hermes can't find one: the profile Files reads from.
-    func workspaceFolderChooser(owner: WorkspaceOwner) -> WorkspaceFolderChooser? {
-        guard let client = workspaceConnections?.workspace as? DirectHermesWorkspaceClient,
-              let profile = homeAgent?.id ?? client.nativeContext?.servingProfileID
-        else { return nil }
-        return .live(client: client, owner: owner, profileID: profile)
+    /// Where Files finds agents' folders: the bighelp plugin on the selected host, or the demo's.
+    var configuredWorkspaceSource: (any ConfiguredWorkspaceSource)? {
+        if usesWorkspaceFixtures, workspaceConnections?.isDirectSelected != true { return DemoConfiguredWorkspace() }
+        guard let workspace = workspaceConnections?.workspace,
+              let http = workspaceConnections?.hosts.selectedWorkspace?.nativeClient else { return nil }
+        return HostConfiguredWorkspace(http: http, workspace: workspace)
     }
 
+    /// The Files target on screen now: nil once another connection is in use, another target once
+    /// another agent is, so a late reply for the last one never lands.
+    func currentFilesTarget(agentID: @escaping @MainActor () -> String?) -> @MainActor () -> WorkspaceFilesTarget? {
+        let workspace = workspaceConnections?.workspace
+        return {
+            guard workspaceConnections?.workspace === workspace, let owner = currentWorkspaceOwner else { return nil }
+            return WorkspaceFilesTarget(owner: owner, agentID: agentID())
+        }
+    }
+
+    /// Files in the agent home: the selected agent's own folder, and its folder chooser saves for it.
     @ViewBuilder
-    var appsArtifacts: some View {
-        if let owner = currentWorkspaceOwner, let performer = workspaceConnections?.workspace,
-           let direct = workspaceConnections?.hosts.selectedWorkspace?.nativeClient {
-            let agentID = homeAgent?.id
-            ConfiguredWorkspaceArtifactsView(
-                hostName: workspaceHostName, owner: owner, http: direct, performer: performer,
-                currentOwner: {
-                    guard workspaceConnections?.workspace === performer, homeAgent?.id == agentID else { return nil }
-                    return currentWorkspaceOwner
-                },
-                agentID: agentID, isEmbedded: true, folderChooser: workspaceFolderChooser(owner: owner)
-            )
-            .id(owner)
-            .id(agentID)
+    func appsArtifacts(agentID: String) -> some View {
+        if let owner = currentWorkspaceOwner, let source = configuredWorkspaceSource {
+            let target = WorkspaceFilesTarget(owner: owner, agentID: agentID)
+            ConfiguredWorkspaceArtifactsView(hostName: workspaceHostName, target: target, source: source,
+                currentTarget: currentFilesTarget { homeAgent?.id }, isEmbedded: true)
+                .id(target)
         } else {
             ContentUnavailableView("No artifacts yet", systemImage: "square.on.circle",
                 description: Text("Files, pages and apps your agent makes show up here."))

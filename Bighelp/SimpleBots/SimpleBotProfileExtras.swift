@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Saves what the full avatar studio made for a bot, at once: the picture on the host (what every
 /// screen, device and Hermes Desktop shows), and here the character or pet that chats draw over
-/// it. The bot's mark goes, so Simple Bot mode shows the new avatar.
+/// it. The bot's mark goes, so Bots mode shows the new avatar.
 @MainActor
 enum SimpleBotAvatarSaving {
     enum Failure: Error { case render, photo }

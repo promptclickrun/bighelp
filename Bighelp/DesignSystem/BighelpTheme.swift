@@ -735,7 +735,7 @@ struct BighelpAppearanceContext: Equatable, Sendable {
     var bubbleHex: String? { customBubbleHex ?? bubbleColor?.hex }
     /// Vision Pro: 0 is a solid window, 1 shows the room through the glass.
     var windowTransparency = BighelpVisionGlass.defaultTransparency
-    /// Simple Bot mode's look: black bubbles by day and ink after dark, unless a bubble color was picked.
+    /// Bots mode's look: black bubbles by day and ink after dark, unless a bubble color was picked.
     var simpleBots = false
 
     init(
@@ -770,7 +770,7 @@ extension BighelpTheme {
         case (true, .increased): definition.darkHighContrast
         @unknown default: dark ? definition.dark : definition.light
         }
-        // Simple Bot mode's own look, unless a bubble color was picked in Appearance: black bubbles by day
+        // Bots mode's own look, unless a bubble color was picked in Appearance: black bubbles by day
         // (they'd vanish on a black page, so ink after dark), and buttons and tinted text in the page's ink
         // (the gray bubble color read as grayed out).
         let simpleDefault = context.simpleBots && context.bubbleHex == nil

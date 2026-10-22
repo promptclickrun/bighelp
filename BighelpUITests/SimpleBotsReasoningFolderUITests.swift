@@ -1,6 +1,6 @@
 import XCTest
 
-/// Simple Bot mode's "{Agent}'s reasoning" folder: open while the bot works, closed in place when the
+/// Bots mode's "{Agent}'s reasoning" folder: open while the bot works, closed in place when the
 /// turn ends, and a tap opens it again (demo tool stream: two notes, each before a tool, then the answer).
 final class SimpleBotsReasoningFolderUITests: BighelpUITestCase {
     @MainActor

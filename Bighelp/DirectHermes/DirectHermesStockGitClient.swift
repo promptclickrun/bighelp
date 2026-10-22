@@ -234,7 +234,7 @@ final class DirectHermesStockGitClient: StockGitManaging, ProjectGitClient {
     private var preparedActions: [UUID: StockGitPreparedAction] = [:]
     /// Linked worktrees of each registered Project's primary folder, from Hermes's own
     /// worktree list for that folder. Besides the primary folder, these are the only
-    /// paths a target may name (Bighelp IDE's sessions each work in one).
+    /// paths a target may name (Code mode's sessions each work in one).
     private var projectWorktrees: [String: (primary: StockGitProjectTarget, paths: Set<String>)] = [:]
 
     init(

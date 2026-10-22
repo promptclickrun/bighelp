@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Search in Simple Bot mode: every bot by name or what it's for. The filter
+/// Search in Bots mode: every bot by name or what it's for. The filter
 /// shows hidden bots too, so a hidden one can come back.
 @MainActor
 struct SimpleBotsSearchView: View {

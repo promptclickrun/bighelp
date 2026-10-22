@@ -106,7 +106,7 @@ struct RootShellView: View {
     @State var providerUsage = ProviderUsageStore()
     @State var usage = UsageStore()
     @State var agentMedia = AgentMediaStore()
-    /// Which bots are working or need you, for Simple Bot mode and the Agents screen.
+    /// Which bots are working or need you, for Bots mode and the Agents screen.
     @State var botChatActivity = BotChatActivityStore()
     @State var profileAgentID: String?
     @State var isAgentSwitcherPresented = false
@@ -114,7 +114,7 @@ struct RootShellView: View {
     @State var didAutoOpenHomeChat = false
     /// The open Projects screens' chats and project details.
     @State var projectsStore: ProjectsStore?
-    /// Bighelp IDE's home for the selected computer (`cacheScopeID`), kept through reconnects.
+    /// Code mode's home for the selected computer (`cacheScopeID`), kept through reconnects.
     @State var codeHome: CodeHomeStore?
     @State var codeSheet: CodeSheet?
     @State var devFactory: DevFactoryStore?
@@ -572,6 +572,13 @@ struct RootShellView: View {
             }
     }
 
+    /// The Unified Mode Toggle in the root bar, in place of the brand: on the Chat tab's list (when it
+    /// opens on a list, or on all hosts) and on Code's home. The Chat tab's own chat and Bots' home
+    /// draw their own headers with it.
+    private var barModeSwitch: BighelpModeSwitch? {
+        [.sessions, .code].contains(appState.selectedTab) && !simpleBotsOn ? modeSwitch : nil
+    }
+
     /// Feed, Ideas, Goals and Apps draw their own header (the agent's avatar).
     private var showsAgentBoard: Bool {
         appState.path.isEmpty && appState.selectedTab.isAgentBoard
@@ -580,7 +587,7 @@ struct RootShellView: View {
     private var shell: some View {
         rootTabs
         .toolbar(.hidden, for: .tabBar)
-        // Boards and Simple Bot mode's home draw their own header. The home's stays hidden while a
+        // Boards and Bots mode's home draw their own header. The home's stays hidden while a
         // chat is pushed over it too: its bar (with ☰) showed through for the length of Back.
         .toolbar(showsAgentBoard || simpleBotsHomeIsRoot ? .hidden : .automatic, for: .navigationBar)
         .navigationTitle(showsAgentBoard || simpleBotsHomeIsRoot ? "" : rootNavigationTitle)
@@ -601,9 +608,14 @@ struct RootShellView: View {
                 .bighelpIconLabel(String(localized: "Chats and menu"), shortcut: "⌃⌘S")
                 .accessibilityIdentifier("home.drawer.open")
             }
-            // Ember lives only in chrome: the brand bar on root screens.
-            // Touch and hold it to switch hosts.
-            BighelpBrandToolbarItem(demoHosts: demoHosts)
+            if let barModeSwitch {
+                // The Unified Mode Toggle takes the bar's middle on the Chat list; hosts stay in ☰.
+                ToolbarItem(placement: .principal) { BighelpModePill(modeSwitch: barModeSwitch) }
+            } else {
+                // Ember lives only in chrome: the brand bar on root screens.
+                // Touch and hold it to switch hosts.
+                BighelpBrandToolbarItem(demoHosts: demoHosts)
+            }
             // All agents has its own options there instead (☰ switches back to one host).
             if fleetModeOn, appState.path.isEmpty, appState.selectedTab == .scheduledTasks { fleetToolbar }
         }
@@ -632,9 +644,9 @@ struct RootShellView: View {
             }
         }
         .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.bottom } action: { rootBottomSafeArea = $0 }
-        // Bighelp Chat or Bighelp IDE: the launch's choice, then ☰'s switch.
+        // Chat or Code mode: the launch's choice, then ☰'s switch.
         .onChange(of: settings.experience, initial: true) { applyExperience() }
-        // Simple Bot mode on or off: back to that mode's home, whatever was open.
+        // Bots mode on or off: back to that mode's home, whatever was open.
         .onChange(of: settings.simpleBotsEnabled) {
             appState.path.removeAll()
             appState.homeTab = .sessions
@@ -748,8 +760,8 @@ struct RootShellView: View {
     /// Ideas and Goals are clearly its own.
     private var showsTabsOnRoot: Bool {
         let tab = appState.selectedTab
-        // Bighelp IDE's message box sits where the bar would; ☰ goes everywhere else.
-        // Simple Bot mode has no bar: its home is the whole app.
+        // Code mode's message box sits where the bar would; ☰ goes everywhere else.
+        // Bots mode has no bar: its home is the whole app.
         guard tab != .code, !simpleBotsOn else { return false }
         let pinned = tab != .sessions && barTabs.contains(tab)
         return (tab != .agents || pinned) && (!fleetModeOn || tab.isAgentBoard || pinned)
@@ -909,6 +921,10 @@ struct RootShellView: View {
             if fleetModeOn { openAgentsList() } else { openHomeChat() }
         case .profile:
             openSettingsPage()
+        case .nextMode:
+            settings.switchMode(settings.nextMode)
+        case .botsMode, .chatMode, .codeMode:
+            if let mode = action.mode { settings.switchMode(mode) }
         case .none:
             break
         }
@@ -1200,13 +1216,15 @@ struct RootShellView: View {
             }
     }
 
-    /// The menu bar's New Chat (⌘N), Settings (⌘,), sidebar (⌃⌘S) and, on the Mac, tabs (⌘1–⌘5).
+    /// The menu bar's New Chat (⌘N), Settings (⌘,), sidebar (⌃⌘S), modes (⌃⌘1–⌃⌘3, with the Unified
+    /// Mode Toggle on) and, on the Mac, tabs (⌘1–⌘5).
     private var menuCommandActions: BighelpShellActions {
         var actions = BighelpShellActions(
             newChat: { startNewChat(explicitAgentID: nil) },
             openSettings: { isUnifiedSettingsPresented = true },
             isSidebarOpen: isHomeDrawerPresented,
-            toggleSidebar: { isHomeDrawerPresented.toggle() }
+            toggleSidebar: { isHomeDrawerPresented.toggle() },
+            modeSwitch: modeSwitch
         )
         if appState.path.isEmpty, !fleetModeOn {
             let selection = tabSelection

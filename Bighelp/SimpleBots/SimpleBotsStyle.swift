@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Simple Bot mode's building blocks: round glass buttons, gray rounded cards
+/// Bots mode's building blocks: round glass buttons, gray rounded cards
 /// with full-width rows, and quiet section labels, all in the system font.
 struct SimpleBotsCircleButton: View {
     let systemImage: String

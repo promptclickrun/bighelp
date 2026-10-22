@@ -18,7 +18,7 @@ struct CodeHomeContext {
     let connectionKey: String?
 }
 
-/// Bighelp IDE's home (the Launchpad): this project's coding sessions with their
+/// Code mode's home (the Launchpad): this project's coding sessions with their
 /// live status, and the message box that starts a new one with each send.
 struct CodeHomeView: View {
     let context: CodeHomeContext

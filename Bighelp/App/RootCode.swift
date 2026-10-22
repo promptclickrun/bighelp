@@ -1,21 +1,21 @@
 import SwiftUI
 
-/// Bighelp IDE's sheets over its home.
+/// Code mode's sheets over its home.
 enum CodeSheet: String, Identifiable {
     case pullRequests, worktrees
     var id: String { rawValue }
 }
 
-// Bighelp IDE (Settings › Bighelp IDE): its home, sessions, changes and ☰ entries.
+// Code mode (Settings › Code mode): its home, sessions, changes and ☰ entries.
 extension RootShellView {
-    /// Bighelp IDE needs a host that starts sessions in a chosen folder: native Hermes, or the demo.
+    /// Code mode needs a host that starts sessions in a chosen folder: native Hermes, or the demo.
     var canUseCodeMode: Bool {
         nativeRuntime != nil || (usesWorkspaceFixtures && workspaceConnections?.isDirectSelected != true)
     }
 
     /// Shows the home `settings.experience` picks, and returns to it after host and account changes.
     func applyExperience() {
-        // Simple Bot mode's home is the Chat tab's place, whatever IDE's choice.
+        // Bots mode's home is the Chat tab's place, whatever Code's choice.
         let home: AppTab = settings.experience == .code && !simpleBotsOn ? .code : .sessions
         guard appState.homeTab != home else { return }
         appState.homeTab = home
@@ -29,10 +29,10 @@ extension RootShellView {
                 CodeHomeView(context: codeContext(store))
                     .bighelpSheet(item: $codeSheet) { sheet in codeSheetView(sheet, store: store) }
             } else if canUseCodeMode {
-                ProgressView("Loading Bighelp IDE")
+                ProgressView("Loading Code")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                ContentUnavailableView("Bighelp IDE needs your computer", systemImage: "laptopcomputer",
+                ContentUnavailableView("Code needs your computer", systemImage: "laptopcomputer",
                     description: Text("Connect to a computer running Hermes, then come back to Code."))
             }
         }
@@ -105,7 +105,7 @@ extension RootShellView {
         }
     }
 
-    /// Opens a Bighelp IDE session's chat over the Code home; Back returns to it.
+    /// Opens a Code mode session's chat over the Code home; Back returns to it.
     func openCodeSession(_ session: CodeSessionRecord) {
         appState.chatOpenedFromList = true
         guard let record = sessionCatalog.session(id: session.id) else {
@@ -125,7 +125,7 @@ extension RootShellView {
         return canUseCodeMode ? DemoHostTextFiles.shared : nil
     }
 
-    /// A Bighelp IDE session's chat links Markdown paths to the viewer, inside its folder.
+    /// A Code mode session's chat links Markdown paths to the viewer, inside its folder.
     func codeFileLinks(sessionID: String) -> HostFileLinkContext? {
         guard let session = codeHome?.sessions.first(where: { $0.id == sessionID }),
               let files = hostTextFiles(profileID: session.agentID) else { return nil }
@@ -221,7 +221,7 @@ extension RootShellView {
             }
         } else {
             ContentUnavailableView("Dev Factory isn't open", systemImage: "hammer",
-                description: Text("Open it from the menu in Bighelp IDE."))
+                description: Text("Open it from the menu in Code."))
         }
     }
 
@@ -244,11 +244,11 @@ extension RootShellView {
                 canShip: false)
         } else {
             ContentUnavailableView("Changes aren't available", systemImage: "plus.forwardslash.minus",
-                description: Text("Add this project in Bighelp IDE to read its changes here."))
+                description: Text("Add this project in Code to read its changes here."))
         }
     }
 
-    /// ☰ in Bighelp IDE: New session, Projects, Pull requests and Worktrees, then Kanban and Settings.
+    /// ☰ in Code mode: New session, Projects, Pull requests and Worktrees, then Kanban and Settings.
     var codeMenu: BighelpMenuDestinations.Code {
         BighelpMenuDestinations.Code(
             onNewSession: { afterClosingHomeSheets { appState.select(.code) } },
@@ -262,11 +262,22 @@ extension RootShellView {
         )
     }
 
-    /// ☰'s switch between Bighelp Chat and Bighelp IDE, while Bighelp IDE is on in Settings.
+    /// ☰'s switch between Chat and Code, while Code mode is on in Settings. The Unified Mode
+    /// Toggle takes its place at the top of each home, so ☰ has none while that's on.
     var experienceSwitch: BighelpMenuDestinations.ExperienceSwitch? {
-        guard settings.codeModeEnabled else { return nil }
+        guard settings.codeModeEnabled, !settings.unifiedModeToggleEnabled else { return nil }
         return BighelpMenuDestinations.ExperienceSwitch(current: settings.experience) { experience in
             afterClosingHomeSheets { settings.experience = experience }
+        }
+    }
+
+    /// Settings › Experience › Unified Mode Toggle: Bots, Chat and Code at the top of each home
+    /// (and ⌃⌘1–⌃⌘3 on the Mac). Nil while it's off.
+    var modeSwitch: BighelpModeSwitch? {
+        guard settings.unifiedModeToggleEnabled else { return nil }
+        // At once: the pill sits in a home's header, not in a sheet that has to close first.
+        return BighelpModeSwitch(modes: settings.availableModes, current: settings.currentMode) { mode in
+            settings.switchMode(mode)
         }
     }
 }

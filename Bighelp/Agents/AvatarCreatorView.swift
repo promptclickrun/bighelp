@@ -10,7 +10,7 @@ enum AvatarCreatorResult {
     /// A petdex pet's first frame, ready to save; its moves play in chats.
     case pet(PetdexPet, avatar: Data)
     case photo(PhotosPickerItem)
-    /// A Simple Bot mode mark: a shape in a color, with two eyes.
+    /// A Bots mode mark: a shape in a color, with two eyes.
     case mark(SimpleBotMark)
 }
 
@@ -27,7 +27,7 @@ enum AvatarCreatorStart: Equatable {
     case pet(slug: String, picture: Data?)
     /// A photo, or no avatar at all when there's no picture.
     case photo(Data?)
-    /// A Simple Bot mode mark.
+    /// A Bots mode mark.
     case mark(SimpleBotMark)
 }
 
@@ -74,7 +74,7 @@ final class AvatarCreatorModel {
         }
     }
 
-    /// Simple Bot mode's marks are offered where that mode opens the creator.
+    /// Bots mode's marks are offered where that mode opens the creator.
     var offersBotMarks = false
     var categories: [Category] { Category.allCases.filter { $0 != .bots || offersBotMarks } }
     /// The Simple Bot mark being made while `style` is `.bots`.

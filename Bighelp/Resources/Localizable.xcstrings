@@ -527,40 +527,6 @@
         }
       }
     },
-    "Bighelp Chat": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bighelp Chat"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Bighelp 聊天"
-          }
-        }
-      }
-    },
-    "Bighelp IDE": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bighelp IDE"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Bighelp IDE"
-          }
-        }
-      }
-    },
     "Black": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -591,6 +557,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "机器人"
+          }
+        }
+      }
+    },
+    "Bots mode": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bots mode"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "机器人模式"
           }
         }
       }
@@ -1130,6 +1113,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "编程"
+          }
+        }
+      }
+    },
+    "Code mode": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Code mode"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "编程模式"
           }
         }
       }
@@ -4110,23 +4110,6 @@
         }
       }
     },
-    "Simple Bot mode": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Simple Bot mode"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "简易机器人模式"
-          }
-        }
-      }
-    },
     "Simple chats with your bots, like texting friends.": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -4463,6 +4446,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "向日葵黄"
+          }
+        }
+      }
+    },
+    "Switch between Bots, Chat and Code from the top of each home.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switch between Bots, Chat and Code from the top of each home."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "在每个主页顶部切换机器人、聊天和编程。"
           }
         }
       }
@@ -4873,6 +4873,23 @@
         }
       }
     },
+    "Unified Mode Toggle": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unified Mode Toggle"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "统一模式切换"
+          }
+        }
+      }
+    },
     "Update the bighelp plugin on this computer to use this.": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -5226,6 +5243,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "之后可以更改"
+          }
+        }
+      }
+    },
+    "You can switch modes any time from the top of each home.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can switch modes any time from the top of each home."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "随时可以在每个主页顶部切换模式。"
           }
         }
       }

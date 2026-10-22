@@ -1,6 +1,6 @@
 import XCTest
 
-/// #504: Simple Bot mode shows which bots are working on a turn and which need you. On the demo
+/// #504: Bots mode shows which bots are working on a turn and which need you. On the demo
 /// data with `-test-bot-activity`, Mina Shah browses the web in her Bot Chat and Jordan Lee needs
 /// you; with Multi-gateway, Sage Ortiz works on the sample Studio Mac. Light and dark.
 /// TEST_RUNNER_BIGHELP_BOT_ACTIVITY_EVIDENCE=<folder> saves the screenshots there, and

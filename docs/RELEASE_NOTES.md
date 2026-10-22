@@ -3,6 +3,20 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.11
+
+### Modes
+
+- **New names:** the three modes are now **Bots**, **Chat** and **Code**. Simple Bot mode is now **Bots mode**. Bighelp IDE
+  is now **Code mode**.
+- **Unified Mode Toggle:** a new switch in **Settings** › **Experience**. It is off by default. Turn it on to show a pill
+  with Bots, Chat and Code at the top of each home. Tap a mode to switch to it.
+  - Code shows in the pill only when **Settings** › **Code mode** is on.
+  - In Bots mode, **Search** and **Filter by Gateway** move to a row under the pill.
+  - On the Mac, press ⌃⌘1, ⌃⌘2 or ⌃⌘3 to switch modes.
+- **Edge swipes:** a swipe from the edge of the screen can switch modes. Pick **Next mode**, **Bots mode**, **Chat mode**
+  or **Code mode** in the edge swipe settings. A mode swipe also works in Bots mode.
+
 ## 2.6.10
 
 ### Group chats

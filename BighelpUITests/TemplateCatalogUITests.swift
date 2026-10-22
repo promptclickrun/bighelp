@@ -1,7 +1,7 @@
 import XCTest
 
 /// Every template picker by topic: the search row, the topic chips, a section per topic, Sort, and
-/// a search that finds nothing. Agents' New agent (its rail and Browse all), Simple Bot mode's New
+/// a search that finds nothing. Agents' New agent (its rail and Browse all), Bots mode's New
 /// Bot › Templates (My Templates first), and Feed, Ideas and Goals blueprints. Demo data (bundled,
 /// offline). BIGHELP_CATALOG_EVIDENCE (TEST_RUNNER_…) saves light and dark shots.
 final class TemplateCatalogUITests: BighelpUITestCase {

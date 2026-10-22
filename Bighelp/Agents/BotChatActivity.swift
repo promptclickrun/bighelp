@@ -132,7 +132,7 @@ enum BotChatActivitySignals {
     }
 }
 
-/// Each bot's Bot Chat state, for Simple Bot mode and the Agents screen. While a screen that shows
+/// Each bot's Bot Chat state, for Bots mode and the Agents screen. While a screen that shows
 /// it is open and the app is active, it reads the gateway in use once per tick, in one request,
 /// quicker while something works; nothing runs otherwise, and what's shown is cleared then, since
 /// it would go stale. Each bot's state is observed on its own, so a row redraws only when its own

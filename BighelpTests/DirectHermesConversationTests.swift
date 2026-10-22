@@ -2148,7 +2148,7 @@ struct DirectHermesConversationTests {
     }
 
     /// One chat fed Hermes' events in their real order, read the way the chat shows it: normal,
-    /// and Simple Bot mode with Show reasoning off and on.
+    /// and Bots mode with Show reasoning off and on.
     @MainActor
     private final class LandedAnswerReplay {
         let model: ChatModel

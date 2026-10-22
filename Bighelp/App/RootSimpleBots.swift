@@ -1,9 +1,9 @@
 import SwiftUI
 
-// Simple Bot mode (Settings › Simple Bot mode): its home in place of the Chat
+// Bots mode (Settings › Bots mode): its home in place of the Chat
 // tab, its short Settings, bot profiles, and how its chats look.
 extension RootShellView {
-    /// Simple Bot mode wins over the all-hosts view and Open on (`fleetModeOn`).
+    /// Bots mode wins over the all-hosts view and Open on (`fleetModeOn`).
     var simpleBotsOn: Bool { settings.simpleBotsEnabled }
 
     /// The home is the tab's root, whatever is pushed over it: no bar, no ☰; the person's circle opens Settings.
@@ -44,7 +44,7 @@ extension RootShellView {
         }
     }
 
-    /// Simple Bot mode: a chat opening from a list, a search, a profile or a link. Nil outside it.
+    /// Bots mode: a chat opening from a list, a search, a profile or a link. Nil outside it.
     func beginSimpleBotsChatOpening(_ session: SessionSummary) -> UUID? {
         guard simpleBotsOn else { return nil }
         let agentID = session.kind == .direct && session.agentIDs.count == 1 ? session.agentIDs[0] : nil
@@ -112,7 +112,8 @@ extension RootShellView {
             onRoutines: { openSimpleBotRoutines($0) },
             gateways: simpleBotsGateways,
             activity: botChatActivity,
-            activitySource: botChatActivitySource
+            activitySource: botChatActivitySource,
+            modeSwitch: modeSwitch
         )
     }
 
@@ -222,7 +223,7 @@ extension RootShellView {
             })
     }
 
-    /// The edge swipes in Simple Bot mode (`effectiveLeftEdgeSwipeAction`): from the left back to your
+    /// The edge swipes in Bots mode (`effectiveLeftEdgeSwipeAction`): from the left back to your
     /// bots, from the right this bot's profile (the primary bot's on the home). False for anything else.
     func performSimpleBotsSwipe(_ action: WorkspaceSwipeAction) -> Bool {
         switch action {
@@ -249,7 +250,7 @@ extension RootShellView {
         openCanonicalAgentChat(agentID, fromList: true)
     }
 
-    /// Its scheduled tasks as a page with Back, not the Tasks tab Simple Bot mode doesn't show.
+    /// Its scheduled tasks as a page with Back, not the Tasks tab Bots mode doesn't show.
     func openSimpleBotRoutines(_ agentID: String) {
         guard featureStore.prepareScheduledTasks(filteredTo: agentID) else { return }
         appState.open(.scheduledTasks)
@@ -323,7 +324,7 @@ extension RootShellView {
         }
     }
 
-    /// Simple Bot mode's Settings sheet; All Settings leads to everything else.
+    /// Bots mode's Settings sheet; All Settings leads to everything else.
     func simpleBotsSettings() -> some View {
         let close = { isUnifiedSettingsPresented = false }
         let profile = agents.resolvedAgent(explicitID: nil)?.id ?? "default"

@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-/// Simple Bot mode: a bot's chat can take a few seconds to open when the computer has to find or
+/// Bots mode: a bot's chat can take a few seconds to open when the computer has to find or
 /// resume its Bot Chat and read its history first. After a short grace, so a quick open never
 /// flashes it, the opening loader covers the wait until the chat can show its messages, or fails
 /// with its own error. Cancel goes back to where the tap came from.

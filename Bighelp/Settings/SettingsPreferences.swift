@@ -239,8 +239,8 @@ enum BotChatExperience: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// Which home bighelp shows: the everyday agent chat, or Bighelp IDE's coding
-/// sessions (Settings › Bighelp IDE; ☰ switches between them).
+/// Which home bighelp shows: the everyday agent chat, or Code mode's coding
+/// sessions (Settings › Code mode; ☰ switches between them).
 enum BighelpExperience: String, CaseIterable, Identifiable, Sendable {
     case bighelp
     case code
@@ -249,10 +249,36 @@ enum BighelpExperience: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .bighelp: String(localized: "Bighelp Chat")
-        case .code: String(localized: "Bighelp IDE")
+        case .bighelp: String(localized: "Chat")
+        case .code: String(localized: "Code")
         }
     }
+}
+
+/// The three ways bighelp opens: Bots mode (`simpleBotsEnabled`), Chat, and Code
+/// (`experience`, once Settings › Code mode is on). The Unified Mode Toggle and the
+/// mode edge swipes switch between them.
+enum BighelpMode: String, CaseIterable, Identifiable, Sendable {
+    case bots
+    case chat
+    case code
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .bots: String(localized: "Bots")
+        case .chat: String(localized: "Chat")
+        case .code: String(localized: "Code")
+        }
+    }
+}
+
+/// The Unified Mode Toggle in a home's header: the modes on offer, the one showing, and the switch.
+struct BighelpModeSwitch {
+    let modes: [BighelpMode]
+    let current: BighelpMode
+    let select: @MainActor (BighelpMode) -> Void
 }
 
 enum WorkspaceSwipeAction: String, CaseIterable, Identifiable, Sendable {
@@ -263,6 +289,10 @@ enum WorkspaceSwipeAction: String, CaseIterable, Identifiable, Sendable {
     case home
     case inbox
     case profile
+    case nextMode
+    case botsMode
+    case chatMode
+    case codeMode
     case none
 
     static let allCases: [WorkspaceSwipeAction] = [
@@ -272,8 +302,24 @@ enum WorkspaceSwipeAction: String, CaseIterable, Identifiable, Sendable {
         .agents,
         .home,
         .profile,
+        .nextMode,
+        .botsMode,
+        .chatMode,
+        .codeMode,
         .none,
     ]
+
+    /// Switches mode instead of opening a place, so it works in Bots mode too.
+    var mode: BighelpMode? {
+        switch self {
+        case .botsMode: .bots
+        case .chatMode: .chat
+        case .codeMode: .code
+        default: nil
+        }
+    }
+
+    var switchesMode: Bool { self == .nextMode || mode != nil }
 
     var id: Self { self }
 
@@ -286,6 +332,10 @@ enum WorkspaceSwipeAction: String, CaseIterable, Identifiable, Sendable {
         case .home: "Home"
         case .inbox: "Inbox"
         case .profile: "Profile & Settings"
+        case .nextMode: "Next mode"
+        case .botsMode: "Bots mode"
+        case .chatMode: "Chat mode"
+        case .codeMode: "Code mode"
         case .none: "Off"
         }
     }
@@ -299,6 +349,10 @@ enum WorkspaceSwipeAction: String, CaseIterable, Identifiable, Sendable {
         case .home: "house"
         case .inbox: "tray"
         case .profile: "person.crop.circle"
+        case .nextMode: "arrow.left.arrow.right"
+        case .botsMode: "bubble.left.and.bubble.right"
+        case .chatMode: "message"
+        case .codeMode: "chevron.left.forwardslash.chevron.right"
         case .none: "hand.raised.slash"
         }
     }

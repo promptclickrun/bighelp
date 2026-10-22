@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// A job staged in Bighelp IDE's message box, waiting for Send all. It keeps the
+/// A job staged in Code mode's message box, waiting for Send all. It keeps the
 /// chips it was staged with (where it runs, branch, model, mode).
 struct CodeStagedJob: Codable, Identifiable, Equatable, Sendable {
     let id: UUID

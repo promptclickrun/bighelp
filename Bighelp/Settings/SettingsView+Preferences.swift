@@ -153,13 +153,18 @@ extension SettingsView {
         .listRowBackground(theme.surface)
     }
 
+    /// Code mode's swipe only while Code mode is on (or already picked, so the picker still shows it).
+    func swipeChoices(keeping current: WorkspaceSwipeAction) -> [WorkspaceSwipeAction] {
+        WorkspaceSwipeAction.allCases.filter { $0 != .codeMode || settings.codeModeEnabled || current == .codeMode }
+    }
+
     /// A Mac has no screen edges to swipe from.
     @ViewBuilder
     var edgeGestures: some View {
         #if !targetEnvironment(macCatalyst)
         Section {
             Picker("Swipe from left edge", selection: $settings.leftEdgeSwipeAction) {
-                ForEach(WorkspaceSwipeAction.allCases) { action in
+                ForEach(swipeChoices(keeping: settings.leftEdgeSwipeAction)) { action in
                     Label(action.title, systemImage: action.systemImage).tag(action)
                 }
             }
@@ -167,7 +172,7 @@ extension SettingsView {
             .accessibilityIdentifier("settings.left-edge-swipe")
 
             Picker("Swipe from right edge", selection: $settings.rightEdgeSwipeAction) {
-                ForEach(WorkspaceSwipeAction.allCases) { action in
+                ForEach(swipeChoices(keeping: settings.rightEdgeSwipeAction)) { action in
                     Label(action.title, systemImage: action.systemImage).tag(action)
                 }
             }

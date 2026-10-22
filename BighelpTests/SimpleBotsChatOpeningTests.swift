@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import Bighelp
 
-/// Simple Bot mode's opening loader for a chat on the gateway in use: it waits a short grace so a quick
+/// Bots mode's opening loader for a chat on the gateway in use: it waits a short grace so a quick
 /// open never flashes it, stays up until the chat can show its messages, and ends on Cancel or an error.
 @MainActor
 struct SimpleBotsChatOpeningTests {

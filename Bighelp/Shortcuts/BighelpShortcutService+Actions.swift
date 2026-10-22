@@ -284,7 +284,7 @@ extension BighelpShortcutService {
             throw BighelpShortcutServiceError.workflowsUnavailable
         }
         let host = hostServices.hostID()
-        // Dev Factory's recipes run from Bighelp IDE, with their projects.
+        // Dev Factory's recipes run from Code mode, with their projects.
         let workflows = list.workflows.filter { !$0.isCodeRecipe }
         let pinnedFirst = workflows.filter(\.pinned) + workflows.filter { !$0.pinned }
         return pinnedFirst.prefix(Self.listLimit).map {

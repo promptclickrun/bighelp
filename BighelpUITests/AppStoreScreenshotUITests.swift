@@ -67,13 +67,13 @@ final class AppStoreScreenshotUITests: BighelpUITestCase {
         scrollToCard(in: app, by: 0)
         save("02-packing", app)
 
-        // Simple Bot mode's home on the same host, after the agents' chats above. The same app
+        // Bots mode's home on the same host, after the agents' chats above. The same app
         // (and run ID) relaunched, so it stays connected.
         app.terminate()
         app.launchArguments += ["-bighelp.settings.simple-bots", "YES"]
         app.launch()
         let home = app.descendants(matching: .any)["simple-bots.home"]
-        XCTAssertTrue(home.waitForExistence(timeout: 60), "Simple Bot mode opens on its home")
+        XCTAssertTrue(home.waitForExistence(timeout: 60), "Bots mode opens on its home")
         for id in ["penny", "atlas"] {
             let bot = app.descendants(matching: .any).matching(NSPredicate(format: "identifier IN %@",
                 ["simple-bots.bot.\(id)", "simple-bots.pinned.\(id)"])).firstMatch

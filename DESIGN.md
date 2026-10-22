@@ -368,9 +368,9 @@ Long instructions (an agent's SOUL, a personality) have an expand icon that open
 form. Present that editor from the form's root: a full-screen cover hung on a list section header never got the
 keyboard.
 
-## Simple Bot mode
+## Bots mode
 
-An opt-in calm home (Settings › Experience › Simple Bot mode): just your bots and their chats. No tab bar
+An opt-in calm home (Settings › Experience › Bots mode): just your bots and their chats. No tab bar
 and no ☰. The page is white by day and black at night, your bubbles are black (ink after dark) unless you
 picked a bubble color in Appearance, and buttons and tinted text are the page's ink (white after dark). The
 text is SF Pro, as everywhere.
@@ -416,18 +416,18 @@ text is SF Pro, as everywhere.
   (or this device's, automatically); Teamwork; Bot Computer; Notifications and Appearance; then the
   switch back and All Settings.
 
-## Bighelp IDE
+## Code mode
 
-An opt-in second home for coding (Settings › Bighelp IDE; Bighelp Chat stays the default). Its home is the
+An opt-in second home for coding (Settings › Code mode; Chat stays the default). Its home is the
 Launchpad: filter chips (All, Running, Needs you, Ready), one card per session (a still status dot, its name, its
 branch in code type, what it's doing now) and a message box pinned at the bottom in place of the bottom bar. Under
 the box, three chips choose the project, where it runs (New worktree, the default, or Local checkout) and the
 branch; they stay set, so each send starts the next session at once and adds its card. Inside the box, the agent's
 face, a model chip (model, reasoning, fast mode; a long name truncates, never the buttons beside it) and a mode
 button (Default, Plan, YOLO) set what new sessions run on. A card opens the session's ordinary
-chat, where steer, queue and approvals work as in every chat; it has no bottom bar while Bighelp IDE is the home.
+chat, where steer, queue and approvals work as in every chat; it has no bottom bar while Code mode is the home.
 Touch and hold a card (right-click on the Mac) for Changes: uncommitted files, then the branch's commits, and Ship
-(commit, push, pull request). ☰ keeps one menu: a Bighelp Chat / Bighelp IDE switch on top, then Sessions, Projects, Pull
+(commit, push, pull request). ☰ keeps one menu: a Chat / Code mode switch on top, then Sessions, Projects, Pull
 requests, Worktrees, Kanban and Settings. Nothing animates on the cards.
 
 Orchestration mode: Stage (beside Send; an icon once something is staged) keeps the message, with the chips as
@@ -436,7 +436,7 @@ on the home with a line per session, and opens one chat for all of them: colored
 own chat), your messages on the right, and under each one every session's answer in a single block. `#` lists
 the batch's sessions, then the project's open pull requests; the chip and a line over the box say who gets it.
 
-Dev Factory (☰ › Dev Factory in Bighelp IDE): coding recipes across projects. Its home lists what runs now
+Dev Factory (☰ › Dev Factory in Code mode): coding recipes across projects. Its home lists what runs now
 (one card per start, a line per project), the recipes (projects as small code chips, a Run button), then the
 templates new recipes start from. A start's screen has one card per project: its step track, what it does now
 in the computer's own words, and only the buttons it needs (Approve and Look at changes, Try again, the pull

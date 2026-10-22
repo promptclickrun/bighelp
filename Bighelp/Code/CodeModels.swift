@@ -1,6 +1,6 @@
 import Foundation
 
-/// Where a Bighelp IDE session works.
+/// Where a Code mode session works.
 enum CodePlacement: String, Codable, CaseIterable, Identifiable, Sendable {
     /// Its own copy of the project on a new branch, so sessions run side by side.
     case newWorktree
@@ -31,7 +31,7 @@ enum CodePlacement: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// How a new Bighelp IDE session works (the message box's mode button). Each is a
+/// How a new Code mode session works (the message box's mode button). Each is a
 /// Hermes option: Plan sends the first message through `/plan`, which writes a
 /// Markdown plan and changes no code; YOLO turns on the session's own YOLO
 /// setting (no approval prompts) before the first message.
@@ -73,7 +73,7 @@ enum CodeSessionMode: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// A project Bighelp IDE can start sessions in: a Hermes project with one main folder.
+/// A project Code mode can start sessions in: a Hermes project with one main folder.
 struct CodeProject: Identifiable, Equatable, Sendable {
     let id: String
     let name: String
@@ -90,7 +90,7 @@ struct CodeFoundFolder: Identifiable, Equatable, Sendable {
     var id: String { path }
 }
 
-/// One session Bighelp IDE started, kept on this device per computer so its card
+/// One session Code mode started, kept on this device per computer so its card
 /// survives a relaunch. Its status always comes from the live chat.
 struct CodeSessionRecord: Codable, Identifiable, Equatable, Sendable {
     /// The app's session ID, which opens the chat.

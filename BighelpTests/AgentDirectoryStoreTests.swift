@@ -144,7 +144,7 @@ struct AgentDirectoryStoreTests {
         #expect(restored.pinnedAgents.isEmpty)
     }
 
-    /// Simple Bot mode pins by its own count (the bots its home shows), past the shared list's five.
+    /// Bots mode pins by its own count (the bots its home shows), past the shared list's five.
     @Test func simpleBotModePinsByItsOwnCount() async throws {
         let defaults = isolatedDefaults()
         let profiles = (0..<7).map { index in
@@ -155,7 +155,7 @@ struct AgentDirectoryStoreTests {
         try await store.load()
         for profile in profiles.prefix(5) { store.pinAgent(profile.id) }
         #expect(!store.pinAgent("agent-5"), "The shared list holds five")
-        #expect(store.pinAgent("agent-5", limit: 6, counting: 3), "Simple Bot mode counts only the pins it shows")
+        #expect(store.pinAgent("agent-5", limit: 6, counting: 3), "Bots mode counts only the pins it shows")
         #expect(!store.pinAgent("agent-6", limit: 6, counting: 6))
         #expect(store.pinnedAgentIDs.last == "agent-5")
     }

@@ -1,6 +1,6 @@
 import XCTest
 
-/// Bighelp IDE against a real Hermes host: a send makes a worktree and a session on
+/// Code mode against a real Hermes host: a send makes a worktree and a session on
 /// the chosen model, the agent's change shows in Changes, and Ship commits it.
 /// Needs a project whose main folder is a throwaway git repository with no remote.
 /// Set (as TEST_RUNNER_…):
@@ -20,7 +20,7 @@ final class CodeModeHostUITests: BighelpUITestCase {
         app.launchArguments = ["-bighelp.settings.code-mode", "YES", "-bighelp.settings.code-mode.open-in", "code"]
         app.launch()
         try onboardOpenHost(app, address: host)
-        XCTAssertTrue(element("code.screen", in: app).waitForExistence(timeout: 30), "Bighelp IDE is the home.")
+        XCTAssertTrue(element("code.screen", in: app).waitForExistence(timeout: 30), "Code mode is the home.")
 
         app.buttons["code.chip.project"].tap()
         let probe = app.buttons["code.project.\(project)"]
@@ -54,7 +54,7 @@ final class CodeModeHostUITests: BighelpUITestCase {
         let field = element("code.composer.field", in: app)
         XCTAssertTrue(field.waitForExistence(timeout: 10))
         field.tap()
-        field.typeText("Create a file named HELLO.md containing exactly one line: hello from Bighelp IDE. "
+        field.typeText("Create a file named HELLO.md containing exactly one line: hello from Code mode. "
                        + "Do not change any other file and do not commit.")
         app.buttons["code.composer.send"].tap()
 
@@ -141,7 +141,7 @@ final class CodeModeHostUITests: BighelpUITestCase {
         app.launchArguments = ["-bighelp.settings.code-mode", "YES", "-bighelp.settings.code-mode.open-in", "code"]
         app.launch()
         try onboardOpenHost(app, address: host)
-        XCTAssertTrue(element("code.screen", in: app).waitForExistence(timeout: 30), "Bighelp IDE is the home.")
+        XCTAssertTrue(element("code.screen", in: app).waitForExistence(timeout: 30), "Code mode is the home.")
         app.buttons["code.chip.project"].tap()
         // By its ID, or its name (a project made with the CLI has an ID of the host's own).
         let probe = app.buttons.matching(NSPredicate(

@@ -181,7 +181,7 @@ extension RootShellView {
                 hostFiles: codeFileLinks(sessionID: conversationID)
             )
             .environment(\.chatCardInteractions, cardInteractions(for: model))
-            .environment(\.agentHomeChrome, homeChrome)
+            .environment(\.agentHomeChrome, homeChrome(forChat: conversationID))
             .environment(connectionKeeper)
         case (.scheduledTasks, .scheduledTasks(let store)?):
             routeWithWorkspaceMenu {

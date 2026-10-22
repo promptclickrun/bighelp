@@ -78,9 +78,9 @@ struct BighelpMenuDestinations {
     var onBoard: ((AppTab) -> Void)? = nil
     /// Feed, Ideas and Goals with something new, for a dot on their rows.
     var unread: Set<AppTab> = []
-    /// Bighelp IDE's own places, listed instead of the everyday ones while it's the home.
+    /// Code mode's own places, listed instead of the everyday ones while it's the home.
     var code: Code? = nil
-    /// Settings › Bighelp IDE on: the switch between Bighelp Chat and Bighelp IDE, on top.
+    /// Settings › Code mode on: the switch between Chat and Code mode, on top.
     var experience: ExperienceSwitch? = nil
 
     struct Code {
@@ -194,7 +194,7 @@ struct BighelpMenu<Recent: View>: View {
         }
     }
 
-    /// Bighelp Chat or Bighelp IDE: which home the app shows.
+    /// Chat or Code mode: which home the app shows.
     private func experienceSection(_ experience: BighelpMenuDestinations.ExperienceSwitch) -> some View {
         Section {
             Picker("Mode", selection: Binding(get: { experience.current }, set: { value in
@@ -212,7 +212,7 @@ struct BighelpMenu<Recent: View>: View {
         .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
     }
 
-    /// Bighelp IDE's places: its home, the project's pull requests and worktrees, then
+    /// Code mode's places: its home, the project's pull requests and worktrees, then
     /// Projects, Kanban and Settings.
     @ViewBuilder
     private func codeRows(_ code: BighelpMenuDestinations.Code) -> some View {

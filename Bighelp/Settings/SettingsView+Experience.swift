@@ -1,13 +1,14 @@
 import SwiftUI
 
-/// Settings › Experience: Simple Bot mode, Bighelp IDE, and which home a launch opens in once it's on.
+/// Settings › Experience: Bots mode, Code mode, which home a launch opens in once Code is on,
+/// and the Unified Mode Toggle that puts Bots, Chat and Code at the top of each home.
 extension SettingsView {
     var experienceSection: some View {
         Section {
             Toggle(isOn: $settings.simpleBotsEnabled) {
                 HStack(spacing: BighelpTokens.space12) {
                     BighelpIconTile(systemName: "circle.hexagongrid")
-                    settingLabel(String(localized: "Simple Bot mode"), detail: String(localized: "Just your bots and their chats, nothing else."))
+                    settingLabel(String(localized: "Bots mode"), detail: String(localized: "Just your bots and their chats, nothing else."))
                 }
                 .padding(.horizontal, BighelpMenuRowLayout.labelInset)
             }
@@ -16,7 +17,7 @@ extension SettingsView {
             Toggle(isOn: $settings.codeModeEnabled) {
                 HStack(spacing: BighelpTokens.space12) {
                     BighelpIconTile(systemName: "chevron.left.forwardslash.chevron.right")
-                    settingLabel(String(localized: "Bighelp IDE"), detail: String(localized: "Fire off coding sessions against your projects."))
+                    settingLabel(String(localized: "Code mode"), detail: String(localized: "Fire off coding sessions against your projects."))
                 }
                 .padding(.horizontal, BighelpMenuRowLayout.labelInset)
             }
@@ -32,10 +33,23 @@ extension SettingsView {
                 .frame(minHeight: BighelpTokens.hitTarget)
                 .accessibilityIdentifier("settings.code-mode.open-in")
             }
+            Toggle(isOn: $settings.unifiedModeToggleEnabled) {
+                HStack(spacing: BighelpTokens.space12) {
+                    BighelpIconTile(systemName: "capsule.lefthalf.filled")
+                    settingLabel(String(localized: "Unified Mode Toggle"),
+                                 detail: String(localized: "Switch between Bots, Chat and Code from the top of each home."))
+                }
+                .padding(.horizontal, BighelpMenuRowLayout.labelInset)
+            }
+            .bighelpMacSettingsRowInsets()
+            .accessibilityIdentifier("settings.unified-mode-toggle")
         } header: {
             Text("Experience")
         } footer: {
-            if settings.codeModeEnabled {
+            if settings.unifiedModeToggleEnabled {
+                Text("You can switch modes any time from the top of each home.")
+                    .bighelpFont(.metadata)
+            } else if settings.codeModeEnabled {
                 Text("You can switch modes any time from ☰.")
                     .bighelpFont(.metadata)
             }

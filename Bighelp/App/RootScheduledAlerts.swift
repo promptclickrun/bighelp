@@ -16,7 +16,7 @@ extension RootShellView {
             performFleetOpen(.task(jobID: task.id, profileID: task.agentID))
             return
         }
-        // Simple Bot mode has no tab bar: the bot's routines open over its home, and the task over them.
+        // Bots mode has no tab bar: the bot's routines open over its home, and the task over them.
         openSimpleBotRoutines(task.agentID)
         openPrepared(.scheduledTask(id: task.id, agentID: task.agentID))
     }

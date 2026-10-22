@@ -341,7 +341,7 @@ final class DirectHermesWorkspaceClient: WorkspaceOperationPerforming {
                 }
                 return .rpc(operation.rawValue, payload)
             }
-            // YOLO (Bighelp IDE's mode, the chat's toggle): one session's flag, never the agent's default.
+            // YOLO (Code mode's mode, the chat's toggle): one session's flag, never the agent's default.
             if payload["key"] == .string("yolo") {
                 guard operation == .configSet, payload["profile"]?.string != nil,
                       payload["session_id"]?.string != nil, payload["scope"] == .string("session"),

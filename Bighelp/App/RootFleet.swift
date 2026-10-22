@@ -4,15 +4,15 @@ import SwiftUI
 /// all hosts; opening anything first makes its host the selected one, and
 /// screens that belong to one host (Settings, Projects…) ask which host.
 extension RootShellView {
-    /// Simple Bot mode wins: its home stays, and its Multi-gateway switch lists every host instead.
+    /// Bots mode wins: its home stays, and its Multi-gateway switch lists every host instead.
     var fleetModeOn: Bool { settings.allHostsMode && fleet != nil && !settings.simpleBotsEnabled }
 
-    /// Simple Bot mode's home lists every host's bots.
+    /// Bots mode's home lists every host's bots.
     var simpleBotsMultiGatewayOn: Bool {
         settings.simpleBotsEnabled && settings.simpleBotsMultiGateway && fleet != nil
     }
 
-    /// Every host's data is on screen: the all-hosts view, or Simple Bot mode's Multi-gateway.
+    /// Every host's data is on screen: the all-hosts view, or Bots mode's Multi-gateway.
     var showsEveryHost: Bool { fleetModeOn || simpleBotsMultiGatewayOn }
 
     func setAllHostsMode(_ on: Bool) {
@@ -400,7 +400,7 @@ extension RootShellView {
         guard let fleet, let pending = fleet.pendingOpen, pending.hostID == fleet.selectedHostID,
               isFleetHostReady else { return }
         fleet.pendingOpen = nil
-        // Simple Bot mode: the chat's own opening loader takes over from the gateway's, with no gap.
+        // Bots mode: the chat's own opening loader takes over from the gateway's, with no gap.
         simpleBotsChatOpening.showsNextAtOnce = simpleBotsOn
         performFleetOpen(pending.open)
         simpleBotsChatOpening.showsNextAtOnce = false

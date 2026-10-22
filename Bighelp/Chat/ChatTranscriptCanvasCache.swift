@@ -40,7 +40,7 @@ final class ChatTranscriptCanvasCache {
         let isBotMode: Bool
         let foldsCompletedTurns: Bool
         let interimReplies: ChatInterimReplyPlacement
-        /// Simple Bot mode: interim messages go under the bot's reasoning folder.
+        /// Bots mode: interim messages go under the bot's reasoning folder.
         let simpleBotsReasoning: SimpleBotsReasoning?
     }
 

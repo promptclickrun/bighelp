@@ -81,7 +81,7 @@ struct DirectHermesWorkspaceClientTests {
         }
     }
 
-    /// Bighelp IDE's YOLO mode turns on Hermes' session flag before the first message. Only
+    /// Code mode's YOLO mode turns on Hermes' session flag before the first message. Only
     /// one session's flag: never the agent's default, never without a profile.
     @Test func yoloIsOneSessionsFlag() throws {
         let session: [String: BighelpJSONValue] = [

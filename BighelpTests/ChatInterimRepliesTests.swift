@@ -76,7 +76,7 @@ struct ChatInterimRepliesTests {
         #expect(interimIDs(ChatInterimReplies.marking(entries, isSending: false, isBotMode: true)).isEmpty)
     }
 
-    /// Simple Bot mode: a turn's interim messages go under one "{Agent}'s reasoning" row where the first
+    /// Bots mode: a turn's interim messages go under one "{Agent}'s reasoning" row where the first
     /// was, shown with Show reasoning on and hidden with it off. The message that ends the turn is its
     /// answer and always shows.
     @Test func simpleBotChatsGroupInterimMessagesUnderTheBotsReasoning() {

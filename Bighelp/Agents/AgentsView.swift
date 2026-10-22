@@ -18,6 +18,9 @@ struct AgentsView: View {
     var groupFilterRequest: Binding<String?> = .constant(nil)
     /// Set from all computers › New agent: opens the new-agent editor once this computer is connected.
     var createRequest: Binding<Bool> = .constant(false)
+    /// Which agents' Bot Chats are working or need you, kept current while this screen shows.
+    var botChatActivity: BotChatActivityStore? = nil
+    var botChatActivitySource: BotChatActivitySource? = nil
 
     @State private var query = ""
     @State private var groupPreferences = AgentGroupPreferences()
@@ -37,6 +40,7 @@ struct AgentsView: View {
     /// A pinned agent is lifted: the list holds still while it moves.
     @State private var isArrangingPinned = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
 
     private var visibleProfiles: [AgentProfile] {
         AgentDirectoryPresentation.visibleProfiles(store.profiles, query: query)
@@ -69,9 +73,9 @@ struct AgentsView: View {
     }
 
     private var liveStates: [String: AgentLiveState] {
-        guard let botModeRooms else { return [:] }
-        return AgentLiveStatePresentation.agentStates(
-            rooms: botModeRooms.catalogRooms, pendingApprovals: botModeRooms.pendingApprovals(roomID:)
+        AgentLiveStatePresentation.agentStates(
+            rooms: botModeRooms?.catalogRooms ?? [], pendingApprovals: { botModeRooms?.pendingApprovals(roomID: $0) ?? [] },
+            botChats: botChatActivity?.liveActivities() ?? [:]
         )
     }
 
@@ -183,6 +187,7 @@ struct AgentsView: View {
             guard Self.shouldBootstrapStoreRefresh(for: workspaceOwner) else { return }
             await store.loadIfNeededReportingErrors()
         }
+        .botChatActivityUpdates(botChatActivity, source: botChatActivitySource, isActive: scenePhase == .active)
         .task(id: workspaceOwner) {
             guard Self.shouldBootstrapStoreRefresh(for: workspaceOwner) else { return }
             if botModeRooms?.catalogState == .idle {

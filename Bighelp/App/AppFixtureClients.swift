@@ -306,3 +306,25 @@ final class DemoAgentDirectoryClient: AgentDirectoryClient, AgentListPlacementWr
         return profile
     }
 }
+
+#if DEBUG
+/// `-test-bot-activity`: on the demo data, Mina is browsing the web in her Bot Chat and Jordan needs
+/// you, so the home's working states show without a host (UI tests and screenshots).
+@MainActor
+final class DemoBotChatActivity: BotChatActivityReading {
+    static let launchArgument = "-test-bot-activity"
+    static var isOn: Bool { ProcessInfo.processInfo.arguments.contains(launchArgument) }
+
+    func activity(agentIDs: [String]) async -> [String: BotChatActivity]? {
+        var result: [String: BotChatActivity] = [:]
+        for id in agentIDs {
+            result[id] = switch id {
+            case "travel": .working(tool: "web_search")
+            case "home": .waiting
+            default: .idle
+            }
+        }
+        return result
+    }
+}
+#endif

@@ -106,6 +106,8 @@ struct RootShellView: View {
     @State var providerUsage = ProviderUsageStore()
     @State var usage = UsageStore()
     @State var agentMedia = AgentMediaStore()
+    /// Which bots are working or need you, for Simple Bot mode and the Agents screen.
+    @State var botChatActivity = BotChatActivityStore()
     @State var profileAgentID: String?
     @State var isAgentSwitcherPresented = false
     @State var isHomeDrawerPresented = false
@@ -553,7 +555,9 @@ struct RootShellView: View {
 ,
                 onAction: handleAgentWorkspaceAction,
                 groupFilterRequest: $agentGroupFilterRequest,
-                createRequest: $agentCreateRequest
+                createRequest: $agentCreateRequest,
+                botChatActivity: botChatActivity,
+                botChatActivitySource: botChatActivitySource
             )
             // The one main action, where a thumb rests, as on All agents.
             .overlay(alignment: .bottomTrailing) {

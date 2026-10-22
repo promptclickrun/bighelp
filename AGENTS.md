@@ -190,6 +190,13 @@ change in both repos.
   and each reread recovers the chat's connection. Send stays on through it (`acceptsSubmissionAfterCatchUp`); a
   message sent then waits in the box until the recovery ends (`isAwaitingCatchUp`). As a turn, the recovery's idle
   readback would take it for a stale one and drop it.
+- **Who's working:** Simple Bot mode's home and the Agents screen show each agent's Bot Chat working or needing
+  you from the plugin's `agents/activity` (`native-agents-activity-v1`): Hermes' turn leases in any process
+  (the app, `message_agent`, `chat -q`) and the dashboard's open prompts, for up to 64 agents in one read.
+  `BotChatActivityStore` reads it while one of those screens shows and the app is active (3 s while something
+  works, 6 s idle), keyed by `cacheScopeID`; other gateways come from their all-hosts copies (`FleetBotChat`),
+  only while fresh. Without the route it uses the Bot Chats the app knows to be running, and says nothing
+  about updating. Never open or resume a chat to learn this.
 - **Plugin routes:**
   - Each route is a `WorkspaceOperation` case plus a `Route(path:feature:isMutation:maximumResponseBytes:)` in
     `DirectHermesNativeContext.swift`.

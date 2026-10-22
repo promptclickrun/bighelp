@@ -196,6 +196,8 @@ struct SimpleBotMarkView: View {
     var isPrimary = false
     /// Blinks now and then, so the bot looks alive (never with Reduce Motion).
     var blinks = false
+    /// Thinking looks up with narrowed eyes; needing you opens them wide. A still pose, not a motion.
+    var state: AgentLiveState = .idle
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -217,17 +219,23 @@ struct SimpleBotMarkView: View {
             if isPrimary { SimpleBotPrimaryBadge(size: size * 0.3) }
         }
         .task(id: blinks && !reduceMotion) { await blink() }
+        .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: state)
         .accessibilityHidden(true)
     }
 
     private var eyes: some View {
         let center = mark.shape.eyeCenter
+        let pose: (height: CGFloat, lift: CGFloat) = switch state {
+        case .thinking: (0.7, 0.05)
+        case .nudge: (1.15, 0)
+        default: (1, 0)
+        }
         return HStack(spacing: size * 0.11) {
             eye
             eye
         }
-        .scaleEffect(x: 1, y: isBlinking ? 0.1 : 1)
-        .position(x: size * center.x, y: size * center.y)
+        .scaleEffect(x: 1, y: (isBlinking ? 0.1 : 1) * pose.height)
+        .position(x: size * center.x, y: size * (center.y - pose.lift))
     }
 
     /// A quick blink every few seconds, at its own pace, so marks side by side don't blink together.
@@ -257,6 +265,24 @@ struct SimpleBotMarkView: View {
         renderer.scale = 1
         renderer.isOpaque = false
         return renderer.uiImage?.pngData()
+    }
+}
+
+/// What a bot is doing, on its face: a still badge, so it reads with Reduce Motion and on any look.
+/// Working shows the kind of work (a globe while it browses); needing you, a raised hand.
+struct SimpleBotActivityBadge: View {
+    let activity: BotChatActivity
+    let size: CGFloat
+    @BighelpThemeReader private var theme
+
+    var body: some View {
+        Image(systemName: activity == .waiting ? "hand.raised.fill" : activity.activityKind.systemImage)
+            .font(.system(size: size * 0.5, weight: .bold))
+            .foregroundStyle(activity == .waiting ? Color.white : theme.actionForeground)
+            .frame(width: size, height: size)
+            .background(Circle().fill(activity == .waiting ? BighelpBrand.ember : theme.action))
+            .overlay(Circle().stroke(theme.canvas, lineWidth: max(2, size * 0.12)))
+            .accessibilityHidden(true)
     }
 }
 
@@ -306,7 +332,9 @@ final class SimpleBotMarkStore {
 }
 
 /// A bot's face in Simple Bot mode: the mark picked here; else the picture,
-/// character or pet it already has; else its starting mark.
+/// character or pet it already has; else its starting mark. While its Bot Chat
+/// works or needs you, a still badge says so on every look; characters and pets
+/// also play the move for that work.
 struct SimpleBotFace: View {
     let agentID: String
     let name: String
@@ -315,24 +343,37 @@ struct SimpleBotFace: View {
     var isPrimary = false
     /// Marks blink now and then; characters and pets move on their own.
     var blinks = false
+    /// What its Bot Chat is doing; nil or idle shows nothing.
+    var activity: BotChatActivity? = nil
 
     @Environment(\.companionAgentScope) private var scope
     @Environment(\.companionStore) private var companions
 
+    private var busy: BotChatActivity? { activity?.isBusy == true ? activity : nil }
+
     var body: some View {
         Group {
             if let mark = SimpleBotMarkStore.shared.mark(scope: scope, agentID: agentID) {
-                SimpleBotMarkView(mark: mark, size: size, isPrimary: isPrimary, blinks: blinks)
+                SimpleBotMarkView(mark: mark, size: size, isPrimary: isPrimary, blinks: blinks,
+                                  state: busy?.liveState ?? .idle)
             } else if hasOwnPicture {
-                AgentLiveAvatar(agentID: agentID, displayName: name, imageURL: imageURL, size: size, showsBadge: false)
+                // A photo stays still: the badge says it. Characters and pets play their move.
+                AgentLiveAvatar(agentID: agentID, displayName: name, imageURL: imageURL,
+                                activity: busy?.activityKind ?? .idle, size: size, showsBadge: false,
+                                movesPhoto: false)
                     .overlay(alignment: .bottomTrailing) {
                         if isPrimary { SimpleBotPrimaryBadge(size: size * 0.3) }
                     }
             } else {
-                SimpleBotMarkView(mark: .defaultMark(for: agentID), size: size, isPrimary: isPrimary, blinks: blinks)
+                SimpleBotMarkView(mark: .defaultMark(for: agentID), size: size, isPrimary: isPrimary, blinks: blinks,
+                                  state: busy?.liveState ?? .idle)
             }
         }
         .frame(width: size, height: size)
+        .overlay(alignment: .topTrailing) {
+            if let busy { SimpleBotActivityBadge(activity: busy, size: min(28, max(18, size * 0.28))) }
+        }
+        // The row or tile it's in says the state, once, as its value.
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(name)
     }

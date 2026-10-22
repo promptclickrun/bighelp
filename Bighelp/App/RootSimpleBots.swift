@@ -110,8 +110,50 @@ extension RootShellView {
             onCreateGroup: { createGroupChat(with: $0) },
             makeCreator: { makeSimpleBotCreator() },
             onRoutines: { openSimpleBotRoutines($0) },
-            gateways: simpleBotsGateways
+            gateways: simpleBotsGateways,
+            activity: botChatActivity,
+            activitySource: botChatActivitySource
         )
+    }
+
+    /// Where the bots' working states come from: the gateway in use's plugin route, else what stock
+    /// Hermes tells the app of its Bot Chats; with Multi-gateway, also the other gateways' fresh
+    /// all-hosts copies. The closures hold only stores, so each tick reads what's current.
+    var botChatActivitySource: BotChatActivitySource {
+        let agents = agents, catalog = sessionCatalog, connections = workspaceConnections
+        let fleet = fleet, settings = settings
+        let fixtures = usesWorkspaceFixtures
+        return BotChatActivitySource(
+            live: {
+                // Hidden bots last, so the ones shown are always in the request.
+                let ids = (agents.profiles.filter { $0.placement?.isHidden != true }
+                    + agents.profiles.filter { $0.placement?.isHidden == true }).map(\.id)
+                if fixtures, connections?.isDirectSelected != true {
+                    #if DEBUG
+                    if DemoBotChatActivity.isOn {
+                        return .init(scope: "fixtures", signIn: nil, agentIDs: ids, reader: DemoBotChatActivity(),
+                                     fallback: { [:] })
+                    }
+                    #endif
+                    return nil
+                }
+                guard let connections, let owner = connections.owner, let workspace = connections.workspace else {
+                    return nil
+                }
+                let routed = workspace.nativeContext?.features.contains(DirectHermesBotChatActivityClient.feature) == true
+                return .init(scope: owner.cacheScopeID, signIn: owner.signIn, agentIDs: ids,
+                             reader: routed ? DirectHermesBotChatActivityClient(
+                                 currentWorkspace: { [weak connections] in connections?.workspace }) : nil,
+                             fallback: { BotChatActivitySignals.botChats(catalog.records) })
+            },
+            others: {
+                guard settings.simpleBotsEnabled, settings.simpleBotsMultiGateway, let fleet else { return [:] }
+                return BotChatActivitySignals.fleet(fleet.snapshots, now: Date())
+            },
+            refreshOthers: {
+                guard settings.simpleBotsEnabled, settings.simpleBotsMultiGateway else { return }
+                fleet?.refresh()
+            })
     }
 
     /// Multi-gateway: every gateway's bots. The one in use is live, or its all-hosts copy until its agents
@@ -132,7 +174,9 @@ extension RootShellView {
                 pinned += agents.pinnedAgentIDs.map { FleetID.make(host.id, $0) }
             } else {
                 for agent in fleet.agents(on: host.id) {
-                    bots.append(SimpleBotsBot(agent, imageURL: fleet.avatars.url(for: agent.avatarFile)))
+                    var bot = SimpleBotsBot(agent, imageURL: fleet.avatars.url(for: agent.avatarFile))
+                    bot.isOnGatewayInUse = host.id == selected
+                    bots.append(bot)
                     if let chat = fleet.latestChat(for: agent) {
                         latest[agent.id] = SimpleBotsLatest(preview: chat.preview, date: chat.updatedAt)
                     }

@@ -46,62 +46,40 @@ final class ComposerInteractionUITests: BighelpUITestCase {
         saveComposer("composer-typing-light", app)
     }
 
-    /// TEMP evidence for #515 (not committed): type past the wrap and delete back,
-    /// recording the box's frame and the expand button after each step.
+    /// #515: once a draft wraps, the expand button stays and the box keeps its width on every key.
     @MainActor
-    func testTEMPWrapStability() throws {
-        let env = ProcessInfo.processInfo.environment
+    func testWrappedDraftKeepsTheBoxStillWhileTyping() throws {
         let app = makeApp()
         app.launchArguments = [
             "-use-demo-fixtures", "-disable-demo-delays", "-start-chat", "-preview-ui-v3",
-            "-loopdy.appearance.interface-version", "v3",
-            "-loopdy.demo.appearance", env["BIGHELP_WRAP_APPEARANCE"] ?? "light"
+            "-loopdy.appearance.interface-version", "v3", "-loopdy.demo.appearance", "light"
         ]
-        if let size = env["BIGHELP_WRAP_TEXTSIZE"] { app.launchArguments += ["-UIPreferredContentSizeCategoryName", size] }
-        if env["BIGHELP_WRAP_LANDSCAPE"] != nil { XCUIDevice.shared.orientation = .landscapeLeft }
-        defer { XCUIDevice.shared.orientation = .portrait }
         app.launch()
-        let tag = env["BIGHELP_WRAP_TAG"] ?? "run"
         let input = app.textViews["Message"]
         XCTAssertTrue(input.waitForExistence(timeout: 10))
         input.tap()
         let field = app.otherElements["chat.composer.field"]
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         let expand = app.buttons["chat.composer.expand"]
-        let text = env["BIGHELP_WRAP_TEXT"] ?? "Please read the notes from the garden club and write a short summary of the plans for the spring plant sale with every date"
-        var step = 0
-        func record(_ phase: String) {
-            step += 1
-            print("WRAP_TRACE \(tag) \(phase) step=\(step) field=\(field.frame) expand=\(expand.exists)")
-            if step % 4 == 0 { saveComposer("wrap-\(tag)-\(String(format: "%03d", step))-\(phase)", app) }
-        }
-        record("start")
+        let text = "Please read the notes from the garden club and write a short summary of the plans for the spring plant sale with every date"
+        var wrappedWidth: CGFloat?
         var index = text.startIndex
         while index < text.endIndex {
             let next = text.index(index, offsetBy: 3, limitedBy: text.endIndex) ?? text.endIndex
             input.typeText(String(text[index..<next]))
             index = next
-            record("type")
+            if let width = wrappedWidth {
+                XCTAssertTrue(expand.exists, "The expand button stays once the draft wraps")
+                XCTAssertEqual(field.frame.width, width, accuracy: 1, "The box keeps its width while typing")
+            } else if expand.exists {
+                wrappedWidth = field.frame.width
+            }
         }
-        saveComposer("wrap-\(tag)-typed", app)
-        for _ in 0..<(text.count / 3 + 2) {
-            input.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 3))
-            record("delete")
-        }
+        XCTAssertNotNil(wrappedWidth, "A long draft wraps and offers the expand button")
+        saveComposer("composer-wrapped-light", app)
+        input.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: text.count))
+        XCTAssertTrue(input.waitForExistence(timeout: 2))
         XCTAssertFalse(expand.exists, "An empty draft has no expand button")
-        input.typeText(text)
-        XCTAssertTrue(expand.waitForExistence(timeout: 3))
-        record("retyped")
-        expand.tap()
-        let expanded = app.descendants(matching: .any)["chat.composer.expanded"]
-        XCTAssertTrue(expanded.waitForExistence(timeout: 5))
-        let expandedText = app.textViews["chat.composer.expanded.text"].exists
-            ? app.textViews["chat.composer.expanded.text"] : app.textViews.firstMatch
-        print("WRAP_TRACE \(tag) expanded value=\((expandedText.value as? String) ?? "nil")")
-        saveComposer("wrap-\(tag)-expanded", app)
-        expandedText.typeText("!")
-        print("WRAP_TRACE \(tag) expanded-after-typing value=\((expandedText.value as? String) ?? "nil")")
-        saveComposer("wrap-\(tag)-expanded-typed", app)
     }
 
     @MainActor

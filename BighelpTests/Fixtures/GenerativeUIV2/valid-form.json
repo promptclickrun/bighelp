@@ -1,0 +1,32 @@
+{
+  "schema": "loopdy.generative_ui",
+  "version": 2,
+  "component": "form",
+  "title": "Trip preference",
+  "data": {
+    "description": "Choose the preferred departure day. Do not enter credentials.",
+    "submit_label": "Send preference",
+    "fields": [
+      {
+        "id": "departure_day",
+        "kind": "select",
+        "label": "Departure day",
+        "required": true,
+        "options": [
+          { "id": "friday", "label": "Friday" },
+          { "id": "saturday", "label": "Saturday" }
+        ]
+      },
+      {
+        "id": "bags",
+        "kind": "integer",
+        "label": "Number of bags",
+        "required": false,
+        "min": 0,
+        "max": 5,
+        "step": 1,
+        "default": 1
+      }
+    ]
+  }
+}

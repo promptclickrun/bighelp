@@ -884,7 +884,7 @@ struct BighelpLinkWireTests {
 
         let card = try JSONDecoder().decode(GenerativeUICard.self, from: data)
 
-        let fields = try #require(card.data["fields"]?.array?.compactMap(\.object))
+        let fields = try #require(card.data["fields"]?.array).compactMap(\.object)
         let goal = try GenerativeUIFormFieldLimits(fields[0], kind: "text")
         #expect(goal.minimumLength == 3 && goal.maximumLength == 80)
         let sessions = try GenerativeUIFormFieldLimits(fields[2], kind: "integer")
@@ -943,28 +943,83 @@ struct BighelpLinkWireTests {
         #expect(throws: (any Error).self) {
             try JSONDecoder().decode(GenerativeUICard.self, from: data)
         }
-        #expect(GenerativeUIFormDate.date(from: "2026-1-001") == nil)
-        #expect(GenerativeUIFormDate.date(from: "2026-02-30") == nil)
-        #expect(GenerativeUIFormDate.date(from: "2026-01-31") != nil)
+        for spelling in ["2026-1-001", "2026-02-30", "2026-02-29", "+2026-01-01", "10000-01-01", "0000-01-01",
+                         "2026-01-31 ", "２０２６-01-31", "2026/01/31"] {
+            #expect(!GenerativeUIFormDate.isCanonical(spelling), "\(spelling)")
+        }
+        #expect(GenerativeUIFormDate.isCanonical("2026-01-31") && GenerativeUIFormDate.isCanonical("2028-02-29"))
     }
 
-    /// A form date is a day in UTC, and the picker shows UTC, so a one-day range is the
-    /// same day west of UTC too. Read in Los Angeles the same instant is the day before.
-    @Test func formDatesAreTheSameDayInEveryTimeZone() throws {
+    /// The picker shows days where the person is, so a form date is the start of that
+    /// day in their time zone: a one-day range is that one day, east or west of UTC.
+    @Test func formDateRangesAreTheDayThePersonSees() throws {
         let data = try Self.formCardData(fields: [
             ["id": "target_date", "kind": "date", "label": "Target date", "required": true,
              "min": "2026-11-01", "max": "2026-11-01"],
         ])
-        _ = try JSONDecoder().decode(GenerativeUICard.self, from: data)
+        let card = try JSONDecoder().decode(GenerativeUICard.self, from: data)
+        let field = try #require(card.data["fields"]?.array?.first?.object)
+        let limits = try GenerativeUIFormFieldLimits(field, kind: "date")
 
-        let day = try #require(GenerativeUIFormDate.date(from: "2026-11-01"))
-        var utc = Calendar(identifier: .gregorian)
-        utc.timeZone = GenerativeUIFormDate.timeZone
-        #expect(utc.dateComponents([.year, .month, .day], from: day) == DateComponents(year: 2026, month: 11, day: 1))
-        #expect(GenerativeUIFormDate.text(from: day) == "2026-11-01")
-        var losAngeles = Calendar(identifier: .gregorian)
-        losAngeles.timeZone = try #require(TimeZone(identifier: "America/Los_Angeles"))
-        #expect(losAngeles.component(.day, from: day) == 31)
+        for identifier in ["America/Los_Angeles", "Asia/Tokyo"] {
+            let timeZone = try #require(TimeZone(identifier: identifier))
+            let dates = GenerativeUIFormDate(timeZone: timeZone)
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = timeZone
+            let earliest = try #require(limits.earliestDate.flatMap(dates.date(from:)))
+            let latest = try #require(limits.latestDate.flatMap(dates.date(from:)))
+            #expect(earliest == latest, "\(identifier)")
+            #expect(
+                calendar.dateComponents([.year, .month, .day, .hour], from: earliest)
+                    == DateComponents(year: 2026, month: 11, day: 1, hour: 0),
+                "\(identifier)"
+            )
+            // Whatever time of day the picker keeps, the answer is the day it shows.
+            #expect(dates.text(from: earliest) == "2026-11-01", "\(identifier)")
+            #expect(dates.text(from: earliest.addingTimeInterval(22 * 3_600)) == "2026-11-01", "\(identifier)")
+        }
+    }
+
+    /// A date field without a default starts on the person's today, not UTC's, inside its limits.
+    @Test func formDatesStartOnTodayWhereThePersonIs() throws {
+        let morningUTC = try Date("2026-10-21T03:00:00Z", strategy: .iso8601)
+        let eveningUTC = try Date("2026-10-21T20:00:00Z", strategy: .iso8601)
+        let open = GenerativeUIFormFieldLimits()
+        let losAngeles = GenerativeUIFormDate(timeZone: try #require(TimeZone(identifier: "America/Los_Angeles")))
+        let tokyo = GenerativeUIFormDate(timeZone: try #require(TimeZone(identifier: "Asia/Tokyo")))
+
+        #expect(losAngeles.today(within: open, now: morningUTC) == "2026-10-20")
+        #expect(losAngeles.today(within: open, now: eveningUTC) == "2026-10-21")
+        #expect(tokyo.today(within: open, now: morningUTC) == "2026-10-21")
+        #expect(tokyo.today(within: open, now: eveningUTC) == "2026-10-22")
+
+        let november = try GenerativeUIFormFieldLimits(["min": .string("2026-11-01")], kind: "date")
+        #expect(losAngeles.today(within: november, now: eveningUTC) == "2026-11-01")
+        let throughToday = try GenerativeUIFormFieldLimits(["max": .string("2026-10-21")], kind: "date")
+        #expect(tokyo.today(within: throughToday, now: eveningUTC) == "2026-10-21")
+        #expect(losAngeles.today(within: throughToday, now: morningUTC) == "2026-10-20")
+    }
+
+    /// The plugin's own form example (bighelp-plugin fixtures/generative_ui_v2/valid-form.json),
+    /// in the card the plugin's form tool makes of it.
+    @Test func generativeUIV2FormsDecodeThePluginsFormExample() throws {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .appending(path: "Fixtures/GenerativeUIV2/valid-form.json")
+        let example = try #require(
+            JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any]
+        )
+        let data = try Self.formCardData(
+            title: try #require(example["title"] as? String),
+            data: try #require(example["data"] as? [String: Any])
+        )
+
+        let card = try JSONDecoder().decode(GenerativeUICard.self, from: data)
+
+        let fields = try #require(card.data["fields"]?.array).compactMap(\.object)
+        let bags = try GenerativeUIFormFieldLimits(fields[1], kind: "integer")
+        #expect(bags.minimum == 0 && bags.maximum == 5 && bags.step == 1)
+        #expect(bags.hint == "Between 0 and 5")
     }
 
     @Test func formFieldLimitsDecideWhichAnswersCanBeSent() throws {
@@ -1580,16 +1635,20 @@ struct BighelpLinkWireTests {
     }
 
     private static func formCardData(fields: [[String: Any]]) throws -> Data {
+        try formCardData(title: "Set a new goal", data: [
+            "description": "A few quick answers.",
+            "submit_label": "Send answers",
+            "fields": fields,
+        ])
+    }
+
+    private static func formCardData(title: String, data: [String: Any]) throws -> Data {
         let payload: [String: Any] = [
             "schema": "loopdy.generative_ui",
             "version": 2,
             "component": "form",
-            "title": "Set a new goal",
-            "data": [
-                "description": "A few quick answers.",
-                "submit_label": "Send answers",
-                "fields": fields,
-            ],
+            "title": title,
+            "data": data,
             "content_hash": String(repeating: "b", count: 64),
             "created_at": "2026-08-29T12:00:00Z",
             "origin": "live",

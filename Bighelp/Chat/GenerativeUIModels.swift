@@ -454,7 +454,7 @@ struct GenerativeUICard: Codable, Equatable, Sendable, Identifiable {
         case "date":
             guard
                 let value = value.string,
-                Self.isFormDate(value)
+                GenerativeUIFormDate.isCanonical(value)
             else { throw GenerativeUICardError.invalidValue }
         case "select":
             guard let value = value.string, optionIDs.contains(value) else {
@@ -505,10 +505,6 @@ struct GenerativeUICard: Codable, Equatable, Sendable, Identifiable {
             value.utf8.count <= maximum,
             !value.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains)
         else { throw GenerativeUICardError.invalidValue }
-    }
-
-    static func isFormDate(_ value: String) -> Bool {
-        GenerativeUIFormDate.date(from: value) != nil
     }
 
     private static func validateChart(
@@ -645,37 +641,56 @@ extension GenerativeUIFormFieldLimits {
 
     private static func date(_ value: BighelpJSONValue?) throws -> String? {
         guard let value else { return nil }
-        guard let date = value.string, GenerativeUICard.isFormDate(date) else {
+        guard let date = value.string, GenerativeUIFormDate.isCanonical(date) else {
             throw GenerativeUICardError.invalidValue
         }
         return date
     }
 }
 
-/// A form date is a day, written `yyyy-MM-dd`. Each one stands for midnight UTC,
-/// and the date picker shows UTC too, so a day reads the same in every time zone.
-enum GenerativeUIFormDate {
-    static let timeZone = TimeZone(secondsFromGMT: 0)!
+/// A form date is a day, written `yyyy-MM-dd` with Gregorian years and ASCII digits.
+/// The date picker shows days where the person is, so in the sheet a day stands for its
+/// start in their time zone: the picker, its limits, the starting "today" and the
+/// written answer all use that one time zone.
+struct GenerativeUIFormDate: Sendable {
+    let timeZone: TimeZone
+    private let calendar: Calendar
 
-    /// Only the canonical spelling: the formatter alone also reads "2026-1-001"
-    /// as January 1 and "2026-02-30" as March 2, and limits compare as text.
-    static func date(from text: String) -> Date? {
-        let formatter = formatter()
-        guard let date = formatter.date(from: text), formatter.string(from: date) == text else { return nil }
+    init(timeZone: TimeZone = .current) {
+        self.timeZone = timeZone
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        self.calendar = calendar
+    }
+
+    private static let spelling = GenerativeUIFormDate(timeZone: .gmt)
+
+    /// Only the canonical spelling, so limits compare as text in the days' order.
+    static func isCanonical(_ text: String) -> Bool {
+        spelling.date(from: text) != nil
+    }
+
+    /// Reads only what `text(from:)` writes: "2026-1-001" (January 1 to a lenient
+    /// reader) and "2026-02-30" (March 2) aren't days.
+    func date(from text: String) -> Date? {
+        let parts = text.split(separator: "-", omittingEmptySubsequences: false)
+        guard
+            text.utf8.count == 10, parts.count == 3,
+            let year = Int(parts[0]), let month = Int(parts[1]), let day = Int(parts[2]),
+            let date = calendar.date(from: DateComponents(year: year, month: month, day: day)),
+            self.text(from: date) == text
+        else { return nil }
         return date
     }
 
-    static func text(from date: Date) -> String {
-        formatter().string(from: date)
+    func text(from date: Date) -> String {
+        let day = calendar.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04ld-%02ld-%02ld", day.year ?? 0, day.month ?? 0, day.day ?? 0)
     }
 
-    private static func formatter() -> DateFormatter {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = timeZone
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter
+    /// Where a date field without a default starts: today, moved inside its limits.
+    func today(within limits: GenerativeUIFormFieldLimits, now: Date = .now) -> String {
+        limits.clamped(date: text(from: now))
     }
 }
 

@@ -1042,6 +1042,7 @@ private struct GenerativeUIFormSheet: View {
     /// Sends the finished answers to the agent; throws when the chat can't.
     let send: @MainActor (String) throws -> Void
     private let fields: [Field]
+    private let dates = GenerativeUIFormDate()
 
     @State private var textValues: [String: String]
     @State private var toggleValues: [String: Bool]
@@ -1066,8 +1067,7 @@ private struct GenerativeUIFormSheet: View {
                     (field.defaultValue?.array ?? []).compactMap(\.string)
                 )
             case "date":
-                text[field.id] = field.defaultValue?.string
-                    ?? field.limits.clamped(date: Date.now.formatted(.iso8601.year().month().day().dateSeparator(.dash)))
+                text[field.id] = field.defaultValue?.string ?? dates.today(within: field.limits)
             // Numbers as `Int`/`Double` read them back: the display text rounds to two
             // places and groups thousands, so a default could fail its own range.
             case "integer":
@@ -1198,7 +1198,7 @@ private struct GenerativeUIFormSheet: View {
                 datePicker(field)
                     .labelsHidden()
                     .tint(theme.action)
-                    .environment(\.timeZone, GenerativeUIFormDate.timeZone)
+                    .environment(\.timeZone, dates.timeZone)
             default:
                 TextField("Enter a response", text: textBinding(field.id))
                     .textFieldStyle(.roundedBorder)
@@ -1218,8 +1218,8 @@ private struct GenerativeUIFormSheet: View {
 
     @ViewBuilder
     private func datePicker(_ field: Field) -> some View {
-        let earliest = field.limits.earliestDate.flatMap(GenerativeUIFormDate.date(from:))
-        let latest = field.limits.latestDate.flatMap(GenerativeUIFormDate.date(from:))
+        let earliest = field.limits.earliestDate.flatMap(dates.date(from:))
+        let latest = field.limits.latestDate.flatMap(dates.date(from:))
         switch (earliest, latest) {
         case let (earliest?, latest?) where earliest <= latest:
             DatePicker(field.label, selection: dateBinding(field.id), in: earliest...latest, displayedComponents: .date)
@@ -1312,8 +1312,8 @@ private struct GenerativeUIFormSheet: View {
 
     private func dateBinding(_ id: String) -> Binding<Date> {
         Binding(
-            get: { GenerativeUIFormDate.date(from: textValues[id] ?? "") ?? .now },
-            set: { textValues[id] = GenerativeUIFormDate.text(from: $0) }
+            get: { dates.date(from: textValues[id] ?? "") ?? .now },
+            set: { textValues[id] = dates.text(from: $0) }
         )
     }
 

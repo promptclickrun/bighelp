@@ -337,6 +337,11 @@ extension BotModeRoomStore {
         (nativePendingRetryTaskIDsByRoom[roomID] ?? []).sorted()
     }
 
+    /// Turns Hermes lost track of, which only a Discard lets the room get past.
+    func pendingNativeDiscards(roomID: String) -> [HermesBotModePendingDiscard] {
+        nativePendingDiscardsByRoom[roomID] ?? []
+    }
+
     /// Refreshes the negotiated groups contract after a Link connection or
     /// host changes. Capability methods are advertised even while the durable
     /// driver is stopped, so callers must use the full readiness predicate.
@@ -369,6 +374,8 @@ extension BotModeRoomStore {
         nativeObservationTokens.removeAll()
         nativePendingApprovalsByRoom.removeAll()
         nativePendingRetryTaskIDsByRoom.removeAll()
+        nativeRetryAttemptsByRoom.removeAll()
+        nativePendingDiscardsByRoom.removeAll()
         nativeDriverWorkingByRoom.removeAll()
         nativeBoundaryGeneration += 1
         nativeCapabilities = nil
@@ -453,6 +460,8 @@ extension BotModeRoomStore {
         }
         guard settled else { return }
         nativePendingRetryTaskIDsByRoom.removeValue(forKey: roomID)
+        nativeRetryAttemptsByRoom.removeValue(forKey: roomID)
+        nativePendingDiscardsByRoom.removeValue(forKey: roomID)
         nativeDriverWorkingByRoom.removeValue(forKey: roomID)
     }
 
@@ -548,5 +557,26 @@ extension BotModeRoomStore {
             throw BotModeRoomError.nativeApprovalStale
         }
         return receipt
+    }
+
+    /// Discards one turn Hermes lost track of, only while Hermes still lists
+    /// that exact attempt, then reads the room again so the action goes away.
+    func discardNative(roomID: String, discard: HermesBotModePendingDiscard) async throws {
+        guard let nativeClient, let discarding = nativeClient as? any HermesBotModeDiscarding else {
+            throw BotModeRoomError.executionUnavailable
+        }
+        let boundary = nativeBoundaryGeneration
+        try requireNativeBoundary(boundary)
+        let expectedOwner = room(id: roomID)?.runOwner.map(BotModeRunOwnerExpectation.owner) ?? .noOwner
+        let before = try await nativeClient.groupsState(roomID: roomID, includeDisbanded: false)
+        try reconcileNativeRetryActions(roomID: roomID, driverStatus: before.driverStatus,
+                                        expectedOwner: expectedOwner, boundary: boundary)
+        guard pendingNativeDiscards(roomID: roomID).contains(discard) else { throw BotModeRoomError.nativeDiscardStale }
+        _ = try await discarding.groupsDiscard(roomID: roomID, discard: discard)
+        try requireNativeBoundary(boundary)
+        let after = try await nativeClient.groupsState(roomID: roomID, includeDisbanded: false)
+        try reconcileNativeRetryActions(roomID: roomID, driverStatus: after.driverStatus,
+                                        expectedOwner: room(id: roomID)?.runOwner.map(BotModeRunOwnerExpectation.owner) ?? .noOwner,
+                                        boundary: boundary)
     }
 }

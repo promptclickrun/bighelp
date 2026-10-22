@@ -93,6 +93,8 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     case groupsDisband = "groups.disband"
     case groupsStop = "groups.stop"
     case groupsRetry = "groups.retry"
+    /// Hermes' session path: end one member turn it lost track of (a host stopped mid-turn).
+    case groupsDiscard = "groups.discard"
     case groupsApprove = "groups.approve"
     /// RoomLink, sent to the computer an agent lives on: a grant for that agent
     /// to join a room whose home is another computer.

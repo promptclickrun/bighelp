@@ -216,7 +216,12 @@ final class DirectHermesWorkspaceClient: WorkspaceOperationPerforming {
         case .groupsStop, .groupsDisband:
             return try rpc(operation, payload, allowed: ["room_id", "cancel_id"], required: ["room_id"])
         case .groupsRetry:
-            return try rpc(operation, payload, allowed: ["room_id", "task_id"], required: ["room_id", "task_id"])
+            // Hermes' session path names the attempt (`member_id`, `execution_generation`).
+            return try rpc(operation, payload, allowed: ["room_id", "task_id", "member_id", "execution_generation"],
+                           required: ["room_id", "task_id"])
+        case .groupsDiscard:
+            return try rpc(operation, payload, allowed: ["room_id", "member_id", "task_id", "execution_generation"],
+                           required: ["room_id", "member_id", "task_id", "execution_generation"])
         case .groupsApprove:
             return try rpc(operation, payload,
                            allowed: ["room_id", "member_id", "task_id", "execution_generation", "request_id", "choice"],

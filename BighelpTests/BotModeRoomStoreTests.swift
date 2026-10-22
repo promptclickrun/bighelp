@@ -1473,7 +1473,7 @@ final class NativeBotModeTestClient: HermesBotModeClient, HermesBotModeApprovalC
         continuations.forEach { $0.resume() }
     }
 
-    func groupsRetry(roomID _: String, taskID _: String) async throws -> HermesBotModeRetryResult {
+    func groupsRetry(roomID _: String, taskID _: String, attempt _: HermesBotModeRetryAttempt?) async throws -> HermesBotModeRetryResult {
         if !retryResults.isEmpty {
             let result = try retryResults.removeFirst().get()
             driverStatus = driverStatusAfterRetry

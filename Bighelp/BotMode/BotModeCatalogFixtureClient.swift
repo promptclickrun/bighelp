@@ -110,7 +110,7 @@ class BotModeCatalogFixtureClient: HermesBotModeCatalogClient, HermesBotModePeer
     func groupsStop(roomID: String, cancelID: String) async throws {
         throw BotModeRoomError.executionUnavailable
     }
-    func groupsRetry(roomID: String, taskID: String) async throws -> HermesBotModeRetryResult {
+    func groupsRetry(roomID: String, taskID: String, attempt: HermesBotModeRetryAttempt?) async throws -> HermesBotModeRetryResult {
         throw BotModeRoomError.executionUnavailable
     }
 

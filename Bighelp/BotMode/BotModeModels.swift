@@ -11,6 +11,9 @@ struct HermesBotModeCapabilities: Codable, Equatable, Sendable {
     let features: [String]
     let methods: [String]
     let maxLogLimit: Int
+    /// The local profiles Hermes seats in a new room for this connection. Hermes'
+    /// session path lists them; the older path doesn't, and seats any profile.
+    var seatableProfiles: [String]? = nil
 
     private enum CodingKeys: String, CodingKey {
         case protocolVersion = "protocol_version"
@@ -21,10 +24,15 @@ struct HermesBotModeCapabilities: Codable, Equatable, Sendable {
         case features
         case methods
         case maxLogLimit = "max_log_limit"
+        case seatableProfiles = "seatable_profiles"
     }
 
     func supports(_ operation: String) -> Bool {
         methods.contains(operation)
+    }
+
+    func canSeat(profile: String) -> Bool {
+        seatableProfiles?.contains(profile) ?? true
     }
 
     var supportsNativeExecution: Bool {
@@ -46,11 +54,13 @@ struct HermesBotModeCapabilities: Codable, Equatable, Sendable {
         "groups.approve",
     ]
 
+    /// What both Hermes paths advertise. The older path also lists typed_events,
+    /// idempotent_send and coordinator_fencing; the session path keeps the same
+    /// events, send keys and epochs without naming them, and the app checks each
+    /// of those itself (every event, every receipt, every page's authority).
     static let requiredFeatures: [String] = [
-        "typed_events",
-        "idempotent_send",
+        "room_identity",
         "monotonic_log",
-        "coordinator_fencing",
     ]
 }
 
@@ -275,6 +285,13 @@ struct HermesBotModeRetryResult: Codable, Equatable, Sendable {
     let task: HermesBotModeTaskReceipt
 }
 
+/// The exact attempt a host's retry action names. Hermes' session path retries
+/// only with it; the older path takes the task ID alone and refuses these keys.
+struct HermesBotModeRetryAttempt: Equatable, Sendable {
+    let memberID: String
+    let executionGeneration: Int
+}
+
 @MainActor
 protocol HermesBotModeClient: AnyObject {
     func groupsCapabilities() async throws -> HermesBotModeCapabilities
@@ -296,7 +313,11 @@ protocol HermesBotModeClient: AnyObject {
         includeDisbanded: Bool
     ) async throws -> HermesBotModeLogPage
     func groupsStop(roomID: String, cancelID: String) async throws
-    func groupsRetry(roomID: String, taskID: String) async throws -> HermesBotModeRetryResult
+    func groupsRetry(
+        roomID: String,
+        taskID: String,
+        attempt: HermesBotModeRetryAttempt?
+    ) async throws -> HermesBotModeRetryResult
 }
 
 enum BotModeRoomError: Error, Equatable {
@@ -312,6 +333,7 @@ enum BotModeRoomError: Error, Equatable {
     case nativeRetryRejected
     case nativeApprovalStale
     case nativeApprovalRejected
+    case nativeDiscardStale
     case nativeAuthorityMismatch
     case nativeTurnTimedOut
     case nativeMembershipImmutable

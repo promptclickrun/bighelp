@@ -194,7 +194,7 @@ struct BighelpLinkHermesBotModeClientTests {
         ).clientEventID == eventID)
         #expect(try await client.groupsLog(roomID: roomID, sinceSequence: 0, limit: 20, includeDisbanded: false).latestSequence == 1)
         try await client.groupsStop(roomID: roomID, cancelID: "cancel-1")
-        #expect(try await client.groupsRetry(roomID: roomID, taskID: taskID).task.taskID == taskID)
+        #expect(try await client.groupsRetry(roomID: roomID, taskID: taskID, attempt: nil).task.taskID == taskID)
         #expect(messaging.requests.map(\.operation) == [
             .groupsCapabilities, .groupsCreate, .groupsState, .groupsSend,
             .groupsLog, .groupsStop, .groupsRetry,
@@ -592,7 +592,7 @@ struct BighelpLinkHermesBotModeClientTests {
         )
 
         await #expect(throws: BighelpLinkWorkspaceClientError.invalidResponse) {
-            _ = try await client.groupsRetry(roomID: "room-1", taskID: "task-1")
+            _ = try await client.groupsRetry(roomID: "room-1", taskID: "task-1", attempt: nil)
         }
     }
 
@@ -623,7 +623,7 @@ struct BighelpLinkHermesBotModeClientTests {
         )
 
         await #expect(throws: BighelpLinkWorkspaceClientError.invalidResponse) {
-            _ = try await client.groupsRetry(roomID: "room-1", taskID: "task-1")
+            _ = try await client.groupsRetry(roomID: "room-1", taskID: "task-1", attempt: nil)
         }
     }
 
@@ -851,9 +851,12 @@ struct BighelpLinkHermesBotModeClientTests {
         "persistent_process": .boolean(true),
         "authority_gateway_id": .string("gateway-1"),
         "room_link": .object(["kind": .string("hosted")]),
+        // What Hermes' older `groups.*` path lists (Fixtures/HermesGroups/legacy-path.json).
         "features": .array([
-            .string("typed_events"), .string("idempotent_send"),
-            .string("monotonic_log"), .string("coordinator_fencing"),
+            .string("authority_epoch"), .string("coordinator_fencing"), .string("room_identity"),
+            .string("monotonic_log"), .string("idempotent_send"), .string("replayable_disband"),
+            .string("typed_events"), .string("actor_identity"), .string("log_replication"),
+            .string("authority_takeover"),
         ]),
         "methods": .array([
             .string("groups.capabilities"), .string("groups.create"),

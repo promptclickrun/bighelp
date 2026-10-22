@@ -50,7 +50,9 @@ struct BotModeCreateRoomView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction).bighelpToolbarText() } }
             .onAppear {
-                if let seedProfileID, selected.isEmpty { selected.insert(seedProfileID) }
+                if let seedProfileID, selected.isEmpty, pickableProfiles.contains(where: { $0.id == seedProfileID }) {
+                    selected.insert(seedProfileID)
+                }
             }
         }
     }
@@ -63,7 +65,7 @@ struct BotModeCreateRoomView: View {
                     .accessibilityIdentifier("bot-mode.create.title")
             }
             Section {
-                ForEach(agents.profiles) { profile in
+                ForEach(pickableProfiles) { profile in
                     Button {
                         toggle(profile)
                     } label: {
@@ -85,6 +87,9 @@ struct BotModeCreateRoomView: View {
                 Text("Participants")
             } footer: {
                 Text("Choose two to six agents on this host. Hermes fixes the participants when the room is created.")
+            }
+            if let unseatableNote {
+                Section { Text(unseatableNote).accessibilityIdentifier("bot-mode.create.unseatable") }
             }
             if let errorMessage {
                 Section {
@@ -136,7 +141,7 @@ struct BotModeCreateRoomView: View {
                             .monospacedDigit()
                             .foregroundStyle(theme.secondaryText)
                     }
-                    if agents.profiles.isEmpty {
+                    if pickableProfiles.isEmpty {
                         Text("No agents on this host yet.")
                             .bighelpFont(.body)
                             .foregroundStyle(theme.secondaryText)
@@ -145,7 +150,7 @@ struct BotModeCreateRoomView: View {
                             columns: [GridItem(.adaptive(minimum: 88), spacing: BighelpTokens.space8)],
                             spacing: BighelpTokens.space12
                         ) {
-                            ForEach(agents.profiles) { profile in
+                            ForEach(pickableProfiles) { profile in
                                 participantRow(profile)
                             }
                         }
@@ -164,6 +169,13 @@ struct BotModeCreateRoomView: View {
                         .foregroundStyle(theme.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("bot-mode.create.unavailable")
+                }
+                if let unseatableNote {
+                    Label(unseatableNote, systemImage: "info.circle")
+                        .bighelpFont(.label)
+                        .foregroundStyle(theme.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("bot-mode.create.unseatable")
                 }
                 if ownerChanged {
                     Label(
@@ -343,8 +355,27 @@ struct BotModeCreateRoomView: View {
         if startsDirectChat { return isSubmitting || ownerChanged }
         return isSubmitting || ownerChanged || !rooms.canCreateNativeRoom
             || !(2...BotModeRoom.maximumMembers).contains(selected.count)
+            || unseatableNote != nil
             || (onStartDirect == nil && name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             || name.count > 200
+    }
+
+    /// Hermes says which agents it can seat in a group (`seatable_profiles`). New group chat
+    /// lists only those; New chat keeps every agent for 1:1 chats and holds back a group
+    /// that includes one it can't seat.
+    private var pickableProfiles: [AgentProfile] {
+        guard onStartDirect == nil, let capabilities = rooms.nativeCapabilities else { return agents.profiles }
+        return agents.profiles.filter { capabilities.canSeat(profile: $0.id) }
+    }
+
+    private var unseatableNote: String? {
+        guard isGroupSelection, let capabilities = rooms.nativeCapabilities else { return nil }
+        let names = agents.profiles.filter { selected.contains($0.id) && !capabilities.canSeat(profile: $0.id) }
+            .map(\.name)
+        guard !names.isEmpty else { return nil }
+        return names.count == 1
+            ? "\(names[0]) can’t join group chats on this host."
+            : "\(ListFormatter.localizedString(byJoining: names)) can’t join group chats on this host."
     }
 
     /// New-chat groups may skip the name.

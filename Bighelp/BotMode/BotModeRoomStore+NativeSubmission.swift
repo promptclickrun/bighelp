@@ -401,7 +401,9 @@ extension BotModeRoomStore {
                     sending, expectedRevision: sending.persistenceRevision, expectedOwner: .owner(owner)
                 ) else { throw BotModeRoomError.persistenceConflict }
                 replaceStored(savedIntent)
-                let receipt = try await nativeClient.groupsRetry(roomID: roomID, taskID: taskID)
+                let receipt = try await nativeClient.groupsRetry(
+                    roomID: roomID, taskID: taskID, attempt: nativeRetryAttemptsByRoom[roomID]?[taskID]
+                )
                 try requireNativeBoundary(boundary)
                 // Hermes returns the authoritative task receipt after the
                 // fenced requeue. Keep every identity coordinate intact and

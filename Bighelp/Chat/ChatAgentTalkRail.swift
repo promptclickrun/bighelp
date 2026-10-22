@@ -471,7 +471,7 @@ struct ChatAgentFaceStack: View {
     }
 }
 
-/// One agent's face: its Simple Bot mode mark while that mode is on, else the
+/// One agent's face: its Bots mode mark while that mode is on, else the
 /// face the rest of the app draws (character, pet or picture).
 struct ChatAgentTalkFace: View {
     let agentID: String

@@ -732,7 +732,7 @@ struct ChatView: View {
             .frame(width: 92, alignment: .leading)
             conversationHeader.frame(maxWidth: .infinity)
             HStack(spacing: 4) {
-                // Simple Bot mode keeps each bot to one chat on its home; ⋯ still starts a new one.
+                // Bots mode keeps each bot to one chat on its home; ⋯ still starts a new one.
                 if !homeChrome.isSimpleBots {
                     Button(action: onNewChatTap) {
                         Image(systemName: "square.and.pencil")
@@ -910,7 +910,7 @@ struct ChatView: View {
     }
     #endif
 
-    /// Simple Bot mode: the bot's mark and name in one pill; it opens the bot's profile.
+    /// Bots mode: the bot's mark and name in one pill; it opens the bot's profile.
     private var simpleBotIdentityButton: some View {
         let participant = resolvedIdentityParticipants.first
         let agentID = model.memberIDs.first ?? participant?.stableID ?? agentName
@@ -953,7 +953,7 @@ struct ChatView: View {
     private var conversationIdentityButton: some View {
         Button {
             dismissKeyboard()
-            // Simple Bot mode: a bot's name opens its profile; a group's still opens its people.
+            // Bots mode: a bot's name opens its profile; a group's still opens its people.
             if homeChrome.isSimpleBots, !model.isBotMode, let agentID = model.memberIDs.first {
                 homeChrome.onProfile(agentID)
             } else {

@@ -53,7 +53,7 @@ struct SimpleBotsTests {
                 == "3A3A3F")
     }
 
-    /// Buttons, links and tinted Settings text use the page's ink in Simple Bot mode. The accent used
+    /// Buttons, links and tinted Settings text use the page's ink in Bots mode. The accent used
     /// to follow the bubble color, which is a dark gray after dark, so tinted text in Settings read as
     /// grayed out ("Hermes restart", Check Host Status).
     @Test func simpleLookTintsWithThePagesInk() {
@@ -67,7 +67,7 @@ struct SimpleBotsTests {
         }
     }
 
-    /// A bubble color picked in Appearance wins in Simple Bot mode too; black and ink are only its default.
+    /// A bubble color picked in Appearance wins in Bots mode too; black and ink are only its default.
     @Test func simpleLookKeepsThePickedBubbleColor() {
         for scheme in [ColorScheme.light, .dark] {
             var context = BighelpAppearanceContext(appearance: scheme == .dark ? .dark : .light,

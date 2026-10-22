@@ -2,7 +2,7 @@ import Observation
 import SwiftUI
 import UIKit
 
-/// A bot's mark in Simple Bot mode: one of thirteen solid shapes in one of
+/// A bot's mark in Bots mode: one of thirteen solid shapes in one of
 /// eleven colors, with two white eyes. It's the bot's picture everywhere: the
 /// host keeps a rendering of it, so other screens, devices and Hermes Desktop
 /// show the same bot.
@@ -331,7 +331,7 @@ final class SimpleBotMarkStore {
     }
 }
 
-/// A bot's face in Simple Bot mode: the mark picked here; else the picture,
+/// A bot's face in Bots mode: the mark picked here; else the picture,
 /// character or pet it already has; else its starting mark. While its Bot Chat
 /// works or needs you, a still badge says so on every look; characters and pets
 /// also play the move for that work.

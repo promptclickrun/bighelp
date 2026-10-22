@@ -24,7 +24,7 @@ final class SettingsStore {
     private(set) var sessionSectionPreferencesRevision = 0
 
     var appearanceContext: BighelpAppearanceContext {
-        // Simple Bot mode has one look: a white page by day, black at night, black bubbles.
+        // Bots mode has one look: a white page by day, black at night, black bubbles.
         var context = BighelpAppearanceContext(
             appearance: appearance,
             lightBackground: simpleBotsEnabled ? .paper : lightBackground,
@@ -191,10 +191,60 @@ final class SettingsStore {
         didSet { defaults.set(rightEdgeSwipeAction.rawValue, forKey: Keys.rightEdgeSwipeAction) }
     }
 
-    /// What the edge swipes do. Simple Bot mode hides most places they lead to, so there they're its
-    /// own: from the left, your bots; from the right, this bot's profile.
-    var effectiveLeftEdgeSwipeAction: WorkspaceSwipeAction { simpleBotsEnabled ? .agents : leftEdgeSwipeAction }
-    var effectiveRightEdgeSwipeAction: WorkspaceSwipeAction { simpleBotsEnabled ? .profile : rightEdgeSwipeAction }
+    /// What the edge swipes do. Bots mode hides most places they lead to, so there they're its
+    /// own: from the left, your bots; from the right, this bot's profile. A mode swipe stays a mode
+    /// swipe, so it can bring you back out of Bots mode.
+    var effectiveLeftEdgeSwipeAction: WorkspaceSwipeAction {
+        Self.effective(leftEdgeSwipeAction, botsMode: .agents, isBotsMode: simpleBotsEnabled, codeModeEnabled: codeModeEnabled)
+    }
+    var effectiveRightEdgeSwipeAction: WorkspaceSwipeAction {
+        Self.effective(rightEdgeSwipeAction, botsMode: .profile, isBotsMode: simpleBotsEnabled, codeModeEnabled: codeModeEnabled)
+    }
+
+    nonisolated static func effective(_ action: WorkspaceSwipeAction, botsMode: WorkspaceSwipeAction,
+                                      isBotsMode: Bool, codeModeEnabled: Bool) -> WorkspaceSwipeAction {
+        // Code mode switched off later: its swipe does nothing rather than open Chat.
+        if action == .codeMode, !codeModeEnabled { return .none }
+        if action.switchesMode { return action }
+        return isBotsMode ? botsMode : action
+    }
+
+    /// Settings › Experience › Unified Mode Toggle: Bots, Chat and Code in a pill at the top of each
+    /// home. Off by default; ☰ keeps its Chat and Code switch while it's off.
+    var unifiedModeToggleEnabled: Bool {
+        didSet { defaults.set(unifiedModeToggleEnabled, forKey: Keys.unifiedModeToggle) }
+    }
+
+    /// The modes on offer: Code only while Settings › Code mode is on.
+    var availableModes: [BighelpMode] { codeModeEnabled ? [.bots, .chat, .code] : [.bots, .chat] }
+
+    /// The mode showing now. Bots mode wins over Chat and Code, as its home does.
+    var currentMode: BighelpMode {
+        if simpleBotsEnabled { return .bots }
+        return codeModeEnabled && experience == .code ? .code : .chat
+    }
+
+    /// The mode after this one, for the Next mode swipe: Bots, Chat, Code, then Bots again.
+    var nextMode: BighelpMode {
+        let modes = availableModes
+        let index = modes.firstIndex(of: currentMode) ?? 0
+        return modes[(index + 1) % modes.count]
+    }
+
+    /// Switches to `mode`. The shell follows `experience` and `simpleBotsEnabled` to that mode's home.
+    func switchMode(_ mode: BighelpMode) {
+        guard availableModes.contains(mode), mode != currentMode else { return }
+        switch mode {
+        case .bots:
+            simpleBotsEnabled = true
+        case .chat:
+            experience = .bighelp
+            simpleBotsEnabled = false
+        case .code:
+            experience = .code
+            simpleBotsEnabled = false
+        }
+    }
 
     var preferredBrowser: ChatBrowserPreference {
         didSet { defaults.set(preferredBrowser.rawValue, forKey: Keys.preferredBrowser) }
@@ -261,8 +311,8 @@ final class SettingsStore {
         didSet { defaults.set(allHostsMode, forKey: Keys.allHostsMode) }
     }
 
-    /// Settings › Bighelp IDE: a second home for coding sessions on the host's
-    /// projects. Off by default; Bighelp Chat stays the out-of-box home.
+    /// Settings › Code mode: a second home for coding sessions on the host's
+    /// projects. Off by default; Chat stays the out-of-box home.
     var codeModeEnabled: Bool {
         didSet {
             defaults.set(codeModeEnabled, forKey: Keys.codeMode)
@@ -270,9 +320,9 @@ final class SettingsStore {
         }
     }
 
-    /// Settings › Simple Bot mode: a calm home with just your bots, in place of
+    /// Settings › Bots mode: a calm home with just your bots, in place of
     /// the tab bar and ☰. Its own Settings sheet turns it off again.
-    /// Simple Bot mode's Multi-gateway: the home lists every gateway's bots, not only the selected one's.
+    /// Bots mode's Multi-gateway: the home lists every gateway's bots, not only the selected one's.
     var simpleBotsMultiGateway: Bool {
         didSet { defaults.set(simpleBotsMultiGateway, forKey: Keys.simpleBotsMultiGateway) }
     }
@@ -297,7 +347,7 @@ final class SettingsStore {
         didSet { defaults.set(simpleBotsEnabled, forKey: Keys.simpleBots) }
     }
 
-    /// Settings › Open in: the home a launch starts on while Bighelp IDE is on.
+    /// Settings › Open in: the home a launch starts on while Code mode is on.
     var startExperience: BighelpExperience {
         didSet { defaults.set(startExperience.rawValue, forKey: Keys.startExperience) }
     }
@@ -463,6 +513,7 @@ final class SettingsStore {
         let start = defaults.string(forKey: Keys.startExperience).flatMap(BighelpExperience.init(rawValue:)) ?? .bighelp
         codeModeEnabled = codeMode
         simpleBotsEnabled = defaults.bool(forKey: Keys.simpleBots, default: false)
+        unifiedModeToggleEnabled = defaults.bool(forKey: Keys.unifiedModeToggle, default: false)
         simpleBotsMultiGateway = defaults.bool(forKey: Keys.simpleBotsMultiGateway, default: false)
         simpleBotsGatewayFilter = defaults.bool(forKey: Keys.simpleBotsGatewayFilter, default: false)
         systemManagesAllGateways = defaults.bool(forKey: Keys.systemManagesAllGateways, default: false)
@@ -492,7 +543,7 @@ final class SettingsStore {
         defaults.set(startAgentIDs, forKey: BighelpLanding.startAgentKey)
     }
 
-    /// A picked Open on decides, at launch, whether every computer's agents show. Simple Bot mode
+    /// A picked Open on decides, at launch, whether every computer's agents show. Bots mode
     /// opens on its own home and ignores Open on (its Multi-gateway switch shows every computer).
     func applyLaunchLandingToAllHostsMode() {
         guard !simpleBotsEnabled,
@@ -777,6 +828,7 @@ private extension SettingsStore {
         static let codeMode = "bighelp.settings.code-mode"
         static let startExperience = "bighelp.settings.code-mode.open-in"
         static let simpleBots = "bighelp.settings.simple-bots"
+        static let unifiedModeToggle = "bighelp.settings.unified-mode-toggle"
         static let simpleBotsMultiGateway = "bighelp.simple-bots.multi-gateway"
         static let simpleBotsGatewayFilter = "bighelp.simple-bots.gateway-filter"
         static let systemManagesAllGateways = "bighelp.settings.system.manages-all-gateways"

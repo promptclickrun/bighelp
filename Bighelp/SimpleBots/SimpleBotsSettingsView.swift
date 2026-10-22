@@ -1,7 +1,7 @@
 import Observation
 import SwiftUI
 
-/// Hermes settings Simple Bot mode shows: approvals and the time zone, read
+/// Hermes settings Bots mode shows: approvals and the time zone, read
 /// from and saved to the bot's own config on its computer.
 @MainActor
 protocol SimpleBotHostConfiguring: AnyObject {
@@ -145,7 +145,7 @@ final class SimpleBotHostSettings {
     private(set) var approvalsOff = false
 }
 
-/// What Simple Bot mode's Settings needs from the shell.
+/// What Bots mode's Settings needs from the shell.
 @MainActor
 struct SimpleBotsSettingsContext {
     let settings: SettingsStore
@@ -173,7 +173,7 @@ enum SimpleBotsSettingsPage: Hashable {
     case you, appearance, notifications, apps, chat
 }
 
-/// Simple Bot mode's Settings: you, usage, apps, your primary bot's approvals
+/// Bots mode's Settings: you, usage, apps, your primary bot's approvals
 /// and time zone, notifications and appearance, then the way back to all of bighelp.
 @MainActor
 struct SimpleBotsSettingsView: View {
@@ -447,7 +447,7 @@ struct SimpleBotsSettingsView: View {
         SimpleBotsCard {
             Toggle(isOn: Binding(get: { context.settings.simpleBotsEnabled },
                                  set: { context.settings.simpleBotsEnabled = $0 })) {
-                rowText("Simple Bot mode", detail: "Turn off to see everything bighelp can do.")
+                rowText("Bots mode", detail: "Turn off to see everything bighelp can do.")
             }
             .tint(SimpleBotColor.green.color)
             .padding(.horizontal, BighelpTokens.space20)

@@ -4,7 +4,7 @@ import SwiftUI
 /// big live avatar, the ☰ drawer, New chat, and the bottom bar under the composer.
 struct AgentHomeChrome {
     var isEnabled = false
-    /// Simple Bot mode's chat header: Back, the bot (its profile) and options, no New chat.
+    /// Bots mode's chat header: Back, the bot (its profile) and options, no New chat.
     var isSimpleBots = false
     /// The tab bar under the message box. Every chat on one computer has it,
     /// whether it's the Chat tab's own or opened from the list, Agents or Feed.
@@ -21,6 +21,8 @@ struct AgentHomeChrome {
     var unreadTabs: Set<AppTab> = []
     /// The bar's tabs: Chat, then what's pinned (Appearance › App layout).
     var barTabs: [AppTab] = AppTab.allCases
+    /// The Unified Mode Toggle, on the Chat tab's own chat only (Settings › Experience).
+    var modeSwitch: BighelpModeSwitch?
 }
 
 private struct AgentHomeChromeKey: EnvironmentKey {
@@ -73,6 +75,8 @@ struct AgentHomeChatHeader: View {
                 }
             }
             .frame(maxWidth: .infinity)
+            // The mode pill takes the top row's middle, so the agent steps down below it.
+            .padding(.top, chrome.modeSwitch == nil ? 0 : HeaderButtonMetrics.glass + HeaderButtonMetrics.slop)
             HStack(alignment: .top) {
                 Button {
                     beforeAction()
@@ -90,7 +94,12 @@ struct AgentHomeChatHeader: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("Chats and menu")
                 .accessibilityIdentifier("chat.menu")
-                Spacer()
+                Spacer(minLength: 0)
+                if let modeSwitch = chrome.modeSwitch {
+                    BighelpModePill(modeSwitch: modeSwitch)
+                        .padding(.top, HeaderButtonMetrics.slop)
+                    Spacer(minLength: 0)
+                }
                 HStack(spacing: 0) {
                     newChatButton
                     options

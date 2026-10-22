@@ -21,7 +21,7 @@ struct SimpleBotProfileContext {
     var showsHiddenFiles = false
 }
 
-/// A bot's profile in Simple Bot mode: its mark, name and role, then Info
+/// A bot's profile in Bots mode: its mark, name and role, then Info
 /// (its look, instructions and routines), Computer (its screen, when the
 /// host has one), Files (its folder on the computer) and Media (photos and
 /// videos from its chats).

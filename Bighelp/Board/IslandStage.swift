@@ -29,7 +29,7 @@ struct IslandStage: View {
         .accessibilityHidden(true)
     }
 
-    /// Simple Bot mode draws each bot as its mark, here too.
+    /// Bots mode draws each bot as its mark, here too.
     @ViewBuilder
     private var face: some View {
         if appearance.simpleBots {

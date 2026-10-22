@@ -3,7 +3,7 @@ import Testing
 @testable import Bighelp
 
 /// My Templates: bots saved as templates on the person's computer (plugin `native-my-templates-v1`),
-/// listed with the Template Catalog, and the Templates button in Simple Bot mode's New Bot.
+/// listed with the Template Catalog, and the Templates button in Bots mode's New Bot.
 @MainActor
 struct MyTemplatesTests {
     private static let tripID = "6f1c2a8e-3b4d-4c5e-8f9a-0b1c2d3e4f5a"

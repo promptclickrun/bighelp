@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// ☰ › Pull requests in Bighelp IDE: the selected project's pull requests that
+/// ☰ › Pull requests in Code mode: the selected project's pull requests that
 /// GitHub knows for its branches. Each opens on GitHub.
 struct CodePullRequestsSheet: View {
     let projectName: String
@@ -52,7 +52,7 @@ struct CodePullRequestsSheet: View {
     @BighelpThemeReader private var theme
 }
 
-/// ☰ › Worktrees in Bighelp IDE: the project's branches and worktrees, where
+/// ☰ › Worktrees in Code mode: the project's branches and worktrees, where
 /// finished ones are removed (Hermes keeps a worktree until someone does).
 struct CodeWorktreesSheet: View {
     @State var store: StockGitStore

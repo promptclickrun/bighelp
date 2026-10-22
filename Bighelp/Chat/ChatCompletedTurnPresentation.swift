@@ -36,7 +36,7 @@ struct ChatCompletedTurn: Identifiable {
 enum ChatTurnDisplayRow: Identifiable {
     case entry(ChatTranscriptEntry)
     case completed(ChatCompletedTurn)
-    /// Simple Bot mode: a turn's interim messages under one "{Agent}'s reasoning" row.
+    /// Bots mode: a turn's interim messages under one "{Agent}'s reasoning" row.
     case reasoning(ChatInterimReasoning)
 
     var id: String {
@@ -48,7 +48,7 @@ enum ChatTurnDisplayRow: Identifiable {
     }
 }
 
-/// The messages a bot wrote on the way to a turn's answer, in Simple Bot mode: one folder named for the bot,
+/// The messages a bot wrote on the way to a turn's answer, in Bots mode: one folder named for the bot,
 /// its messages under it in reasoning's quiet look. Open while the turn runs (`isLive`), closed once it ends.
 struct ChatInterimReasoning: Identifiable, Equatable {
     let id: String

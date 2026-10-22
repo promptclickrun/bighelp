@@ -101,7 +101,7 @@ private struct BighelpFormSurfaceModifier: ViewModifier {
     }
 }
 
-/// Simple Bot mode tints with the page's ink, which is white after dark: a switch would be white on
+/// Bots mode tints with the page's ink, which is white after dark: a switch would be white on
 /// white. Its switches are green, as on its own Settings page.
 private struct SimpleBotsSwitchStyle: ToggleStyle {
     func makeBody(configuration: Configuration) -> some View {

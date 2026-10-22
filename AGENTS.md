@@ -42,12 +42,18 @@ change in both repos.
     a `BighelpSearchField` as the first row under the title (`bighelpListSearchRow()`), filter chips below
     it; never `.searchable` on a screen with the bar (iOS 26 puts it along the bottom, on the bar).
   - Never show "bighelp account" or "Link" wording. That pairing system is retired.
-  - Bighelp IDE is a second home, not a second app: Settings turns it on and picks the mode a launch opens in
+  - Code mode is a second home, not a second app: Settings turns it on and picks the mode a launch opens in
     (`settings.codeModeEnabled`, `startExperience`); ☰ gets a mode switch on top and Code's places while it's the
-    home (`AppTab.code`, `appState.homeTab`). Bighelp Chat stays the out-of-box home.
-  - Simple Bot mode (Settings › Experience, `settings.simpleBotsEnabled`) is the one exception to ☰ and the bar:
+    home (`AppTab.code`, `appState.homeTab`). Chat stays the out-of-box home.
+  - The modes are Bots, Chat and Code (`BighelpMode`; `settings.switchMode`). Settings › Experience ›
+    Unified Mode Toggle (`unifiedModeToggleEnabled`, off by default) puts them in one pill
+    (`BighelpModePill`) at the top of each home: the Chat tab's own chat or its list, Code's home and Bots'
+    home (where Search and Filter by Gateway move to a row under it). ☰ drops its Chat and Code switch
+    then. Edge swipes can switch modes too (Next mode, Bots, Chat, Code), also from Bots mode; on the
+    Mac, ⌃⌘1–⌃⌘3.
+  - Bots mode (Settings › Experience, `settings.simpleBotsEnabled`) is the one exception to ☰ and the bar:
     its home (`SimpleBotsHomeView`) takes the Chat tab's place with neither, and the person's circle opens its
-    short Settings (`SimpleBotsSettingsView`), whose All Settings row and Simple Bot mode switch lead back.
+    short Settings (`SimpleBotsSettingsView`), whose All Settings row and Bots mode switch lead back.
     Everything in it uses the same stores and chat; `Bighelp/SimpleBots/` holds its screens. It wins over the
     all-hosts view and Settings › Open on (`fleetModeOn` is off while it's on). Its Multi-gateway switch
     (`simpleBotsMultiGateway`) lists every gateway's bots (`SimpleBotsGateways`, one `SimpleBotsBot` model
@@ -95,7 +101,7 @@ change in both repos.
 | `Bighelp/Settings/` | Settings screens and `SettingsStore` |
 | `Bighelp/Agents/`, `Board/`, `Companion/` | Agents, Feed/Ideas/Goals, the avatar kit renderer |
 | `Bighelp/Kanban/` | Kanban on Hermes' Kanban plugin: board model, lanes, cards, Vision Pro window and pinch-drag |
-| `Bighelp/Code/` | Bighelp IDE (Settings › Bighelp IDE): its home (`CodeHomeView`), the message box's chips (project, new worktree or local, branch), `CodeLauncher`, Changes and Ship |
+| `Bighelp/Code/` | Code mode (Settings › Code mode): its home (`CodeHomeView`), the message box's chips (project, new worktree or local, branch), `CodeLauncher`, Changes and Ship |
 | `Bighelp/Connectors/` | Settings › Apps (`AppsHubView`): Hermes' connectors as Native App Connections (the inline connect cards in chat, `connection.request`, `ConnectorCardStore`; `ConnectorAppsModel`) and Composio Apps (`Composio/`, [docs/COMPOSIO_APPS.md](docs/COMPOSIO_APPS.md)) |
 | `Bighelp/BotScreen/` | Bot Screen: an agent's Linux screen (Hermes `display.*`) in its profile's Screen tab, a native RFB client (`RFB/`) and the full-screen viewer with take control and hand back |
 | `Bighelp/Usage/` | The Usage page (☰ › Usage): plans and limits (`ProviderUsageStore`), Hermes' own analytics per agent and computer (`UsageStore`, `HostUsageLoader`), charts |
@@ -194,7 +200,7 @@ change in both repos.
   and each reread recovers the chat's connection. Send stays on through it (`acceptsSubmissionAfterCatchUp`); a
   message sent then waits in the box until the recovery ends (`isAwaitingCatchUp`). As a turn, the recovery's idle
   readback would take it for a stale one and drop it.
-- **Who's working:** Simple Bot mode's home and the Agents screen show each agent's Bot Chat working or needing
+- **Who's working:** Bots mode's home and the Agents screen show each agent's Bot Chat working or needing
   you from the plugin's `agents/activity` (`native-agents-activity-v1`): Hermes' turn leases in any process
   (the app, `message_agent`, `chat -q`) and the dashboard's open prompts, for up to 64 agents in one read.
   `BotChatActivityStore` reads it while one of those screens shows and the app is active (3 s while something
@@ -238,7 +244,7 @@ change in both repos.
   - Hosts differ, so parse leniently: ignore unknown keys and treat most parts as optional.
   - A missing part should hide one row, not break a screen.
 
-### Bighelp IDE
+### Code mode
 
 - Each Send runs `CodeLauncher`: the host's stock git makes the worktree (`/api/git/worktree/add` through
   `StockGitManaging` prepare/execute) or switches the local branch, then `session.create` starts the session in
@@ -323,7 +329,7 @@ change in both repos.
   the files that use it and rebuild before chasing it.
 - **Live properties read outside `body`:** calling another view's computed property (a section of
   `SettingsView`, say) from elsewhere reads its `@Environment` and `@BighelpThemeReader` with their defaults,
-  the light theme, so Simple Bot mode's pages drew white rows and light-mode grays at night. Build such a page
+  the light theme, so Bots mode's pages drew white rows and light-mode grays at night. Build such a page
   in the view's own `body` (`opening(_:)`, `simpleBotsPage(_:)`).
 - **Light and Dark on open sheets:** `.preferredColorScheme` gives a sheet its style when it opens and doesn't
   change it after, so a switch in Settings left the open sheet's text fields and pickers in the old style.

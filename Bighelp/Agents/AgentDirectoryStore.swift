@@ -332,7 +332,7 @@ final class AgentDirectoryStore {
         pinAgent(id, limit: Self.pinnedAgentLimit, counting: pinnedAgentIDs.count)
     }
 
-    /// Pins `id` while `counting` is under `limit`. Simple Bot mode counts only the
+    /// Pins `id` while `counting` is under `limit`. Bots mode counts only the
     /// pinned bots its home shows (`SimpleBotsHomeProjection.canPin`).
     @discardableResult
     func pinAgent(_ id: String, limit: Int, counting: Int) -> Bool {

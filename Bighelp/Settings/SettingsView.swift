@@ -391,7 +391,7 @@ struct SettingsView: View {
         "\(hostRegistry?.selectedHostID?.uuidString ?? "none"):\(hostRegistry?.selectedWorkspace?.isConnected == true)"
     }
 
-    /// One page of Settings on its own, for Simple Bot mode's short Settings. Built in `body`, like
+    /// One page of Settings on its own, for Bots mode's short Settings. Built in `body`, like
     /// `opening(_:)`: the page reads the theme live there. Built outside it, it drew the light theme's
     /// rows and grays in dark mode (a white name box, gray text).
     func simpleBotsPage(_ page: SimpleBotsSettingsPage) -> Self {

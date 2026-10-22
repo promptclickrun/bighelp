@@ -14,7 +14,7 @@ struct DevFactoryContext {
 }
 
 /// Dev Factory's home (approved 4.1): what runs now, then your recipes, then the templates
-/// new ones start from. ☰ › Dev Factory in Bighelp IDE.
+/// new ones start from. ☰ › Dev Factory in Code mode.
 struct DevFactoryHomeView: View {
     let context: DevFactoryContext
     @State private var newFrom: WorkflowTemplate?

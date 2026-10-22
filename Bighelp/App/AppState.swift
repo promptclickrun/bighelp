@@ -17,7 +17,7 @@ struct SuspendedChat: Equatable {
 @Observable
 final class AppState {
     var selectedTab: AppTab = .sessions
-    /// The root a host or account change returns to: Chat, or Code in Bighelp IDE.
+    /// The root a host or account change returns to: Chat, or Code in Code mode.
     var homeTab: AppTab = .sessions
     var path: [AppRoute] = []
     private(set) var activeConversationID: String?

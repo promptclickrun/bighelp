@@ -1,8 +1,8 @@
 import XCTest
 
-/// Bighelp IDE on the demo data: chosen as the start mode it is the home, each send
+/// Code mode on the demo data: chosen as the start mode it is the home, each send
 /// starts its own session card without leaving the screen, and ☰ switches back to
-/// Bighelp Chat. Set BIGHELP_CODE_MODE_EVIDENCE (TEST_RUNNER_BIGHELP_CODE_MODE_EVIDENCE)
+/// Chat. Set BIGHELP_CODE_MODE_EVIDENCE (TEST_RUNNER_BIGHELP_CODE_MODE_EVIDENCE)
 /// to a folder to save screenshots; BIGHELP_CODE_MODE_APPEARANCE picks light or dark.
 final class CodeModeUITests: BighelpUITestCase {
     @MainActor
@@ -14,7 +14,7 @@ final class CodeModeUITests: BighelpUITestCase {
                                "-loopdy.demo.appearance", appearance]
         app.launch()
 
-        XCTAssertTrue(element("code.screen", in: app).waitForExistence(timeout: 10), "Bighelp IDE opens as the home.")
+        XCTAssertTrue(element("code.screen", in: app).waitForExistence(timeout: 10), "Code mode opens as the home.")
         XCTAssertTrue(app.buttons["code.chip.project"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["code.chip.project"].label.contains("bighelp"), "The first project is picked.")
         save("01-home", app)
@@ -53,24 +53,24 @@ final class CodeModeUITests: BighelpUITestCase {
         save("05-project", app)
         app.buttons["Done"].firstMatch.tap()
 
-        // A card opens its session's chat, with no bottom bar; ☰ › Sessions returns to the Bighelp IDE home.
+        // A card opens its session's chat, with no bottom bar; ☰ › Sessions returns to the Code mode home.
         cards.element(boundBy: 0).tap()
         XCTAssertTrue(element("chat.composer-shell", in: app).waitForExistence(timeout: 8), "The card opens its chat.")
-        XCTAssertFalse(app.buttons["tab.feed"].exists, "Bighelp IDE's chats have no bottom bar.")
+        XCTAssertFalse(app.buttons["tab.feed"].exists, "Code mode's chats have no bottom bar.")
         save("06-session", app)
         app.buttons["chat.menu"].tap()
         app.buttons["menu.code.sessions"].tap()
         XCTAssertTrue(element("code.screen", in: app).waitForExistence(timeout: 5))
 
-        // ☰: the mode switch on top and Code's places; Bighelp Chat brings the chat home back.
+        // ☰: the mode switch on top and Code's places; Chat brings the chat home back.
         app.buttons["home.drawer.open"].tap()
         XCTAssertTrue(element("menu.experience", in: app).waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["menu.code.pull-requests"].exists)
         XCTAssertTrue(app.buttons["menu.code.worktrees"].exists)
-        XCTAssertFalse(app.buttons["menu.agents"].exists, "Bighelp IDE's ☰ lists its own places.")
+        XCTAssertFalse(app.buttons["menu.agents"].exists, "Code mode's ☰ lists its own places.")
         save("07-menu", app)
-        app.buttons["Bighelp Chat"].tap()
-        XCTAssertTrue(element("code.screen", in: app).waitForNonExistence(timeout: 5), "Bighelp Chat leaves Code.")
+        app.segmentedControls.buttons["Chat"].tap()
+        XCTAssertTrue(element("code.screen", in: app).waitForNonExistence(timeout: 5), "Chat leaves Code.")
     }
 
     /// A tap outside the message box puts the keyboard away, on an empty home and
@@ -270,7 +270,7 @@ final class CodeModeUITests: BighelpUITestCase {
 
         app.buttons["home.drawer.open"].tap()
         let menuRow = app.buttons["menu.code.dev-factory"]
-        XCTAssertTrue(menuRow.waitForExistence(timeout: 5), "☰ in Bighelp IDE lists Dev Factory.")
+        XCTAssertTrue(menuRow.waitForExistence(timeout: 5), "☰ in Code mode lists Dev Factory.")
         menuRow.tap()
         XCTAssertTrue(element("devfactory.home", in: app).waitForExistence(timeout: 8))
         let group = app.buttons["devfactory.group-row"].firstMatch
@@ -312,7 +312,7 @@ final class CodeModeUITests: BighelpUITestCase {
         save("22-new-run", app)
     }
 
-    /// Out of the box there's no Bighelp IDE: no switch in ☰.
+    /// Out of the box there's no Code mode: no switch in ☰.
     @MainActor
     func testCodeModeIsOffByDefault() throws {
         let app = makeApp()

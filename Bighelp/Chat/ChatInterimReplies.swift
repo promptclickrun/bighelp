@@ -85,7 +85,7 @@ enum ChatInterimReplies {
         return lower.map { candidate > $0 } ?? true ? candidate : nil
     }
 
-    /// Simple Bot mode: each turn's interim messages move under one "{Agent}'s reasoning" folder, where
+    /// Bots mode: each turn's interim messages move under one "{Agent}'s reasoning" folder, where
     /// the first of them was. With Show reasoning on it fills in as the bot works and closes in place
     /// when the turn ends (`isLive`); off, they're hidden. The message that ends a turn is its answer and
     /// always shows as a message.
@@ -153,7 +153,7 @@ struct ChatInterimReplyStyle: ViewModifier {
     }
 }
 
-/// Simple Bot mode's "{Agent}'s reasoning" folder: the bot's interim messages follow it in the same quiet
+/// Bots mode's "{Agent}'s reasoning" folder: the bot's interim messages follow it in the same quiet
 /// look, on the same line down their left, while it's open. It opens while the bot works and closes in
 /// place when the turn ends; a tap opens or closes it any time.
 struct ChatInterimReasoningHeader: View {

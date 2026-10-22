@@ -373,8 +373,8 @@ struct SettingsStoreTests {
         #expect(BotChatExperience.allCases == [.botChat, .lastChat, .newChat])
     }
 
-    /// Bighelp Chat is the out-of-box home. Bighelp IDE opens a launch only once it's
-    /// on and chosen, and turning it off brings Bighelp Chat back at once.
+    /// Chat is the out-of-box home. Code mode opens a launch only once it's
+    /// on and chosen, and turning it off brings Chat back at once.
     @Test func codeModeIsOffByDefaultAndOpensOnlyWhenChosen() {
         let suiteName = #function
         let defaults = UserDefaults(suiteName: suiteName)!

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Bighelp IDE's message box: the text with Send beside it, then a line with the agent
+/// Code mode's message box: the text with Send beside it, then a line with the agent
 /// (its chip opens the model, reasoning and fast mode for new sessions), the mode
 /// (Default, Plan, YOLO) and Stage, each a full-size target. Under it, three chips choose
 /// the project, where the session works (a new worktree or the local checkout) and its

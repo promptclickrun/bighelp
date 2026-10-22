@@ -24,7 +24,7 @@ struct ChatDestinationView: View {
     @State private var isHapticsSurfaceVisible = false
     @State private var projectChanges: ProjectChangesStore
     @State var voicePresentation: VoicePresentation?
-    /// Simple Bot mode's voice: a bar over the chat instead of the voice screen.
+    /// Bots mode's voice: a bar over the chat instead of the voice screen.
     @State var voiceBar: VoicePresentation?
     @State var attachmentFlow = ChatAttachmentFlowState()
     @State var isPhotoPickerPresented = false
@@ -72,7 +72,7 @@ struct ChatDestinationView: View {
     let onOpenAgentSessions: (String) -> Void
     let onOpenApproval: (ApprovalRequest) -> Void
     let onForkMessage: ((String) -> Void)?
-    /// Bighelp IDE sessions: Markdown paths in messages open the viewer.
+    /// Code mode sessions: Markdown paths in messages open the viewer.
     let hostFiles: HostFileLinkContext?
 
     private var currentAppearanceScope: SessionAppearanceScope? {
@@ -281,7 +281,7 @@ struct ChatDestinationView: View {
         )
     }
 
-    /// The voice bar over a Simple Bot mode chat, under its header.
+    /// The voice bar over a Bots mode chat, under its header.
     @ViewBuilder
     private var voiceBarOverlay: some View {
         if let voiceBar, let agentID = model.memberIDs.first {

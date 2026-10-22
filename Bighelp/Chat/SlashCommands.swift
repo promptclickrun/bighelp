@@ -158,7 +158,7 @@ struct SlashCommandIndex: Equatable, Sendable {
 @MainActor
 protocol SlashCommandCatalogClient: AnyObject {
     func catalog(sessionID: String, agentID: String) async throws -> [SlashCommandDescriptor]
-    /// The commands a new session would have, before it exists (Bighelp IDE's / list).
+    /// The commands a new session would have, before it exists (Code mode's / list).
     func draftCatalog(agentID: String, folder: String?) async throws -> [SlashCommandDescriptor]
 }
 

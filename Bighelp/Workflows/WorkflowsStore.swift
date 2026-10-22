@@ -108,7 +108,7 @@ final class WorkflowsStore {
             let recentValue = try await client.runs(workflowID: nil, filter: .all, before: nil, limit: 20)
             guard !Task.isCancelled else { return }
             self.status = statusValue
-            // Dev Factory's recipes and runs live in Bighelp IDE (☰ › Dev Factory), not here.
+            // Dev Factory's recipes and runs live in Code mode (☰ › Dev Factory), not here.
             var shown = listValue
             shown.workflows.removeAll(where: \.isCodeRecipe)
             shown.waiting.removeAll { $0.code != nil }

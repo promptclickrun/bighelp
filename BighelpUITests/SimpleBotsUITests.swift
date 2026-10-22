@@ -1,6 +1,6 @@
 import XCTest
 
-/// Simple Bot mode on demo data: the home (your circle, search, +, the primary
+/// Bots mode on demo data: the home (your circle, search, +, the primary
 /// bot, the rest), Settings, Create New Bot, search, a bot's menu, its chat and
 /// its profile, in light and dark. Set BIGHELP_SIMPLE_BOTS_EVIDENCE
 /// (TEST_RUNNER_…) to a folder to save the screenshots.
@@ -10,8 +10,8 @@ final class SimpleBotsUITests: BighelpUITestCase {
         for appearance in ["light", "dark"] {
             let app = launch(appearance: appearance)
             let home = app.descendants(matching: .any)["simple-bots.home"]
-            XCTAssertTrue(home.waitForExistence(timeout: 15), "Simple Bot mode opens on its home")
-            XCTAssertFalse(app.buttons["home.drawer.open"].exists, "No ☰ in Simple Bot mode")
+            XCTAssertTrue(home.waitForExistence(timeout: 15), "Bots mode opens on its home")
+            XCTAssertFalse(app.buttons["home.drawer.open"].exists, "No ☰ in Bots mode")
             XCTAssertFalse(app.descendants(matching: .any)["tabbar.sessions"].exists, "No tab bar")
             let primary = app.buttons["simple-bots.primary"]
             XCTAssertTrue(primary.exists)

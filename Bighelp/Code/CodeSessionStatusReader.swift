@@ -1,6 +1,6 @@
 import Foundation
 
-/// Reads a Bighelp IDE session's status from its live chat, where the app keeps one,
+/// Reads a Code mode session's status from its live chat, where the app keeps one,
 /// and otherwise from the session list (which Hermes's active sessions refresh).
 @MainActor
 protocol CodeSessionStatusReading {

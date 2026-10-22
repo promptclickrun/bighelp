@@ -1,6 +1,6 @@
 import Foundation
 
-/// Bighelp IDE names a new worktree's branch from the message that starts it:
+/// Code mode names a new worktree's branch from the message that starts it:
 /// "Make the Kanban lanes scroll on iPad" → `code/make-kanban-lanes-scroll-ipad`.
 /// The worktree's folder takes the part after `code/`.
 enum CodeBranchName {

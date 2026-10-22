@@ -155,7 +155,7 @@ final class TeamworkModel {
     }
 }
 
-/// The Teamwork switch, for Settings and Simple Bot mode's Settings.
+/// The Teamwork switch, for Settings and Bots mode's Settings.
 struct TeamworkToggle<Label: View>: View {
     let model: TeamworkModel
     @ViewBuilder let label: (String) -> Label

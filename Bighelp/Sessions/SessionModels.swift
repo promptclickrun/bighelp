@@ -575,7 +575,7 @@ protocol SessionCatalogClient {
     func refreshMetadata(_ record: SessionRecord) async throws -> SessionRecord?
     func canonicalToolCallIDs(for record: SessionRecord) -> Set<String>
     func create(kind: SessionKind, agentIDs: [String]) async throws -> SessionRecord
-    /// Bighelp IDE: a new direct chat in exactly `folder`, named `title`, on `runtime`'s model choices.
+    /// Code mode: a new direct chat in exactly `folder`, named `title`, on `runtime`'s model choices.
     func createSession(agentID: String, folder: String, title: String,
                        runtime: SessionStartRuntime) async throws -> SessionRecord
     func hydrate(_ record: SessionRecord) async throws -> SessionRecord
@@ -615,7 +615,7 @@ extension SessionCatalogClient {
 
     func hydrate(_ record: SessionRecord) async throws -> SessionRecord { record }
 
-    /// Only hosts that can start a chat in a chosen folder (native Hermes, demo) have Bighelp IDE.
+    /// Only hosts that can start a chat in a chosen folder (native Hermes, demo) have Code mode.
     func createSession(agentID: String, folder: String, title: String,
                        runtime: SessionStartRuntime) async throws -> SessionRecord {
         throw WorkspaceClientError.unavailable(.unsupportedOperation)

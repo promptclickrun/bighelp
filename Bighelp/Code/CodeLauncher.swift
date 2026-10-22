@@ -11,7 +11,7 @@ protocol CodeSessionStarting {
     func send(_ message: String, toSession sessionID: String) async throws
 }
 
-/// What one Send in Bighelp IDE asks for.
+/// What one Send in Code mode asks for.
 struct CodeLaunchRequest: Equatable, Sendable {
     let message: String
     let agentID: String

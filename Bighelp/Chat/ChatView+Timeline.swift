@@ -304,7 +304,7 @@ extension ChatView {
         return ChatActivityWaiting.resolve(prompts: prompts, events: turn.events)
     }
     private var transcriptDisplayContext: ChatTranscriptCanvasCache.DisplayContext {
-        // Simple Bot mode keeps interim messages out of the "Worked for" fold: they go under the
+        // Bots mode keeps interim messages out of the "Worked for" fold: they go under the
         // bot's own reasoning row instead (`groupingForSimpleBots`).
         let simpleBots = homeChrome.isSimpleBots && !model.isBotMode
         return ChatTranscriptCanvasCache.DisplayContext(

@@ -73,7 +73,7 @@ extension RootShellView {
     /// something (Feed's Discuss, a task, a deeper page) goes back to it with
     /// the edge swipe; ☰ reaches everything else.
     var homeChrome: AgentHomeChrome {
-        // Simple Bot mode: Back, the bot's name (its profile) and options; no ☰ or bar.
+        // Bots mode: Back, the bot's name (its profile) and options; no ☰ or bar.
         if simpleBotsOn {
             return AgentHomeChrome(isSimpleBots: true,
                                    onProfile: { appState.open(.simpleBotProfile(agentID: $0)) })
@@ -81,7 +81,7 @@ extension RootShellView {
         return AgentHomeChrome(
             isEnabled: true,
             // All hosts too: a chat's agent is on the selected host, so its tabs are that agent's.
-            // Bighelp IDE has no bottom bar: its sessions return to its home through ☰ or Back.
+            // Code mode has no bottom bar: its sessions return to its home through ☰ or Back.
             showsTabBar: settings.experience != .code,
             onMenu: { isHomeDrawerPresented.toggle() },
             onProfile: { profileAgentID = $0 },
@@ -92,6 +92,17 @@ extension RootShellView {
             unreadTabs: boardUnreadTabs,
             barTabs: barTabs
         )
+    }
+
+    /// A chat's header chrome. The Chat tab's own chat (not one opened from a list, and not a Code
+    /// session) also carries the Unified Mode Toggle.
+    func homeChrome(forChat id: String) -> AgentHomeChrome {
+        var chrome = homeChrome
+        if chrome.isEnabled, settings.currentMode == .chat, !fleetModeOn, !appState.chatOpenedFromList,
+           case .chat(let first)? = appState.path.first, first == id {
+            chrome.modeSwitch = modeSwitch
+        }
+        return chrome
     }
 
     /// Feed, Ideas and Goals with items the person hasn't seen yet.
@@ -131,7 +142,7 @@ extension RootShellView {
             actionErrorMessage = "Connect to this computer to open the agent’s chat."
             return
         }
-        // Simple Bot mode: the opening loader covers the lookup and the chat's first load if they're slow.
+        // Bots mode: the opening loader covers the lookup and the chat's first load if they're slow.
         let opening = simpleBotsOn
             ? simpleBotsChatOpening.begin(agentID: profileID, name: agents.profiles.first { $0.id == profileID }?.name,
                                           originPath: appState.path)
@@ -237,7 +248,7 @@ extension RootShellView {
         // Never push under the "Unable to open" alert: iOS drops that push while
         // the path keeps it, leaving the Chats list with no ☰ or tab bar. A link,
         // widget or notification opening the app wins (it marks this done).
-        // Simple Bot mode opens on its own home, the list of bots.
+        // Bots mode opens on its own home, the list of bots.
         if simpleBotsOn, !didAutoOpenHomeChat {
             didAutoOpenHomeChat = true
             return true

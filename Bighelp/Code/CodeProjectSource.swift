@@ -1,6 +1,6 @@
 import Foundation
 
-/// The projects Bighelp IDE can start sessions in, for one agent (Hermes keeps
+/// The projects Code mode can start sessions in, for one agent (Hermes keeps
 /// projects per agent).
 @MainActor
 protocol CodeProjectSource: AnyObject {

@@ -10,7 +10,7 @@ final class ChatOpenOnceUITests: BighelpUITestCase {
                                "-bighelp.settings.simple-bots", "YES", "-start-chat"]
         app.launch()
         let back = app.buttons["chat.back"]
-        XCTAssertTrue(back.waitForExistence(timeout: 15), "Simple Bot mode's chat has Back")
+        XCTAssertTrue(back.waitForExistence(timeout: 15), "Bots mode's chat has Back")
 
         // The chat on screen, opened again from outside.
         let chat = URL(string: "loopdy://chat/demo-finance")!

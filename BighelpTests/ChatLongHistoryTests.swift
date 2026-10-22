@@ -156,7 +156,7 @@ struct ChatLongHistoryTests {
     /// Keeping turns that didn't change gives exactly the rows (and message groups) that
     /// projecting the whole chat again would, through a turn that streams, works, finishes
     /// and starts again, with folders opened and closed, every fold and interim-note
-    /// setting, in Simple Bot mode, and with agents messaging each other.
+    /// setting, in Bots mode, and with agents messaging each other.
     @Test(arguments: [false, true])
     func keptTurnsMatchProjectingTheWholeChat(withAgentTalk: Bool) throws {
         let card = try JSONDecoder().decode(GenerativeUICard.self, from: Data(Self.cardJSON.utf8))

@@ -307,7 +307,7 @@ enum FirstRunMode: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .bots: String(localized: "Bots")
-        case .sessions: String(localized: "Sessions")
+        case .sessions: String(localized: "Chat")
         case .code: String(localized: "Code")
         }
     }
@@ -337,7 +337,7 @@ enum FirstRunMode: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Bots is Simple Bot mode; Sessions the app as it comes; Code opens in Bighelp IDE.
+    /// Bots is Bots mode; Sessions the app as it comes; Code opens in Code mode.
     @MainActor
     func apply(to settings: SettingsStore) {
         switch self {

@@ -1,11 +1,11 @@
 import XCTest
 
-/// Simple Bot mode on demo data, switching Light and Dark the way people do: in Settings, with a
+/// Bots mode on demo data, switching Light and Dark the way people do: in Settings, with a
 /// page open. The open page, its name field and the home behind it change at once. Back from a
 /// bot's chat never shows ☰. Set BIGHELP_SIMPLE_BOTS_EVIDENCE (TEST_RUNNER_…) to a folder to save
 /// the screenshots.
 final class SimpleBotsAppearanceUITests: BighelpUITestCase {
-    /// Simple Bot mode's Settings opens Settings › Chat directly, the same page All Settings has.
+    /// Bots mode's Settings opens Settings › Chat directly, the same page All Settings has.
     @MainActor
     func testSettingsOpensChatDirectly() throws {
         let app = makeApp()
@@ -72,7 +72,7 @@ final class SimpleBotsAppearanceUITests: BighelpUITestCase {
         XCTAssertLessThan(brightness(of: app.windows.firstMatch, in: app), 0.25, "The home turned dark")
     }
 
-    /// Your name in Simple Bot mode's Settings: a box that reads in light and in dark.
+    /// Your name in Bots mode's Settings: a box that reads in light and in dark.
     @MainActor
     func testNameRowReadsInBothModes() throws {
         for (appearance, isDark) in [("light", false), ("dark", true)] {

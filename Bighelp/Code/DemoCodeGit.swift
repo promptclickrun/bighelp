@@ -1,7 +1,7 @@
 import Foundation
 
 /// Demo mode's git: each sample project's main folder on `main`, plus the worktrees
-/// Bighelp IDE makes. A new worktree comes with three sample changed files (one is the
+/// Code mode makes. A new worktree comes with three sample changed files (one is the
 /// plan `DemoHostTextFiles` serves), so Changes, its Markdown preview and Ship have
 /// something to show; commit, push and PR move them along.
 @MainActor

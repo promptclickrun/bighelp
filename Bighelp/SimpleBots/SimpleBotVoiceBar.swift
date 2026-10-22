@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Voice in Simple Bot mode: a bar over the chat, so the chat stays in view and in use. The bot's face,
+/// Voice in Bots mode: a bar over the chat, so the chat stays in view and in use. The bot's face,
 /// a visualizer from real audio levels (your voice in the page's ink, the bot's in its color, dots while
 /// nobody speaks), the voice choices, the microphone, and End.
 @MainActor

@@ -5,7 +5,7 @@ enum AppTab: String, CaseIterable, Identifiable {
     case feed, ideas, goals, apps
     /// Pages ☰ opens, as tabs when the person pins them to the bottom bar.
     case projects, kanban, workflows, usage
-    /// Bighelp IDE's home: coding sessions on the host's projects (Settings › Bighelp IDE).
+    /// Code mode's home: coding sessions on the host's projects (Settings › Code mode).
     case code
 
     /// The standard bottom bar: the agent's chat, then its Feed, Ideas, Goals and Apps.
@@ -56,16 +56,16 @@ enum AppRoute: Hashable {
     case allHostsChats
     /// Feed, Ideas, Goals or Files as a quick screen with Back, when the bottom bar doesn't hold it.
     case board(AppTab)
-    /// A Bighelp IDE session's changes, with Ship.
+    /// A Code mode session's changes, with Ship.
     case codeChanges(sessionID: String)
     /// Orchestration mode's chat for a batch sent with Send all.
     case codeBatch(id: UUID)
-    /// Dev Factory (☰ › Dev Factory in Bighelp IDE): its home, a recipe, one start's runs, a run's changes.
+    /// Dev Factory (☰ › Dev Factory in Code mode): its home, a recipe, one start's runs, a run's changes.
     case devFactory
     case devFactoryRecipe(id: String)
     case devFactoryGroup(id: String)
     case devFactoryChanges(runID: String)
-    /// Simple Bot mode: a bot's profile, from its chat's name or a long press.
+    /// Bots mode: a bot's profile, from its chat's name or a long press.
     case simpleBotProfile(agentID: String)
 
     /// Screens about every computer, which stay put when the working computer changes.

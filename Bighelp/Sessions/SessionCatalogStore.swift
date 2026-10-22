@@ -181,7 +181,7 @@ final class SessionCatalogStore {
         return record
     }
 
-    /// Bighelp IDE: a new chat with `agentID` working in exactly `folder`.
+    /// Code mode: a new chat with `agentID` working in exactly `folder`.
     func createDirect(agentID: String, folder: String, title: String,
                       runtime: SessionStartRuntime = .init()) async throws -> SessionRecord {
         let generation = accountGeneration

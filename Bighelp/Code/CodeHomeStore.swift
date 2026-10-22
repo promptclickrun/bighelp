@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-/// Bighelp IDE's home for one computer: what the three chips under the message box
+/// Code mode's home for one computer: what the three chips under the message box
 /// hold (project, where it runs, branch), the agent that runs the sessions, and
 /// the sessions sent from here. Each Send starts its own session and returns at
 /// once, so several can be sent back to back. Orchestration mode stages jobs (each

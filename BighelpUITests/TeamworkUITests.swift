@@ -1,7 +1,7 @@
 import XCTest
 
 /// Settings › Teamwork on demo data: off by default, and on says how many
-/// agents now know each other; in full Settings and in Simple Bot mode's.
+/// agents now know each other; in full Settings and in Bots mode's.
 final class TeamworkUITests: BighelpUITestCase {
     @MainActor
     func testTeamworkTurnsOnInSettings() throws {

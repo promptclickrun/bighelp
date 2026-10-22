@@ -5,7 +5,7 @@ import XCTest
 final class BotsWidgetUITests: BighelpUITestCase {
     private static let link = URL(string: "loopdy://agent-chat?agent=travel&host=0D0D0D0D-0000-4000-8000-000000000001")!
 
-    /// Simple Bot mode, bighelp in the background: the bot's chat, with Back to the bots.
+    /// Bots mode, bighelp in the background: the bot's chat, with Back to the bots.
     @MainActor
     func testABotOpensItsChatInSimpleBotMode() throws {
         let app = makeApp()

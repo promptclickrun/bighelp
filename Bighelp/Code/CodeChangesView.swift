@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// A Bighelp IDE session's changes in its worktree (or the local folder), and
+/// A Code mode session's changes in its worktree (or the local folder), and
 /// shipping them: commit, push and a pull request, with the host's own git.
 @MainActor
 @Observable

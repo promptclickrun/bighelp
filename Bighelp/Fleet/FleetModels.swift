@@ -171,7 +171,7 @@ enum FleetOpen: Equatable, Sendable {
     case newGroup(profileIDs: [String], peers: [HermesBotModePeerCandidate] = [])
     /// The agent's routines (its scheduled tasks).
     case routines(profileID: String)
-    /// Simple Bot mode's bot profile.
+    /// Bots mode's bot profile.
     case botProfile(profileID: String)
     case destination(FleetDestination)
 }

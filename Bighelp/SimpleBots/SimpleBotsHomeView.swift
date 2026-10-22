@@ -1,7 +1,7 @@
 import Observation
 import SwiftUI
 
-/// What Simple Bot mode's home needs from the shell.
+/// What Bots mode's home needs from the shell.
 @MainActor
 struct SimpleBotsContext {
     let agents: AgentDirectoryStore
@@ -26,9 +26,11 @@ struct SimpleBotsContext {
     /// Which bots are working or need you, kept current while the home shows.
     var activity: BotChatActivityStore? = nil
     var activitySource: BotChatActivitySource? = nil
+    /// The Unified Mode Toggle (Settings › Experience); nil while it's off.
+    var modeSwitch: BighelpModeSwitch? = nil
 }
 
-/// Simple Bot mode's Multi-gateway: every gateway's bots in one home, the gateway in use's live and the
+/// Bots mode's Multi-gateway: every gateway's bots in one home, the gateway in use's live and the
 /// others' from the copies the all-hosts view keeps (those gateways stay connected meanwhile). Opening or
 /// managing a bot on another gateway makes that gateway the one in use first.
 @MainActor
@@ -272,7 +274,7 @@ enum SimpleBotsHomeProjection {
     }
 }
 
-/// The order the person dragged Simple Bot mode's list into, per computer.
+/// The order the person dragged Bots mode's list into, per computer.
 @MainActor
 @Observable
 final class SimpleBotsOrderStore {
@@ -351,7 +353,7 @@ private enum SimpleBotsSheet: Identifiable {
     }
 }
 
-/// Simple Bot mode's home: your circle top left, search and + top right, the
+/// Bots mode's home: your circle top left, search and + top right, the
 /// primary bot large in the middle, then every other bot and group chat with
 /// its latest message.
 @MainActor
@@ -522,7 +524,57 @@ struct SimpleBotsHomeView: View {
         .background { SimpleBotsHeaderFade() }
     }
 
+    @ViewBuilder
     private var homeHeader: some View {
+        if let modeSwitch = context.modeSwitch {
+            modeHeader(modeSwitch)
+        } else {
+            classicHeader
+        }
+    }
+
+    /// With the Unified Mode Toggle: you, the mode pill and New on one row; Search (and Filter by
+    /// Gateway, to its right) on the row under it, so the pill keeps the middle to itself.
+    private func modeHeader(_ modeSwitch: BighelpModeSwitch) -> some View {
+        VStack(spacing: BighelpTokens.space12) {
+            ZStack {
+                HStack {
+                    SimpleBotsPersonButton(name: context.personName, imageURL: context.personImageURL,
+                                           action: context.onOpenSettings)
+                    Spacer()
+                    newMenu
+                }
+                BighelpModePill(modeSwitch: modeSwitch)
+            }
+            HStack(spacing: BighelpTokens.space8) {
+                Button { sheet = .search } label: {
+                    HStack(spacing: BighelpTokens.space8) {
+                        Image(systemName: "magnifyingglass")
+                        Text("Search bots")
+                        Spacer(minLength: 0)
+                    }
+                    .font(.bighelp(.body))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, BighelpTokens.space12)
+                    .frame(maxWidth: .infinity, minHeight: 40)
+                    .background(theme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .contentShape(.rect)
+                }
+                .bighelpPlainButtonStyle(.rounded(12))
+                .accessibilityLabel("Search bots")
+                .accessibilityIdentifier("simple-bots.search")
+                if let gateways = context.gateways?.filter {
+                    gatewayFilterButton(gateways)
+                }
+            }
+        }
+        .padding(.horizontal, BighelpTokens.space20)
+        .padding(.top, BighelpTokens.space4)
+        .padding(.bottom, BighelpTokens.space8)
+        .background { SimpleBotsHeaderFade() }
+    }
+
+    private var classicHeader: some View {
         HStack(spacing: BighelpTokens.space8) {
             SimpleBotsPersonButton(name: context.personName, imageURL: context.personImageURL,
                                    action: context.onOpenSettings)
@@ -532,28 +584,33 @@ struct SimpleBotsHomeView: View {
             }
             SimpleBotsCircleButton(systemImage: "magnifyingglass", label: "Search bots",
                                    identifier: "simple-bots.search") { sheet = .search }
-            Menu {
-                Button("New Bot", systemImage: "plus.circle") { sheet = .create }
-                    .disabled(!context.canCreateBots)
-                Button("New Group Chat", systemImage: "person.2") { sheet = .group }
-                    .disabled(!context.canCreateGroups)
-            } label: {
-                Image(systemName: "plus")
-                    .font(.bighelp(.title3, weight: .medium))
-                    .foregroundStyle(.primary)
-                    .frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
-                    .contentShape(.circle)
-                    .bighelpNavigationGlass(in: Circle(), isInteractive: true)
-            }
-            .menuStyle(.button)
-            .buttonStyle(.plain)
-            .accessibilityLabel("New")
-            .accessibilityIdentifier("simple-bots.new")
+            newMenu
         }
         .padding(.horizontal, BighelpTokens.space20)
         .padding(.top, BighelpTokens.space4)
         .padding(.bottom, BighelpTokens.space8)
         .background { SimpleBotsHeaderFade() }
+    }
+
+    /// New Bot and New Group Chat.
+    private var newMenu: some View {
+        Menu {
+            Button("New Bot", systemImage: "plus.circle") { sheet = .create }
+                .disabled(!context.canCreateBots)
+            Button("New Group Chat", systemImage: "person.2") { sheet = .group }
+                .disabled(!context.canCreateGroups)
+        } label: {
+            Image(systemName: "plus")
+                .font(.bighelp(.title3, weight: .medium))
+                .foregroundStyle(.primary)
+                .frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
+                .contentShape(.circle)
+                .bighelpNavigationGlass(in: Circle(), isInteractive: true)
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .accessibilityLabel("New")
+        .accessibilityIdentifier("simple-bots.new")
     }
 
     /// Filter by Gateway: every gateway's bots, or one gateway's.
@@ -1081,7 +1138,7 @@ private struct SimpleBotsPreview: View {
             .padding(BighelpTokens.space20)
         }
         .frame(width: 320, alignment: .leading)
-        // A preview is drawn outside the app's own colors; the system's match Simple Bot mode.
+        // A preview is drawn outside the app's own colors; the system's match Bots mode.
         .background(Color(uiColor: .systemBackground))
     }
 }

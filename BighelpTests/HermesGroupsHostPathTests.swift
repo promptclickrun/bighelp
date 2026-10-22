@@ -91,7 +91,8 @@ struct HermesGroupsHostPathTests {
         defer { deadline.cancel() }
         let result = await retry.result
 
-        #expect(host.sentPayloads(.groupsRetry) == [try host.object("crash_retry", "params")])
+        let sent = try host.object("crash_retry", "params")
+        #expect(host.sentPayloads(.groupsRetry) == [sent])
         switch path {
         case .legacy:
             #expect(throws: Never.self) { try result.get() }
@@ -117,7 +118,8 @@ struct HermesGroupsHostPathTests {
 
         try await store.discardNative(roomID: host.roomID, discard: discard)
 
-        #expect(host.sentPayloads(.groupsDiscard) == [try host.object("crash_discard", "params")])
+        let sent = try host.object("crash_discard", "params")
+        #expect(host.sentPayloads(.groupsDiscard) == [sent])
         #expect(store.pendingNativeDiscards(roomID: host.roomID).isEmpty)
         await #expect(throws: BotModeRoomError.nativeDiscardStale) {
             try await store.discardNative(roomID: host.roomID, discard: discard)
@@ -193,13 +195,15 @@ private final class HermesGroupsVectorHost: WorkspaceOperationPerforming {
     lazy var client = BighelpLinkHermesBotModeClient(workspace: self, owner: owner!)
 
     init(_ path: HermesGroupsHostPathTests.HostPath, crash scenario: String? = nil) throws {
-        self.path = path
         let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
             .appending(path: "Fixtures/HermesGroups/\(path.rawValue).json")
-        vector = try JSONDecoder().decode([String: BighelpJSONValue].self, from: Data(contentsOf: url))
+        let vector = try JSONDecoder().decode([String: BighelpJSONValue].self, from: Data(contentsOf: url))
+        let crash = scenario.flatMap { vector[$0]?.object } ?? [:]
+        self.path = path
+        self.vector = vector
+        self.crash = crash
         owner = WorkspaceOwner(authority: try .fixture(id: UUID().uuidString),
                                authenticationGeneration: UUID(), connectionGeneration: UUID())
-        crash = scenario.flatMap { vector[$0]?.object } ?? [:]
         events = crash["events"]?.array ?? []
         driverStatus = crash["driver_status"] ?? .null
     }

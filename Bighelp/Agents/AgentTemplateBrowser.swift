@@ -4,7 +4,7 @@ import SwiftUI
 /// Sort (For you, Newest, Most used; bighelp only when there are community ones). Picking one fills
 /// in the editor like the Templates rail.
 struct AgentTemplateBrowser: View {
-    var title = "Agent templates"
+    var title = String(localized: "Agent templates")
     var myTemplates: MyTemplatesStore = .shared
     let onPick: (AgentSoulTemplate) -> Void
     @Environment(\.dismiss) private var dismiss
@@ -24,7 +24,8 @@ struct AgentTemplateBrowser: View {
         NavigationStack {
             List {
                 Section {
-                    BighelpSearchField(text: $search, prompt: "Search templates", accessibilityLabel: "Search templates",
+                    BighelpSearchField(text: $search, prompt: String(localized: "Search templates"),
+                                       accessibilityLabel: String(localized: "Search templates"),
                                        accessibilityIdentifier: "agent.templates.search")
                         .bighelpListSearchRow()
                     TemplateTopicChips(filters: listing.filters, selection: $filter, identifier: "agent.templates")
@@ -45,7 +46,7 @@ struct AgentTemplateBrowser: View {
                     }
                 }
                 if listing.isEmpty, !showsSkipped {
-                    TemplateEmptyView(state: TemplateEmptyState(search: search, filter: listing.filter, noun: "templates"),
+                    TemplateEmptyView(state: TemplateEmptyState(search: search, filter: listing.filter, noun: .templates),
                                       identifier: "agent.templates.empty") { filter = .all }
                         .listRowBackground(Color.clear)
                 }
@@ -99,8 +100,8 @@ struct AgentTemplateBrowser: View {
                     }
             }
         } header: {
-            TemplateSectionHeader(title: "My Templates", systemImage: "person.fill", count: mine.count,
-                                  identifier: "agent.templates.mine")
+            TemplateSectionHeader(title: String(localized: "My Templates"), systemImage: "person.fill",
+                                  count: mine.count, identifier: "agent.templates.mine")
         } footer: {
             VStack(alignment: .leading, spacing: BighelpTokens.space4) {
                 Text("Saved on your computer. Hold one to delete it.")
@@ -188,11 +189,13 @@ struct AgentTemplateRow: View {
         var parts: [String] = []
         if showsSource {
             if !template.isCommunity { parts.append("bighelp") }
-            else if let credit = template.credit { parts.append("by @\(credit)") }
-            else { parts.append("Community") }
+            else if let credit = template.credit { parts.append(String(localized: "by @\(credit)")) }
+            else { parts.append(String(localized: "Community")) }
         }
         if showsTopic { parts.append(template.category.title) }
-        if uses > 0 { parts.append(uses == 1 ? "Used once" : "Used \(uses) times") }
+        if uses > 0 {
+            parts.append(uses == 1 ? String(localized: "Used once") : String(localized: "Used \(uses) times"))
+        }
         return parts
     }
 }

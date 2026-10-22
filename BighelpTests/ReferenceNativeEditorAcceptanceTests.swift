@@ -118,11 +118,16 @@ struct ReferenceNativeEditorAcceptanceTests {
         #expect(view.isFirstResponder)
     }
 
-    @Test func wrappedDraftKeepsTheExpandButtonWhileTyping() async throws {
+    /// Beside the status rail (landscape with the keyboard up), the row is capped at the
+    /// lane's width, so SwiftUI also measures the editor at that wide, finite width. The
+    /// draft wraps in the box but fits one line at that width.
+    @Test(arguments: [false, true])
+    func wrappedDraftKeepsTheExpandButtonWhileTyping(besideStatusRail: Bool) async throws {
         let fixture = try EditorFixture()
-        fixture.source += String(repeating: " and a few more words", count: 8)
+        fixture.source += " and a few more words"
         let reports = ExpansionReports()
-        let mounted = try await MountedEditor(root: ComposerRowSurface(fixture: fixture, reports: reports))
+        let mounted = try await MountedEditor(root: ComposerRowSurface(fixture: fixture, reports: reports,
+            besideStatusRail: besideStatusRail))
         defer { mounted.close() }
         let view = try #require(mounted.textView())
         for word in ["one", "two", "three", "four", "five"] {
@@ -776,9 +781,25 @@ struct ReferenceNativeEditorAcceptanceTests {
 @MainActor private struct ComposerRowSurface: View {
     @Bindable var fixture: EditorFixture
     let reports: ExpansionReports
+    var besideStatusRail = false
     @State private var focused = true
     @State private var showsExpandButton = false
     var body: some View {
+        Group {
+            if besideStatusRail {
+                HStack(alignment: .bottom, spacing: 4) {
+                    Color.clear.frame(width: 44, height: 44)
+                    row.frame(maxWidth: ChatCanvasLayout.regularLaneMaximumWidth)
+                }
+            } else {
+                row
+            }
+        }
+        .padding()
+        .environment(\.appAppearance, BighelpAppearanceContext(appearance: .light, bubbleColor: nil))
+        .environment(\.colorScheme, .light)
+    }
+    private var row: some View {
         HStack(spacing: 8) {
             HStack(alignment: .bottom, spacing: 4) {
                 ReferenceComposerTextView(text: $fixture.source, hub: fixture.hub, session: fixture.session,
@@ -794,9 +815,6 @@ struct ReferenceNativeEditorAcceptanceTests {
             }
             if showsExpandButton { Color.clear.frame(width: 44, height: 44) }
         }
-        .padding()
-        .environment(\.appAppearance, BighelpAppearanceContext(appearance: .light, bubbleColor: nil))
-        .environment(\.colorScheme, .light)
     }
 }
 

@@ -154,10 +154,11 @@ struct ReferenceComposerTextView: UIViewRepresentable {
         // the expand button shows beside the box from there.
         let overflowing = DraftFieldSizing.shouldOfferExpandedEditor(hasText: !uiView.text.isEmpty,
             measuredHeight: measured.height, lineHeight: lineHeight, thresholdLines: 2)
-        // Only a real width decides: SwiftUI also probes at infinite width, where
-        // any draft fits one line, and reporting that flips the expand button
-        // (and the box's width) on every pass, so the box shakes.
-        if isSurfaceActive, width.isFinite { context.coordinator.reportOverflow(overflowing) }
+        // Only the width the box is laid out at decides. SwiftUI also measures it at
+        // widths it never gets (infinite, or the lane's cap beside the status rail),
+        // where the draft fits; reporting those flips the expand button, and with it
+        // the box's width, on every pass, so the box shakes.
+        if isSurfaceActive, !expanded { context.coordinator.measuredOverflow(overflowing, atWidth: width, in: container) }
         // A compact editor has a real native viewport, not merely a clipped
         // SwiftUI frame. Keep enough room for UIKit's caret and line leading.
         return CGSize(width: width, height: viewportHeight ?? DraftFieldSizing.height(
@@ -193,6 +194,8 @@ struct ReferenceComposerTextView: UIViewRepresentable {
         private var lastPublished: Data
         private var ownedDraft: UUID
         private var lastOverflow: Bool?
+        private var measuredOverflows: [(width: CGFloat, overflowing: Bool)] = []
+        private var overflowCheckScheduled = false
         private var scrollGeneration: UInt64 = 0
         private var transferringSurface = false
         private var restoreFocusAfterTransfer = false
@@ -644,10 +647,23 @@ struct ReferenceComposerTextView: UIViewRepresentable {
             }
         }
 
-        func reportOverflow(_ value: Bool) {
-            guard lastOverflow != value else { return }
-            lastOverflow = value
-            DispatchQueue.main.async { [weak self] in self?.parent.onExpansionAvailabilityChange(value) }
+        /// Keeps the latest few measurements; once layout is done, the one at the
+        /// box's own width is the answer.
+        func measuredOverflow(_ value: Bool, atWidth width: CGFloat, in container: ReferenceComposerContainer) {
+            guard width.isFinite else { return }
+            measuredOverflows.append((width, value))
+            if measuredOverflows.count > 8 { measuredOverflows.removeFirst() }
+            guard value != lastOverflow, !overflowCheckScheduled else { return }
+            overflowCheckScheduled = true
+            DispatchQueue.main.async { [weak self, weak container] in
+                guard let self else { return }
+                self.overflowCheckScheduled = false
+                guard let width = container?.bounds.width,
+                      let value = self.measuredOverflows.last(where: { abs($0.width - width) < 0.5 })?.overflowing,
+                      self.lastOverflow != value else { return }
+                self.lastOverflow = value
+                self.parent.onExpansionAvailabilityChange(value)
+            }
         }
     }
 }

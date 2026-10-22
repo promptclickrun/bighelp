@@ -118,6 +118,41 @@ struct ReferenceNativeEditorAcceptanceTests {
         #expect(view.isFirstResponder)
     }
 
+    /// Beside the status rail (landscape with the keyboard up), the row is capped at the
+    /// lane's width, so SwiftUI also measures the editor at that wide, finite width. The
+    /// draft wraps in the box but fits one line at that width.
+    @Test(arguments: [false, true])
+    func wrappedDraftKeepsTheExpandButtonWhileTyping(besideStatusRail: Bool) async throws {
+        let fixture = try EditorFixture()
+        fixture.source += " and a few more words"
+        let reports = ExpansionReports()
+        let mounted = try await MountedEditor(root: ComposerRowSurface(fixture: fixture, reports: reports,
+            besideStatusRail: besideStatusRail))
+        defer { mounted.close() }
+        let view = try #require(mounted.textView())
+        for word in ["one", "two", "three", "four", "five"] {
+            view.insertText(" " + word)
+            await mounted.settle()
+        }
+
+        let typed = reports.values
+        #expect(typed.last == true)
+        #expect(typed.drop(while: { !$0 }).allSatisfy { $0 },
+            "SwiftUI also measures at infinite width, where any draft fits one line; reporting that hides the button and the box shakes.")
+
+        // The button still goes away once the draft fits one line again.
+        view.selectedRange = NSRange(location: 0, length: view.text.utf16.count)
+        view.insertText("Short")
+        await mounted.settle()
+        #expect(reports.values.last == false)
+
+        view.selectedRange = NSRange(location: 0, length: view.text.utf16.count)
+        view.deleteBackward()
+        await mounted.settle()
+        #expect(view.text.isEmpty)
+        #expect(reports.values.last == false)
+    }
+
     @Test func proseKeyboardTraitsReturnAfterLiteralSlashTokenWithoutReplacingNativeState() async throws {
         let fixture = try EditorFixture()
         fixture.source = "Please summarize "
@@ -737,14 +772,63 @@ struct ReferenceNativeEditorAcceptanceTests {
     }
 }
 
+@MainActor private final class ExpansionReports {
+    var values: [Bool] = []
+}
+
+/// The chat composer's row: the editor shares a bottom-aligned HStack with Send,
+/// and the expand button beside the box narrows it once the draft wraps.
+@MainActor private struct ComposerRowSurface: View {
+    @Bindable var fixture: EditorFixture
+    let reports: ExpansionReports
+    var besideStatusRail = false
+    @State private var focused = true
+    @State private var showsExpandButton = false
+    var body: some View {
+        Group {
+            if besideStatusRail {
+                HStack(alignment: .bottom, spacing: 4) {
+                    Color.clear.frame(width: 44, height: 44)
+                    row.frame(maxWidth: ChatCanvasLayout.regularLaneMaximumWidth)
+                }
+            } else {
+                row
+            }
+        }
+        .padding()
+        .environment(\.appAppearance, BighelpAppearanceContext(appearance: .light, bubbleColor: nil))
+        .environment(\.colorScheme, .light)
+    }
+    private var row: some View {
+        HStack(spacing: 8) {
+            HStack(alignment: .bottom, spacing: 4) {
+                ReferenceComposerTextView(text: $fixture.source, hub: fixture.hub, session: fixture.session,
+                    focus: $focused, isEnabled: true,
+                    onExpansionAvailabilityChange: { value in
+                        reports.values.append(value)
+                        showsExpandButton = value
+                    })
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(minHeight: 44)
+                    .overlay(alignment: .topLeading) { if fixture.source.isEmpty { Text("Message") } }
+                Color.clear.frame(width: 44, height: 44)
+            }
+            if showsExpandButton { Color.clear.frame(width: 44, height: 44) }
+        }
+    }
+}
+
 @MainActor private final class MountedEditor {
     let window: UIWindow
-    init(_ fixture: EditorFixture) async throws {
+    convenience init(_ fixture: EditorFixture) async throws {
+        try await self.init(root: EditorAcceptanceSurface(fixture: fixture))
+    }
+    init(root: some View) async throws {
         let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
         window = UIWindow(windowScene: scene)
         window.frame = scene.coordinateSpace.bounds
         window.windowLevel = .alert + 1
-        window.rootViewController = UIHostingController(rootView: EditorAcceptanceSurface(fixture: fixture))
+        window.rootViewController = UIHostingController(rootView: root)
         window.makeKeyAndVisible()
         await settle()
         _ = textView()?.becomeFirstResponder()

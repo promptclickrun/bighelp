@@ -182,6 +182,10 @@ change in both repos.
   deletes ended chats idle past `retention_days`. Plugin 3.18.0 (`durable_sessions.py`) gives `bighelp`
   Desktop's treatment. In the app, a refresh never retires an open chat whose runtime ended: it resumes it
   (`onRetainedStreamsNeedResume`), and a chat route without its model reopens (`reopenChatRoute`).
+- **Group chats come on two paths:** a `hermes serve` dashboard answers `groups.*` on the older path,
+  v0.22.4's gateway listener on the session path; features, retry and discard, RoomLink and seatable
+  profiles differ. Go by what `groups.capabilities` and each pending action say, never the version
+  (docs/HERMES_BOT_MODE.md, vectors in `BighelpTests/Fixtures/HermesGroups`).
 - **Bot Chats are hidden in Hermes:** `GET /api/sessions` never returns them; the catalog list adds each
   agent's (`canonical_session`, `canonicalBotChat`) so a refresh can't drop it.
 - **Archived:** the catalog lists `archived=include` and keeps rows Hermes' idle sweep archived
@@ -190,6 +194,13 @@ change in both repos.
   and each reread recovers the chat's connection. Send stays on through it (`acceptsSubmissionAfterCatchUp`); a
   message sent then waits in the box until the recovery ends (`isAwaitingCatchUp`). As a turn, the recovery's idle
   readback would take it for a stale one and drop it.
+- **Who's working:** Simple Bot mode's home and the Agents screen show each agent's Bot Chat working or needing
+  you from the plugin's `agents/activity` (`native-agents-activity-v1`): Hermes' turn leases in any process
+  (the app, `message_agent`, `chat -q`) and the dashboard's open prompts, for up to 64 agents in one read.
+  `BotChatActivityStore` reads it while one of those screens shows and the app is active (3 s while something
+  works, 6 s idle), keyed by `cacheScopeID`; other gateways come from their all-hosts copies (`FleetBotChat`),
+  only while fresh. Without the route it uses the Bot Chats the app knows to be running, and says nothing
+  about updating. Never open or resume a chat to learn this.
 - **Plugin routes:**
   - Each route is a `WorkspaceOperation` case plus a `Route(path:feature:isMutation:maximumResponseBytes:)` in
     `DirectHermesNativeContext.swift`.

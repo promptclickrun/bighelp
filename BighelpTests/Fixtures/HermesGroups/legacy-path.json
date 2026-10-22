@@ -1,0 +1,700 @@
+{
+ "about": "Hermes v0.22.4 (4d04303) standalone `hermes serve` /api/ws: tui_gateway/methods_groups.py, byte-identical to v0.22.2's",
+ "capabilities": {
+  "authority_gateway_id": "install:5e551011f00dfeed5e551011f00dfeed",
+  "driver": true,
+  "features": [
+   "authority_epoch",
+   "coordinator_fencing",
+   "room_identity",
+   "monotonic_log",
+   "idempotent_send",
+   "replayable_disband",
+   "typed_events",
+   "actor_identity",
+   "log_replication",
+   "authority_takeover"
+  ],
+  "max_log_limit": 500,
+  "methods": [
+   "groups.capabilities",
+   "groups.list",
+   "groups.create",
+   "groups.state",
+   "groups.send",
+   "groups.rename",
+   "groups.log",
+   "groups.disband",
+   "groups.replicate",
+   "groups.replica_state",
+   "groups.promote",
+   "groups.demote",
+   "groups.stop",
+   "groups.retry",
+   "groups.approve",
+   "groups.peer.invite",
+   "groups.peer.revoke",
+   "groups.peer.register"
+  ],
+  "persistent_process": true,
+  "protocol_version": 2,
+  "room_link": {
+   "catalog": {
+    "attachments": false,
+    "catalog_digest": "ab00dce395a802cdbcde6c0b5b3a6513d90df618e25e8206028ef098fa8c4db0",
+    "endpoint": {
+     "available": false,
+     "reason": "not_configured"
+    },
+    "execution_policy": {
+     "approval_mode": "manual",
+     "enabled_toolsets": [
+      "bighelp",
+      "bighelp_templates",
+      "bighelp_workflows",
+      "bot_room",
+      "browser",
+      "code_execution",
+      "connections",
+      "cronjob",
+      "delegation",
+      "file",
+      "image_gen",
+      "memory",
+      "session_search",
+      "skills",
+      "terminal",
+      "todo",
+      "vision",
+      "web"
+     ],
+     "max_iterations": 3,
+     "policy_digest": "4047c6a44abac5beaab93c8f623b13d7aa938f087f3d7b8b59dce5ca001a6b86",
+     "target_profile": "default",
+     "version": 1
+    },
+    "installation_id": "install:5e551011f00dfeed5e551011f00dfeed",
+    "link_modes": [
+     "direct"
+    ],
+    "persistent_process": true,
+    "protocol_versions": [
+     2
+    ],
+    "text": true
+   },
+   "enabled": true,
+   "endpoint": {
+    "available": false,
+    "reason": "not_configured"
+   },
+   "profile": "default"
+  }
+ },
+ "crash_retry": {
+  "driver_status": {
+   "blocked": true,
+   "counts": {
+    "indeterminate": 1
+   },
+   "peer_routes": [],
+   "pending_actions": [
+    {
+     "kind": "retry",
+     "task_id": "dtask:1957bc420567b11f62612b2c8f3f4681bbc056d662357848"
+    }
+   ],
+   "running": true,
+   "working": false
+  },
+  "events": [
+   {
+    "actor": {
+     "id": "desktop",
+     "kind": "user"
+    },
+    "authority_epoch": 1,
+    "created_at": 1792632215.977333,
+    "event_id": "user:bca996f561e6526e863f642cd8f15cb8e8f147a506cfcc27a6f9be3732f6d4c5",
+    "idempotent": false,
+    "kind": "message.user",
+    "payload": {
+     "text": "SLOW @default only please",
+     "thread_id": "loopdy-crash-1611de2eb694"
+    },
+    "room_id": "crash-1611de2eb694",
+    "seq": 1
+   }
+  ],
+  "events_after": [
+   {
+    "actor": {
+     "id": "default",
+     "kind": "member",
+     "profile": "default"
+    },
+    "authority_epoch": 1,
+    "created_at": 1792632311.657878,
+    "event_id": "dmessage:1957bc420567b11f62612b2c8f3f4681bbc056d662357848",
+    "idempotent": false,
+    "kind": "message.member",
+    "payload": {
+     "discussion_event_id": "user:bca996f561e6526e863f642cd8f15cb8e8f147a506cfcc27a6f9be3732f6d4c5",
+     "member_id": "default",
+     "member_index": 0,
+     "round_index": 0,
+     "task_id": "dtask:1957bc420567b11f62612b2c8f3f4681bbc056d662357848",
+     "text": "Canned reply from fake-alpha. This one took a while.",
+     "thread_id": "loopdy-crash-1611de2eb694",
+     "turn_id": "d1.r0.p0.s1.mfa926e1907f4fe8540b0d0f2"
+    },
+    "room_id": "crash-1611de2eb694",
+    "seq": 2
+   },
+   {
+    "actor": {
+     "id": "install:5e551011f00dfeed5e551011f00dfeed",
+     "kind": "gateway"
+    },
+    "authority_epoch": 1,
+    "created_at": 1792632311.670588,
+    "event_id": "dterminal:1957bc420567b11f62612b2c8f3f4681bbc056d662357848",
+    "idempotent": false,
+    "kind": "turn.settled",
+    "payload": {
+     "discussion_event_id": "user:bca996f561e6526e863f642cd8f15cb8e8f147a506cfcc27a6f9be3732f6d4c5",
+     "member_id": "default",
+     "member_index": 0,
+     "message_event_id": "dmessage:1957bc420567b11f62612b2c8f3f4681bbc056d662357848",
+     "passed": false,
+     "round_index": 0,
+     "seen_through_seq": 1,
+     "task_id": "dtask:1957bc420567b11f62612b2c8f3f4681bbc056d662357848",
+     "thread_id": "loopdy-crash-1611de2eb694",
+     "turn_id": "d1.r0.p0.s1.mfa926e1907f4fe8540b0d0f2"
+    },
+    "room_id": "crash-1611de2eb694",
+    "seq": 3
+   }
+  ],
+  "params": {
+   "room_id": "crash-1611de2eb694",
+   "task_id": "dtask:1957bc420567b11f62612b2c8f3f4681bbc056d662357848"
+  },
+  "reply": {
+   "retried": true,
+   "task": {
+    "cancel_generation": 0,
+    "execution_generation": 1,
+    "room_id": "crash-1611de2eb694",
+    "status": "queued",
+    "task_id": "dtask:1957bc420567b11f62612b2c8f3f4681bbc056d662357848",
+    "thread_id": "loopdy-crash-1611de2eb694",
+    "turn_id": "d1.r0.p0.s1.mfa926e1907f4fe8540b0d0f2"
+   }
+  }
+ },
+ "create": {
+  "params": {
+   "members": [
+    {
+     "handle": "default",
+     "member_id": "default",
+     "profile": "default",
+     "target": {
+      "kind": "local",
+      "profile": "default"
+     }
+    },
+    {
+     "handle": "nova",
+     "member_id": "nova",
+     "profile": "nova",
+     "target": {
+      "kind": "local",
+      "profile": "nova"
+     }
+    }
+   ],
+   "name": "Probe room",
+   "room_id": "probe-84f6ffed7b07"
+  },
+  "reply": {
+   "room": {
+    "authority_epoch": 1,
+    "authority_gateway_id": "install:5e551011f00dfeed5e551011f00dfeed",
+    "created_at": 1792631193.2042282,
+    "idempotent": false,
+    "members": [
+     {
+      "handle": "default",
+      "member_id": "default",
+      "profile": "default",
+      "target": {
+       "kind": "local",
+       "profile": "default"
+      }
+     },
+     {
+      "handle": "nova",
+      "member_id": "nova",
+      "profile": "nova",
+      "target": {
+       "kind": "local",
+       "profile": "nova"
+      }
+     }
+    ],
+    "name": "Probe room",
+    "revision": 1,
+    "room_id": "probe-84f6ffed7b07",
+    "updated_at": 1792631193.2042282
+   }
+  }
+ },
+ "disband": {
+  "tombstone": {
+   "disbanded_at": 1792631295.301358,
+   "event": {
+    "actor": {
+     "id": "room-control",
+     "kind": "system"
+    },
+    "authority_epoch": 1,
+    "created_at": 1792631295.301358,
+    "event_id": "system:room-disbanded",
+    "idempotent": false,
+    "kind": "room.disbanded",
+    "payload": {
+     "room_id": "probe-84f6ffed7b07"
+    },
+    "room_id": "probe-84f6ffed7b07",
+    "seq": 11
+   },
+   "idempotent": false,
+   "room_id": "probe-84f6ffed7b07"
+  }
+ },
+ "list": {
+  "next_offset": null,
+  "rooms": [
+   {
+    "authority_epoch": 1,
+    "authority_gateway_id": "install:5e551011f00dfeed5e551011f00dfeed",
+    "created_at": 1792631193.2042282,
+    "idempotent": false,
+    "latest_seq": 0,
+    "members": [
+     {
+      "handle": "default",
+      "member_id": "default",
+      "profile": "default",
+      "target": {
+       "kind": "local",
+       "profile": "default"
+      }
+     },
+     {
+      "handle": "nova",
+      "member_id": "nova",
+      "profile": "nova",
+      "target": {
+       "kind": "local",
+       "profile": "nova"
+      }
+     }
+    ],
+    "name": "Probe room",
+    "revision": 1,
+    "room_id": "probe-84f6ffed7b07",
+    "updated_at": 1792631193.2042282
+   }
+  ]
+ },
+ "log": {
+  "authority": {
+   "epoch": 1,
+   "gateway_id": "install:5e551011f00dfeed5e551011f00dfeed"
+  },
+  "cursor": 9,
+  "events": [
+   {
+    "actor": {
+     "id": "desktop",
+     "kind": "user"
+    },
+    "authority_epoch": 1,
+    "created_at": 1792631193.27201,
+    "event_id": "user:20c59d5b787956d8fe1cb70986029fb792b7677db1f3dfc2e194eb7ab5705f84",
+    "idempotent": false,
+    "kind": "message.user",
+    "payload": {
+     "text": "Hello both of you",
+     "thread_id": "loopdy-probe-84f6ffed7b07"
+    },
+    "room_id": "probe-84f6ffed7b07",
+    "seq": 1
+   },
+   {
+    "actor": {
+     "id": "default",
+     "kind": "member",
+     "profile": "default"
+    },
+    "authority_epoch": 1,
+    "created_at": 1792631195.961098,
+    "event_id": "dmessage:8070980f5c8bba681fd96427e6817c06f5e819893c2a2368",
+    "idempotent": false,
+    "kind": "message.member",
+    "payload": {
+     "discussion_event_id": "user:20c59d5b787956d8fe1cb70986029fb792b7677db1f3dfc2e194eb7ab5705f84",
+     "member_id": "default",
+     "member_index": 0,
+     "round_index": 0,
+     "task_id": "dtask:8070980f5c8bba681fd96427e6817c06f5e819893c2a2368",
+     "text": "Canned reply from fake-alpha.",
+     "thread_id": "loopdy-probe-84f6ffed7b07",
+     "turn_id": "d1.r0.p0.s1.mfa926e1907f4fe8540b0d0f2"
+    },
+    "room_id": "probe-84f6ffed7b07",
+    "seq": 2
+   },
+   {
+    "actor": {
+     "id": "install:5e551011f00dfeed5e551011f00dfeed",
+     "kind": "gateway"
+    },
+    "authority_epoch": 1,
+    "created_at": 1792631195.9823492,
+    "event_id": "dterminal:8070980f5c8bba681fd96427e6817c06f5e819893c2a2368",
+    "idempotent": false,
+    "kind": "turn.settled",
+    "payload": {
+     "discussion_event_id": "user:20c59d5b787956d8fe1cb70986029fb792b7677db1f3dfc2e194eb7ab5705f84",
+     "member_id": "default",
+     "member_index": 0,
+     "message_event_id": "dmessage:8070980f5c8bba681fd96427e6817c06f5e819893c2a2368",
+     "passed": false,
+     "round_index": 0,
+     "seen_through_seq": 1,
+     "task_id": "dtask:8070980f5c8bba681fd96427e6817c06f5e819893c2a2368",
+     "thread_id": "loopdy-probe-84f6ffed7b07",
+     "turn_id": "d1.r0.p0.s1.mfa926e1907f4fe8540b0d0f2"
+    },
+    "room_id": "probe-84f6ffed7b07",
+    "seq": 3
+   },
+   {
+    "actor": {
+     "id": "nova",
+     "kind": "member",
+     "profile": "nova"
+    },
+    "authority_epoch": 1,
+    "created_at": 1792631198.020544,
+    "event_id": "dmessage:fca4add4e5d3c4d5c78188277b142521db8e2b0be69fe7ad",
+    "idempotent": false,
+    "kind": "message.member",
+    "payload": {
+     "discussion_event_id": "user:20c59d5b787956d8fe1cb70986029fb792b7677db1f3dfc2e194eb7ab5705f84",
+     "member_id": "nova",
+     "member_index": 1,
+     "round_index": 0,
+     "task_id": "dtask:fca4add4e5d3c4d5c78188277b142521db8e2b0be69fe7ad",
+     "text": "Canned reply from fake-beta.",
+     "thread_id": "loopdy-probe-84f6ffed7b07",
+     "turn_id": "d1.r0.p1.s2.m9e844e4b6cf675a44e0491d9"
+    },
+    "room_id": "probe-84f6ffed7b07",
+    "seq": 4
+   },
+   {
+    "actor": {
+     "id": "install:5e551011f00dfeed5e551011f00dfeed",
+     "kind": "gateway"
+    },
+    "authority_epoch": 1,
+    "created_at": 1792631198.0303428,
+    "event_id": "dterminal:fca4add4e5d3c4d5c78188277b142521db8e2b0be69fe7ad",
+    "idempotent": false,
+    "kind": "turn.settled",
+    "payload": {
+     "discussion_event_id": "user:20c59d5b787956d8fe1cb70986029fb792b7677db1f3dfc2e194eb7ab5705f84",
+     "member_id": "nova",
+     "member_index": 1,
+     "message_event_id": "dmessage:fca4add4e5d3c4d5c78188277b142521db8e2b0be69fe7ad",
+     "passed": false,
+     "round_index": 0,
+     "seen_through_seq": 2,
+     "task_id": "dtask:fca4add4e5d3c4d5c78188277b142521db8e2b0be69fe7ad",
+     "thread_id": "loopdy-probe-84f6ffed7b07",
+     "turn_id": "d1.r0.p1.s2.m9e844e4b6cf675a44e0491d9"
+    },
+    "room_id": "probe-84f6ffed7b07",
+    "seq": 5
+   },
+   {
+    "actor": {
+     "id": "install:5e551011f00dfeed5e551011f00dfeed",
+     "kind": "gateway"
+    },
+    "authority_epoch": 1,
+    "created_at": 1792631198.067049,
+    "event_id": "dactivity:user:20c59d5b787956d8fe1cb70986029fb792b7677db1f3dfc2e194eb7ab5705f84:silent_round",
+    "idempotent": false,
+    "kind": "room.activity",
+    "payload": {
+     "discussion_event_id": "user:20c59d5b787956d8fe1cb70986029fb792b7677db1f3dfc2e194eb7ab5705f84",
+     "reason_code": "silent_round",
+     "status": "settled",
+     "thread_id": "loopdy-probe-84f6ffed7b07"
+    },
+    "room_id": "probe-84f6ffed7b07",
+    "seq": 6
+   },
+   {
+    "actor": {
+     "id": "desktop",
+     "kind": "user"
+    },
+    "authority_epoch": 1,
+    "created_at": 1792631199.3794591,
+    "event_id": "user:72e61ecad4a8339a52338ec2c850469126eaf8909a82ff204bac19c8f9053589",
+    "idempotent": false,
+    "kind": "message.user",
+    "payload": {
+     "text": "SLOW please take your time",
+     "thread_id": "loopdy-probe-84f6ffed7b07"
+    },
+    "room_id": "probe-84f6ffed7b07",
+    "seq": 7
+   },
+   {
+    "actor": {
+     "id": "install:5e551011f00dfeed5e551011f00dfeed",
+     "kind": "gateway"
+    },
+    "authority_epoch": 1,
+    "created_at": 1792631204.49439,
+    "event_id": "room-stop:db578cc8c1bdf8809974ec607d57d7a2",
+    "idempotent": false,
+    "kind": "room.stop_requested",
+    "payload": {
+     "cancel_id": "cancel-675f314767bc4d9080cf9d1061f6fefe"
+    },
+    "room_id": "probe-84f6ffed7b07",
+    "seq": 8
+   },
+   {
+    "actor": {
+     "id": "install:5e551011f00dfeed5e551011f00dfeed",
+     "kind": "gateway"
+    },
+    "authority_epoch": 1,
+    "created_at": 1792631204.726184,
+    "event_id": "dterminal:168a45d09d62c419a6d844e2d0411c09c24d14cfa8a21dfd",
+    "idempotent": false,
+    "kind": "turn.cancelled",
+    "payload": {
+     "discussion_event_id": "user:72e61ecad4a8339a52338ec2c850469126eaf8909a82ff204bac19c8f9053589",
+     "member_id": "default",
+     "member_index": 0,
+     "reason": "member turn cancelled",
+     "round_index": 0,
+     "seen_through_seq": 7,
+     "task_id": "dtask:168a45d09d62c419a6d844e2d0411c09c24d14cfa8a21dfd",
+     "thread_id": "loopdy-probe-84f6ffed7b07",
+     "turn_id": "d7.r0.p0.s7.mfa926e1907f4fe8540b0d0f2"
+    },
+    "room_id": "probe-84f6ffed7b07",
+    "seq": 9
+   }
+  ],
+  "has_more": false,
+  "latest_seq": 9
+ },
+ "retry_refusals": [
+  {
+   "error": {
+    "code": 5118,
+    "message": "no retryable room task matches task_id"
+   },
+   "params": {
+    "room_id": "probe-84f6ffed7b07",
+    "task_id": "dtask:none"
+   }
+  },
+  {
+   "error": {
+    "code": 4000,
+    "message": "invalid params for groups.retry: member_id: Extra inputs are not permitted \u2014 the client and the Hermes backend are out of sync (different versions); run `hermes update` and restart both"
+   },
+   "params": {
+    "execution_generation": 1,
+    "member_id": "default",
+    "room_id": "probe-84f6ffed7b07",
+    "task_id": "dtask:none"
+   }
+  }
+ ],
+ "send": {
+  "params": {
+   "event_id": "evt-d606bf9215df4e929e58bc4bdd02cc55",
+   "payload": {
+    "text": "Hello both of you",
+    "thread_id": "loopdy-probe-84f6ffed7b07"
+   },
+   "room_id": "probe-84f6ffed7b07"
+  },
+  "reply": {
+   "accepted": true,
+   "client_event_id": "evt-d606bf9215df4e929e58bc4bdd02cc55",
+   "driver_started": true,
+   "event": {
+    "actor": {
+     "id": "desktop",
+     "kind": "user"
+    },
+    "authority_epoch": 1,
+    "created_at": 1792631193.27201,
+    "event_id": "user:20c59d5b787956d8fe1cb70986029fb792b7677db1f3dfc2e194eb7ab5705f84",
+    "idempotent": false,
+    "kind": "message.user",
+    "payload": {
+     "text": "Hello both of you",
+     "thread_id": "loopdy-probe-84f6ffed7b07"
+    },
+    "room_id": "probe-84f6ffed7b07",
+    "seq": 1
+   }
+  }
+ },
+ "state": {
+  "driver_status": {
+   "blocked": false,
+   "counts": {},
+   "peer_routes": [],
+   "pending_actions": [],
+   "running": true,
+   "working": false
+  },
+  "room": {
+   "authority_epoch": 1,
+   "authority_gateway_id": "install:5e551011f00dfeed5e551011f00dfeed",
+   "created_at": 1792631193.2042282,
+   "idempotent": false,
+   "latest_seq": 0,
+   "members": [
+    {
+     "handle": "default",
+     "member_id": "default",
+     "profile": "default",
+     "target": {
+      "kind": "local",
+      "profile": "default"
+     }
+    },
+    {
+     "handle": "nova",
+     "member_id": "nova",
+     "profile": "nova",
+     "target": {
+      "kind": "local",
+      "profile": "nova"
+     }
+    }
+   ],
+   "name": "Probe room",
+   "revision": 1,
+   "room_id": "probe-84f6ffed7b07",
+   "updated_at": 1792631193.2042282
+  }
+ },
+ "state_disbanded": {
+  "room": {
+   "authority_epoch": 1,
+   "authority_gateway_id": "install:5e551011f00dfeed5e551011f00dfeed",
+   "created_at": 1792631193.2042282,
+   "disbanded_at": 1792631295.301358,
+   "idempotent": false,
+   "latest_seq": 11,
+   "members": [
+    {
+     "handle": "default",
+     "member_id": "default",
+     "profile": "default",
+     "target": {
+      "kind": "local",
+      "profile": "default"
+     }
+    },
+    {
+     "handle": "nova",
+     "member_id": "nova",
+     "profile": "nova",
+     "target": {
+      "kind": "local",
+      "profile": "nova"
+     }
+    }
+   ],
+   "name": "Probe room",
+   "revision": 2,
+   "room_id": "probe-84f6ffed7b07",
+   "updated_at": 1792631295.301358
+  }
+ },
+ "state_running": {
+  "driver_status": {
+   "blocked": false,
+   "counts": {
+    "running": 1,
+    "settled": 2
+   },
+   "peer_routes": [],
+   "pending_actions": [],
+   "running": true,
+   "working": true
+  },
+  "room": {
+   "authority_epoch": 1,
+   "authority_gateway_id": "install:5e551011f00dfeed5e551011f00dfeed",
+   "created_at": 1792631193.2042282,
+   "idempotent": false,
+   "latest_seq": 7,
+   "members": [
+    {
+     "handle": "default",
+     "member_id": "default",
+     "profile": "default",
+     "target": {
+      "kind": "local",
+      "profile": "default"
+     }
+    },
+    {
+     "handle": "nova",
+     "member_id": "nova",
+     "profile": "nova",
+     "target": {
+      "kind": "local",
+      "profile": "nova"
+     }
+    }
+   ],
+   "name": "Probe room",
+   "revision": 1,
+   "room_id": "probe-84f6ffed7b07",
+   "updated_at": 1792631199.3794591
+  }
+ },
+ "stop": {
+  "params": {
+   "cancel_id": "cancel-675f314767bc4d9080cf9d1061f6fefe",
+   "room_id": "probe-84f6ffed7b07"
+  },
+  "reply": {
+   "cancelled": 1
+  }
+ }
+}

@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import SwiftUI
 
 /// Main's notification implementation must verify the authenticated plugin
 /// capability and recipient grant. Installed/configured-enabled is not readiness.
@@ -510,12 +511,27 @@ final class HostNotificationSetupModel {
                 host.notificationState = .outcomeUnknown
                 try? registry.update(host)
             }
+        case .installed where enrollNotifications:
+            // Notification setup was still running. It stops at its next check, so say so with
+            // a code, not "Finishing setup…" with nothing left to finish it.
+            let named = BighelpNotificationSetupFailure(.interrupted, step: .contextCheck,
+                                                        kind: .check("left_during_setup"), state: .outcomeUnknown)
+            note(named)
+            state = .outcomeUnknown
+            host.notificationState = .outcomeUnknown
+            try? registry.update(host)
         case .checking:
             state = enrollNotifications ? host.notificationState : .notConfigured
         default:
             break
         }
         // Persisted install/toggle intent remains for readback. Never replay it.
+    }
+
+    /// The app left the foreground or came back. Only going to the background stops setup: the
+    /// iOS notification prompt makes the app inactive in the middle of it (#443).
+    func sceneChanged(to phase: ScenePhase) {
+        if phase == .background { cancel() }
     }
 
     /// Set Up Again: clears this computer's notification setup on every side (the

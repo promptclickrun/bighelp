@@ -228,7 +228,7 @@ Some problems do not go away when you try again. For these problems, bighelp doe
 
 | Code | What happened | What to do | What we need |
 |---|---|---|---|
-| NS-901 | Something changed during setup, for example a different computer or agent, or bighelp went to the background. | Try again. | Nothing. |
+| NS-901 | Something changed during setup, for example a different computer or agent. Or bighelp went to the background, or you closed the setup screen. | Try again. | Nothing. |
 | NS-902 | Setup already runs for this computer. | Wait for setup to finish. | Nothing. |
 | NS-903 | bighelp found a problem in its own code. | Update bighelp. | The code and its details. |
 | NS-999 | An unknown problem stopped setup. | Try again. | If the problem continues, the code and its details. |

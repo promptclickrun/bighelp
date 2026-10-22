@@ -392,7 +392,7 @@ private final class PersistedNativeRoomClient: HermesBotModeClient {
         guard roomID == state.roomID else { throw BotModeRoomError.roomNotFound }
     }
 
-    func groupsRetry(roomID: String, taskID _: String) async throws -> HermesBotModeRetryResult {
+    func groupsRetry(roomID: String, taskID _: String, attempt _: HermesBotModeRetryAttempt?) async throws -> HermesBotModeRetryResult {
         guard roomID == state.roomID else { throw BotModeRoomError.roomNotFound }
         throw BotModeRoomError.noRetryableFailure
     }

@@ -46,6 +46,42 @@ final class ComposerInteractionUITests: BighelpUITestCase {
         saveComposer("composer-typing-light", app)
     }
 
+    /// #515: once a draft wraps, the expand button stays and the box keeps its width on every key.
+    @MainActor
+    func testWrappedDraftKeepsTheBoxStillWhileTyping() throws {
+        let app = makeApp()
+        app.launchArguments = [
+            "-use-demo-fixtures", "-disable-demo-delays", "-start-chat", "-preview-ui-v3",
+            "-loopdy.appearance.interface-version", "v3", "-loopdy.demo.appearance", "light"
+        ]
+        app.launch()
+        let input = app.textViews["Message"]
+        XCTAssertTrue(input.waitForExistence(timeout: 10))
+        input.tap()
+        let field = app.otherElements["chat.composer.field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        let expand = app.buttons["chat.composer.expand"]
+        let text = "Please read the notes from the garden club and write a short summary of the plans for the spring plant sale with every date"
+        var wrappedWidth: CGFloat?
+        var index = text.startIndex
+        while index < text.endIndex {
+            let next = text.index(index, offsetBy: 3, limitedBy: text.endIndex) ?? text.endIndex
+            input.typeText(String(text[index..<next]))
+            index = next
+            if let width = wrappedWidth {
+                XCTAssertTrue(expand.exists, "The expand button stays once the draft wraps")
+                XCTAssertEqual(field.frame.width, width, accuracy: 1, "The box keeps its width while typing")
+            } else if expand.exists {
+                wrappedWidth = field.frame.width
+            }
+        }
+        XCTAssertNotNil(wrappedWidth, "A long draft wraps and offers the expand button")
+        saveComposer("composer-wrapped-light", app)
+        input.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: text.count))
+        XCTAssertTrue(input.waitForExistence(timeout: 2))
+        XCTAssertFalse(expand.exists, "An empty draft has no expand button")
+    }
+
     @MainActor
     private func saveComposer(_ name: String, _ app: XCUIApplication) {
         guard let folder = ProcessInfo.processInfo.environment["BIGHELP_COMPOSER_EVIDENCE"] else { return }

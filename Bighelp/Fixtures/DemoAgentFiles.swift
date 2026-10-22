@@ -203,6 +203,108 @@ final class SimpleBotDemoFiles: SimpleBotFilesSource {
     """
 }
 
+/// The full app's Files on the demo data: each agent's own folder from `SimpleBotDemoFiles`, answered
+/// in the bighelp plugin's workspace-files shapes, so the real browser and its checks run on it. No
+/// agent (Nerd Mode's Artifacts) is the agent serving the plugin, the one in Hermes' workspace folder.
+@MainActor
+struct DemoConfiguredWorkspace: ConfiguredWorkspaceSource {
+    static let servingAgentID = "finance"
+
+    func open(_ target: WorkspaceFilesTarget,
+              currentOwner: @escaping @MainActor () -> WorkspaceOwner?) async throws -> ConfiguredWorkspace {
+        let files = DemoWorkspaceFiles(agentID: target.agentID ?? Self.servingAgentID, owner: target.owner,
+                                       currentOwner: currentOwner)
+        let listing = try await files.perform(.filesList, payload: ["path": .string(files.root)], owner: target.owner)
+        let scope = try DirectHermesWorkspaceFileScope.pluginReported(workspaceListing: listing, owner: target.owner)
+        return .init(target: target, scope: scope, performer: files, validateScope: { scope })
+    }
+
+    /// The demo always finds its agents' folders.
+    func folderChooser(for target: WorkspaceFilesTarget) -> WorkspaceFolderChooser? { nil }
+}
+
+/// One demo agent's folder, answered the way the plugin's `workspace-files` routes answer.
+@MainActor
+final class DemoWorkspaceFiles: WorkspaceOperationPerforming {
+    let root: String
+    private let agentID: String
+    private let capturedOwner: WorkspaceOwner
+    private let currentOwner: @MainActor () -> WorkspaceOwner?
+    private let files = SimpleBotDemoFiles()
+
+    init(agentID: String, owner: WorkspaceOwner, currentOwner: @escaping @MainActor () -> WorkspaceOwner?) {
+        self.agentID = agentID
+        root = SimpleBotDemoFiles.root(for: agentID)
+        capturedOwner = owner
+        self.currentOwner = currentOwner
+    }
+
+    var owner: WorkspaceOwner? { currentOwner() == capturedOwner ? capturedOwner : nil }
+    var capabilities: WorkspaceCapabilities { .disconnected }
+
+    func perform(_ operation: WorkspaceOperation, payload: [String: BighelpJSONValue],
+                 owner expectedOwner: WorkspaceOwner) async throws -> [String: BighelpJSONValue] {
+        guard expectedOwner == capturedOwner, owner == capturedOwner else { throw WorkspaceClientError.ownerChanged }
+        switch operation {
+        case .filesList:
+            guard payload.count == 1, let path = payload["path"]?.string else { throw WorkspaceClientError.invalidRequest }
+            let folder = try await files.list(agentID: agentID, path: path)
+            return reply(path: folder.path, parent: folder.parent, entries: folder.files)
+        case .filesRecent:
+            // Like the plugin's: the folder's files, newest first.
+            let recent = try await allFiles(in: root).sorted { $0.modifiedAt > $1.modifiedAt }
+            return reply(path: root, parent: nil, entries: recent)
+        case .filesRead:
+            guard payload.count == 1, let path = payload["path"]?.string else { throw WorkspaceClientError.invalidRequest }
+            let folder = try await files.list(agentID: agentID, path: (path as NSString).deletingLastPathComponent)
+            guard let file = folder.files.first(where: { $0.path == path && !$0.isDirectory }) else {
+                throw DirectHermesManagedFilesError.invalidPath
+            }
+            let bytes = try await files.download(agentID: agentID, file: file).bytes
+            let mimeType = file.mimeType ?? "application/octet-stream"
+            return policy.merging([
+                "path": .string(path), "size": .integer(bytes.count), "mime_type": .string(mimeType),
+                "data_url": .string("data:\(mimeType);base64," + bytes.base64EncodedString()),
+            ]) { $1 }
+        default:
+            throw WorkspaceClientError.unavailable(.unsupportedOperation)
+        }
+    }
+
+    /// Locked to the agent's own folder, as the plugin locks it.
+    private var policy: [String: BighelpJSONValue] {
+        ["root": .string(root), "locked_root": .string(root), "can_change_path": .boolean(false)]
+    }
+
+    private func reply(path: String, parent: String?, entries: [HermesManagedFile]) -> [String: BighelpJSONValue] {
+        policy.merging([
+            "workspace": .object(["root": .string(root), "source": .string("terminal.cwd"),
+                                  "profileId": .string(agentID)]),
+            "path": .string(path), "parent": parent.map(BighelpJSONValue.string) ?? .null,
+            "entries": .array(entries.map { file in
+                .object([
+                    "name": .string(file.name), "path": .string(file.path), "is_directory": .boolean(file.isDirectory),
+                    "size": file.byteCount.map(BighelpJSONValue.integer) ?? .null,
+                    "mime_type": file.mimeType.map(BighelpJSONValue.string) ?? .null,
+                    "mtime": .number(file.modifiedAt.timeIntervalSince1970),
+                ])
+            }),
+        ]) { $1 }
+    }
+
+    private func allFiles(in folder: String) async throws -> [HermesManagedFile] {
+        var found: [HermesManagedFile] = []
+        for file in try await files.list(agentID: agentID, path: folder).files {
+            if file.isDirectory {
+                found += try await allFiles(in: file.path)
+            } else {
+                found.append(file)
+            }
+        }
+        return found
+    }
+}
+
 /// The demo bots' photos and videos from their chats, drawn on the phone from made-up numbers.
 @MainActor
 final class DemoAgentMediaClient: AgentMediaClient {

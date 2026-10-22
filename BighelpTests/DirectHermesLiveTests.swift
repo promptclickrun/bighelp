@@ -131,6 +131,139 @@ final class DirectHermesLiveTests: XCTestCase {
         if let failure { throw failure }
     }
 
+    /// #517 on a real host: Hermes applies a stop whose answer the app never
+    /// sees, and the room log settles it; Stop again with the saved cancel ID
+    /// is still one stop; a saved stop never holds the next message.
+    /// `BIGHELP_LIVE_ROOM_NO_TURNS=1` (a host whose agents must not run) uses
+    /// two existing profiles and skips the message, the only step that starts
+    /// member turns.
+    @MainActor
+    func testRealHostedRoomStopWithALostAnswerSettlesFromTheLog() async throws {
+        let config = try configuration()
+        let environment = ProcessInfo.processInfo.environment
+        guard environment["BIGHELP_LIVE_ROOM_STOP"] == "1" else {
+            throw XCTSkip("Run explicitly against a disposable host")
+        }
+        let startsNoTurns = environment["BIGHELP_LIVE_ROOM_NO_TURNS"] == "1"
+        let vault = DirectHermesKeychainVault(service: "app.loopdy.room-stop-proof." + UUID().uuidString)
+        defer { try? vault.delete() }
+        let auth: DirectHermesAuthInput = config["auth_mode"] == "dashboard"
+            ? .dashboard : .token(try XCTUnwrap(config["token"]))
+        let transport = try await DirectHermesClient.connect(
+            address: XCTUnwrap(config["address"]), auth: auth, allowPrivateHTTP: true, vault: vault
+        )
+        let owner = WorkspaceOwner(authority: try XCTUnwrap(transport.savedConnection.workspaceAuthority),
+            authenticationGeneration: UUID(), connectionGeneration: UUID())
+        let workspace = DirectHermesWorkspaceClient(rpc: transport, http: transport, owner: owner,
+            capabilities: .init(owner: owner, values: Dictionary(uniqueKeysWithValues:
+                WorkspaceCapability.allCases.map { ($0, .available) })), currentOwner: { owner })
+        let client = HermesHostedRoomClient(workspace: workspace, owner: owner)
+        let store = BotModeRoomStore(client: NativeWorkspaceUnavailableClient(), executionEnabled: false, nativeClient: client)
+        let roomID = "bighelp-stop-proof-" + UUID().uuidString.lowercased()
+        var created = false
+        var failure: Error?
+        do {
+            let profiles: [String]
+            if startsNoTurns {
+                let listed = try await transport.request("profiles.list", params: ["include_sessions": .boolean(false)])
+                let names = (listed.object?["profiles"]?.array ?? []).compactMap { $0.object?["name"]?.string }
+                profiles = ["default", try XCTUnwrap(names.first { $0 != "default" && HermesBotModeWireCodec.identifier($0) })]
+            } else {
+                _ = try? await transport.request("profiles.create", params: ["name": .string("stopcheck")])
+                profiles = ["default", "stopcheck"]
+            }
+            print("ROOM_STOP_PROFILES \(profiles)")
+            let capabilities = try await client.groupsCapabilities()
+            XCTAssertTrue(capabilities.supportsNativeExecution)
+            let members = profiles.map {
+                HermesBotModeRoomMember(memberID: $0, profile: $0, handle: $0,
+                                        target: ["kind": .string("local"), "profile": .string($0)])
+            }
+            created = true
+            _ = try await client.groupsCreate(roomID: roomID, name: "bighelp temporary stop check", members: members)
+            _ = try await store.openNativeRoom(roomID: roomID)
+
+            // Hermes applies the stop; the app never sees its answer.
+            var room = try XCTUnwrap(store.room(id: roomID))
+            room.setNativeCancelIntent("loopdy-stop-lost-answer")
+            try store.persist(room: room)
+            let answer = try await transport.request("groups.stop", params: [
+                "room_id": .string(roomID), "cancel_id": .string("loopdy-stop-lost-answer"),
+            ])
+            print("ROOM_STOP_ANSWER \(liveJSON(answer))")
+            try await store.syncNativeRoom(roomID: roomID)
+            XCTAssertNil(store.room(id: roomID)?.nativePendingCancelID, "The room log settles the lost answer")
+            print("ROOM_STOP_STAGE settled_from_log")
+
+            // An older app read past that stop without settling it. Stop
+            // again sends the same cancel ID, and Hermes keeps one stop.
+            room = try XCTUnwrap(store.room(id: roomID))
+            room.setNativeCancelIntent("loopdy-stop-lost-answer")
+            try store.persist(room: room)
+            try await store.stopNativeRoom(roomID: roomID)
+            XCTAssertNil(store.room(id: roomID)?.nativePendingCancelID)
+            let log = try await transport.request("groups.log", params: [
+                "room_id": .string(roomID), "since_seq": .integer(0), "limit": .integer(500),
+                "include_disbanded": .boolean(false),
+            ])
+            let stops = (log.object?["events"]?.array ?? []).filter {
+                $0.object?["kind"]?.string == "room.stop_requested"
+                    && $0.object?["payload"]?.object?["cancel_id"]?.string == "loopdy-stop-lost-answer"
+            }
+            XCTAssertEqual(stops.count, 1, "Stop again with the saved cancel ID is the same stop")
+            print("ROOM_STOP_EVENT \(liveJSON(stops.first ?? .null))")
+            print("ROOM_STOP_STAGE stop_again_same_event")
+            if startsNoTurns { throw LiveRoomStopDone() }
+
+            // A stop that never reached Hermes doesn't hold the next message.
+            room = try XCTUnwrap(store.room(id: roomID))
+            room.setNativeCancelIntent("loopdy-stop-never-sent")
+            try store.persist(room: room)
+            let marker = "BIGHELP_STOP_PROOF_NEXT_MESSAGE"
+            let sending = Task { @MainActor in try await store.send(text: "@default \(marker)", roomID: roomID) }
+            let deadline = ContinuousClock.now.advanced(by: .seconds(60))
+            while ContinuousClock.now < deadline, store.room(id: roomID)?.nativePendingDiscussionEventID == nil,
+                  store.room(id: roomID)?.visibleEvents.contains(where: { $0.text?.contains(marker) == true }) != true {
+                try await Task.sleep(for: .milliseconds(100))
+            }
+            XCTAssertNil(store.room(id: roomID)?.nativePendingCancelID)
+            try await store.stopNativeRoom(roomID: roomID)
+            _ = await sending.result
+            let afterSend = try await transport.request("groups.log", params: [
+                "room_id": .string(roomID), "since_seq": .integer(0), "limit": .integer(500),
+                "include_disbanded": .boolean(false),
+            ])
+            let delivered = (afterSend.object?["events"]?.array ?? []).contains {
+                $0.object?["kind"]?.string == "message.user"
+                    && $0.object?["payload"]?.object?["text"]?.string?.contains(marker) == true
+            }
+            XCTAssertTrue(delivered, "The next message reached Hermes")
+            XCTAssertNil(store.room(id: roomID)?.nativePendingCancelID)
+            XCTAssertEqual(store.room(id: roomID)?.isRunning, false)
+            print("ROOM_STOP_STAGE next_message_sent")
+        } catch is LiveRoomStopDone {
+        } catch { failure = error }
+        store.configureNativeClient(nil)
+        if created {
+            if !startsNoTurns {
+                _ = try? await transport.request("groups.stop", params: ["room_id": .string(roomID), "cancel_id": .string("cleanup-" + roomID)])
+            }
+            _ = try? await transport.request("groups.disband", params: ["room_id": .string(roomID)])
+            let state = try? await transport.request("groups.state", params: ["room_id": .string(roomID), "include_disbanded": .boolean(true)])
+            print("ROOM_STOP_CLEANUP room=\(roomID) disbanded=\(state?.object?["room"]?.object?["disbanded_at"]?.number != nil)")
+        }
+        await transport.disconnect()
+        if let failure { throw failure }
+    }
+
+    private struct LiveRoomStopDone: Error {}
+
+    private func liveJSON(_ value: BighelpJSONValue) -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        return (try? encoder.encode(value)).flatMap { String(data: $0, encoding: .utf8) } ?? "?"
+    }
+
     @MainActor
     func testRealNativeMediaBytesAndRestoredDelivery() async throws {
         let config = try configuration()

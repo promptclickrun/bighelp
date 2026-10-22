@@ -105,7 +105,7 @@ extension ChatModel {
         guard !isAwaitingAuthoritativeSessionAllocation, !isBotMode || botModeExecutionEnabled,
               botModeRoom?.isRunning != true, botModeRoom?.nativePendingEventID == nil,
               !hasNativeBotModeRetryActions, botModeRoom?.nativeRetryJournal == nil,
-              botModeRoom?.nativePendingCancelID == nil,
+              !isBotModeStopInFlight,
               !referenceOwnerRetired, referenceSubmission == nil, !referenceSendInFlight,
               !hasExclusiveMidSessionSubmission, !isPDFDraftSendInFlight else { return false }
         return !isSending || isMidSessionTurnLive
@@ -363,7 +363,10 @@ extension ChatModel {
                 guard isCurrentOwner(generation) else { return }
             } catch {
                 guard isCurrentOwner(generation) else { return }
-                failureMessage = "The active turn could not be stopped. Try again."
+                // A saved cancel ID shows its own row with Stop again.
+                if botModeRoom?.nativePendingCancelID == nil {
+                    failureMessage = "The active turn could not be stopped. Try again."
+                }
             }
             isStopping = false
             return

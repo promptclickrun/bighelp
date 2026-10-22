@@ -384,6 +384,12 @@ text is SF Pro, as everywhere.
   menus, chats or blinking, and every bot and group chat drags into place, on top (the primary bot too) or in
   the list. Save keeps the order per computer (`SimpleBotsOrderStore`); a bot or group chat not placed yet leads
   the list, by its latest message. Hidden bots stay off the home; search's filter shows them.
+- **Working and Needs you**: a bot whose Bot Chat is on a turn gets a still badge on its face (the kind of work:
+  a globe while it browses, in the page's ink) and, in the list, a line in place of its latest message
+  ("Browsing the web…", "Working…"); one waiting on you (an approval, a question) gets a raised hand in ember
+  and "Needs you", which wins over working. Marks also look up while they work; characters and pets play the
+  move for the work; photos stay still. It's only what the computer says (`BotChatActivityStore`): unknown
+  or out of date shows nothing, and it clears when the turn ends.
 - **Touch and hold** a bot: its latest message, then Mark Unread (kept on this device), Pin, Replace
   Primary Bot… or Make Primary Bot, Rearrange, and More (profile, new chat, routines, then Hide at the bottom).
   A group chat's menu has Mark Unread and Rearrange.

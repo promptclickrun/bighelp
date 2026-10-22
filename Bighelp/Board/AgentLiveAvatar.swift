@@ -45,6 +45,8 @@ struct AgentLiveAvatar: View {
     var showsBadge = true
     /// How the face rests with no work (voice mode shows listening).
     var restingState: AgentLiveState = .idle
+    /// A photo moves with the work; Simple Bot mode's calm home keeps it still and badges it instead.
+    var movesPhoto = true
 
     @Environment(\.companionStore) private var companionStore
     @Environment(\.agentActivityInIsland) private var activityInIsland
@@ -98,7 +100,7 @@ struct AgentLiveAvatar: View {
         } else {
             AvatarView(stableID: agentID, displayName: displayName, imageURL: imageURL,
                        size: size, state: liveState)
-                .modifier(ActivityMotion(activity: activity, enabled: !reduceMotion))
+                .modifier(ActivityMotion(activity: activity, enabled: !reduceMotion && movesPhoto))
         }
     }
 

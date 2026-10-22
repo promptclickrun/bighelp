@@ -16,6 +16,8 @@ struct AgentsShellView: View {
     let onAction: @MainActor (AgentWorkspaceActionRequest) -> Void
     var groupFilterRequest: Binding<String?> = .constant(nil)
     var createRequest: Binding<Bool> = .constant(false)
+    var botChatActivity: BotChatActivityStore? = nil
+    var botChatActivitySource: BotChatActivitySource? = nil
 
     var body: some View {
         AgentsView(
@@ -32,7 +34,9 @@ struct AgentsShellView: View {
             shortcutsAvailable: shortcutsAvailable,
             onAction: onAction,
             groupFilterRequest: groupFilterRequest,
-            createRequest: createRequest
+            createRequest: createRequest,
+            botChatActivity: botChatActivity,
+            botChatActivitySource: botChatActivitySource
         )
     }
 }

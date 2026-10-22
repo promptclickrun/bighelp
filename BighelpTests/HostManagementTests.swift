@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Testing
 @testable import Bighelp
 
@@ -196,6 +197,60 @@ import Testing
         await model.enable()
         #expect(model.offersRetry)
         #expect(model.actionTitle != nil)
+    }
+
+    /// The iOS notification prompt makes the app inactive in the middle of setup (#443). Settings ›
+    /// Notifications stopped setup there: a first setup on an iPhone ended before this device
+    /// registered for push, with no code. Only going to the background stops setup.
+    @Test func theNotificationPromptDoesNotStopSetup() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        let management = Manager(saved: fixture.saved)
+        management.rows = [fixture.plugin(enabled: true)]
+        let setup = PromptingEnrollment()
+        fixture.registry.notificationSetup = setup
+        let model = HostNotificationSetupModel(host: fixture.host, registry: fixture.registry,
+            pin: fixture.pin, management: management, defaults: fixture.defaults)
+
+        let run = Task { await model.enable() }
+        await setup.promptShown()
+        model.sceneChanged(to: .inactive)
+        setup.answerPrompt()
+        await run.value
+        #expect(model.state == .enabled)
+        #expect(model.failure == nil)
+        #expect(fixture.registry.hosts.first?.notificationState == .enabled)
+    }
+
+    /// Leaving bighelp while setup runs stops it, and setup says so with a code people can send us,
+    /// not "Plugin installed. Finishing setup…" with nothing left to finish it.
+    @Test func setupStoppedByLeavingShowsItsCode() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        let management = Manager(saved: fixture.saved)
+        management.rows = [fixture.plugin(enabled: true)]
+        let setup = PromptingEnrollment()
+        fixture.registry.notificationSetup = setup
+        let model = HostNotificationSetupModel(host: fixture.host, registry: fixture.registry,
+            pin: fixture.pin, management: management, defaults: fixture.defaults)
+
+        let run = Task { await model.enable() }
+        await setup.promptShown()
+        model.sceneChanged(to: .background)
+        #expect(model.failure?.code == .interrupted)
+        #expect(model.state == .outcomeUnknown)
+        #expect(model.message == BighelpNotificationErrorCode.interrupted.message)
+        #expect(!model.isWorking)
+        setup.answerPrompt()
+        await run.value
+        #expect(model.failure?.code == .interrupted, "The stopped run doesn't replace it")
+        #expect(model.offersRetry)
+        #expect(fixture.registry.hosts.first?.notificationState == .outcomeUnknown)
+        #expect(BighelpNotificationLastFailure.load(fixture.defaults)?.code == .interrupted)
+
+        let reopened = HostNotificationSetupModel(host: try #require(fixture.registry.hosts.first),
+            registry: fixture.registry, pin: fixture.pin, management: management, defaults: fixture.defaults)
+        #expect(reopened.failure?.code == .interrupted, "Setup opened again keeps the code")
     }
 
     /// Settings opened again shows the same code, on this build, and lets people try again:
@@ -602,6 +657,36 @@ import Testing
             calls += 1
             if let error { throw error }
             return result
+        }
+        func removeLocalEnrollment(host: BighelpConfiguredHost) throws {}
+    }
+    /// Waits on the iOS notification prompt in the middle of setup, then checks that setup is
+    /// still current, as the notification service does.
+    private final class PromptingEnrollment: HostNotificationSetupServing {
+        private var shown: CheckedContinuation<Void, Never>?
+        private var answer: CheckedContinuation<Void, Never>?
+        private var isShowing = false
+        func enroll(host: BighelpConfiguredHost, connection: DirectHermesSavedConnection,
+                    isCurrent: @escaping @MainActor () -> Bool) async throws -> HostNotificationSetupResult {
+            guard isCurrent() else { throw DirectHermesError.secureStorageChanged }
+            await withCheckedContinuation { continuation in
+                answer = continuation
+                isShowing = true
+                shown?.resume()
+                shown = nil
+            }
+            guard isCurrent() else {
+                throw BighelpNotificationSetupFailure(step: .contextCheck, error: DirectHermesError.secureStorageChanged)
+            }
+            return .enabled
+        }
+        func promptShown() async {
+            guard !isShowing else { return }
+            await withCheckedContinuation { shown = $0 }
+        }
+        func answerPrompt() {
+            answer?.resume()
+            answer = nil
         }
         func removeLocalEnrollment(host: BighelpConfiguredHost) throws {}
     }

@@ -45,7 +45,7 @@ enum CardReplyText {
             let labels = ids.compactMap(\.string).map(label)
             return labels.isEmpty ? "None" : labels.joined(separator: ", ")
         case ("date", .string(let day)):
-            return date(day).map { $0.formatted(date: .long, time: .omitted) } ?? day
+            return GenerativeUIFormDate().date(from: day).map { $0.formatted(date: .long, time: .omitted) } ?? day
         case (_, .integer(let number)):
             return String(number)
         case (_, .number(let number)):
@@ -55,14 +55,5 @@ enum CardReplyText {
         default:
             return value.displayText ?? ""
         }
-    }
-
-    private static func date(_ day: String) -> Date? {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = .current
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.date(from: day)
     }
 }

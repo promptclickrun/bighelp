@@ -75,17 +75,12 @@ extension RootShellView {
                     WorkspaceSessionContentView(destination: destination, catalog: sessionCatalog,
                         profileID: workspaceAgentID, isCurrent: { currentWorkspaceOwner == owner }, onOpenChat: openSession)
                 } else if destination == .artifacts {
-                    if let owner = currentWorkspaceOwner, let performer = workspaceConnections?.workspace,
-                       let direct = workspaceConnections?.hosts.selectedWorkspace?.nativeClient {
-                        ConfiguredWorkspaceArtifactsView(
-                            hostName: workspaceHostName,
-                            owner: owner,
-                            http: direct,
-                            performer: performer,
-                            currentOwner: { workspaceConnections?.workspace === performer ? currentWorkspaceOwner : nil },
-                            folderChooser: workspaceFolderChooser(owner: owner)
-                        )
-                        .id(owner)
+                    if let owner = currentWorkspaceOwner, let source = configuredWorkspaceSource {
+                        // The host's own Artifacts: the serving agent's folder, whichever agent is selected.
+                        let target = WorkspaceFilesTarget(owner: owner, agentID: nil)
+                        ConfiguredWorkspaceArtifactsView(hostName: workspaceHostName, target: target, source: source,
+                            currentTarget: currentFilesTarget { nil })
+                            .id(target)
                     } else {
                         WorkspaceUnavailableView(
                             destination: .artifacts,

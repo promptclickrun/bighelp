@@ -93,6 +93,8 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     case groupsDisband = "groups.disband"
     case groupsStop = "groups.stop"
     case groupsRetry = "groups.retry"
+    /// Hermes' session path: end one member turn it lost track of (a host stopped mid-turn).
+    case groupsDiscard = "groups.discard"
     case groupsApprove = "groups.approve"
     /// RoomLink, sent to the computer an agent lives on: a grant for that agent
     /// to join a room whose home is another computer.
@@ -175,6 +177,8 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     /// Whether another Hermes process is running a chat now, and stopping that run (plugin, `native-chat-activity-v1`).
     case chatActivity = "chat.activity"
     case chatStop = "chat.stop"
+    /// What each agent's Bot Chat is doing, in one read (plugin, `native-agents-activity-v1`).
+    case agentsActivity = "agents.activity"
     /// Teamwork: every agent told about the others (plugin, `native-team-v1`).
     case teamSettings = "team.settings"
     /// My Templates: bots saved as templates on the computer (plugin, `native-my-templates-v1`).

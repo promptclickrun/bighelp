@@ -8,6 +8,7 @@ extension BotModeRoomStore {
         activitySink: ((BotModeRunActivity) -> Void)?
     ) async throws {
         guard let nativeClient else { throw BotModeRoomError.executionUnavailable }
+        try await settleUnconfirmedNativeStop(roomID: roomID)
         if let working = room(id: roomID), working.isNativeWorking {
             // Hermes queues a message sent while members work behind the
             // room's active drive, so it goes out now instead of waiting.
@@ -400,7 +401,9 @@ extension BotModeRoomStore {
                     sending, expectedRevision: sending.persistenceRevision, expectedOwner: .owner(owner)
                 ) else { throw BotModeRoomError.persistenceConflict }
                 replaceStored(savedIntent)
-                let receipt = try await nativeClient.groupsRetry(roomID: roomID, taskID: taskID)
+                let receipt = try await nativeClient.groupsRetry(
+                    roomID: roomID, taskID: taskID, attempt: nativeRetryAttemptsByRoom[roomID]?[taskID]
+                )
                 try requireNativeBoundary(boundary)
                 // Hermes returns the authoritative task receipt after the
                 // fenced requeue. Keep every identity coordinate intact and

@@ -286,7 +286,9 @@ struct BighelpAppComposition {
             }
         }
         if usesFixtures, arguments.contains(TeamCallDemoGroupsClient.launchArgument) {
-            botModeRooms.configureNativeClient(TeamCallDemoGroupsClient())
+            botModeRooms.configureNativeClient(TeamCallDemoGroupsClient(
+                losesFirstStop: arguments.contains(TeamCallDemoGroupsClient.losesFirstStopArgument)
+            ))
         }
         #endif
         do {

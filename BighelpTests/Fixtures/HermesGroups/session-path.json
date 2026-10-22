@@ -1,0 +1,761 @@
+{
+ "about": "Hermes v0.22.4 (4d04303), the gateway's own /api/ws: gateway/session_group_controls.py",
+ "capabilities": {
+  "authority_gateway_id": "install:5e551011f00dfeed5e551011f00dfeed",
+  "driver": true,
+  "features": [
+   "room_identity",
+   "monotonic_log",
+   "replayable_disband"
+  ],
+  "max_log_limit": 500,
+  "methods": [
+   "groups.capabilities",
+   "groups.list",
+   "groups.state",
+   "groups.log",
+   "groups.create",
+   "groups.rename",
+   "groups.disband",
+   "groups.send",
+   "groups.attachment.upload",
+   "groups.attachment.download",
+   "groups.stop",
+   "groups.retry",
+   "groups.discard",
+   "groups.approve"
+  ],
+  "persistent_process": true,
+  "protocol_version": 2,
+  "room_link": {
+   "enabled": false,
+   "reason": "canonical_driver_required"
+  },
+  "seatable_profiles": [
+   "default",
+   "nova"
+  ]
+ },
+ "crash_discard": {
+  "driver_status": {
+   "blocked": true,
+   "counts": {
+    "indeterminate": 1
+   },
+   "peer_routes": [],
+   "pending_actions": [
+    {
+     "execution_generation": 1,
+     "kind": "discard",
+     "member_id": "default",
+     "task_id": "dtask:d5eb3cab75bb60909d4887312d05ba315b2b29fef4a5ac82"
+    }
+   ],
+   "running": true,
+   "working": false
+  },
+  "events": [
+   {
+    "actor": {
+     "id": "desktop",
+     "kind": "user"
+    },
+    "authority_epoch": 1,
+    "created_at": 1792632028.717042,
+    "event_id": "user:4cbf777ad5357d2692b7ad9c5591ae768a7c6ce0290598c34b6a6a2ea7793922",
+    "idempotent": false,
+    "kind": "message.user",
+    "payload": {
+     "text": "SLOW @default only please",
+     "thread_id": "loopdy-crash-fe04de466567"
+    },
+    "room_id": "crash-fe04de466567",
+    "seq": 1
+   }
+  ],
+  "events_after": [
+   {
+    "actor": {
+     "id": "desktop",
+     "kind": "user"
+    },
+    "authority_epoch": 1,
+    "created_at": 1792632028.717042,
+    "event_id": "user:4cbf777ad5357d2692b7ad9c5591ae768a7c6ce0290598c34b6a6a2ea7793922",
+    "idempotent": false,
+    "kind": "message.user",
+    "payload": {
+     "text": "SLOW @default only please",
+     "thread_id": "loopdy-crash-fe04de466567"
+    },
+    "room_id": "crash-fe04de466567",
+    "seq": 1
+   },
+   {
+    "actor": {
+     "id": "install:5e551011f00dfeed5e551011f00dfeed",
+     "kind": "gateway"
+    },
+    "authority_epoch": 1,
+    "created_at": 1792632059.7656791,
+    "event_id": "dterminal:d5eb3cab75bb60909d4887312d05ba315b2b29fef4a5ac82",
+    "idempotent": false,
+    "kind": "turn.cancelled",
+    "payload": {
+     "discussion_event_id": "user:4cbf777ad5357d2692b7ad9c5591ae768a7c6ce0290598c34b6a6a2ea7793922",
+     "member_id": "default",
+     "member_index": 0,
+     "reason": "member turn cancelled",
+     "round_index": 0,
+     "seen_through_seq": 1,
+     "task_id": "dtask:d5eb3cab75bb60909d4887312d05ba315b2b29fef4a5ac82",
+     "thread_id": "loopdy-crash-fe04de466567",
+     "turn_id": "d1.r0.p0.s1.mfa926e1907f4fe8540b0d0f2"
+    },
+    "room_id": "crash-fe04de466567",
+    "seq": 2
+   },
+   {
+    "actor": {
+     "id": "install:5e551011f00dfeed5e551011f00dfeed",
+     "kind": "gateway"
+    },
+    "authority_epoch": 1,
+    "created_at": 1792632059.7888901,
+    "event_id": "dactivity:user:4cbf777ad5357d2692b7ad9c5591ae768a7c6ce0290598c34b6a6a2ea7793922:silent_round",
+    "idempotent": false,
+    "kind": "room.activity",
+    "payload": {
+     "discussion_event_id": "user:4cbf777ad5357d2692b7ad9c5591ae768a7c6ce0290598c34b6a6a2ea7793922",
+     "reason_code": "silent_round",
+     "status": "settled",
+     "thread_id": "loopdy-crash-fe04de466567"
+    },
+    "room_id": "crash-fe04de466567",
+    "seq": 3
+   }
+  ],
+  "params": {
+   "execution_generation": 1,
+   "member_id": "default",
+   "room_id": "crash-fe04de466567",
+   "task_id": "dtask:d5eb3cab75bb60909d4887312d05ba315b2b29fef4a5ac82"
+  },
+  "reply": {
+   "discarded": true,
+   "task": {
+    "cancel_generation": 1,
+    "execution_generation": 1,
+    "room_id": "crash-fe04de466567",
+    "status": "cancelled",
+    "task_id": "dtask:d5eb3cab75bb60909d4887312d05ba315b2b29fef4a5ac82",
+    "thread_id": "loopdy-crash-fe04de466567",
+    "turn_id": "d1.r0.p0.s1.mfa926e1907f4fe8540b0d0f2"
+   }
+  }
+ },
+ "crash_retry": {
+  "driver_status": {
+   "blocked": false,
+   "counts": {
+    "deferred": 1
+   },
+   "peer_routes": [],
+   "pending_actions": [
+    {
+     "execution_generation": 1,
+     "kind": "retry",
+     "member_id": "default",
+     "task_id": "dtask:e0c5783d6d40aa3edad5b93f17aa3b5ce470701cba72366e"
+    }
+   ],
+   "running": true,
+   "working": false
+  },
+  "error": {
+   "code": 4001,
+   "data": {
+    "reason": "unknown_execution"
+   },
+   "message": "unknown_execution"
+  },
+  "events": [
+   {
+    "actor": {
+     "id": "desktop",
+     "kind": "user"
+    },
+    "authority_epoch": 1,
+    "created_at": 1792631766.518925,
+    "event_id": "user:ee723e305cfbd4969764fc07781d419757a26dbef021598cbd45b5268b775700",
+    "idempotent": false,
+    "kind": "message.user",
+    "payload": {
+     "text": "SLOW @default only please",
+     "thread_id": "loopdy-crash-4cf396d526a1"
+    },
+    "room_id": "crash-4cf396d526a1",
+    "seq": 1
+   },
+   {
+    "actor": {
+     "id": "install:5e551011f00dfeed5e551011f00dfeed",
+     "kind": "gateway"
+    },
+    "authority_epoch": 1,
+    "created_at": 1792631858.507351,
+    "event_id": "ddeferred:e0c5783d6d40aa3edad5b93f17aa3b5ce470701cba72366e:g1",
+    "idempotent": false,
+    "kind": "turn.deferred",
+    "payload": {
+     "discussion_event_id": "user:ee723e305cfbd4969764fc07781d419757a26dbef021598cbd45b5268b775700",
+     "execution_generation": 1,
+     "member_id": "default",
+     "member_index": 0,
+     "reason": "member_unavailable",
+     "round_index": 0,
+     "seen_through_seq": 1,
+     "task_id": "dtask:e0c5783d6d40aa3edad5b93f17aa3b5ce470701cba72366e",
+     "thread_id": "loopdy-crash-4cf396d526a1",
+     "turn_id": "d1.r0.p0.s1.mfa926e1907f4fe8540b0d0f2"
+    },
+    "room_id": "crash-4cf396d526a1",
+    "seq": 2
+   },
+   {
+    "actor": {
+     "id": "install:5e551011f00dfeed5e551011f00dfeed",
+     "kind": "gateway"
+    },
+    "authority_epoch": 1,
+    "created_at": 1792631858.53488,
+    "event_id": "dactivity:user:ee723e305cfbd4969764fc07781d419757a26dbef021598cbd45b5268b775700:silent_round",
+    "idempotent": false,
+    "kind": "room.activity",
+    "payload": {
+     "discussion_event_id": "user:ee723e305cfbd4969764fc07781d419757a26dbef021598cbd45b5268b775700",
+     "reason_code": "silent_round",
+     "status": "settled",
+     "thread_id": "loopdy-crash-4cf396d526a1"
+    },
+    "room_id": "crash-4cf396d526a1",
+    "seq": 3
+   }
+  ],
+  "params": {
+   "execution_generation": 1,
+   "member_id": "default",
+   "room_id": "crash-4cf396d526a1",
+   "task_id": "dtask:e0c5783d6d40aa3edad5b93f17aa3b5ce470701cba72366e"
+  }
+ },
+ "create": {
+  "params": {
+   "members": [
+    {
+     "handle": "default",
+     "member_id": "default",
+     "profile": "default",
+     "target": {
+      "kind": "local",
+      "profile": "default"
+     }
+    },
+    {
+     "handle": "nova",
+     "member_id": "nova",
+     "profile": "nova",
+     "target": {
+      "kind": "local",
+      "profile": "nova"
+     }
+    }
+   ],
+   "name": "Probe room",
+   "room_id": "probe-fe8fa19df2f4"
+  },
+  "reply": {
+   "room": {
+    "authority_epoch": 1,
+    "authority_gateway_id": "install:5e551011f00dfeed5e551011f00dfeed",
+    "created_at": 1792631092.4788601,
+    "idempotent": false,
+    "members": [
+     {
+      "handle": "default",
+      "member_id": "default",
+      "profile": "default",
+      "target": {
+       "kind": "local",
+       "profile": "default"
+      }
+     },
+     {
+      "handle": "nova",
+      "member_id": "nova",
+      "profile": "nova",
+      "target": {
+       "kind": "local",
+       "profile": "nova"
+      }
+     }
+    ],
+    "name": "Probe room",
+    "revision": 1,
+    "room_id": "probe-fe8fa19df2f4",
+    "updated_at": 1792631092.4788601
+   }
+  }
+ },
+ "disband": {
+  "tombstone": {
+   "disbanded_at": 1792631193.067913,
+   "event": {
+    "actor": {
+     "id": "room-control",
+     "kind": "system"
+    },
+    "authority_epoch": 1,
+    "created_at": 1792631193.067913,
+    "event_id": "system:room-disbanded",
+    "idempotent": false,
+    "kind": "room.disbanded",
+    "payload": {
+     "room_id": "probe-fe8fa19df2f4"
+    },
+    "room_id": "probe-fe8fa19df2f4",
+    "seq": 11
+   },
+   "idempotent": false,
+   "room_id": "probe-fe8fa19df2f4"
+  }
+ },
+ "list": {
+  "next_offset": null,
+  "rooms": [
+   {
+    "authority_epoch": 1,
+    "authority_gateway_id": "install:5e551011f00dfeed5e551011f00dfeed",
+    "created_at": 1792631092.4788601,
+    "idempotent": false,
+    "latest_seq": 0,
+    "members": [
+     {
+      "handle": "default",
+      "member_id": "default",
+      "profile": "default",
+      "target": {
+       "kind": "local",
+       "profile": "default"
+      }
+     },
+     {
+      "handle": "nova",
+      "member_id": "nova",
+      "profile": "nova",
+      "target": {
+       "kind": "local",
+       "profile": "nova"
+      }
+     }
+    ],
+    "name": "Probe room",
+    "revision": 1,
+    "room_id": "probe-fe8fa19df2f4",
+    "updated_at": 1792631092.4788601
+   }
+  ]
+ },
+ "log": {
+  "authority": {
+   "epoch": 1,
+   "gateway_id": "install:5e551011f00dfeed5e551011f00dfeed"
+  },
+  "cursor": 9,
+  "events": [
+   {
+    "actor": {
+     "id": "desktop",
+     "kind": "user"
+    },
+    "authority_epoch": 1,
+    "created_at": 1792631092.53006,
+    "event_id": "user:430fac733548148c97f699c73c2e46f9ec4d475a1e074aa289390965b66a3782",
+    "idempotent": false,
+    "kind": "message.user",
+    "payload": {
+     "text": "Hello both of you",
+     "thread_id": "loopdy-probe-fe8fa19df2f4"
+    },
+    "room_id": "probe-fe8fa19df2f4",
+    "seq": 1
+   },
+   {
+    "actor": {
+     "id": "default",
+     "kind": "member",
+     "profile": "default"
+    },
+    "authority_epoch": 1,
+    "created_at": 1792631094.053897,
+    "event_id": "dmessage:44d1be27580779a2f23549668362e44eefae3a2f676b0b8e",
+    "idempotent": false,
+    "kind": "message.member",
+    "payload": {
+     "discussion_event_id": "user:430fac733548148c97f699c73c2e46f9ec4d475a1e074aa289390965b66a3782",
+     "member_id": "default",
+     "member_index": 0,
+     "round_index": 0,
+     "task_id": "dtask:44d1be27580779a2f23549668362e44eefae3a2f676b0b8e",
+     "text": "Canned reply from fake-alpha.",
+     "thread_id": "loopdy-probe-fe8fa19df2f4",
+     "turn_id": "d1.r0.p0.s1.mfa926e1907f4fe8540b0d0f2"
+    },
+    "room_id": "probe-fe8fa19df2f4",
+    "seq": 2
+   },
+   {
+    "actor": {
+     "id": "install:5e551011f00dfeed5e551011f00dfeed",
+     "kind": "gateway"
+    },
+    "authority_epoch": 1,
+    "created_at": 1792631094.056121,
+    "event_id": "dterminal:44d1be27580779a2f23549668362e44eefae3a2f676b0b8e",
+    "idempotent": false,
+    "kind": "turn.settled",
+    "payload": {
+     "discussion_event_id": "user:430fac733548148c97f699c73c2e46f9ec4d475a1e074aa289390965b66a3782",
+     "member_id": "default",
+     "member_index": 0,
+     "message_event_id": "dmessage:44d1be27580779a2f23549668362e44eefae3a2f676b0b8e",
+     "passed": false,
+     "round_index": 0,
+     "seen_through_seq": 1,
+     "task_id": "dtask:44d1be27580779a2f23549668362e44eefae3a2f676b0b8e",
+     "thread_id": "loopdy-probe-fe8fa19df2f4",
+     "turn_id": "d1.r0.p0.s1.mfa926e1907f4fe8540b0d0f2"
+    },
+    "room_id": "probe-fe8fa19df2f4",
+    "seq": 3
+   },
+   {
+    "actor": {
+     "id": "nova",
+     "kind": "member",
+     "profile": "nova"
+    },
+    "authority_epoch": 1,
+    "created_at": 1792631095.674957,
+    "event_id": "dmessage:d502a67045acac49456d50bd9077bfb21df62ed521ca47a3",
+    "idempotent": false,
+    "kind": "message.member",
+    "payload": {
+     "discussion_event_id": "user:430fac733548148c97f699c73c2e46f9ec4d475a1e074aa289390965b66a3782",
+     "member_id": "nova",
+     "member_index": 1,
+     "round_index": 0,
+     "task_id": "dtask:d502a67045acac49456d50bd9077bfb21df62ed521ca47a3",
+     "text": "Canned reply from fake-beta.",
+     "thread_id": "loopdy-probe-fe8fa19df2f4",
+     "turn_id": "d1.r0.p1.s2.m9e844e4b6cf675a44e0491d9"
+    },
+    "room_id": "probe-fe8fa19df2f4",
+    "seq": 4
+   },
+   {
+    "actor": {
+     "id": "install:5e551011f00dfeed5e551011f00dfeed",
+     "kind": "gateway"
+    },
+    "authority_epoch": 1,
+    "created_at": 1792631095.678519,
+    "event_id": "dterminal:d502a67045acac49456d50bd9077bfb21df62ed521ca47a3",
+    "idempotent": false,
+    "kind": "turn.settled",
+    "payload": {
+     "discussion_event_id": "user:430fac733548148c97f699c73c2e46f9ec4d475a1e074aa289390965b66a3782",
+     "member_id": "nova",
+     "member_index": 1,
+     "message_event_id": "dmessage:d502a67045acac49456d50bd9077bfb21df62ed521ca47a3",
+     "passed": false,
+     "round_index": 0,
+     "seen_through_seq": 2,
+     "task_id": "dtask:d502a67045acac49456d50bd9077bfb21df62ed521ca47a3",
+     "thread_id": "loopdy-probe-fe8fa19df2f4",
+     "turn_id": "d1.r0.p1.s2.m9e844e4b6cf675a44e0491d9"
+    },
+    "room_id": "probe-fe8fa19df2f4",
+    "seq": 5
+   },
+   {
+    "actor": {
+     "id": "install:5e551011f00dfeed5e551011f00dfeed",
+     "kind": "gateway"
+    },
+    "authority_epoch": 1,
+    "created_at": 1792631095.7076259,
+    "event_id": "dactivity:user:430fac733548148c97f699c73c2e46f9ec4d475a1e074aa289390965b66a3782:silent_round",
+    "idempotent": false,
+    "kind": "room.activity",
+    "payload": {
+     "discussion_event_id": "user:430fac733548148c97f699c73c2e46f9ec4d475a1e074aa289390965b66a3782",
+     "reason_code": "silent_round",
+     "status": "settled",
+     "thread_id": "loopdy-probe-fe8fa19df2f4"
+    },
+    "room_id": "probe-fe8fa19df2f4",
+    "seq": 6
+   },
+   {
+    "actor": {
+     "id": "desktop",
+     "kind": "user"
+    },
+    "authority_epoch": 1,
+    "created_at": 1792631097.159729,
+    "event_id": "user:960167ceec0d51f45efd314afebd9d58403752a2f48695fbaea8741d244f9620",
+    "idempotent": false,
+    "kind": "message.user",
+    "payload": {
+     "text": "SLOW please take your time",
+     "thread_id": "loopdy-probe-fe8fa19df2f4"
+    },
+    "room_id": "probe-fe8fa19df2f4",
+    "seq": 7
+   },
+   {
+    "actor": {
+     "id": "install:5e551011f00dfeed5e551011f00dfeed",
+     "kind": "gateway"
+    },
+    "authority_epoch": 1,
+    "created_at": 1792631102.338877,
+    "event_id": "room-stop:72119037c2430d0b7b7638a94f1a9aca",
+    "idempotent": false,
+    "kind": "room.stop_requested",
+    "payload": {
+     "cancel_id": "cancel-b0f8e375d5a14946824b87a64b18a3dc"
+    },
+    "room_id": "probe-fe8fa19df2f4",
+    "seq": 8
+   },
+   {
+    "actor": {
+     "id": "install:5e551011f00dfeed5e551011f00dfeed",
+     "kind": "gateway"
+    },
+    "authority_epoch": 1,
+    "created_at": 1792631102.445246,
+    "event_id": "dterminal:bb56a2d658bc2ad747b4c00567bd6a1a3c267895b3c2b834",
+    "idempotent": false,
+    "kind": "turn.cancelled",
+    "payload": {
+     "discussion_event_id": "user:960167ceec0d51f45efd314afebd9d58403752a2f48695fbaea8741d244f9620",
+     "member_id": "default",
+     "member_index": 0,
+     "reason": "member turn cancelled",
+     "round_index": 0,
+     "seen_through_seq": 7,
+     "task_id": "dtask:bb56a2d658bc2ad747b4c00567bd6a1a3c267895b3c2b834",
+     "thread_id": "loopdy-probe-fe8fa19df2f4",
+     "turn_id": "d7.r0.p0.s7.mfa926e1907f4fe8540b0d0f2"
+    },
+    "room_id": "probe-fe8fa19df2f4",
+    "seq": 9
+   }
+  ],
+  "has_more": false,
+  "latest_seq": 9
+ },
+ "retry_refusals": [
+  {
+   "error": {
+    "code": 4001,
+    "data": {
+     "reason": "invalid_params"
+    },
+    "message": "invalid_params"
+   },
+   "params": {
+    "room_id": "probe-fe8fa19df2f4",
+    "task_id": "dtask:none"
+   }
+  },
+  {
+   "error": {
+    "code": 4001,
+    "data": {
+     "reason": "stale_generation"
+    },
+    "message": "stale_generation"
+   },
+   "params": {
+    "execution_generation": 1,
+    "member_id": "default",
+    "room_id": "probe-fe8fa19df2f4",
+    "task_id": "dtask:none"
+   }
+  }
+ ],
+ "send": {
+  "params": {
+   "event_id": "evt-5a8c3885c769420d98c6dc005373584e",
+   "payload": {
+    "text": "Hello both of you",
+    "thread_id": "loopdy-probe-fe8fa19df2f4"
+   },
+   "room_id": "probe-fe8fa19df2f4"
+  },
+  "reply": {
+   "accepted": true,
+   "client_event_id": "evt-5a8c3885c769420d98c6dc005373584e",
+   "driver_started": true,
+   "event": {
+    "actor": {
+     "id": "desktop",
+     "kind": "user"
+    },
+    "authority_epoch": 1,
+    "created_at": 1792631092.53006,
+    "event_id": "user:430fac733548148c97f699c73c2e46f9ec4d475a1e074aa289390965b66a3782",
+    "idempotent": false,
+    "kind": "message.user",
+    "payload": {
+     "text": "Hello both of you",
+     "thread_id": "loopdy-probe-fe8fa19df2f4"
+    },
+    "room_id": "probe-fe8fa19df2f4",
+    "seq": 1
+   }
+  }
+ },
+ "state": {
+  "driver_status": {
+   "blocked": false,
+   "counts": {},
+   "peer_routes": [],
+   "pending_actions": [],
+   "running": true,
+   "working": false
+  },
+  "room": {
+   "authority_epoch": 1,
+   "authority_gateway_id": "install:5e551011f00dfeed5e551011f00dfeed",
+   "created_at": 1792631092.4788601,
+   "idempotent": false,
+   "latest_seq": 0,
+   "members": [
+    {
+     "handle": "default",
+     "member_id": "default",
+     "profile": "default",
+     "target": {
+      "kind": "local",
+      "profile": "default"
+     }
+    },
+    {
+     "handle": "nova",
+     "member_id": "nova",
+     "profile": "nova",
+     "target": {
+      "kind": "local",
+      "profile": "nova"
+     }
+    }
+   ],
+   "name": "Probe room",
+   "revision": 1,
+   "room_id": "probe-fe8fa19df2f4",
+   "updated_at": 1792631092.4788601
+  }
+ },
+ "state_disbanded": {
+  "room": {
+   "authority_epoch": 1,
+   "authority_gateway_id": "install:5e551011f00dfeed5e551011f00dfeed",
+   "created_at": 1792631092.4788601,
+   "disbanded_at": 1792631193.067913,
+   "idempotent": false,
+   "latest_seq": 11,
+   "members": [
+    {
+     "handle": "default",
+     "member_id": "default",
+     "profile": "default",
+     "target": {
+      "kind": "local",
+      "profile": "default"
+     }
+    },
+    {
+     "handle": "nova",
+     "member_id": "nova",
+     "profile": "nova",
+     "target": {
+      "kind": "local",
+      "profile": "nova"
+     }
+    }
+   ],
+   "name": "Probe room",
+   "revision": 2,
+   "room_id": "probe-fe8fa19df2f4",
+   "updated_at": 1792631193.067913
+  }
+ },
+ "state_running": {
+  "driver_status": {
+   "blocked": false,
+   "counts": {
+    "running": 1,
+    "settled": 2
+   },
+   "peer_routes": [],
+   "pending_actions": [],
+   "running": true,
+   "working": true
+  },
+  "room": {
+   "authority_epoch": 1,
+   "authority_gateway_id": "install:5e551011f00dfeed5e551011f00dfeed",
+   "created_at": 1792631092.4788601,
+   "idempotent": false,
+   "latest_seq": 7,
+   "members": [
+    {
+     "handle": "default",
+     "member_id": "default",
+     "profile": "default",
+     "target": {
+      "kind": "local",
+      "profile": "default"
+     }
+    },
+    {
+     "handle": "nova",
+     "member_id": "nova",
+     "profile": "nova",
+     "target": {
+      "kind": "local",
+      "profile": "nova"
+     }
+    }
+   ],
+   "name": "Probe room",
+   "revision": 1,
+   "room_id": "probe-fe8fa19df2f4",
+   "updated_at": 1792631097.159729
+  }
+ },
+ "stop": {
+  "params": {
+   "cancel_id": "cancel-b0f8e375d5a14946824b87a64b18a3dc",
+   "room_id": "probe-fe8fa19df2f4"
+  },
+  "reply": {
+   "cancelled": 1
+  }
+ }
+}

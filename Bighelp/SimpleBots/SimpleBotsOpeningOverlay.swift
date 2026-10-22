@@ -16,7 +16,7 @@ struct SimpleBotsOpeningOverlay: View {
                 BighelpNoodleView(motion: .loader, size: 72)
                     .accessibilityHidden(true)
                 VStack(spacing: BighelpTokens.space4) {
-                    Text(botName.map { "Opening \($0)…" } ?? "Opening…")
+                    Text(botName.map { String(localized: "Opening \($0)…") } ?? String(localized: "Opening…"))
                         .bighelpFont(.sectionTitle, weight: .semibold)
                         .foregroundStyle(theme.primaryText)
                         .multilineTextAlignment(.center)

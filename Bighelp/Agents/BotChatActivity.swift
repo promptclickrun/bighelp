@@ -35,9 +35,9 @@ enum BotChatActivity: Equatable, Sendable {
     var line: String? {
         switch self {
         case .idle: nil
-        case .waiting: "Needs you"
+        case .waiting: String(localized: "Needs you")
         case .working(let tool?): AgentActivityKind(toolName: tool).label + "…"
-        case .working(nil): "Working…"
+        case .working(nil): String(localized: "Working…")
         }
     }
 
@@ -45,9 +45,9 @@ enum BotChatActivity: Equatable, Sendable {
     var accessibilityLabel: String? {
         switch self {
         case .idle: nil
-        case .waiting: "Needs you"
+        case .waiting: String(localized: "Needs you")
         case .working(let tool?): AgentActivityKind(toolName: tool).label
-        case .working(nil): "Working"
+        case .working(nil): String(localized: "Working")
         }
     }
 

@@ -8,10 +8,10 @@ enum SimpleBotProfileTab: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .info: "Info"
-        case .computer: "Computer"
-        case .files: "Files"
-        case .media: "Media"
+        case .info: String(localized: "Info")
+        case .computer: String(localized: "Computer")
+        case .files: String(localized: "Files")
+        case .media: String(localized: "Media")
         }
     }
 
@@ -33,13 +33,16 @@ struct SimpleBotFilesTab: View {
         VStack(alignment: .leading, spacing: BighelpTokens.space12) {
             switch model.phase {
             case .loading:
-                SimpleBotsMessageCard(title: "Opening \(botName)'s files…", isLoading: true)
+                SimpleBotsMessageCard(title: String(localized: "Opening \(botName)'s files…"), isLoading: true)
             case .needsPluginUpdate:
-                SimpleBotsMessageCard(systemImage: "arrow.down.circle", title: "Update the bighelp plugin to see files",
-                                      detail: "Update it on your computer in Settings, then come back here.")
+                SimpleBotsMessageCard(systemImage: "arrow.down.circle",
+                                      title: String(localized: "Update the bighelp plugin to see files"),
+                                      detail: String(localized: "Update it on your computer in Settings, then come back here."))
             case .failed(let message):
-                SimpleBotsMessageCard(systemImage: "exclamationmark.triangle", title: "Files didn't load",
-                                      detail: message, actionTitle: "Try Again") { Task { await model.refresh() } }
+                SimpleBotsMessageCard(systemImage: "exclamationmark.triangle", title: String(localized: "Files didn't load"),
+                                      detail: message, actionTitle: String(localized: "Try Again")) {
+                    Task { await model.refresh() }
+                }
             case .loaded:
                 folder
             }
@@ -63,7 +66,8 @@ struct SimpleBotFilesTab: View {
         LazyVStack(spacing: 0) {
             if !model.isAtTop {
                 Button { Task { await model.goUp() } } label: {
-                    SimpleBotsRow(title: "Back to \(model.parentTitle)", leading: Image(systemName: "chevron.left")) {
+                    SimpleBotsRow(title: String(localized: "Back to \(model.parentTitle)"),
+                                  leading: Image(systemName: "chevron.left")) {
                         EmptyView()
                     }
                 }
@@ -168,21 +172,22 @@ struct SimpleBotMediaTab: View {
     private var empty: some View {
         switch store.state {
         case .idle, .loading:
-            SimpleBotsMessageCard(title: "Finding photos and videos…", isLoading: true)
+            SimpleBotsMessageCard(title: String(localized: "Finding photos and videos…"), isLoading: true)
         case .unavailable where !isConnected:
-            SimpleBotsMessageCard(systemImage: "wifi.slash", title: "Your computer isn't connected",
-                                  detail: "Photos and videos show up here once it's back.")
+            SimpleBotsMessageCard(systemImage: "wifi.slash", title: String(localized: "Your computer isn't connected"),
+                                  detail: String(localized: "Photos and videos show up here once it's back."))
         case .unavailable:
-            SimpleBotsMessageCard(systemImage: "arrow.down.circle", title: "Update the bighelp plugin to see media",
-                                  detail: "Update it on your computer in Settings, then come back here.")
+            SimpleBotsMessageCard(systemImage: "arrow.down.circle",
+                                  title: String(localized: "Update the bighelp plugin to see media"),
+                                  detail: String(localized: "Update it on your computer in Settings, then come back here."))
         case .failed(let message):
-            SimpleBotsMessageCard(systemImage: "exclamationmark.triangle", title: "Media didn't load",
-                                  detail: message, actionTitle: "Try Again") {
+            SimpleBotsMessageCard(systemImage: "exclamationmark.triangle", title: String(localized: "Media didn't load"),
+                                  detail: message, actionTitle: String(localized: "Try Again")) {
                 Task { await store.load(agentID: agentID) }
             }
         case .loaded:
-            SimpleBotsMessageCard(systemImage: "photo.on.rectangle", title: "No photos or videos yet",
-                                  detail: "Pictures and videos \(botName) sends you or makes show up here.")
+            SimpleBotsMessageCard(systemImage: "photo.on.rectangle", title: String(localized: "No photos or videos yet"),
+                                  detail: String(localized: "Pictures and videos \(botName) sends you or makes show up here."))
         }
     }
 }

@@ -106,7 +106,7 @@ struct SimpleBotProfileView: View {
                     faceName: AgentEditorModel.editing(profile, store: context.agents,
                                                        processor: AvatarImageProcessor()).faceName,
                     petSource: PetdexSource(store: context.agents, cacheScope: "\(ObjectIdentifier(context.agents))"),
-                    offersBotMarks: true, useTitle: "Save"
+                    offersBotMarks: true, useTitle: String(localized: "Save")
                 ) { result in saveAvatar(result, for: profile) }
                 .presentationDragIndicator(.visible)
                 #if os(visionOS)
@@ -135,7 +135,7 @@ struct SimpleBotProfileView: View {
             // After the sheet has gone, so the alert can show.
             guard let title = savedTemplateTitle else { return }
             savedTemplateTitle = nil
-            templateNotice = "“\(title)” is saved on your computer. Pick it from Templates when you make a new bot."
+            templateNotice = String(localized: "“\(title)” is saved on your computer. Pick it from Templates when you make a new bot.")
         }) {
             if let profile {
                 SimpleBotSaveTemplateSheet(profile: profile) { savedTemplateTitle = $0.title }
@@ -287,7 +287,7 @@ struct SimpleBotProfileView: View {
 
     private func info(_ profile: AgentProfile) -> some View {
         VStack(alignment: .leading, spacing: BighelpTokens.space12) {
-            SimpleBotsSectionLabel(title: "Character")
+            SimpleBotsSectionLabel(title: String(localized: "Character"))
             SimpleBotsCard {
                 SimpleBotMarkPicker(mark: Binding(
                     get: { mark ?? SimpleBotMarkStore.shared.mark(scope: scope, agentID: profile.id)
@@ -321,8 +321,8 @@ struct SimpleBotProfileView: View {
                 .disabled(!context.canEdit)
                 .accessibilityIdentifier("simple-bots.profile.more-avatars")
             }
-            Text(saveState ?? (context.canEdit ? "How this Bot's mark looks everywhere"
-                                               : "This computer doesn't let the app change this bot."))
+            Text(saveState ?? (context.canEdit ? String(localized: "How this Bot's mark looks everywhere")
+                                               : String(localized: "This computer doesn't let the app change this bot.")))
                 .font(.bighelp(.subheadline))
                 .foregroundStyle(theme.tertiaryText)
                 .padding(.horizontal, BighelpTokens.space20)
@@ -330,7 +330,7 @@ struct SimpleBotProfileView: View {
 
             SimpleBotsCard {
                 Button { isInstructionsPresented = true } label: {
-                    SimpleBotsRow(title: "Instructions", leading: Image(systemName: "doc.text"))
+                    SimpleBotsRow(title: String(localized: "Instructions"), leading: Image(systemName: "doc.text"))
                 }
                 .buttonStyle(.plain)
                 .disabled(!context.canEdit)
@@ -338,7 +338,7 @@ struct SimpleBotProfileView: View {
                 if let modelDefaults {
                     SimpleBotsDivider()
                     Button { isModelPresented = true } label: {
-                        SimpleBotsRow(title: "Default Model", leading: Image(systemName: "cpu"),
+                        SimpleBotsRow(title: String(localized: "Default Model"), leading: Image(systemName: "cpu"),
                                       value: modelName(modelDefaults))
                     }
                     .buttonStyle(.plain)
@@ -355,7 +355,7 @@ struct SimpleBotProfileView: View {
     private func routines(_ profile: AgentProfile) -> some View {
         if let store = context.scheduledTasks {
             let tasks = store.tasks.filter { $0.agentID == profile.id }
-            SimpleBotsSectionLabel(title: "Routines")
+            SimpleBotsSectionLabel(title: String(localized: "Routines"))
             SimpleBotsCard {
                 if tasks.isEmpty {
                     Text("No routines yet")
@@ -400,8 +400,8 @@ struct SimpleBotProfileView: View {
         if let files {
             SimpleBotFilesTab(model: files, botName: profile.name)
         } else {
-            SimpleBotsMessageCard(systemImage: "wifi.slash", title: "Your computer isn't connected",
-                                  detail: "\(profile.name)'s files show up here once it's back.")
+            SimpleBotsMessageCard(systemImage: "wifi.slash", title: String(localized: "Your computer isn't connected"),
+                                  detail: String(localized: "\(profile.name)'s files show up here once it's back."))
         }
     }
 
@@ -414,7 +414,7 @@ struct SimpleBotProfileView: View {
         mark = newMark
         SimpleBotMarkStore.shared.set(newMark, scope: scope, agentID: profile.id)
         saveTask?.cancel()
-        saveState = "Saving…"
+        saveState = String(localized: "Saving…")
         let agents = context.agents
         let companions = companions
         let scope = scope
@@ -426,10 +426,10 @@ struct SimpleBotProfileView: View {
                 try await SimpleBotMarkSaving.save(newMark, for: current, agents: agents,
                                                    companions: companions, scope: scope)
                 guard !Task.isCancelled else { return }
-                saveState = "Saved. This is how \(profile.name) looks everywhere."
+                saveState = String(localized: "Saved. This is how \(profile.name) looks everywhere.")
             } catch {
                 guard !Task.isCancelled else { return }
-                saveState = "Saved on this device. The computer didn't take the picture; try again later."
+                saveState = String(localized: "Saved on this device. The computer didn't take the picture; try again later.")
             }
         }
     }
@@ -442,7 +442,7 @@ struct SimpleBotProfileView: View {
         }
         saveTask?.cancel()
         mark = nil
-        saveState = "Saving…"
+        saveState = String(localized: "Saving…")
         let agents = context.agents
         let companions = companions
         let scope = scope
@@ -453,17 +453,17 @@ struct SimpleBotProfileView: View {
                 try await SimpleBotAvatarSaving.save(result, for: current, agents: agents, companions: companions,
                                                      scope: scope, look: look)
                 guard !Task.isCancelled else { return }
-                saveState = "Saved. This is how \(profile.name) looks everywhere."
+                saveState = String(localized: "Saved. This is how \(profile.name) looks everywhere.")
             } catch {
                 guard !Task.isCancelled else { return }
-                saveState = "The computer didn't take the new avatar. Try again."
+                saveState = String(localized: "The computer didn't take the new avatar. Try again.")
             }
         }
     }
 
     private func modelName(_ defaults: AgentRuntimeDefaultsEditorModel) -> String {
         let modelID = defaults.draft[.mainChats].modelID
-        return modelID.isEmpty ? "Automatic" : ModelNameCatalog.empty.displayName(for: modelID)
+        return modelID.isEmpty ? String(localized: "Automatic") : ModelNameCatalog.empty.displayName(for: modelID)
     }
 
 }
@@ -527,7 +527,7 @@ private struct SimpleBotInstructionsEditor: View {
             _ = try await agents.update(id: profile.id, draft: draft)
             dismiss()
         } catch {
-            errorMessage = "The computer didn't save that. Your text is still here; try again."
+            errorMessage = String(localized: "The computer didn't save that. Your text is still here; try again.")
         }
     }
 }

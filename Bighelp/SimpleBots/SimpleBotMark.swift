@@ -31,19 +31,19 @@ enum SimpleBotShape: String, Codable, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .circle: "Circle"
-        case .cloud: "Cloud"
-        case .diamond: "Diamond"
-        case .sparkle: "Sparkle"
-        case .clover: "Clover"
-        case .heart: "Heart"
-        case .flower: "Flower"
-        case .drop: "Drop"
-        case .pill: "Pill"
-        case .play: "Triangle"
-        case .pentagon: "Pentagon"
-        case .star: "Star"
-        case .hexagon: "Hexagon"
+        case .circle: String(localized: "Circle")
+        case .cloud: String(localized: "Cloud")
+        case .diamond: String(localized: "Diamond")
+        case .sparkle: String(localized: "Sparkle")
+        case .clover: String(localized: "Clover")
+        case .heart: String(localized: "Heart")
+        case .flower: String(localized: "Flower")
+        case .drop: String(localized: "Drop")
+        case .pill: String(localized: "Pill")
+        case .play: String(localized: "Triangle")
+        case .pentagon: String(localized: "Pentagon")
+        case .star: String(localized: "Star")
+        case .hexagon: String(localized: "Hexagon")
         }
     }
 
@@ -180,7 +180,21 @@ enum SimpleBotColor: String, Codable, CaseIterable, Identifiable, Sendable {
 
     var color: Color { Color(hex: hex) }
 
-    var title: String { rawValue.capitalized }
+    var title: String {
+        switch self {
+        case .black: String(localized: "Black")
+        case .brown: String(localized: "Brown")
+        case .red: String(localized: "Red")
+        case .orange: String(localized: "Orange")
+        case .amber: String(localized: "Amber")
+        case .green: String(localized: "Green")
+        case .teal: String(localized: "Teal")
+        case .blue: String(localized: "Blue")
+        case .purple: String(localized: "Purple")
+        case .pink: String(localized: "Pink")
+        case .gray: String(localized: "Gray")
+        }
+    }
 }
 
 private struct SimpleBotShapeOutline: Shape {

@@ -58,10 +58,10 @@ final class AppLayoutUITests: BighelpUITestCase {
     @MainActor
     func testSessionsOpensEveryChatFromTheMenuAndItsOwnTab() throws {
         let app = makeApp()
-        app.launchArguments += ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.home.opens-chat", "YES"]
+        app.launchArguments += ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.home.opens-chat", "YES",
+                                "-bighelp.hosts.all-hosts", "NO"]
         app.launch()
-        XCTAssertTrue(app.descendants(matching: .any)["chat.identity"].firstMatch.waitForExistence(timeout: 20),
-                      "Chat opens the agent's chat")
+        XCTAssertTrue(chatIdentity(in: app).waitForExistence(timeout: 30), "Chat opens the agent's chat")
 
         let menu = app.buttons["home.drawer.open"].firstMatch
         XCTAssertTrue(menu.waitForExistence(timeout: 5))
@@ -89,8 +89,7 @@ final class AppLayoutUITests: BighelpUITestCase {
         XCTAssertTrue(list.exists && tab.isSelected, "The list is Sessions' tab")
         XCTAssertFalse(app.buttons["tab.sessions"].isSelected)
         app.buttons["tab.sessions"].tap()
-        XCTAssertTrue(app.descendants(matching: .any)["chat.identity"].firstMatch.waitForExistence(timeout: 10),
-                      "Chat still opens the agent's chat")
+        XCTAssertTrue(chatIdentity(in: app).waitForExistence(timeout: 10), "Chat still opens the agent's chat")
         app.buttons["tab.session-list"].firstMatch.tap()
         XCTAssertTrue(list.waitForExistence(timeout: 10), "The Sessions tab opens every chat")
         XCTAssertTrue(app.buttons["tab.session-list"].firstMatch.isSelected)

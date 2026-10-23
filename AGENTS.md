@@ -31,6 +31,8 @@ change in both repos.
     (`BighelpAppLayout`). ☰ lists every place the bar doesn't hold, so nothing is out of reach, and Agents
     and Settings always (`staysInMenu`): quick screens hide the bar. A new place
     in ☰ is a `BighelpPlace` case; a page that can be pinned also needs an `AppTab` and a root in `rootTabs`.
+    Sessions' tab (`AppTab.sessionList`) is the Chat tab's own list: `selectedTab` stays `.sessions`, and only
+    the bar lights Sessions (`selectedBarTab`).
   - Long-stay screens (Chat, Agents, Projects, Kanban, Workflows, Scheduled tasks) open from ☰ as screens of
     their own, with ☰ in the corner (`AppTab.isLongStay`). Quick ones (Usage; Feed, Ideas, Goals and Files when
     the bar doesn't hold them) slide in over where you are, with Back. Settings is a sheet: Back steps through

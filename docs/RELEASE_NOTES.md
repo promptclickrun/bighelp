@@ -5,6 +5,13 @@ short sentences, one instruction in each step, and the active voice.
 
 ## 2.6.14
 
+### Sessions
+
+- **Sessions in the menu:** the menu (☰) now has a **Sessions** row below **Agents**. It opens the list of all your
+  chats. If you changed **App layout** before, **Sessions** is at the end of the menu.
+- **Sessions in the bottom bar:** to put it there, go to **Settings** › **Appearance** › **App layout** and tap the
+  plus button beside **Sessions**. **Chat** still opens your agent's chat.
+
 ### Fixes
 
 - **Faster after you come back to bighelp:** bighelp now gets your chat list from your computer with up to four

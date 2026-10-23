@@ -97,6 +97,12 @@ not arbitrary ancestor or branch operations. Stored metadata readback verifies
 returned flags where REST exposes them; `unread` uses the mutation
 acknowledgement because detail does not expose an equivalent Boolean.
 
+Every edit and delete of a saved chat (title, archive, hide, pin, unread, New Bot Chat, delete) goes through
+`DirectHermesFencedSessionEdit`: when the row's detail has an integer `runtime_revision`, the request sends a fresh
+lowercase-UUID `request_id` and `expected_revision` (and `expected_generation` for a delete). One `revision_conflict`
+or `stale_generation` is read again and sent once more under a new ID. A detail without the revision (older Hermes) gets
+the plain body, never the new fields; Hermes' own 409 words (`client_upgrade_required`…) reach the alert.
+
 Generic conversation deletion is disabled. The explicit internal
 `deleteNativeRow` operation refreshes the catalog target and returns a row-only
 receipt that warns other history may remain. Hermes deletes that row and

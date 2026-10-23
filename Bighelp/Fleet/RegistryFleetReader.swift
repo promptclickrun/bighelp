@@ -68,26 +68,34 @@ final class RegistryFleetReader: FleetHostReading {
     /// when archived, which retires it as Hermes Desktop does.
     func updateChat(_ change: FleetChatChange, chat: FleetChat) async throws {
         try await withWorkspace(chat.hostID) { workspace, owner, _, _ in
-            let target: [String: BighelpJSONValue] = [
-                "session_id": .string(chat.storedSessionID), "profile": .string(chat.profileID),
-            ]
-            let botChat = chat.title == "Bot Chat"
-            var fields: [String: BighelpJSONValue]
-            switch change {
-            case .rename(let title):
-                if botChat {
-                    let shown = try await workspace.perform(.sessionUpdate, payload: target.merging(["hidden": .boolean(false)]) { $1 },
-                                                            owner: owner)
-                    guard shown["ok"]?.boolean == true else { throw WorkspaceClientError.invalidResponse }
-                }
-                fields = ["title": .string(try SessionTitleRules.validated(title))]
-            case .archive:
-                fields = ["archived": .boolean(true)]
-                if botChat { fields["hidden"] = .boolean(true) }
-            }
-            let response = try await workspace.perform(.sessionUpdate, payload: target.merging(fields) { $1 }, owner: owner)
-            guard response["ok"]?.boolean == true else { throw WorkspaceClientError.invalidResponse }
+            try await Self.apply(change, to: chat, edits: DirectHermesFencedSessionEdit(perform: { operation, payload in
+                try await workspace.perform(operation, payload: payload, owner: owner)
+            }))
         }
+    }
+
+    /// The edits of `updateChat`, each sent with Hermes' edit check (`DirectHermesFencedSessionEdit`).
+    static func apply(_ change: FleetChatChange, to chat: FleetChat,
+                      edits: DirectHermesFencedSessionEdit) async throws {
+        let botChat = chat.title == "Bot Chat"
+        var fields: [String: BighelpJSONValue]
+        var revision: Int?
+        switch change {
+        case .rename(let title):
+            if botChat {
+                let shown = try await edits.update(chat.storedSessionID, profile: chat.profileID,
+                                                   fields: ["hidden": .boolean(false)])
+                guard shown.response["ok"]?.boolean == true else { throw WorkspaceClientError.invalidResponse }
+                revision = shown.revision
+            }
+            fields = ["title": .string(try SessionTitleRules.validated(title))]
+        case .archive:
+            fields = ["archived": .boolean(true)]
+            if botChat { fields["hidden"] = .boolean(true) }
+        }
+        let receipt = try await edits.update(chat.storedSessionID, profile: chat.profileID, fields: fields,
+                                             knownRevision: revision)
+        guard receipt.response["ok"]?.boolean == true else { throw WorkspaceClientError.invalidResponse }
     }
 
     /// Runs `body` with a host's workspace client: connected for it when it

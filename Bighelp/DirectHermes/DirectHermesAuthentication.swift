@@ -436,6 +436,16 @@ final class DirectHermesHTTP {
             throughCloudflare: response.http.value(forHTTPHeaderField: "CF-RAY") != nil)
     }
 
+    /// Hermes refuses a chat edit or delete with 409 and a `detail` that names why: its edit check
+    /// (`client_upgrade_required`, `revision_conflict`, `stale_generation`…) or a busy chat. The
+    /// reason decides what the app does next, and the words are what people read.
+    static func sessionEditRefusal(_ request: DirectHermesHTTPRequest, _ response: Response) -> DirectHermesError? {
+        guard response.http.statusCode == 409, request.method == .patch || request.method == .delete,
+              request.path.hasPrefix("/api/sessions/"),
+              let detail = (try? response.object())?["detail"]?.string else { return nil }
+        return .rpcRejected(code: 409, message: HermesRefusalMessage(detail))
+    }
+
     static func requireSuccess(_ response: Response) throws {
         switch response.http.statusCode {
         case 200...299: return

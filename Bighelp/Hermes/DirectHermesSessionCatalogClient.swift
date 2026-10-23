@@ -555,12 +555,18 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
     /// Hermes refuses to rename a hidden chat titled "Bot Chat": hidden is what makes it
     /// the agent's Bot Chat. Shown in the list, it's a regular chat to rename, and the
     /// agent's next Bot Chat is a new one.
-    private func releaseBotChat(_ registryID: String, profileID: String) async throws {
-        let response = try await perform(.sessionUpdate, [
-            "session_id": .string(registryID), "profile": .string(profileID), "hidden": .boolean(false),
-        ])
-        guard response["ok"]?.boolean == true else { throw WorkspaceClientError.invalidResponse }
+    private func releaseBotChat(_ registryID: String, profileID: String,
+                                revisions: inout [String: Int]) async throws {
+        let receipt = try await sessionEdits.update(registryID, profile: profileID, fields: ["hidden": .boolean(false)],
+                                                    knownRevision: revisions[registryID])
+        guard receipt.response["ok"]?.boolean == true else { throw WorkspaceClientError.invalidResponse }
+        revisions[registryID] = receipt.revision
         forgetBotChat(profileKey: DirectHermesSessionIdentity.key(profileID))
+    }
+
+    /// Edits and deletes of saved chats, which current Hermes only takes with its edit check.
+    private var sessionEdits: DirectHermesFencedSessionEdit {
+        DirectHermesFencedSessionEdit(perform: { [self] operation, payload in try await perform(operation, payload) })
     }
 
     /// Read coverage only from this owner's matching retained history window.
@@ -765,7 +771,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
                     state.canonicalRegistryID = canonicalIDs[key]?.id
                     try retain(state)
                     if let stored = binding.coordinate.storedSessionID {
-                        _ = try? await perform(.sessionDelete, ["session_id": .string(stored), "profile": .string(profileID)])
+                        _ = try? await sessionEdits.delete(stored, profile: profileID)
                     }
                     return holder
                 }
@@ -777,7 +783,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
                 try retain(state)
                 // The empty chat made for it goes too, so none piles up on the host.
                 if let stored = binding.coordinate.storedSessionID {
-                    _ = try? await perform(.sessionDelete, ["session_id": .string(stored), "profile": .string(profileID)])
+                    _ = try? await sessionEdits.delete(stored, profile: profileID)
                 }
             }
             throw error
@@ -1188,15 +1194,17 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         // history, not the registry's root, and is hidden too.
         let isBotChat = record.isBotChat || binding.record.isBotChat
         var unhidden: Set<String> = []
+        // Each edit leaves its row one revision on; the next edit of that row starts from there.
+        var revisions: [String: Int] = [:]
         if let canonical = binding.canonicalRegistryID {
-            try await releaseBotChat(canonical, profileID: binding.coordinate.profileID)
+            try await releaseBotChat(canonical, profileID: binding.coordinate.profileID, revisions: &revisions)
             unhidden.insert(canonical)
             binding.canonicalRegistryID = nil
         }
         let targetID: String
         if let live = binding.coordinate.runtimeSessionID {
             if isBotChat, let stored = binding.coordinate.storedSessionID, !unhidden.contains(stored) {
-                try await releaseBotChat(stored, profileID: binding.coordinate.profileID)
+                try await releaseBotChat(stored, profileID: binding.coordinate.profileID, revisions: &revisions)
             }
             let response = try await perform(.sessionTitle, ["session_id": .string(live), "title": .string(title)])
             guard response["pending"]?.boolean == false, response["title"]?.string == title else {
@@ -1209,14 +1217,13 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
             let catalog = try await refreshedCatalogCoordinate(for: binding)
             for row in [catalog.canonicalRegistryID, isBotChat ? catalog.rowID : nil].compactMap({ $0 })
                 where unhidden.insert(row).inserted {
-                try await releaseBotChat(row, profileID: binding.coordinate.profileID)
+                try await releaseBotChat(row, profileID: binding.coordinate.profileID, revisions: &revisions)
             }
             targetID = catalog.rowID
             binding.catalog = catalog
-            let response = try await perform(.sessionUpdate, [
-                "session_id": .string(targetID),
-                "profile": .string(binding.coordinate.profileID), "title": .string(title),
-            ])
+            let response = try await sessionEdits.update(
+                targetID, profile: binding.coordinate.profileID, fields: ["title": .string(title)],
+                knownRevision: revisions[targetID]).response
             guard response["ok"]?.boolean == true, response["title"]?.string == title else {
                 throw WorkspaceClientError.invalidResponse
             }
@@ -1281,9 +1288,8 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
     func restoreArchivedChat(_ chat: SessionArchivedChat) async throws {
         try DirectHermesSessionValidation.coordinate(chat.profileID, maximum: 128)
         try DirectHermesSessionValidation.coordinate(chat.storedID)
-        let response = try await perform(.sessionUpdate, [
-            "session_id": .string(chat.storedID), "profile": .string(chat.profileID), "archived": .boolean(false),
-        ])
+        let response = try await sessionEdits.update(chat.storedID, profile: chat.profileID,
+                                                     fields: ["archived": .boolean(false)]).response
         guard response["ok"]?.boolean == true else { throw WorkspaceClientError.invalidResponse }
     }
 
@@ -1311,10 +1317,8 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         if let value = flags.pinned { fields["pinned"] = .boolean(value) }
         if let value = flags.unread { fields["unread"] = .boolean(value) }
         guard !fields.isEmpty else { throw WorkspaceClientError.invalidRequest }
-        let response = try await perform(.sessionUpdate, fields.merging([
-            "session_id": .string(targetID),
-            "profile": .string(binding.coordinate.profileID),
-        ]) { _, new in new })
+        let response = try await sessionEdits.update(targetID, profile: binding.coordinate.profileID,
+                                                     fields: fields).response
         guard response["ok"]?.boolean == true,
               fields.allSatisfy({ response[$0.key] == $0.value }) else {
             throw WorkspaceClientError.invalidResponse
@@ -1337,10 +1341,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
     func deleteNativeRow(_ record: SessionRecord) async throws -> DirectHermesNativeRowDeletionReceipt {
         let binding = try candidate(for: record)
         let catalog = try await refreshedCatalogCoordinate(for: binding)
-        let response = try await perform(.sessionDelete, [
-            "session_id": .string(catalog.rowID),
-            "profile": .string(binding.coordinate.profileID),
-        ])
+        let response = try await sessionEdits.delete(catalog.rowID, profile: binding.coordinate.profileID)
         guard response["ok"]?.boolean == true,
               response["already_absent"] == nil || response["already_absent"]?.boolean != nil else {
             throw WorkspaceClientError.invalidResponse

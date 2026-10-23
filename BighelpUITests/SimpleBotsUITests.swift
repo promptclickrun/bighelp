@@ -412,11 +412,11 @@ final class SimpleBotsUITests: BighelpUITestCase {
         input.typeText("Text 123")
         XCTAssertTrue(app.buttons["chat.send"].waitForExistence(timeout: 3))
         XCTAssertFalse(app.buttons["chat.voice"].exists, "Typing swaps voice mode for Send")
-        XCTAssertFalse(app.buttons["chat.composer.expand"].exists, "One line keeps the box full width")
+        XCTAssertFalse(app.buttons["chat.composer.expand"].exists, "One line has no Expand")
         save("simple-composer-typing-dark", app)
         input.typeText(" and a longer draft that wraps onto a second line in the box")
         XCTAssertTrue(app.buttons["chat.composer.expand"].waitForExistence(timeout: 3),
-                      "Expand sits beside the box once the draft wraps")
+                      "Expand shows inside the box once the draft wraps")
     }
 
     @MainActor

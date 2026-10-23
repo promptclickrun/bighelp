@@ -49,7 +49,9 @@ are historical (`docs/ui-v3-design.md`).
 - Product type is SF Pro. Root screens use large titles; section captions are small, bold, letterspaced and muted.
 - The message box: + beside it, and one pill inside it at its end: voice mode (a waveform) while it's empty,
   Send once there's text, Stop while the agent works. No other microphone button. A long draft's expand
-  button sits beside the box, so the pill never covers it.
+  button is a faint circle inside the box, at the top of the text's trailing end, and moves up above the pill
+  once the box is tall enough. The text always keeps that corner free (`ComposerTextCornerReserve`, an exclusion
+  path), so no text runs under the button and the text's width never changes when it shows.
 - Attachments in a draft are one small glass tag above the message box, lined up with the field
   (`DraftAttachmentRail`): the count first, then the kinds ("4 attached · 3 photos, 1 PDF"), with photos leading a
   stack of up to three thumbnails. One photo says "1 photo"; one file shows its name and size. While photos or files

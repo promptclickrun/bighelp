@@ -19,9 +19,50 @@ final class ReferenceComposerEditorSession {
     }
 }
 
+/// The top-trailing corner the message box's Expand button sits in. The text
+/// container leaves it empty, so no line, caret or selection ever runs under
+/// the button, and it is kept whether or not Expand shows, so the text never
+/// wraps again when the button comes or goes.
+struct ComposerTextCornerReserve: Equatable {
+    /// The corner cut out of the first line(s): the button and its gap.
+    var width: CGFloat
+    var height: CGFloat
+    /// How tall the box must be to hold the button above Send instead. Where
+    /// even the tallest box can't (a one-line viewport, tiny text with big
+    /// buttons), the text scrolls under the corner, so the whole trailing edge
+    /// is kept free instead.
+    var actionClearance: CGFloat
+}
+
 final class ReferenceComposerContainer: UIView {
     weak var coordinator: ReferenceComposerTextView.Coordinator?
     private var lastViewportSize: CGSize?
+    var cornerReserve: ComposerTextCornerReserve? {
+        didSet { if cornerReserve != oldValue { setNeedsLayout() } }
+    }
+    var viewportHeight: CGFloat? {
+        didSet { if viewportHeight != oldValue { setNeedsLayout() } }
+    }
+
+    /// Sets the text view's exclusion path for a layout `width`. Only the box
+    /// that holds the text view sets it, so the expanded editor keeps every line full.
+    func applyCornerReserve(forWidth width: CGFloat) {
+        guard let textView = subviews.first as? UITextView else { return }
+        let rect = reservedRect(forWidth: width, font: textView.font)
+        // Comparing first keeps TextKit from laying the draft out again on every pass.
+        guard textView.textContainer.exclusionPaths.first?.bounds != rect else { return }
+        textView.textContainer.exclusionPaths = rect.map { [UIBezierPath(rect: $0)] } ?? []
+    }
+
+    private func reservedRect(forWidth width: CGFloat, font: UIFont?) -> CGRect? {
+        guard let reserve = cornerReserve, width.isFinite, width > reserve.width * 2 else { return nil }
+        let lineHeight = font?.lineHeight ?? UIFont.bighelp(.body).lineHeight
+        let tallest = viewportHeight ?? lineHeight * CGFloat(DraftFieldSizing.maximumVisibleLines)
+        // Exclusion paths are in content coordinates: a box that scrolls with the
+        // button still in the text's corner needs the whole edge, not one line.
+        let height = tallest < reserve.actionClearance ? 100_000 : reserve.height
+        return CGRect(x: width - reserve.width, y: 0, width: reserve.width, height: height)
+    }
 
     override func didMoveToWindow() {
         super.didMoveToWindow()
@@ -37,6 +78,7 @@ final class ReferenceComposerContainer: UIView {
         let previousSize = lastViewportSize
         lastViewportSize = bounds.size
         textView.frame = bounds
+        applyCornerReserve(forWidth: bounds.width)
         if previousSize != bounds.size, bounds.width > 0, bounds.height > 0, textView.isFirstResponder,
            !textView.isTracking, !textView.isDragging, !textView.isDecelerating {
             textView.layoutIfNeeded()
@@ -94,6 +136,8 @@ struct ReferenceComposerTextView: UIViewRepresentable {
     var onReturnKey: ((ComposerReturnKey) -> Bool)?
     var onSelectionChange: (Int?) -> Void = { _ in }
     var onExpansionAvailabilityChange: (Bool) -> Void = { _ in }
+    /// The compact box's Expand corner (`ComposerTextCornerReserve`); nil keeps every line full.
+    var cornerReserve: ComposerTextCornerReserve?
 
     func makeCoordinator() -> Coordinator {
         if let coordinator = session.coordinator { return coordinator }
@@ -138,6 +182,8 @@ struct ReferenceComposerTextView: UIViewRepresentable {
     }
 
     func updateUIView(_ container: ReferenceComposerContainer, context: Context) {
+        container.cornerReserve = expanded ? nil : cornerReserve
+        container.viewportHeight = viewportHeight
         context.coordinator.updateSurface(self, in: container)
     }
 
@@ -148,10 +194,17 @@ struct ReferenceComposerTextView: UIViewRepresentable {
     func sizeThatFits(_ proposal: ProposedViewSize, uiView container: ReferenceComposerContainer, context: Context) -> CGSize? {
         guard let uiView = session.textView, let width = proposal.width, width > 0 else { return nil }
         if expanded, let height = proposal.height { return CGSize(width: width, height: height) }
+        // Measure with the Expand corner at this width, then put it back for the
+        // width the box has, so what's drawn never keeps a measuring pass's corner.
+        let ownsTextView = uiView.superview === container
+        if ownsTextView { container.applyCornerReserve(forWidth: width) }
         let measured = uiView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
+        if ownsTextView, container.bounds.width > 0, abs(container.bounds.width - width) > 0.5 {
+            container.applyCornerReserve(forWidth: container.bounds.width)
+        }
         let lineHeight = uiView.font?.lineHeight ?? UIFont.bighelp(.body).lineHeight
         // Wrapped onto a second line (one line plus the editor's insets stays under two line heights):
-        // the expand button shows beside the box from there.
+        // the expand button shows inside the box from there.
         let overflowing = DraftFieldSizing.shouldOfferExpandedEditor(hasText: !uiView.text.isEmpty,
             measuredHeight: measured.height, lineHeight: lineHeight, thresholdLines: 2)
         // Only the width the box is laid out at decides. SwiftUI also measures it at
@@ -279,6 +332,8 @@ struct ReferenceComposerTextView: UIViewRepresentable {
                 container.addSubview(view)
                 view.frame = container.bounds
                 view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+                // The other box may have left its corner (or none) on the shared text view.
+                container.applyCornerReserve(forWidth: container.bounds.width)
                 host = container
             }
             if view.isEditable != update.isEnabled { view.isEditable = update.isEnabled }

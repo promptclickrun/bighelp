@@ -13,10 +13,13 @@ struct DraftCaretSelection {
 }
 
 enum DraftFieldSizing {
+    /// The message box grows to this many lines, then scrolls.
+    static let maximumVisibleLines = 4
+
     static func height(
         measuredHeight: CGFloat,
         lineHeight: CGFloat,
-        maximumVisibleLines: Int = 4
+        maximumVisibleLines: Int = DraftFieldSizing.maximumVisibleLines
     ) -> CGFloat {
         let boundedLineHeight = max(lineHeight, 1)
         let maximumHeight = boundedLineHeight * CGFloat(max(maximumVisibleLines, 1))

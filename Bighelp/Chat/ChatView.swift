@@ -621,9 +621,10 @@ struct ChatView: View {
             }
             .overlay(alignment: .bottom) {
                 VStack(spacing: 0) {
-                    // Takes every spare point first: half-folded, the message box's area is only
-                    // as tall as the space under the fold.
-                    Spacer(minLength: headerHeight).layoutPriority(1)
+                    // Half-folded, it takes every spare point first, so the message box's area is
+                    // only as tall as the space under the fold. Only then: elsewhere the message box
+                    // and the bar keep their own height.
+                    Spacer(minLength: headerHeight).layoutPriority(laptopDeckHeight > 0 ? 1 : 0)
                     VStack(spacing: 0) {
                         // Half-folded like a laptop: everything under the fold is the message box's.
                         // Typing, it rests on the keyboard; otherwise it sits just under the fold.

@@ -29,6 +29,8 @@ struct ClipboardImagePasteRequest {
 final class ClipboardPasteTextView: UITextView, ComposerReturnKeyHandling {
     var onPasteImageProviders: (([NSItemProvider]) -> Void)?
     var isClipboardImagePasteEnabled = true
+    /// Dropped photos and files (`ComposerAttachmentDropTarget`).
+    lazy var attachmentDrop = ComposerAttachmentDropTarget(textView: self)
     /// Hardware Return keys. True when the chat handled the key (sent, or
     /// showed send choices); false types a new line. Nil leaves Return alone.
     var onReturnKey: ((ComposerReturnKey) -> Bool)?

@@ -201,6 +201,7 @@ struct MarkdownSourceTextView: UIViewRepresentable {
     let accessibilityLabel: String
     var focus: FocusState<Bool>.Binding?
     var onPasteImageProviders: (([NSItemProvider]) -> Void)? = nil
+    var onDropAttachmentProviders: (([NSItemProvider]) -> Void)? = nil
     var onReturnKey: ((ComposerReturnKey) -> Bool)? = nil
     var contentRevision: Int = 0
     var focusOwner: RichDraftFocusOwner? = nil
@@ -236,6 +237,7 @@ struct MarkdownSourceTextView: UIViewRepresentable {
         context.coordinator.parent = self
         textView.isClipboardImagePasteEnabled = onPasteImageProviders != nil
         textView.onPasteImageProviders = onPasteImageProviders
+        textView.attachmentDrop.onDropProviders = onDropAttachmentProviders
         textView.onReturnKey = onReturnKey
         let isExternalTransaction = context.coordinator.appliedRevision != contentRevision
         if (isExternalTransaction || !textView.isFirstResponder), textView.markedTextRange == nil {
@@ -259,6 +261,7 @@ struct MarkdownSourceTextView: UIViewRepresentable {
     static func dismantleUIView(_ view: ClipboardPasteTextView, coordinator: Coordinator) {
         coordinator.focusOwner.detach(view)
         view.onPasteImageProviders = nil
+        view.attachmentDrop.onDropProviders = nil
         view.isClipboardImagePasteEnabled = false
         view.delegate = nil
         view.undoManager?.removeAllActions(withTarget: coordinator)
@@ -353,6 +356,7 @@ struct RichDraftEditor: View {
     private let isFocused: FocusState<Bool>.Binding
     private let identifierPrefix: String
     private let onPasteImageProviders: (([NSItemProvider]) -> Void)?
+    private let onDropAttachmentProviders: (([NSItemProvider]) -> Void)?
     /// A chat's message box takes hardware Return keys; the Scratchpad doesn't.
     private let onReturnKey: ((ComposerReturnKey) -> Bool)?
     private let onRecoveryStateChange: (RichDraftRecoveryState) -> Void
@@ -383,6 +387,7 @@ struct RichDraftEditor: View {
         isFocused: FocusState<Bool>.Binding,
         identifierPrefix: String = "chat.composer.expanded",
         onPasteImageProviders: (([NSItemProvider]) -> Void)? = nil,
+        onDropAttachmentProviders: (([NSItemProvider]) -> Void)? = nil,
         onReturnKey: ((ComposerReturnKey) -> Bool)? = nil,
         recovery: RichDraftRecoveryState? = nil,
         onRecoveryStateChange: @escaping (RichDraftRecoveryState) -> Void
@@ -391,6 +396,7 @@ struct RichDraftEditor: View {
         self.isFocused = isFocused
         self.identifierPrefix = identifierPrefix
         self.onPasteImageProviders = onPasteImageProviders
+        self.onDropAttachmentProviders = onDropAttachmentProviders
         self.onReturnKey = onReturnKey
         self.onRecoveryStateChange = onRecoveryStateChange
         initialRecovery = recovery
@@ -451,6 +457,7 @@ struct RichDraftEditor: View {
                         : "Scratchpad",
                     focus: isFocused,
                     onPasteImageProviders: onPasteImageProviders,
+                    onDropAttachmentProviders: onDropAttachmentProviders,
                     onReturnKey: onReturnKey,
                     contentRevision: sourceRevision,
                     focusOwner: focusOwner
@@ -466,6 +473,7 @@ struct RichDraftEditor: View {
                         ? "Expanded message" : "Scratchpad",
                     focus: isFocused,
                     onPasteImageProviders: onPasteImageProviders,
+                    onDropAttachmentProviders: onDropAttachmentProviders,
                     onReturnKey: onReturnKey,
                     onEdit: { text, selection, composing in
                         accept(text, selection: selection, isComposing: composing)

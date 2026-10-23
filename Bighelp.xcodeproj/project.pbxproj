@@ -92,6 +92,7 @@
 		0CE9C43DF3F65AAAB9774C17 /* BighelpCardNetworkPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D12A9A183C6B09B9D6AF577 /* BighelpCardNetworkPolicy.swift */; };
 		0D100B37340F649C41416764 /* BighelpFontCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DB9EF46E1E97ADD774C7AAD /* BighelpFontCatalogTests.swift */; };
 		0D3F9602067C53E5067B50CD /* YouTubeVideo.swift in Sources */ = {isa = PBXBuildFile; fileRef = D06C24D87C372A65A26A919F /* YouTubeVideo.swift */; };
+		0D40D111275B41726C604E90 /* ComposerAttachmentDropTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97ABB3DF34D521C7C64F84F1 /* ComposerAttachmentDropTests.swift */; };
 		0D8E1F10385914665BDE0916 /* ChatPDFPagesAttachmentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 162EE5C3663FE108138730F8 /* ChatPDFPagesAttachmentView.swift */; };
 		0DEFBB34FA5816364DF7A136 /* ProjectsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63251885F39D2000A08AC761 /* ProjectsStoreTests.swift */; };
 		0E052909DB294266DB3D46E3 /* DirectHermesReactionHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05971E8F375C4B8871760975 /* DirectHermesReactionHistory.swift */; };
@@ -1113,6 +1114,7 @@
 		A4C2A472F47C2ACFBAAFDC50 /* BighelpKanbanWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8540B54D37AC7754A2D6B4AB /* BighelpKanbanWidget.swift */; };
 		A4FECAE76C68178FECEC3222 /* DeviceAlarmsToolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92EE7F74E34D732EF562D242 /* DeviceAlarmsToolTests.swift */; };
 		A502E93285ADE122D390D37C /* bighelp-trick-spring.json in Resources */ = {isa = PBXBuildFile; fileRef = 8CAB7EADE627EDE9A8A189AC /* bighelp-trick-spring.json */; };
+		A555C3140D47F2D3F69DF6A8 /* ComposerAttachmentDrop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 580978D40E72CAB3863619A6 /* ComposerAttachmentDrop.swift */; };
 		A585B165139B51D80E47C74C /* bighelp-trick-bunny.json in Resources */ = {isa = PBXBuildFile; fileRef = F9ED060AEBD25162FD0DD9C0 /* bighelp-trick-bunny.json */; };
 		A59E59CBEB264CAE459B2C17 /* templates-save.json in Resources */ = {isa = PBXBuildFile; fileRef = D3D2F8B1EC1B801E839E9497 /* templates-save.json */; };
 		A5A506094873E5A9C79E5935 /* soul-lens.md in Resources */ = {isa = PBXBuildFile; fileRef = 4C6DBCCBBC55CBBA9186BEF1 /* soul-lens.md */; };
@@ -2412,6 +2414,7 @@
 		5773624C45D469AD5E685C4B /* DeviceMusicToolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceMusicToolTests.swift; sourceTree = "<group>"; };
 		578DE4F4361908BAD8275D2F /* ManagementSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagementSearch.swift; sourceTree = "<group>"; };
 		579F050808B1CE8C5147D10F /* BighelpThinkingOrbTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpThinkingOrbTests.swift; sourceTree = "<group>"; };
+		580978D40E72CAB3863619A6 /* ComposerAttachmentDrop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerAttachmentDrop.swift; sourceTree = "<group>"; };
 		580AB2B819C0E24ADA7B2FB0 /* ProviderLogos-NOTICES.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "ProviderLogos-NOTICES.txt"; sourceTree = "<group>"; };
 		5839EBC64D344E43871E5958 /* ChatAttributionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatAttributionTests.swift; sourceTree = "<group>"; };
 		58625F7B2E999825B55E3351 /* ProviderUsageUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderUsageUITests.swift; sourceTree = "<group>"; };
@@ -2854,6 +2857,7 @@
 		975A91EBDB1C161C5F813C12 /* HostOperationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostOperationsView.swift; sourceTree = "<group>"; };
 		976873BD4A04753268CBA227 /* WorkflowFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowFlowView.swift; sourceTree = "<group>"; };
 		9775DDC3330098E37AD98104 /* ShellFeatureStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellFeatureStore.swift; sourceTree = "<group>"; };
+		97ABB3DF34D521C7C64F84F1 /* ComposerAttachmentDropTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerAttachmentDropTests.swift; sourceTree = "<group>"; };
 		97C4947AC3EDDEA0A082CA13 /* DeferredVoiceSessionClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeferredVoiceSessionClient.swift; sourceTree = "<group>"; };
 		97E85DBCBB8DDC592F728728 /* AppleDeviceToolServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleDeviceToolServiceTests.swift; sourceTree = "<group>"; };
 		97EA4A5348E78AB7B934304D /* NativeDeviceToolSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeDeviceToolSession.swift; sourceTree = "<group>"; };
@@ -4678,6 +4682,7 @@
 				21796C5BE7BB0044774A8C36 /* CompanionReactionTests.swift */,
 				56C6BE492AC88D63BDEC7A9A /* CompanionStoreTests.swift */,
 				EB79AD3628A20BBEB183791B /* CompanionVoicePlaybackTests.swift */,
+				97ABB3DF34D521C7C64F84F1 /* ComposerAttachmentDropTests.swift */,
 				06FD31C123E82129F64466A0 /* ComposerReturnKeyTests.swift */,
 				9F37A3435A5BA30BBD8998B0 /* ComposioAppsTests.swift */,
 				1A70F976C0CC391A0B67AF51 /* ConfiguredWorkspaceFilesTests.swift */,
@@ -5926,6 +5931,7 @@
 				EF0FC423CD328CD1CD1ADF2B /* ClipboardDraftTextEditor.swift */,
 				BCCFBD412402D4F7B54F6035 /* ClipboardImagePaste.swift */,
 				4B45258C70F501D58F768487 /* ClipboardImagePasteControl.swift */,
+				580978D40E72CAB3863619A6 /* ComposerAttachmentDrop.swift */,
 				AD099D1782E37EF7351F4BA0 /* ComposerReturnKey.swift */,
 				F91AB3213E2C4E85CBED57B4 /* ConversationClient.swift */,
 				EA34CCD2CFE325CDC15584CB /* ExpandedDraftEditor.swift */,
@@ -6896,6 +6902,7 @@
 				213AF4500013854447A6F8E1 /* CompanionSettingsView.swift in Sources */,
 				5930C45B7848380B5ABA0A76 /* CompanionSurfacePhysics.swift in Sources */,
 				35781E5C253B94D0517FC009 /* CompanionViewportObserver.swift in Sources */,
+				A555C3140D47F2D3F69DF6A8 /* ComposerAttachmentDrop.swift in Sources */,
 				B480B5B9FCECB638734C0B2A /* ComposerReturnKey.swift in Sources */,
 				694C55C8A031A0C7CE4E909C /* ComposioAccount.swift in Sources */,
 				09E6D796342C13C363780B9C /* ComposioAgentHost.swift in Sources */,
@@ -7783,6 +7790,7 @@
 				BBA132CACFBE9000296578AB /* CompanionReactionTests.swift in Sources */,
 				B2DFA7BD7F8DE8846B888F8A /* CompanionStoreTests.swift in Sources */,
 				8FED26FC8F9190D355179D90 /* CompanionVoicePlaybackTests.swift in Sources */,
+				0D40D111275B41726C604E90 /* ComposerAttachmentDropTests.swift in Sources */,
 				5DEA5937AFB0A225E6C52A79 /* ComposerReturnKeyTests.swift in Sources */,
 				1A13CB25130AF752D5D5CFAE /* ComposioAppsTests.swift in Sources */,
 				2EEE9B061C6DBDFFA64CE627 /* ConfiguredWorkspaceFilesTests.swift in Sources */,

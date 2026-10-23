@@ -78,6 +78,15 @@ extension ChatModel {
         if let progress = draftAttachmentImport, progress.finished >= progress.total { draftAttachmentImport = nil }
     }
 
+    /// Photos and files dropped on the message box, through the same progress,
+    /// limits and "didn't attach" retry as Add › Photo and Add › File.
+    func importDroppedAttachments(_ providers: [NSItemProvider]) {
+        guard !isComposerAttachmentInputDisabled else { return }
+        let drop = ComposerAttachmentDrop.imports(from: providers)
+        guard !drop.loaders.isEmpty else { return }
+        Task { await importDraftAttachments(drop.kind, drop.loaders) }
+    }
+
     func retryFailedDraftAttachments() async {
         let failures = draftAttachmentFailures
         guard !failures.isEmpty else { return }

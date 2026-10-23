@@ -9,6 +9,7 @@ struct ClipboardDraftTextEditor: UIViewRepresentable {
     let isFocused: FocusState<Bool>.Binding
     let isEnabled: Bool
     let onPasteImageProviders: ([NSItemProvider]) -> Void
+    var onDropAttachmentProviders: (([NSItemProvider]) -> Void)? = nil
     var onReturnKey: ((ComposerReturnKey) -> Bool)? = nil
 
     func makeCoordinator() -> Coordinator {
@@ -34,6 +35,7 @@ struct ClipboardDraftTextEditor: UIViewRepresentable {
         view.isEditable = isEnabled
         view.isClipboardImagePasteEnabled = isEnabled
         view.onPasteImageProviders = context.coordinator.pasteImages
+        view.attachmentDrop.onDropProviders = isEnabled ? onDropAttachmentProviders : nil
         view.onReturnKey = onReturnKey
         return view
     }
@@ -54,6 +56,7 @@ struct ClipboardDraftTextEditor: UIViewRepresentable {
         view.isEditable = isEnabled
         view.isClipboardImagePasteEnabled = isEnabled
         view.onPasteImageProviders = context.coordinator.pasteImages
+        view.attachmentDrop.onDropProviders = isEnabled ? onDropAttachmentProviders : nil
 
         if isFocused.wrappedValue, !view.isFirstResponder {
             DispatchQueue.main.async { [weak view] in
@@ -68,6 +71,7 @@ struct ClipboardDraftTextEditor: UIViewRepresentable {
     static func dismantleUIView(_ view: ClipboardPasteTextView, coordinator: Coordinator) {
         view.isClipboardImagePasteEnabled = false
         view.onPasteImageProviders = nil
+        view.attachmentDrop.onDropProviders = nil
         view.delegate = nil
         view.resignFirstResponder()
     }

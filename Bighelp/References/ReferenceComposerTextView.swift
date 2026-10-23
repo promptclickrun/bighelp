@@ -132,6 +132,8 @@ struct ReferenceComposerTextView: UIViewRepresentable {
     var viewportHeight: CGFloat?
     var expanded = false
     var onPasteImageProviders: (([NSItemProvider]) -> Void)?
+    /// Photos and files dropped on the box (`ComposerAttachmentDropTarget`).
+    var onDropAttachmentProviders: (([NSItemProvider]) -> Void)?
     /// Hardware Return keys (`ComposerReturnKeyHandling`). True means handled.
     var onReturnKey: ((ComposerReturnKey) -> Bool)?
     var onSelectionChange: (Int?) -> Void = { _ in }
@@ -272,6 +274,7 @@ struct ReferenceComposerTextView: UIViewRepresentable {
             let isEnabled: Bool
             let expanded: Bool
             let onPasteImageProviders: (([NSItemProvider]) -> Void)?
+            let onDropAttachmentProviders: (([NSItemProvider]) -> Void)?
             let onReturnKey: ((ComposerReturnKey) -> Bool)?
         }
         private weak var requestedHost: ReferenceComposerContainer?
@@ -305,7 +308,8 @@ struct ReferenceComposerTextView: UIViewRepresentable {
             pendingSurfaceUpdate = SurfaceUpdate(configuration: surface.configuration,
                 theme: BighelpTheme.resolve(appearance: surface.appearance, colorScheme: surface.colorScheme, contrast: surface.contrast),
                 isEnabled: surface.isEnabled, expanded: surface.expanded,
-                onPasteImageProviders: surface.onPasteImageProviders, onReturnKey: surface.onReturnKey)
+                onPasteImageProviders: surface.onPasteImageProviders,
+                onDropAttachmentProviders: surface.onDropAttachmentProviders, onReturnKey: surface.onReturnKey)
             guard !surfaceUpdateScheduled else { return }
             surfaceUpdateScheduled = true
             DispatchQueue.main.async { [weak self] in
@@ -345,6 +349,7 @@ struct ReferenceComposerTextView: UIViewRepresentable {
             if view.textColor != ink { view.textColor = ink }
             view.isClipboardImagePasteEnabled = update.isEnabled && update.onPasteImageProviders != nil
             view.onPasteImageProviders = update.onPasteImageProviders
+            view.attachmentDrop.onDropProviders = update.isEnabled ? update.onDropAttachmentProviders : nil
             view.onReturnKey = update.onReturnKey
             view.accessibilityLabel = update.expanded ? "Expanded message" : "Message"
             view.accessibilityIdentifier = update.expanded ? "chat.composer.expanded.text" : "chat.composer.text"
@@ -366,6 +371,7 @@ struct ReferenceComposerTextView: UIViewRepresentable {
             discardTransferredSelection()
             scheduleHubDetachment(parent.hub)
             view?.onPasteImageProviders = nil
+            view?.attachmentDrop.onDropProviders = nil
             view?.onReturnKey = nil
             view?.isClipboardImagePasteEnabled = false
             cancelFocusRestoration()

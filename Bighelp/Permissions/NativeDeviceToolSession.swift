@@ -286,7 +286,8 @@ final class NativeDeviceToolSession {
 
     /// Connect refusals that leave no channel on the host, so there is nothing to close.
     private static let refusedBeforeOpening: Set<String> = [
-        chatHeldCode, "profile_not_served", "session_not_found", "channel_capacity", "channel_id_consumed",
+        chatHeldCode, "profile_not_served", "profile_not_found", "session_not_found", "channel_capacity",
+        "channel_id_consumed",
     ]
 
     /// The plugin's own reason for a refusal: a short code, or nil.

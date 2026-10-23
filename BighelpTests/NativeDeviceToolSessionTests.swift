@@ -173,6 +173,18 @@ struct NativeDeviceToolSessionTests {
         #expect(fixture.http.refusals.isEmpty)
     }
 
+    /// The agent's profile is gone from the host (deleted while its chat was open): nothing opened,
+    /// so nothing is closed either.
+    @Test func aProfileTheHostDoesNotHaveOpensAndClosesNothing() async throws {
+        let fixture = try Fixture()
+        fixture.http.features.append("native-device-tools-agents-v1")
+        fixture.http.missingProfiles = ["retired"]
+        let session = fixture.session(agentID: "retired")
+        await #expect(throws: WorkspaceClientError.self) { try await session.run() }
+        #expect(fixture.http.paths == ["context", "device-tools/connect"])
+        #expect(fixture.http.closeBodies.isEmpty)
+    }
+
     /// Going to the background past the grace tells a newer plugin the phone is only away, so a call
     /// waits for it to come back instead of failing at once (`native-device-tools-wait-v1`).
     @Test func aChannelClosedForTheBackgroundSaysItIsPaused() async throws {
@@ -442,6 +454,8 @@ struct NativeDeviceToolSessionTests {
         var closeBodies: [[String: BighelpJSONValue]] = []
         /// The agent each channel opened for.
         var connectedAgents: [String] = []
+        /// Profiles the host doesn't have (`profile_not_found`).
+        var missingProfiles: Set<String> = []
         /// The codes the plugin would answer and log (`bighelp native request rejected: …`).
         var refusals: [String] = []
         var openChannels: Int { purge(); return channels.count }
@@ -473,6 +487,9 @@ struct NativeDeviceToolSessionTests {
                 guard let agent = request.body?["agentId"]?.string,
                       features.contains("native-device-tools-agents-v1") || agent == servingProfile else {
                     return try refusal("profile_not_served", status: 403, request: request, requestGuard: requestGuard)
+                }
+                if missingProfiles.contains(agent) {
+                    return try refusal("profile_not_found", status: 404, request: request, requestGuard: requestGuard)
                 }
                 guard let id = channel.string, let device = request.body?["deviceId"]?.string,
                       let session = request.body?["sessionId"]?.string else { throw WorkspaceClientError.invalidRequest }

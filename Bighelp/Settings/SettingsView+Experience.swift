@@ -43,6 +43,9 @@ extension SettingsView {
             }
             .bighelpMacSettingsRowInsets()
             .accessibilityIdentifier("settings.unified-mode-toggle")
+            if (settings.simpleBotsEnabled || settings.codeModeEnabled), BighelpChatSwitcher.isOffered(screen: screen) {
+                chatSwitcherToggle
+            }
         } header: {
             Text("Experience")
         } footer: {
@@ -55,5 +58,19 @@ extension SettingsView {
             }
         }
         .listRowBackground(theme.surface)
+    }
+
+    /// The Duo folded, and iPad and Mac in landscape: the bots or sessions beside a chat.
+    var chatSwitcherToggle: some View {
+        Toggle(isOn: $settings.chatSwitcherEnabled) {
+            HStack(spacing: BighelpTokens.space12) {
+                BighelpIconTile(systemName: "rectangle.righthalf.inset.filled")
+                settingLabel(String(localized: "Chat switcher"),
+                             detail: String(localized: "Your bots, or your running sessions in Code, beside each chat."))
+            }
+            .padding(.horizontal, BighelpMenuRowLayout.labelInset)
+        }
+        .bighelpMacSettingsRowInsets()
+        .accessibilityIdentifier("settings.chat-switcher")
     }
 }

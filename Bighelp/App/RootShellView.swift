@@ -91,6 +91,9 @@ struct RootShellView: View {
     @State var isFleetNewChatPresented = false
     @Environment(\.workspaceConnections) var workspaceConnections
     @Environment(\.scenePhase) var scenePhase
+    @Environment(\.bighelpScreen) var screen
+    @Environment(\.bighelpSplitColumn) var splitColumn
+    @Environment(\.horizontalSizeClass) var horizontalSizeClass
     @State var connectionKeeper = WorkspaceConnectionKeeper()
     /// The computer and sign-in open screens belong to (`WorkspacePresentationContinuity`).
     @State var workspaceSignIn: WorkspaceSignIn?
@@ -111,6 +114,8 @@ struct RootShellView: View {
     @State var profileAgentID: String?
     @State var isAgentSwitcherPresented = false
     @State var isHomeDrawerPresented = false
+    /// This shell, for the open Duo's list: a new shell replaces the list the last one showed.
+    @State var splitColumnShellID = UUID()
     @State var didAutoOpenHomeChat = false
     /// The open Projects screens' chats and project details.
     @State var projectsStore: ProjectsStore?
@@ -588,21 +593,23 @@ struct RootShellView: View {
     /// The Unified Mode Toggle in the root bar, in place of the brand: on the Chat tab's list (when it
     /// opens on a list, or on all hosts) and on Code's home. The Chat tab's own chat and Bots' home
     /// draw their own headers with it.
-    private var barModeSwitch: BighelpModeSwitch? {
+    var barModeSwitch: BighelpModeSwitch? {
         [.sessions, .code].contains(appState.selectedTab) && !simpleBotsOn ? modeSwitch : nil
     }
 
     /// Feed, Ideas, Goals and Apps draw their own header (the agent's avatar).
     private var showsAgentBoard: Bool {
-        appState.path.isEmpty && appState.selectedTab.isAgentBoard
+        appState.path.isEmpty && showsAgentBoard(appState.selectedTab)
     }
+
+    func showsAgentBoard(_ tab: AppTab) -> Bool { tab.isAgentBoard }
 
     private var shell: some View {
         rootTabs
         .toolbar(.hidden, for: .tabBar)
         // Boards and Bots mode's home draw their own header. The home's stays hidden while a
         // chat is pushed over it too: its bar (with ☰) showed through for the length of Back.
-        .toolbar(showsAgentBoard || simpleBotsHomeIsRoot ? .hidden : .automatic, for: .navigationBar)
+        .toolbar(showsAgentBoard || simpleBotsHomeIsRoot || splitList != nil ? .hidden : .automatic, for: .navigationBar)
         .navigationTitle(showsAgentBoard || simpleBotsHomeIsRoot ? "" : rootNavigationTitle)
         // One title size on every tab: the bar's. A large title kept the size of the tab before
         // (small after Feed or Kanban, large after Chat), so the same screen looked different.
@@ -611,16 +618,7 @@ struct RootShellView: View {
             // ☰ always opens chats, agents, tasks and settings, on iPad too. Always part of the
             // root screen's bar (a pushed chat has its own, and boards hide it): added only once
             // a chat closed, it was sometimes dropped mid-switch, and Agents had no ☰.
-            ToolbarItem(placement: .topBarLeading) {
-                Button {
-                    isHomeDrawerPresented.toggle()
-                } label: {
-                    Image(systemName: "line.3.horizontal").bighelpToolbarIcon()
-                        .bighelpMenuDot(menuHasUnread)
-                }
-                .bighelpIconLabel(String(localized: "Chats and menu"), shortcut: "⌃⌘S")
-                .accessibilityIdentifier("home.drawer.open")
-            }
+            ToolbarItem(placement: .topBarLeading) { rootMenuButton }
             if let barModeSwitch {
                 // The Unified Mode Toggle takes the bar's middle on the Chat list; hosts stay in ☰.
                 ToolbarItem(placement: .principal) { BighelpModePill(modeSwitch: barModeSwitch) }
@@ -644,7 +642,7 @@ struct RootShellView: View {
         }
         #endif
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if showsBottomNavigation && !BighelpPlatform.usesTabOrnament {
+            if showsBottomNavigation && !BighelpPlatform.usesTabOrnament && !screen.usesSideBar {
                 // All agents has its own New chat, bottom right.
                 FloatingTabBar(selection: tabSelection, tabs: barTabs,
                                onNewChat: appState.selectedTab == .sessions && !fleetModeOn ? {
@@ -657,6 +655,19 @@ struct RootShellView: View {
             }
         }
         .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.bottom } action: { rootBottomSafeArea = $0 }
+        // The iPhone Duo: the bar's places go down the side strip with the screen's own buttons.
+        .toolbar {
+            if showsBottomNavigation && screen.usesSideBar {
+                BighelpStripTabs(selection: tabSelection, tabs: barTabs, unread: boardUnreadTabs,
+                                 onNewChat: appState.selectedTab == .sessions && !fleetModeOn ? {
+                                     appState.chatOpenedFromList = true
+                                     startNewChat(explicitAgentID: nil)
+                                 } : nil,
+                                 selectedTint: theme.action, tint: theme.secondaryText)
+            }
+        }
+        // The iPhone Duo open: the list beside the page.
+        .onChange(of: splitColumnKey, initial: true) { updateSplitColumn() }
         // Chat or Code mode: the launch's choice, then ☰'s switch.
         .onChange(of: settings.experience, initial: true) { applyExperience() }
         // Bots mode on or off: back to that mode's home, whatever was open.
@@ -781,7 +792,7 @@ struct RootShellView: View {
     }
 
     @ViewBuilder
-    private var rootTabs: some View {
+    var rootTabs: some View {
         // The conversation shell owns navigation. A hidden TabView creates a
         // UIKit containment boundary that drops feature search and toolbar actions.
         switch appState.selectedTab {
@@ -800,7 +811,7 @@ struct RootShellView: View {
         case .profile:
             workspaceSettings()
         case .sessions, .sessionList:
-            if simpleBotsOn { simpleBotsHome } else { sessionsRootTab }
+            if let splitList, splitList.isList { splitPlaceholder(splitList) } else if simpleBotsOn { simpleBotsHome } else { sessionsRootTab }
         case .feed, .ideas, .goals, .apps:
             agentBoardTab(appState.selectedTab)
         // Pinned to the bottom bar: the page ☰ opens, as a tab.
@@ -813,11 +824,23 @@ struct RootShellView: View {
         case .usage:
             routeDestination(.usage)
         case .code:
-            codeRootTab
+            if let splitList, splitList.isList { splitPlaceholder(splitList) } else { codeRootTab }
         }
     }
 
-    private var rootNavigationTitle: String {
+    /// ☰: chats, places, agents and Settings. The root's bar has it, and the open Duo's list.
+    var rootMenuButton: some View {
+        Button {
+            isHomeDrawerPresented.toggle()
+        } label: {
+            Image(systemName: "line.3.horizontal").bighelpToolbarIcon()
+                .bighelpMenuDot(menuHasUnread)
+        }
+        .bighelpIconLabel(String(localized: "Chats and menu"), shortcut: "⌃⌘S")
+        .accessibilityIdentifier("home.drawer.open")
+    }
+
+    var rootNavigationTitle: String {
         switch appState.selectedTab {
         case .sessions, .sessionList: fleetModeOn ? String(localized: "All agents") : String(localized: "Sessions")
         case .agents: String(localized: "Agents")
@@ -1022,7 +1045,7 @@ struct RootShellView: View {
     }
 
     @ViewBuilder
-    private var sessionsRootTab: some View {
+    var sessionsRootTab: some View {
         if fleetModeOn, let fleet {
             fleetHome(fleet)
         } else if case .sessions(let model)? = featureStore.preparedModel(for: .sessions) {

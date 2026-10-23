@@ -185,6 +185,7 @@ struct SimpleBotsSettingsView: View {
     @State private var isTimeZonePresented = false
     @AppStorage("bighelp.simple-bots.automatic-time-zone") private var automaticTimeZone = false
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.bighelpScreen) private var screen
     @BighelpThemeReader private var theme
 
     private var primary: AgentProfile? { context.agents.resolvedAgent(explicitID: nil) }
@@ -400,6 +401,18 @@ struct SimpleBotsSettingsView: View {
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("simple-bots.settings.appearance")
+            if BighelpChatSwitcher.isOffered(screen: screen) {
+                SimpleBotsDivider()
+                Toggle(isOn: Binding(get: { context.settings.chatSwitcherEnabled },
+                                     set: { context.settings.chatSwitcherEnabled = $0 })) {
+                    rowText(String(localized: "Chat switcher"),
+                            detail: String(localized: "Your top bots beside each chat. Tap one to go to its chat."))
+                }
+                .tint(SimpleBotColor.green.color)
+                .padding(.horizontal, BighelpTokens.space20)
+                .padding(.vertical, BighelpTokens.space12)
+                .accessibilityIdentifier("simple-bots.settings.chat-switcher")
+            }
         }
     }
 

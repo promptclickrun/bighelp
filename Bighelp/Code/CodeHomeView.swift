@@ -150,11 +150,7 @@ struct CodeHomeView: View {
     }
 
     private func status(of session: CodeSessionRecord) -> CodeSessionStatus {
-        if let launch = context.store.launch(for: session) {
-            if case .failed(let reason) = launch.step { return .failed(reason) }
-            return .starting("Sending your message…")
-        }
-        return context.status.status(of: session.id)
+        context.store.status(of: session, reader: context.status)
     }
 
     private var filterChips: some View {

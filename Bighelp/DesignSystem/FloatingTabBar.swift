@@ -459,7 +459,7 @@ extension AppTab {
         }
     }
 
-    fileprivate func systemImage(selected: Bool) -> String {
+    func systemImage(selected: Bool) -> String {
         switch (self, selected) {
         case (.home, true): "waveform.path"
         case (.home, false): "waveform.path"

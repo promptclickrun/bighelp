@@ -43,6 +43,7 @@ struct BighelpApp: App {
     private let shortcutService: BighelpShortcutService
     @State private var reflectiveVisionCamera: ReflectiveVisionCamera
     @State private var sideMenu = BighelpSideMenu()
+    @State private var splitColumn = BighelpSplitColumn()
     @State private var providerLogoStore: ProviderLogoStore?
     #if os(visionOS)
     @State private var spatialAvatar: SpatialAvatarModel
@@ -536,6 +537,10 @@ struct BighelpApp: App {
                         rootShell(native: native, navigation: navigation)
                     }
                     .modifier(BighelpSideMenuHost(menu: sideMenu))
+                    // The iPhone Duo open: the list beside the page.
+                    .modifier(BighelpSplitColumnHost(column: splitColumn))
+                    // Which iPhone Duo screen this is, for every screen, pushed ones too.
+                    .modifier(BighelpScreenPostureReader())
                     // Around the Dynamic Island: which agent is working, on what.
                     .environment(\.agentActivityInIsland, agentIsland.isAvailable)
                     #if !targetEnvironment(macCatalyst)

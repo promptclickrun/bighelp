@@ -54,6 +54,14 @@ The catalog pages each served profile's native REST sessions. Preview text is
 metadata, not a fabricated transcript message. Native REST's recent-activity
 heuristic is not promoted to running-agent evidence.
 
+A full list asks for its pages and its chats' `projects.for_cwd` lookups ahead of
+reading them, at most four at a time (`DirectHermesCatalogPrefetch`): every first
+page at once, and the rest once a first page gives its `total`. The list still reads
+each answer in the host's order, so its rows, its errors and where it stops are what
+one request after another gave. An answer it never reads, such as a page past
+`has_more` or the folder of a chat it skips, is dropped with its error. Taps from
+notifications, widgets and Shortcuts wait for this list after the app returns (#535).
+
 History requests use explicit profile, order, offset and bounded row limits.
 `latest` responses are already chronological. Physical row IDs and timestamps
 must not be used to reorder compaction projections. Complete hydration consumes

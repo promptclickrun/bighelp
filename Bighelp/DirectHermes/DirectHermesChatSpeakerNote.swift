@@ -10,25 +10,34 @@ protocol ChatSpeakerNoting: AnyObject, Sendable {
 /// The bighelp plugin's `native-people-v1` route. Sends the name you saved
 /// (never the "You" placeholder) and your person ID. Older plugins, no
 /// connection or a slow host all just mean the message goes without a name.
+///
+/// When the plugin's `/native/context` lists `native-card-objects-v1`, the note
+/// also says which object cards this app draws (`renders`), so the plugin lets
+/// the agent send them in this chat. Without that feature the note is exactly
+/// what older plugins accept: they refuse fields they don't know.
 @MainActor
 final class DirectHermesChatSpeakerNote: ChatSpeakerNoting {
     private let currentWorkspace: @MainActor () -> (any WorkspaceOperationPerforming)?
     private let name: @MainActor () -> String
     private let personID: @MainActor () -> String?
+    /// The features the plugin's context listed, read when the app connected; no request per turn.
+    private let pluginFeatures: @MainActor () -> Set<String>
 
     init(currentWorkspace: @escaping @MainActor () -> (any WorkspaceOperationPerforming)?,
          name: @escaping @MainActor () -> String,
-         personID: @escaping @MainActor () -> String? = { BighelpPersonID.current() }) {
+         personID: @escaping @MainActor () -> String? = { BighelpPersonID.current() },
+         pluginFeatures: @escaping @MainActor () -> Set<String> = { [] }) {
         self.currentWorkspace = currentWorkspace
         self.name = name
         self.personID = personID
+        self.pluginFeatures = pluginFeatures
     }
 
     func note(agentID: String, storedSessionID: String) async {
         guard let person = personID(), BighelpPersonID.isValid(person),
               let workspace = currentWorkspace(), let owner = workspace.owner else { return }
         let payload = Self.payload(agentID: agentID, storedSessionID: storedSessionID,
-                                   personID: person, name: name())
+                                   personID: person, name: name(), pluginFeatures: pluginFeatures())
         do {
             _ = try await workspace.perform(.peopleSpeaking, payload: payload, owner: owner)
         } catch WorkspaceClientError.conflict {
@@ -37,10 +46,16 @@ final class DirectHermesChatSpeakerNote: ChatSpeakerNoting {
         } catch {}
     }
 
-    static func payload(agentID: String, storedSessionID: String,
-                        personID: String, name: String) -> [String: BighelpJSONValue] {
-        ["agentId": .string(agentID), "sessionId": .string(storedSessionID),
-         "personId": .string(personID), "name": .string(UserIdentity.savedName(name))]
+    static func payload(agentID: String, storedSessionID: String, personID: String, name: String,
+                        pluginFeatures: Set<String> = []) -> [String: BighelpJSONValue] {
+        var payload: [String: BighelpJSONValue] = [
+            "agentId": .string(agentID), "sessionId": .string(storedSessionID),
+            "personId": .string(personID), "name": .string(UserIdentity.savedName(name)),
+        ]
+        if pluginFeatures.contains(BighelpCardObjects.feature) {
+            payload["renders"] = .array(BighelpCardObjects.renders.map(BighelpJSONValue.string))
+        }
+        return payload
     }
 }
 

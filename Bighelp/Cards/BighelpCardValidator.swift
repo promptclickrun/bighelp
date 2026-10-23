@@ -12,6 +12,7 @@ enum BighelpCardValidator {
     static let supportedElementTypes: Set<String> = [
         "card", "vstack", "hstack", "grid", "text", "metric", "badge",
         "progress", "chart", "table", "list", "divider", "spacer", "image",
+        "contact", "place", "music",
     ]
     private static let supportedOperations: Set<String> = [
         "coalesce", "add", "subtract", "multiply", "divide", "percent_change",
@@ -71,8 +72,14 @@ enum BighelpCardValidator {
                 throw BighelpCardValidationError.unknownElement
             }
             guard rawChildren.count <= maximumChildren else { throw BighelpCardValidationError.limitExceeded }
-            try validateElement(type: type, props: props, children: rawChildren)
-            try validateBindings(.object(props), sourceIDs: sourceIDs, depth: 0)
+            if BighelpCardObjects.types.contains(type) {
+                // Plain values only: a music object's `source` is a word, not a data source.
+                guard rawChildren.isEmpty else { throw BighelpCardValidationError.invalid }
+                try BighelpCardObjects.validate(type: type, props: props)
+            } else {
+                try validateElement(type: type, props: props, children: rawChildren)
+                try validateBindings(.object(props), sourceIDs: sourceIDs, depth: 0)
+            }
 
             active.insert(id)
             visited.insert(id)

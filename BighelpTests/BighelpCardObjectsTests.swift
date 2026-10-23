@@ -1,0 +1,234 @@
+import Foundation
+import Testing
+@testable import Bighelp
+
+/// Object components (`contact`, `place`, `music`): exactly the props, values
+/// and limits in docs/BIGHELP_CARDS.md › Object components, and nothing else.
+@MainActor
+struct BighelpCardObjectsTests {
+    // MARK: Contact
+
+    private static let contact: [String: BighelpJSONValue] = [
+        "name": .string("Jordan Sample"),
+        "subtitle": .string("Designer at Example Studio"),
+        "phones": .array([.object(["label": .string("mobile"), "value": .string("+1 (555) 010-0142")])]),
+        "emails": .array([.object(["label": .string("work"), "value": .string("jordan@example.com")])]),
+        "address": .object(["street": .string("12 Sample Street"), "city": .string("Testville"),
+                            "region": .string("CA"), "postal_code": .string("90000"),
+                            "country": .string("United States")]),
+        "contact_id": .string("ABCD-1234:ABPerson"),
+    ]
+
+    @Test func aFullContactValidatesAndReadsBack() throws {
+        try accepts("contact", Self.contact)
+        let contact = try BighelpCardContact(props: Self.contact)
+        #expect(contact.name == "Jordan Sample")
+        #expect(contact.phones.first?.value == "+1 (555) 010-0142")
+        #expect(contact.emails.first?.label == "work")
+        #expect(contact.address?.singleLine == "12 Sample Street, Testville, CA 90000, United States")
+        #expect(contact.contactID == "ABCD-1234:ABPerson")
+        try accepts("contact", ["name": .string("Jordan")])
+        // A phone or email may leave out its label.
+        try accepts("contact", ["name": .string("Jordan"), "phones": .array([.object(["value": .string("555 0100")])])])
+    }
+
+    @Test func contactRefusesWhatTheContractDoesNotAllow() throws {
+        try refuses("contact", [:])
+        try refuses("contact", ["name": .string("   ")])
+        try refuses("contact", ["name": .string(String(repeating: "a", count: 201))])
+        try refuses("contact", ["name": .integer(4)])
+        try refuses("contact", merged(Self.contact, ["nickname": .string("Jo")]))
+        try refuses("contact", merged(Self.contact, ["subtitle": .string(String(repeating: "a", count: 201))]))
+        try refuses("contact", merged(Self.contact, ["contact_id": .string(String(repeating: "a", count: 513))]))
+        // Phones: digits, spaces and + ( ) - . only, at least one digit, at most five.
+        try refuses("contact", phones("555-0100 ext 4"))
+        try refuses("contact", phones("tel:5550100"))
+        try refuses("contact", phones("+()- ."))
+        try refuses("contact", phones("５５５０１００")) // full-width digits
+        try accepts("contact", phones("+44 20.7946.0000"))
+        try refuses("contact", merged(Self.contact, ["phones": .array(Array(repeating: .object(["value": .string("5550100")]), count: 6))]))
+        try refuses("contact", merged(Self.contact, ["phones": .array([.object(["value": .string("5550100"), "kind": .string("x")])])]))
+        try refuses("contact", merged(Self.contact, ["phones": .array([.object(["label": .string(String(repeating: "a", count: 41)), "value": .string("5550100")])])]))
+        try refuses("contact", merged(Self.contact, ["phones": .array([.string("5550100")])]))
+        try refuses("contact", merged(Self.contact, ["phones": .string("5550100")]))
+        // Emails must look like one.
+        for bad in ["jordan", "jordan@", "@example.com", "jordan@example", "jordan@@example.com",
+                    "jordan smith@example.com", "jordan@example..com", "jordan@example.com?subject=hi",
+                    "<jordan@example.com>"] {
+            try refuses("contact", emails(bad))
+        }
+        try accepts("contact", emails("jordan.sample+cards@mail.example.co"))
+        // Address: the five parts only, each at most 100.
+        try refuses("contact", merged(Self.contact, ["address": .object(["planet": .string("Earth")])]))
+        try refuses("contact", merged(Self.contact, ["address": .object(["city": .string(String(repeating: "a", count: 101))])]))
+        try refuses("contact", merged(Self.contact, ["address": .string("12 Sample Street")]))
+        try refuses("contact", merged(Self.contact, ["address": .object(["city": .integer(5)])]))
+    }
+
+    @Test func contactButtonsDialOnlyDigits() {
+        #expect(BighelpCardContacts.dialable("+1 (555) 010-0142") == "+15550100142")
+        #expect(BighelpCardContacts.dialable("555.0100") == "5550100")
+        #expect(BighelpCardContacts.dialable("+ ( )") == nil)
+        #expect(BighelpCardContacts.mail("jordan@example.com")?.absoluteString == "mailto:jordan@example.com")
+        #expect(BighelpCardContacts.directions(to: "12 Sample Street, Testville")?.host == "maps.apple.com")
+    }
+
+    /// One picture per spot, span, size and light or dark: the chat never makes a map per redraw.
+    @Test func mapPicturesAreKeptBySpotSizeAndStyle() throws {
+        let place = try BighelpCardPlace(props: Self.place)
+        let size = CGSize(width: 320.2, height: 132)
+        let light = BighelpCardMapSnapshots.Key(place: place, size: size, scale: 3, isDark: false)
+        #expect(light == BighelpCardMapSnapshots.Key(place: place, size: CGSize(width: 320, height: 132), scale: 3, isDark: false))
+        #expect(light != BighelpCardMapSnapshots.Key(place: place, size: size, scale: 3, isDark: true))
+        #expect(light != BighelpCardMapSnapshots.Key(place: place, size: CGSize(width: 400, height: 132), scale: 3, isDark: false))
+        #expect(!BighelpCardMapSnapshots.Key(place: place, size: .zero, scale: 3, isDark: false).isDrawable)
+    }
+
+    // MARK: Place
+
+    private static let place: [String: BighelpJSONValue] = [
+        "name": .string("Fixture Coffee"), "subtitle": .string("Coffee · Open until 6 PM"),
+        "address": .string("1 Placeholder Way, Testville"),
+        "latitude": .number(37.7694), "longitude": .number(-122.4862), "span_meters": .integer(1_200),
+    ]
+
+    @Test func aPlaceValidatesWithItsDefaultSpan() throws {
+        try accepts("place", Self.place)
+        let minimal = try BighelpCardPlace(props: ["name": .string("Spot"), "latitude": .integer(0), "longitude": .integer(0)])
+        #expect(minimal.spanMeters == 1_000)
+        try accepts("place", merged(Self.place, ["latitude": .integer(-90), "longitude": .integer(180)]))
+        try accepts("place", merged(Self.place, ["span_meters": .integer(200)]))
+        try accepts("place", merged(Self.place, ["span_meters": .number(50_000)]))
+    }
+
+    @Test func placeRefusesWhatTheContractDoesNotAllow() throws {
+        try refuses("place", ["name": .string("Spot"), "latitude": .integer(0)])
+        try refuses("place", ["latitude": .integer(0), "longitude": .integer(0)])
+        try refuses("place", merged(Self.place, ["latitude": .number(90.0001)]))
+        try refuses("place", merged(Self.place, ["longitude": .number(-180.5)]))
+        try refuses("place", merged(Self.place, ["latitude": .string("37.7")]))
+        try refuses("place", merged(Self.place, ["span_meters": .integer(199)]))
+        try refuses("place", merged(Self.place, ["span_meters": .integer(50_001)]))
+        try refuses("place", merged(Self.place, ["address": .string(String(repeating: "a", count: 301))]))
+        try refuses("place", merged(Self.place, ["zoom": .integer(12)]))
+        try refuses("place", merged(Self.place, ["subtitle": .object(["literal": .string("Bound")])]))
+    }
+
+    // MARK: Music
+
+    private static let music: [String: BighelpJSONValue] = [
+        "kind": .string("album"), "title": .string("Sample Album"), "artist": .string("The Placeholders"),
+        "music_id": .string("1234567890"), "source": .string("catalog"),
+        "url": .string("https://music.apple.com/us/album/sample-album/1234567890"),
+    ]
+
+    @Test func musicValidatesEveryKindAndSource() throws {
+        try accepts("music", Self.music)
+        for kind in ["song", "album", "playlist", "artist"] {
+            try accepts("music", ["kind": .string(kind), "title": .string("Sample")])
+        }
+        try accepts("music", merged(Self.music, ["source": .string("library"), "music_id": .string("i.AbC123")]))
+    }
+
+    @Test func musicRefusesWhatTheContractDoesNotAllow() throws {
+        try refuses("music", ["title": .string("Sample")])
+        try refuses("music", ["kind": .string("podcast"), "title": .string("Sample")])
+        try refuses("music", ["kind": .string("song")])
+        try refuses("music", merged(Self.music, ["source": .string("radio")]))
+        try refuses("music", merged(Self.music, ["artist": .string(String(repeating: "a", count: 201))]))
+        try refuses("music", merged(Self.music, ["music_id": .string(String(repeating: "1", count: 513))]))
+        try refuses("music", merged(Self.music, ["artwork_url": .string("https://example.com/a.png")]))
+        for bad in ["http://music.apple.com/us/album/1", "https://music.apple.com.example.com/a",
+                    "https://example.com/music.apple.com/", "https://user@music.apple.com/a",
+                    "https://music.apple.com:8443/a", "music://music.apple.com/a",
+                    "https://music.apple.com/" + String(repeating: "a", count: 480)] {
+            try refuses("music", merged(Self.music, ["url": .string(bad)]))
+        }
+    }
+
+    @Test func openInMusicUsesTheLinkThenTheCatalogPageThenASearch() throws {
+        let linked = try BighelpCardMusic(props: Self.music)
+        #expect(linked.openURL?.absoluteString == "https://music.apple.com/us/album/sample-album/1234567890")
+        let catalog = try BighelpCardMusic(props: ["kind": .string("song"), "title": .string("Sample"),
+                                                   "music_id": .string("987")])
+        #expect(catalog.openURL?.absoluteString == "https://music.apple.com/song/987")
+        let library = try BighelpCardMusic(props: ["kind": .string("song"), "title": .string("Sample Song"),
+                                                   "artist": .string("The Placeholders"),
+                                                   "music_id": .string("i.abc"), "source": .string("library")])
+        let search = try #require(library.openURL.flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: false) })
+        #expect(search.host == "music.apple.com" && search.path == "/search")
+        #expect(search.queryItems == [URLQueryItem(name: "term", value: "Sample Song The Placeholders")])
+    }
+
+    // MARK: Whole cards
+
+    @Test func objectsTakeNoChildrenAndKeepTheOtherRules() throws {
+        var elements = Self.elements(["type": .string("place"), "props": .object(Self.place),
+                                      "children": .array([.string("extra")])])
+        elements["extra"] = .object(["type": .string("divider"), "props": .object([:]), "children": .array([])])
+        #expect(throws: BighelpCardValidationError.self) {
+            try BighelpCardValidator.validateForStaticRelease(BighelpCardDocument(document: Self.document(elements)))
+        }
+        // A music object's `source` is a word, not a data source.
+        let music = Self.elements(["type": .string("music"), "props": .object(Self.music), "children": .array([])])
+        _ = try BighelpCardValidator.validateForStaticRelease(BighelpCardDocument(document: Self.document(music)))
+    }
+
+    @Test func theDemoCardHoldsAllThreeObjects() throws {
+        let card = try BighelpCardValidator.validateForStaticRelease(BighelpCardDemoFixtures.objects)
+        let types = Set(card.elements.values.compactMap { $0.object?["type"]?.string })
+        #expect(types.isSuperset(of: ["contact", "place", "music"]))
+        #expect(BighelpCardRenderer(card: card).isValid)
+    }
+
+    // MARK: Helpers
+
+    private func accepts(_ type: String, _ props: [String: BighelpJSONValue],
+                         sourceLocation: SourceLocation = #_sourceLocation) throws {
+        let elements = Self.elements(["type": .string(type), "props": .object(props), "children": .array([])])
+        let card = try BighelpCardDocument(document: Self.document(elements))
+        #expect(throws: Never.self, sourceLocation: sourceLocation) {
+            try BighelpCardValidator.validateForStaticRelease(card)
+        }
+    }
+
+    private func refuses(_ type: String, _ props: [String: BighelpJSONValue],
+                         sourceLocation: SourceLocation = #_sourceLocation) throws {
+        let elements = Self.elements(["type": .string(type), "props": .object(props), "children": .array([])])
+        let card = try BighelpCardDocument(document: Self.document(elements))
+        #expect(throws: BighelpCardValidationError.self, sourceLocation: sourceLocation) {
+            try BighelpCardValidator.validateForStaticRelease(card)
+        }
+    }
+
+    private func merged(_ base: [String: BighelpJSONValue], _ changes: [String: BighelpJSONValue]) -> [String: BighelpJSONValue] {
+        base.merging(changes) { $1 }
+    }
+
+    private func phones(_ value: String) -> [String: BighelpJSONValue] {
+        merged(Self.contact, ["phones": .array([.object(["value": .string(value)])])])
+    }
+
+    private func emails(_ value: String) -> [String: BighelpJSONValue] {
+        merged(Self.contact, ["emails": .array([.object(["value": .string(value)])])])
+    }
+
+    private static func elements(_ object: [String: BighelpJSONValue]) -> [String: BighelpJSONValue] {
+        [
+            "root": .object(["type": .string("card"), "props": .object(["title": .string("Fixture")]),
+                             "children": .array([.string("object")])]),
+            "object": .object(object),
+        ]
+    }
+
+    private static func document(_ elements: [String: BighelpJSONValue]) -> [String: BighelpJSONValue] {
+        [
+            "schema": .string("loopdy.card"), "version": .integer(1), "title": .string("Fixture"),
+            "spoken_summary": .string("Fixture summary"), "data_sources": .array([]), "root": .string("root"),
+            "elements": .object(elements),
+            "content_hash": .string(String(repeating: "a", count: 64)),
+            "card_id": .string(String(repeating: "b", count: 32)),
+            "origin": .string("live"), "created_at": .string("2026-09-02T12:00:00Z"),
+        ]
+    }
+}

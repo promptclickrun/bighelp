@@ -224,6 +224,15 @@ struct BighelpCardRenderer: View {
                 .font(.bighelp(.title2))
                 .foregroundStyle(semanticColor(props["semantic"]?.string))
                 .accessibilityLabel(label))
+        case "contact":
+            guard let contact = try? BighelpCardContact(props: props) else { return AnyView(unavailable("Invalid card element")) }
+            return AnyView(BighelpCardContactView(contact: contact, elementID: id))
+        case "place":
+            guard let place = try? BighelpCardPlace(props: props) else { return AnyView(unavailable("Invalid card element")) }
+            return AnyView(BighelpCardPlaceView(place: place, elementID: id))
+        case "music":
+            guard let music = try? BighelpCardMusic(props: props) else { return AnyView(unavailable("Invalid card element")) }
+            return AnyView(BighelpCardMusicView(music: music, elementID: id))
         default:
             return AnyView(unavailable("Unsupported card element"))
         }

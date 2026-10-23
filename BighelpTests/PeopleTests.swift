@@ -100,6 +100,40 @@ struct PeopleTests {
         #expect(performer.payloads.count == 1)
     }
 
+    /// Older plugins refuse fields they don't know, so without
+    /// `native-card-objects-v1` the note is exactly what it always was.
+    @Test func withoutTheObjectCardsFeatureTheNoteIsUnchanged() async throws {
+        let performer = try SpeakingPerformer()
+        await DirectHermesChatSpeakerNote(currentWorkspace: { performer }, name: { "Colt" }, personID: { Self.person },
+                                          pluginFeatures: { ["native-people-v1", "native-voice-v1"] })
+            .note(agentID: "default", storedSessionID: "s1")
+        await DirectHermesChatSpeakerNote(currentWorkspace: { performer }, name: { "Colt" }, personID: { Self.person })
+            .note(agentID: "default", storedSessionID: "s1")
+        #expect(performer.payloads.count == 2)
+        for payload in performer.payloads {
+            #expect(Set(payload.keys) == ["agentId", "sessionId", "personId", "name"])
+        }
+        #expect(DirectHermesChatSpeakerNote.payload(agentID: "a", storedSessionID: "s", personID: Self.person,
+                                                    name: "Colt")["renders"] == nil)
+    }
+
+    /// With the feature, the plugin learns this app draws contacts, places and music.
+    @Test func withTheObjectCardsFeatureTheNoteSaysWhatTheAppDraws() async throws {
+        let performer = try SpeakingPerformer()
+        var features: Set<String> = ["native-people-v1", "native-card-objects-v1"]
+        let note = DirectHermesChatSpeakerNote(currentWorkspace: { performer }, name: { "Colt" },
+                                               personID: { Self.person }, pluginFeatures: { features })
+        await note.note(agentID: "default", storedSessionID: "s1")
+        let payload = try #require(performer.payloads.last)
+        #expect(Set(payload.keys) == ["agentId", "sessionId", "personId", "name", "renders"])
+        #expect(payload["renders"] == .array([.string("contact"), .string("place"), .string("music")]))
+        #expect(payload["name"] == .string("Colt"))
+        // A plugin that drops the feature (a downgrade, another computer) gets the plain note again.
+        features = ["native-people-v1"]
+        await note.note(agentID: "default", storedSessionID: "s1")
+        #expect(performer.payloads.last?["renders"] == nil)
+    }
+
     @Test func thePluginRouteNeedsItsFeature() throws {
         #expect(DirectHermesNativePluginClient.supports(.peopleSpeaking))
     }

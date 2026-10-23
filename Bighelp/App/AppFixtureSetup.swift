@@ -84,6 +84,10 @@ enum AppFixtureSetup {
             initialSessions[index] = ConversationFixtures.weatherCardsPreview(
                 plain: arguments.contains("-test-weather-cards-plain"))
         }
+        if usesFixtures, arguments.contains("-test-object-cards"),
+           let index = initialSessions.firstIndex(where: { $0.id == "demo-finance" }) {
+            initialSessions[index] = ConversationFixtures.objectCardsPreview
+        }
         if usesFixtures, arguments.contains("-test-completed-turn-context"),
            let index = initialSessions.firstIndex(where: { $0.id == "demo-finance" }) {
             initialSessions[index] = ConversationFixtures.completedTurnContextPreview

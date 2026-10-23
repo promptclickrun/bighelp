@@ -88,7 +88,8 @@ struct ChatMessageExportTests {
     @Test func pdfIsAPDFDocument() throws {
         let data = ChatMessageExport.pdf("**Hello** there", title: "Message from Avery Park")
         #expect(String(decoding: data.prefix(4), as: UTF8.self) == "%PDF")
-        let document = try #require(CGPDFDocument(try #require(CGDataProvider(data: data as CFData))))
+        let provider = try #require(CGDataProvider(data: data as CFData))
+        let document = try #require(CGPDFDocument(provider))
         #expect(document.numberOfPages == 1)
     }
 
@@ -96,7 +97,8 @@ struct ChatMessageExportTests {
         let source = (1...300).map { "Paragraph \($0) has a few words to fill the page." }.joined(separator: "\n\n")
         let data = ChatMessageExport.pdf(source, title: "Message")
         #expect(String(decoding: data.prefix(4), as: UTF8.self) == "%PDF")
-        let document = try #require(CGPDFDocument(try #require(CGDataProvider(data: data as CFData))))
+        let provider = try #require(CGDataProvider(data: data as CFData))
+        let document = try #require(CGPDFDocument(provider))
         #expect(document.numberOfPages > 1)
     }
 
@@ -116,5 +118,24 @@ struct ChatMessageExportTests {
     @Test func sharedPDFsAreNamedForTheAgent() {
         #expect(ChatMessageShareSheet(markdown: "Hi", agentName: "Avery Park").documentTitle == "Message from Avery Park")
         #expect(ChatMessageShareSheet(markdown: "Hi", agentName: nil).documentTitle == "Message")
+    }
+
+    @Test func cardsReferencesAndFileLinesStayOut() {
+        let source = """
+        Here's the trip.
+
+        ```loopdy-card
+        {"type":"trip","id":"1"}
+        ```
+
+        MEDIA:/tmp/itinerary.pdf
+        Have a good one.
+        """
+        for text in [ChatMessageExport.markdown(source), ChatMessageExport.plain(source), ChatMessageExport.styled(source)] {
+            #expect(!text.contains("loopdy-card"))
+            #expect(!text.contains("\"type\""))
+            #expect(!text.contains("MEDIA:"))
+        }
+        #expect(ChatMessageExport.plain(source) == "Here's the trip.\n\nHave a good one.")
     }
 }

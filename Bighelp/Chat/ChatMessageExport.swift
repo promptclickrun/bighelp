@@ -10,7 +10,31 @@ import UIKit
 /// (heading, list item, quote, code, table cell) and its inline style. The chat's
 /// own `MarkdownDocument` is built for drawing and doesn't keep inline styles.
 enum ChatMessageExport {
-    static func markdown(_ source: String) -> String { source }
+    static func markdown(_ source: String) -> String { shareable(source) }
+
+    /// The words of a message without what only the app reads: cards, reference lists and the
+    /// `MEDIA:` lines that name an agent's files. The files and cards themselves aren't shared.
+    static func shareable(_ source: String) -> String {
+        let hidden = [ChatCardMessageProjection.fenceLanguage, ReferenceCodec.fenceLanguage]
+        var kept: [Substring] = []
+        var skippingFence = false
+        for line in source.split(separator: "\n", omittingEmptySubsequences: false) {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if skippingFence {
+                if trimmed.hasPrefix("```") { skippingFence = false }
+                continue
+            }
+            if trimmed.hasPrefix("```"), hidden.contains(where: { trimmed.dropFirst(3).hasPrefix($0) }) {
+                skippingFence = true
+                continue
+            }
+            if trimmed.hasPrefix("MEDIA:") { continue }
+            kept.append(line)
+        }
+        return kept.joined(separator: "\n")
+            .replacingOccurrences(of: "\n{3,}", with: "\n\n", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 
     static func plain(_ source: String) -> String {
         text(blocks(source), styled: false)
@@ -51,6 +75,7 @@ enum ChatMessageExport {
     }
 
     static func blocks(_ source: String) -> [Block] {
+        let source = shareable(source)
         let options = AttributedString.MarkdownParsingOptions(
             allowsExtendedAttributes: false,
             interpretedSyntax: .full,

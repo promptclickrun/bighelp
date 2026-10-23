@@ -1,13 +1,14 @@
 import XCTest
 
 /// Long-press › Share… on demo data: the sheet previews the message in each
-/// format, and the preview changes with the format.
+/// format, and the preview changes with the format. Set BIGHELP_SHARE_EVIDENCE (TEST_RUNNER_…) to a
+/// folder to save the screenshots, and BIGHELP_SHARE_APPEARANCE to dark for the dark ones.
 final class ChatShareUITests: BighelpUITestCase {
     @MainActor
     func testShareShowsTheMessageInEachFormat() {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-start-chat", "-preview-ui-v3",
-                               "-loopdy.demo.appearance", "light"]
+                               "-loopdy.demo.appearance", appearance]
         app.launch()
 
         let agentMessage = app.textViews.matching(NSPredicate(
@@ -31,6 +32,7 @@ final class ChatShareUITests: BighelpUITestCase {
         XCTAssertTrue(app.staticTexts["Some apps and screen readers can't read styled letters."].exists)
         XCTAssertTrue(app.buttons["chat.share.copy"].exists)
         XCTAssertTrue(app.descendants(matching: .any)["chat.share.share"].firstMatch.exists)
+        save("share-messages-\(appearance)", app)
 
         app.buttons["Markdown"].firstMatch.tap()
         let markdown = waitForPreview(preview, toContain: "**Room")
@@ -44,9 +46,19 @@ final class ChatShareUITests: BighelpUITestCase {
 
         app.buttons["PDF"].firstMatch.tap()
         XCTAssertTrue(app.images["chat.share.preview"].waitForExistence(timeout: 5), "PDF shows its first page")
+        save("share-pdf-\(appearance)", app)
 
         app.buttons["chat.share.copy"].tap()
         XCTAssertTrue(app.buttons["Copied"].waitForExistence(timeout: 2), "Copy confirms in place")
+    }
+
+    private var appearance: String { ProcessInfo.processInfo.environment["BIGHELP_SHARE_APPEARANCE"] ?? "light" }
+
+    @MainActor
+    private func save(_ name: String, _ app: XCUIApplication) {
+        guard let folder = ProcessInfo.processInfo.environment["BIGHELP_SHARE_EVIDENCE"] else { return }
+        try? FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
+        try? app.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: folder).appendingPathComponent("\(name).png"))
     }
 
     @MainActor

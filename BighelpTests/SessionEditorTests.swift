@@ -44,6 +44,8 @@ final class FakeHermesSessionHost {
     private(set) var requests: [Request] = []
     /// The chat open on the gateway, by runtime ID.
     private(set) var live: [String: String] = [:]
+    /// A compacted chat's root → its newest row, which Hermes resumes instead.
+    var latest: [String: String] = [:]
     private var receipts: [String: (signature: String, reply: [String: BighelpJSONValue])] = [:]
     /// Runs just before a dashboard edit is checked: someone else editing the row in between.
     var beforeCheck: (@MainActor (FakeHermesSessionHost) -> Void)?
@@ -116,8 +118,10 @@ final class FakeHermesSessionHost {
             guard rows[id] != nil else {
                 throw DirectHermesError.rpcRejected(code: 4007, message: HermesRefusalMessage("session not found"))
             }
-            live["runtime"] = id
-            return DirectHermesSessionCatalogClientTests.attached(stored: id, profile: payload["profile"]?.string ?? "alpha")
+            // As Hermes resumes a compacted chat: at its newest row (`_session_latest_descendant`).
+            let leaf = latest[id] ?? id
+            live["runtime"] = leaf
+            return DirectHermesSessionCatalogClientTests.attached(stored: leaf, profile: payload["profile"]?.string ?? "alpha")
         case .sessionTitle:
             guard let key = live[id] else {
                 throw DirectHermesError.rpcRejected(code: 4001, message: HermesRefusalMessage("session not found"))
@@ -587,6 +591,7 @@ struct SessionEditorTests {
     private func workspace(_ host: FakeHermesSessionHost, canonical: String? = nil,
                            resolved: String? = nil) throws -> SessionWorkspaceStub {
         let workspace = try SessionWorkspaceStub()
+        if let canonical, let resolved, canonical != resolved { host.latest[canonical] = resolved }
         // The fake answers "method not found" itself where the host has no such methods.
         workspace.hasSocketEdits = true
         workspace.handler = { operation, payload in

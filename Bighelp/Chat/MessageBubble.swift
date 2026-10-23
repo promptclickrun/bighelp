@@ -119,6 +119,7 @@ struct MessageBubble: View {
     let replyAgentName: String
 
     @State private var isSelectingText = false
+    @State private var isSharing = false
     @State private var isCopied = false
     @State private var isReactionPickerPresented = false
     @State private var contentCache = ChatMessageContentCache()
@@ -253,6 +254,14 @@ struct MessageBubble: View {
                 .presentationDragIndicator(.visible)
                 .bighelpSheetSize(.standard)
             }
+            .bighelpSheet(isPresented: $isSharing) {
+                // What the bubble shows: no reply quote line, no reference appendix.
+                ChatMessageShareSheet(markdown: projection.references.prose,
+                                      agentName: role == .assistant ? speakerName : nil)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+                    .bighelpSheetSize(.standard)
+            }
             #if targetEnvironment(macCatalyst)
             // On the Mac reactions are a small choice, so they pop over the message.
             .popover(isPresented: $isReactionPickerPresented) {
@@ -342,6 +351,9 @@ struct MessageBubble: View {
                 .accessibilityAction(named: "Reply") {
                     onReply?()
                 }
+                .accessibilityAction(named: "Share") {
+                    isSharing = true
+                }
                 #if !targetEnvironment(macCatalyst)
                 .accessibilityAction(named: "Select text") {
                     isSelectingText = true
@@ -365,7 +377,8 @@ struct MessageBubble: View {
             onSelect: { isSelectingText = true },
             onFork: onFork,
             onReply: onReply,
-            reactions: reactionActions
+            reactions: reactionActions,
+            onShare: { isSharing = true }
         )
     }
 
@@ -417,6 +430,11 @@ struct MessageBubble: View {
             copyMessage(interaction)
         } label: {
             Label(copyActionLabel, systemImage: "doc.on.doc")
+        }
+        Button {
+            isSharing = true
+        } label: {
+            Label("Share…", systemImage: "square.and.arrow.up")
         }
         // The Mac selects message text with the mouse; no separate sheet.
         if !BighelpPlatform.isMac {
@@ -490,6 +508,7 @@ struct MessageBubble: View {
                 onFork: onFork,
                 reactions: reactionActions,
                 onReply: onReply,
+                onShare: { isSharing = true },
                 textScale: (isInterimReply ? ChatInterimReplyStyle.textScale : 1) * chatTextSize.scale,
                 mentionIdentities: mentionIdentities,
                 menuAnchor: menuAnchor,
@@ -572,6 +591,7 @@ struct MessageBubble: View {
                             onFork: onFork,
                             reactions: reactionActions,
                             onReply: onReply,
+                            onShare: { isSharing = true },
                             mentionIdentities: mentionIdentities,
                             menuAnchor: menuAnchor,
                             bubbleShape: bubbleShape

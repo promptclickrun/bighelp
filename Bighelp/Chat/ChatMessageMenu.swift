@@ -9,6 +9,8 @@ struct ChatMessageMenuActions {
     var onFork: (() -> Void)?
     var onReply: (() -> Void)?
     var reactions: ChatMessageReactionActions?
+    /// Share…: the message as Messages text, Markdown, plain text or a PDF.
+    var onShare: (() -> Void)? = nil
 }
 
 struct ChatMessageReactionActions {
@@ -327,6 +329,11 @@ final class ChatMessageMenuDriver: NSObject, UIContextMenuInteractionDelegate {
         elements.append(UIAction(title: actions.copyActionLabel, image: UIImage(systemName: "doc.on.doc")) { _ in
             onCopy()
         })
+        if let onShare = actions.onShare {
+            elements.append(UIAction(title: "Share…", image: UIImage(systemName: "square.and.arrow.up")) { _ in
+                onShare()
+            })
+        }
         // On the Mac, text is selected with the pointer; no separate sheet.
         if !BighelpPlatform.isMac {
             let onSelect = actions.onSelect

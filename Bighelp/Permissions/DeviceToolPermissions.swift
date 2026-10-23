@@ -110,6 +110,12 @@ enum DeviceToolSystemAccess: Equatable, Sendable {
 final class DeviceToolPermissions {
     /// Where "Let agents change how bighelp looks" is saved; missing means on.
     static let appearanceAllowedKey = "bighelp.device-tools.appearance"
+    /// Where the switches are saved: one list for this phone, for every computer and agent. A switch
+    /// stays on until the person turns it off; iOS saying no only pauses its tool (`isUsable`).
+    static let grantsKey = "bighelp.device-tools.grants"
+    /// Before 2.6.15 each host had its own list (`DeviceToolScope.storageKey`). They're read once,
+    /// when the phone's list doesn't exist yet, and an approval from any of them carries over.
+    static let legacyGrantsPrefix = "loopdy.device-tools.v1."
 
     private(set) var scope: DeviceToolScope?
     private(set) var revision: UInt64 = 0
@@ -121,36 +127,46 @@ final class DeviceToolPermissions {
     private let readStatus: (DeviceToolCapability) async -> DeviceToolSystemAccess
     private let requestAccess: (DeviceToolCapability) async -> DeviceToolSystemAccess
     private let isForeground: () -> Bool
-    private let readGrants: (String) -> [String]
     private let writeGrants: (String, [String]) -> Void
     private let saveAppearanceAllowed: (Bool) -> Void
     init(
         status: @escaping (DeviceToolCapability) async -> DeviceToolSystemAccess,
         request: @escaping (DeviceToolCapability) async -> DeviceToolSystemAccess,
         isForeground: @escaping () -> Bool,
-        readGrants: @escaping (String) -> [String],
+        readGrants: @escaping (String) -> [String]?,
         writeGrants: @escaping (String, [String]) -> Void,
+        legacyGrants: () -> [[String]] = { [] },
         appearanceAllowed: Bool = true,
         saveAppearanceAllowed: @escaping (Bool) -> Void = { _ in }
     ) {
         readStatus = status
         requestAccess = request
         self.isForeground = isForeground
-        self.readGrants = readGrants
         self.writeGrants = writeGrants
         self.appearanceAllowed = appearanceAllowed
         self.saveAppearanceAllowed = saveAppearanceAllowed
+        let saved = readGrants(Self.grantsKey)
+        let names = saved ?? legacyGrants().flatMap { $0 }
+        enabled = Set(names.compactMap(DeviceToolCapability.init(rawValue:)).filter(\.sharesPersonalData))
+        if saved == nil, !enabled.isEmpty { persist() }
     }
 
+    /// The host the phone's channel and calls belong to. Switching retires work in flight; the
+    /// switches stay, since they're the phone's.
     func bind(_ scope: DeviceToolScope?) {
         guard self.scope != scope else { return }
         revision &+= 1
         self.scope = scope
-        enabled = Set(scope.map { readGrants($0.storageKey).compactMap(DeviceToolCapability.init(rawValue:)) } ?? [])
     }
 
+    /// The person's switch: on until they turn it off.
     func isEnabled(_ kind: DeviceToolCapability) -> Bool {
-        scope != nil && (kind.sharesPersonalData ? enabled.contains(kind) : appearanceAllowed)
+        kind.sharesPersonalData ? enabled.contains(kind) : appearanceAllowed
+    }
+
+    /// Whether an agent can use it now: the switch is on, a computer is connected, and iOS allows it.
+    func isUsable(_ kind: DeviceToolCapability) -> Bool {
+        scope != nil && isEnabled(kind) && (!kind.sharesPersonalData || status(for: kind) == .available)
     }
 
     func status(for kind: DeviceToolCapability) -> DeviceToolSystemAccess {
@@ -169,15 +185,19 @@ final class DeviceToolPermissions {
     /// Retires in-flight work without changing the user's saved choices.
     func invalidateOperations() { revision &+= 1 }
 
-    /// Refresh never prompts or creates an app grant from an existing OS grant.
+    /// Refresh never prompts, never creates an app grant from an existing OS grant, and never turns a
+    /// switch off: iOS saying no (Location Services off for a moment, access taken back in Settings)
+    /// only pauses the tool until iOS allows it again. A change for a switch that's on retires work
+    /// started under the old answer and reopens the phone's channel with or without the tool.
     func refresh() async {
         for kind in DeviceToolCapability.allCases where kind.sharesPersonalData {
             guard requestInFlight != kind else { continue }
             let owner = revision
             let value = await readStatus(kind)
             guard revision == owner, requestInFlight != kind else { continue }
+            let previous = statuses[kind]
             statuses[kind] = value
-            if isEnabled(kind), value == .denied || value == .unavailable { disable(kind) }
+            if isEnabled(kind), let previous, previous != value { revision &+= 1 }
         }
     }
 
@@ -185,6 +205,7 @@ final class DeviceToolPermissions {
     func disable(_ kind: DeviceToolCapability) {
         guard kind.sharesPersonalData else { setAppearanceAllowed(false); return }
         revision &+= 1
+        choices &+= 1
         enabled.remove(kind)
         persist()
     }
@@ -192,21 +213,26 @@ final class DeviceToolPermissions {
     func setEnabled(_ enabled: Bool, for kind: DeviceToolCapability) async {
         guard enabled else { disable(kind); return }
         guard kind.sharesPersonalData else { setAppearanceAllowed(true); return }
-        guard let scope, isForeground(), requestInFlight == nil, !isEnabled(kind) else { return }
-        let owner = revision
+        guard isForeground(), requestInFlight == nil, !isEnabled(kind) else { return }
+        let choice = choices
         requestInFlight = kind
         defer { requestInFlight = nil }
         let value = await requestAccess(kind)
-        guard self.scope == scope, revision == owner else { return }
+        // Only the person changing a switch meanwhile undoes it; the switch is the phone's, so a host
+        // switch during the question doesn't.
+        guard choices == choice else { return }
         statuses[kind] = value
         guard value == .available else { return }
         self.enabled.insert(kind)
         revision &+= 1
+        choices &+= 1
         persist()
     }
 
+    /// Counts the person's own switch changes, so a late iOS answer can't undo one.
+    private var choices: UInt64 = 0
+
     private func persist() {
-        guard let scope else { return }
-        writeGrants(scope.storageKey, enabled.map(\.rawValue).sorted())
+        writeGrants(Self.grantsKey, enabled.map(\.rawValue).sorted())
     }
 }

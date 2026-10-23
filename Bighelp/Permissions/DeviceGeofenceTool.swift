@@ -96,10 +96,14 @@ final class DeviceGeofenceTool: DeviceCapabilityTool {
     /// For a caller that knows a switch just changed.
     func grantsChanged() async { await engine.pruneDisallowed() }
 
-    /// Whether Arriving and leaving is still on for the place's computer. The switch is saved
-    /// per computer (`DeviceToolPermissions`); a place whose switch went off stops being watched.
-    /// With no phone ID yet (the app is still starting) nothing is taken away.
+    /// Whether Arriving and leaving is still on. The switch is the phone's, for every computer
+    /// (`DeviceToolPermissions.grantsKey`); a place whose switch went off stops being watched.
+    /// Before the phone's list exists (an update that hasn't opened Device access yet), the place's
+    /// own computer's list from before decides, and with no phone ID yet nothing is taken away.
     static func grantAllows(_ place: DeviceGeofencePlace, defaults: UserDefaults) -> Bool {
+        if let grants = defaults.stringArray(forKey: DeviceToolPermissions.grantsKey) {
+            return grants.contains(DeviceToolCapability.geofences.rawValue)
+        }
         guard let deviceID = defaults.string(forKey: "loopdy.native-device-tools.device-id") else { return true }
         let scope = DeviceToolScope(deviceID: deviceID, authorizationEpoch: 1, hostID: place.hostID)
         return (defaults.stringArray(forKey: scope.storageKey) ?? [])

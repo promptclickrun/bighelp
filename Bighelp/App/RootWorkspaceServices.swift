@@ -104,12 +104,16 @@ extension RootShellView {
 
     var nativeDeviceToolTrigger: String {
         let coordinate = appState.activeConversationID.flatMap { nativeRuntime?.bridge.currentCoordinate(for: $0) }
-        return "\(nativeWorkspaceStore?.nativeClient?.isConnected == true):\(voiceSettingsScope ?? "none"):\(appState.activeConversationID ?? "none"):\(coordinate?.storedSessionID ?? "none"):\(coordinate?.runtimeSessionID ?? "none"):\(permissionCenter.deviceTools.revision):\(hostRegistry?.deviceToolFeatureReadinessToken ?? 0):\(deviceToolPhase):\(UIApplication.shared.isProtectedDataAvailable)"
+        return "\(nativeWorkspaceStore?.nativeClient?.isConnected == true):\(voiceSettingsScope ?? "none"):\(appState.activeConversationID ?? "none"):\(coordinate?.storedSessionID ?? "none"):\(coordinate?.runtimeSessionID ?? "none"):\(permissionCenter.deviceTools.revision):\(hostRegistry?.deviceToolFeatureReadinessToken ?? 0):\(deviceToolsOpen):\(UIApplication.shared.isProtectedDataAvailable)"
     }
 
-    /// The scene phase the phone channel goes by: active for as long as a tool call has the app out
-    /// in another app and waits for it to come back (`DeviceToolHandoff`).
-    var deviceToolPhase: ScenePhase { DeviceToolHandoff.shared.effectivePhase(scenePhase) }
+    /// Whether the phone's channel runs: while bighelp is active or inactive (a notification pulled
+    /// down, Control Center, a system question), for the background grace after leaving, and while a
+    /// tool call has the app out in another app (`DeviceToolHandoff`).
+    var deviceToolsOpen: Bool { DeviceToolHandoff.shared.isOpen(scenePhase) }
+
+    /// The same, read live by the channel's closures, which outlive this view's copy of the scene phase.
+    static var deviceToolsOpenNow: Bool { DeviceToolHandoff.shared.isAppOpen(UIApplication.shared.applicationState) }
 
     func runNativeDeviceTools() async {
         #if DEBUG
@@ -125,10 +129,11 @@ extension RootShellView {
               let scope = currentDeviceToolScope, let direct = nativeWorkspaceStore?.nativeClient,
               direct.isConnected,
               let handler = permissionCenter.nativeDeviceToolHandler,
-              deviceToolPhase == .active, UIApplication.shared.isProtectedDataAvailable else { return }
+              deviceToolsOpen, UIApplication.shared.isProtectedDataAvailable else { return }
         let permissions = permissionCenter.deviceTools
         await permissions.refresh()
-        let enabled = Set(DeviceToolCapability.allCases.filter { permissions.isEnabled($0) })
+        // On, and allowed by iOS now: a switch whose iOS access is off stays on but isn't offered.
+        let enabled = Set(DeviceToolCapability.allCases.filter { permissions.isUsable($0) })
         guard !enabled.isEmpty else { permissionCenter.nativeDeviceToolStatus = nil; return }
         guard let conversationID = appState.activeConversationID,
               let coordinate = nativeRuntime?.bridge.currentCoordinate(for: conversationID),
@@ -146,9 +151,9 @@ extension RootShellView {
                     sessionID: coordinate.storedSessionID ?? coordinate.runtimeSessionID ?? coordinate.sessionID,
                     enabled: enabled, isAvailable: {
                         permissions.scope == scope && permissions.revision == revision
-                            && deviceToolPhase == .active && UIApplication.shared.isProtectedDataAvailable
+                            && Self.deviceToolsOpenNow && UIApplication.shared.isProtectedDataAvailable
                             && appState.activeConversationID == conversationID
-                    }, handle: handler)
+                    }, isPaused: { !Self.deviceToolsOpenNow }, handle: handler)
                 session = next
                 return next
             }, onConnected: { connected in

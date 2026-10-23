@@ -43,13 +43,22 @@ final class NativeDeviceToolSession {
     private var enabled: Set<DeviceToolCapability>
     /// Tools turned on here that this host's plugin is too old to offer.
     private(set) var needsNewerPlugin: Set<DeviceToolCapability> = []
-    /// The agent the plugin serves, set when this chat is with another one. Hermes loads the plugin,
-    /// and so the phone tools, only into that agent, and the plugin refuses any other agent's channel.
+    /// The agent the plugin serves, set when this chat is with another one and the plugin is too old to
+    /// give every agent the phone's tools (`everyAgentFeature`): it refuses any other agent's channel.
     private(set) var servingAgentID: String?
+    /// A plugin that shares one phone-tool hub with every agent on the host, so any agent's chat can
+    /// open its channel (plugin 3.30.0).
+    static let everyAgentFeature = "native-device-tools-agents-v1"
+    /// A plugin that keeps a call waiting for a while when the phone is only away (a channel closed
+    /// with `reason: "paused"`), instead of failing it at once.
+    static let waitFeature = "native-device-tools-wait-v1"
     /// Appearance is on by default and never urgent, so a channel with nothing else polls every
     /// 8 seconds: well inside the plugin's 30-second lease and tool timeout, a quarter of the traffic.
     var pollInterval: Duration { enabled == [.appearance] ? .seconds(8) : .milliseconds(750) }
     private let isAvailable: @MainActor () -> Bool
+    /// True when the channel ends because bighelp went to the background, not because the chat, host
+    /// or a switch changed.
+    private let isPaused: @MainActor () -> Bool
     private let handle: Handler
     private let closeCleanupFactory: (@MainActor (String) -> (@MainActor () async -> Void)?)?
     private var closeCleanup: (@MainActor () async -> Void)?
@@ -64,11 +73,12 @@ final class NativeDeviceToolSession {
          currentOwner: @escaping @MainActor () -> WorkspaceOwner?, scope: DeviceToolScope,
          agentID: String, sessionID: String, enabled: Set<DeviceToolCapability>,
          isAvailable: @escaping @MainActor () -> Bool,
+         isPaused: @escaping @MainActor () -> Bool = { false },
          closeCleanupFactory: (@MainActor (String) -> (@MainActor () async -> Void)?)? = nil,
          handle: @escaping Handler) {
         self.http = http; self.owner = owner; self.currentOwner = currentOwner
         self.scope = scope; self.agentID = agentID; self.sessionID = sessionID
-        self.enabled = enabled; self.isAvailable = isAvailable; self.handle = handle
+        self.enabled = enabled; self.isAvailable = isAvailable; self.isPaused = isPaused; self.handle = handle
         self.closeCleanupFactory = closeCleanupFactory
     }
 
@@ -86,11 +96,13 @@ final class NativeDeviceToolSession {
         let offered = enabled.filter { $0.pluginFeature.map(context.features.contains) ?? true }
         needsNewerPlugin = enabled.subtracting(offered)
         guard !offered.isEmpty else { throw WorkspaceClientError.unavailable(.pluginRequired) }
-        // Another agent's chat has no phone tools to call; a connect would only be refused
-        // (`profile_not_served`) and its cleanup close too (`channel_not_found`), on every chat change.
-        guard let served = context.servingProfileID, served == agentID else {
-            servingAgentID = context.servingProfileID
-            throw WorkspaceClientError.unavailable(.unsupportedOperation)
+        // An older plugin gives the phone's tools only to the agent it serves: another agent's chat
+        // would only be refused (`profile_not_served`), and its cleanup close too, on every chat change.
+        if !context.features.contains(Self.everyAgentFeature) {
+            guard let served = context.servingProfileID, served == agentID else {
+                servingAgentID = context.servingProfileID
+                throw WorkspaceClientError.unavailable(.unsupportedOperation)
+            }
         }
         enabled = offered
         self.context = context
@@ -99,7 +111,7 @@ final class NativeDeviceToolSession {
            direct.isConnected, direct.savedConnection.workspaceAuthority == owner.authority,
            direct.savedConnection.endpoint == direct.endpoint,
            let cleanup = DirectHermesDeviceToolCloseCleanup(direct: direct, etag: context.etag, channelID: channelID) {
-            closeCleanup = { await cleanup.close() }
+            closeCleanup = { [weak self] in await cleanup.close(paused: self?.closesPaused() ?? false) }
         }
         connectionAttempted = true
         let result: [String: BighelpJSONValue]
@@ -204,7 +216,15 @@ final class NativeDeviceToolSession {
             return
         }
         guard currentOwner() == owner else { return }
-        _ = try? await request("close", ["channelId": .string(channelID)], closing: true)
+        var body: [String: BighelpJSONValue] = ["channelId": .string(channelID)]
+        if closesPaused() { body["reason"] = .string("paused") }
+        _ = try? await request("close", body, closing: true)
+    }
+
+    /// Whether this close tells the plugin the phone is only away. An older plugin refuses fields it
+    /// doesn't know, so only one with `waitFeature` hears it.
+    private func closesPaused() -> Bool {
+        isPaused() && context?.features.contains(Self.waitFeature) == true
     }
 
     private func request(_ action: String, _ payload: [String: BighelpJSONValue], closing: Bool = false) async throws -> [String: BighelpJSONValue] {
@@ -266,7 +286,8 @@ final class NativeDeviceToolSession {
 
     /// Connect refusals that leave no channel on the host, so there is nothing to close.
     private static let refusedBeforeOpening: Set<String> = [
-        chatHeldCode, "profile_not_served", "session_not_found", "channel_capacity", "channel_id_consumed",
+        chatHeldCode, "profile_not_served", "profile_not_found", "session_not_found", "channel_capacity",
+        "channel_id_consumed",
     ]
 
     /// The plugin's own reason for a refusal: a short code, or nil.
@@ -355,13 +376,15 @@ private final class DirectHermesDeviceToolCloseCleanup {
         self.guardValue = guardValue; self.channelID = channelID
     }
 
-    func close() async {
+    func close(paused: Bool) async {
         guard !consumed else { return }
         consumed = true
         let http = DirectHermesHTTP(endpoint: endpoint)
         defer { http.invalidate() }
+        var body: [String: BighelpJSONValue] = ["channelId": .string(channelID)]
+        if paused { body["reason"] = .string("paused") }
         _ = try? await http.send(route: "/api/plugins/loopdy/native/device-tools/close", method: "POST",
-            body: ["channelId": .string(channelID)], bearer: bearer, legacyToken: sessionToken,
+            body: body, bearer: bearer, legacyToken: sessionToken,
             maximumResponseBytes: 16_384, nativeGuard: guardValue)
     }
 }

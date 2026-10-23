@@ -338,8 +338,13 @@ struct BighelpAppComposition {
             },
             isForeground: { UIApplication.shared.applicationState == .active },
             // Demo switches last only for the launch.
-            readGrants: { usesFixtures ? [] : defaults.stringArray(forKey: $0) ?? [] },
+            readGrants: { usesFixtures ? [] : defaults.stringArray(forKey: $0) },
             writeGrants: { if !usesFixtures { defaults.set($1, forKey: $0) } },
+            legacyGrants: {
+                defaults.dictionaryRepresentation()
+                    .filter { $0.key.hasPrefix(DeviceToolPermissions.legacyGrantsPrefix) }
+                    .compactMap { $0.value as? [String] }
+            },
             appearanceAllowed: defaults.object(forKey: DeviceToolPermissions.appearanceAllowedKey) == nil
                 || defaults.bool(forKey: DeviceToolPermissions.appearanceAllowedKey),
             saveAppearanceAllowed: { if !usesFixtures { defaults.set($0, forKey: DeviceToolPermissions.appearanceAllowedKey) } }

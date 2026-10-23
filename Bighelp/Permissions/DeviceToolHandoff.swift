@@ -6,9 +6,9 @@ import UIKit
 /// A phone tool call that has to leave bighelp for a moment and come back with its answer
 /// (`shortcuts.run` opens Shortcuts, which runs the shortcut and opens bighelp again).
 ///
-/// Leaving bighelp normally retires every phone-tool call and stops the phone's channel
-/// (`RootShellView`, `runNativeDeviceTools`, the coordinator's `available()`). While a handoff is
-/// active, bighelp counts as open for the phone tools: the call, the channel and its grants stay.
+/// Staying in the background past its grace normally retires every phone-tool call and stops the
+/// phone's channel (`RootShellView`, `runNativeDeviceTools`, the coordinator's `available()`). While a
+/// handoff is active, bighelp counts as open for the phone tools: the call, the channel and its grants stay.
 /// Everything else still cancels the call as before: the switch turning off, a host or chat change,
 /// signing out, and the person locking the phone (protected data).
 ///
@@ -84,13 +84,25 @@ final class DeviceToolHandoff {
         self.graceDuration = returnGrace
     }
 
+    /// True from going to the background until the background grace ends (`BighelpBackgroundGrace`),
+    /// unless bighelp comes back first. Observed, so the phone's channel follows it.
+    private(set) var isInBackgroundGrace = false
+
     // MARK: Reading the app's state
 
-    /// The scene phase the phone tools go by: active for as long as a handoff is out.
-    func effectivePhase(_ phase: ScenePhase) -> ScenePhase { isActive ? .active : phase }
+    /// Whether bighelp counts as open for the phone tools' channel. Inactive is open: a notification
+    /// pulled down, Control Center or a system question leave bighelp on screen. The background is
+    /// open only for the grace after leaving, and through a handoff's trip to another app.
+    func isOpen(_ phase: ScenePhase) -> Bool { isActive || isInBackgroundGrace || phase != .background }
 
-    /// Whether bighelp counts as open for the phone tools (the coordinator's `available()`).
-    func isAppOpen(_ state: UIApplication.State) -> Bool { isActive || state == .active }
+    /// The same for the coordinator's `available()`, which reads the app's state.
+    func isAppOpen(_ state: UIApplication.State) -> Bool { isActive || isInBackgroundGrace || state != .background }
+
+    /// A quick trip away keeps the phone tools, like the host connection: until the grace ends.
+    func holdBackgroundGrace() { isInBackgroundGrace = true }
+
+    /// Back in bighelp, or the grace ran out.
+    func releaseBackgroundGrace() { isInBackgroundGrace = false }
 
     // MARK: Running a handoff
 

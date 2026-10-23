@@ -1,5 +1,6 @@
 @preconcurrency import CoreLocation
 import Foundation
+import UIKit
 #if os(visionOS)
 import MapKit
 #endif
@@ -53,9 +54,14 @@ final class DeviceLocationTool {
     static let purposeKey = "AgentRequest"
     static let maximumFieldLength = 100
     private let provider: any DeviceLocationProviding
+    /// iOS asks about precise location only while bighelp is in front. The phone tools also run while it's
+    /// inactive or just left, and a question then would land behind a notification or not show at all.
+    private let canAsk: @MainActor () -> Bool
 
-    init(provider: any DeviceLocationProviding) {
+    init(provider: any DeviceLocationProviding,
+         canAsk: @escaping @MainActor () -> Bool = { UIApplication.shared.applicationState == .active }) {
         self.provider = provider
+        self.canAsk = canAsk
     }
 
     /// iOS's current answer. Never asks.
@@ -81,7 +87,7 @@ final class DeviceLocationTool {
         // A question from iOS only while this chat still owns the call and the app is open.
         try authorize()
         var precise = provider.accuracy == .full
-        if !precise {
+        if !precise, canAsk() {
             // bighelp shares approximate location by default; iOS asks about precise for this call.
             precise = await provider.requestPrecise(purposeKey: Self.purposeKey) == .full
             try authorize()

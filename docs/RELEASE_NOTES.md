@@ -3,6 +3,20 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.17
+
+### Links
+
+- **Maps and Music open in their apps:** if you picked a browser in **Settings** › **Chat**, links to Maps, Music and
+  other Apple apps now open in those apps. A card's **Directions** opens Apple Maps, and **Open in Music** opens Apple
+  Music. If another app on your phone can open a link (for example Spotify or YouTube), that app opens it. Only web
+  pages open in your browser.
+
+### iPhone Duo
+
+- **Dots for new items:** on the folded Duo, **Feed**, **Ideas** and **Goals** in the side column show a dot again
+  when they have something new.
+
 ## 2.6.16
 
 ### iPhone Duo

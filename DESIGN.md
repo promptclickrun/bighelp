@@ -52,6 +52,9 @@ are historical (`docs/ui-v3-design.md`).
   button is a faint circle inside the box, at the top of the text's trailing end, and moves up above the pill
   once the box is tall enough. The text always keeps that corner free (`ComposerTextCornerReserve`, an exclusion
   path), so no text runs under the button and the text's width never changes when it shows.
+- Links in a chat open where they belong (`ChatLinkRoute`): Maps, Music, the App Store, Podcasts, TV, Books and
+  News links in those apps, any other link in an installed app that claims it, and only web pages in the browser
+  picked in Settings › Chat. A card's Directions opens Apple Maps, never a map website.
 - Attachments in a draft are one small glass tag above the message box, lined up with the field
   (`DraftAttachmentRail`): the count first, then the kinds ("4 attached · 3 photos, 1 PDF"), with photos leading a
   stack of up to three thumbnails. One photo says "1 photo"; one file shows its name and size. While photos or files

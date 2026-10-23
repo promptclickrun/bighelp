@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // The iPhone Duo's side strip, the column on the trailing edge under the camera and the status:
 // the bar's places as toolbar items, and room for the chat switcher.
@@ -73,7 +74,7 @@ struct BighelpStripTabs: ToolbarContent {
             BighelpKeyboard.dismiss()
             selection = tab
         } label: {
-            Label { Text(tab.title) } icon: { icon(tab, selected: isSelected) }
+            Label { Text(tab.title) } icon: { icon(tab, selected: isSelected, isNew: isNew) }
                 .labelStyle(.iconOnly)
         }
         .tint(isSelected ? selectedTint : tint)
@@ -83,10 +84,22 @@ struct BighelpStripTabs: ToolbarContent {
         .accessibilityIdentifier(tab.accessibilityIdentifier)
     }
 
-    private func icon(_ tab: AppTab, selected: Bool) -> Image {
-        if let glyph = tab.glyph {
-            return Image(uiImage: glyph.image(selected: selected)).renderingMode(.template)
+    private func icon(_ tab: AppTab, selected: Bool, isNew: Bool) -> Image {
+        let base = tab.glyph?.image(selected: selected) ?? UIImage(systemName: tab.systemImage(selected: selected))
+        guard let base else { return Image(systemName: tab.systemImage(selected: selected)) }
+        guard isNew else { return Image(uiImage: base).renderingMode(.template) }
+        // A toolbar button shows no badge, so Feed, Ideas or Goals with something new draws the
+        // bar's dot into its icon, colored here as the toolbar would have tinted it.
+        let diameter = max(6, base.size.width * 0.28)
+        // The dot gets its own corner, just outside the icon's art.
+        let inset = diameter * 0.5
+        let size = CGSize(width: base.size.width + inset, height: base.size.height + inset)
+        let image = UIGraphicsImageRenderer(size: size).image { _ in
+            base.withTintColor(UIColor(tint), renderingMode: .alwaysOriginal).draw(at: CGPoint(x: 0, y: inset))
+            UIColor(selectedTint).setFill()
+            UIBezierPath(ovalIn: CGRect(x: size.width - diameter, y: 0, width: diameter, height: diameter)).fill()
         }
-        return Image(systemName: tab.systemImage(selected: selected))
+        // On the image itself: the toolbar tints anything it's allowed to.
+        return Image(uiImage: image.withRenderingMode(.alwaysOriginal))
     }
 }

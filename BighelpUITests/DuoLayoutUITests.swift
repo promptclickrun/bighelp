@@ -196,7 +196,9 @@ final class DuoLayoutUITests: BighelpUITestCase {
     private func save(_ name: String, _ app: XCUIApplication) {
         guard let folder = ProcessInfo.processInfo.environment["BIGHELP_DUO_EVIDENCE"] else { return }
         try? FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
-        try? app.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: folder).appendingPathComponent("\(name).png"))
+        // The screen's, not the app's: an iPad on its side crops the app's.
+        try? XCUIScreen.main.screenshot().pngRepresentation
+            .write(to: URL(fileURLWithPath: folder).appendingPathComponent("\(name).png"))
     }
 }
 

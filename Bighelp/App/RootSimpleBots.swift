@@ -84,7 +84,7 @@ extension RootShellView {
         withTransaction(instant) { appState.path = opening.originPath }
     }
 
-    private var simpleBotsContext: SimpleBotsContext {
+    var simpleBotsContext: SimpleBotsContext {
         let owner = currentWorkspaceOwner
         let capabilities = currentWorkspaceCapabilities
         func supports(_ capability: WorkspaceCapability) -> Bool {

@@ -93,6 +93,7 @@ private struct ChatAgentEditorRoute: Identifiable {
 
 struct ChatView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.bighelpScreen) private var screen
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.providerUsage) private var providerUsage
     @Environment(\.companionStore) private var companionStore
@@ -196,6 +197,8 @@ struct ChatView: View {
     /// Full screen height, for the Auto avatar size.
     @State private var screenHeight: CGFloat = 0
     @State private var bottomSafeArea: CGFloat = 0
+    /// The bottom of the chat's safe area (the keyboard's top while it shows), in the window.
+    @State private var safeBottomInWindow: CGFloat = 0
     @AppStorage(ChatLayoutPreferences.densityKey) var chatDensity: ChatDensity = .comfortable
     @AppStorage(ChatLayoutPreferences.showsSessionTitleKey)
     private var showsSessionTitle = ChatLayoutPreferences.showsSessionTitleByDefault
@@ -618,22 +621,29 @@ struct ChatView: View {
             }
             .overlay(alignment: .bottom) {
                 VStack(spacing: 0) {
-                    Spacer(minLength: headerHeight)
+                    // Takes every spare point first: half-folded, the message box's area is only
+                    // as tall as the space under the fold.
+                    Spacer(minLength: headerHeight).layoutPriority(1)
                     VStack(spacing: 0) {
+                        // Half-folded like a laptop: everything under the fold is the message box's.
+                        // Typing, it rests on the keyboard; otherwise it sits just under the fold.
+                        if laptopDeckHeight > 0, isDraftFocused { Spacer(minLength: 0) }
                         composer
                             .fixedSize(horizontal: false, vertical: !(referenceHub ?? fallbackReferenceHub).isPresented)
                             #if targetEnvironment(macCatalyst)
                             .popover(isPresented: sessionControlsPresented(from: .composer)) { macSessionControls }
                             #endif
+                        if laptopDeckHeight > 0, !isDraftFocused { Spacer(minLength: 0) }
                         // Chats keep the bottom bar under the composer.
-                        if homeChrome.isEnabled, homeChrome.showsTabBar, let selection = homeChrome.tabSelection,
-                           !isDraftFocused, !BighelpPlatform.usesTabOrnament {
+                        if showsChatBar, !screen.usesSideBar, let selection = homeChrome.tabSelection {
                             FloatingTabBar(selection: selection, tabs: homeChrome.barTabs,
                                            homeIndicatorSink: FloatingTabBar.homeIndicatorSink(forBottomInset: bottomSafeArea),
                                            unread: homeChrome.unreadTabs, isInChat: true)
                                 .transition(.move(edge: .bottom).combined(with: .opacity))
                         }
                     }
+                    // The messages stop at the fold: the timeline keeps clear of all of this.
+                    .frame(minHeight: laptopDeckHeight)
                     #if !os(visionOS)
                     // The same soft blur under the message box and the tab bar.
                     .background {
@@ -645,6 +655,14 @@ struct ChatView: View {
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
+            // The iPhone Duo: the bar's places go down the side strip instead of under the message box.
+            .toolbar {
+                if showsChatBar, screen.usesSideBar, let selection = homeChrome.tabSelection {
+                    BighelpStripTabs(selection: selection, tabs: homeChrome.barTabs,
+                                     unread: homeChrome.unreadTabs, isInChat: true,
+                                     selectedTint: theme.action, tint: theme.secondaryText)
+                }
+            }
             #if os(visionOS)
             // Chats keep Vision Pro's tab strip beside the window.
             .ornament(visibility: homeChrome.isEnabled && homeChrome.showsTabBar && homeChrome.tabSelection != nil
@@ -660,9 +678,25 @@ struct ChatView: View {
                 proxy.size.height + proxy.safeAreaInsets.top + proxy.safeAreaInsets.bottom
             } action: { screenHeight = $0 }
             .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.bottom } action: { bottomSafeArea = $0 }
+            .onGeometryChange(for: CGFloat.self) { [isLaptop = screen.isLaptop] proxy in
+                // Only half-folded like a laptop: a chat redraws for every change of this.
+                isLaptop ? proxy.frame(in: .global).maxY - proxy.safeAreaInsets.bottom : 0
+            } action: { safeBottomInWindow = $0 }
             #if targetEnvironment(macCatalyst)
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { canvasWidth = $0 }
             #endif
+    }
+
+    /// The iPhone Duo half-folded like a laptop: from the fold down to the bottom of the safe area.
+    private var laptopDeckHeight: CGFloat {
+        guard screen.isLaptop, let fold = screen.fold else { return 0 }
+        return max(0, safeBottomInWindow - fold.maxY)
+    }
+
+    /// Chats keep the bar, and it tucks away while you type.
+    private var showsChatBar: Bool {
+        homeChrome.isEnabled && homeChrome.showsTabBar && homeChrome.tabSelection != nil
+            && !isDraftFocused && !BighelpPlatform.usesTabOrnament
     }
 
     /// Each control samples the transcript, never an opaque toolbar slab.

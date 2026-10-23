@@ -372,6 +372,27 @@ sections can crash only on devices ("Thread stack size exceeded").
 - The chat lane (messages, message box, status rail) is `ChatCanvasLayout.regularLaneMaximumWidth` wide on iPad
   and Vision Pro. Bubbles take their share of it; don't reintroduce a fixed narrow column.
 
+### iPhone Duo
+
+- `BighelpScreenPostureReader` (on the navigation stack, so pushed chats get it too) sets `\.bighelpScreen`:
+  the posture (`cover`, `open`, `openUpright`, `standard`), the trailing status column and the fold, from the window's
+  size classes, its size and iOS 27.1's reserved regions (`.occlusion` for the camera column, `.division` for the
+  fold, active while half-folded). Go by these, never the device model or the hinge angle (Apple says the hinge
+  isn't for layout).
+- Cover (466 × 678, or half of the open screen in Split View) and open wide (`usesSideBar`): built with the iOS 27.1
+  SDK, iOS lays a screen's navigation bar buttons down the 84-pt status column under its 174-pt camera area. The bar's
+  places are toolbar items (`BighelpStripTabs`, `.bottomBar`), so iOS stacks them there too; a column of our own
+  drawn over the strip lay on top of ☰ and the brand. The brand shows only the Noodle there. Chats in Bots and Code
+  mode, which have no bar, get `BighelpChatSwitcher` in the strip instead.
+- Open wide: `BighelpSplitColumn` shows the tab's list in its own `NavigationStack` up to the fold
+  (`splitColumnWidth`), and what it opens is pushed on the app's one stack beside it, so `path`, the active chat
+  and every top-of-stack rule work as on iPhone. The list is the shell's own view, drawn again from its stores
+  (`BighelpLiveColumn`); the stack's root shows `BighelpSplitPlaceholder` instead of a second copy of the list.
+- Upright with the fold active (`isLaptop`): `ChatView` keeps everything under the fold for the message box.
+- The Duo's simulator needs the iOS 27.1 runtime and starts folded; tests can't open or fold it, and DeviceHub's
+  controls don't take scripted clicks. `-bighelp.debug.screen-posture` and `-bighelp.debug.fold-halfway` show the
+  open and half-folded layouts on an iPad simulator (`DuoLayoutUITests`).
+
 ### Mac
 
 - The Mac app is the iPad app through Mac Catalyst in "Optimize for Mac" mode (family 6, `UIUserInterfaceIdiom.mac`;

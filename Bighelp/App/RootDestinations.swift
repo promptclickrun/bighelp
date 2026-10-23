@@ -141,6 +141,8 @@ extension RootShellView {
                 }
             }
         case (.chat(let conversationID), .chat(let model)?):
+            let switcher = chatSwitcherColumn(for: conversationID,
+                                              agentID: model.memberIDs.count == 1 ? model.memberIDs.first : nil)
             ChatDestinationView(
                 model: model,
                 appState: appState,
@@ -183,6 +185,7 @@ extension RootShellView {
             .environment(\.chatCardInteractions, cardInteractions(for: model))
             .environment(\.agentHomeChrome, homeChrome(forChat: conversationID))
             .environment(connectionKeeper)
+            .bighelpSideColumn(screen, isShown: switcher != nil) { switcher }
         case (.scheduledTasks, .scheduledTasks(let store)?):
             routeWithWorkspaceMenu {
                 ScheduledTasksView(store: store, agents: agents, onOpen: openScheduledTask)

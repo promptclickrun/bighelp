@@ -59,6 +59,7 @@ struct SettingsView: View {
     @State var nameSaveStatus: String?
     @State var isPersonalitiesPresented = false
     @Environment(\.bighelpHostRegistry) var hostRegistry
+    @Environment(\.bighelpScreen) var screen
     @State var isClearCacheConfirmationPresented = false
     @State var isClearingLocalCache = false
     @State var localCacheStatusMessage: String?

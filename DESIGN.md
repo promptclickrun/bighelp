@@ -90,7 +90,16 @@ agents' chats excepted). Every chat has ☰ in the top left, like the other root
 list, Agents, Feed or a task goes back to it with the edge swipe. A group chat's name opens its Chat Info. The line under
 the name says "Updating…" while a chat reloads from Hermes, the agent's activity while it works, and otherwise the
 chat's title when Settings › Chat › Session title is on (off by default; never "New chat" or "Bot Chat"). iPad works the same way, with no always-open sidebar:
-☰ slides the menu in from the leading edge, and chats use the width of the screen. On Vision Pro bighelp always
+☰ slides the menu in from the leading edge, and chats use the width of the screen. The iPhone Duo follows how it's
+held (`BighelpScreenPosture`). Folded, the cover screen is wide and short, with the camera and status in a column on
+its trailing edge: the bar's places go down that column as iOS's own toolbar items (`BighelpStripTabs`), under the
+screen's own buttons (☰, the brand, a filter), which iOS moves there too, so chats get their height back, and in Bots and Code mode the column holds the chat switcher instead (`BighelpChatSwitcher`: the bots on top
+of the home, or the running sessions, each with its live state; Settings › Experience › Chat switcher, on by default
+there and opt-in on iPad and Mac in landscape). Open and held wide, the list (Bots mode's home, the chat list, or
+Code's home) sits left of the fold and what it opens sits right of it, like a book (`BighelpSplitColumn`); nothing
+crosses the fold. Held upright it's a big phone, never the cover screen's layout, and half-folded like a small
+laptop a chat keeps its messages above the fold and its message box and keyboard below it. Half of the open screen
+in iOS's Split View gets the cover screen's layout. On Vision Pro bighelp always
 starts in its own window. The tabs sit in a strip beside the window (`VisionTabOrnament`), clear of the system's
 move and close controls under it; ☰ opens the menu as a column inside the window and the page beside it narrows
 (`VisionSideMenu`). Everything you look at and pinch is at least 56pt, and Appearance › Transparency sets how much

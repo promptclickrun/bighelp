@@ -215,6 +215,13 @@ final class SettingsStore {
         didSet { defaults.set(unifiedModeToggleEnabled, forKey: Keys.unifiedModeToggle) }
     }
 
+    /// Settings › Experience › Chat switcher: the bots (Bots mode) or running sessions (Code mode)
+    /// beside a chat. On by default on phones, where only the iPhone Duo folded shows it; iPad and
+    /// Mac show it in landscape once it's turned on (`BighelpChatSwitcher`).
+    var chatSwitcherEnabled: Bool {
+        didSet { defaults.set(chatSwitcherEnabled, forKey: Keys.chatSwitcher) }
+    }
+
     /// The modes on offer: Code only while Settings › Code mode is on.
     var availableModes: [BighelpMode] { codeModeEnabled ? [.bots, .chat, .code] : [.bots, .chat] }
 
@@ -514,6 +521,7 @@ final class SettingsStore {
         codeModeEnabled = codeMode
         simpleBotsEnabled = defaults.bool(forKey: Keys.simpleBots, default: false)
         unifiedModeToggleEnabled = defaults.bool(forKey: Keys.unifiedModeToggle, default: false)
+        chatSwitcherEnabled = defaults.bool(forKey: Keys.chatSwitcher, default: BighelpChatSwitcher.isOnByDefault)
         simpleBotsMultiGateway = defaults.bool(forKey: Keys.simpleBotsMultiGateway, default: false)
         simpleBotsGatewayFilter = defaults.bool(forKey: Keys.simpleBotsGatewayFilter, default: false)
         systemManagesAllGateways = defaults.bool(forKey: Keys.systemManagesAllGateways, default: false)
@@ -829,6 +837,7 @@ private extension SettingsStore {
         static let startExperience = "bighelp.settings.code-mode.open-in"
         static let simpleBots = "bighelp.settings.simple-bots"
         static let unifiedModeToggle = "bighelp.settings.unified-mode-toggle"
+        static let chatSwitcher = "bighelp.settings.chat-switcher"
         static let simpleBotsMultiGateway = "bighelp.simple-bots.multi-gateway"
         static let simpleBotsGatewayFilter = "bighelp.simple-bots.gateway-filter"
         static let systemManagesAllGateways = "bighelp.settings.system.manages-all-gateways"

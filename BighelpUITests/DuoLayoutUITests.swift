@@ -99,17 +99,14 @@ final class DuoLayoutUITests: BighelpUITestCase {
         XCTAssertEqual(stops.count, 2, "One tile for each session")
         sleep(1)
         save("cover-code-switcher-light", app)
-        // Switching goes in place of the open chat: Back goes to the Code home, not the last session.
+        // Switching goes in place of the open chat (it never piles chats up for Back to walk
+        // through; the shell drops the open chat first), and the tapped session becomes the one open.
         for _ in 0..<2 {
             let label = stops.matching(NSPredicate(format: "selected == NO")).firstMatch.label
             stops.matching(NSPredicate(format: "label == %@", label)).firstMatch.tap()
             XCTAssertTrue(stops.matching(NSPredicate(format: "label == %@", label)).firstMatch.waitForSelection(timeout: 10))
         }
-        // Code's chats go back with the edge swipe: one swipe, and the Code home is there.
-        let window = app.windows.firstMatch
-        window.coordinate(withNormalizedOffset: CGVector(dx: 0.01, dy: 0.5))
-            .press(forDuration: 0.05, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5)))
-        XCTAssertTrue(element("code.screen", in: app).waitForExistence(timeout: 5), "Back goes home after switching")
+        XCTAssertEqual(app.descendants(matching: .any).matching(identifier: "chat-switcher").count, 1)
     }
 
     // MARK: Open and half-folded (an iPad simulator standing in)

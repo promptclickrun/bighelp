@@ -28,6 +28,11 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     case sessionTitle = "session.title"
     case sessionUpdate = "sessions.update"
     case sessionDelete = "sessions.delete"
+    /// The socket's own edits of a saved chat. Current Hermes refuses the dashboard's edit routes for
+    /// chats the app made over the socket, but takes these (`DirectHermesSessionEditor`).
+    case sessionSetHidden = "session.set_hidden"
+    case sessionArchive = "session.archive"
+    case nativeSessionDelete = "session.delete"
     case sessionBranch = "session.branch"
     case sessionEvents = "session.events.since"
     case promptSubmit = "prompt.submit"

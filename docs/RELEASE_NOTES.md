@@ -3,6 +3,31 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.16
+
+### iPhone Duo
+
+- **Folded:** the bottom bar's places move into the column on the right side of the cover screen, under the clock.
+  Your chats get more space for messages.
+- **Switch chats from the side:** in Bots mode, the faces of your top bots show beside each chat. Tap a face to go to
+  that bot's chat. In Code mode, your sessions show there. Each face or tile shows when it is working or needs you. To
+  turn this off, go to **Settings** › **Experience** › **Chat switcher**.
+- **Open:** your bots, your chats or your Code sessions show on the left side of the fold. The chat that you open
+  shows on the right side. Nothing goes across the fold.
+- **Like a small laptop:** when you fold the phone halfway and hold it upright, the messages stay above the fold. The
+  message box and the keyboard stay below it.
+
+### iPad and Mac
+
+- **Chat switcher:** to see your bots or sessions beside each chat in landscape, go to **Settings** › **Experience**
+  and turn on **Chat switcher**.
+
+### Share a message
+
+- **Share in the right format:** touch and hold a message, then tap **Share…**. Choose **Messages**, **Markdown**,
+  **Plain text** or **PDF**, then tap **Copy** or **Share…**. **Messages** shows bold, italic and code with styled
+  letters, for apps that do not show Markdown.
+
 ## 2.6.15
 
 ### Phone tools

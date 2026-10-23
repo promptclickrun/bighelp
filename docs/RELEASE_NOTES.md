@@ -3,6 +3,29 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.15
+
+### Phone tools
+
+- **Approvals stay on:** a switch in **Settings** › **Device access** now stays on until you turn it off. It is for
+  this device, and all your agents and computers can use it. If iOS takes access away, the switch stays on and
+  bighelp shows **Allow access in iOS Settings**.
+- **Every agent:** each agent's chat can now use the phone tools, not only your main agent's chat. This needs bighelp
+  plugin 3.30.0 or later.
+- **Fewer interruptions:** the phone tools keep working when you pull down a notification, open Control Center or
+  answer a system question. After you leave bighelp, they keep working for about 25 seconds. With plugin 3.30.0, a
+  request waits a short time for you to come back, instead of failing at once.
+
+### CarPlay
+
+- **CarPlay on your iPhone:** voice chat with your agents now works in CarPlay on a real iPhone. Before, it worked
+  only in the simulator.
+
+### Message box
+
+- **Expand inside the box:** the Expand button is now inside the message box, in its top corner. The text no longer
+  moves when the button appears.
+
 ## 2.6.14
 
 ### Sessions

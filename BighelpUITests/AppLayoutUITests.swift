@@ -53,6 +53,50 @@ final class AppLayoutUITests: BighelpUITestCase {
         save("app-layout-feed", app)
     }
 
+    /// ☰ › Sessions opens every chat, easier to find than Recent sessions' See all. Pinned, it's
+    /// a tab of its own while Chat stays the agent's chat.
+    @MainActor
+    func testSessionsOpensEveryChatFromTheMenuAndItsOwnTab() throws {
+        let app = makeApp()
+        app.launchArguments += ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.home.opens-chat", "YES"]
+        app.launch()
+        XCTAssertTrue(app.descendants(matching: .any)["chat.identity"].firstMatch.waitForExistence(timeout: 20),
+                      "Chat opens the agent's chat")
+
+        let menu = app.buttons["home.drawer.open"].firstMatch
+        XCTAssertTrue(menu.waitForExistence(timeout: 5))
+        menu.tap()
+        let sessions = app.buttons["menu.sessions"]
+        XCTAssertTrue(sessions.waitForExistence(timeout: 5), "Sessions has its own row in the menu")
+        save("sessions-menu", app)
+        sessions.tap()
+        let list = app.descendants(matching: .any)["sessions.screen"]
+        XCTAssertTrue(list.waitForExistence(timeout: 10), "The menu's Sessions opens every chat")
+        save("sessions-list-from-menu", app)
+
+        openAppLayout(in: app)
+        let add = app.buttons["app-layout.add.sessions"]
+        app.buttons["app-layout.remove.files"].tap()
+        XCTAssertTrue(scrollTo(add, in: app), "Sessions can go in the bottom bar")
+        add.tap()
+        for _ in 0..<4 { app.swipeDown() }
+        XCTAssertTrue(app.descendants(matching: .any)["app-layout.bar.sessions"].waitForExistence(timeout: 5))
+        save("sessions-app-layout", app)
+        closeSettings(in: app)
+
+        let tab = app.buttons["tab.session-list"]
+        XCTAssertTrue(tab.waitForExistence(timeout: 10), "Sessions is in the bottom bar")
+        XCTAssertTrue(list.exists && tab.isSelected, "The list is Sessions' tab")
+        XCTAssertFalse(app.buttons["tab.sessions"].isSelected)
+        app.buttons["tab.sessions"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["chat.identity"].firstMatch.waitForExistence(timeout: 10),
+                      "Chat still opens the agent's chat")
+        app.buttons["tab.session-list"].firstMatch.tap()
+        XCTAssertTrue(list.waitForExistence(timeout: 10), "The Sessions tab opens every chat")
+        XCTAssertTrue(app.buttons["tab.session-list"].firstMatch.isSelected)
+        save("sessions-tab", app)
+    }
+
     @MainActor
     func testResetAsksFirstThenRestoresTheDefaultLayout() throws {
         let app = makeApp()

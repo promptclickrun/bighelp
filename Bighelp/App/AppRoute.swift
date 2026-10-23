@@ -7,6 +7,9 @@ enum AppTab: String, CaseIterable, Identifiable {
     case projects, kanban, workflows, usage
     /// Code mode's home: coding sessions on the host's projects (Settings › Code mode).
     case code
+    /// Every chat, as its own tab (App layout's Sessions). It's the Chat tab's list
+    /// (`selectedTab` stays `.sessions`); only the bottom bar tells them apart.
+    case sessionList
 
     /// The standard bottom bar: the agent's chat, then its Feed, Ideas, Goals and Apps.
     /// Settings › Appearance › App layout changes it (`BighelpAppLayout.barTabs`).

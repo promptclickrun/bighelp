@@ -455,6 +455,7 @@ extension AppTab {
         case .workflows: String(localized: "Workflows")
         case .usage: String(localized: "Usage")
         case .code: String(localized: "Code")
+        case .sessionList: String(localized: "Sessions")
         }
     }
 
@@ -487,6 +488,8 @@ extension AppTab {
         case (.workflows, _): "flowchart"
         case (.usage, _): "gauge.with.dots.needle.50percent"
         case (.code, _): "chevron.left.forwardslash.chevron.right"
+        case (.sessionList, true): "bubble.left.and.bubble.right.fill"
+        case (.sessionList, false): "bubble.left.and.bubble.right"
         }
     }
 
@@ -508,6 +511,7 @@ extension AppTab {
         case .workflows: "tab.workflows"
         case .usage: "tab.usage"
         case .code: "tab.code"
+        case .sessionList: "tab.session-list"
         }
     }
 }

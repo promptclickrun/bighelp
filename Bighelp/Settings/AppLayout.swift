@@ -3,7 +3,7 @@ import Foundation
 /// A place in bighelp that ☰ lists and the bottom bar can hold.
 enum BighelpPlace: String, CaseIterable, Codable, Identifiable, Sendable {
     case feed, ideas, goals, files
-    case agents, projects, kanban, workflows, scheduledTasks, usage
+    case agents, sessions, projects, kanban, workflows, scheduledTasks, usage
     case settings
 
     var id: Self { self }
@@ -15,6 +15,7 @@ enum BighelpPlace: String, CaseIterable, Codable, Identifiable, Sendable {
         case .goals: String(localized: "Goals")
         case .files: String(localized: "Files")
         case .agents: String(localized: "Agents")
+        case .sessions: String(localized: "Sessions")
         case .projects: String(localized: "Projects")
         case .kanban: String(localized: "Kanban")
         case .workflows: String(localized: "Workflows")
@@ -32,6 +33,7 @@ enum BighelpPlace: String, CaseIterable, Codable, Identifiable, Sendable {
         case .goals: "checkmark.square"
         case .files: "square.on.circle"
         case .agents: "person.2"
+        case .sessions: "bubble.left.and.bubble.right"
         case .projects: "folder"
         case .kanban: "rectangle.split.3x1"
         case .workflows: "flowchart"
@@ -49,6 +51,8 @@ enum BighelpPlace: String, CaseIterable, Codable, Identifiable, Sendable {
         case .goals: .goals
         case .files: .apps
         case .agents: .agents
+        // Every chat. Chat, the bar's first tab, is the agent's own chat.
+        case .sessions: .sessionList
         case .projects: .projects
         case .kanban: .kanban
         case .workflows: .workflows
@@ -86,7 +90,7 @@ struct BighelpAppLayout: Equatable, Sendable {
 
     static let standard = BighelpAppLayout(
         pinned: [.feed, .ideas, .goals, .files],
-        menuOrder: [.agents, .projects, .kanban, .workflows, .scheduledTasks, .usage,
+        menuOrder: [.agents, .sessions, .projects, .kanban, .workflows, .scheduledTasks, .usage,
                     .feed, .ideas, .goals, .files, .settings])
 
     init(pinned: [BighelpPlace], menuOrder: [BighelpPlace]) {

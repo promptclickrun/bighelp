@@ -787,7 +787,7 @@ struct RootShellView: View {
             hostAwareHomeTab
         case .profile:
             workspaceSettings()
-        case .sessions:
+        case .sessions, .sessionList:
             if simpleBotsOn { simpleBotsHome } else { sessionsRootTab }
         case .feed, .ideas, .goals, .apps:
             agentBoardTab(appState.selectedTab)
@@ -807,7 +807,7 @@ struct RootShellView: View {
 
     private var rootNavigationTitle: String {
         switch appState.selectedTab {
-        case .sessions: fleetModeOn ? String(localized: "All agents") : String(localized: "Sessions")
+        case .sessions, .sessionList: fleetModeOn ? String(localized: "All agents") : String(localized: "Sessions")
         case .agents: String(localized: "Agents")
         // Its tab's name: the long one didn't fit beside its buttons.
         case .scheduledTasks: String(localized: "Tasks")
@@ -931,12 +931,23 @@ struct RootShellView: View {
         }
     }
 
+    /// The bar's lit tab. With Sessions in the bar, every chat's list, and a chat picked
+    /// from it, is Sessions; Chat is the agent's own chat.
+    private var selectedBarTab: AppTab {
+        guard appState.selectedTab == .sessions, !fleetModeOn, barTabs.contains(.sessionList) else {
+            return appState.selectedTab
+        }
+        if appState.path.isEmpty { return .sessionList }
+        if appState.chatOpenedFromList, appState.path.count == 1, case .chat = appState.path[0] { return .sessionList }
+        return .sessions
+    }
+
     var tabSelection: Binding<AppTab> {
         Binding(
-            get: { appState.selectedTab },
+            get: { selectedBarTab },
             set: { tab in
                 // Chat from a chat is where you already are, not a trip to the list.
-                if tab == .sessions, case .chat? = appState.path.last { return }
+                if tab == .sessions, selectedBarTab == .sessions, case .chat? = appState.path.last { return }
                 // From a chat, its agent's Feed, Ideas and Goals; and the switch is a swap like
                 // Feed to Ideas, not the chat sliding away.
                 if fleetModeOn, case .chat(let id)? = appState.path.last { fleetLastChatID = id }
@@ -955,6 +966,10 @@ struct RootShellView: View {
     }
 
     private func selectTab(_ tab: AppTab) {
+        if tab == .sessionList {
+            openAllSessions()
+            return
+        }
         // All hosts has no home chat: Chat goes back to the chat you were in, else to All agents.
         if tab == .sessions, fleetModeOn, appState.path.isEmpty, let id = fleetLastChatID,
            let record = sessionCatalog.session(id: id) {

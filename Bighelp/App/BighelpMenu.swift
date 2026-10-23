@@ -178,6 +178,8 @@ struct BighelpMenu<Recent: View>: View {
             if let onWorkflows = destinations.onWorkflows {
                 row(place.title, symbol: place.symbol, id: "menu.workflows", action: onWorkflows)
             }
+        case .sessions:
+            row(place.title, symbol: place.symbol, id: "menu.sessions", action: destinations.onAllChats)
         case .scheduledTasks:
             row(place.title, symbol: place.symbol, id: "menu.scheduled-tasks", action: destinations.onScheduledTasks)
         case .usage:

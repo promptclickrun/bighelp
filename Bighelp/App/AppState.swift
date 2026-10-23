@@ -49,6 +49,8 @@ final class AppState {
             selectedTab = .workspace
             path = [.workspaceActivity]
             return
+        case .sessionList:
+            selectedTab = .sessions
         default:
             selectedTab = tab
         }

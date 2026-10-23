@@ -60,10 +60,12 @@ are historical (`docs/ui-v3-design.md`).
 
 iPhone is an agent home. The bottom bar is **Chat, Feed, Ideas, Goals, Files** (the Apps page), all for the selected agent;
 it is always open and names each tab under its icon. In a chat, Chat is the lit tab and tapping it does nothing.
+With Sessions in the bar (App layout), every chat's list and a chat picked from it light Sessions instead, and
+Chat there opens the agent's own chat.
 Chat opens that agent's canonical Bot Chat (the same conversation as Hermes Desktop's bot entry) with its live avatar big at the top: tap the avatar for its profile (This chat's
 model and reasoning, then Activity, Approvals, Schedules, Identity), tap the name to switch agents or open a group
 chat, and ☰ for everything else. ☰'s first screen fits without
-scrolling: the host as one switcher row on top, then New chat (Group beside it), Agents, Projects, Kanban, Workflows
+scrolling: the host as one switcher row on top, then New chat (Group beside it), Agents, Sessions (every chat), Projects, Kanban, Workflows
 (where the computer's plugin has them or says why it can't run them; with All hosts on it asks which computer),
 Scheduled tasks, Usage and Settings, then Recent chats with See all. The Secure credential vault and Nerd Mode's folder
 sit under More at the bottom.

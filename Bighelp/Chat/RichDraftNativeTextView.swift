@@ -13,6 +13,7 @@ struct RichDraftNativeTextView: UIViewRepresentable {
     let accessibilityLabel: String
     var focus: FocusState<Bool>.Binding
     var onPasteImageProviders: (([NSItemProvider]) -> Void)?
+    var onDropAttachmentProviders: (([NSItemProvider]) -> Void)? = nil
     var onReturnKey: ((ComposerReturnKey) -> Bool)? = nil
     var onEdit: (AttributedString, AttributedTextSelection, Bool) -> Void
     var onSelectionChange: (AttributedTextSelection) -> Void
@@ -81,6 +82,7 @@ struct RichDraftNativeTextView: UIViewRepresentable {
             view.isEditable = context.environment.isEnabled
         }
         view.onPasteImageProviders = onPasteImageProviders
+        view.attachmentDrop.onDropProviders = onDropAttachmentProviders
         view.onReturnKey = onReturnKey
         if coordinator.appliedRevision != contentRevision, !view.isComposing {
             // Toolbar edits participate in undo. Loading an external document does
@@ -96,6 +98,7 @@ struct RichDraftNativeTextView: UIViewRepresentable {
     static func dismantleUIView(_ view: RichDraftUIKitTextView, coordinator: Coordinator) {
         coordinator.focusOwner.detach(view)
         view.onPasteImageProviders = nil
+        view.attachmentDrop.onDropProviders = nil
         view.onReturnKey = nil
         view.onCompositionEnded = nil
         view.delegate = nil
@@ -327,6 +330,8 @@ struct RichDraftNativeTextView: UIViewRepresentable {
 @MainActor
 final class RichDraftUIKitTextView: UITextView, ComposerReturnKeyHandling {
     var onPasteImageProviders: (([NSItemProvider]) -> Void)?
+    /// Dropped photos and files (`ComposerAttachmentDropTarget`).
+    lazy var attachmentDrop = ComposerAttachmentDropTarget(textView: self)
     /// Hardware Return keys in a chat's message box; nil elsewhere (the Scratchpad).
     var onReturnKey: ((ComposerReturnKey) -> Bool)?
 

@@ -192,6 +192,7 @@ struct ExpandedDraftEditor: View {
                 session: referenceEditorSession ?? localReferenceEditorSession,
                 focus: $isReferenceEditorFocused, isEnabled: !model.isComposerInputDisabled,
                 expanded: true, onPasteImageProviders: importClipboardImages,
+                onDropAttachmentProviders: droppedAttachmentImporter,
                 onReturnKey: handleReturnKey,
                 onSelectionChange: {
                     model.setMentionCursor(offset: $0)
@@ -202,6 +203,7 @@ struct ExpandedDraftEditor: View {
         } else if #available(iOS 26.0, *), uiV2Enabled {
             RichDraftEditor(markdown: $model.draft, isFocused: $isEditorFocused,
                             onPasteImageProviders: importClipboardImages,
+                            onDropAttachmentProviders: droppedAttachmentImporter,
                             onReturnKey: handleReturnKey,
                             recovery: model.richDraftRecovery.state,
                             onRecoveryStateChange: { model.richDraftRecovery.update($0) })
@@ -212,6 +214,7 @@ struct ExpandedDraftEditor: View {
                 isFocused: $isEditorFocused,
                 isEnabled: !model.isComposerInputDisabled,
                 onPasteImageProviders: importClipboardImages,
+                onDropAttachmentProviders: droppedAttachmentImporter,
                 onReturnKey: handleReturnKey
             )
                 .accessibilityLabel("Expanded message")
@@ -225,6 +228,13 @@ struct ExpandedDraftEditor: View {
             get: { clipboardErrorMessage != nil },
             set: { if !$0 { clipboardErrorMessage = nil } }
         )
+    }
+
+    /// Nil while this chat can't take attachments, so a drop stays with the text view.
+    private var droppedAttachmentImporter: (([NSItemProvider]) -> Void)? {
+        guard !model.isComposerAttachmentInputDisabled, !model.supportedAttachmentKinds.isEmpty else { return nil }
+        let model = model
+        return { providers in model.importDroppedAttachments(providers) }
     }
 
     private func importClipboardImages(_ providers: [NSItemProvider]) {

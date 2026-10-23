@@ -466,6 +466,7 @@ struct ChatComposer: View {
             isSurfaceActive: presentedSheet == nil,
             viewportHeight: usesCompactEditingLayout ? max(44, compactDraftLineHeight) : nil,
             onPasteImageProviders: importClipboardImages,
+            onDropAttachmentProviders: droppedAttachmentImporter,
             onReturnKey: handleReturnKey,
             onSelectionChange: reportComposerSelection,
             onExpansionAvailabilityChange: { isDraftOverflowing = $0 },
@@ -506,6 +507,13 @@ struct ChatComposer: View {
             get: { clipboardErrorMessage != nil },
             set: { if !$0 { clipboardErrorMessage = nil } }
         )
+    }
+
+    /// Nil while this chat can't take attachments, so a drop stays with the text view.
+    private var droppedAttachmentImporter: (([NSItemProvider]) -> Void)? {
+        guard !model.isComposerAttachmentInputDisabled, !model.supportedAttachmentKinds.isEmpty else { return nil }
+        let model = model
+        return { providers in model.importDroppedAttachments(providers) }
     }
 
     private func importClipboardImages(_ providers: [NSItemProvider]) {

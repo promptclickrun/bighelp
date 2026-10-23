@@ -7,6 +7,7 @@ enum ChatAttachmentError: Error, Equatable, LocalizedError {
     case invalidSize
     case unsupportedKind
     case unsupportedClient
+    case tooMany
 
     var errorDescription: String? {
         switch self {
@@ -16,6 +17,7 @@ enum ChatAttachmentError: Error, Equatable, LocalizedError {
         case .invalidSize: "This attachment exceeds the supported size."
         case .unsupportedKind: "This attachment type is unavailable on this connection."
         case .unsupportedClient: "Attachments are unavailable on this connection. Nothing was sent."
+        case .tooMany: "Add up to 10 photos or files at a time."
         }
     }
 }
@@ -23,7 +25,9 @@ enum ChatAttachmentError: Error, Equatable, LocalizedError {
 extension ChatAttachmentError {
     /// What to tell the person when a photo or file couldn't be added.
     static func userMessage(for error: any Error) -> String {
-        if error as? ChatAttachmentError == .unsupportedClient { return error.localizedDescription }
+        if error as? ChatAttachmentError == .unsupportedClient || error as? ChatAttachmentError == .tooMany {
+            return error.localizedDescription
+        }
         if error as? ChatAttachmentError == .unsupportedKind { return DirectHermesFileAttachments.imagesUnavailable }
         if error as? ChatAttachmentError == .invalidSize {
             return "Each attachment can be up to 8 MB, with up to 24 MB in one message."

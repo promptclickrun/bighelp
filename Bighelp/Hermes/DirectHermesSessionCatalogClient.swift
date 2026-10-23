@@ -276,6 +276,15 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         let startingRevisions = bindings.compactMapValues { $0.ownership?.revision }
         let loaded = try await loadProfiles()
         let discoversActiveSessions = options == DirectHermesSessionListOptions()
+        let prefetch = DirectHermesCatalogPrefetch(
+            fetch: { [weak self] operation, payload in
+                guard let self else { throw CancellationError() }
+                return try await self.perform(operation, payload)
+            },
+            isCurrent: { [weak self] in self?.listToken == token }
+        )
+        defer { prefetch.finish() }
+        for profile in loaded { prefetchPages(of: profile, options: options, into: prefetch) }
         var records: [SessionRecord] = []
         var pending: [String: Binding] = [:]
         var claimedRetainedVisibleIDs = Set<String>()
@@ -290,14 +299,12 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
             var offset = 0
             var seen: Set<String> = []
             while true {
-                var payload: [String: BighelpJSONValue] = [
-                    "profile": .string(profile.id), "limit": .integer(100), "offset": .integer(offset),
-                    "archived": .string(options.archived.rawValue), "order": .string(options.order.rawValue),
-                ]
-                if !options.sources.isEmpty { payload["sources"] = .string(options.sources.joined(separator: ",")) }
-                if !options.excludedSources.isEmpty { payload["exclude_sources"] = .string(options.excludedSources.joined(separator: ",")) }
-                if let path = options.cwdPrefix { payload["cwd_prefix"] = .string(path) }
-                let response = try await perform(.sessionsList, payload)
+                let response = try await prefetch.value(.page(profile: profile.id, offset: offset), .sessionsList,
+                                                        listPagePayload(profile, offset: offset, options: options))
+                // A page that came early doesn't wait on the network: give typing and menus their
+                // turn between pages, as one request after another did (#492).
+                await Task.yield()
+                try requireOwner()
                 guard listToken == token else { throw CancellationError() }
                 guard let rows = response["sessions"]?.array,
                       rows.count <= DirectHermesSessionValidation.maximumSessions,
@@ -346,7 +353,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
                             // A validated `project: null` response is an
                             // authoritative unassigned session.
                         } else if let association = try await projectAssociation(
-                            for: cwd, profile: profile
+                            for: cwd, profile: profile, prefetch: prefetch
                         ) {
                             projectAssociationsByCWD[associationKey] = association
                             binding.record.workspaceID = association.id
@@ -2043,12 +2050,19 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
     /// only that explicit unsupported-operation result, or a nonmatching cwd
     /// fallback for a stale path, degrades to unassigned; malformed project
     /// payloads and transport responses still fail the authoritative load.
-    private func projectAssociation(for cwd: String, profile: Profile) async throws -> ProjectAssociation? {
+    private func projectAssociation(for cwd: String, profile: Profile,
+                                    prefetch: DirectHermesCatalogPrefetch? = nil) async throws -> ProjectAssociation? {
         let path = try WorkspaceManagementDecoder.path(.string(cwd))
         do {
-            let response = try await perform(.projectsForCwd, [
-                "profile": .string(profile.id), "cwd": .string(path)
-            ])
+            let payload: [String: BighelpJSONValue] = ["profile": .string(profile.id), "cwd": .string(path)]
+            let response: [String: BighelpJSONValue]
+            if let prefetch {
+                response = try await prefetch.value(.folder(projectAssociationKey(profile: profile, cwd: cwd)),
+                                                    .projectsForCwd, payload)
+                try requireOwner()
+            } else {
+                response = try await perform(.projectsForCwd, payload)
+            }
             // Hermes resolves a deleted/nonexistent stored cwd to its current
             // completion cwd. That fallback is not evidence for a project
             // association: keep this row unassigned while allowing the rest
@@ -2066,6 +2080,53 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
             }
         } catch WorkspaceClientError.unavailable(.unsupportedOperation) {
             return nil
+        }
+    }
+
+    private func listPagePayload(_ profile: Profile, offset: Int,
+                                 options: DirectHermesSessionListOptions) -> [String: BighelpJSONValue] {
+        var payload: [String: BighelpJSONValue] = [
+            "profile": .string(profile.id), "limit": .integer(100), "offset": .integer(offset),
+            "archived": .string(options.archived.rawValue), "order": .string(options.order.rawValue),
+        ]
+        if !options.sources.isEmpty { payload["sources"] = .string(options.sources.joined(separator: ",")) }
+        if !options.excludedSources.isEmpty { payload["exclude_sources"] = .string(options.excludedSources.joined(separator: ",")) }
+        if let path = options.cwdPrefix { payload["cwd_prefix"] = .string(path) }
+        return payload
+    }
+
+    /// Asks for `profile`'s first page now and, once it says how many there are, the rest,
+    /// with the folders of the chats each page lists. `list` reads them in order.
+    private func prefetchPages(of profile: Profile, options: DirectHermesSessionListOptions,
+                               into prefetch: DirectHermesCatalogPrefetch) {
+        prefetch.start(.page(profile: profile.id, offset: 0), .sessionsList,
+                       listPagePayload(profile, offset: 0, options: options)) { [weak self, weak prefetch] first in
+            guard let self, let prefetch else { return }
+            self.prefetchFolders(of: first, profile: profile, options: options, into: prefetch)
+            // Without a total, the next page is known only from this one: `list` asks for each in turn.
+            guard let rows = first["sessions"]?.array, first["offset"]?.integer == 0, first["limit"]?.integer == 100,
+                  let total = first["total"]?.integer, (0...DirectHermesSessionValidation.maximumSessions).contains(total),
+                  Self.pageHasMore(first, offset: 0, rows: rows.count) else { return }
+            for offset in stride(from: 100, to: total, by: 100) {
+                prefetch.start(.page(profile: profile.id, offset: offset), .sessionsList,
+                               self.listPagePayload(profile, offset: offset, options: options)) { [weak self, weak prefetch] page in
+                    guard let self, let prefetch else { return }
+                    self.prefetchFolders(of: page, profile: profile, options: options, into: prefetch)
+                }
+            }
+        }
+    }
+
+    private func prefetchFolders(of page: [String: BighelpJSONValue], profile: Profile,
+                                 options: DirectHermesSessionListOptions, into prefetch: DirectHermesCatalogPrefetch) {
+        for row in page["sessions"]?.array ?? [] {
+            guard let object = row.object else { continue }
+            if options.archived == .include, !options.keepsDeliberatelyArchived,
+               Self.isDeliberatelyArchived(object) { continue }
+            guard let cwd = object["cwd"]?.string, !cwd.isEmpty,
+                  let path = try? WorkspaceManagementDecoder.path(.string(cwd)) else { continue }
+            prefetch.start(.folder(projectAssociationKey(profile: profile, cwd: cwd)), .projectsForCwd,
+                           ["profile": .string(profile.id), "cwd": .string(path)])
         }
     }
 

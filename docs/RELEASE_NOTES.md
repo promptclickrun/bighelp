@@ -3,6 +3,18 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.13
+
+### Fixes
+
+- **New Bot Chat:** **New Bot Chat** works again on Hermes 0.22.3 and later. Before, bighelp showed "bighelp couldn't
+  start a new Bot Chat".
+- **Rename, archive, hide and delete:** these work again on Hermes 0.22.3 and later. bighelp now makes these changes
+  through its own connection to the chat.
+- **Pin and Mark Unread:** if Hermes refuses one of these, bighelp now shows the reason from Hermes.
+- **Alerts:** you no longer get an alert for the chat that you look at. This is also true while the chat connects,
+  after its history is compacted, and for questions and approvals.
+
 ## 2.6.12
 
 ### Device access

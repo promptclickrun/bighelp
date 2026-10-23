@@ -11,7 +11,8 @@ enum BighelpCarPlayServices {
     static var settings: SettingsStore?
 }
 
-/// A hands-free voice chat with the default agent, for the car. The iPhone is
+/// A hands-free voice chat with the agent last picked in the car (else the
+/// default agent), for the car. The iPhone is
 /// usually locked, so its own voice screen can't listen; this runs the same
 /// voice session without a screen, using the voice chosen in Settings.
 @MainActor
@@ -24,12 +25,16 @@ final class CarPlayVoiceSession {
 
     private(set) var phase: Phase = .connecting
     private(set) var agentName = "your agent"
+    /// The chat this car connection is in; Talk after a pause goes on in it.
+    private(set) var chatID: String?
     private(set) var isMuted = false
 
     private let workspace: () async throws -> BighelpShortcutWorkspace
     private let settings: () -> SettingsStore?
     private let microphoneAllowed: () -> Bool
     private let speechAllowed: () -> Bool
+    private let preference: CarPlayAgentPreference
+    private var continuity = CarPlayChatContinuity()
     private var voice: VoiceModel?
     private var live: LiveVoiceModel?
     private var following: Task<Void, Never>?
@@ -43,16 +48,21 @@ final class CarPlayVoiceSession {
         },
         settings: @escaping () -> SettingsStore? = { BighelpCarPlayServices.settings },
         microphoneAllowed: @escaping () -> Bool = { AVAudioApplication.shared.recordPermission == .granted },
-        speechAllowed: @escaping () -> Bool = { SFSpeechRecognizer.authorizationStatus() == .authorized }
+        speechAllowed: @escaping () -> Bool = { SFSpeechRecognizer.authorizationStatus() == .authorized },
+        preference: CarPlayAgentPreference = CarPlayAgentPreference()
     ) {
         self.workspace = workspace
         self.settings = settings
         self.microphoneAllowed = microphoneAllowed
         self.speechAllowed = speechAllowed
+        self.preference = preference
     }
 
-    /// Starts a new chat with the default agent and listens.
-    func start() async {
+    /// Listens. `agentID` is a pick from the car's list: it's saved and talked
+    /// to. Without it, the agent already in this connection, else the saved
+    /// pick, else the default. The same agent goes on in the same chat; another
+    /// agent, or a new connection, starts a new one.
+    func start(agentID: String? = nil) async {
         stop()
         generation += 1
         let current = generation
@@ -68,13 +78,21 @@ final class CarPlayVoiceSession {
         do {
             let workspace = try await workspace()
             guard current == generation else { return }
-            guard let agent = workspace.agents.resolvedAgent(explicitID: nil) else {
+            let agents = workspace.agents.profiles.map(CarPlayAgent.init)
+            guard let agent = CarPlayAgentChoice.resolve(
+                requestedID: agentID ?? continuity.agentID ?? preference.agentID, in: agents,
+                fallbackID: workspace.agents.resolvedAgent(explicitID: nil)?.id)
+            else {
                 phase = .problem("Pick an agent in bighelp on your iPhone first.")
                 return releaseHostConnection()
             }
+            if agentID == agent.id { preference.agentID = agent.id }
             agentName = agent.name
-            let (sessionID, _) = try await workspace.readyChat(agentID: agent.id, reusing: nil)
+            let (sessionID, _) = try await workspace.readyChat(
+                agentID: agent.id, reusing: continuity.reusableSessionID(for: agent.id))
             guard current == generation else { return }
+            continuity.remember(sessionID: sessionID, agentID: agent.id)
+            chatID = sessionID
             let presentation = workspace.featureStore.makeVoicePresentation(
                 for: sessionID,
                 mode: .pressToTalk,
@@ -106,6 +124,8 @@ final class CarPlayVoiceSession {
 
     /// Ends the conversation; a running reply still finishes in the chat.
     func stop() {
+        // A start still connecting must not begin listening after this.
+        generation += 1
         following?.cancel()
         following = nil
         live?.end()
@@ -117,6 +137,19 @@ final class CarPlayVoiceSession {
         voice = nil
         releaseHostConnection()
         if case .problem = phase {} else { phase = .paused }
+    }
+
+    /// The agents for the car's list, names only, cut to `limit`, the one in
+    /// use marked. Holds the host connection while it asks.
+    func agentRows(limit: Int = CarPlayAgentChoice.maximumListed) async throws -> [CarPlayAgentRow] {
+        let release = BighelpShortcutService.holdHostConnection()
+        defer { release() }
+        let workspace = try await workspace()
+        let agents = workspace.agents.profiles.map(CarPlayAgent.init)
+        let current = CarPlayAgentChoice.resolve(
+            requestedID: continuity.agentID ?? preference.agentID, in: agents,
+            fallbackID: workspace.agents.resolvedAgent(explicitID: nil)?.id)
+        return CarPlayAgentChoice.rows(for: agents, currentID: current?.id, limit: limit)
     }
 
     private static let permissionProblem =

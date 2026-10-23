@@ -66,7 +66,7 @@ protocol DeviceToolJournal: AnyObject {
 
 @MainActor
 final class DeviceToolCoordinator {
-    typealias Execute = @MainActor (String, [String: BighelpJSONValue], @escaping @MainActor () throws -> Void) async throws -> [String: BighelpJSONValue]
+    typealias Execute = @MainActor (String, [String: BighelpJSONValue], DeviceToolCallContext, @escaping @MainActor () throws -> Void) async throws -> [String: BighelpJSONValue]
     private struct Failure: Error { let code: String }
     private let permissions: DeviceToolPermissions
     private let journal: any DeviceToolJournal
@@ -96,10 +96,11 @@ final class DeviceToolCoordinator {
               request.sentAt <= clock() + 5,
               [request.requestId, request.deviceId, request.hostId, request.sessionId,
                request.agentId, request.turnId].allSatisfy(Self.validIdentifier),
-              let capability = Self.capability(for: request.operation),
+              let operation = DeviceToolCatalog.operations[request.operation],
               let encoded = try? Self.encoder.encode(request), encoded.count <= 20_480
         else { return failed("invalid_request") }
 
+        let capability = operation.capability
         let grantRevision = permissions.revision
         let authorize: @MainActor () throws -> Void = { [self] in
             guard owner == request.scope, permissions.scope == owner, isCurrent() else {
@@ -115,7 +116,7 @@ final class DeviceToolCoordinator {
         do { try authorize() } catch let error as Failure { return failed(error.code) }
         catch { return failed("unavailable") }
 
-        let mutation = !Self.unjournaledOperations.contains(request.operation)
+        let mutation = operation.journaled
         let fingerprint = SHA256.hash(data: encoded).map { String(format: "%02x", $0) }.joined()
         if mutation {
             do {
@@ -142,13 +143,13 @@ final class DeviceToolCoordinator {
         let result: DeviceToolResult
         do {
             try authorize()
-            let payload = try await execute(request.operation, request.arguments, authorize)
+            let payload = try await execute(request.operation, request.arguments, DeviceToolCallContext(request), authorize)
             try authorize()
             guard (try Self.encoder.encode(payload)).count <= 128_000 else {
                 throw Failure(code: "result_limit_exceeded")
             }
             // Durable outcomes never include event contents or read data.
-            if mutation, !Set(payload.keys).isSubset(of: ["id", "revision", "deleted"]) {
+            if mutation, !Set(payload.keys).isSubset(of: operation.journalKeys.union(operation.liveOnlyKeys)) {
                 throw Failure(code: "invalid_result")
             }
             result = DeviceToolResult(request: request, status: "completed", payload: payload, sentAt: clock())
@@ -166,7 +167,10 @@ final class DeviceToolCoordinator {
         }
         if mutation {
             do {
-                let entry = DeviceToolJournalEntry(fingerprint: fingerprint, expiresAt: request.expiresAt, result: result)
+                // What a tool says only for now (a shortcut's output) never reaches the disk.
+                let durable = DeviceToolResult(request: request, status: result.status, code: result.code,
+                    payload: result.payload.filter { operation.journalKeys.contains($0.key) }, sentAt: result.sentAt)
+                let entry = DeviceToolJournalEntry(fingerprint: fingerprint, expiresAt: request.expiresAt, result: durable)
                 try journal.save(entry, requestID: request.requestId, scope: owner)
                 guard try journal.entry(requestID: request.requestId, scope: owner) == entry else {
                     return failed("outcome_unknown")
@@ -178,22 +182,6 @@ final class DeviceToolCoordinator {
 
     private static func validIdentifier(_ value: String) -> Bool {
         !value.isEmpty && value.utf8.count <= 512 && !value.unicodeScalars.contains { CharacterSet.controlCharacters.contains($0) }
-    }
-
-    /// Reads are never journaled: their results (events, where someone is) stay off disk. Neither is
-    /// an appearance change: making the app dark twice is the same as once, so there's nothing to reconcile.
-    private static let unjournaledOperations: Set<String> = [
-        "calendar.list", "reminders.list", "location.current", "appearance.get", "appearance.set",
-    ]
-
-    private static func capability(for operation: String) -> DeviceToolCapability? {
-        switch operation {
-        case "calendar.list", "calendar.create", "calendar.update", "calendar.delete": .calendar
-        case "reminders.list", "reminders.create", "reminders.update", "reminders.delete": .reminders
-        case "location.current": .location
-        case "appearance.get", "appearance.set": .appearance
-        default: nil
-        }
     }
 
     private static var encoder: JSONEncoder {

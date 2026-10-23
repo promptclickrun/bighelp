@@ -2,8 +2,10 @@
 import CarPlay
 import UIKit
 
-/// Opening bighelp in CarPlay starts a new voice chat with your agent, ready
-/// to listen. CarPlay shows only what the conversation is doing.
+/// Opening bighelp in CarPlay starts a new voice chat with the agent you last
+/// picked in the car (else your default agent), ready to listen. CarPlay shows
+/// only what the conversation is doing; Agents opens the one list, to pick who
+/// to talk to.
 @MainActor
 final class BighelpCarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     private var controller: CarPlayVoiceController?
@@ -29,6 +31,7 @@ final class CarPlayVoiceController {
     private var template: CPVoiceControlTemplate?
     private var mirroring: Task<Void, Never>?
     private var shownPhase: CarPlayVoiceSession.Phase?
+    private var agentLoad: Task<Void, Never>?
 
     init(interface: CPInterfaceController, session: CarPlayVoiceSession = CarPlayVoiceSession()) {
         self.interface = interface
@@ -47,7 +50,8 @@ final class CarPlayVoiceController {
         }
         let template = CPVoiceControlTemplate(voiceControlStates: CarPlayVoiceStates.all(
             end: { [weak self] in self?.session.stop() },
-            talk: { [weak self] in self?.restart() }))
+            talk: { [weak self] in self?.restart() },
+            agents: { [weak self] in self?.showAgents() }))
         self.template = template
         interface.setRootTemplate(template, animated: false, completion: nil)
         updateButtons()
@@ -64,6 +68,8 @@ final class CarPlayVoiceController {
     func finish() {
         mirroring?.cancel()
         mirroring = nil
+        agentLoad?.cancel()
+        agentLoad = nil
         session.stop()
     }
 
@@ -96,9 +102,75 @@ final class CarPlayVoiceController {
         interface.presentTemplate(alert, animated: true, completion: nil)
     }
 
-    private func restart() {
+    private func restart(agentID: String? = nil) {
         shownPhase = nil
-        Task { await session.start() }
+        Task { await session.start(agentID: agentID) }
+    }
+
+    // MARK: Agents
+
+    /// Ends listening (the audio session goes with it) and opens the agent
+    /// list one level above the voice screen. Never deeper than two templates.
+    private func showAgents() {
+        guard interface.templates.count < 2 else { return }
+        session.stop()
+        let list = CPListTemplate(title: "Agents", sections: [Self.section([Self.message("Loading agents…")])])
+        interface.pushTemplate(list, animated: true, completion: nil)
+        loadAgents(into: list)
+    }
+
+    private func loadAgents(into list: CPListTemplate) {
+        agentLoad?.cancel()
+        agentLoad = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let limit = min(CarPlayAgentChoice.maximumListed, Int(CPListTemplate.maximumItemCount))
+            do {
+                let rows = try await session.agentRows(limit: limit)
+                guard !Task.isCancelled else { return }
+                if rows.isEmpty {
+                    list.updateSections([Self.section([Self.message("No agents yet", detail: "Add one in bighelp on your iPhone.")])])
+                    return
+                }
+                list.updateSections([Self.section(rows.map { row in
+                    let item = Self.item(for: row)
+                    item.handler = { [weak self] _, completion in
+                        self?.choose(agentID: row.id)
+                        completion()
+                    }
+                    return item
+                })])
+            } catch {
+                guard !Task.isCancelled else { return }
+                let retry = Self.message("Couldn't load your agents", detail: "Tap to try again.", enabled: true)
+                retry.handler = { [weak self] _, completion in
+                    list.updateSections([Self.section([Self.message("Loading agents…")])])
+                    self?.loadAgents(into: list)
+                    completion()
+                }
+                list.updateSections([Self.section([retry])])
+            }
+        }
+    }
+
+    /// A pick goes back to the voice screen and starts talking to that agent.
+    private func choose(agentID: String) {
+        interface.popTemplate(animated: true, completion: nil)
+        restart(agentID: agentID)
+    }
+
+    private static func section(_ items: [CPListItem]) -> CPListSection {
+        CPListSection(items: items)
+    }
+
+    private static func message(_ text: String, detail: String? = nil, enabled: Bool = false) -> CPListItem {
+        let item = CPListItem(text: text, detailText: detail)
+        item.isEnabled = enabled
+        return item
+    }
+
+    private static func item(for row: CarPlayAgentRow) -> CPListItem {
+        let mark = row.isCurrent ? CarPlayVoiceStates.symbol("checkmark", size: 24) : nil
+        return CPListItem(text: row.title, detailText: row.detail, image: nil, accessoryImage: mark, accessoryType: .none)
     }
 
     /// Mute sits in the top bar while the conversation runs.
@@ -129,8 +201,13 @@ enum CarPlayVoiceStates {
     static let speaking = "speaking"
     static let paused = "paused"
 
-    /// Running states offer End; the paused one offers Talk.
-    static func all(end: @escaping @MainActor () -> Void, talk: @escaping @MainActor () -> Void) -> [CPVoiceControlState] {
+    /// Running states offer End; the paused one offers Talk. Each also offers
+    /// Agents, the second of the two buttons a state can hold.
+    static func all(
+        end: @escaping @MainActor () -> Void,
+        talk: @escaping @MainActor () -> Void,
+        agents: @escaping @MainActor () -> Void
+    ) -> [CPVoiceControlState] {
         let states = [
             CPVoiceControlState(identifier: connecting, titleVariants: ["Connecting to your agent…", "Connecting…"],
                                 image: animated(["waveform"], values: [0.1, 0.3, 0.1]), repeats: true),
@@ -145,15 +222,17 @@ enum CarPlayVoiceStates {
         ]
         if #available(iOS 26.4, *) {
             for state in states {
+                let first: CPButton
                 if state.identifier == paused {
-                    let button = CPButton(image: symbol("waveform")) { _ in talk() }
-                    button.title = "Talk"
-                    state.actionButtons = [button]
+                    first = CPButton(image: symbol("waveform")) { _ in talk() }
+                    first.title = "Talk"
                 } else {
-                    let button = CPButton(image: symbol("xmark")) { _ in end() }
-                    button.title = "End"
-                    state.actionButtons = [button]
+                    first = CPButton(image: symbol("xmark")) { _ in end() }
+                    first.title = "End"
                 }
+                let second = CPButton(image: symbol("person.2")) { _ in agents() }
+                second.title = "Agents"
+                state.actionButtons = [first, second]
             }
         }
         return states

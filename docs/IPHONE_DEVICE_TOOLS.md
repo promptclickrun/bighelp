@@ -19,7 +19,8 @@ in `AppleDeviceToolServiceTests` reproduces that crash before the correction;
 keep the post-fetch authorization check. See Apple's
 [asynchronous reminder retrieval](https://developer.apple.com/documentation/eventkit/retrieving-events-and-reminders).
 
-Permissions contains independent Calendar, Reminders and Location controls. Apple Health
+Device access has independent switches for Calendar, Reminders, Contacts, Photos,
+Location, Arriving and leaving, Alarms and timers, Music, Focus and Shortcuts. Apple Health
 access was removed in 2.3.0 (105): App Review (guideline 2.5.1) refuses HealthKit in an app
 whose main features don't need health data. The phone never lists or runs `health.read`, so
 the plugin's `iphone_health` tool answers `authorization_required`; a saved Health grant is
@@ -135,6 +136,22 @@ are returned only to their active caller, not cached for later retries.
 | `iphone_reminders` | List with optional list IDs, completion and undated filters; create; update/delete an exact ID with expected revision. An optional date filter requires start, end and time zone together. |
 | `iphone_location` | `current` only, with no other arguments: where the phone is right now. Needs plugin feature `native-device-location-v1`. |
 | `iphone_appearance` | `get` (no arguments) or `set` with `mode` and/or `color`: light or dark mode and the chat color. Needs plugin feature `native-device-appearance-v1`. |
+| `iphone_contacts` | `list`, `create`, `update`, `delete`. Needs `native-device-contacts-v1`. |
+| `iphone_photos` | `list`, `albums`, `get`, `save`, `update`, `createAlbum`, `delete`. Needs `native-device-photos-v1`. |
+| `iphone_geofences` | `list`, `create`, `delete`: places the phone watches, and a message to the chat on arrival or departure. Needs `native-device-geofences-v1`. |
+| `iphone_alarms` | `list`, `create`, `update`, `delete`: alarms and timers (AlarmKit, iPhone and iPad on iOS 26 and later). Needs `native-device-alarms-v1`. |
+| `iphone_music` | `nowPlaying`, `search`, `library`, `play`, `control`, `createPlaylist`, `addToPlaylist`, `addToLibrary`. Needs `native-device-music-v1`. |
+| `iphone_focus` | `current`: the Focus filter that's on and the person's note for agents. Needs `native-device-focus-v1`. |
+| `iphone_shortcuts` | `list`, `run`: only the shortcuts the person picked. Needs `native-device-shortcuts-v1`. |
+
+Each tool sends `operation` plus the arguments below; the phone's operation is
+`<kind>.<operation>` (`iphone_photos` `createAlbum` is `photos.createAlbum`).
+`DeviceToolCatalog` lists them all, with which ones are journaled. Dates are
+ISO-8601 with an offset or `Z`. IDs are opaque strings of at most 512
+characters. Unknown keys, a wrong type or an out-of-range value is
+`invalid_arguments`, checked by the plugin before the call leaves the host and
+again by the phone before it touches anything. An `update` that changes nothing
+is `invalid_arguments` too. Results are bounded to 128 KB on both sides.
 
 Calendar creation accepts title/start/end/time zone and optional calendar,
 location, notes and URL. Recurring event results carry `occurrenceStart`;
@@ -207,6 +224,195 @@ next pick there wins.
 - Demo mode: `-test-agent-appearance '{"mode":"dark","color":"rose"}'` sends that
   one call through the real coordinator and tool when the first chat opens
   (`DeviceAppearanceFixture`, `AgentAppearanceUITests`).
+
+## Contacts
+
+`contacts.*` (`DeviceContactsTool`), iOS permission `NSContactsUsageDescription`.
+With limited access (iOS 18) the agent sees only the people the person shared;
+results say `access: "full"` or `"limited"`.
+
+- `list`: `query` (optional, 1–200 characters: matches names, and emails or
+  phone numbers when it looks like one), `limit` (1–50, default 20). Returns
+  `contacts`, each with `id`, `revision`, and when set `givenName`,
+  `familyName`, `nickname`, `organization`, `jobTitle`, `birthday`
+  (`YYYY-MM-DD`, or `--MM-DD` without a year), and lists `phones`, `emails`,
+  `urls` (`{label, value}`) and `addresses` (`{label, street, city, region,
+  postalCode, country}`); plus `truncated` and `access`.
+- `create`: at least one of `givenName`, `familyName`, `organization`
+  (each ≤ 200); optional `nickname`, `jobTitle`, `birthday`, `phones` (≤ 10),
+  `emails` (≤ 10), `urls` (≤ 5), `addresses` (≤ 5). A label is `home`, `work`,
+  `mobile`, `iPhone`, `main`, `other` or any text up to 40 characters.
+  Returns `{id, revision}`.
+- `update`: `id`, `expectedRevision`, and any `create` field. A list given
+  replaces the whole list; an empty string or list clears it. Returns
+  `{id, revision}`.
+- `delete`: `id`, `expectedRevision`. Returns `{id, deleted: true}`.
+- `revision` is a hash of the fields the tool reads (Contacts keeps no
+  modification date). A changed contact is `stale_revision`; a missing one is
+  `not_found`. Notes are never read or written: Apple gives contact notes only
+  to apps with a special entitlement.
+
+## Photos
+
+`photos.*` (`DevicePhotosTool`), read and write library access
+(`NSPhotoLibraryUsageDescription`). With limited access the agent sees only the
+photos the person picked. Attaching a photo in chat still uses Apple's private
+picker and needs none of this.
+
+- `list`: `start` and `end` together (creation date), `albumID`, `mediaType`
+  (`image`, `video` or `any`, default `any`), `favorites` (bool), `limit`
+  (1–100, default 30), newest first. `photos` lists each item: `id`, `revision`, `mediaType`,
+  `created`, `width`, `height`, `favorite`, `durationSeconds` for videos, and
+  `latitude`/`longitude` (4 decimals) when the photo has a place. Plus
+  `truncated` and `access`.
+- `albums`: the person's albums and the main smart albums (Favorites, Recents,
+  Screenshots, Selfies, Videos): `albums` of `{id, title, count, kind}` (`album`
+  or `smart`).
+- `get`: `id`, `maxPixels` (256–1024, default 768). Returns the item's fields
+  and `image: {format: "jpeg", width, height, data}` (base64, at most 90 KB of
+  JPEG, quality stepped down to fit; a video gives its first frame). The plugin
+  writes the picture to a file on the host (`bighelp/phone-photos/` in the
+  Hermes home, the newest 50 for 7 days) and gives the agent
+  `image: {format, width, height, path}` instead of the data, so the agent can
+  look at it with its vision tool.
+- `save`: `path`, a file on the host (checked by the plugin like
+  `attachments/resolve`: an image or video of at most 50 MB), optional
+  `albumID`. The plugin grants that path to the calling chat for 10 minutes,
+  and the phone downloads it through `attachments/resolve` (as
+  `MEDIA:<path>`) and `attachments/fetch`, like a file the agent sent
+  (`DirectHermesDeviceHostFiles`). Returns `{id}`.
+- `update`: `id`, `expectedRevision` (the item's modification date), and any
+  of `favorite`, `addToAlbumIDs`, `removeFromAlbumIDs` (≤ 20 each). Returns
+  `{id, revision}`.
+- `createAlbum`: `title` (1–200). Returns `{id}`.
+- `delete`: `ids` (1–50). iOS asks the person to confirm; Don't Allow is
+  `cancelled`. Returns `{deleted: true, count}`.
+- Codes: `not_found`, `stale_revision`, `cancelled`, `unsupported_media`,
+  `file_too_large`.
+
+## Arriving and leaving
+
+`geofences.*` (`DeviceGeofenceTool`). The switch asks for location While Using,
+then Always (`NSLocationAlwaysAndWhenInUseUsageDescription`). With only While
+Using, places are watched only while bighelp is open; `background` says which.
+
+- `list`: this host's places: `geofences` of `{id, name, latitude, longitude,
+  radiusMeters, on, note, repeats, created, agentId}`, plus `background` and
+  `limit` (20, iOS's most for one app).
+- `create`: `name` (1–100), `latitude` and `longitude`, or `here: true` for
+  where the phone is now; `radiusMeters` (100–5000, default 150); `on`
+  (`arrive`, `leave` or `both`, default `arrive`); `note` (≤ 1000, what the
+  agent wanted to do then); `repeats` (default false: the place is removed after
+  its first event). Returns `{id}`. Full is `limit_reached`. iOS watches places
+  only with precise location, so approximate location is
+  `precise_location_required`.
+- `delete`: `id`. Returns `{id, deleted: true}`.
+- When the person arrives or leaves, bighelp sends a message to the chat that
+  made the place (same host, agent and session) through the Shortcuts host path,
+  even with bighelp closed when Always is allowed: the place, arrived or left,
+  the time and the note. If that fails, a notification tells the person.
+  One event per place per 5 minutes. Places live on the phone
+  (`DeviceGeofenceMonitor`), readable once it has been unlocked after a restart;
+  an unreadable store is `storage_unavailable`. A place whose switch was turned
+  off is removed at its next event.
+
+Reminders take a place too, with no location permission (iOS Reminders watches
+it): `reminders.create` and `reminders.update` accept `locationTrigger`
+`{name, latitude, longitude, radiusMeters (100–5000), proximity: "arrive" |
+"leave"}`, and `reminders.update` accepts `clearLocationTrigger: true`.
+`reminders.list` returns `locationTrigger` when a reminder has one.
+
+## Alarms and timers
+
+`alarms.*` (`DeviceAlarmsTool`), AlarmKit (`NSAlarmKitUsageDescription`), iPhone
+and iPad on iOS 26 and later. Device access hides the row elsewhere. The agent
+sees and changes only bighelp's alarms, never the Clock app's. A timer counts
+down in a Live Activity (`BighelpLiveActivity`).
+
+- `list`: `alarms` of `{id, label, kind (alarm or timer), state (scheduled,
+  countdown, paused or alerting), time {hour, minute}, weekdays, date,
+  timerSeconds}` (fields as set).
+- `create`: `label` (1–60) and exactly one of: `time` `{hour, minute}` with
+  optional `weekdays` (`monday` … `sunday`, repeats weekly; without it, rings
+  once at the next such time), `date` (one time), or `timerSeconds`
+  (5–86,400). Returns `{id}`.
+- `update`: `id` and any `create` field; the new schedule replaces the old one
+  under the same `id`. Returns `{id}`.
+- `delete`: `id`. Returns `{id, deleted: true}`. Missing is `not_found`.
+- AlarmKit keeps no label, so the phone keeps each alarm's label beside its id.
+  It has no edit either: `update` cancels and schedules again, and puts the old
+  alarm back if the new one is refused. When AlarmKit holds no more alarms the
+  code is `alarm_limit_reached`.
+
+## Music
+
+`music.*` (`DeviceMusicTool`), MusicKit and the Music app
+(`NSAppleMusicUsageDescription`). Playing the Apple Music catalog needs the
+person's subscription; without one, `search` and `play` use their library.
+The App ID needs the MusicKit app service for catalog requests; without it they
+fail as `music_service_unavailable`.
+
+- `nowPlaying`: `{state (playing, paused or stopped), item {id, title, artist,
+  album, durationSeconds}, positionSeconds}`.
+- `search`: `query` (1–200), `types` (`songs`, `albums`, `playlists`,
+  `artists`; default the first three), `source` (`catalog` or `library`,
+  default catalog with a subscription), `limit` (1–25, default 10). Returns
+  `results` of `{id, type, title, artist, album, source}` (`type` is
+  `song`, `album`, `playlist` or `artist`; requests take either form) and
+  `subscription` (`canPlayCatalog`). An explicit `source: catalog` without a
+  subscription is `subscription_required`; without `source` it falls back to
+  the library.
+- `library`: `type` (`playlists` or `recent`, default playlists), `limit`
+  (1–50). Returns `items` like `search`.
+- `play`: `id`, `type` and `source` from a result, or `query` (plays the best
+  song match); optional `shuffle`. Returns `nowPlaying`'s fields.
+- `control`: `action` (`pause`, `resume`, `next`, `previous`, `stop`). Returns
+  `nowPlaying`'s fields.
+- `createPlaylist`: `name` (1–100), `description` (≤ 300), `itemIDs` (≤ 100
+  songs). Returns `{id}`.
+- `addToPlaylist`: `playlistID`, `itemIDs` (1–100). Returns `{id}`.
+- `addToLibrary`: `id`, `type`. Returns `{id}`.
+- Codes: `subscription_required`, `not_found`, `music_service_unavailable`.
+
+## Focus
+
+`focus.current` (`DeviceFocusTool`) reads bighelp's Focus filter
+(`BighelpFocusFilter`, a `SetFocusFilterIntent`). The person adds it to a Focus
+in iOS Settings › Focus › Focus filters and fills in a name, a note for agents
+and Quiet agent alerts. iOS gives the app only its own filter's values, so a
+Focus without bighelp's filter reads as `active: false`. No app can turn a
+Focus on or off.
+
+- `current`: `{active, name, note, quietAlerts, since}` (`name`, `note` and
+  `since` only while active) and `hint` saying the person sets it up in Focus
+  settings.
+- While a filter with Quiet agent alerts is on, the notification service
+  extension delivers agent alerts passively (no sound or banner); the filter is
+  kept in the app group (`bighelp.focus-filter.v1`).
+
+## Shortcuts
+
+`shortcuts.*` (`DeviceShortcutsTool`). iOS gives apps no list of shortcuts, so
+the person types the names their agents may run in Device access › Shortcuts
+(up to 50, kept on the device).
+
+- `list`: `shortcuts` of `{name}`.
+- `run`: `name` (exactly one from the list, else `not_allowed`), `input`
+  (optional text, ≤ 4000). bighelp opens Shortcuts with
+  `shortcuts://x-callback-url/run-shortcut`, which runs it and comes back to
+  bighelp with its output. Returns `{id, status (completed, cancelled or
+  failed), output, truncated}` (output ≤ 8000 characters; a failed run's
+  output is Shortcuts' `errorMessage`). The journal keeps only `id`, so a retry
+  never runs it twice. The host waits up to 60 seconds and holds the channel's
+  lease meanwhile; a run that doesn't come back in time is `outcome_unknown`.
+  A second run while one is out is `device_busy`.
+- While the run is out in Shortcuts (at most 60 seconds), bighelp counts as
+  open for the phone tools (`DeviceToolHandoff`): leaving for Shortcuts doesn't
+  close the channel or retire the call. It holds a background task and the host
+  connection, and still retires the call on everything else (switch off, host
+  or chat change, sign-out). The callback is
+  `loopdy://device-tool/shortcuts/<success|cancel|error>/<run id>`; callbacks
+  for unknown or finished runs are ignored.
 
 ## Mutation reconciliation
 

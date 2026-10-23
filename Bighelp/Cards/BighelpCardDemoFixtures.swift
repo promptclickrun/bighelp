@@ -49,6 +49,44 @@ enum BighelpCardDemoFixtures {
         ]
     )
 
+    /// A person, a place and a song in one card (`native-card-objects-v1`).
+    /// Made-up people and places; the song has no id, so Open in Music searches for it.
+    static let objects = make(
+        id: "44444444444444444444444444444444",
+        title: "Saturday plans",
+        summary: "Coffee with Jordan Sample at Fixture Coffee, and a song for the drive.",
+        importance: "normal",
+        elements: [
+            "root": node("card", ["title": .string("Saturday plans"), "subtitle": .string("Demo objects")],
+                         ["person", "first_divider", "spot", "second_divider", "song"]),
+            "person": node("contact", [
+                "name": .string("Jordan Sample"),
+                "subtitle": .string("Designer at Example Studio"),
+                "phones": .array([.object(["label": .string("mobile"), "value": .string("+1 (555) 010-0142")])]),
+                "emails": .array([.object(["label": .string("work"), "value": .string("jordan@example.com")])]),
+                "address": .object([
+                    "street": .string("12 Sample Street"), "city": .string("Testville"),
+                    "region": .string("CA"), "postal_code": .string("90000"), "country": .string("United States"),
+                ]),
+            ]),
+            "first_divider": node("divider", [:]),
+            "spot": node("place", [
+                "name": .string("Fixture Coffee"),
+                "subtitle": .string("Coffee · Open until 6 PM"),
+                "address": .string("1 Placeholder Way, Testville"),
+                "latitude": .number(37.7694),
+                "longitude": .number(-122.4862),
+                "span_meters": .integer(1_200),
+            ]),
+            "second_divider": node("divider", [:]),
+            "song": node("music", [
+                "kind": .string("song"),
+                "title": .string("Sample Song"),
+                "artist": .string("The Placeholders"),
+            ]),
+        ]
+    )
+
     private static func make(
         id: String,
         title: String,

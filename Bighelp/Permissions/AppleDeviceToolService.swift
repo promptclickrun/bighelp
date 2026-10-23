@@ -154,7 +154,7 @@ private extension AppleDeviceToolService {
             try validateThisEventSpan(arguments)
         case "reminders.create":
             try validateKeys(arguments, allowed: [
-                "title", "listID", "dueDate", "startDate", "timeZone", "notes", "priority",
+                "title", "listID", "dueDate", "startDate", "timeZone", "notes", "priority", "locationTrigger",
             ])
             try requireString(arguments, key: "title")
             try validateOptionalString(arguments, key: "listID", allowNull: false)
@@ -165,6 +165,7 @@ private extension AppleDeviceToolService {
             }
             try validateOptionalString(arguments, key: "notes")
             try validatePriority(arguments)
+            try validateLocationTrigger(arguments)
         case "calendar.update":
             try validateKeys(arguments, allowed: [
                 "id", "expectedRevision", "title", "start", "end", "timeZone", "location", "notes", "url", "span", "occurrenceStart",
@@ -188,6 +189,7 @@ private extension AppleDeviceToolService {
         case "reminders.update":
             try validateKeys(arguments, allowed: [
                 "id", "expectedRevision", "title", "dueDate", "startDate", "timeZone", "notes", "priority", "completed",
+                "locationTrigger", "clearLocationTrigger",
             ])
             try validateIdentity(arguments)
             try validateOptionalString(arguments, key: "title", allowNull: false)
@@ -197,6 +199,8 @@ private extension AppleDeviceToolService {
             try validateOptionalString(arguments, key: "notes")
             try validatePriority(arguments)
             try validateOptionalBool(arguments, key: "completed")
+            try validateLocationTrigger(arguments)
+            try validateOptionalBool(arguments, key: "clearLocationTrigger")
         case "reminders.delete":
             try validateKeys(arguments, allowed: ["id", "expectedRevision"])
             try validateIdentity(arguments)
@@ -356,6 +360,17 @@ private extension AppleDeviceToolService {
         }
     }
 
+    /// A reminder's place (`locationTrigger`), checked whole before anything changes. Setting one
+    /// and clearing it in the same update contradict each other.
+    static func validateLocationTrigger(_ arguments: [String: BighelpJSONValue]) throws {
+        if let trigger = arguments["locationTrigger"] {
+            _ = try ReminderLocationTrigger.parse(trigger)
+            guard arguments["clearLocationTrigger"]?.boolean != true else {
+                throw AppleDeviceToolError.invalidArguments
+            }
+        }
+    }
+
     static func requireString(_ arguments: [String: BighelpJSONValue], key: String) throws {
         guard let value = arguments[key]?.string, !value.isEmpty, value.count <= 4_000 else {
             throw AppleDeviceToolError.invalidArguments
@@ -443,6 +458,8 @@ final class LiveAppleDeviceToolNativeBoundary: AppleDeviceToolNativeBoundary {
         case .reminders: eventKitStatus(.reminder)
         case .location: await location.status()
         case .appearance: .available
+        // The router sends these to their own tools.
+        default: .unavailable
         }
     }
 
@@ -452,6 +469,7 @@ final class LiveAppleDeviceToolNativeBoundary: AppleDeviceToolNativeBoundary {
         case .reminders: await requestFullReminderAccess()
         case .location: await location.request()
         case .appearance: .available
+        default: .unavailable
         }
     }
 
@@ -674,6 +692,9 @@ private extension LiveAppleDeviceToolNativeBoundary {
         }
         reminder.notes = arguments["notes"]?.string
         if let priority = arguments["priority"]?.integer { reminder.priority = priority }
+        if let trigger = arguments["locationTrigger"] {
+            ReminderLocationTrigger.apply(try ReminderLocationTrigger.parse(trigger), to: reminder)
+        }
         try authorize()
         do { try eventStore.save(reminder, commit: true) }
         catch { throw AppleDeviceToolError.nativeFailure }
@@ -700,6 +721,11 @@ private extension LiveAppleDeviceToolNativeBoundary {
         if let notes = arguments["notes"]?.string { reminder.notes = notes }
         if let priority = arguments["priority"]?.integer { reminder.priority = priority }
         if let completed = arguments["completed"]?.boolean { reminder.isCompleted = completed }
+        if let trigger = arguments["locationTrigger"] {
+            ReminderLocationTrigger.apply(try ReminderLocationTrigger.parse(trigger), to: reminder)
+        } else if arguments["clearLocationTrigger"]?.boolean == true {
+            ReminderLocationTrigger.apply(nil, to: reminder)
+        }
         try authorize()
         do { try eventStore.save(reminder, commit: true) }
         catch { throw AppleDeviceToolError.nativeFailure }
@@ -854,6 +880,7 @@ private extension LiveAppleDeviceToolNativeBoundary {
             "completed": .boolean(reminder.isCompleted),
             "listID": .string(reminder.calendar.calendarIdentifier),
         ]
+        if let trigger = ReminderLocationTrigger.read(from: reminder) { item["locationTrigger"] = trigger }
         if let due = reminder.dueDateComponents {
             var calendar = Calendar(identifier: .gregorian)
             calendar.timeZone = due.timeZone ?? timeZone

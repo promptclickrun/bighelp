@@ -197,6 +197,21 @@ struct BighelpApp: App {
         )
         composition.shortcutService.hostServices = Self.shortcutHostServices(connections: connections,
                                                                             arguments: arguments)
+        // Photos' Save takes the agent's file from the computer in use, as chat does.
+        DeviceToolServices.hostFileDownloader = { [weak connections] in
+            guard let connections, let owner = connections.owner,
+                  let workspace = connections.workspace else { return nil }
+            return DirectHermesDeviceHostFiles(workspace: workspace, owner: owner)
+        }
+        // An arrival goes to the computer whose agent set the place, even if another is in use.
+        DeviceGeofenceHostRouting.currentHostID = { [weak connections] in connections?.owner?.cacheScopeID }
+        let gatewayShortcuts = composition.shortcutService
+        DeviceGeofenceHostRouting.selectHost = { [weak hostRegistry] scopeID in
+            guard let hostRegistry, let host = hostRegistry.hosts.first(where: {
+                hostRegistry.workspace(for: $0).savedConnection?.workspaceAuthority?.cacheScopeID == scopeID
+            }) else { return false }
+            return (try? gatewayShortcuts.useGateway(host.id)) != nil
+        }
         if !usesDemoWorkspace {
             composition.shortcutService.gatewayDirectory = RegistryShortcutGateways(
                 registry: hostRegistry, fleet: fleet, liveAgents: { nativeWorkspaces.current?.agents.profiles ?? [] })
@@ -367,6 +382,7 @@ struct BighelpApp: App {
         #endif
         let shortcuts = composition.shortcutService
         BighelpCarPlayServices.workspace = { try await shortcuts.connectedWorkspace() }
+        DeviceToolServices.workspace = { try await shortcuts.connectedWorkspace() }
     }
     #endif
 
@@ -630,6 +646,9 @@ struct BighelpApp: App {
                     // Keep the workspace through a quick trip away; mark the
                     // presentation boundary only if the app stays away.
                     BighelpBackgroundGrace.shared.begin("workspace") { [nativeWorkspaces, hostRegistry] in
+                        // Work started outside the app (a Shortcut, CarPlay, an arrival, a run out in
+                        // Shortcuts) still needs the socket, as RootShellView's closer knows.
+                        guard BighelpShortcutService.holdsHostConnection == 0 else { return }
                         nativeWorkspaces.suspend()
                         // Other gateways kept connected for the all-hosts view or Multi-gateway close too.
                         hostRegistry.keepsOtherHostsConnected = false

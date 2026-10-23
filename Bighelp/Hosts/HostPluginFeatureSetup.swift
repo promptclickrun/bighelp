@@ -8,7 +8,7 @@ enum HostPluginFeature: String, Hashable, Sendable {
     var detail: String {
         self == .liveVoice
             ? "Codex Live Voice requires the bighelp plugin on your Hermes host, plus a Codex subscription signed in on that host."
-            : "Calendar, Reminders, and Location access require the bighelp plugin on your Hermes host. You choose each permission separately on this \(BighelpPlatform.isMac ? "Mac" : "iPhone")."
+            : "Phone tools like Calendar, Contacts, Photos, and Location need the bighelp plugin on your Hermes host. You choose each permission separately on this \(BighelpPlatform.isMac ? "Mac" : "iPhone")."
     }
     var installIdentifier: String {
         self == .liveVoice ? CodexLiveVoiceSettingsPresentation.installAccessibilityIdentifier

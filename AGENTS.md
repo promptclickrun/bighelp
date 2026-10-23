@@ -239,6 +239,13 @@ change in both repos.
   `native-workspace-files-agents-v1`) and read that agent's working folder with the same refusals. A bot's Files
   tab sends its ID (`DirectHermesManagedFilesClient(agentID:)`); the serving agent never names itself, so older
   plugins keep working for it, and other bots say to update the plugin.
+- **Phone tools** (Settings › Device access; contract in
+  [docs/IPHONE_DEVICE_TOOLS.md](docs/IPHONE_DEVICE_TOOLS.md)): an agent's `iphone_*` call reaches the phone over the
+  chat's device-tool channel. `DeviceToolCatalog` lists every operation and which are journaled; each capability with
+  its own iOS permission is a `DeviceCapabilityTool` that `DeviceToolRouter` checks before it runs. A new one needs a
+  catalog entry, a tool, a plugin feature (`native-device-<kind>-v1`) and the contract text. Every switch starts off.
+  Two reach past the open chat: Arriving and leaving sends its message from the background (`DeviceGeofenceMonitor`),
+  and a Shortcuts run keeps the call alive while Shortcuts is in front (`DeviceToolHandoff`).
 - **Hermes versions never gate connections or features.** Older, newer, custom and absent version strings are
   metadata, not an allowlist. Check actual host capabilities and route responses instead.
   - Hosts differ, so parse leniently: ignore unknown keys and treat most parts as optional.

@@ -302,7 +302,8 @@ final class NativeWorkspaceRuntime {
         bridge.attachmentResolver = mediaResolver
         bridge.speakerNote = DirectHermesChatSpeakerNote(
             currentWorkspace: { [weak connections] in connections?.workspace },
-            name: { [weak userIdentity] in userIdentity?.identity.name ?? "" }
+            name: { [weak userIdentity] in userIdentity?.identity.name ?? "" },
+            pluginFeatures: { [weak connections] in connections?.workspace?.nativeContext?.features ?? [] }
         )
         bridge.agentTalk = DirectHermesAgentTalkReader(currentWorkspace: { [weak connections] in connections?.workspace })
         let features = ShellFeatureStore(

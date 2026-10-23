@@ -2,24 +2,93 @@ import Foundation
 import Observation
 import CryptoKit
 
+/// The order here is the order of Settings › Device access.
 enum DeviceToolCapability: String, CaseIterable, Codable, Identifiable, Sendable {
-    case calendar, reminders, location, appearance
+    case calendar, reminders, contacts, photos, location, geofences, alarms, music, focus, shortcuts, appearance
     var id: String { rawValue }
 
     /// The plugin feature a host must list before the phone offers this tool.
     /// Older plugins reject an unknown name in the channel's `enabled` list.
     var pluginFeature: String? {
         switch self {
+        case .calendar, .reminders: nil
         case .location: "native-device-location-v1"
         case .appearance: "native-device-appearance-v1"
-        case .calendar, .reminders: nil
+        case .contacts: "native-device-contacts-v1"
+        case .photos: "native-device-photos-v1"
+        case .geofences: "native-device-geofences-v1"
+        case .alarms: "native-device-alarms-v1"
+        case .music: "native-device-music-v1"
+        case .focus: "native-device-focus-v1"
+        case .shortcuts: "native-device-shortcuts-v1"
         }
     }
 
-    /// Calendar, Reminders and Location share the person's data: each stays off for a host until
-    /// they allow it and iOS agrees. Appearance shares nothing and is easy to undo, so it's on for
-    /// every host until they turn it off.
+    /// Everything but Appearance shares the person's data or acts for them: each stays off for a
+    /// host until they allow it and iOS agrees. Appearance shares nothing and is easy to undo, so
+    /// it's on for every host until they turn it off.
     var sharesPersonalData: Bool { self != .appearance }
+
+    /// False where Apple has no such feature, so Device access leaves the row out instead of
+    /// showing a switch that can never turn on.
+    var isOfferedOnThisPlatform: Bool {
+        switch self {
+        case .alarms:
+            #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(AlarmKit)
+            if #available(iOS 26.0, *) { return true }
+            #endif
+            return false
+        case .focus, .shortcuts:
+            // visionOS has no Focus filters, and its Shortcuts can't call an app back.
+            #if os(visionOS)
+            return false
+            #else
+            return true
+            #endif
+        case .geofences, .music:
+            // A Mac isn't launched for arrivals and stays put; its Music player and playlist
+            // calls aren't available to Catalyst apps.
+            #if os(visionOS) || targetEnvironment(macCatalyst)
+            return false
+            #else
+            return true
+            #endif
+        default:
+            return true
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .calendar: String(localized: "Calendar")
+        case .reminders: String(localized: "Reminders")
+        case .contacts: String(localized: "Contacts")
+        case .photos: String(localized: "Photos")
+        case .location: String(localized: "Location")
+        case .geofences: String(localized: "Arriving and leaving")
+        case .alarms: String(localized: "Alarms and timers")
+        case .music: String(localized: "Music")
+        case .focus: String(localized: "Focus")
+        case .shortcuts: String(localized: "Shortcuts")
+        case .appearance: String(localized: "Appearance")
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .calendar: String(localized: "Read, create, update, and delete events directly after you enable access.")
+        case .reminders: String(localized: "Read, create, update, and delete reminders directly after you enable access.")
+        case .contacts: String(localized: "Look up, add, change, and delete people in your contacts.")
+        case .photos: String(localized: "Find and look at your photos, save pictures your agent makes, and sort them into albums.")
+        case .location: String(localized: "Share where you are when your agent asks, for things like finding places near you.")
+        case .geofences: String(localized: "Your agent can watch places you name and hear from bighelp when you arrive or leave.")
+        case .alarms: String(localized: "Set, change, and turn off alarms and timers that ring even on silent.")
+        case .music: String(localized: "See what's playing, play and pause music, and make playlists in Apple Music.")
+        case .focus: String(localized: "Tell your agent when a Focus is on, with the note you set for it.")
+        case .shortcuts: String(localized: "Run the shortcuts you pick and give your agent what they return.")
+        case .appearance: String(localized: "Switch light or dark mode and change your chat color when you ask.")
+        }
+    }
 }
 
 struct DeviceToolScope: Codable, Hashable, Sendable {

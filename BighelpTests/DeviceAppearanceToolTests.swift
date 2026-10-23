@@ -221,7 +221,7 @@ private final class AppearanceFixture {
     lazy var permissions = makePermissions(saved: true)
     lazy var coordinator = DeviceToolCoordinator(
         permissions: permissions, journal: journal, clock: { 1_000 }, available: { [unowned self] in available }
-    ) { [unowned self] operation, arguments, authorize in
+    ) { [unowned self] operation, arguments, _, authorize in
         try tool.execute(operation: operation, arguments: arguments, authorize: authorize)
     }
 

@@ -132,7 +132,7 @@ private final class DeviceCoordinatorFixture {
     lazy var coordinator = makeCoordinator()
     init() { permissions.bind(scope) }
     func makeCoordinator() -> DeviceToolCoordinator {
-        DeviceToolCoordinator(permissions: permissions, journal: journal, clock: { 1_000 }, available: { self.available }) { _, _, authorize in
+        DeviceToolCoordinator(permissions: permissions, journal: journal, clock: { 1_000 }, available: { self.available }) { _, _, _, authorize in
             try authorize()
             self.executions += 1
             self.onExecute?()

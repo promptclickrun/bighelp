@@ -127,13 +127,17 @@ that opens it; the Watch also offers the same link through Handoff.
 
 ### CarPlay voice
 
-Opening bighelp in CarPlay starts a new chat with the default agent and runs
+Opening bighelp in CarPlay starts a new chat with the agent last picked in the
+car (`CarPlayAgentChoice`, else the default agent) and runs
 `CarPlayVoiceSession` without a screen (the iPhone is usually locked, and the
 phone's voice screen only listens while it's active). It builds the same
 `VoicePresentation` the chat uses, keeps it listening between turns, and holds
 the host connection (`BighelpShortcutService.holdHostConnection()`) while the
 car is connected. The CarPlay scene is declared in the iOS Info.plist; visionOS
-generates its own scene manifest, which wins there.
+generates its own scene manifest, which wins there. Voice stays the root, as Apple asks of voice
+apps. Each voice state's second button, Agents, stops listening and pushes a list
+of up to 12 agents; a pick starts talking to it. Talk after a pause continues
+the same car chat; another agent or a new car connection starts a new one.
 
 ## 3. Composition and state ownership
 

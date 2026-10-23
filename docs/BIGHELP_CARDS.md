@@ -113,6 +113,74 @@ RGB values, font names, font sizes, frames, coordinates, blur radii, arbitrary
 SF Symbol names, or SwiftUI modifiers. Version 1 images are bundled symbols or
 assets only; remote image decoding is not supported.
 
+## Object components
+
+Plugin feature `native-card-objects-v1` adds three components that show one real
+thing the person can act on: a person, a place, or music. They follow Bots
+mode's look: one clean row with a round picture, a title, one quiet line, and a
+few round buttons. They are still data. Each button is one fixed native action
+the app chooses from the props; a card can't name a URL scheme, a selector or
+code.
+
+| Type | Purpose | Allowed props | Children |
+|---|---|---|---|
+| `contact` | A person, with Call, Message, Email and Contacts | `name`, `subtitle`, `phones`, `emails`, `address`, `contact_id` | None |
+| `place` | A spot on a map, with Directions and Maps | `name`, `subtitle`, `address`, `latitude`, `longitude`, `span_meters` | None |
+| `music` | A song, album, playlist or artist, with Play and Music | `kind`, `title`, `artist`, `music_id`, `source`, `url` | None |
+
+- `contact`: `name` (required, 1–200). `subtitle` (≤ 200, like a job or
+  company). `phones` and `emails` (≤ 5 each) are `{label, value}` with `label`
+  ≤ 40 and `value` ≤ 200; a phone keeps only digits, spaces and `+ ( ) - .`,
+  an email must look like one. `address` is `{street, city, region,
+  postal_code, country}`, each ≤ 100. `contact_id` (≤ 512) is the id from
+  `iphone_contacts`: the button opens that person in Contacts when this phone
+  has them, else offers Add to Contacts with the card's fields.
+  Buttons: Call and Message for the first phone, Email for the first email,
+  Directions when there's an address, and Contacts.
+- `place`: `name` (required, 1–200), `latitude` (−90–90) and `longitude`
+  (−180–180) (required), `subtitle` (≤ 200, like "Coffee · Open until 6 PM"),
+  `address` (≤ 300), `span_meters` (200–50,000, default 1,000). The app draws a
+  still map picture with a pin (MapKit's snapshotter, kept by coordinate), never
+  a live map in the chat. Buttons: Directions and Open in Maps.
+- `music`: `kind` (required: `song`, `album`, `playlist` or `artist`), `title`
+  (required, 1–200), `artist` (≤ 200), `music_id` and `source` (`catalog` or
+  `library`) from `iphone_music`, `url` (≤ 500, only `https://music.apple.com/…`).
+  The artwork comes from MusicKit by id only while Music is on in Device access;
+  otherwise the row shows a music symbol. Play plays it through the Music app
+  when Music is on, else opens it in Music; Open in Music opens `url` or the id.
+- Object props are plain JSON values, never `{ "literal": … }` or other
+  bindings, and objects take no children. A phone's or email's `label` may be
+  left out; an `address` with every part empty reads as no address.
+- What the app does (`BighelpCardObjects`, `BighelpCardObjectViews`):
+  - Contact: a round initials picture. Call and Message open `tel:` and `sms:`
+    with the first phone's digits, Email opens `mailto:`, Directions opens
+    Maps' driving directions to the written address. The Contacts button reads
+    Open in Contacts when the card has a `contact_id` and Contacts access
+    already lets bighelp read it, else Add to Contacts (Contacts' own new-contact
+    screen, filled in from the card). A card never asks for Contacts access.
+  - Place: the map picture is a button that opens Maps too. Directions and
+    Open in Maps hand the spot to Maps (`MKMapItem`). Pictures are kept by
+    coordinate, span, size, scale and light or dark (`BighelpCardMapSnapshots`).
+  - Music: Open in Music opens `url`, else the catalog item's page
+    (`https://music.apple.com/<kind>/<music_id>`), else a search in Music for
+    the title and artist (library ids have no public page). On the Mac, Play
+    opens Music.
+  - Every button is round, at least 44 points (56 on Vision Pro), with a
+    VoiceOver name; on the Mac a right-click lists the same actions.
+- A card may hold several objects (a `vstack` of three places, say), up to the
+  card's element limit.
+- Older apps reject unknown types ("Invalid or unsupported card"), so the
+  plugin accepts these only in a chat whose app said it draws them: before each
+  turn the app's `people/speaking` note carries `renders: ["contact", "place",
+  "music"]` when `/native/context` lists `native-card-objects-v1`. A card with
+  an object in any other chat is refused with a note that tells the agent to
+  use the basic components.
+  The app reads the feature from the context it loaded when it connected, so
+  the note costs no extra request; without the feature the note stays exactly
+  as before, because older plugins refuse fields they don't know.
+- `-use-demo-fixtures -test-object-cards` opens a chat with one card holding a
+  made-up person, place and song (`BighelpCardDemoFixtures.objects`).
+
 ## Weather backgrounds
 
 A `card` element may carry an animated weather background beside its `props`:

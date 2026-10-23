@@ -38,6 +38,51 @@ final class DeviceToolPermissionsUITests: BighelpUITestCase {
     }
 
     @MainActor
+    func testNewPhoneToolsAreListedAndOffInLight() throws {
+        try newPhoneToolsAreListedAndOff(appearance: "light")
+    }
+
+    @MainActor
+    func testNewPhoneToolsAreListedAndOffInDark() throws {
+        try newPhoneToolsAreListedAndOff(appearance: "dark")
+    }
+
+    /// Contacts, Photos, places, alarms, Music, Focus and Shortcuts each get their own switch, off
+    /// until the person turns it on. Demo mode never asks iOS, so they can't turn on here.
+    @MainActor
+    private func newPhoneToolsAreListedAndOff(appearance: String) throws {
+        let app = makeApp()
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays",
+            "-preview-ui-v3", "-loopdy.appearance.interface-version", "v3",
+            "-loopdy.demo.appearance", appearance]
+        app.launch()
+        openSettings(in: app)
+        settingsRow("settings.menu.permissions", in: app).tap()
+        let titles = ["contacts": "Contacts", "photos": "Photos", "geofences": "Arriving and leaving",
+                      "alarms": "Alarms and timers", "music": "Music", "focus": "Focus", "shortcuts": "Shortcuts"]
+        var shot = 0
+        for capability in ["contacts", "photos", "geofences", "alarms", "music", "focus", "shortcuts"] {
+            let toggle = deviceToolSwitch(capability, in: app)
+            XCTAssertTrue(toggle.waitForExistence(timeout: 5), capability)
+            XCTAssertEqual(toggle.value as? String, "0", capability)
+            XCTAssertTrue(app.staticTexts[titles[capability]!].exists, capability)
+            if capability == "contacts" || capability == "music" { saveEvidence(app, "device-access-\(appearance)-\(shot)"); shot += 1 }
+        }
+        XCTAssertEqual(app.alerts.count, 0)
+    }
+
+    @MainActor
+    private func saveEvidence(_ app: XCUIApplication, _ name: String) {
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = name
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+        if let folder = ProcessInfo.processInfo.environment["BIGHELP_EVIDENCE"] {
+            try? app.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: folder).appending(path: "\(name).png"))
+        }
+    }
+
+    @MainActor
     func testLocationSwitchTurnsOnInLight() throws {
         try locationSwitchTurnsOn(appearance: "light")
     }

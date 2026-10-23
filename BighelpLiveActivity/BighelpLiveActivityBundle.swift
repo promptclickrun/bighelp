@@ -7,6 +7,11 @@ struct BighelpLiveActivityBundle: WidgetBundle {
         #if os(iOS)
         BighelpSessionLiveActivity()
         #endif
+        #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(AlarmKit)
+        if #available(iOS 26.0, *) {
+            BighelpAlarmLiveActivity()
+        }
+        #endif
         BighelpAgentWidget()
         BighelpActiveSessionsWidget()
         BighelpScheduledTasksWidget()

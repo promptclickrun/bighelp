@@ -3,6 +3,46 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.12
+
+### Device access
+
+Seven new switches in **Settings** › **Device access**. Each switch is off until you turn it on. When it is on, your
+agent can use it while you have its chat open. These need bighelp plugin 3.29.0 or later.
+
+- **Contacts:** your agent can find, add, change and delete people in your contacts. If you share only some contacts
+  with bighelp, your agent sees only those.
+- **Photos:** your agent can find and look at your photos, save pictures that it makes, mark favorites and sort photos
+  into albums. Before a photo is deleted, iOS asks you.
+- **Arriving and leaving:** your agent can watch places that you name. When you arrive or leave, bighelp tells the
+  chat that set the place. To get this when bighelp is closed, allow location **Always**. Reminders can also ring
+  when you arrive at or leave a place.
+- **Alarms and timers:** your agent can set, change and turn off alarms and timers. They ring also when your iPhone is
+  on silent. This needs iOS 26 on iPhone or iPad.
+- **Music:** your agent can tell what is playing, play and pause music, and make playlists in Apple Music.
+- **Focus:** add the bighelp filter to a Focus in iOS **Settings** › **Focus**. Then your agent knows when that Focus
+  is on and reads the note that you write for it. You can also make agent alerts quiet during that Focus.
+- **Shortcuts:** type the names of the shortcuts that your agent can run. To run one, bighelp opens Shortcuts and then
+  comes back with the result.
+
+### Chat
+
+- **Cards for people, places and music:** your agent can show a person, a place or music as a card in the chat.
+  - A person card has **Call**, **Message**, **Email**, **Directions** and **Contacts**.
+  - A place card shows a map, with **Directions** and **Open in Maps**.
+  - A music card has **Play** and **Open in Music**.
+  - These cards need bighelp plugin 3.29.0 or later.
+
+### CarPlay
+
+- **Agents:** in CarPlay, tap **Agents** to pick the agent that you talk to. bighelp remembers it for the next drive.
+- **Talk:** after a pause, **Talk** continues the same chat.
+
+### Languages
+
+- **Simplified Chinese:** Bots mode, Teamwork and their Settings pages now show in Simplified Chinese. This text is a
+  draft. Tell us on GitHub if a word is wrong.
+
 ## 2.6.11
 
 ### Modes

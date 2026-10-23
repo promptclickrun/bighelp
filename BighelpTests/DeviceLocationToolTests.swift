@@ -122,11 +122,21 @@ struct DeviceLocationToolTests {
     @Test func approximateLocationAsksForPreciseOnceAndUsesItWhenAllowed() async throws {
         let provider = FakeLocationProvider(accuracy: .reduced)
         provider.answerToPrecise = .full
-        let result = try await DeviceLocationTool(provider: provider).current(authorize: {})
+        let result = try await DeviceLocationTool(provider: provider, canAsk: { true }).current(authorize: {})
         #expect(provider.preciseRequests == [DeviceLocationTool.purposeKey])
         #expect(result["precise"] == .boolean(true))
         #expect(result["note"] == nil)
         #expect(result["place"]?.object?["street"] == .string("100 Example Street"))
+    }
+
+    /// The phone tools also run while bighelp is inactive or just left; iOS asks nothing then, and the
+    /// agent gets the rough area it's allowed.
+    @Test func awayFromBighelpNoPreciseQuestionIsAsked() async throws {
+        let provider = FakeLocationProvider(accuracy: .reduced)
+        provider.answerToPrecise = .full
+        let result = try await DeviceLocationTool(provider: provider, canAsk: { false }).current(authorize: {})
+        #expect(provider.preciseRequests.isEmpty)
+        #expect(result["precise"] == .boolean(false))
     }
 
     @Test func keepingApproximateReturnsARoughAreaAndSaysSo() async throws {
@@ -134,7 +144,7 @@ struct DeviceLocationToolTests {
         provider.answerToPrecise = .reduced
         provider.fix = DeviceLocationFix(latitude: 12.3, longitude: -65.4, horizontalAccuracy: 3_000,
                                          timestamp: Self.fix.timestamp)
-        let result = try await DeviceLocationTool(provider: provider).current(authorize: {})
+        let result = try await DeviceLocationTool(provider: provider, canAsk: { true }).current(authorize: {})
         #expect(result["precise"] == .boolean(false))
         #expect(result["horizontalAccuracyMeters"] == .integer(3_000))
         let note = try #require(result["note"]?.string)

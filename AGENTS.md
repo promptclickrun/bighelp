@@ -245,7 +245,11 @@ change in both repos.
   [docs/IPHONE_DEVICE_TOOLS.md](docs/IPHONE_DEVICE_TOOLS.md)): an agent's `iphone_*` call reaches the phone over the
   chat's device-tool channel. `DeviceToolCatalog` lists every operation and which are journaled; each capability with
   its own iOS permission is a `DeviceCapabilityTool` that `DeviceToolRouter` checks before it runs. A new one needs a
-  catalog entry, a tool, a plugin feature (`native-device-<kind>-v1`) and the contract text. Every switch starts off.
+  catalog entry, a tool, a plugin feature (`native-device-<kind>-v1`) and the contract text. Every switch starts off
+  and then stays on until the person turns it off: one list for the phone, every host and agent
+  (`DeviceToolPermissions.grantsKey`); iOS saying no pauses a tool (`isUsable`), never turns its switch off. The
+  channel runs while bighelp is active, inactive or in the background grace, and in any agent's chat on a plugin with
+  `native-device-tools-agents-v1`; after the grace it closes as `paused` so the host waits for the phone.
   Two reach past the open chat: Arriving and leaving sends its message from the background (`DeviceGeofenceMonitor`),
   and a Shortcuts run keeps the call alive while Shortcuts is in front (`DeviceToolHandoff`).
 - **Hermes versions never gate connections or features.** Older, newer, custom and absent version strings are

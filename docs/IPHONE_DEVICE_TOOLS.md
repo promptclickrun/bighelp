@@ -32,13 +32,24 @@ person turns it off, and it needs no iOS permission. Calendar and Reminders auth
 creation, updates and deletion after enablement, with no per-operation approval.
 Location is read-only. OS permission by itself never enables agent access.
 
-Grants are scoped to the current phone, phone authorization epoch and selected
-host. Turning a control off invalidates active work immediately. Switching host,
-signing out, backgrounding or losing protected-data access invalidates in-flight
+A grant belongs to this phone (`DeviceToolPermissions.grantsKey`): every host and
+every agent on it can use it, and it stays through app updates, reconnects and new
+sign-ins until the person turns the switch off. Grants saved for each host before
+2.6.15 (`loopdy.device-tools.v1.<scope hash>`) are merged into the phone's list once.
+iOS saying no (access taken back in iOS Settings, Location Services off) never turns a
+switch off: the tool is paused (`isUsable` is false, it isn't offered to the host) and
+the row says to allow access in iOS Settings; it comes back when iOS allows it again.
+Turning a control off invalidates active work immediately. Switching host, signing
+out, the background grace ending or losing protected-data access invalidates in-flight
 operations. Account erasure deletes persisted grants and mutation outcomes.
 Re-enabling a grant cannot revive a read started under an older grant revision.
 
-The phone must be open, unlocked and connected. No background execution or wake-up
+The phone must be unlocked and connected, and bighelp open: active, or inactive (a
+notification pulled down, Control Center, a system question), or within the background
+grace (`BighelpBackgroundGrace`, 25 seconds) after it goes to the background. iOS asks
+its permission questions only while bighelp is active. After the grace the channel
+closes with `reason: "paused"` (plugin `native-device-tools-wait-v1`), so the host keeps
+a call waiting for the phone to come back instead of failing it at once. No wake-up
 guarantee is offered. Unavailable or denied access is a failure, never fabricated
 empty data.
 
@@ -78,13 +89,15 @@ The plugin constructs context from the verified Link frame's phone ID and
 phone epoch, with the authenticated host ID as an attribute and profile as
 scope. Phone and host authorization epochs are independent.
 
-Only the agent the plugin serves has the phone tools: `servingProfileId` in
-`/native/context`, usually `default`. Hermes loads a profile's plugins only into
-that profile's agents, and the plugin refuses a channel for any other agent
-(`profile_not_served`). So the phone opens a channel only while that agent's
-chat is open (`NativeDeviceToolSession.servingAgentID`). Another agent's chat
-sends nothing after the context check, and Device access names the agent that
-can use the shared data.
+Every agent on the host has the phone tools when the plugin lists
+`native-device-tools-agents-v1` (plugin 3.30.0): Hermes loads a separate copy of the
+plugin for each profile in the dashboard process, and they share one tool hub, so any
+agent's chat opens its own channel. An older plugin gives them only to the agent it
+serves (`servingProfileId` in `/native/context`, usually `default`) and refuses a
+channel for any other agent (`profile_not_served`); with it, the phone opens a channel
+only while that agent's chat is open (`NativeDeviceToolSession.servingAgentID`),
+another agent's chat sends nothing after the context check, and Device access names
+the agent that can use the shared data.
 
 One chat has one phone. The plugin refuses a second channel for a chat
 (`channel_ambiguous`) and never picks a phone by which one came last. A channel
@@ -117,7 +130,8 @@ to 128 KB. Host timeout is normally 30 seconds (bounded to 20–60 seconds);
 the native envelope permits no more than 120 seconds.
 
 Status is advisory. Every operation still checks the live native grant,
-foreground/protected-data state, selected host, account and expiry. Results
+open (active, inactive or background grace)/protected-data state, selected host,
+account and expiry. Results
 recheck those conditions after native execution and while waiting for the
 outbox. Reconnect or backpressure cannot replay private results after permission
 revocation, ownership change or downgrade to a legacy relay. A pending private
@@ -175,15 +189,16 @@ address comes from `CLGeocoder`, which gives it in parts back to iOS 17; on
 Vision Pro, where that's deprecated, MapKit's `MKReverseGeocodingRequest` names
 only the city and country. A fix takes at most 15 seconds and an address 5.
 
-- The Location switch asks iOS for While Using the App, never Always. Nothing
-  runs in the background; a call while bighelp isn't open fails like the other
-  tools (`device_unavailable` on the phone, `phone_unavailable` on the host).
+- The Location switch asks iOS for While Using the App, never Always. A call while
+  bighelp isn't open fails like the other tools (`device_unavailable` on the phone,
+  `phone_unavailable` on the host); in the background grace iOS may give no fix
+  (`unavailable`).
 - `NSLocationDefaultAccuracyReduced` keeps approximate location the default.
   When a call finds approximate access, iOS asks once for precise location
   (`requestTemporaryFullAccuracyAuthorization`, purpose key `AgentRequest` in
   `NSLocationTemporaryUsageDescriptionDictionary`). The question is asked only
-  after the call is re-authorized (switch, chat, foreground), and the grant is
-  re-checked after it. If the person keeps approximate, `precise` is false, a
+  while bighelp is active and after the call is re-authorized (switch, chat, open),
+  and the grant is re-checked after it. Otherwise the call keeps approximate. If the person keeps approximate, `precise` is false, a
   `note` says it's a rough area, and `place` has no street, neighborhood or
   postal code.
 - It's a read: never journaled, never kept by the plugin for a retry.

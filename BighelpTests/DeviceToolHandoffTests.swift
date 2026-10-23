@@ -200,22 +200,34 @@ struct DeviceToolHandoffTests {
 
     // MARK: Staying open
 
-    @Test func theScenePhaseTheChannelGoesByStaysActiveThroughTheHopAndNotAfter() async {
+    /// A notification pulled down, Control Center or a system question makes bighelp inactive, not gone:
+    /// the phone tools keep going. The background closes them, except through a handoff's hop.
+    @Test func inactiveCountsAsOpenAndTheBackgroundOnlyThroughAHop() async {
         let fixture = HandoffFixture()
-        let before = [ScenePhase.active, .inactive, .background].map { fixture.handoff.effectivePhase($0) }
-        #expect(before == [.active, .inactive, .background])
-        #expect(fixture.handoff.isAppOpen(.active) && !fixture.handoff.isAppOpen(.inactive) && !fixture.handoff.isAppOpen(.background))
+        #expect([ScenePhase.active, .inactive, .background].map { fixture.handoff.isOpen($0) } == [true, true, false])
+        #expect(fixture.handoff.isAppOpen(.active) && fixture.handoff.isAppOpen(.inactive) && !fixture.handoff.isAppOpen(.background))
 
         let id = UUID()
         let run = fixture.start(id)
         await fixture.waitUntil { fixture.handoff.isActive }
-        // bighelp goes away to Shortcuts and comes back: the phase the channel sees never changes.
+        // bighelp goes away to Shortcuts and comes back: the channel counts it as open throughout.
         for phase in [ScenePhase.inactive, .background, .inactive, .active] {
-            #expect(fixture.handoff.effectivePhase(phase) == .active)
+            #expect(fixture.handoff.isOpen(phase))
         }
         #expect(fixture.handoff.isAppOpen(.background))
         fixture.handoff.handleCallback(fixture.callback(.cancel, id))
         _ = await run.value
+    }
+
+    /// A quick trip away (the app switcher, a widget, a notification opened) keeps the phone tools for
+    /// the background grace, like the host connection; they stop when it ends or bighelp comes back.
+    @Test func theBackgroundGraceKeepsThePhoneToolsUntilItEnds() {
+        let handoff = DeviceToolHandoff()
+        handoff.holdBackgroundGrace()
+        #expect(handoff.isOpen(.background) && handoff.isAppOpen(.background))
+        handoff.releaseBackgroundGrace()
+        #expect(!handoff.isOpen(.background) && !handoff.isAppOpen(.background))
+        #expect(handoff.isOpen(.inactive))
     }
 
     // MARK: Callback URLs

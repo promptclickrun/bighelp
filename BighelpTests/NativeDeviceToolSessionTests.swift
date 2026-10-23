@@ -157,6 +157,51 @@ struct NativeDeviceToolSessionTests {
         #expect(fixture.http.refusals.isEmpty)
     }
 
+    /// A newer plugin gives every agent on the host the phone's tools: any agent's chat opens its own
+    /// channel, and only that agent's calls come through it.
+    @Test func withEveryAgentsToolsAnotherAgentsChatOpensItsOwnChannel() async throws {
+        let fixture = try Fixture()
+        fixture.http.features.append("native-device-tools-agents-v1")
+        fixture.http.request["agentId"] = .string("researcher")
+        let session = fixture.session(agentID: "researcher")
+        try await session.connect()
+        #expect(session.servingAgentID == nil)
+        #expect(fixture.http.connectedAgents == ["researcher"])
+        try await session.pollOnce()
+        #expect(fixture.handled == 1)
+        #expect(fixture.http.results.first?["agentId"]?.string == "researcher")
+        #expect(fixture.http.refusals.isEmpty)
+    }
+
+    /// Going to the background past the grace tells a newer plugin the phone is only away, so a call
+    /// waits for it to come back instead of failing at once (`native-device-tools-wait-v1`).
+    @Test func aChannelClosedForTheBackgroundSaysItIsPaused() async throws {
+        let fixture = try Fixture()
+        fixture.http.features.append("native-device-tools-wait-v1")
+        let session = fixture.session()
+        try await session.connect()
+        fixture.paused = true
+        await session.close()
+        #expect(fixture.http.closeBodies.count == 1)
+        #expect(fixture.http.closeBodies.first?["reason"] == .string("paused"))
+    }
+
+    @Test func otherClosesAndOlderPluginsGetAPlainClose() async throws {
+        let waiting = try Fixture()
+        waiting.http.features.append("native-device-tools-wait-v1")
+        let chatChange = waiting.session()
+        try await chatChange.connect()
+        await chatChange.close()
+        #expect(waiting.http.closeBodies.first?["reason"] == nil, "A chat or permission change ends the channel")
+
+        let older = try Fixture()
+        let session = older.session()
+        try await session.connect()
+        older.paused = true
+        await session.close()
+        #expect(older.http.closeBodies.first?["reason"] == nil, "An older plugin refuses fields it doesn't know")
+    }
+
     @Test func anotherAgentsChatSaysWhichAgentCanUseSharedData() {
         #expect(DeviceToolChannelNote.otherAgent(enabled: [.calendar, .appearance], servingAgentName: "Sol")
             == "Open a chat with Sol to use this iPhone’s shared data.")
@@ -339,6 +384,8 @@ struct NativeDeviceToolSessionTests {
         var current = true
         var handled = 0
         var available = true
+        /// The app left for the background and its grace ran out (`DeviceToolHandoff`).
+        var paused = false
         var wrongResult = false
         /// The first request handled takes this long, like a run out in Shortcuts.
         var slowFor: Duration?
@@ -354,7 +401,7 @@ struct NativeDeviceToolSessionTests {
         func session(enabled: Set<DeviceToolCapability> = [.calendar], agentID: String = "default") -> NativeDeviceToolSession {
             NativeDeviceToolSession(http: http, owner: owner, currentOwner: { self.current ? self.owner : nil },
                 scope: scope, agentID: agentID, sessionID: "session", enabled: enabled,
-                isAvailable: { self.available }, handle: { request, _, _ in
+                isAvailable: { self.available }, isPaused: { self.paused }, handle: { request, _, _ in
                     self.handled += 1
                     if let slowFor = self.slowFor { try? await Task.sleep(for: slowFor) }
                     var resultRequest = request
@@ -391,6 +438,10 @@ struct NativeDeviceToolSessionTests {
         var replacesSamePhone = false
         /// The close never reaches the host (the app was closing, or the connection dropped).
         var closeFails = false
+        /// What each close said, in order.
+        var closeBodies: [[String: BighelpJSONValue]] = []
+        /// The agent each channel opened for.
+        var connectedAgents: [String] = []
         /// The codes the plugin would answer and log (`bighelp native request rejected: …`).
         var refusals: [String] = []
         var openChannels: Int { purge(); return channels.count }
@@ -418,12 +469,15 @@ struct NativeDeviceToolSessionTests {
                 "runtimeId": .string("runtime"), "servingProfileId": .string(servingProfile), "principal": .null,
                 "features": .array(features.map(BighelpJSONValue.string))]
             case "device-tools/connect":
-                guard request.body?["agentId"] == .string(servingProfile) else {
+                // A newer plugin shares one hub with every agent on the host (`native-device-tools-agents-v1`).
+                guard let agent = request.body?["agentId"]?.string,
+                      features.contains("native-device-tools-agents-v1") || agent == servingProfile else {
                     return try refusal("profile_not_served", status: 403, request: request, requestGuard: requestGuard)
                 }
                 guard let id = channel.string, let device = request.body?["deviceId"]?.string,
                       let session = request.body?["sessionId"]?.string else { throw WorkspaceClientError.invalidRequest }
-                let held = channels.filter { $0.value.agent == servingProfile && $0.value.session == session }
+                connectedAgents.append(agent)
+                let held = channels.filter { $0.value.agent == agent && $0.value.session == session }
                 if !held.isEmpty {
                     guard replacesSamePhone, held.values.allSatisfy({ $0.device == device }) else {
                         return try refusal("channel_ambiguous", status: 409, request: request, requestGuard: requestGuard)
@@ -432,7 +486,7 @@ struct NativeDeviceToolSessionTests {
                 }
                 connectedEnabled = request.body?["enabled"]?.array?.compactMap(\.string) ?? []
                 beforeConnectReply()
-                channels[id] = Held(device: device, agent: servingProfile, session: session, expires: now + 30)
+                channels[id] = Held(device: device, agent: agent, session: session, expires: now + 30)
                 value = ["channelId": channel, "connected": .boolean(true)]
             case "device-tools/poll":
                 if let refused = try gone(channel, request: request, requestGuard: requestGuard) { return refused }
@@ -450,6 +504,7 @@ struct NativeDeviceToolSessionTests {
                 value = ["accepted": .boolean(true)]
             case "device-tools/close":
                 if closeFails { throw URLError(.networkConnectionLost) }
+                closeBodies.append(request.body ?? [:])
                 if let refused = try gone(channel, request: request, requestGuard: requestGuard) { return refused }
                 if let id = channel.string { channels[id] = nil; retired.insert(id) }
                 value = ["closed": .boolean(true)]

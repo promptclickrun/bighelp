@@ -314,8 +314,20 @@ struct RootShellView: View {
             sessionRestoreRequest = nil
         }
         .onChange(of: scenePhase) { _, phase in
-            // A shortcut running in Shortcuts keeps the phone tools' calls alive (`DeviceToolHandoff`).
-            if phase == .background, !DeviceToolHandoff.shared.isActive { permissionCenter.deviceTools.invalidateOperations() }
+            // A quick trip away (the app switcher, a widget, a notification opened) keeps the phone tools,
+            // like the host connection, until the background grace ends; only then are calls retired and
+            // the channel closed as paused. A shortcut out in Shortcuts keeps them on its own (`DeviceToolHandoff`).
+            if phase == .background {
+                DeviceToolHandoff.shared.holdBackgroundGrace()
+                BighelpBackgroundGrace.shared.begin("device-tools") { [permissionCenter] in
+                    // Back on screen as it ran out (still inactive): nothing to stop.
+                    guard UIApplication.shared.applicationState == .background else { return }
+                    DeviceToolHandoff.shared.releaseBackgroundGrace()
+                    if !DeviceToolHandoff.shared.isActive { permissionCenter.deviceTools.invalidateOperations() }
+                }
+            } else {
+                DeviceToolHandoff.shared.releaseBackgroundGrace()
+            }
         }
         .task(id: hostRuntimeScope) { await prepareHostRuntime() }
         .onChange(of: agents.errorMessage) { _, _ in

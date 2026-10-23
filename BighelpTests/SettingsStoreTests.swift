@@ -437,6 +437,33 @@ struct SettingsStoreTests {
         #expect(available == [.systemDefault, .chrome, .brave])
     }
 
+    @Test func appleAppLinksOpenInTheAppsWhateverBrowserIsPicked() throws {
+        for link in ["https://maps.apple.com/?daddr=1%20Infinite%20Loop&dirflg=d",
+                     "https://music.apple.com/us/album/sample/123?i=456",
+                     "https://apps.apple.com/app/id6801968179", "https://podcasts.apple.com/us/podcast/x/id1",
+                     "https://MAPS.apple.com/?q=coffee"] {
+            let url = try #require(URL(string: link))
+            for browser in ChatBrowserPreference.allCases {
+                #expect(ChatLinkRoute.route(url, browser: browser, browserIsInstalled: true) == .system, "\(link)")
+            }
+        }
+    }
+
+    @Test func otherLinksTryTheirAppThenThePickedBrowser() throws {
+        let page = try #require(URL(string: "https://open.spotify.com/track/abc"))
+        let chrome = try #require(ChatBrowserPreference.chrome.targetURL(for: page))
+        #expect(ChatLinkRoute.route(page, browser: .chrome, browserIsInstalled: true) == .appElseBrowser(chrome))
+        // No browser picked, or the picked one is gone: iOS decides, as everywhere else.
+        #expect(ChatLinkRoute.route(page, browser: .systemDefault, browserIsInstalled: true) == .system)
+        #expect(ChatLinkRoute.route(page, browser: .chrome, browserIsInstalled: false) == .system)
+        // Not a web page: the phone, mail and other apps' own links.
+        let call = try #require(URL(string: "tel:+15555550123"))
+        #expect(ChatLinkRoute.route(call, browser: .brave, browserIsInstalled: true) == .system)
+        // A look-alike host is just a web page.
+        let lookalike = try #require(URL(string: "https://maps.apple.com.example.net/"))
+        #expect(ChatLinkRoute.route(lookalike, browser: .firefox, browserIsInstalled: true) != .system)
+    }
+
     @Test func browserRoutesPreserveTheOriginalWebDestination() throws {
         let original = try #require(URL(
             string: "https://loopdy.app/docs?q=link%20routing#settings"

@@ -787,17 +787,22 @@ struct ChatDestinationView: View {
         }
     }
 
+    /// Maps, Music and other apps' links open in their apps; web pages in the browser picked in
+    /// Settings › Chat (`ChatLinkRoute`).
     private var chatOpenURLAction: OpenURLAction {
         OpenURLAction { url in
             let browser = settings.preferredBrowser
-            guard browser != .systemDefault else { return .systemAction }
-            guard
-                let probeURL = browser.availabilityProbeURL,
-                UIApplication.shared.canOpenURL(probeURL),
-                let targetURL = browser.targetURL(for: url)
-            else { return .systemAction }
-            UIApplication.shared.open(targetURL)
-            return .handled
+            let isInstalled = browser.availabilityProbeURL.map { UIApplication.shared.canOpenURL($0) } ?? true
+            switch ChatLinkRoute.route(url, browser: browser, browserIsInstalled: isInstalled) {
+            case .system:
+                return .systemAction
+            case .appElseBrowser(let browserURL):
+                Task { @MainActor in
+                    if await UIApplication.shared.open(url, options: [.universalLinksOnly: true]) { return }
+                    await UIApplication.shared.open(browserURL)
+                }
+                return .handled
+            }
         }
     }
 

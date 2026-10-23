@@ -185,6 +185,35 @@ enum ChatBrowserPreference: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// Where a link tapped in a chat opens. A link that belongs to an app opens in that app, as it does
+/// everywhere on iOS: Apple's own apps always, any other app that claims it when it's installed.
+/// Only web pages go to the browser picked in Settings › Chat.
+enum ChatLinkRoute: Equatable, Sendable {
+    /// iOS opens it: the app it belongs to, else the default browser.
+    case system
+    /// An installed app that claims the link (a universal link) opens it; else this, the link
+    /// in the picked browser.
+    case appElseBrowser(URL)
+
+    static func route(_ url: URL, browser: ChatBrowserPreference, browserIsInstalled: Bool) -> ChatLinkRoute {
+        guard browser != .systemDefault, browserIsInstalled, !opensInAppleApp(url),
+              let target = browser.targetURL(for: url) else { return .system }
+        return .appElseBrowser(target)
+    }
+
+    /// Maps, Music, the App Store, Podcasts, TV, Books and News answer these, whatever browser is set.
+    static let appleAppHosts: Set<String> = [
+        "maps.apple.com", "music.apple.com", "classical.music.apple.com", "itunes.apple.com", "apps.apple.com",
+        "podcasts.apple.com", "tv.apple.com", "books.apple.com", "apple.news",
+    ]
+
+    static func opensInAppleApp(_ url: URL) -> Bool {
+        guard let scheme = url.scheme?.lowercased(), scheme == "https" || scheme == "http",
+              let host = url.host?.lowercased() else { return false }
+        return appleAppHosts.contains(host)
+    }
+}
+
 enum MidSessionChatBehavior: String, CaseIterable, Identifiable, Sendable {
     case steer
     case queued

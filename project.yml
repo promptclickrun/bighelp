@@ -93,12 +93,14 @@ targets:
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=xrsimulator*]: YES
         INFOPLIST_KEY_UIApplicationPreferredDefaultSceneSessionRole[sdk=xros*]: UIWindowSceneSessionRoleApplication
         INFOPLIST_KEY_UIApplicationPreferredDefaultSceneSessionRole[sdk=xrsimulator*]: UIWindowSceneSessionRoleApplication
-        MARKETING_VERSION: 2.6.14
-        CURRENT_PROJECT_VERSION: 154
+        MARKETING_VERSION: 2.6.15
+        CURRENT_PROJECT_VERSION: 155
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_ENTITLEMENTS: Bighelp/Bighelp.entitlements
-        # CarPlay voice needs Apple's CarPlay entitlement, which device builds
-        # can't carry until Apple grants it; the simulator's CarPlay uses this copy.
+        # CarPlay voice needs Apple's CarPlay Voice-Based Conversation entitlement
+        # (granted 2026-10-23). iPhone and iPad builds carry it; Vision Pro and the
+        # Mac have no CarPlay, so their builds keep the plain entitlements.
+        CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]: Bighelp/BighelpCarPlay.entitlements
         CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]: Bighelp/BighelpCarPlay.entitlements
         # The Mac app shares the iPhone app's ID, because pushes are addressed to it, but it
         # is never uploaded to App Store Connect. "Optimize for Mac" (family 6) draws at full
@@ -127,8 +129,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.loopdy.mobile.watchkitapp
         PRODUCT_NAME: BighelpWatch
-        MARKETING_VERSION: 2.6.14
-        CURRENT_PROJECT_VERSION: 154
+        MARKETING_VERSION: 2.6.15
+        CURRENT_PROJECT_VERSION: 155
         CODE_SIGN_STYLE: Automatic
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: BighelpWatch/Info.plist
@@ -149,8 +151,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.loopdy.mobile.notification-service
         PRODUCT_NAME: BighelpNotificationService
-        MARKETING_VERSION: 2.6.14
-        CURRENT_PROJECT_VERSION: 154
+        MARKETING_VERSION: 2.6.15
+        CURRENT_PROJECT_VERSION: 155
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_ENTITLEMENTS: BighelpNotificationService/BighelpNotificationService.entitlements
         CODE_SIGN_ENTITLEMENTS[sdk=macosx*]: BighelpNotificationService/BighelpNotificationServiceCatalyst.entitlements
@@ -175,8 +177,8 @@ targets:
         PRODUCT_NAME: BighelpLiveActivity
         XROS_DEPLOYMENT_TARGET: "26.0"
         EXCLUDED_ARCHS[sdk=xrsimulator*]: x86_64
-        MARKETING_VERSION: 2.6.14
-        CURRENT_PROJECT_VERSION: 154
+        MARKETING_VERSION: 2.6.15
+        CURRENT_PROJECT_VERSION: 155
         CODE_SIGN_STYLE: Automatic
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: BighelpLiveActivity/Info.plist
@@ -198,8 +200,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.loopdy.mobile.mac-updater
         PRODUCT_NAME: BighelpMacUpdater
-        MARKETING_VERSION: 2.6.14
-        CURRENT_PROJECT_VERSION: 154
+        MARKETING_VERSION: 2.6.15
+        CURRENT_PROJECT_VERSION: 155
         CODE_SIGN_STYLE: Automatic
         ENABLE_HARDENED_RUNTIME: YES
         GENERATE_INFOPLIST_FILE: YES
@@ -218,8 +220,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.loopdy.desktop
-        MARKETING_VERSION: 2.6.14
-        CURRENT_PROJECT_VERSION: 154
+        MARKETING_VERSION: 2.6.15
+        CURRENT_PROJECT_VERSION: 155
         CODE_SIGN_STYLE: Automatic
         GENERATE_INFOPLIST_FILE: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: ""

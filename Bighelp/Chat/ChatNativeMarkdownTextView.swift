@@ -77,6 +77,7 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
     let onFork: (() -> Void)?
     let reactions: ChatMessageReactionActions?
     var onReply: (() -> Void)? = nil
+    var onShare: (() -> Void)? = nil
     var textScale: CGFloat = 1
     var mentionIdentities: [ChatMentionIdentity] = []
     /// The bubble around this text, so a hold lifts all of it.
@@ -134,7 +135,8 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
         context.coordinator.openURL = openURL
         context.coordinator.menu.update(
             actions: ChatMessageMenuActions(copyActionLabel: copyActionLabel, onCopy: onCopy, onSelect: onSelect,
-                                            onFork: onFork, onReply: onReply, reactions: reactions),
+                                            onFork: onFork, onReply: onReply, reactions: reactions,
+                                            onShare: onShare),
             anchor: menuAnchor, shape: bubbleShape, theme: theme)
         view.tintColor = UIColor(theme.action)
         view.accessibilityCustomActions = (reactions.map { reactions in
@@ -143,7 +145,9 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
             [UIAccessibilityCustomAction(name: "Reply") { _ in action(); return true }]
         } ?? []) + [
             UIAccessibilityCustomAction(name: copyActionLabel) { _ in onCopy(); return true }
-        ] + (BighelpPlatform.isMac ? [] : [  // Mac text is selectable with the pointer.
+        ] + (onShare.map { action in
+            [UIAccessibilityCustomAction(name: "Share") { _ in action(); return true }]
+        } ?? []) + (BighelpPlatform.isMac ? [] : [  // Mac text is selectable with the pointer.
             UIAccessibilityCustomAction(name: "Select text") { _ in onSelect(); return true }
         ]) + (onFork.map { action in [UIAccessibilityCustomAction(name: "Fork from here") { _ in action(); return true }] } ?? [])
         let accentColor = UIColor(accent)

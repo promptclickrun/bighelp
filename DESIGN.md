@@ -166,6 +166,11 @@ Touch and hold a message (right-click on the Mac) for Reply: "Replying to Avery:
 reloads from Hermes, and the agent reads which message it answers (`ChatReplyQuote`; see
 [Native chat transport](docs/NATIVE_TRANSPORT.md)).
 
+The same menu's Share… (after Copy) opens one sheet (`ChatMessageShareSheet`): pick Messages, Markdown, Plain text or
+PDF (the last pick is kept), see exactly what goes out, then Copy or Share…. Messages styles bold, italics and code
+with Unicode letters for apps that show no Markdown, with a note that some apps and screen readers can't read them;
+the PDF is named for the agent ("Message from Avery Park.pdf"). The converter is `ChatMessageExport`.
+
 Holding a message lifts the whole bubble and floats a reaction bar over it, like Messages' tapback: the six common
 reactions in a solid pill (the raised surface; nothing under it shows through), then + for any emoji
 (`ChatReactionBarProjection`, `ChatMessageMenuDriver`). The menu below has no React item. A tap reacts and closes the

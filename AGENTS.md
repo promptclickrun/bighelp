@@ -557,6 +557,12 @@ Helpful, never a pile to clear (`BighelpNotificationGrouping`):
   for phones that send `scheduledLinks` in their preferences; never a chat's own reference, because the run's text
   isn't in that chat. Scheduled alerts never replace each other.
 - Opening a chat, or returning to the app on one, clears its delivered alerts (`BighelpVisibleChats`).
+- A chat on screen is quiet for every kind of alert, questions and approvals too: they pop up in the chat itself
+  (`BighelpForegroundAlert`). `BighelpVisibleChats` counts chat screens by token (a chat view made again can appear
+  before the old one leaves) and knows a chat by every stored ID it has had, also while its connection is made
+  again (`formerStoredIDs`, the saved row). Compaction gives a chat a new stored ID and Hermes' alert for that turn
+  can name it first, so a chat compacted in the last two minutes answers for its agent's unknown references
+  (`lastCompactionAt`).
 - One Live Activity at a time: a new chat's card replaces the older one (`BighelpManagedNativeActivityRuntime`).
   Finished cards leave the Lock Screen about 30 seconds after the end (the Link service sends a dismissal date),
   and opening the app clears any still there.

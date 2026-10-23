@@ -288,6 +288,14 @@ final class DirectHermesWorkspaceClient: WorkspaceOperationPerforming {
                            allowed: ["profile", "current_session_id"])
         case .sessionTitle:
             return try rpc(operation, payload, allowed: ["session_id", "title"], required: ["session_id", "title"])
+        case .sessionSetHidden:
+            try requireFlag("hidden", in: payload)
+            return try rpc(operation, payload, allowed: ["session_id", "hidden", "profile"], required: ["session_id", "hidden"])
+        case .sessionArchive:
+            try requireFlag("archived", in: payload)
+            return try rpc(operation, payload, allowed: ["session_id", "archived", "profile"], required: ["session_id", "archived"])
+        case .nativeSessionDelete:
+            return try rpc(operation, payload, allowed: ["session_id", "profile"], required: ["session_id"])
         case .sessionResume:
             return try rpc(operation, payload,
                            allowed: ["profile", "session_id", "defer_history", "omit_messages", "close_on_disconnect",
@@ -484,11 +492,15 @@ final class DirectHermesWorkspaceClient: WorkspaceOperationPerforming {
         case .sessionUpdate:
             let id = try pathIdentifier(payload["session_id"])
             let body = removing("session_id", from: payload)
-            try fields(body, allowed: ["profile", "title", "archived", "hidden", "pinned", "unread"], required: ["profile"])
+            try fields(body, allowed: Set(["profile", "title", "archived", "hidden", "pinned", "unread"]).union(Self.sessionEditFence),
+                       required: ["profile"])
+            try requireSessionEditFence(body)
             return .http(.init(path: "/api/sessions/\(id)", method: .patch, body: body))
         case .sessionDelete:
             let id = try pathIdentifier(payload["session_id"])
-            try fields(payload, allowed: ["session_id", "profile"], required: ["session_id", "profile"])
+            try fields(payload, allowed: Set(["session_id", "profile"]).union(Self.sessionEditFence),
+                       required: ["session_id", "profile"])
+            try requireSessionEditFence(payload)
             return .http(.init(path: "/api/sessions/\(id)", method: .delete,
                                query: try queryItems(removing("session_id", from: payload))))
         case .toolsetsList:
@@ -581,6 +593,30 @@ final class DirectHermesWorkspaceClient: WorkspaceOperationPerforming {
                             allowed: Set<String>) throws -> Route {
         try fields(payload, allowed: allowed)
         return .http(.init(path: path, method: .get, query: try queryItems(payload)))
+    }
+
+    private static func requireFlag(_ key: String, in payload: [String: BighelpJSONValue]) throws {
+        guard payload[key]?.boolean != nil else { throw WorkspaceClientError.invalidRequest }
+    }
+
+    /// What Hermes' session edit check takes along: the edit's own ID, the row's revision it was made
+    /// against and, for a delete, the row's generation.
+    private static let sessionEditFence: Set<String> = ["request_id", "expected_revision", "expected_generation"]
+
+    /// The ID is a lowercase UUID and the numbers are whole and not negative. The ID and the revision
+    /// come together (Hermes refuses one without the other), and a generation only with them.
+    private static func requireSessionEditFence(_ payload: [String: BighelpJSONValue]) throws {
+        if let id = payload["request_id"] {
+            guard let text = id.string, let uuid = UUID(uuidString: text), uuid.uuidString.lowercased() == text,
+                  (payload["expected_revision"]?.integer ?? -1) >= 0 else { throw WorkspaceClientError.invalidRequest }
+        } else if payload["expected_revision"] != nil {
+            throw WorkspaceClientError.invalidRequest
+        }
+        if let generation = payload["expected_generation"] {
+            guard payload["request_id"] != nil, (generation.integer ?? -1) >= 0 else {
+                throw WorkspaceClientError.invalidRequest
+            }
+        }
     }
 
     private static func fields(_ payload: [String: BighelpJSONValue],
@@ -755,6 +791,15 @@ final class DirectHermesWorkspaceClient: WorkspaceOperationPerforming {
         // 4022: Hermes won't take the title: another chat holds it (a first Bot Chat checks
         // who), or it's a hidden Bot Chat's.
         case (.sessionTitle, 4022): return WorkspaceClientError.rejected(code: "4022", message: message)
+        // 4007: the stored chat to delete is already gone.
+        case (.nativeSessionDelete, 4007): return WorkspaceClientError.rejected(code: "4007", message: message)
+        // 403, 404 and 409 on a dashboard edit (`DirectHermesHTTP.sessionEditRefusal`): the reason Hermes
+        // names (`revision_conflict`, `client_upgrade_required`, `not_found`…) is the code, its words stay
+        // for the alert.
+        case (.sessionUpdate, 403), (.sessionUpdate, 404), (.sessionUpdate, 409),
+             (.sessionDelete, 403), (.sessionDelete, 404), (.sessionDelete, 409):
+            return WorkspaceClientError.rejected(code: message.text.flatMap(DirectHermesHTTP.sessionEditReason),
+                                                 message: message)
         default: return safeError(error)
         }
     }

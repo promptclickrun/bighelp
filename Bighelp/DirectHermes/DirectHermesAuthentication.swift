@@ -436,6 +436,30 @@ final class DirectHermesHTTP {
             throughCloudflare: response.http.value(forHTTPHeaderField: "CF-RAY") != nil)
     }
 
+    /// Hermes refuses a chat edit or delete with a `detail` that names why: 409 for its edit check
+    /// (`client_upgrade_required`, `revision_conflict`, `stale_generation`…) or a busy chat, 403 or 404
+    /// (`permission_denied`, `not_found`) for a chat only its own transport may control. The reason
+    /// decides what the app does next, and the words are what people read. A 403 or 404 counts only when
+    /// the detail is such a reason, so a gate's or a proxy's own page keeps its meaning.
+    static func sessionEditRefusal(_ request: DirectHermesHTTPRequest, _ response: Response) -> DirectHermesError? {
+        let status = response.http.statusCode
+        guard [403, 404, 409].contains(status), request.method == .patch || request.method == .delete,
+              request.path.hasPrefix("/api/sessions/"),
+              let detail = (try? response.object())?["detail"]?.string,
+              status == 409 || sessionEditReason(HermesRefusalMessage(detail).text ?? "") != nil else { return nil }
+        return .rpcRejected(code: status, message: HermesRefusalMessage(detail))
+    }
+
+    /// Hermes' `detail` is a bare reason (`revision_conflict`) or a reason, a colon and words
+    /// (`client_upgrade_required: …`).
+    static func sessionEditReason(_ text: String) -> String? {
+        let reason = text.prefix { $0 != ":" && !$0.isWhitespace }
+        guard !reason.isEmpty, reason.utf8.allSatisfy({ (97...122).contains($0) || (48...57).contains($0) || $0 == 95 }) else {
+            return nil
+        }
+        return String(reason)
+    }
+
     static func requireSuccess(_ response: Response) throws {
         switch response.http.statusCode {
         case 200...299: return

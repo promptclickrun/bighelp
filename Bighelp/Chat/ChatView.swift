@@ -157,6 +157,8 @@ struct ChatView: View {
     let onReferenceSend: ((ReferenceFrozenDraft, MidSessionChatBehavior?) async -> Void)?
     @State private var fallbackReferenceHub = ReferenceHubStore(owner: nil, providers: [])
     @State private var isChatVisible = false
+    /// This screen, for `BighelpVisibleChats`: a chat view made again can appear before the old one leaves.
+    @State private var screenID = UUID()
 
     @State private var isSessionControlsPresented = false
     @State private var isContextWindowPresented = false
@@ -350,7 +352,7 @@ struct ChatView: View {
         .modifier(ChatScheduledRetryLifecycle(model: model))
         .onAppear {
             isChatVisible = true
-            BighelpVisibleChats.shared.appeared(model)
+            BighelpVisibleChats.shared.appeared(model, screen: screenID)
             ChatPDFPagesDraftRegistry.mount(model)
             model.nativeSessionResumeProgress.mount()
             configureActiveTurnDisclosures()
@@ -441,7 +443,7 @@ struct ChatView: View {
             isForceRefreshing = false
             refreshError = nil
             isChatVisible = false
-            BighelpVisibleChats.shared.disappeared(model)
+            BighelpVisibleChats.shared.disappeared(model, screen: screenID)
             ChatPDFPagesDraftRegistry.unmount(model)
             model.nativeSessionResumeProgress.unmount()
             companionAffectionTask?.cancel()

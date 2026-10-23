@@ -25,6 +25,9 @@ final class DirectHermesConversationClient: StreamingConversationClient, Stoppab
     let usesCatalogHistory: Bool
     internal(set) var runtimeID: String
     internal(set) var storedID: String
+    /// Stored IDs this chat had before Hermes moved it on (a compaction gives the chat
+    /// a new one). An alert already on its way still names the old one.
+    private(set) var formerStoredIDs: [String] = []
     internal(set) var title: String
     internal(set) var modelName = ""
     internal(set) var status = "Ready"
@@ -460,11 +463,19 @@ final class DirectHermesConversationClient: StreamingConversationClient, Stoppab
         ["session_id": .string(runtimeID), "profile": .string(profile)]
     }
 
+    private static let formerStoredIDLimit = 8
+
     func adoptStoredID(_ value: String) {
         guard !value.isEmpty else { return }
         projection.storedID = value
         guard value != storedID else { return }
+        formerStoredIDs.removeAll { $0 == storedID || $0 == value }
+        formerStoredIDs.append(storedID)
+        if formerStoredIDs.count > Self.formerStoredIDLimit {
+            formerStoredIDs.removeFirst(formerStoredIDs.count - Self.formerStoredIDLimit)
+        }
         storedID = value
+        BighelpVisibleChats.shared.identityChanged()
         do {
             let newScope = String(decoding: try JSONEncoder().encode([hostIdentity, profile, value]), as: UTF8.self)
             var next = try drafts.load(scope: newScope)

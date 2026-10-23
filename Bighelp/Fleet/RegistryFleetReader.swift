@@ -68,25 +68,31 @@ final class RegistryFleetReader: FleetHostReading {
     /// when archived, which retires it as Hermes Desktop does.
     func updateChat(_ change: FleetChatChange, chat: FleetChat) async throws {
         try await withWorkspace(chat.hostID) { workspace, owner, _, _ in
-            let target: [String: BighelpJSONValue] = [
-                "session_id": .string(chat.storedSessionID), "profile": .string(chat.profileID),
-            ]
-            let botChat = chat.title == "Bot Chat"
-            var fields: [String: BighelpJSONValue]
-            switch change {
-            case .rename(let title):
-                if botChat {
-                    let shown = try await workspace.perform(.sessionUpdate, payload: target.merging(["hidden": .boolean(false)]) { $1 },
-                                                            owner: owner)
-                    guard shown["ok"]?.boolean == true else { throw WorkspaceClientError.invalidResponse }
-                }
-                fields = ["title": .string(try SessionTitleRules.validated(title))]
-            case .archive:
-                fields = ["archived": .boolean(true)]
-                if botChat { fields["hidden"] = .boolean(true) }
+            try await Self.apply(change, to: chat, editor: DirectHermesSessionEditor(perform: { operation, payload in
+                try await workspace.perform(operation, payload: payload, owner: owner)
+            }))
+        }
+    }
+
+    /// The edits of `updateChat`, made the way the host takes them (`DirectHermesSessionEditor`).
+    static func apply(_ change: FleetChatChange, to chat: FleetChat, editor: DirectHermesSessionEditor) async throws {
+        let botChat = chat.title == "Bot Chat"
+        switch change {
+        case .rename(let title):
+            let title = try SessionTitleRules.validated(title)
+            if botChat {
+                let shown = try await editor.setHidden(chat.storedSessionID, profile: chat.profileID, hidden: false)
+                guard shown.response["ok"]?.boolean == true else { throw WorkspaceClientError.invalidResponse }
             }
-            let response = try await workspace.perform(.sessionUpdate, payload: target.merging(fields) { $1 }, owner: owner)
-            guard response["ok"]?.boolean == true else { throw WorkspaceClientError.invalidResponse }
+            let renamed = try await editor.setTitle(chat.storedSessionID, profile: chat.profileID, title: title)
+            guard renamed.response["ok"]?.boolean == true else { throw WorkspaceClientError.invalidResponse }
+        case .archive:
+            let archived = try await editor.setArchived(chat.storedSessionID, profile: chat.profileID, archived: true)
+            guard archived.response["ok"]?.boolean == true else { throw WorkspaceClientError.invalidResponse }
+            if botChat {
+                let hidden = try await editor.setHidden(chat.storedSessionID, profile: chat.profileID, hidden: true)
+                guard hidden.response["ok"]?.boolean == true else { throw WorkspaceClientError.invalidResponse }
+            }
         }
     }
 

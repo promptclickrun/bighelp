@@ -1216,11 +1216,12 @@ struct DirectHermesSessionCatalogClientTests {
                         "messages": .array([]),
                         "pagination": .object(["offset": payload["offset"]!, "limit": payload["limit"]!,
                                                "order": payload["order"]!, "returned": .integer(0)])]
+            case .sessionResume:
+                // A saved chat is opened before its title is set; the newest row of the chat opens.
+                return Self.attached(stored: "catalog-tip-2")
+            case .sessionTitle:
+                return ["pending": .boolean(false), "title": payload["title"]!]
             case .sessionUpdate:
-                if payload["title"] != nil {
-                    #expect(payload["session_id"] == .string("catalog-tip-2"))
-                    return ["ok": .boolean(true), "title": .string("Renamed")]
-                }
                 #expect(payload["session_id"] == .string("root"))
                 state.pinned = true
                 return ["ok": .boolean(true), "title": .string("Root"), "pinned": .boolean(true)]
@@ -1372,7 +1373,9 @@ struct DirectHermesSessionCatalogClientTests {
         updates.payloads = []
         try await archiving.archive(another.record)
         #expect(updates.payloads == [["session_id": .string("canonical-root"), "profile": .string("alpha"),
-                                      "archived": .boolean(true), "hidden": .boolean(true)]])
+                                      "archived": .boolean(true)],
+                                     ["session_id": .string("canonical-root"), "profile": .string("alpha"),
+                                      "hidden": .boolean(true)]])
     }
 
     /// New Bot Chat sets the Bot Chat aside: Hermes won't rename a hidden "Bot Chat", so the row it
@@ -1436,16 +1439,17 @@ struct DirectHermesSessionCatalogClientTests {
                 return ["sessions": .array([try row()]), "total": .integer(1), "offset": payload["offset"] ?? .integer(0),
                         "limit": .integer(100)]
             case .sessionDetail: return try #require(try row().object)
+            case .sessionResume, .sessionActivate: return Self.attached(stored: "bot-live")
             case .sessionUpdate:
                 if payload["hidden"] == .boolean(false) { host.hidden = false }
-                if let title = payload["title"]?.string {
-                    // As Hermes' SessionDB.set_session_title answers.
-                    guard !host.hidden else {
-                        throw DirectHermesError.rpcRejected(code: 4022, message: HermesRefusalMessage("This is the bot's canonical Bot Chat"))
-                    }
-                    host.title = title
-                }
                 return payload.merging(["ok": .boolean(true)]) { $1 }
+            case .sessionTitle:
+                // As Hermes' SessionDB.set_session_title answers: a hidden Bot Chat can't be renamed.
+                guard !host.hidden else {
+                    throw DirectHermesError.rpcRejected(code: 4022, message: HermesRefusalMessage("This is the bot's canonical Bot Chat"))
+                }
+                host.title = payload["title"]?.string ?? host.title
+                return ["pending": .boolean(false), "title": .string(host.title)]
             default:
                 Issue.record("Unexpected \(operation)")
                 throw WorkspaceClientError.invalidRequest
@@ -1633,6 +1637,7 @@ final class SessionWorkspaceStub: WorkspaceOperationPerforming {
     // documented active-list operation to a scenario-specific handler.
     var activeSessions: [BighelpJSONValue]? = []
     var replayEpoch = "fixture-process"
+    var hasSocketEdits = false
     var epochHandler: (@MainActor () async throws -> [String: BighelpJSONValue])?
     var handler: @MainActor (WorkspaceOperation, [String: BighelpJSONValue]) async throws -> [String: BighelpJSONValue] = { _, _ in
         throw WorkspaceClientError.invalidRequest
@@ -1648,6 +1653,11 @@ final class SessionWorkspaceStub: WorkspaceOperationPerforming {
         // reaches Hermes; a stub that skipped this once hid a new-chat failure.
         _ = try DirectHermesWorkspaceClient.route(operation, payload: payload)
         calls.append(.init(operation: operation, payload: payload))
+        // The socket's own chat edits are newer than the Hermes most fixtures stand for: without
+        // `hasSocketEdits` the host answers "method not found" and the app uses the dashboard routes.
+        if !hasSocketEdits, [.sessionSetHidden, .sessionArchive, .nativeSessionDelete].contains(operation) {
+            throw DirectHermesWorkspaceClient.workspaceError(DirectHermesError.rpcRejected(code: -32601), for: operation)
+        }
         if operation == .sessionEvents, payload["session_id"] == .string("") {
             if let epochHandler { return try await epochHandler() }
             return DirectHermesSessionCatalogClientTests.ownershipEmptyReplay(epoch: replayEpoch)

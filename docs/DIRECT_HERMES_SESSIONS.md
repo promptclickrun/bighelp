@@ -97,6 +97,16 @@ not arbitrary ancestor or branch operations. Stored metadata readback verifies
 returned flags where REST exposes them; `unread` uses the mutation
 acknowledgement because detail does not expose an equivalent Boolean.
 
+Edits of a saved chat go through `DirectHermesSessionEditor`. Current Hermes answers the dashboard's `PATCH` and
+`DELETE /api/sessions/{id}` with 404 `not_found` for chats the app made over the socket, so hide and unhide
+(`session.set_hidden`), archive and restore (`session.archive`) and delete (`session.delete`, refused by Hermes while
+the chat is open) use the socket, and a title is set on an open chat (`session.title`; a saved chat is opened first).
+Pin and unread have no socket method and use the dashboard route; Hermes' own words (`not_found`,
+`client_upgrade_required`…) reach the alert. A socket that answers "method not found" falls back to the dashboard
+route, which sends a fresh lowercase-UUID `request_id` and `expected_revision` (`expected_generation` for a delete)
+when the row's detail has an integer `runtime_revision`, tries once more on `revision_conflict` or `stale_generation`,
+and sends the plain body when the detail has no revision.
+
 Generic conversation deletion is disabled. The explicit internal
 `deleteNativeRow` operation refreshes the catalog target and returns a row-only
 receipt that warns other history may remain. Hermes deletes that row and

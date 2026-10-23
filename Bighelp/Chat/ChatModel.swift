@@ -113,6 +113,9 @@ final class ChatModel {
     /// When the last turn here ended: an alert about it while you're reading
     /// this chat is old news (`BighelpVisibleChats`).
     @ObservationIgnored private(set) var lastTurnEndedAt: Date?
+    /// When Hermes last confirmed a compaction here. It gives the chat a new stored ID,
+    /// which an alert for the turn can name before this app has heard of it.
+    @ObservationIgnored internal(set) var lastCompactionAt: Date?
     /// Send was tapped while the chat catches up; the message waits in the box until it ends.
     var isAwaitingCatchUp = false
     var isSending = false {
@@ -604,6 +607,7 @@ final class ChatModel {
         native.model = self
         if let context = native.sessionContext { reconcileSessionContext(context) }
         scheduleNativeGoalControlRefresh()
+        BighelpVisibleChats.shared.identityChanged()
         return true
     }
 

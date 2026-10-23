@@ -737,6 +737,7 @@
 		6F5D59B13C7D425800CEE120 /* BighelpHomeWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16B85BE01827FCFD38480171 /* BighelpHomeWidgets.swift */; };
 		6F631722BA04755EA6D70BEA /* ChatActivityTurnView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEF757D732EAA92F9B09196B /* ChatActivityTurnView.swift */; };
 		6F72059135AFD8B7C820FC55 /* DevicePhotosTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AB026970720F93BD368C18E /* DevicePhotosTool.swift */; };
+		6F7438BD4D75C87BEBEE01E0 /* SessionEditorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74707D0902600D341422EDD9 /* SessionEditorTests.swift */; };
 		6F8A35FECC89173E916B5899 /* DirectHermesConditionalOwnershipTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DAFE6F3BD557D5146BDC5F4 /* DirectHermesConditionalOwnershipTests.swift */; };
 		6F900DFAC4DF2B95843C798C /* SessionCatalogStore+Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3993FEA0C849C985625C5FA3 /* SessionCatalogStore+Persistence.swift */; };
 		6F9C386FD77C1EACD7845A2A /* DirectHermesKanbanClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB4B4700B35DCCABC0FCEFED /* DirectHermesKanbanClient.swift */; };
@@ -1000,6 +1001,7 @@
 		94E45666E9C29B8C723D8F44 /* RootKanban.swift in Sources */ = {isa = PBXBuildFile; fileRef = 064E0E78CD6C7255C6EC0E57 /* RootKanban.swift */; };
 		94F3C315ECACA1EB8511CB0F /* BighelpShortcutGateways.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807BF997A44CFFC894D0CB15 /* BighelpShortcutGateways.swift */; };
 		9534B54651BFAE1840FB4B72 /* BighelpCardRendererTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 502B365298F8DCD98E706CD9 /* BighelpCardRendererTests.swift */; };
+		9548EB00CB1FF8F019E144A6 /* DirectHermesSessionEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = D33B1686D7946DDE4C6B9031 /* DirectHermesSessionEditor.swift */; };
 		95D8BB88A08570179A634486 /* BighelpGlyph.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43C94BD61162D35FD4205BA8 /* BighelpGlyph.swift */; };
 		95E75CA5B1416FDFB26A4C32 /* WikiEditingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDCAFBE9F10F16C12A6D4203 /* WikiEditingTests.swift */; };
 		9622B5EF6600D45BD3B139CC /* ReleaseScreensWalkthroughUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFAB21B494DC7BB11FC84213 /* ReleaseScreensWalkthroughUITests.swift */; };
@@ -2590,6 +2592,7 @@
 		743A8422BB20CF6C30B55B4B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		7445286B80C4CA76D5634B40 /* PermissionsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsViews.swift; sourceTree = "<group>"; };
 		7459CDC081DDB6A14E0C9F21 /* ChatCompactionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatCompactionTests.swift; sourceTree = "<group>"; };
+		74707D0902600D341422EDD9 /* SessionEditorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionEditorTests.swift; sourceTree = "<group>"; };
 		748B753134C12DD4B400F46B /* DirectHermesGoalControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectHermesGoalControl.swift; sourceTree = "<group>"; };
 		748E848CAEB082A507B830B0 /* SharedWireValidation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedWireValidation.swift; sourceTree = "<group>"; };
 		74B255BFB0C7ACD56433F907 /* ManagedNotificationServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagedNotificationServiceTests.swift; sourceTree = "<group>"; };
@@ -3208,6 +3211,7 @@
 		D29D3004AA6E39970301E5B4 /* BighelpLogo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpLogo.swift; sourceTree = "<group>"; };
 		D2E5AA247E3613B8E4EA02A0 /* WikiModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WikiModels.swift; sourceTree = "<group>"; };
 		D3169FAF80070C715B4D2C9F /* ChatSessionFilesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatSessionFilesView.swift; sourceTree = "<group>"; };
+		D33B1686D7946DDE4C6B9031 /* DirectHermesSessionEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectHermesSessionEditor.swift; sourceTree = "<group>"; };
 		D3839FB429704BEC09A1DF03 /* BighelpRailCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpRailCard.swift; sourceTree = "<group>"; };
 		D3D2F8B1EC1B801E839E9497 /* templates-save.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "templates-save.json"; sourceTree = "<group>"; };
 		D3E4194DE5A3290DDC47268B /* SubagentCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubagentCanvasView.swift; sourceTree = "<group>"; };
@@ -4176,6 +4180,7 @@
 				AB67E4443F09B0F1E4F744B2 /* DirectHermesSessionCatalogClient+Bindings.swift */,
 				28193E2FCD079F5AB0F9F344 /* DirectHermesSessionCatalogClient+Fork.swift */,
 				B8FE80355509F8B363965132 /* DirectHermesSessionCatalogClient+ListRequest.swift */,
+				D33B1686D7946DDE4C6B9031 /* DirectHermesSessionEditor.swift */,
 				0C67013EC7364A1D387E5C93 /* DirectHermesSessionModels.swift */,
 				0B2B706F0F95D18D12795BAB /* HermesAgentMetadata.swift */,
 				6D903B6D24C041C30F119F48 /* HermesUserMessageDisplay.swift */,
@@ -4854,6 +4859,7 @@
 				F972D8331BE114EEEEE074F0 /* SessionCatalogLargeWorkspaceTests.swift */,
 				AACDD67B5DC504EDCABB804B /* SessionCatalogStoreTests.swift */,
 				12DB23F855205AE60F84F5AD /* SessionContentRepositoryTests.swift */,
+				74707D0902600D341422EDD9 /* SessionEditorTests.swift */,
 				E8F660F333A668B6DBEB99A8 /* SessionOpenLatencyTests.swift */,
 				A763C604CBC8373EA5EDE00D /* SessionReopenReplayTests.swift */,
 				B1AB31F3EA0C09A5B9F3FABD /* SessionSectionOrganizationTests.swift */,
@@ -7030,6 +7036,7 @@
 				B3F1B21B8C3D26A5E0FDEEE5 /* DirectHermesSessionCatalogClient+ListRequest.swift in Sources */,
 				28972E92CEE5EBF751BDCFDB /* DirectHermesSessionCatalogClient.swift in Sources */,
 				3DBB149E1CF4F1E5161D4037 /* DirectHermesSessionControlClient.swift in Sources */,
+				9548EB00CB1FF8F019E144A6 /* DirectHermesSessionEditor.swift in Sources */,
 				CDBAEF0147205371BC9A96DC /* DirectHermesSessionMaintenanceClient.swift in Sources */,
 				906B4D0C57A39E4EEAFBC45C /* DirectHermesSessionModels.swift in Sources */,
 				F7A53C30797EC56B4DCAC0A3 /* DirectHermesSkillsHubClient.swift in Sources */,
@@ -7955,6 +7962,7 @@
 				0286FBC6D97E10D963F43C78 /* SessionCatalogLargeWorkspaceTests.swift in Sources */,
 				937480A7273A81C4A9269DC5 /* SessionCatalogStoreTests.swift in Sources */,
 				14A6207C227938283D537F3F /* SessionContentRepositoryTests.swift in Sources */,
+				6F7438BD4D75C87BEBEE01E0 /* SessionEditorTests.swift in Sources */,
 				BCD379362F360EA0EC49DD3C /* SessionOpenLatencyTests.swift in Sources */,
 				E23BFE1E57DE4375EF3D57F6 /* SessionReopenReplayTests.swift in Sources */,
 				5B044D26CE77E23BE97445FA /* SessionSectionOrganizationTests.swift in Sources */,
@@ -8298,10 +8306,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 152;
+				CURRENT_PROJECT_VERSION = 153;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BighelpWatch/Info.plist;
-				MARKETING_VERSION = 2.6.12;
+				MARKETING_VERSION = 2.6.13;
 				PRODUCT_BUNDLE_IDENTIFIER = app.loopdy.mobile.watchkitapp;
 				PRODUCT_NAME = BighelpWatch;
 				SDKROOT = watchos;
@@ -8341,7 +8349,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = Bighelp/BighelpCatalyst.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 152;
+				CURRENT_PROJECT_VERSION = 153;
 				DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER = NO;
 				"ENABLE_HARDENED_RUNTIME[sdk=macosx*]" = YES;
 				"EXCLUDED_ARCHS[sdk=xrsimulator*]" = x86_64;
@@ -8358,7 +8366,7 @@
 					"@executable_path/Frameworks",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MARKETING_VERSION = 2.6.12;
+				MARKETING_VERSION = 2.6.13;
 				PRODUCT_BUNDLE_IDENTIFIER = app.loopdy.mobile;
 				PRODUCT_MODULE_NAME = Bighelp;
 				PRODUCT_NAME = Bighelp;
@@ -8380,7 +8388,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = BighelpLiveActivity/BighelpLiveActivity.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 152;
+				CURRENT_PROJECT_VERSION = 153;
 				"EXCLUDED_ARCHS[sdk=xrsimulator*]" = x86_64;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BighelpLiveActivity/Info.plist;
@@ -8389,7 +8397,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.6.12;
+				MARKETING_VERSION = 2.6.13;
 				PRODUCT_BUNDLE_IDENTIFIER = "app.loopdy.mobile.live-activity";
 				PRODUCT_NAME = BighelpLiveActivity;
 				SDKROOT = auto;
@@ -8429,7 +8437,7 @@
 				CODE_SIGN_ENTITLEMENTS = BighelpNotificationService/BighelpNotificationService.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = BighelpNotificationService/BighelpNotificationServiceCatalyst.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 152;
+				CURRENT_PROJECT_VERSION = 153;
 				DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER = NO;
 				"ENABLE_HARDENED_RUNTIME[sdk=macosx*]" = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -8439,7 +8447,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.6.12;
+				MARKETING_VERSION = 2.6.13;
 				PRODUCT_BUNDLE_IDENTIFIER = "app.loopdy.mobile.notification-service";
 				PRODUCT_NAME = BighelpNotificationService;
 				SDKROOT = auto;
@@ -8474,10 +8482,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 152;
+				CURRENT_PROJECT_VERSION = 153;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BighelpWatch/Info.plist;
-				MARKETING_VERSION = 2.6.12;
+				MARKETING_VERSION = 2.6.13;
 				PRODUCT_BUNDLE_IDENTIFIER = app.loopdy.mobile.watchkitapp;
 				PRODUCT_NAME = BighelpWatch;
 				SDKROOT = watchos;
@@ -8585,14 +8593,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 152;
+				CURRENT_PROJECT_VERSION = 153;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 2.6.12;
+				MARKETING_VERSION = 2.6.13;
 				PRODUCT_BUNDLE_IDENTIFIER = app.loopdy.desktop;
 				SDKROOT = macosx;
 			};
@@ -8605,7 +8613,7 @@
 				CODE_SIGN_ENTITLEMENTS = BighelpNotificationService/BighelpNotificationService.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = BighelpNotificationService/BighelpNotificationServiceCatalyst.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 152;
+				CURRENT_PROJECT_VERSION = 153;
 				DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER = NO;
 				"ENABLE_HARDENED_RUNTIME[sdk=macosx*]" = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -8615,7 +8623,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.6.12;
+				MARKETING_VERSION = 2.6.13;
 				PRODUCT_BUNDLE_IDENTIFIER = "app.loopdy.mobile.notification-service";
 				PRODUCT_NAME = BighelpNotificationService;
 				SDKROOT = auto;
@@ -8641,7 +8649,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = Bighelp/BighelpCatalyst.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 152;
+				CURRENT_PROJECT_VERSION = 153;
 				DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER = NO;
 				"ENABLE_HARDENED_RUNTIME[sdk=macosx*]" = YES;
 				"EXCLUDED_ARCHS[sdk=xrsimulator*]" = x86_64;
@@ -8658,7 +8666,7 @@
 					"@executable_path/Frameworks",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MARKETING_VERSION = 2.6.12;
+				MARKETING_VERSION = 2.6.13;
 				PRODUCT_BUNDLE_IDENTIFIER = app.loopdy.mobile;
 				PRODUCT_MODULE_NAME = Bighelp;
 				PRODUCT_NAME = Bighelp;
@@ -8680,7 +8688,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = BighelpLiveActivity/BighelpLiveActivity.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 152;
+				CURRENT_PROJECT_VERSION = 153;
 				"EXCLUDED_ARCHS[sdk=xrsimulator*]" = x86_64;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BighelpLiveActivity/Info.plist;
@@ -8689,7 +8697,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.6.12;
+				MARKETING_VERSION = 2.6.13;
 				PRODUCT_BUNDLE_IDENTIFIER = "app.loopdy.mobile.live-activity";
 				PRODUCT_NAME = BighelpLiveActivity;
 				SDKROOT = auto;
@@ -8726,13 +8734,13 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 152;
+				CURRENT_PROJECT_VERSION = 153;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSPrincipalClass = BighelpMacUpdaterController;
 				LD_RUNPATH_SEARCH_PATHS = "@loader_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.6.12;
+				MARKETING_VERSION = 2.6.13;
 				PRODUCT_BUNDLE_IDENTIFIER = "app.loopdy.mobile.mac-updater";
 				PRODUCT_NAME = BighelpMacUpdater;
 				SDKROOT = macosx;
@@ -8763,13 +8771,13 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 152;
+				CURRENT_PROJECT_VERSION = 153;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSPrincipalClass = BighelpMacUpdaterController;
 				LD_RUNPATH_SEARCH_PATHS = "@loader_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.6.12;
+				MARKETING_VERSION = 2.6.13;
 				PRODUCT_BUNDLE_IDENTIFIER = "app.loopdy.mobile.mac-updater";
 				PRODUCT_NAME = BighelpMacUpdater;
 				SDKROOT = macosx;
@@ -8800,14 +8808,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 152;
+				CURRENT_PROJECT_VERSION = 153;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 2.6.12;
+				MARKETING_VERSION = 2.6.13;
 				PRODUCT_BUNDLE_IDENTIFIER = app.loopdy.desktop;
 				SDKROOT = macosx;
 			};

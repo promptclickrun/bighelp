@@ -104,6 +104,7 @@ extension ChatModel {
 
     /// Hermes committed a compaction ("compacted"): Done, even if its start went unseen.
     func confirmCompaction() {
+        lastCompactionAt = Date()
         if compaction == nil || compaction?.phase == .done {
             compaction = ChatCompaction(phase: .compacting, startedAt: .now)
         }

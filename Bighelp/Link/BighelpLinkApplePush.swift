@@ -330,17 +330,11 @@ final class BighelpLinkApplicationDelegate: NSObject, UIApplicationDelegate,
         withCompletionHandler completionHandler: @escaping @Sendable (UNNotificationPresentationOptions) -> Void
     ) {
         let content = notification.request.content
-        // The chat from the push data; the thread names the agent once the
-        // notification extension has grouped it.
-        let chat = BighelpNotificationGrouping.chat(of: content.userInfo)
-            ?? (content.threadIdentifier.hasPrefix("bighelp") ? nil : content.threadIdentifier)
-        let agent = BighelpNotificationGrouping.agent(of: content.userInfo)
-        // Helper results and repeats of an alert shown already go to Notification Center only.
-        let quiet = content.interruptionLevel == .passive
+        let facts = BighelpForegroundAlert.Facts(userInfo: content.userInfo, thread: content.threadIdentifier,
+                                                 interruptionLevel: content.interruptionLevel)
         Task { @MainActor in
             // Stay quiet for the chat you're already looking at; the reply is on screen.
-            let showing = BighelpVisibleChats.shared.isShowing(chat: chat, agent: agent)
-            completionHandler(showing ? [] : quiet ? [.list] : [.banner, .list, .sound])
+            completionHandler(BighelpForegroundAlert.options(facts))
         }
     }
 

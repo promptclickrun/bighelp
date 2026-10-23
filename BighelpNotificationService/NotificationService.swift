@@ -29,6 +29,8 @@ final class NotificationService: BuzzKitNotificationService, @unchecked Sendable
         if BighelpRecentAlerts.shared.contains(eventID) {
             BighelpSealedAlertPresentation.quietRepeat(content)
         }
+        // A Focus filter with Quiet agent alerts on: replies arrive in Notification Center only.
+        BighelpFocusFilterState.quiet(content, eventType: sealed.eventType)
         setPending((contentHandler, content.copy() as? UNNotificationContent ?? content))
         let box = UncheckedBox((request: request, content: content))
         // The picture comes from the phone's cache after the first alert. A first
@@ -64,6 +66,7 @@ final class NotificationService: BuzzKitNotificationService, @unchecked Sendable
             content.userInfo = userInfo
         }
         BighelpNotificationGrouping.apply(to: content, eventType: eventType, agentName: content.title)
+        BighelpFocusFilterState.quiet(content, eventType: eventType)
         return UNNotificationRequest(identifier: request.identifier, content: content, trigger: nil)
     }
 

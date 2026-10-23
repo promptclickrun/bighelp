@@ -152,8 +152,13 @@ final class NativeDeviceToolSession {
         guard next == expected else { throw WorkspaceClientError.invalidResponse }
         for (sequence, value) in requests {
             try check()
-            guard value.expiresAt > Int(Date().timeIntervalSince1970) else { throw WorkspaceClientError.invalidResponse }
-            let result = await handle(value, scope, { [self] in owns() })
+            // A request can expire while an earlier one in the batch runs (a shortcut out in the
+            // Shortcuts app, a big photo). Answer it as expired; closing the channel would leave
+            // the chat without phone tools until something else reopened it.
+            let result = value.expiresAt > Int(Date().timeIntervalSince1970)
+                ? await handle(value, scope, { [self] in owns() })
+                : DeviceToolResult(request: value, status: "failed", code: "request_expired",
+                                   sentAt: Int(Date().timeIntervalSince1970))
             try check()
             guard result.version == 1, result.type == "device.tool.result",
                   result.requestId == value.requestId, result.deviceId == value.deviceId,
@@ -304,8 +309,12 @@ enum DeviceToolChannelNote {
     }
 
     static func connected(needsNewerPlugin: Set<DeviceToolCapability>) -> String? {
+        let others = DeviceToolCapability.allCases.filter {
+            needsNewerPlugin.contains($0) && $0 != .location && $0 != .appearance
+        }
         let wants = [
             needsNewerPlugin.contains(.location) ? "share your location" : nil,
+            others.isEmpty ? nil : "use \(ListFormatter.localizedString(byJoining: others.map(\.title)))",
             needsNewerPlugin.contains(.appearance) ? "let agents change how bighelp looks" : nil,
         ].compactMap { $0 }
         guard !wants.isEmpty else { return nil }

@@ -314,16 +314,27 @@ struct BighelpAppComposition {
             onSelectedHostChange: { hostSelectionChangeRelay.send($0) }
         )
         let appleDeviceTools = AppleDeviceToolService()
+        let deviceToolEnvironment = DeviceToolEnvironment(
+            settings: settings, defaults: defaults, dataDirectory: dataDirectory, usesFixtures: usesFixtures)
+        let deviceToolRouter = DeviceToolRouter(apple: appleDeviceTools, tools: [
+            DeviceContactsTool.live(deviceToolEnvironment),
+            DevicePhotosTool.live(deviceToolEnvironment),
+            DeviceGeofenceTool.live(deviceToolEnvironment),
+            DeviceAlarmsTool.live(deviceToolEnvironment),
+            DeviceMusicTool.live(deviceToolEnvironment),
+            DeviceFocusTool.live(deviceToolEnvironment),
+            DeviceShortcutsTool.live(deviceToolEnvironment),
+        ])
         // Demo mode never asks iOS for real data. Location answers from a made-up place.
         let demoLocation = usesFixtures ? DeviceLocationTool(provider: DemoDeviceLocationProvider()) : nil
         let deviceToolPermissions = DeviceToolPermissions(
             status: { kind in
                 if kind == .location, let demoLocation { return await demoLocation.status() }
-                return usesFixtures ? .unavailable : await appleDeviceTools.status(kind)
+                return usesFixtures ? .unavailable : await deviceToolRouter.status(kind)
             },
             request: { kind in
                 if kind == .location, let demoLocation { return await demoLocation.request() }
-                return usesFixtures ? .unavailable : await appleDeviceTools.request(kind)
+                return usesFixtures ? .unavailable : await deviceToolRouter.request(kind)
             },
             isForeground: { UIApplication.shared.applicationState == .active },
             // Demo switches last only for the launch.
@@ -339,17 +350,22 @@ struct BighelpAppComposition {
             journal: DeviceToolFileJournal(url: dataDirectory.appending(path: "device-tool-outcomes-v1.json")),
             clock: { Int(Date().timeIntervalSince1970) },
             available: {
-                !usesFixtures && UIApplication.shared.applicationState == .active
+                !usesFixtures && DeviceToolHandoff.shared.isAppOpen(UIApplication.shared.applicationState)
                     && UIApplication.shared.isProtectedDataAvailable
             },
-            execute: { operation, arguments, authorize in
+            execute: { operation, arguments, context, authorize in
                 if DeviceAppearanceTool.operations.contains(operation) {
                     return try appearanceTool.execute(operation: operation, arguments: arguments, authorize: authorize)
                 }
-                return try await appleDeviceTools.execute(operation: operation, arguments: arguments, authorize: authorize)
+                return try await deviceToolRouter.execute(
+                    operation: operation, arguments: arguments, context: context, authorize: authorize)
             }
         )
         let permissionCenter = PermissionCenter(deviceTools: deviceToolPermissions)
+        // Music cards in chat show artwork and play only while Music is on in Device access.
+        BighelpCardObjectAccess.musicEnabled = { [weak deviceToolPermissions] in
+            deviceToolPermissions?.isEnabled(.music) == true
+        }
         if let identifier = defaults.string(forKey: "loopdy.native-device-tools.device-id"),
            UUID(uuidString: identifier) != nil {
             permissionCenter.nativeDeviceID = identifier

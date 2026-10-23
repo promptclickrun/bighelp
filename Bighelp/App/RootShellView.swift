@@ -314,7 +314,8 @@ struct RootShellView: View {
             sessionRestoreRequest = nil
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .background { permissionCenter.deviceTools.invalidateOperations() }
+            // A shortcut running in Shortcuts keeps the phone tools' calls alive (`DeviceToolHandoff`).
+            if phase == .background, !DeviceToolHandoff.shared.isActive { permissionCenter.deviceTools.invalidateOperations() }
         }
         .task(id: hostRuntimeScope) { await prepareHostRuntime() }
         .onChange(of: agents.errorMessage) { _, _ in
@@ -1389,6 +1390,8 @@ struct RootShellView: View {
     }
 
     private func handleIncomingURL(_ url: URL) {
+        // The way back from Shortcuts to a phone-tool call: not a screen to open.
+        if DeviceToolHandoff.shared.handleCallback(url) { return }
         guard let route = BighelpIncomingURLRoute.parse(url) else { return }
         // A link opening the app wins over Settings › Chat › Open on, and keeps the mode you were in.
         didAutoOpenHomeChat = true

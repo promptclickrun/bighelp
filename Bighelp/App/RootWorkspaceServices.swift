@@ -104,8 +104,12 @@ extension RootShellView {
 
     var nativeDeviceToolTrigger: String {
         let coordinate = appState.activeConversationID.flatMap { nativeRuntime?.bridge.currentCoordinate(for: $0) }
-        return "\(nativeWorkspaceStore?.nativeClient?.isConnected == true):\(voiceSettingsScope ?? "none"):\(appState.activeConversationID ?? "none"):\(coordinate?.storedSessionID ?? "none"):\(coordinate?.runtimeSessionID ?? "none"):\(permissionCenter.deviceTools.revision):\(hostRegistry?.deviceToolFeatureReadinessToken ?? 0):\(scenePhase):\(UIApplication.shared.isProtectedDataAvailable)"
+        return "\(nativeWorkspaceStore?.nativeClient?.isConnected == true):\(voiceSettingsScope ?? "none"):\(appState.activeConversationID ?? "none"):\(coordinate?.storedSessionID ?? "none"):\(coordinate?.runtimeSessionID ?? "none"):\(permissionCenter.deviceTools.revision):\(hostRegistry?.deviceToolFeatureReadinessToken ?? 0):\(deviceToolPhase):\(UIApplication.shared.isProtectedDataAvailable)"
     }
+
+    /// The scene phase the phone channel goes by: active for as long as a tool call has the app out
+    /// in another app and waits for it to come back (`DeviceToolHandoff`).
+    var deviceToolPhase: ScenePhase { DeviceToolHandoff.shared.effectivePhase(scenePhase) }
 
     func runNativeDeviceTools() async {
         #if DEBUG
@@ -121,7 +125,7 @@ extension RootShellView {
               let scope = currentDeviceToolScope, let direct = nativeWorkspaceStore?.nativeClient,
               direct.isConnected,
               let handler = permissionCenter.nativeDeviceToolHandler,
-              scenePhase == .active, UIApplication.shared.isProtectedDataAvailable else { return }
+              deviceToolPhase == .active, UIApplication.shared.isProtectedDataAvailable else { return }
         let permissions = permissionCenter.deviceTools
         await permissions.refresh()
         let enabled = Set(DeviceToolCapability.allCases.filter { permissions.isEnabled($0) })
@@ -142,7 +146,7 @@ extension RootShellView {
                     sessionID: coordinate.storedSessionID ?? coordinate.runtimeSessionID ?? coordinate.sessionID,
                     enabled: enabled, isAvailable: {
                         permissions.scope == scope && permissions.revision == revision
-                            && scenePhase == .active && UIApplication.shared.isProtectedDataAvailable
+                            && deviceToolPhase == .active && UIApplication.shared.isProtectedDataAvailable
                             && appState.activeConversationID == conversationID
                     }, handle: handler)
                 session = next

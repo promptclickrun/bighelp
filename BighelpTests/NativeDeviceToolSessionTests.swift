@@ -181,6 +181,32 @@ struct NativeDeviceToolSessionTests {
         #expect(fixture.handled == 0 && fixture.http.results.isEmpty)
     }
 
+    /// A shortcut out in the Shortcuts app can outlast the next request in its batch. That one is
+    /// answered as expired, and the channel keeps working instead of closing.
+    @Test func aRequestThatExpiresBehindASlowOneIsAnsweredAndTheChannelStays() async throws {
+        let fixture = try Fixture()
+        let now = Int(Date().timeIntervalSince1970)
+        var quick = fixture.http.request
+        quick["requestId"] = .string("tool-call-2")
+        quick["expiresAt"] = .integer(now + 1)
+        fixture.http.batch = [fixture.http.request, quick]
+        fixture.slowFor = .milliseconds(2_100)
+        let session = fixture.session()
+        try await session.connect()
+        try await session.pollOnce()
+        #expect(fixture.handled == 1)
+        #expect(fixture.http.results.count == 2)
+        #expect(fixture.http.results.last?["requestId"] == .string("tool-call-2"))
+        #expect(fixture.http.results.last?["status"] == .string("failed"))
+        #expect(fixture.http.results.last?["code"] == .string("request_expired"))
+        var next = fixture.http.request
+        next["requestId"] = .string("tool-call-3")
+        fixture.http.batch = [next]
+        fixture.slowFor = nil
+        try await session.pollOnce()
+        #expect(fixture.handled == 2)
+    }
+
     @Test func mismatchedHandlerResultCannotAdvanceCursor() async throws {
         let fixture = try Fixture()
         fixture.wrongResult = true
@@ -314,6 +340,8 @@ struct NativeDeviceToolSessionTests {
         var handled = 0
         var available = true
         var wrongResult = false
+        /// The first request handled takes this long, like a run out in Shortcuts.
+        var slowFor: Duration?
         init() throws {
             owner = WorkspaceOwner(authority: try .dashboard(endpointIdentity: "https://host.example:9119"),
                                    authenticationGeneration: UUID(), connectionGeneration: UUID())
@@ -328,6 +356,7 @@ struct NativeDeviceToolSessionTests {
                 scope: scope, agentID: agentID, sessionID: "session", enabled: enabled,
                 isAvailable: { self.available }, handle: { request, _, _ in
                     self.handled += 1
+                    if let slowFor = self.slowFor { try? await Task.sleep(for: slowFor) }
                     var resultRequest = request
                     if self.wrongResult {
                         var raw = self.http.request
@@ -349,6 +378,8 @@ struct NativeDeviceToolSessionTests {
         var beforePollReply: () -> Void = {}
         var beforeConnectReply: () -> Void = {}
         var duplicateRequest = false
+        /// Requests the next poll returns, in order, instead of `request`.
+        var batch: [[String: BighelpJSONValue]]?
         /// Like the plugin: it serves one Hermes profile and holds one phone's channel per agent and chat,
         /// for 30 seconds after its last poll. A second phone for the chat is refused (`channel_ambiguous`);
         /// a newer plugin lets the same phone replace its own channel.
@@ -407,9 +438,13 @@ struct NativeDeviceToolSessionTests {
                 if let refused = try gone(channel, request: request, requestGuard: requestGuard) { return refused }
                 if let id = channel.string { keepAlive(id) }
                 beforePollReply()
-                let count = duplicateRequest ? 2 : 1
-                value = ["channelId": channel, "next": .integer(count),
-                         "requests": .array((1...count).map { .object(["sequence": .integer($0), "request": .object(self.request)]) })]
+                let rows = batch ?? Array(repeating: self.request, count: duplicateRequest ? 2 : 1)
+                // A batch continues after the phone's cursor; the single request always comes as the first.
+                let start = batch == nil ? 0 : Int(request.body?["after"]?.integer ?? 0)
+                value = ["channelId": channel, "next": .integer(start + rows.count),
+                         "requests": .array(rows.enumerated().map {
+                             .object(["sequence": .integer(start + $0.offset + 1), "request": .object($0.element)])
+                         })]
             case "device-tools/result":
                 if let result = request.body?["result"]?.object { results.append(result) }
                 value = ["accepted": .boolean(true)]

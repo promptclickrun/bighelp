@@ -23,7 +23,7 @@ final class DeviceAppearanceFixture {
             permissions: permissions, journal: UnusedJournal(),
             clock: { Int(Date().timeIntervalSince1970) },
             available: { UIApplication.shared.applicationState == .active },
-            execute: { operation, arguments, authorize in
+            execute: { operation, arguments, _, authorize in
                 try tool.execute(operation: operation, arguments: arguments, authorize: authorize)
             })
     }

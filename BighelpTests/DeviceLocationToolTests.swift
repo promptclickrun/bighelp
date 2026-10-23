@@ -357,7 +357,7 @@ private final class LocationCoordinatorFixture {
     var executions = 0
     var available = true
     lazy var coordinator = DeviceToolCoordinator(permissions: permissions, journal: journal, clock: { 1_000 },
-                                                 available: { self.available }) { operation, _, authorize in
+                                                 available: { self.available }) { operation, _, _, authorize in
         try authorize()
         self.executions += 1
         #expect(operation == "location.current")

@@ -121,13 +121,21 @@
     <string>When you enable Calendar tools, your selected agent can read, create, update, and delete calendar events on your request.</string>
     <key>NSRemindersFullAccessUsageDescription</key>
     <string>When you enable Reminders tools, your selected agent can read, create, update, and delete reminders on your request.</string>
+    <key>NSContactsUsageDescription</key>
+    <string>When you enable Contacts tools, your selected agent can look up, add, change, and delete people in your contacts on your request.</string>
+    <key>NSAlarmKitUsageDescription</key>
+    <string>When you enable Alarms and timers, your selected agent can set, change, and turn off alarms and timers on your request.</string>
+    <key>NSAppleMusicUsageDescription</key>
+    <string>When you enable Music, your selected agent can see what's playing, play and pause music, and make playlists on your request.</string>
 
     <key>BighelpNativeBrowserAuthenticationEnabled</key>
     <true/>
     <key>NSCameraUsageDescription</key>
     <string>bighelp uses the camera to scan short-lived pairing codes, power Reflective Vision, and capture photos or scan documents you intentionally attach to chats.</string>
     <key>NSLocationWhenInUseUsageDescription</key>
-    <string>bighelp shares your location with your agent only when you allow it and the agent asks, for things like finding places near you.</string>
+    <string>bighelp shares your location with your agent only when you allow it and the agent asks, for things like finding places near you, and watches places you name while bighelp is open.</string>
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>When you enable Arriving and leaving, bighelp tells your agent when you arrive at or leave the places you name, even when bighelp is closed. It never tracks where you go.</string>
     <key>NSLocationTemporaryUsageDescriptionDictionary</key>
     <dict>
         <key>AgentRequest</key>
@@ -137,6 +145,8 @@
     <true/>
     <key>NSMicrophoneUsageDescription</key>
     <string>bighelp uses your microphone for live voice conversations with your selected Hermes agent.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>When you enable Photos tools, your selected agent can find and look at your photos, save pictures, and sort them into albums on your request. You can limit it to the photos you choose.</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
     <string>bighelp saves images, GIFs, and videos to Photos only when you choose Save to Photos.</string>
 	<key>NSSupportsLiveActivities</key>

@@ -12,7 +12,7 @@ struct PermissionsSettingsView: View {
             }
 
             Section {
-                ForEach(DeviceToolCapability.allCases.filter(\.sharesPersonalData)) { kind in
+                ForEach(DeviceToolCapability.allCases.filter { $0.sharesPersonalData && $0.isOfferedOnThisPlatform }) { kind in
                     DeviceToolPermissionRow(permissions: center.deviceTools, kind: kind)
                 }
             } header: {
@@ -47,13 +47,13 @@ struct PermissionsSettingsView: View {
             .listRowBackground(theme.surface)
 
             Section {
-                LabeledContent("Selected Photos", value: "Picker Only")
-                    .accessibilityLabel("Selected Photos")
-                    .accessibilityValue("Uses the iOS photo picker. bighelp does not receive full library access.")
+                LabeledContent("Photos you attach", value: "Picker Only")
+                    .accessibilityLabel("Photos you attach")
+                    .accessibilityValue("Attaching uses the iOS photo picker and needs no library access.")
             } header: {
-                Text("Photos")
+                Text("Attaching photos")
             } footer: {
-                Text("Attaching a photo uses Apple’s private picker and does not grant bighelp general access to your photo library.")
+                Text("Photos you attach in chat use Apple’s private picker. Your agent reaches your library only when Photos is on above.")
                     .bighelpFont(.metadata)
             }
             .listRowBackground(theme.surface)
@@ -81,23 +81,8 @@ private struct DeviceToolPermissionRow: View {
     let kind: DeviceToolCapability
     @Environment(\.openURL) private var openURL
 
-    private var title: String {
-        switch kind {
-        case .calendar: "Calendar"
-        case .reminders: "Reminders"
-        case .location: "Location"
-        case .appearance: "Appearance"
-        }
-    }
-
-    private var detail: String {
-        switch kind {
-        case .calendar: "Read, create, update, and delete events directly after you enable access."
-        case .reminders: "Read, create, update, and delete reminders directly after you enable access."
-        case .location: "Share where you are when your agent asks, for things like finding places near you."
-        case .appearance: "Switch light or dark mode and change your chat color when you ask."
-        }
-    }
+    private var title: String { kind.title }
+    private var detail: String { kind.detail }
 
     var body: some View {
         VStack(alignment: .leading, spacing: BighelpTokens.space8) {
@@ -131,6 +116,7 @@ private struct DeviceToolPermissionRow: View {
             } else if permissions.scope != nil, permissions.status(for: kind) == .unavailable {
                 Text("Unavailable on this device.").bighelpFont(.metadata).foregroundStyle(.secondary)
             }
+            DeviceToolPermissionExtras(kind: kind, permissions: permissions)
         }
         .padding(.vertical, BighelpTokens.space4)
     }

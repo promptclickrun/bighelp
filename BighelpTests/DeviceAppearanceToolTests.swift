@@ -25,16 +25,17 @@ struct DeviceAppearanceToolTests {
         #expect(!fixture.permissions.isEnabled(.location), "Data tools stay off until the person allows them")
     }
 
-    @Test func switchNeedsAHostButCountsForEveryHost() {
+    @Test func switchCountsForEveryHostAndIsUsedOnlyWithOne() {
         let fixture = AppearanceFixture()
         fixture.permissions.bind(nil)
-        #expect(!fixture.permissions.isEnabled(.appearance))
+        #expect(fixture.permissions.isEnabled(.appearance))
+        #expect(!fixture.permissions.isUsable(.appearance), "No host, no agent to use it")
         #expect(fixture.permissions.appearanceAllowed)
         fixture.permissions.bind(.init(deviceID: "phone-a", authorizationEpoch: 1, hostID: "host-b"))
-        #expect(fixture.permissions.isEnabled(.appearance))
+        #expect(fixture.permissions.isUsable(.appearance))
         fixture.permissions.setAppearanceAllowed(false)
         fixture.permissions.bind(fixture.scope)
-        #expect(!fixture.permissions.isEnabled(.appearance))
+        #expect(!fixture.permissions.isEnabled(.appearance) && !fixture.permissions.isUsable(.appearance))
     }
 
     @Test func turningItOffIsSavedAndRetiresWorkInFlight() async {

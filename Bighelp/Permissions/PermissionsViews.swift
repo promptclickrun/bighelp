@@ -19,8 +19,8 @@ struct PermissionsSettingsView: View {
                 Text("Shared with your host")
             } footer: {
                 Text(center.deviceTools.scope == nil
-                     ? "Connect a host to enable these optional tools."
-                     : "Requested data is shared with the selected host and its AI provider. Turn access off to stop agent use. Keep bighelp open while using these tools.")
+                     ? "Each switch is for this device and stays on until you turn it off. Connect a host so its agents can use them."
+                     : "Each switch is for this device and stays on until you turn it off. Any agent on your host can use it while you have its chat open, also for a short time after you leave bighelp. Requested data goes to that host and its AI provider.")
             }
             .listRowBackground(theme.surface)
 
@@ -99,7 +99,7 @@ private struct DeviceToolPermissionRow: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .disabled(!permissions.isEnabled(kind) && (permissions.scope == nil || permissions.requestInFlight != nil
+            .disabled(!permissions.isEnabled(kind) && (permissions.requestInFlight != nil
                 || permissions.status(for: kind) == .unavailable))
             .accessibilityIdentifier("permissions.device-tools.\(kind.rawValue)")
 

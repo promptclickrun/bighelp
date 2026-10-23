@@ -918,6 +918,13 @@ struct DeviceGeofenceToolTests {
 
         fixture.defaults.set(["photos"], forKey: scope.storageKey)
         #expect(!DeviceGeofenceTool.grantAllows(place, defaults: fixture.defaults))
+
+        // Once the phone has its own list, it decides for every computer.
+        fixture.defaults.set(["geofences"], forKey: DeviceToolPermissions.grantsKey)
+        #expect(DeviceGeofenceTool.grantAllows(place, defaults: fixture.defaults))
+        fixture.defaults.set(["geofences"], forKey: scope.storageKey)
+        fixture.defaults.set(["photos"], forKey: DeviceToolPermissions.grantsKey)
+        #expect(!DeviceGeofenceTool.grantAllows(place, defaults: fixture.defaults))
     }
 
     // MARK: Helpers

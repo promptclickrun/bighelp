@@ -3,6 +3,15 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.14
+
+### Fixes
+
+- **Faster after you come back to bighelp:** bighelp now gets your chat list from your computer with up to four
+  requests at the same time. Before, it sent one request at a time. When you open bighelp again, it gets the full list
+  before it opens a notification, a widget or a Shortcut. On a remote computer with many chats, this wait is now
+  shorter.
+
 ## 2.6.13
 
 ### Fixes

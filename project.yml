@@ -97,8 +97,10 @@ targets:
         CURRENT_PROJECT_VERSION: 154
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_ENTITLEMENTS: Bighelp/Bighelp.entitlements
-        # CarPlay voice needs Apple's CarPlay entitlement, which device builds
-        # can't carry until Apple grants it; the simulator's CarPlay uses this copy.
+        # CarPlay voice needs Apple's CarPlay Voice-Based Conversation entitlement
+        # (granted 2026-10-23). iPhone and iPad builds carry it; Vision Pro and the
+        # Mac have no CarPlay, so their builds keep the plain entitlements.
+        CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]: Bighelp/BighelpCarPlay.entitlements
         CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]: Bighelp/BighelpCarPlay.entitlements
         # The Mac app shares the iPhone app's ID, because pushes are addressed to it, but it
         # is never uploaded to App Store Connect. "Optimize for Mac" (family 6) draws at full

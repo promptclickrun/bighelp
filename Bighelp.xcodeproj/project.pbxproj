@@ -8353,6 +8353,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				BIGHELP_APS_ENVIRONMENT = production;
 				CODE_SIGN_ENTITLEMENTS = Bighelp/Bighelp.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = Bighelp/BighelpCarPlay.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = Bighelp/BighelpCarPlay.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = Bighelp/BighelpCatalyst.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
@@ -8653,6 +8654,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				BIGHELP_APS_ENVIRONMENT = development;
 				CODE_SIGN_ENTITLEMENTS = Bighelp/Bighelp.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = Bighelp/BighelpCarPlay.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = Bighelp/BighelpCarPlay.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = Bighelp/BighelpCatalyst.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";

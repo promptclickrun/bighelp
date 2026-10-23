@@ -513,10 +513,10 @@ sections can crash only on devices ("Thread stack size exceeded").
 
 ### CarPlay
 
-- CarPlay voice apps need Apple's CarPlay Voice-Based Conversation entitlement (iOS 26.4+), requested at
-  developer.apple.com/contact/request/carplay. Until it's granted only simulator builds carry it
-  (`CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]` → `BighelpCarPlay.entitlements`). Once granted, move the key
-  into `Bighelp.entitlements` and drop the simulator override.
+- CarPlay voice apps need Apple's CarPlay Voice-Based Conversation entitlement (iOS 26.4+). Apple granted it
+  to bighelp's team on 2026-10-23. iPhone and iPad builds, on devices and in the simulator, carry it through
+  `BighelpCarPlay.entitlements` (`CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]` and `[sdk=iphonesimulator*]`). Vision Pro and
+  the Mac have no CarPlay and keep `Bighelp.entitlements`, so a change to the shared keys goes in both files.
 - Voice buttons belong to each `CPVoiceControlState` (`actionButtons`); the template only has bar buttons.
 - Tests can't open the simulator's CarPlay window. `CarPlayVoiceUITests` drives the same session through the
   DEBUG `-test-carplay-session` screen on the demo data.

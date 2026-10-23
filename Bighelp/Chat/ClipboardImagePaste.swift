@@ -187,10 +187,28 @@ struct ClipboardImageImporter {
     private func loadImageRepresentation(
         from provider: NSItemProvider
     ) async throws -> (data: Data, fileExtension: String, mimeType: String) {
-        guard let type = preferredImageType(from: provider) else {
-            throw ClipboardImageImportError.noReadableImage
+        var lastError: any Error = ClipboardImageImportError.noReadableImage
+        for type in preferredImageTypes(from: provider) {
+            try Task.checkCancellation()
+            do {
+                let data = try await loadData(from: provider, type: type)
+                try Task.checkCancellation()
+                return (
+                    data,
+                    type.preferredFilenameExtension ?? "png",
+                    type.preferredMIMEType ?? "image/png"
+                )
+            } catch {
+                try Task.checkCancellation()
+                if error is CancellationError { throw error }
+                lastError = error
+            }
         }
-        let data: Data = try await withCheckedThrowingContinuation { continuation in
+        throw lastError
+    }
+
+    private func loadData(from provider: NSItemProvider, type: UTType) async throws -> Data {
+        try await withCheckedThrowingContinuation { continuation in
             provider.loadDataRepresentation(forTypeIdentifier: type.identifier) { data, error in
                 if let error {
                     continuation.resume(throwing: error)
@@ -201,23 +219,20 @@ struct ClipboardImageImporter {
                 }
             }
         }
-        try Task.checkCancellation()
-        return (
-            data,
-            type.preferredFilenameExtension ?? "png",
-            type.preferredMIMEType ?? "image/png"
-        )
     }
 
-    private func preferredImageType(from provider: NSItemProvider) -> UTType? {
+    private func preferredImageTypes(from provider: NSItemProvider) -> [UTType] {
         let registered = provider.registeredTypeIdentifiers.compactMap(UTType.init)
         let supported = [UTType.png, .jpeg, .heic, .heif]
-        if let exact = supported.first(where: { candidate in
+        var types = supported.filter { candidate in
             registered.contains(where: { $0 == candidate })
-        }) {
-            return exact
         }
-        return registered.first(where: { $0.conforms(to: .image) })
-            ?? (provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) ? .image : nil)
+        for type in registered where type.conforms(to: .image) && !types.contains(type) {
+            types.append(type)
+        }
+        if types.isEmpty, provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
+            types.append(.image)
+        }
+        return types
     }
 }

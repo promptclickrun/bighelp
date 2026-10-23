@@ -60,7 +60,10 @@ struct ImageAttachmentPreparer: Sendable {
         else { throw Error.sourceDimensionsTooLarge }
 
         let sourceMaximumDimension = max(sourceWidth, sourceHeight)
-        if data.count <= maximumOutputBytes, sourceMaximumDimension <= maximumPixelDimension {
+        // macOS clipboard images may be TIFF. Decode them here, but always
+        // encode a transport-supported PNG/JPEG instead of passing TIFF through.
+        if sourceType as String != UTType.tiff.identifier,
+           data.count <= maximumOutputBytes, sourceMaximumDimension <= maximumPixelDimension {
             let type = UTType(sourceType as String)
             guard
                 let fileExtension = type?.preferredFilenameExtension,
@@ -75,7 +78,7 @@ struct ImageAttachmentPreparer: Sendable {
         }
 
         var targetDimension = min(sourceMaximumDimension, maximumPixelDimension)
-        while targetDimension >= 32 {
+        repeat {
             let options: [CFString: Any] = [
                 kCGImageSourceCreateThumbnailFromImageAlways: true,
                 kCGImageSourceCreateThumbnailWithTransform: true,
@@ -112,7 +115,7 @@ struct ImageAttachmentPreparer: Sendable {
                 }
             }
             targetDimension = Int(Double(targetDimension) * 0.75)
-        }
+        } while targetDimension >= 32
         throw Error.outputTooLarge
     }
 
@@ -153,6 +156,7 @@ struct ImageAttachmentPreparer: Sendable {
             || identifier == UTType.jpeg.identifier
             || identifier == UTType.heic.identifier
             || identifier == UTType.heif.identifier
+            || identifier == UTType.tiff.identifier
     }
 }
 

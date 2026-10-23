@@ -1,4 +1,5 @@
 import Testing
+import ImageIO
 import UIKit
 import UniformTypeIdentifiers
 @testable import Bighelp
@@ -24,6 +25,54 @@ struct ClipboardImporterTests {
         #expect(attachment.fileName.hasPrefix("Clipboard image."))
     }
 
+    @Test func macScreenshotTIFFIsConvertedToTransportImage() async throws {
+        let source = try #require(CGImageSourceCreateWithData(try png() as CFData, nil))
+        let image = try #require(CGImageSourceCreateImageAtIndex(source, 0, nil))
+        let data = NSMutableData()
+        let destination = try #require(CGImageDestinationCreateWithData(
+            data, UTType.tiff.identifier as CFString, 1, nil
+        ))
+        CGImageDestinationAddImage(destination, image, nil)
+        #expect(CGImageDestinationFinalize(destination))
+        let provider = NSItemProvider(item: data, typeIdentifier: UTType.tiff.identifier)
+
+        let attachments = try await ClipboardImageImporter().importImages(from: [provider])
+        let attachment = try #require(attachments.first)
+        #expect(attachments.count == 1)
+        #expect(["image/png", "image/jpeg"].contains(attachment.mimeType))
+        #expect(UIImage(data: attachment.data)?.cgImage?.width == image.width)
+        #expect(UIImage(data: attachment.data)?.cgImage?.height == image.height)
+        #expect(attachment.data.count <= ChatAttachment.maximumBytes)
+        #expect(!attachment.fileName.hasSuffix(".tiff"))
+        #expect(throws: ImageAttachmentPreparer.Error.sourceTooLarge) {
+            try ImageAttachmentPreparer(maximumInputBytes: data.length - 1).prepare(data: data as Data)
+        }
+        #expect(throws: ImageAttachmentPreparer.Error.outputTooLarge) {
+            try ImageAttachmentPreparer(maximumOutputBytes: 32).prepare(data: data as Data)
+        }
+        let resized = try ImageAttachmentPreparer(maximumPixelDimension: 8).prepare(data: data as Data)
+        #expect(resized.pixelSize == CGSize(width: 8, height: 6))
+    }
+
+    @Test func unavailablePreferredRepresentationFallsBackToReadableImage() async throws {
+        let image = try #require(UIImage(data: try png()))
+        let data = try #require(image.jpegData(compressionQuality: 1))
+        let provider = NSItemProvider()
+        provider.registerDataRepresentation(forTypeIdentifier: UTType.png.identifier, visibility: .all) { completion in
+            completion(nil, ClipboardImageImportError.noReadableImage)
+            return nil
+        }
+        provider.registerDataRepresentation(forTypeIdentifier: UTType.jpeg.identifier, visibility: .all) { completion in
+            completion(data, nil)
+            return nil
+        }
+
+        let attachments = try await ClipboardImageImporter().importImages(from: [provider])
+        #expect(attachments.count == 1)
+        #expect(attachments.first?.data == data)
+        #expect(attachments.first?.mimeType == "image/jpeg")
+    }
+
     @Test func invalidImageAndExcessiveProviderCountFailWithoutAttachments() async throws {
         let bad = NSItemProvider(item: Data("not an image".utf8) as NSData, typeIdentifier: UTType.png.identifier)
         do {
@@ -35,6 +84,18 @@ struct ClipboardImporterTests {
             Issue.record("Excessive provider count must be rejected")
         } catch {
             #expect(error as? ClipboardImageImportError == .tooManyImages)
+        }
+    }
+
+    @Test func cancelledImportDoesNotProduceAttachments() async throws {
+        let provider = NSItemProvider(item: try png() as NSData, typeIdentifier: UTType.png.identifier)
+        let task = Task { try await ClipboardImageImporter().importImages(from: [provider]) }
+        task.cancel()
+        do {
+            _ = try await task.value
+            Issue.record("Cancelled paste must not produce attachments")
+        } catch {
+            #expect(error is CancellationError)
         }
     }
 

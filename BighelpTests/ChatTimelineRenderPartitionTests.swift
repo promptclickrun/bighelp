@@ -274,21 +274,20 @@ struct ChatTimelineRenderPartitionTests {
         try await Task.sleep(for: .milliseconds(300))
         let table = try #require(tables(host.view).first)
         timeline.beginReview()
-        var assignments: [ObjectIdentifier: String] = [:]
-        var reusedForAnotherRow = false
+        // Cells are held so a freed one's address can't pass for another.
+        var assignments: [(cell: UITableViewCell, id: String)] = []
         for target in [0, 20, 40, 10, 30] {
             table.scrollToRow(at: IndexPath(row: target, section: 0), at: .top, animated: false)
             try await Task.sleep(for: .milliseconds(150))
             for cell in table.visibleCells {
                 let id = try #require(cell.accessibilityIdentifier)
-                let key = ObjectIdentifier(cell)
-                if let previous = assignments[key], previous != id { reusedForAnotherRow = true }
-                assignments[key] = id
+                #expect(assignments.allSatisfy { $0.cell !== cell || $0.id == id },
+                        "A cell shows one row only; rows are kept, never recycled for another.")
+                assignments.append((cell, id))
                 #expect(buttons(cell).first?.title(for: .normal) == id,
-                        "A recycled card must not retain another item's draft/selection/runtime state.")
+                        "A card must not show another item's draft/selection/runtime state.")
             }
         }
-        #expect(reusedForAnotherRow, "Exercise actual UIKit cell reuse.")
     }
 
     /// 2.6.7 (147) crashed opening a chat whose rows repeated an ID: the reset built its index with

@@ -5,7 +5,10 @@ import type { LinkEnv, UserLink } from "../src/user-link.js";
 import type { NotificationActivity, NotificationEgressSnapshot } from "../src/notification-grants.js";
 
 const now = () => Math.floor(Date.now() / 1_000);
-const rowId = (n: number) => `native-${String(n).padStart(43, "a")}`;
+// The format the app sends: "native-" and a SHA-256 in hex. Real digests differ in their last
+// 16 characters, which the card uses to list active chats, so these do too.
+const rowToken = (n: number) => n.toString(16).padStart(16, "0");
+const rowId = (n: number) => `native-${"ab".repeat(24)}${rowToken(n)}`;
 const providerReceipt = () => Response.json({ success: true, data: { results: [{ id: "fixture-receipt", ok: true }] } });
 type Payload = { activityId: string; event: string; timestamp: number; contentState: { activeCount: number; activeRows: string[]; sessions: { id: string; phase: string }[] } };
 afterEach(() => vi.restoreAllMocks());
@@ -162,7 +165,7 @@ describe("shared activity owner integration", () => {
     await f.send(first, "thinking");
     expect(f.payloads[0]!.contentState.activeCount).toBe(64);
     expect(f.payloads[0]!.contentState.activeRows).toHaveLength(64);
-    expect(f.payloads[0]!.contentState.activeRows).toContain("63".padStart(16, "a"));
+    expect(f.payloads[0]!.contentState.activeRows).toContain(rowToken(63));
     expect(f.payloads[0]!.contentState.sessions).toHaveLength(5);
   });
 

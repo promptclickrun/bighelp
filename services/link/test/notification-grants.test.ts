@@ -479,7 +479,7 @@ describe("post-migration Link wake ownership", () => {
     for (const version of [2, 3]) {
       const activityId = `contract-v${version}`;
       const path = `/v1/notifications/host-grants/${grant.grantId}/live-activities/${activityId}`;
-      const extras = version === 3 ? { groupId: "fixture-physical-card", rowId: `native-${"r".repeat(43)}`, rowRevision: 1 } : {};
+      const extras = version === 3 ? { groupId: "fixture-physical-card", rowId: `native-${"0f".repeat(32)}`, rowRevision: 1 } : {};
       const result = await handleLoopdyLinkRequest(await notificationInstallationRequest(
         installationKeys, grant.installationId, path, { ...common, version, ...extras }, "PUT",
       ), targetEnv);
@@ -499,7 +499,7 @@ describe("post-migration Link wake ownership", () => {
     const closed = await handleLoopdyLinkRequest(await notificationInstallationRequest(
       installationKeys, grant.installationId,
       `/v1/notifications/host-grants/${grant.grantId}/live-activities/next-row`,
-      { ...common, version: 3, groupId: "fixture-physical-card", rowId: `native-${"r".repeat(43)}`, rowRevision: 2 }, "PUT",
+      { ...common, version: 3, groupId: "fixture-physical-card", rowId: `native-${"0f".repeat(32)}`, rowRevision: 2 }, "PUT",
     ), targetEnv);
     expect(closed.status).toBe(409);
     expect(await closed.json()).toMatchObject({ error: { code: "notification_activity_group_ended" } });

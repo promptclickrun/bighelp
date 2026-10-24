@@ -94,8 +94,12 @@ final class NativeWorkspaceSessionBridge: SessionCatalogClient {
             }
         )
         for state in self.creationStates.values { try client.restoreCreationState(state) }
+        if let previous = self.lastCatalogClient { client.adoptHistory(from: previous) }
+        self.lastCatalogClient = client
         return client
     }
+    /// The last connection's catalog client, while the box still holds it, for the history it read.
+    private weak var lastCatalogClient: DirectHermesSessionCatalogClient?
 
     init(connections: WorkspaceConnectionStore, authority: WorkspaceAuthority, directory: URL) throws {
         self.connections = connections

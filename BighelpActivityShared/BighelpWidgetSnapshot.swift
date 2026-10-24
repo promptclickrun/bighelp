@@ -109,6 +109,12 @@ struct BighelpWidgetSnapshot: Codable, Equatable, Sendable {
     /// The gateway (computer) this is from: its ID in bighelp (a UUID). Links name
     /// it, so they open there.
     var hostID: String? = nil
+    /// Chat freshness is separate from unrelated board/palette updates.
+    var sessionsUpdatedAt: Date? = nil
+
+    static let chatFreshness: TimeInterval = 120
+    var chatsStaleAt: Date { (sessionsUpdatedAt ?? generatedAt).addingTimeInterval(Self.chatFreshness) }
+    func chatsAreStale(at date: Date) -> Bool { date >= chatsStaleAt }
 
     static let empty = BighelpWidgetSnapshot(defaultAgentID: nil, defaultAgentName: nil,
                                             sessions: [], tasks: [], generatedAt: .distantPast)
@@ -193,7 +199,11 @@ struct BighelpWidgetSnapshot: Codable, Equatable, Sendable {
 
     /// Running sessions first, then the most recently active.
     var feedSessions: [Session] {
-        sessions.sorted { ($0.isRunning ? 1 : 0, $0.updatedAt) > ($1.isRunning ? 1 : 0, $1.updatedAt) }
+        sessions.sorted {
+            if $0.isRunning != $1.isRunning { return $0.isRunning }
+            if $0.updatedAt != $1.updatedAt { return $0.updatedAt > $1.updatedAt }
+            return $0.id < $1.id
+        }
     }
 
     static func chatURL(_ sessionID: String) -> URL {

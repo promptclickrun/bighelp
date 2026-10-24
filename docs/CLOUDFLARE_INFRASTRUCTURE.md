@@ -223,6 +223,23 @@ Do not publish production account identifiers, resource identifiers, API
 tokens, APNs credentials, signing keys, production hostnames not already meant
 to be public, or live operational thresholds.
 
+## Telemetry Worker
+
+The `bighelp-telemetry` Worker (`services/telemetry`) is a separate Worker at `telemetry.bighelp.app`. It accepts
+batches from the app, the notification extension and the Hermes plugin. The Link relay reaches it over a service
+binding that calls the `TelemetryIngest` entrypoint.
+
+- **It holds no storage.** There is no D1, KV, R2, queue or Durable Object. It checks each batch against an
+  allowlist (`contracts/telemetry-v1.json`), applies two Workers Rate Limiting bindings (per ID, and per network by a
+  keyed hash of the client address), and forwards accepted events to Azure Application Insights in the background.
+- **Secrets:** `APPINSIGHTS_CONNECTION_STRING` and `IP_HASH_KEY`. Only this Worker holds the Azure key.
+- **Privacy:** the client address is never stored, logged or forwarded. Logs hold fixed codes only, with sampling.
+  The Worker adds no CORS headers, because only native clients call it.
+- **Failure:** if Azure is down or the connection string is missing, the Worker still answers `202` and drops the
+  events. A telemetry outage never affects pushes.
+
+See [Telemetry](TELEMETRY.md) for what is collected and how to turn it off.
+
 ## Wiki folder setup transport
 
 The optional Wiki family includes explicitly negotiated `wiki.connect` on the existing encrypted workspace transport. It carries an existing folder coordinate and selected profile; the authenticated envelope supplies device/host ownership. New registrations are host-persisted, read-only, and owner-scoped. Root responses may include a source folder path, which remains encrypted like Wiki content. This adds no relay-readable source storage, endpoint, routing authority, or recipient-only encryption.

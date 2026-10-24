@@ -689,3 +689,18 @@ enum BighelpPushPreferenceChanges {
     static var handler: (@MainActor () -> Void)?
     static func notify() { handler?() }
 }
+
+extension BighelpPushRegistrar {
+    /// The ID a Live Activity's push address goes under at the notification service. The shared card's
+    /// address goes under its group ID, the same `groupId` the version 3 registration sends, never under a
+    /// per-turn row alias or a per-chat alias. An individual (version 2) registration keeps its own
+    /// activity's ID.
+    static func targetID(nativeActivityID: String, relayActivityID: String) -> String {
+        BighelpActivityGroupDriver.physicalID(nativeActivityID).map(BighelpManagedActivityDriver.relayID) ?? relayActivityID
+    }
+
+    /// The shared card ended or was dismissed: its address goes too.
+    func sharedCardEnded(physicalID: String) async {
+        await removeActivity(id: BighelpManagedActivityDriver.relayID(physicalID))
+    }
+}

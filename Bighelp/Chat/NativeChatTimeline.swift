@@ -420,6 +420,37 @@ struct ChatRowMotion: ViewModifier {
     }
 }
 
+/// What rows take from the chat screen that changes without changing how a row looks: the scene
+/// phase (each trip to the background and back) and the card actions (none while the host
+/// connection is closed, the new connection's after it opens). Rows follow them as they change.
+/// Copied into rows as they were built, each change built every row again and forgot every
+/// row's height, so the first scroll up after coming back to the app dropped frames.
+@MainActor @Observable
+final class ChatRowLiveValues {
+    var scenePhase = ScenePhase.active
+    var cardInteractions: ChatCardInteractionHandler?
+
+    /// Takes the chat screen's values. Card actions count as changed when their scope does
+    /// (a closed connection has none), so an update for each streamed word leaves rows alone.
+    func take(_ environment: EnvironmentValues) {
+        if scenePhase != environment.scenePhase { scenePhase = environment.scenePhase }
+        let cards = environment.chatCardInteractions
+        if cardInteractions?.scope != cards?.scope { cardInteractions = cards }
+    }
+}
+
+/// Hands a row the live values. Only this modifier reads them: a change reaches the views
+/// that use them without drawing the row again.
+struct ChatRowLiveEnvironment: ViewModifier {
+    let values: ChatRowLiveValues
+
+    func body(content: Content) -> some View {
+        content
+            .environment(\.scenePhase, values.scenePhase)
+            .environment(\.chatCardInteractions, values.cardInteractions)
+    }
+}
+
 /// What rows take from the chat screen besides their own value. A row whose part of it
 /// changes is drawn again; built rows otherwise stay as they are.
 struct ChatCanvasRowContext: Equatable {
@@ -438,10 +469,11 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
     var contentInsets: UIEdgeInsets = .zero
     var rowContext = ChatCanvasRowContext()
     @ViewBuilder let rowContent: (ChatCanvasRow) -> Content
-    /// Rows get a copy of the scene phase. Reading it here makes SwiftUI call
-    /// updateUIView when it changes, so rows don't stay "inactive" from launch
-    /// (which froze every working animation in chat).
+    /// Rows follow the scene phase and card actions (`ChatRowLiveValues`). Reading them here
+    /// makes SwiftUI call updateUIView when they change, so rows don't stay "inactive" from
+    /// launch (which froze every working animation in chat) or keep a closed connection's cards.
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.chatCardInteractions) private var cardInteractions
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -475,6 +507,7 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
 
     func updateUIView(_ table: ChatTimelineTableView, context: Context) {
         _ = scenePhase
+        _ = cardInteractions
         controller.table = table
         context.coordinator.scheduleUpdate(self, environment: context.environment, table: table)
     }
@@ -506,6 +539,7 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
 
     private struct HostedRow: View {
         let state: HostedRowState
+        let live: ChatRowLiveValues
 
         var body: some View {
             // Evaluate under a SwiftUI body observation scope. Building the
@@ -513,7 +547,9 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             // keeps pending state, mode changes and sender stores live even
             // when the transcript item's value itself has not changed.
             let _ = ChatPerformanceProbe.count("row.body")
-            state.render(state.row).id(state.row.id).modifier(ChatRowMotion(presence: state.presence))
+            state.render(state.row).id(state.row.id)
+                .modifier(ChatRowMotion(presence: state.presence))
+                .modifier(ChatRowLiveEnvironment(values: live))
         }
     }
 
@@ -550,9 +586,7 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             let companionAgentScope: String
             let disclosureStoreID: ObjectIdentifier?
             let loaderFocusID: ObjectIdentifier?
-            let cardInteractionScope: ChatCardInteractionScope?
             let hasContentReader: Bool
-            let scenePhase: ScenePhase
 
             init(_ environment: EnvironmentValues) {
                 colorScheme = environment.colorScheme
@@ -574,12 +608,11 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
                 companionAgentScope = environment.companionAgentScope
                 disclosureStoreID = environment.chatActivityDisclosureStore.map(ObjectIdentifier.init)
                 loaderFocusID = environment.bighelpActivityLoaderFocus.map(ObjectIdentifier.init)
-                cardInteractionScope = environment.chatCardInteractions?.scope
                 hasContentReader = environment.bighelpSessionContentReader != nil
-                scenePhase = environment.scenePhase
             }
         }
         private var style: Style?
+        private let live = ChatRowLiveValues()
         private var heights: [String: (width: CGFloat, height: CGFloat)] = [:]
         /// UIKit asks every row's estimate whenever rows are added; working each out from its
         /// text again made each new row of a long chat cost as much as reading the whole chat.
@@ -731,12 +764,13 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             built.isStale = false
             let cell = built.cell
             let environment = environment
+            let live = live
             cell.backgroundColor = .clear
             cell.isOpaque = false
             cell.backgroundConfiguration = UIBackgroundConfiguration.clear()
             cell.selectionStyle = .none
             let configuration = UIHostingConfiguration {
-                HostedRow(state: state)
+                HostedRow(state: state, live: live)
                     .transformEnvironment(\.self, transform: Self.hostedEnvironment(from: environment))
                     .buttonStyle(.plain)
             }.margins(.all, 0)
@@ -773,6 +807,7 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             controller = parent.controller
             rowContent = parent.rowContent
             defer { schedulePrewarm(table) }
+            live.take(environment)
             let nextStyle = Style(environment)
             let previousContext = rowContext
             rowContext = parent.rowContext
@@ -912,7 +947,6 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             values.openWiki = source.openWiki
             values.openGitHub = source.openGitHub
             values.opensHostFiles = source.opensHostFiles
-            values.chatCardInteractions = source.chatCardInteractions
             values.bighelpCardDataClient = source.bighelpCardDataClient
             values.bighelpSessionContentReader = source.bighelpSessionContentReader
             values.providerLogoStore = source.providerLogoStore
@@ -921,7 +955,7 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             values.companionAgentScope = source.companionAgentScope
             values.reflectiveVisionEnabled = source.reflectiveVisionEnabled
             values.reflectiveVisionCamera = source.reflectiveVisionCamera
-            values.scenePhase = source.scenePhase
+            // The scene phase and card actions come live from `ChatRowLiveValues`.
         }
 
         func tableView(_ tableView: UITableView, estimatedHeightForRowAt indexPath: IndexPath) -> CGFloat {

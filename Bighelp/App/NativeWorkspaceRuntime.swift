@@ -72,6 +72,7 @@ final class NativeWorkspaceRuntime {
     private(set) var isRefreshing = false
     private(set) var isReady = false
     private(set) var isSuspended = false
+    private var confirmedWidgetSessionOwner: WorkspaceOwner?
     private var unrecoveredActiveChatID: String?
     private(set) var errorMessage: String?
     private(set) var optionalFeatureMessage: String?
@@ -453,7 +454,12 @@ final class NativeWorkspaceRuntime {
         // A runtime serves the host selected when it's made; another host gets a new one.
         let hostID = connections.hosts.selectedHostID?.uuidString
         widgetPublisher = BighelpWidgetSnapshotPublisher(sessions: sessions, scheduledTasks: scheduledTasks, agents: agents,
-                                                         hostID: hostID, saved: BighelpWidgetSnapshot.load(gateway: hostID))
+                                                         hostID: hostID, saved: BighelpWidgetSnapshot.load(gateway: hostID),
+                                                         isLive: { [weak self] in self?.isSuspended == false && self?.retired == false },
+                                                         sessionsAreLive: { [weak self] in
+                                                             guard let self, let owner = self.connections.owner else { return false }
+                                                             return self.confirmedWidgetSessionOwner == owner
+                                                         })
         // A refresh found open chats whose runtimes Hermes ended (the app was away): resume them in place.
         bridge.onRetainedStreamsNeedResume = { [weak self] in
             guard let self, let owner = self.connections.owner, owner.authority == self.authority else { return }
@@ -590,6 +596,7 @@ final class NativeWorkspaceRuntime {
         do {
             try await sessions.load(requireAuthoritativeRefresh: true)
             try require(owner)
+            confirmedWidgetSessionOwner = owner
         } catch is CancellationError {
         } catch {
             // SessionCatalogStore retains usable saved state and the prior
@@ -604,6 +611,7 @@ final class NativeWorkspaceRuntime {
                 try require(owner, request: request)
                 try await sessions.load(requireAuthoritativeRefresh: true)
                 try require(owner, request: request)
+                confirmedWidgetSessionOwner = owner
             } catch {
                 result.error = error
             }
@@ -700,11 +708,9 @@ final class NativeWorkspaceRuntime {
                 refreshing?.beginHostRefresh()
                 defer { refreshing?.endHostRefresh() }
                 let source = try self.sessions.restoreSessionContent(id: id)
-                let recovered = try await self.sessions.refreshKnownSession(id: id)
+                let recovered = try await self.sessions.refreshHeldHistory(id: id)
                 try self.require(owner, request: request)
-                _ = try self.features.installSessionStateSnapshot(
-                    SessionHydrationPage(record: recovered, nextOffset: nil), source: source
-                )
+                _ = try self.features.installSessionStateSnapshot(recovered, source: source)
             }
             if let active = appState.activeConversationID, failedSessions.contains(active) {
                 unrecoveredActiveChatID = active
@@ -843,7 +849,9 @@ final class NativeWorkspaceRuntime {
     }
 
     func suspend() {
+        widgetPublisher?.publishNow()
         isSuspended = true
+        confirmedWidgetSessionOwner = nil
         refreshFlight.cancel()
         activeSessionsFlight.cancel()
         transportRecoveryFlight.cancel()

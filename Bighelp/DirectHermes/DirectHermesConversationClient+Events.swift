@@ -185,7 +185,18 @@ extension DirectHermesConversationClient {
             model?.adoptNativeTurn(from: self, turnID: projection.turnID, running: false)
             // Turn completion does not imply consumption of an uncertain steer.
         }
-        if !isReplayingActivity { onAdmittedActivity?(change, projection.turnID, turnFailed) }
+        if !isReplayingActivity {
+            var notificationChange = change
+            // A confirmed turn starts the card even for models that emit no
+            // reasoning or tools. This never manufactures a transcript row.
+            if event.type == "message.start" || (event.type == "session.info" && event.payload["running"]?.boolean == true) {
+                notificationChange.activities.insert(ChatActivityEvent(
+                    eventID: "live-turn-" + projection.turnID, sessionID: conversationID,
+                    turnID: projection.turnID, kind: .reasoning, lifecycle: .running,
+                    title: "Preparing a response", summary: nil, detail: nil, occurredAt: Int(Date().timeIntervalSince1970)), at: 0)
+            }
+            onAdmittedActivity?(notificationChange, projection.turnID, turnFailed)
+        }
         if event.type == "message.complete" {
             // Hermes' saved rows for this turn; the reply is on screen by now.
             if !isReplayingActivity, let receipt = event.payload["persisted_turn"]?.object {

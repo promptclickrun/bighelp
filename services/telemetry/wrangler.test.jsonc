@@ -1,0 +1,15 @@
+// Local test harness only. Never deploy this configuration.
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "bighelp-telemetry-test",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-22",
+  "compatibility_flags": [],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": false },
+  "ratelimits": [
+    { "name": "RL_ID", "namespace_id": "910001", "simple": { "limit": 60, "period": 60 } },
+    { "name": "RL_NET", "namespace_id": "910002", "simple": { "limit": 600, "period": 60 } }
+  ]
+}

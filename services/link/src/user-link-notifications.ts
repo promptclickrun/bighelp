@@ -1,3 +1,4 @@
+import { aggregateActivityRows, type ActivityGroupRow } from "./activity-group.js";
 import { LoopdyLinkError } from "./contracts.js";
 import type { NotificationActivity, NotificationAsset, NotificationEgressSnapshot } from "./notification-grants.js";
 import type { UserLinkAccount } from "./user-link-account.js";
@@ -76,12 +77,50 @@ export class UserLinkNotificationStore {
   }
 
   registerNotificationActivity(
-    input: NotificationActivity & { timestamp: number },
+    input: NotificationActivity & { timestamp: number; authority?: NotificationEgressSnapshot },
   ): NotificationActivity {
     this.account.assertAccountActive();
     validateManagedNotificationActivity(input);
     return this.storage.transactionSync(() => {
+      if (input.groupId) {
+        const generation = this.storage.sql.exec<{ row_revision: number; activity_id: string }>(
+          "SELECT row_revision,activity_id FROM managed_activity_row_generations WHERE group_id=? AND row_id=?",
+          input.groupId, input.rowId!,
+        ).toArray()[0];
+        // Check before seeding authority or superseding rows: the old alias might
+        // never have reached this owner, and its history might already be pruned.
+        if (generation && (input.rowRevision! < generation.row_revision
+            || (input.rowRevision === generation.row_revision && input.activityId !== generation.activity_id))) {
+          throw new LoopdyLinkError("notification_activity_stale", "Activity row generation is stale");
+        }
+        if (!input.authority || input.authority.credentialId !== input.credentialId
+            || input.authority.grant?.grantId !== input.grantId
+            || input.leaseExpires > input.authority.grant.expiresAt) {
+          throw new LoopdyLinkError("notification_grant_inactive", "Activity authority is missing");
+        }
+        // Register authority before the host's first update, in the same transaction.
+        // Otherwise a newly registered row is invisible to another chat's end.
+        this.authorizeNotificationEgress(input.authority);
+      }
       const current = this.readManagedNotificationActivity(input.activityId);
+      const group = this.groupRow(input.activityId);
+      if ((input.groupId !== undefined && (!DEVICE_COORDINATE.test(input.groupId)
+          || !/^native-[A-Za-z0-9_-]{43}$/.test(input.rowId ?? "") || !DEVICE_COORDINATE.test(input.credentialId ?? "")))
+          || (current && (group?.group_id !== input.groupId || group?.row_id !== input.rowId
+            || group?.credential_id !== input.credentialId || group?.row_revision !== input.rowRevision))) {
+        throw new LoopdyLinkError("notification_activity_conflict", "Activity group ownership changed");
+      }
+      if (input.groupId) {
+        const physical = this.storage.sql.exec<{ credential_id: string; ended: number }>(
+          "SELECT credential_id,ended FROM managed_activity_groups WHERE group_id=?", input.groupId,
+        ).toArray()[0];
+        if (physical && physical.credential_id !== input.credentialId) {
+          throw new LoopdyLinkError("notification_activity_conflict", "Activity group belongs to another device");
+        }
+        if (physical?.ended) {
+          throw new LoopdyLinkError("notification_activity_group_ended", "Start a new physical activity");
+        }
+      }
       if (current) {
         if (current.grant_id !== input.grantId || current.session_reference !== input.sessionReference
             || current.status !== "active" || input.revision < current.revision
@@ -92,8 +131,46 @@ export class UserLinkNotificationStore {
           );
         }
         if (input.revision === current.revision && input.leaseExpires === current.lease_expires) {
-          return managedNotificationActivityProjection(current);
+          return this.projectActivity(current);
         }
+      }
+      if (input.groupId) {
+        // Mobile row generations own a chat, not host timestamps or update order.
+        // Keep the old alias tombstone so a delayed register cannot reclaim it.
+        this.storage.sql.exec(`UPDATE managed_notification_activities SET status='revoked'
+          WHERE activity_id IN (SELECT activity_id FROM managed_activity_rows
+            WHERE group_id=? AND credential_id=? AND row_id=? AND activity_id!=?)`,
+          input.groupId, input.credentialId!, input.rowId!, input.activityId);
+        const count = this.storage.sql.exec<{ count: number }>(`SELECT COUNT(*) AS count
+          FROM managed_activity_rows r JOIN managed_notification_activities a ON a.activity_id=r.activity_id
+          JOIN managed_notification_grants g ON g.grant_id=a.grant_id
+          WHERE r.group_id=? AND a.activity_id!=? AND a.status='active' AND a.lease_expires>?
+            AND g.state='active' AND g.expires_at>?
+            AND json_extract(r.state_json,'$.phase') NOT IN ('completed','failed')`,
+          input.groupId, input.activityId, Math.floor(Date.now() / 1000), Math.floor(Date.now() / 1000)).one().count;
+        if (count >= 64) {
+          throw new LoopdyLinkError("notification_activity_limit", "Too many active chats");
+        }
+        // Bound retained row payloads too. Keep activity tombstones separately,
+        // so pruning history never lets an old alias become active again.
+        const pruned = this.storage.sql.exec<{ activity_id: string }>(`DELETE FROM managed_activity_rows WHERE activity_id IN (
+          SELECT r.activity_id FROM managed_activity_rows r
+          JOIN managed_notification_activities a ON a.activity_id=r.activity_id
+          JOIN managed_notification_grants g ON g.grant_id=a.grant_id
+          WHERE r.group_id=? AND r.activity_id!=? AND (a.status!='active' OR a.lease_expires<=?
+            OR g.state!='active' OR g.expires_at<=?
+            OR json_extract(r.state_json,'$.phase') IN ('completed','failed'))
+          ORDER BY a.updated_at,a.activity_id LIMIT MAX(0,
+            (SELECT COUNT(*) FROM managed_activity_rows WHERE group_id=?)-63)) RETURNING activity_id`,
+          input.groupId, input.activityId, Math.floor(Date.now() / 1000), Math.floor(Date.now() / 1000), input.groupId).toArray();
+        for (const row of pruned) {
+          // A terminal update can still be pending provider confirmation. Without
+          // this fence, dropping its group metadata would enable the v2 send path.
+          this.storage.sql.exec("UPDATE managed_notification_activities SET status='revoked' WHERE activity_id=? AND status='active'",
+            row.activity_id);
+        }
+        this.storage.sql.exec(`INSERT INTO managed_activity_groups(group_id,credential_id)
+          VALUES(?,?) ON CONFLICT(group_id) DO NOTHING`, input.groupId, input.credentialId!);
       }
       this.storage.sql.exec(
         `INSERT INTO managed_notification_activities(
@@ -105,10 +182,100 @@ export class UserLinkNotificationStore {
         input.activityId, input.grantId, input.sessionReference, input.revision,
         input.leaseExpires, input.timestamp,
       );
-      return managedNotificationActivityProjection(
-        this.requiredManagedNotificationActivity(input.activityId),
-      );
+      if (input.groupId) {
+        this.storage.sql.exec(`INSERT INTO managed_activity_rows(activity_id,group_id,row_id,row_revision,credential_id,state_json)
+          VALUES(?,?,?,?,?,?) ON CONFLICT(activity_id) DO NOTHING`,
+          input.activityId, input.groupId, input.rowId!, input.rowRevision!, input.credentialId!,
+          JSON.stringify({ id: input.rowId, phase: "thinking", timestamp: input.timestamp, activeSubagentCount: 0 }));
+        this.storage.sql.exec(`INSERT INTO managed_activity_row_generations(group_id,row_id,row_revision,activity_id)
+          VALUES(?,?,?,?) ON CONFLICT(group_id,row_id) DO UPDATE SET
+          row_revision=excluded.row_revision,activity_id=excluded.activity_id`,
+          input.groupId, input.rowId!, input.rowRevision!, input.activityId);
+      }
+      return this.projectActivity(this.requiredManagedNotificationActivity(input.activityId));
     });
+  }
+
+  private groupRow(id: string) {
+    return this.storage.sql.exec<{ group_id: string; row_id: string; row_revision: number; credential_id: string }>(
+      "SELECT group_id,row_id,row_revision,credential_id FROM managed_activity_rows WHERE activity_id=?", id,
+    ).toArray()[0];
+  }
+
+  private projectActivity(row: ManagedNotificationActivityRow): NotificationActivity {
+    const group = this.groupRow(row.activity_id);
+    return { ...managedNotificationActivityProjection(row), ...(group ? {
+      groupId: group.group_id, rowId: group.row_id, rowRevision: group.row_revision, credentialId: group.credential_id,
+    } : {}) };
+  }
+
+  updateActivityGroup(activityId: string, state: ActivityGroupRow, credentialId: string): void {
+    const group = this.groupRow(activityId);
+    if (!group || group.row_id !== state.id || group.credential_id !== credentialId) {
+      throw new LoopdyLinkError("notification_activity_conflict", "Activity row ownership changed");
+    }
+    const previous = this.storage.sql.exec<{ state_json: string; last_state_timestamp: number }>(
+      "SELECT state_json,last_state_timestamp FROM managed_activity_rows WHERE activity_id=?", activityId,
+    ).one();
+    const old = JSON.parse(previous.state_json) as ActivityGroupRow;
+    if (state.timestamp < previous.last_state_timestamp || ((old.phase === "completed" || old.phase === "failed")
+        && JSON.stringify(state) !== previous.state_json)) {
+      throw new LoopdyLinkError("notification_activity_stale", "Activity update is stale");
+    }
+    this.storage.sql.exec("UPDATE managed_activity_rows SET state_json=?,last_state_timestamp=? WHERE activity_id=?",
+      JSON.stringify(state), state.timestamp, activityId);
+  }
+
+  activityGroup(activityId: string, now: number, authority: NotificationEgressSnapshot) {
+    // This runs at the final egress boundary. Revocations are mirrored into this
+    // owner before directory cleanup, so all included grants share that fence.
+    this.authorizeNotificationEgress(authority);
+    const group = this.groupRow(activityId);
+    if (!group || group.credential_id !== authority.credentialId) {
+      throw new LoopdyLinkError("notification_activity_invalid", "No activity group");
+    }
+    const authorizationNow = Math.floor(Date.now() / 1_000);
+    const rows = this.storage.sql.exec<{ state_json: string }>(`
+      SELECT r.state_json FROM managed_activity_rows r
+      JOIN managed_notification_activities a ON a.activity_id=r.activity_id
+      JOIN managed_notification_grants g ON g.grant_id=a.grant_id
+      WHERE r.group_id=? AND r.credential_id=? AND g.credential_id=r.credential_id
+        AND g.authorization_epoch=? AND g.state='active' AND g.expires_at>?
+        AND a.status!='revoked' AND a.lease_expires>?
+      ORDER BY CASE WHEN json_extract(r.state_json,'$.phase') IN ('completed','failed') THEN 1 ELSE 0 END,
+        a.updated_at DESC, a.activity_id DESC LIMIT 69`,
+      group.group_id, group.credential_id, authority.authorizationEpoch, authorizationNow, authorizationNow,
+    ).toArray().map((row) => JSON.parse(row.state_json) as ActivityGroupRow);
+    return { ...aggregateActivityRows(rows, now), groupId: group.group_id };
+  }
+
+  activityGroupGrants(activityId: string): NonNullable<NotificationEgressSnapshot["grant"]>[] {
+    const group = this.groupRow(activityId);
+    if (!group) throw new LoopdyLinkError("notification_activity_invalid", "No activity group");
+    const now = Math.floor(Date.now() / 1_000);
+    return this.storage.sql.exec<{ grantId: string; revision: number; expiresAt: number }>(`
+      SELECT DISTINCT g.grant_id AS grantId,g.revision,g.expires_at AS expiresAt
+      FROM managed_activity_rows r
+      JOIN managed_notification_activities a ON a.activity_id=r.activity_id
+      JOIN managed_notification_grants g ON g.grant_id=a.grant_id
+      WHERE r.group_id=? AND r.credential_id=? AND g.credential_id=r.credential_id
+        AND g.state='active' AND g.expires_at>? AND a.status!='revoked' AND a.lease_expires>?
+      ORDER BY g.grant_id`, group.group_id, group.credential_id, now, now).toArray();
+  }
+
+  activityDeliveryTimestamp(activityId: string): number {
+    const group = this.groupRow(activityId);
+    if (!group) throw new LoopdyLinkError("notification_activity_invalid", "No activity group");
+    return this.storage.sql.exec<{ last_timestamp: number }>(
+      "SELECT last_timestamp FROM managed_activity_groups WHERE group_id=?", group.group_id,
+    ).one().last_timestamp;
+  }
+
+  reserveActivityDelivery(activityId: string, timestamp: number, terminal: boolean): void {
+    const group = this.groupRow(activityId);
+    if (!group) throw new LoopdyLinkError("notification_activity_invalid", "No activity group");
+    this.storage.sql.exec(`UPDATE managed_activity_groups SET last_timestamp=?,ended=MAX(ended,?)
+      WHERE group_id=?`, timestamp, terminal ? 1 : 0, group.group_id);
   }
 
   notificationActivity(input: {
@@ -123,7 +290,7 @@ export class UserLinkNotificationStore {
     if (row.grant_id !== input.grantId || row.lease_expires <= input.now) {
       throw new LoopdyLinkError("notification_activity_inactive", "Notification activity is inactive");
     }
-    return managedNotificationActivityProjection(row);
+    return this.projectActivity(row);
   }
 
   revokeNotificationActivity(input: {
@@ -258,6 +425,9 @@ export class UserLinkNotificationStore {
       // Activity records now rather than when they expire.
       this.storage.sql.exec("DELETE FROM notification_assets");
       this.storage.sql.exec("DELETE FROM managed_notification_activities");
+      this.storage.sql.exec("DELETE FROM managed_activity_rows");
+      this.storage.sql.exec("DELETE FROM managed_activity_groups");
+      this.storage.sql.exec("DELETE FROM managed_activity_row_generations");
     });
   }
 
@@ -399,6 +569,9 @@ export class UserLinkNotificationStore {
       "DELETE FROM managed_notification_activities WHERE lease_expires<=?",
       now - ACTIVITY_RECORD_GRACE_SECONDS,
     );
+    this.storage.sql.exec("DELETE FROM managed_activity_rows WHERE activity_id NOT IN (SELECT activity_id FROM managed_notification_activities)");
+    this.storage.sql.exec("DELETE FROM managed_activity_groups WHERE group_id NOT IN (SELECT group_id FROM managed_activity_rows)");
+    this.storage.sql.exec("DELETE FROM managed_activity_row_generations WHERE group_id NOT IN (SELECT group_id FROM managed_activity_groups)");
     const asset = this.storage.sql.exec<{ next: number | null }>(
       "SELECT MIN(expires_at) AS next FROM notification_assets",
     ).one().next;
@@ -451,6 +624,7 @@ function validateManagedNotificationActivity(
 ): void {
   if (!DEVICE_COORDINATE.test(input.activityId) || !GRANT_COORDINATE.test(input.grantId)
       || !/^[A-Za-z0-9_-]{43}$/.test(input.sessionReference)
+      || (input.groupId !== undefined && (!positiveInteger(input.rowRevision) || input.rowRevision! > 9e15))
       || input.status !== "active" || !positiveInteger(input.revision)
       || !positiveInteger(input.leaseExpires) || !positiveInteger(input.timestamp)
       || input.leaseExpires <= input.timestamp || input.leaseExpires - input.timestamp > 28_800) {

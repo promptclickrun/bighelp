@@ -745,7 +745,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
             let receipt = try await resume(profileID: profileID, storedID: stored)
             binding = try attachedBinding(receipt.response, original: candidate, profile: profile, receiptEpoch: receipt.epoch)
             if let requested = state.requestedCWD,
-               binding.cwd.map({ DirectHermesSessionValidation.same($0, requested) }) != true {
+               binding.cwd.map({ DirectHermesSessionValidation.sameFolder($0, requested) }) != true {
                 throw DirectHermesSessionError.workspaceNotConfirmed
             }
         } else {
@@ -891,8 +891,13 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
             page = try await historyPage(binding: binding, offset: 0, limit: rowLimit, order: "latest")
             try requireHydration(record.id, token: token, startingStoredID: startingStoredID, receivedStoredID: page.storedID)
             binding = try rebinding(binding, storedID: page.storedID)
-            combined = page.rows
-            nextOffset = page.returned == page.limit ? combined.count : nil
+            if let window = historyWindows[record.id], let held = try rows(of: window, before: page) {
+                combined = held + page.rows
+                nextOffset = window.nextOffset == nil || page.returned < page.limit ? nil : combined.count
+            } else {
+                combined = page.rows
+                nextOffset = page.returned == page.limit ? combined.count : nil
+            }
         }
         let bytes = try combined.reduce(0) { sum, row in
             sum + (try JSONEncoder().encode(BighelpJSONValue.object(row.raw)).count)
@@ -1172,6 +1177,33 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         result.record = record
         if !result.isLiveDiscoveryOnly { result.durability = .persisted }
         return result
+    }
+
+    /// Takes the chat history the previous connection's client read, when it has the same sign-in.
+    /// The app reconnects each time it comes back, and reading a chat's newest page again keeps the
+    /// earlier pages it holds only if this client knows them (`rows(of:before:)`).
+    func adoptHistory(from previous: DirectHermesSessionCatalogClient) {
+        guard previous !== self, !previous.retired, !retired, previous.owner.signIn == owner.signIn,
+              historyCacheOrder.isEmpty else { return }
+        historyWindows = previous.historyWindows
+        historyProjections = previous.historyProjections
+        historyCacheOrder = previous.historyCacheOrder
+        historyCacheBytes = previous.historyCacheBytes
+    }
+
+    /// The rows a chat holds from before the newest page, when that page read again starts inside
+    /// what it holds: what came in since replaces the held tail, and the earlier pages it loaded stay
+    /// (coming back to the app, or opening the chat again). Nil when the page doesn't line up with
+    /// them: another stored session, more new rows than a page, or history that changed.
+    private func rows(of window: HistoryWindow, before page: HistoryPage) throws -> [DirectHermesHistoryRow]? {
+        guard DirectHermesSessionValidation.same(window.storedID, page.storedID), let first = page.rows.first,
+              let start = window.rows.firstIndex(where: { $0.id == first.id }) else { return nil }
+        let tail = window.rows[start...]
+        guard tail.count <= page.rows.count, zip(tail, page.rows).allSatisfy({ $0.id == $1.id }),
+              try sameRow(window.rows[start], first) else { return nil }
+        let held = Array(window.rows[..<start])
+        guard Set(held.map(\.id)).isDisjoint(with: page.rows.map(\.id)) else { return nil }
+        return held
     }
 
     private func sameRow(_ lhs: DirectHermesHistoryRow, _ rhs: DirectHermesHistoryRow) throws -> Bool {
@@ -2052,7 +2084,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
     /// payloads and transport responses still fail the authoritative load.
     private func projectAssociation(for cwd: String, profile: Profile,
                                     prefetch: DirectHermesCatalogPrefetch? = nil) async throws -> ProjectAssociation? {
-        let path = try WorkspaceManagementDecoder.path(.string(cwd))
+        let path = try WorkspaceManagementDecoder.hostFolder(.string(cwd))
         do {
             let payload: [String: BighelpJSONValue] = ["profile": .string(profile.id), "cwd": .string(path)]
             let response: [String: BighelpJSONValue]
@@ -2067,7 +2099,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
             // completion cwd. That fallback is not evidence for a project
             // association: keep this row unassigned while allowing the rest
             // of the authoritative catalog to load.
-            guard response["cwd"]?.string == path else { return nil }
+            guard response["cwd"]?.string.map({ DirectHermesSessionValidation.sameFolder($0, path) }) == true else { return nil }
             switch response["project"] {
             case .null:
                 return nil
@@ -2124,7 +2156,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
             if options.archived == .include, !options.keepsDeliberatelyArchived,
                Self.isDeliberatelyArchived(object) { continue }
             guard let cwd = object["cwd"]?.string, !cwd.isEmpty,
-                  let path = try? WorkspaceManagementDecoder.path(.string(cwd)) else { continue }
+                  let path = try? WorkspaceManagementDecoder.hostFolder(.string(cwd)) else { continue }
             prefetch.start(.folder(projectAssociationKey(profile: profile, cwd: cwd)), .projectsForCwd,
                            ["profile": .string(profile.id), "cwd": .string(path)])
         }
@@ -2331,7 +2363,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         )
         let binding = try attachedBinding(response, original: original, profile: profile, receiptEpoch: receipt.epoch)
         if let requested = state.requestedCWD,
-           binding.cwd.map({ DirectHermesSessionValidation.same($0, requested) }) != true {
+           binding.cwd.map({ DirectHermesSessionValidation.sameFolder($0, requested) }) != true {
             throw DirectHermesSessionError.workspaceNotConfirmed
         }
         return binding

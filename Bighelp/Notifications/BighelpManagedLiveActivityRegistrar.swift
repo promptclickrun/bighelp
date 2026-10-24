@@ -42,12 +42,22 @@ final class BighelpManagedLiveActivityRegistrar: BighelpLiveActivityRegistering 
             throw RegistrationError.canonicalTurnRequired
         }
         let lease = min(registration.leaseExpires, grant.expiresAt)
-        let body = try ManagedNotificationValidation.data(BighelpJSONValue.object([
-            "version": .integer(2), "profile": .string(owner.profile), "sessionId": .string(owner.storedSessionID),
+        let groupID = BighelpActivityGroupDriver.physicalID(owner.nativeActivityID)
+        var fields: [String: BighelpJSONValue] = [
+            "version": .integer(groupID == nil ? 2 : 3), "profile": .string(owner.profile), "sessionId": .string(owner.storedSessionID),
             "sessionReference": .string(ManagedNotificationValidation.sessionReference(profile: owner.profile, session: owner.storedSessionID)),
             "attributesType": .string("LoopdySessionActivityAttributes"),
             "revision": .integer(registration.revision), "timestamp": .integer(registration.timestamp), "leaseExpires": .integer(lease)
-        ]))
+        ]
+        if let groupID {
+            fields["groupId"] = .string(BighelpManagedActivityDriver.relayID(groupID))
+            fields["rowId"] = .string(owner.opaqueSessionID)
+            guard let rowRevision = BighelpActivityGroupDriver.rowRevision(owner.nativeActivityID) else {
+                throw RegistrationError.ownerChanged
+            }
+            fields["rowRevision"] = .integer(rowRevision)
+        }
+        let body = try ManagedNotificationValidation.data(BighelpJSONValue.object(fields))
         var intent: BighelpManagedActivityRequest
         if let existing = try service.activityKeys.load(registration.activityID) {
             guard matches(existing.owner), existing.pendingRevocationBody == nil else { throw RegistrationError.ownerChanged }
@@ -69,18 +79,39 @@ final class BighelpManagedLiveActivityRegistrar: BighelpLiveActivityRegistering 
         // are suppressed. This also covers a lost mobile registration response.
         owner.remoteOwned = true; try service.ledger.save(owner)
         if !intent.registrationConfirmed {
-            let response = try await service.accountAPI().managedNotificationRequest(path: path(owner), method: "PUT",
-                body: intent.registrationBody, credentials: credentials)
+            let response: BighelpJSONValue
+            do {
+                response = try await service.accountAPI().managedNotificationRequest(path: path(owner), method: "PUT",
+                    body: intent.registrationBody, credentials: credentials)
+            } catch BighelpLinkAPIError.requestFailed(_, let code) where code == "notification_activity_group_ended" {
+                await service.activityRuntime?.invalidatePhysicalActivity(for: owner)
+                throw RegistrationError.ownerChanged
+            }
             try check()
             guard service.ledger.activity(owner.relayActivityID)?.retired == false else { throw RegistrationError.ownerChanged }
             try validateActivity(response, owner: owner, revision: registration.revision, lease: lease, status: "active")
             guard let token = Self.tokenData(registration.pushToken) else { throw RegistrationError.ownerChanged }
-            try await BuzzKit.activities.register(id: owner.relayActivityID, token: token,
-                attributesType: "LoopdySessionActivityAttributes")
-            // Also directly, for sending straight to Apple. On its own task: it never fails or delays
-            // this registration, nor the host subscription below.
-            let direct = service.pushRegistrar, relayID = owner.relayActivityID
-            Task { await direct?.registerActivity(id: relayID, token: token) }
+            let direct = service.pushRegistrar
+            let targetID = BighelpPushRegistrar.targetID(nativeActivityID: owner.nativeActivityID, relayActivityID: owner.relayActivityID)
+            if let groupID {
+                guard let runtime = service.activityRuntime else { throw RegistrationError.ownerChanged }
+                let capturedOwner = owner
+                try await runtime.physicalTokenRegistrar.register(physicalID: BighelpManagedActivityDriver.relayID(groupID),
+                    currentToken: { runtime.currentPushToken(for: capturedOwner) },
+                    isCurrent: { (try? self.check()) != nil && self.service.ledger.activity(capturedOwner.relayActivityID)?.retired == false },
+                    send: { id, current in
+                        try await BuzzKit.activities.register(id: id, token: current, attributesType: "LoopdySessionActivityAttributes")
+                        // Also directly, for sending straight to Apple. The shared card's token goes under its
+                        // group ID (the `groupId` sent above, as BuzzKit has it), never a per-turn or per-chat
+                        // alias. On its own task: it never fails or delays this registration.
+                        Task { await direct?.registerActivity(id: targetID, token: current) }
+                    })
+            } else {
+                try await BuzzKit.activities.register(id: owner.relayActivityID, token: token,
+                    attributesType: "LoopdySessionActivityAttributes")
+                // An individual (version 2) registration keeps its own activity's ID.
+                Task { await direct?.registerActivity(id: targetID, token: token) }
+            }
         }
         // An already acknowledged unchanged registration need not replay an old
         // mobile timestamp. The host PUT below performs CURRENT cloud readback of
@@ -121,9 +152,12 @@ final class BighelpManagedLiveActivityRegistrar: BighelpLiveActivityRegistering 
             body: body, credentials: credentials)
         try check()
         try validateActivity(response, owner: owner, revision: revision, lease: nil, status: "revoked")
-        try await BuzzKit.activities.end(id: owner.relayActivityID)
-        let direct = service.pushRegistrar, relayID = owner.relayActivityID
-        Task { await direct?.removeActivity(id: relayID) }
+        if BighelpActivityGroupDriver.physicalID(owner.nativeActivityID) == nil {
+            try await BuzzKit.activities.end(id: owner.relayActivityID)
+            // The shared card's address goes when the physical card ends (`onPhysicalEnded`), not with a row.
+            let direct = service.pushRegistrar, relayID = owner.relayActivityID
+            Task { await direct?.removeActivity(id: relayID) }
+        }
         // Host removal only stops this local subscription; it is NOT revocation.
         let client = try service.client(for: host)
         _ = try await client.request("/enrollments/\(grant.grantId)/live-activities/\(owner.relayActivityID)", method: "DELETE", body: nil,
@@ -139,7 +173,7 @@ final class BighelpManagedLiveActivityRegistrar: BighelpLiveActivityRegistering 
         guard matches(owner), let request = try service.activityKeys.load(owner.relayActivityID),
               let body = request.pendingRevocationBody else { return false }
         guard let object = try JSONDecoder().decode(BighelpJSONValue.self, from: body).object,
-              object["version"]?.integer == 1, let revision = object["revision"]?.integer,
+              object["version"]?.integer == 2, let revision = object["revision"]?.integer,
               let timestamp = object["timestamp"]?.integer else { throw RegistrationError.ownerChanged }
         try await revoke(.init(activityID: owner.relayActivityID, revision: revision, timestamp: timestamp))
         return true
@@ -209,8 +243,9 @@ final class BighelpManagedActivityDriver: BighelpLiveActivityDriving {
     private let sessionID: String
     private let opaqueID: String
     private let localTurnID: String
-    private let canonicalTurnID: String?
+    private var canonicalTurnID: String?
     private let firstObservedAt: Int
+    private let initialState: LoopdySessionActivityAttributes.ContentState?
     private(set) var isRetired = false
     private var tokenContinuations: [String: AsyncStream<Data>.Continuation] = [:]
 
@@ -232,12 +267,26 @@ final class BighelpManagedActivityDriver: BighelpLiveActivityDriving {
     init(underlying: any BighelpLiveActivityDriving, ledger: BighelpManagedNotificationLedger,
          activityKeys: BighelpManagedActivityKeychain, host: BighelpConfiguredHost,
          grantID: String, profile: String, sessionID: String, localTurnID: String,
-         canonicalTurnID: String?, firstObservedAt: Int) {
+         canonicalTurnID: String?, firstObservedAt: Int, initialState: LoopdySessionActivityAttributes.ContentState? = nil) {
         self.underlying = underlying; self.ledger = ledger; self.activityKeys = activityKeys; self.host = host; self.grantID = grantID
         self.profile = profile; self.sessionID = sessionID; self.localTurnID = localTurnID
-        self.canonicalTurnID = canonicalTurnID; self.firstObservedAt = firstObservedAt
+        self.canonicalTurnID = canonicalTurnID; self.firstObservedAt = firstObservedAt; self.initialState = initialState
         opaqueID = ManagedNotificationValidation.nativeSessionID(host: host, profile: profile, session: sessionID)
     }
+    func promote(to turn: String, state: LoopdySessionActivityAttributes.ContentState) async throws {
+        guard canonicalTurnID == nil, !isRetired else { return }
+        for var owner in ledger.activities where matches(owner) && !owner.retired {
+            guard !owner.remoteOwned, try activityKeys.load(owner.relayActivityID) == nil else {
+                throw DirectHermesError.identityChanged
+            }
+            owner.canonicalTurnID = turn
+            try ledger.promote(owner)
+            canonicalTurnID = turn
+            await underlying.update(id: owner.nativeActivityID, state: state)
+        }
+        canonicalTurnID = turn
+    }
+
     func existingActivities() -> [BighelpLiveActivitySnapshot] {
         guard !isRetired else { return [] }
         return underlying.existingActivities().compactMap { snapshot in
@@ -260,7 +309,7 @@ final class BighelpManagedActivityDriver: BighelpLiveActivityDriving {
     }
     func start(attributes: LoopdySessionActivityAttributes, state: LoopdySessionActivityAttributes.ContentState) throws -> String {
         guard !isRetired, attributes.sessionID == opaqueID else { throw DirectHermesError.secureStorageChanged }
-        let nativeID = try underlying.start(attributes: attributes, state: state)
+        let nativeID = try underlying.start(attributes: attributes, state: initialState ?? state)
         let relayID = Self.relayID(nativeID)
         do {
             try ledger.save(BighelpManagedActivityOwner(accountScope: host.notificationScope, accountID: host.notificationAccountID(),
@@ -276,11 +325,11 @@ final class BighelpManagedActivityDriver: BighelpLiveActivityDriving {
         return nativeID
     }
     func update(id: String, state: LoopdySessionActivityAttributes.ContentState) async {
-        guard !isRetired, let owner = owner(id), !owner.remoteOwned else { return }
+        guard !isRetired, canonicalTurnID == nil, let owner = owner(id), !owner.remoteOwned else { return }
         await underlying.update(id: id, state: state)
     }
     func end(id: String, state: LoopdySessionActivityAttributes.ContentState) async {
-        guard !isRetired, let owner = owner(id), !owner.remoteOwned else { return }
+        guard !isRetired, canonicalTurnID == nil, let owner = owner(id), !owner.remoteOwned else { return }
         await underlying.end(id: id, state: state)
     }
     func dismiss(id: String, state: LoopdySessionActivityAttributes.ContentState) async {

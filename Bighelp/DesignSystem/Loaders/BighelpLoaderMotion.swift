@@ -125,9 +125,9 @@ enum BighelpLoaderMotionPolicy {
     /// - Parameters:
     ///   - appIsActive: the app's own state (`BighelpLoaderSystemState`), which a
     ///     hosted chat row can't get wrong.
-    ///   - scenePhase: the view's environment. Chat rows carry a copy of it, and a
-    ///     stale "inactive" copy once froze every chat animation, so only
-    ///     `.background` from it can stop a loader.
+    ///   - scenePhase: the view's environment. Chat rows follow it through
+    ///     `ChatRowLiveValues`; a stale "inactive" copy once froze every chat
+    ///     animation, so only `.background` from it can stop a loader.
     static func resolve(reduceMotion: Bool, appIsActive: Bool, scenePhase: ScenePhase,
                         lowPowerMode: Bool, override: BighelpLoaderMotionOverride) -> BighelpLoaderMotion {
         let reduce = reduceMotion || override.reduceMotion

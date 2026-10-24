@@ -51,7 +51,12 @@ struct BighelpManagedNotificationFactory {
         #else
         let environment: BighelpLinkPushEnvironment = .production
         #endif
-        service.activityRuntime = BighelpManagedNativeActivityRuntime(service: service,
+        let group = BighelpActivityGroupDriver(underlying: BighelpActivityKitDriver())
+        // The shared card's direct push address is registered under its group ID; it goes when the card ends.
+        group.onPhysicalEnded = { [weak service] physicalID in
+            Task { await service?.pushRegistrar?.sharedCardEnded(physicalID: physicalID) }
+        }
+        service.activityRuntime = BighelpManagedNativeActivityRuntime(service: service, driver: group,
             environment: environment, topic: Bundle.main.bundleIdentifier ?? "app.loopdy.mobile")
         service.pushRegistrar = Self.makePushRegistrar(service: service, api: broker)
         return service
@@ -244,10 +249,27 @@ enum BighelpManagedActivityBridge {
                         // not permission to guess a turn or query again per token.
                         guard binding.selections.count < 512 else { continue }
                         binding.selections[key] = .local
+                        // Start while the confirmed live turn is foregrounded.
+                        // Token registration can wait for its exact host snapshot.
+                        try? await service.activityRuntime?.receive(host: host, chat: currentChat, event: event,
+                            canonicalHostTurnID: nil)
+                        guard isCurrent() else { return }
                         if let snapshot = try? await service.workSnapshot(host: host, profile: profile,
                             storedSessionID: session, isCurrent: isCurrent) {
                             guard isCurrent() else { return }
-                            binding.selections[key] = .observed(snapshot)
+                            if snapshot.work?.terminal == false, client.projection.turnID == event.turnID {
+                                do {
+                                    if try await service.activityRuntime?.promote(host: host, chat: currentChat,
+                                        localTurn: event.turnID, snapshot: snapshot) != true {
+                                        try await service.activityRuntime?.receive(host: host, chat: currentChat, event: event,
+                                            canonicalHostTurnID: snapshot.work?.turnId, workSnapshot: snapshot)
+                                    }
+                                    guard isCurrent() else { return }
+                                    binding.selections[key] = .observed(snapshot)
+                                } catch {
+                                    // Keep the admitted local row; retrying must not guess a new host turn.
+                                }
+                            }
                         }
                     }
                     guard isCurrent(), let selection = binding.selections[key] else { continue }
@@ -264,6 +286,16 @@ enum BighelpManagedActivityBridge {
                         outcome: failed ? .failed : .succeeded)
                 }
             }
+        }
+        // Preparation also runs after reconnect. A live authoritative running
+        // snapshot may have arrived before this observer was installed.
+        if chat.client.connected, !chat.client.isHydrating, !chat.client.needsRecovery,
+           !chat.client.requiresDurableReattachment, chat.client.projection.running {
+            let event = ChatActivityEvent(eventID: "live-turn-" + chat.client.projection.turnID,
+                sessionID: chat.client.conversationID, turnID: chat.client.projection.turnID,
+                kind: .reasoning, lifecycle: .running, title: "Preparing a response",
+                summary: nil, detail: nil, occurredAt: Int(Date().timeIntervalSince1970))
+            chat.client.onAdmittedActivity?(.init(activities: [event]), chat.client.projection.turnID, false)
         }
     }
 }

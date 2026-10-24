@@ -9,6 +9,7 @@ enum DirectHermesSessionError: Error, Equatable, Sendable {
     case creationInProgress(profileID: String)
     case sessionNotPersisted
     case workspaceNotConfirmed
+    case projectFolderUnusable
     case nativeRowDeletionOnly
     case modelNotConfirmed(String)
 }
@@ -23,6 +24,8 @@ extension DirectHermesSessionError: LocalizedError {
             "A new chat with this agent is already starting."
         case .workspaceNotConfirmed:
             "Your computer didn't start the chat in this agent's project folder. Check the project in Projects, then try again."
+        case .projectFolderUnusable:
+            "bighelp can't use this agent's project folder. Check the project in Projects, then try again."
         case .canonicalMissing:
             "This agent's own chat couldn't be found on your computer."
         case .creationPersistenceRequired, .sessionNotPersisted:
@@ -200,6 +203,20 @@ enum DirectHermesSessionValidation {
 
     static func same(_ lhs: String, _ rhs: String) -> Bool {
         lhs.utf8.elementsEqual(rhs.utf8)
+    }
+
+    /// The same folder as the host names it. Windows Hermes answers with its own spelling
+    /// (`os.path.abspath`), so `D:/x` comes back as `D:\x`, and Windows ignores case; POSIX
+    /// folders match byte for byte.
+    static func sameFolder(_ lhs: String, _ rhs: String) -> Bool {
+        if same(lhs, rhs) { return true }
+        func windows(_ folder: String) -> String? {
+            guard folder.hasPrefix(#"\\"#) || folder.range(of: #"^[A-Za-z]:[\\/]"#, options: .regularExpression) != nil
+            else { return nil }
+            return folder.replacingOccurrences(of: "/", with: "\\").lowercased()
+        }
+        guard let left = windows(lhs), let right = windows(rhs) else { return false }
+        return left == right
     }
 
     static func coordinate(_ value: String, maximum: Int = 512) throws {

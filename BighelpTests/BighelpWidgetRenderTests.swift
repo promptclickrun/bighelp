@@ -12,6 +12,68 @@ struct BighelpWidgetRenderTests {
                                             ("medium", .init(width: 364, height: 170)),
                                             ("large", .init(width: 364, height: 382))]
 
+    /// Unlike a fixed frame alone, the natural-height check catches rows that would be compressed
+    /// or clipped. These are fixture renders, not WidgetKit tap or installed-widget evidence.
+    @Test func activeAndRecentChatsFitAndRenderEveryFamily() throws {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        var sessions: [BighelpWidgetSnapshot.Session] = []
+        for index in 0..<7 {
+            let title = index == 0 ? "Plan a weekend with friends" : "Project update \(index)"
+            let agent = index.isMultiple(of: 2) ? "Juno" : "Avery"
+            let activity = index.isMultiple(of: 2) ? "thinking" : "coding"
+            sessions.append(BighelpWidgetSnapshot.Session(id: "chat-\(index)", title: title,
+                agentName: agent, status: "Checking the latest project notes",
+                preview: "Everything is ready for your review. Here are the next steps for the project.",
+                isRunning: index < 5, updatedAt: now.addingTimeInterval(Double(index) * -60), activity: activity))
+        }
+        let busy = BighelpWidgetSnapshot(defaultAgentID: nil, defaultAgentName: "Juno", sessions: sessions,
+            tasks: [], generatedAt: now, hostID: "11111111-0000-4000-8000-000000000001", sessionsUpdatedAt: now)
+        var quiet = busy
+        quiet.sessions = []
+        let states = [("fresh", busy, now), ("paused", busy, now.addingTimeInterval(120)), ("empty", quiet, now)]
+        let families: [(String, WidgetFamily, CGSize)] = [
+            ("small", .systemSmall, Self.sizes[0].1), ("medium", .systemMedium, Self.sizes[1].1),
+            ("large", .systemLarge, Self.sizes[2].1)
+        ]
+        let textSizes: [(String, DynamicTypeSize)] = [("standard", .large), ("larger", .xxxLarge), ("accessibility", .accessibility5)]
+        let out = ProcessInfo.processInfo.environment["BIGHELP_WIDGET_RENDER_DIR"].map(URL.init(fileURLWithPath:))
+        if let out { try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true) }
+        for scheme in [ColorScheme.light, .dark] {
+            let colors = BighelpWidgetColors(snapshot: busy, scheme: scheme, isFullColor: true)
+            for (familyName, family, size) in families {
+                for (textName, textSize) in textSizes {
+                    for (state, snapshot, date) in states {
+                        let views: [(String, AnyView)] = [
+                            ("active", AnyView(BighelpActiveSessionsView(snapshot: snapshot, familyOverride: family, asOf: date))),
+                            ("recent", AnyView(BighelpActivityFeedView(snapshot: snapshot, familyOverride: family, asOf: date)))
+                        ]
+                        for (kind, view) in views {
+                            let name = "chats-\(kind)-\(familyName)-\(state)-\(textName)-\(scheme == .dark ? "dark" : "light")"
+                            let styled = view
+                                .environment(\.bighelpWidgetColors, colors)
+                                .environment(\.colorScheme, scheme)
+                                .environment(\.dynamicTypeSize, textSize)
+                                .foregroundStyle(colors.primary)
+                            let natural = ImageRenderer(content: styled.frame(width: size.width - 32)
+                                .fixedSize(horizontal: false, vertical: true))
+                            let naturalImage = try #require(natural.uiImage, "\(name) did not measure")
+                            #expect(naturalImage.size.height <= size.height - 32 + 1,
+                                    "\(name) needs \(naturalImage.size.height) points inside \(size.height - 32)")
+                            let renderer = ImageRenderer(content: styled.padding(16)
+                                .frame(width: size.width, height: size.height)
+                                .background(colors.canvas).clipShape(.rect(cornerRadius: 22)))
+                            renderer.scale = 2
+                            let image = try #require(renderer.uiImage, "\(name) did not render")
+                            #expect(image.size == size)
+                            let data = try #require(image.pngData())
+                            if let out { try data.write(to: out.appendingPathComponent("\(name).png")) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     @Test func everyWidgetRendersNonEmptyAtItsSizes() throws {
         let snapshot = BighelpWidgetSnapshot(defaultAgentID: "default", defaultAgentName: "Juno", sessions: [
             .init(id: "a", title: "Fix the bighelp build", agentName: "Juno", status: "Running tests",

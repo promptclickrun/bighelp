@@ -5,6 +5,17 @@ short sentences, one instruction in each step, and the active voice.
 
 ## 2.6.19
 
+### Highlights
+
+- **Smooth scrolling:** long chats scroll smoothly. Details are under **Chat** below.
+- **Your agent's work:** go to **Settings** › **Chat** › **Agent's work** and choose **Card**, **Minimal** or
+  **Full**.
+- **iPhone Duo:** on the folded Duo, your places move into the column beside the cover screen. The faces of your
+  top bots show beside each chat. On the open Duo, your chats show on one side of the fold and the chat that you
+  open shows on the other side. Details are under 2.6.16 and 2.6.17.
+- **CarPlay:** talk to your agent in the car. bighelp connects in CarPlay without you opening the app on your
+  iPhone. Voice works when your iPhone is locked. Details are under 2.6.18.
+
 ### Chat
 
 - **Smooth scrolling:** chats scroll smoothly, also long chats. A message that you saw before shows again at once.

@@ -224,6 +224,8 @@ extension DirectHermesConversationClient {
         workspaceHistoryDeferred = false
         guard connected, owner == generation else { throw DirectHermesError.notConnected }
         guard replayHeldEventsIfCovered() else { throw DirectHermesError.tooManyRequests }
+        // Without an exact replay, a background task's answer sent while away is lost for good.
+        if !exactReplay { settleBackgroundTaskWaiters() }
         // Legacy receipts lack proof of acceptance. Preserve their exact text
         // locally without making them alerts, retrying them, or blocking an
         // independent new message after the native connection is recovered.

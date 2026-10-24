@@ -47,8 +47,11 @@ unique subset of `chat-replies-completions`, `scheduled-tasks-deliveries`, `ques
 BuzzKit applies the same settings to its own sends, so the Worker has to apply them to direct ones (see "Muted topics").
 
 A body with other keys, an unknown or repeated topic, or a value that doesn't match, is
-`400 notification_push_target_invalid`. An installation may write to the two target routes 30 times an hour. After that
-a `PUT` answers `429 notification_push_target_rate_limited`. A `DELETE` is never limited.
+`400 notification_push_target_invalid`. Writes are limited per installation in ten-minute windows, so a block never lasts longer than ten minutes: 4 for alert and
+push-to-start tokens together (about 20 an hour), 40 for Live Activity tokens (about 240 an hour) and 2 for any one
+activity (about 12 an hour). The app writes at launch, when its token or muted topics change, and at every Live Activity
+start and token rotation, and a busy Live Activity user never uses up the alert allowance. Over a limit, a `PUT` answers
+`429 notification_push_target_rate_limited`. A `DELETE` is never limited.
 
 ### `DELETE /v1/notifications/push-target`
 
@@ -83,9 +86,10 @@ Migration `0010_push_targets.sql` adds two tables to `loopdy-link-accounts`.
   keeps at most eight Live Activity rows.
 - A token APNs reports as dead is marked `invalid_at` and not used again. A new `PUT` clears the mark.
 - Revoking an installation (`DELETE /v1/notifications/installations/current`) deletes its tokens and send records. Even
-  before that finishes, a revoked installation's rows are never read, and the egress check refuses the send.
+  before that finishes, a revoked installation's rows are never read, and the egress check refuses the send. If clearing the
+  rows fails, the revocation still completes and the failure is logged as `push_cleanup_failed`. The rows expire.
 - `push_sends` has one row per direct send. It is the idempotency record (below), kept for 24 hours and purged an hour
-  after that. `push_target_writes` counts the hourly writes.
+  after that. `push_target_writes` counts the writes in each ten-minute window.
 - Housekeeping deletes up to 100 expired rows of each table. It runs after a `PUT` or `DELETE` on either route, at the
   start of every queue batch and after about one direct send in sixteen. It never delays an answer.
 
@@ -127,10 +131,15 @@ goes straight to BuzzKit. A rich (unsealed) alert never queues either, because i
 
 ### Muted topics
 
-BuzzKit applies each person's topic settings to every message by its `topic`. A direct alert whose topic is in the
-target's `mutedTopics` is not sent. The host gets `202` with `status: "accepted"`, `providerStatus: "suppressed"` and
-`counts: {"total":0,"sent":0}`, which is what BuzzKit answers for a message nobody is subscribed to. Nothing is recorded.
-The sign-in wake, the test notification and Live Activity updates ignore muted topics, as they do on BuzzKit.
+BuzzKit applies each person's topic settings to every message by its `topic`, and it still holds the real settings. The
+Worker's `mutedTopics` is a copy that can be out of date, so it is never used to hide an alert while BuzzKit can decide:
+
+- While BuzzKit is configured, a direct-eligible alert whose topic is in `mutedTopics` goes through BuzzKit and records
+  `push.fallback_buzzkit` with `topic_muted`. If the person did mute it, BuzzKit sends nothing. If the list is stale,
+  they still get the alert they want.
+- Only when BuzzKit isn't configured does the Worker suppress the alert itself. The host gets `202` with
+  `status: "accepted"`, `providerStatus: "suppressed"` and `counts: {"total":0,"sent":0}`, and nothing is recorded.
+- The sign-in wake, the test notification and Live Activity updates ignore muted topics, as they do on BuzzKit.
 
 ### Circuit breaker
 
@@ -157,10 +166,10 @@ alerts, `bighelp-renew-<grantId>-<window>` for wakes (a window is six hours), th
 `activityId|updateId` for Live Activity updates.
 
 - A repeat of a message that was sent, or is waiting in the retry queue, answers `status: "duplicate"` and sends nothing.
-- A repeat that arrives while the first request is still sending answers `503 push_in_flight`. Nothing has been sent
+- A repeat that arrives while the first request is still sending (under 20 seconds) answers `503 push_in_flight`. Nothing has been sent
   that an "accepted" could stand for, and a host retries a 503. The Worker never answers this case with 400, 401, 403,
   404, 410 or 422, because a host drops its grant on some of those.
-- A record left in `sending` by a Worker that was cut off can be taken over after 60 seconds.
+- A record left in `sending` by a Worker that was cut off can be taken over after 20 seconds. The direct path ends by 8.
 - A message that fell back to BuzzKit is marked `buzzkit`. A repeat goes to BuzzKit too, which deduplicates by the same
   key, so the phone can't get it by both routes. If the BuzzKit call failed, the repeat tries BuzzKit again.
 - If the send was stopped before anything left (egress authority withdrawn, an unexpected error), the record is deleted.
@@ -175,9 +184,11 @@ call. The retry queue asks again before every attempt.
 ## What the Worker sends to APNs
 
 `POST https://api.push.apple.com/3/device/<token>`, or `api.sandbox.push.apple.com` when the target says `sandbox`.
-The provider token is an ES256 JWT, kept in memory per Worker instance and made again after 40 minutes. APNs rejects a
-new token under 20 minutes old and one over 60 minutes old. The request times out after 5 seconds, and at most 4 KiB of
-the answer is read.
+The provider token is an ES256 JWT, kept in memory per Worker instance and made again after 40 minutes, or when its issue
+time is 50 minutes old. Its `iat` is rounded down to a 30-minute boundary, so every instance signs the same issue time and
+APNs sees one token, not a refresh storm. APNs rejects a new token under 20 minutes old and one over 60 minutes old, and a
+token is never used past 50 minutes of `iat`. The request times out after 5 seconds (less when the 8 second direct deadline is closer, and no request starts after a slow
+egress check has used the time up), and at most 4 KiB of the answer is read.
 
 | Header | Value |
 |---|---|
@@ -255,7 +266,8 @@ A push is worth little once it is late, so a message gets one more direct try an
   in the dead-letter queue.
 
 Each attempt checks the grant and installation again, opens the stored token again, checks the person's muted topics
-again and asks for egress authority again. A message whose authority is gone, whose push has expired or that has already
+again and asks for egress authority again. Any unexpected error after the grant is loaded (a database or decryption error,
+for example) sends the message through BuzzKit at once, with `consumer_error`, instead of waiting to fail the same way. A message whose authority is gone, whose push has expired or that has already
 been sent is dropped.
 
 ## Telemetry
@@ -270,7 +282,7 @@ a token, an ID, message text or a path.
 | `push.token_invalid` | `kind`, `reason` |
 | `push.retry` | `attempt`, `reason` |
 | `push.dlq` | `reason` |
-| `push.fallback_buzzkit` | `reason`: `apns_unconfigured`, `no_target`, `target_unreadable`, `target_incomplete`, `token_invalid`, `provider_token`, `no_queue`, `not_queued`, `plaintext_not_queued`, `queue_unavailable`, `retries_exhausted`, `apns_breaker_open`, `apns_deadline`, `payload_too_large`, `target_lookup_failed`, `claim_failed`, `already_with_buzzkit` or `apns_<apns reason>` |
+| `push.fallback_buzzkit` | `reason`: `apns_unconfigured`, `no_target`, `target_unreadable`, `target_incomplete`, `token_invalid`, `provider_token`, `no_queue`, `not_queued`, `plaintext_not_queued`, `queue_unavailable`, `retries_exhausted`, `apns_breaker_open`, `apns_deadline`, `topic_muted`, `consumer_error`, `payload_too_large`, `target_lookup_failed`, `claim_failed`, `already_with_buzzkit` or `apns_<apns reason>` |
 | `push.shadow` | `eventType`, `wouldUseDirect` |
 
 ### Workers Logs

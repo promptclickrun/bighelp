@@ -14,9 +14,11 @@ import {
 import { canonicalDeviceRequest } from "../src/device-auth.js";
 import { handleLoopdyLinkRequest } from "../src/http.js";
 import { canonicalNotificationHostRequest } from "../src/notification-grants.js";
-import { liveActivitySpec, messageSpec, resetApnsBreaker, retryStillUseful } from "../src/push-delivery.js";
+import { directAttempt, liveActivitySpec, messageSpec, resetApnsBreaker, retryStillUseful } from "../src/push-delivery.js";
 import { handleApnsRetryBatch, parseRetryMessage } from "../src/push-retry.js";
-import { openPushToken, putPushTarget, purgeExpiredPushState } from "../src/push-targets.js";
+import {
+  allowTargetWrite, findPushTarget, openPushToken, putPushTarget, purgeExpiredPushState,
+} from "../src/push-targets.js";
 import { LoopdyLinkError } from "../src/contracts.js";
 import {
   apnsBudgetBytes, attachDeliveryMeta, MAX_APNS_PAYLOAD_BYTES, sealedMessage, sendBuzzKitMessage,
@@ -60,6 +62,7 @@ function randomKey(): string {
   return btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));
 }
 
+const quantizedIat = (ms: number) => Math.floor(ms / 1_800_000) * 1_800;
 let providerKey: Awaited<ReturnType<typeof throwawayP8>>;
 let log: string[];
 let telemetry: ReturnType<typeof vi.fn>;
@@ -379,25 +382,62 @@ describe("APNs provider token", () => {
 
   it("is a valid ES256 JWT, cached for 40 minutes and then minted again", async () => {
     const now = vi.spyOn(Date, "now");
-    now.mockReturnValue(1_700_000_000_000);
+    // The start of a 30-minute window, so the token's issue time is the moment it is minted.
+    const windowStart = 1_699_999_200_000;
+    now.mockReturnValue(windowStart);
     const first = await apnsProviderToken(await config());
     const [header, claims, signature] = first.split(".") as [string, string, string];
     const decode = (value: string) => JSON.parse(atob(value.replaceAll("-", "+").replaceAll("_", "/")));
     expect(decode(header)).toEqual({ alg: "ES256", kid: "ABC123DEFG" });
-    expect(decode(claims)).toEqual({ iss: "TEAM123456", iat: 1_700_000_000 });
+    expect(decode(claims)).toEqual({ iss: "TEAM123456", iat: quantizedIat(windowStart) });
     const raw = Uint8Array.from(atob(signature.replaceAll("-", "+").replaceAll("_", "/")), (c) => c.charCodeAt(0));
     expect(raw.length).toBe(64);
     expect(await crypto.subtle.verify(
       { name: "ECDSA", hash: "SHA-256" }, providerKey.publicKey, raw, new TextEncoder().encode(`${header}.${claims}`),
     )).toBe(true);
 
-    now.mockReturnValue(1_700_000_000_000 + 39 * 60_000);
+    now.mockReturnValue(windowStart + 39 * 60_000);
     expect(await apnsProviderToken(await config())).toBe(first);
-    now.mockReturnValue(1_700_000_000_000 + 41 * 60_000);
+    now.mockReturnValue(windowStart + 41 * 60_000);
     const refreshed = await apnsProviderToken(await config());
     expect(refreshed).not.toBe(first);
     expect(JSON.parse(atob(refreshed.split(".")[1]!.replaceAll("-", "+").replaceAll("_", "/"))).iat)
-      .toBe(1_700_000_000 + 41 * 60);
+      .toBe(quantizedIat(windowStart + 41 * 60_000));
+  });
+
+  it("rounds its issue time down to 30 minutes, so every instance signs the same one", async () => {
+    const now = vi.spyOn(Date, "now");
+    const iatOf = (token: string) => JSON.parse(atob(token.split(".")[1]!.replaceAll("-", "+").replaceAll("_", "/"))).iat as number;
+    const windowStart = 1_700_000_400_000 - (1_700_000_400_000 % 1_800_000);
+    const seen = new Set<number>();
+    for (const offset of [1_000, 400_000, 1_700_000]) {
+      resetApnsTokenCache();
+      now.mockReturnValue(windowStart + offset);
+      seen.add(iatOf(await apnsProviderToken(await config())));
+    }
+    expect([...seen]).toEqual([windowStart / 1_000]);
+    resetApnsTokenCache();
+    now.mockReturnValue(windowStart + 1_800_000 + 5);
+    expect(iatOf(await apnsProviderToken(await config()))).toBe(windowStart / 1_000 + 1_800);
+  });
+
+  it("is never older than 60 minutes when used, and is minted again no more than every 20", async () => {
+    const now = vi.spyOn(Date, "now");
+    const iatOf = (token: string) => JSON.parse(atob(token.split(".")[1]!.replaceAll("-", "+").replaceAll("_", "/"))).iat as number;
+    const start = 1_700_000_000_000 + 7 * 60_000;
+    const mints: number[] = [];
+    let last = "";
+    for (let minute = 0; minute <= 6 * 60; minute += 1) {
+      const at = start + minute * 60_000;
+      now.mockReturnValue(at);
+      const token = await apnsProviderToken(await config());
+      if (token !== last) { mints.push(minute); last = token; }
+      expect(at / 1_000 - iatOf(token)).toBeLessThan(55 * 60);
+    }
+    for (let index = 1; index < mints.length; index += 1) {
+      expect(mints[index]! - mints[index - 1]!).toBeGreaterThanOrEqual(20);
+    }
+    expect(mints.length).toBeGreaterThan(5);
   });
 
   it("is not built from missing or malformed settings", () => {
@@ -1833,11 +1873,11 @@ describe("a send that is already running", () => {
       dedupe_key,installation_id,apns_id,state,created_at,expires_at) VALUES(?,?,'old-id','sending',?,?)`)
       .bind(key, installation.installationId, NOW - age, NOW + 3_600).run();
     // Fresh: someone is on it.
-    await insert(5);
+    await insert(15);
     expect((await sendSealed(hostKeys, installation, targetEnv)).status).toBe(503);
     expect(apnsCalls).toEqual([]);
-    // Stale: nobody is, so this request sends it.
-    await insert(120);
+    // Stale after 20 seconds, since the direct path ends by 8: nobody is on it, so this request sends it.
+    await insert(25);
     const response = await sendSealed(hostKeys, installation, targetEnv);
     expect(response.status).toBe(202);
     expect(await response.json()).toMatchObject({ status: "accepted", providerStatus: "sent" });
@@ -1870,6 +1910,22 @@ describe("a send that is already running", () => {
     expect(apnsCalls).toHaveLength(1);
     expect(buzzKitCalls.filter((call) => call.method === "POST")).toHaveLength(1);
     expect(relayedEvents().find((event) => event.name === "push.fallback_buzzkit")!.p).toEqual({ reason: "apns_deadline" });
+  });
+
+  it("starts no request when a slow authority check has used up the time", async () => {
+    const config = apnsConfig({
+      APNS_KEY_P8: providerKey.pem, APNS_KEY_ID: "ABC123DEFG", APNS_TEAM_ID: "TEAM123456",
+    })!;
+    const realNow = Date.now.bind(Date);
+    let skew = 0;
+    vi.spyOn(Date, "now").mockImplementation(() => realNow() + skew);
+    const result = await sendApns({
+      config, environment: "production", tokenHex: TOKEN, pushType: "alert", priority: 10, expiration: NOW + 900,
+      apnsId: await apnsIdFor("slow"), payload: {}, deadlineAt: realNow() + 8_000,
+      authorize: async () => { skew = 7_900; },
+    });
+    expect(result).toMatchObject({ outcome: "rejected", reason: "deadline" });
+    expect(apnsCalls).toEqual([]);
   });
 
   it("starts no request, and cuts a running one short, at the deadline", async () => {
@@ -1972,14 +2028,29 @@ describe("muted topics", () => {
     targetEnv = targetEnvironment();
   });
 
-  const post = async (eventType: string, hex: string) => handleLoopdyLinkRequest(
+  const post = async (eventType: string, hex: string, forEnv = targetEnv) => handleLoopdyLinkRequest(
     await hostRequest(hostKeys, installation.grantId, "/events", { ...(await sealedBody(installation, hex)), eventType }),
-    targetEnv,
+    forEnv,
   );
+  /** The Worker with no BuzzKit key: nobody else knows the person's settings. */
+  const withoutBuzzKit = () => ({ ...targetEnv, BUZZKIT_API_KEY: undefined }) as LinkEnv;
 
-  it("accepts a muted alert and sends it nowhere, as BuzzKit does for a topic nobody listens to", async () => {
+  it("lets BuzzKit decide a muted topic while BuzzKit is configured: a stale list can't hide an alert", async () => {
     await addTarget(targetEnv, installation, { mutedTopics: ["chat-replies-completions"] });
     const response = await post("session.completed", "1");
+    expect(response.status).toBe(202);
+    expect(await response.json()).toMatchObject({ deliveryId: "msg_buzzkit_1" });
+    expect(apnsCalls).toEqual([]);
+    expect(buzzKitCalls.filter((call) => call.method === "POST")).toHaveLength(1);
+    expect(relayedEvents().find((event) => event.name === "push.fallback_buzzkit")!.p).toEqual({ reason: "topic_muted" });
+    expect(await sendRows()).toEqual([]);
+    // A topic that is not muted still goes direct.
+    expect(await (await post("approval.required", "9")).json()).toMatchObject({ providerStatus: "sent" });
+  });
+
+  it("accepts a muted alert and sends it nowhere when BuzzKit isn't configured", async () => {
+    await addTarget(targetEnv, installation, { mutedTopics: ["chat-replies-completions"] });
+    const response = await post("session.completed", "1", withoutBuzzKit());
     expect(response.status).toBe(202);
     expect(await response.json()).toEqual({
       version: 1, status: "accepted", deliveryId: expect.any(String), providerStatus: "suppressed",
@@ -1996,9 +2067,9 @@ describe("muted topics", () => {
     ["approval.required", "questions-approvals"],
     ["clarification.required", "questions-approvals"],
     ["subagent.completed", "subagent-completions"],
-  ])("suppresses %s when %s is muted, and sends it when only the others are", async (eventType, topic) => {
+  ])("suppresses %s when %s is muted and BuzzKit is absent, and sends it when only the others are", async (eventType, topic) => {
     await addTarget(targetEnv, installation, { mutedTopics: [topic] });
-    expect(await (await post(eventType, "2")).json()).toMatchObject({ providerStatus: "suppressed" });
+    expect(await (await post(eventType, "2", withoutBuzzKit())).json()).toMatchObject({ providerStatus: "suppressed" });
     expect(apnsCalls).toEqual([]);
     await addTarget(targetEnv, installation, { mutedTopics: ALL.filter((candidate) => candidate !== topic) });
     expect(await (await post(eventType, "3")).json()).toMatchObject({ providerStatus: "sent" });
@@ -2061,18 +2132,29 @@ describe("muted topics", () => {
       .toEqual({ muted_topics: '["chat-replies-completions","subagent-completions"]' });
   });
 
-  it("honours a topic muted while the message waits in the queue", async () => {
+  it("honours a topic muted while the message waits in the queue: BuzzKit decides, or nothing is sent without it", async () => {
     await addTarget(targetEnv, installation);
     apnsAnswers.push({ status: 503, reason: "ServiceUnavailable" });
     await post("session.completed", "5");
     const body = retryQueue.send.mock.calls[0]![0];
     await addTarget(targetEnv, installation, { mutedTopics: ["chat-replies-completions"] });
     apnsCalls = [];
-    const message = { id: "m", timestamp: new Date(), body, attempts: 1, ack: vi.fn(), retry: vi.fn() };
-    await handleApnsRetryBatch({ queue: "q", messages: [message] } as never, targetEnv, { waitUntil() {} } as never);
-    expect(message.ack).toHaveBeenCalled();
+    const consume = async (runEnv: LinkEnv) => {
+      const message = { id: "m", timestamp: new Date(), body, attempts: 1, ack: vi.fn(), retry: vi.fn() };
+      await handleApnsRetryBatch({ queue: "q", messages: [message] } as never, runEnv, { waitUntil() {} } as never);
+      return message;
+    };
+    const quiet = await consume({ ...targetEnv, BUZZKIT_API_KEY: undefined } as LinkEnv);
+    expect(quiet.ack).toHaveBeenCalled();
     expect(apnsCalls).toEqual([]);
     expect(buzzKitCalls).toEqual([]);
+    await env.ACCOUNTS.prepare("DELETE FROM push_sends").run();
+    const handled = await consume(targetEnv);
+    expect(handled.ack).toHaveBeenCalled();
+    expect(apnsCalls).toEqual([]);
+    expect(buzzKitCalls.filter((call) => call.method === "POST")).toHaveLength(1);
+    expect(relayedEvents().filter((event) => event.name === "push.fallback_buzzkit").map((event) => event.p).at(-1))
+      .toEqual({ reason: "topic_muted" });
   });
 });
 
@@ -2211,42 +2293,82 @@ describe("a target the Worker can't use", () => {
 });
 
 describe("target route limits", () => {
-  it("allows 30 writes an hour per installation, then answers 429, and still lets a delete through", async () => {
+  const rateEnvironment = async () => {
     const installationKeys = await keys();
     const installation = await insertInstallation(installationKeys, await keys());
     const targetEnv = targetEnvironment();
-    const put = (path: string, body: object) =>
-      installationRequest(installationKeys, installation.installationId, "PUT", path, body)
+    const put = (path: string, body: object, who = installation) =>
+      installationRequest(installationKeys, who.installationId, "PUT", path, body)
         .then((request) => handleLoopdyLinkRequest(request, targetEnv));
-    for (let index = 0; index < 20; index += 1) {
-      expect((await put("/v1/notifications/push-target", {
-        version: 1, token: TOKEN, environment: "production", appVersion: "2.7.0(160)", mutedTopics: [],
-      })).status).toBe(200);
-    }
-    for (let index = 0; index < 10; index += 1) {
-      expect((await put("/v1/notifications/live-activity-target", {
-        version: 1, kind: "liveactivity", activityId: `activity-${index}`, token: TOKEN, environment: "production",
-      })).status).toBe(200);
-    }
-    const limited = await put("/v1/notifications/push-target", {
-      version: 1, token: OTHER_TOKEN, environment: "production", appVersion: "2.7.0(160)", mutedTopics: [],
+    const alert = (token = TOKEN, who = installation) => put("/v1/notifications/push-target", {
+      version: 1, token, environment: "production", appVersion: "2.7.0(160)", mutedTopics: [],
+    }, who);
+    const live = (activityId: string) => put("/v1/notifications/live-activity-target", {
+      version: 1, kind: "liveactivity", activityId, token: TOKEN, environment: "production",
     });
+    const pts = () => put("/v1/notifications/live-activity-target", {
+      version: 1, kind: "pts", token: TOKEN, environment: "production",
+    });
+    return { installationKeys, installation, targetEnv, put, alert, live, pts };
+  };
+
+  it("limits alert and push-to-start tokens to four writes in ten minutes, together", async () => {
+    const { alert, pts, installation, installationKeys, targetEnv } = await rateEnvironment();
+    for (let index = 0; index < 3; index += 1) expect((await alert()).status).toBe(200);
+    expect((await pts()).status).toBe(200);
+    const limited = await alert(OTHER_TOKEN);
     expect(limited.status).toBe(429);
     expect(await limited.json()).toMatchObject({ error: { code: "notification_push_target_rate_limited" } });
+    expect((await pts()).status).toBe(429);
     // The stored token is the last one accepted.
     const ciphertext = (await env.ACCOUNTS.prepare("SELECT token_ciphertext FROM push_targets WHERE kind='alert'")
       .first<{ token_ciphertext: string }>())!.token_ciphertext;
     expect(await openPushToken(targetEnv, installation.installationId, "alert", "", ciphertext)).toBe(TOKEN);
+    // A delete is never limited.
     const removed = await installationRequest(
       installationKeys, installation.installationId, "DELETE", "/v1/notifications/push-target", { version: 1 },
     ).then((request) => handleLoopdyLinkRequest(request, targetEnv));
     expect(removed.status).toBe(200);
-    // Another installation has its own allowance.
+  });
+
+  it("gives a busy Live Activity user a bigger allowance, which never blocks an alert update", async () => {
+    const { alert, live } = await rateEnvironment();
+    // Forty writes across activities, two each: the Live Activity bucket's whole allowance.
+    for (let index = 0; index < 20; index += 1) {
+      expect((await live(`activity-${index}`)).status).toBe(200);
+      expect((await live(`activity-${index}`)).status).toBe(200);
+    }
+    expect((await live("activity-new")).status).toBe(429);
+    // The alert target is untouched.
+    for (let index = 0; index < 4; index += 1) expect((await alert()).status).toBe(200);
+    expect((await alert()).status).toBe(429);
+  });
+
+  it("limits one activity to two writes in ten minutes", async () => {
+    const { live } = await rateEnvironment();
+    expect((await live("activity-a")).status).toBe(200);
+    expect((await live("activity-a")).status).toBe(200);
+    const limited = await live("activity-a");
+    expect(limited.status).toBe(429);
+    expect(await limited.json()).toMatchObject({ error: { code: "notification_push_target_rate_limited" } });
+    expect((await live("activity-b")).status).toBe(200);
+  });
+
+  it("starts over in the next ten-minute window, so a block lasts at most that long", async () => {
+    const { installation, targetEnv } = await rateEnvironment();
+    const write = (now: number) => allowTargetWrite(targetEnv, installation.installationId, "alert", "", now);
+    const windowStart = NOW - (NOW % 600);
+    for (let index = 0; index < 4; index += 1) expect(await write(windowStart + 5)).toBe(true);
+    expect(await write(windowStart + 599)).toBe(false);
+    expect(await write(windowStart + 600)).toBe(true);
+  });
+
+  it("gives each installation its own allowance", async () => {
+    const { alert, installationKeys } = await rateEnvironment();
+    for (let index = 0; index < 4; index += 1) await alert();
+    expect((await alert()).status).toBe(429);
     const other = await insertInstallation(installationKeys, await keys());
-    expect((await installationRequest(
-      installationKeys, other.installationId, "PUT", "/v1/notifications/push-target",
-      { version: 1, token: TOKEN, environment: "production", appVersion: "2.7.0(160)", mutedTopics: [] },
-    ).then((request) => handleLoopdyLinkRequest(request, targetEnv))).status).toBe(200);
+    expect((await alert(TOKEN, other)).status).toBe(200);
   });
 
   it("purges expired rows on a delete too", async () => {
@@ -2318,5 +2440,103 @@ describe("the Worker's entry point", () => {
     expect(pending.length).toBeGreaterThan(0);
     await Promise.all(pending);
     expect(relayedEvents().some((event) => event.name === "push.sent")).toBe(true);
+  });
+});
+
+describe("things that must not get in the way", () => {
+  it("lets a revocation finish when the push tables hiccup", async () => {
+    const installationKeys = await keys();
+    const installation = await insertInstallation(installationKeys, await keys());
+    const targetEnv = targetEnvironment();
+    await addTarget(targetEnv, installation);
+    const broken = targetEnvironment({
+      ACCOUNTS: new Proxy(env.ACCOUNTS, {
+        get(target, property) {
+          if (property === "prepare") {
+            return (query: string) => {
+              if (query.includes("DELETE FROM push_targets WHERE installation_id")) throw new Error("database unavailable");
+              return target.prepare(query);
+            };
+          }
+          const value = Reflect.get(target, property, target);
+          return typeof value === "function" ? value.bind(target) : value;
+        },
+      }),
+    });
+    const logs = vi.spyOn(console, "info");
+    const response = await installationRequest(
+      installationKeys, installation.installationId, "DELETE", "/v1/notifications/installations/current", null,
+    ).then((request) => handleLoopdyLinkRequest(request, broken));
+    expect(response.status).toBe(200);
+    expect(await env.ACCOUNTS.prepare("SELECT state FROM notification_installations WHERE installation_id=?")
+      .bind(installation.installationId).first()).toEqual({ state: "revoked" });
+    expect(logs.mock.calls.flat().join("\n")).toContain("push_cleanup_failed: push_state");
+    // Revoked is revoked: the leftover token is never read.
+    expect(await findPushTarget(targetEnv, {
+      installationId: installation.installationId, ownerCoordinate: installation.coordinate,
+    }, "alert", "", NOW)).toEqual({ status: "none" });
+  });
+
+  it("sends a queued message through BuzzKit at the first unexpected error instead of retrying blind", async () => {
+    const hostKeys = await keys();
+    const installation = await insertInstallation(await keys(), hostKeys);
+    const targetEnv = targetEnvironment();
+    await addTarget(targetEnv, installation);
+    apnsAnswers.push({ status: 503, reason: "ServiceUnavailable" });
+    await sendSealed(hostKeys, installation, targetEnv);
+    const body = retryQueue.send.mock.calls[0]![0];
+    buzzKitCalls = []; apnsCalls = [];
+    const failing = (query: string) => query.includes("FROM push_targets");
+    const consumerEnv = targetEnvironment({
+      PUSH_TOKEN_KEY: targetEnv.PUSH_TOKEN_KEY,
+      ACCOUNTS: new Proxy(env.ACCOUNTS, {
+        get(target, property) {
+          if (property === "prepare") {
+            return (query: string) => {
+              if (failing(query)) throw new Error("database unavailable");
+              return target.prepare(query);
+            };
+          }
+          const value = Reflect.get(target, property, target);
+          return typeof value === "function" ? value.bind(target) : value;
+        },
+      }),
+    });
+    const message = { id: "m", timestamp: new Date(), body, attempts: 1, ack: vi.fn(), retry: vi.fn() };
+    await handleApnsRetryBatch({ queue: "q", messages: [message] } as never, consumerEnv, { waitUntil() {} } as never);
+    expect(message.ack).toHaveBeenCalled();
+    expect(message.retry).not.toHaveBeenCalled();
+    expect(apnsCalls).toEqual([]);
+    expect(buzzKitCalls.filter((call) => call.method === "POST")).toHaveLength(1);
+    expect(relayedEvents().find((event) => event.name === "push.fallback_buzzkit")!.p).toEqual({ reason: "consumer_error" });
+  });
+});
+
+describe("microtask ordering inside the delivery code", () => {
+  it("starts the APNs request in the same turn authority is granted, through directAttempt too", async () => {
+    const config = apnsConfig({
+      APNS_KEY_P8: providerKey.pem, APNS_KEY_ID: "ABC123DEFG", APNS_TEAM_ID: "TEAM123456",
+    })!;
+    let running = false;
+    let ticks = 0;
+    const tick = () => { if (running) { ticks += 1; queueMicrotask(tick); } };
+    let ticksAtRequest = -1;
+    vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+      ticksAtRequest = ticks;
+      running = false;
+      return new Response(null, { status: 200 });
+    });
+    const spec = await messageSpec("wake", "wake", {
+      body: { data: { bighelp_wake: { version: 1 } }, ttlSeconds: 900, collapseId: "x" }, idempotencyKey: "k",
+    }, Date.now());
+    const result = await directAttempt({
+      env: targetEnvironment() as never, owner: { kind: "notification-instance", coordinate: "c", credentialId: "i" },
+      config,
+      target: { kind: "alert", activityId: "", environment: "production", token: TOKEN, appVersion: "", mutedTopics: [], ciphertext: "x" },
+      spec: spec!, apnsId: await apnsIdFor("ticks-2"), startedAt: NOW, attempt: 1,
+      authorize: async () => { running = true; tick(); },
+    }, []);
+    expect(result.outcome).toBe("sent");
+    expect(ticksAtRequest).toBe(2);
   });
 });

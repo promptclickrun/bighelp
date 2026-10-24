@@ -3,6 +3,22 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.19
+
+### Chat
+
+- **Smooth scrolling:** chats scroll smoothly, also long chats. A message that you saw before shows again at once.
+  When the chat is still, bighelp prepares the messages above the screen, so they are ready when you scroll up.
+- **Your agent's work:** to choose how a chat shows the work of your agent, go to **Settings** › **Chat** ›
+  **Agent's work**.
+  - **Card:** while your agent works, one card shows the newest steps. When the turn ends, the card becomes one
+    line above the answer, for example "Worked for 18s · 4 steps".
+  - **Minimal:** while your agent works, one line shows the current step. When the turn ends, a small line shows
+    under the answer.
+  - **Full:** while your agent works, the chat shows every message, tool and thought where it occurs.
+  - In all three, tap the card or the line to see each step.
+- **Fixed:** when a new message from the same agent arrives, the message above it now moves closer to it.
+
 ## 2.6.18
 
 ### CarPlay

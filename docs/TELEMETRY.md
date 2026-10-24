@@ -31,8 +31,14 @@ Message text, prompts, replies, tool arguments or output, file names or paths, c
 emails, IP addresses, host URLs, profile names, chat or session IDs, and event IDs.
 
 How this is enforced:
-- **No free text.** Every value is a number in a range, a fixed list of words, or a short string that must match a
-  strict pattern. A value that does not fit is dropped.
+- **No free text.** Every value is a number in a range, a word from a fixed list, or a short string that must match
+  a strict pattern. A value that does not fit is dropped.
+- **Pattern-checked identifiers are not fixed lists.** `provider`, `model`, `tool`, `code` (and the `reason`,
+  `result` and `stage` values, which use the same pattern) and `hermesVersion` are short identifiers that must match
+  a strict pattern: at most 64 characters of letters, digits and a few separators. The Worker can't prove they come
+  from a fixed list, only that they are short and shaped like an identifier. The plugin maps them to fixed values
+  before sending (for example `custom` for an unknown model, `mcp` or `custom` for a tool that isn't built in). The
+  Worker is the second check, not the first.
 - **Unknown names are dropped.** An unknown event name or key never reaches storage.
 - **No address.** The Worker uses the client address only to make a keyed hash for rate limiting. It does not store,
   log or forward the address, and it sends Azure `0.0.0.0` in the location field.
@@ -52,6 +58,15 @@ The Worker checks each batch, then forwards the accepted events to Azure Applica
 Log Analytics workspace in the Central US region. Both keep data for 90 days. The workspace has a daily ingestion cap.
 
 The Worker keeps nothing. It logs fixed codes only, with sampling.
+
+## Abuse limits
+
+The Worker allows 60 batches a minute for one ID and 600 for one network (the full address for IPv4, the /64 prefix
+for IPv6), and answers 429 with `Retry-After: 60`. If the Worker can't make a network key, all senders share one
+key, so the limit still holds. These limits slow a casual sender, not a determined one. The hard backstop is the
+workspace's 1 GB daily ingestion cap. Once it is reached, Azure stops storing data until the next day. For a flood,
+add a Cloudflare WAF rate-limiting rule on `telemetry.bighelp.app/v1/batch` (optional, no code change). Alert rules
+that read public events can be forged; see the Azure README.
 
 ## How to turn it off
 

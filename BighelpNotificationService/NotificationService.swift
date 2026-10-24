@@ -1,14 +1,12 @@
-import BuzzKitNotificationServiceExtension
 import Foundation
 import UserNotifications
 
-/// BuzzKit owns rich notification media and receipts. Sealed bighelp alerts are
-/// opened here first: only this phone can read their title, text and avatar.
-final class NotificationService: BuzzKitNotificationService, @unchecked Sendable {
-    override var buzzKitAppGroup: String? { "group.app.loopdy.mobile.buzzkit" }
-
-    private let lock = NSLock()
-    private var pending: (handler: (UNNotificationContent) -> Void, content: UNNotificationContent)?
+/// Every alert shows here, whether the notification service sent it through BuzzKit or
+/// straight to Apple. Sealed bighelp alerts are opened first: only this phone can read
+/// their title, text and avatar. Action buttons and pictures come from the push's `bk`
+/// object (`BighelpPushDisplay`). bighelp sends no delivery receipts from here.
+final class NotificationService: UNNotificationServiceExtension, @unchecked Sendable {
+    private let delivery = BighelpNotificationDelivery()
 
     override func didReceive(_ request: UNNotificationRequest,
                              withContentHandler contentHandler: @escaping (UNNotificationContent) -> Void) {
@@ -17,7 +15,7 @@ final class NotificationService: BuzzKitNotificationService, @unchecked Sendable
         guard let sealed = BighelpSealedNotification(userInfo: request.content.userInfo),
               let opened = try? sealed.open(),
               let content = request.content.mutableCopy() as? UNMutableNotificationContent else {
-            super.didReceive(Self.grouped(request), withContentHandler: contentHandler)
+            display(Self.grouped(request), contentHandler)
             return
         }
         // The app keeps alerts for the chat on screen quiet by reading the chat from
@@ -31,7 +29,7 @@ final class NotificationService: BuzzKitNotificationService, @unchecked Sendable
         }
         // A Focus filter with Quiet agent alerts on: replies arrive in Notification Center only.
         BighelpFocusFilterState.quiet(content, eventType: sealed.eventType)
-        setPending((contentHandler, content.copy() as? UNNotificationContent ?? content))
+        delivery.hold(contentHandler, content.copy() as? UNNotificationContent ?? content)
         let box = UncheckedBox((request: request, content: content))
         // The picture comes from the phone's cache after the first alert. A first
         // download still running after a moment finishes in the background for
@@ -47,8 +45,8 @@ final class NotificationService: BuzzKitNotificationService, @unchecked Sendable
                let attachment = try? UNNotificationAttachment(identifier: "bk.image", url: file) {
                 box.value.content.attachments = [attachment]
             }
-            guard let handler = self.takePending()?.handler else { return }
-            self.forward(UNNotificationRequest(identifier: box.value.request.identifier,
+            guard let handler = self.delivery.take()?.handler else { return }
+            self.display(UNNotificationRequest(identifier: box.value.request.identifier,
                                                content: box.value.content, trigger: nil), handler)
         }
     }
@@ -71,18 +69,26 @@ final class NotificationService: BuzzKitNotificationService, @unchecked Sendable
     }
 
     override func serviceExtensionTimeWillExpire() {
-        // Out of time before the avatar arrived: show the opened text without it.
-        if let pending = takePending() { pending.handler(pending.content) }
-        super.serviceExtensionTimeWillExpire()
+        // Out of time before the avatar or a picture arrived: show what is ready.
+        delivery.finish()
     }
 
-    /// BuzzKit then registers the actions and sends the delivered receipt.
-    private func forward(_ request: UNNotificationRequest, _ handler: @escaping (UNNotificationContent) -> Void) {
-        super.didReceive(request, withContentHandler: handler)
-    }
-
-    private func setPending(_ value: (handler: (UNNotificationContent) -> Void, content: UNNotificationContent)) {
-        lock.withLock { pending = value }
+    /// Adds the push's action buttons and picture, then shows it.
+    private func display(_ request: UNNotificationRequest, _ handler: @escaping (UNNotificationContent) -> Void) {
+        guard let content = request.content.mutableCopy() as? UNMutableNotificationContent else {
+            handler(request.content)
+            return
+        }
+        delivery.hold(handler, content)
+        guard let display = BighelpPushDisplay(userInfo: request.content.userInfo) else {
+            delivery.finish()
+            return
+        }
+        let box = UncheckedBox(content)
+        Task {
+            await display.apply(to: box.value)
+            self.delivery.finish()
+        }
     }
 
     /// The task's value, or nil once `limit` passes (the task keeps running).
@@ -95,13 +101,6 @@ final class NotificationService: BuzzKitNotificationService, @unchecked Sendable
                 try? await Task.sleep(for: limit)
                 once.resume(nil)
             }
-        }
-    }
-
-    private func takePending() -> (handler: (UNNotificationContent) -> Void, content: UNNotificationContent)? {
-        lock.withLock {
-            defer { pending = nil }
-            return pending
         }
     }
 }

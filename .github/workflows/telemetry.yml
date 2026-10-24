@@ -1,0 +1,51 @@
+name: Telemetry Worker
+
+# services/telemetry is the ingestion Worker for app, host and relay telemetry. A pull request that touches it,
+# its Azure templates or the shared schema is tested, type-checked and dry-run deployed. Nothing here deploys.
+
+on:
+  pull_request:
+    paths:
+      - services/telemetry/**
+      - contracts/telemetry-v1.json
+      - Scripts/check-relay.mjs
+      - tsconfig.base.json
+      - .github/workflows/telemetry.yml
+
+permissions:
+  contents: read
+
+jobs:
+  worker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: services/telemetry
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: services/telemetry/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: services/telemetry/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm typecheck
+      - run: pnpm exec wrangler deploy --dry-run --outdir "$RUNNER_TEMP/telemetry-dry-run"
+
+  azure-templates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and lint the Bicep templates
+        run: |
+          set -e
+          for file in services/telemetry/azure/*.bicep; do
+            az bicep build --file "$file" --stdout > /dev/null
+            az bicep lint --file "$file"
+          done

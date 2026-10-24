@@ -34,10 +34,19 @@ final class ObjectCardsUITests: BighelpUITestCase {
             XCTAssertEqual(app.buttons["card.contact.call"].firstMatch.label, "Call")
             XCTAssertEqual(app.buttons["card.contact.contacts"].firstMatch.label, "Add to Contacts",
                            "The demo person has no saved contact, so it offers Add to Contacts")
+            // Demo mode draws a made-up cover offline; VoiceOver names it once it shows.
+            let artwork = app.descendants(matching: .any)["card.music.artwork"].firstMatch
+            XCTAssertTrue(artwork.waitForExistence(timeout: 5), "The song shows its artwork in \(appearance)")
+            XCTAssertEqual(artwork.label, "Album artwork for Sample Song")
+            XCTAssertGreaterThanOrEqual(artwork.frame.width, 90, "The artwork leads the music card at full size")
             // Give MapKit a moment to make the map picture.
             RunLoop.current.run(until: Date().addingTimeInterval(4))
             save("object-card-\(appearance)", app.screenshot())
             if card.exists, card.frame.height > 40 { save("object-card-\(appearance)-card", card.screenshot()) }
+            let song = app.descendants(matching: .any)["card.object.song"].firstMatch
+            if song.exists, song.frame.height > 40 { save("object-card-\(appearance)-music", song.screenshot()) }
+            let map = app.buttons["card.place.map"].firstMatch
+            if map.exists, map.frame.height > 40 { save("object-card-\(appearance)-map", map.screenshot()) }
 
             // Add to Contacts opens Contacts' own new-contact screen, with no permission prompt.
             app.buttons["card.contact.contacts"].firstMatch.tap()

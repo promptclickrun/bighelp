@@ -160,6 +160,120 @@ struct BighelpCardObjectsTests {
         #expect(search.queryItems == [URLQueryItem(name: "term", value: "Sample Song The Placeholders")])
     }
 
+    // MARK: Music artwork
+
+    private func music(_ props: [String: BighelpJSONValue]) throws -> BighelpCardMusic {
+        try BighelpCardMusic(props: merged(["kind": .string("song"), "title": .string("Sample Song"),
+                                            "artist": .string("The Placeholders")], props))
+    }
+
+    @Test func storeNumbersComeFromTheLinkThenTheCatalogID() throws {
+        typealias StoreID = BighelpCardMusicLookup.StoreID
+        func storeID(_ props: [String: BighelpJSONValue]) throws -> StoreID? {
+            BighelpCardMusicLookup.storeID(for: try music(props))
+        }
+        let link = "https://music.apple.com/us/album/sample-album/1234567890?i=1234567899"
+        // A song on an album: the song's number for a song, the album's for anything else.
+        #expect(try storeID(["url": .string(link)]) == StoreID(id: "1234567899", storefront: "us"))
+        #expect(try storeID(["kind": .string("album"), "url": .string(link)])
+                == StoreID(id: "1234567890", storefront: "us"))
+        #expect(try storeID(["url": .string("https://music.apple.com/gb/song/sample-song/555")])
+                == StoreID(id: "555", storefront: "gb"))
+        #expect(try storeID(["kind": .string("album"), "url": .string("https://music.apple.com/album/id777")])
+                == StoreID(id: "777", storefront: nil))
+        // Playlists have no store number in their link.
+        #expect(try storeID(["kind": .string("playlist"),
+                             "url": .string("https://music.apple.com/us/playlist/sample/pl.abc123")]) == nil)
+        // Without a link: a numeric catalog id, never a library one.
+        #expect(try storeID(["music_id": .string("987")]) == StoreID(id: "987", storefront: nil))
+        #expect(try storeID(["music_id": .string("i.AbC123")]) == nil)
+        #expect(try storeID(["music_id": .string("987"), "source": .string("library")]) == nil)
+        #expect(try storeID(["music_id": .string("pl.u-abc")]) == nil)
+        #expect(BighelpCardMusicLookup.isLibraryID("i.AbC123") && BighelpCardMusicLookup.isLibraryID("l.xyz"))
+        #expect(!BighelpCardMusicLookup.isLibraryID("pl.u-abc") && !BighelpCardMusicLookup.isLibraryID("987"))
+    }
+
+    @Test func lookupAndSearchAddresses() throws {
+        let lookup = try #require(BighelpCardMusicLookup.lookupURL(.init(id: "1234567899", storefront: "us")))
+        #expect(lookup.absoluteString == "https://itunes.apple.com/lookup?id=1234567899&country=us")
+        #expect(BighelpCardMusicLookup.lookupURL(.init(id: "5", storefront: nil))?.absoluteString
+                == "https://itunes.apple.com/lookup?id=5")
+        let song = try music([:])
+        let search = try #require(BighelpCardMusicLookup.searchURL(for: song)
+            .flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: false) })
+        #expect(search.host == "itunes.apple.com" && search.path == "/search")
+        #expect(search.queryItems?.first { $0.name == "term" }?.value == "Sample Song The Placeholders")
+        #expect(search.queryItems?.first { $0.name == "entity" }?.value == "song")
+        let album = try music(["kind": .string("album")])
+        #expect(BighelpCardMusicLookup.searchURL(for: album).map { $0.absoluteString.contains("entity=album") } == true)
+        // Apple's search lists no pictures for these, so they never search.
+        let artist = try music(["kind": .string("artist")])
+        let playlist = try music(["kind": .string("playlist")])
+        #expect(BighelpCardMusicLookup.searchURL(for: artist) == nil)
+        #expect(BighelpCardMusicLookup.searchURL(for: playlist) == nil)
+    }
+
+    @Test func artworkAddressesGrowAndStayOnApplesPictureServers() {
+        let small = "https://is1-ssl.mzstatic.com/image/thumb/Music/v4/aa/bb/cc/source/100x100bb.jpg"
+        #expect(BighelpCardMusicLookup.largeArtworkURL(small)?.absoluteString
+                == "https://is1-ssl.mzstatic.com/image/thumb/Music/v4/aa/bb/cc/source/600x600bb.jpg")
+        #expect(BighelpCardMusicLookup.largeArtworkURL("http://is1-ssl.mzstatic.com/a/100x100bb.jpg") == nil)
+        #expect(BighelpCardMusicLookup.largeArtworkURL("https://example.com/100x100bb.jpg") == nil)
+        #expect(BighelpCardMusicLookup.largeArtworkURL("https://mzstatic.com.example.com/100x100bb.jpg") == nil)
+    }
+
+    /// A lookup answer as Apple sends it, with made-up names and numbers.
+    private static let lookupAnswer = Data("""
+    {"resultCount":1,"results":[{"wrapperType":"track","kind":"song","artistId":111,"collectionId":1234567890,
+    "trackId":1234567899,"artistName":"The Placeholders","collectionName":"Sample Album",
+    "trackName":"Sample Song (Remastered)",
+    "artworkUrl30":"https://is1-ssl.mzstatic.com/image/thumb/Music/x/30x30bb.jpg",
+    "artworkUrl100":"https://is1-ssl.mzstatic.com/image/thumb/Music/x/100x100bb.jpg",
+    "trackTimeMillis":201000,"country":"USA","primaryGenreName":"Pop","isStreamable":true}]}
+    """.utf8)
+
+    @Test func artworkAddressesComeFromTheAnswer() throws {
+        let song = try music([:])
+        #expect(BighelpCardMusicLookup.artworkURL(in: Self.lookupAnswer, for: song, matchingNames: false)?.absoluteString
+                == "https://is1-ssl.mzstatic.com/image/thumb/Music/x/600x600bb.jpg")
+        // A search answer must name the card's song and artist.
+        #expect(BighelpCardMusicLookup.artworkURL(in: Self.lookupAnswer, for: song, matchingNames: true) != nil)
+        let other = try music(["title": .string("Another Tune")])
+        #expect(BighelpCardMusicLookup.artworkURL(in: Self.lookupAnswer, for: other, matchingNames: true) == nil)
+        let otherArtist = try music(["artist": .string("Someone Else")])
+        #expect(BighelpCardMusicLookup.artworkURL(in: Self.lookupAnswer, for: otherArtist, matchingNames: true) == nil)
+        // Albums match by the album's name.
+        let album = try music(["kind": .string("album"), "title": .string("sample  álbum")])
+        #expect(BighelpCardMusicLookup.artworkURL(in: Self.lookupAnswer, for: album, matchingNames: true) != nil)
+        // Nothing found, not JSON, or too big.
+        let empty = Data(#"{"resultCount":0,"results":[]}"#.utf8)
+        #expect(BighelpCardMusicLookup.artworkURL(in: empty, for: song, matchingNames: false) == nil)
+        #expect(BighelpCardMusicLookup.artworkURL(in: Data("<html>".utf8), for: song, matchingNames: false) == nil)
+        let huge = Data(count: BighelpCardMusicLookup.maximumResponseBytes + 1)
+        #expect(BighelpCardMusicLookup.artworkURL(in: huge, for: song, matchingNames: false) == nil)
+        let offServer = Data(#"{"results":[{"artworkUrl100":"https://example.com/100x100bb.jpg"}]}"#.utf8)
+        #expect(BighelpCardMusicLookup.artworkURL(in: offServer, for: song, matchingNames: false) == nil)
+    }
+
+    /// One kept picture per item: the same card shares it, any other item doesn't.
+    @Test func artworkIsKeptByTheCardsItem() throws {
+        func key(_ props: [String: BighelpJSONValue]) throws -> String {
+            BighelpCardMusicLookup.cacheKey(for: try music(props))
+        }
+        let song = try key([:])
+        #expect(song.count == 64 && song.allSatisfy(\.isHexDigit))
+        #expect(try song == key([:]))
+        #expect(try song != key(["kind": .string("album")]))
+        #expect(try song != key(["music_id": .string("987")]))
+        #expect(try song != key(["artist": .string("Someone Else")]))
+    }
+
+    @Test func artworkHasAPlainVoiceOverLabel() throws {
+        #expect(try music([:]).artworkLabel == "Album artwork for Sample Song")
+        #expect(try music(["kind": .string("playlist")]).artworkLabel == "Playlist artwork for Sample Song")
+        #expect(try music(["kind": .string("artist")]).artworkLabel == "Picture of Sample Song")
+    }
+
     // MARK: Whole cards
 
     @Test func objectsTakeNoChildrenAndKeepTheOtherRules() throws {

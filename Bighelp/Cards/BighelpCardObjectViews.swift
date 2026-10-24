@@ -136,16 +136,32 @@ struct BighelpCardContactView: View {
     @State private var sheet: BighelpContactSheetRequest?
     /// Whether Contacts already lets bighelp show this person; read once, never asked for.
     @State private var opensSaved = false
+    /// The saved person's own photo, when Contacts already lets bighelp read it.
+    @State private var photo: UIImage?
+
+    private static let pictureSize: CGFloat = 48
 
     var body: some View {
         BighelpCardObjectRow(title: contact.name, lines: contact.subtitle.map { [$0] } ?? [],
                              actions: actions, elementID: elementID) {
-            AvatarView(stableID: "card.contact.\(contact.name)", displayName: contact.name,
-                       size: 48, kind: .person)
-                .accessibilityHidden(true)
+            Group {
+                if let photo = photo ?? contact.contactID.flatMap(BighelpCardContacts.keptPhoto) {
+                    Image(uiImage: photo)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: Self.pictureSize, height: Self.pictureSize)
+                        .clipShape(.circle)
+                } else {
+                    // The person's initials on their own color.
+                    AvatarView(stableID: "card.contact.\(contact.name)", displayName: contact.name,
+                               size: Self.pictureSize, kind: .person)
+                }
+            }
+            .accessibilityHidden(true)
         }
         .task(id: contact.contactID) {
             opensSaved = contact.contactID != nil && BighelpCardContacts.canReadSaved
+            if opensSaved, let id = contact.contactID { photo = await BighelpCardContacts.photo(id) }
         }
         #if canImport(ContactsUI)
         .bighelpSheet(item: $sheet) { request in
@@ -195,6 +211,36 @@ enum BighelpCardContacts {
         if status == .authorized { return true }
         if #available(iOS 18.0, *), status == .limited { return true }
         return false
+    }
+
+    /// Saved people's photos by contact id, the newest 50, for the launch.
+    private static var photos: [String: UIImage] = [:]
+    private static var photoOrder: [String] = []
+    /// Ids already read that have no photo, so a scrolled-back row doesn't read again.
+    private static var noPhoto: Set<String> = []
+
+    static func keptPhoto(_ id: String) -> UIImage? { photos[id] }
+
+    /// The saved person's thumbnail, read once off the main thread. Only
+    /// called when Contacts access was already given; never asks for it.
+    static func photo(_ id: String) async -> UIImage? {
+        if let photo = photos[id] { return photo }
+        guard !noPhoto.contains(id), canReadSaved else { return nil }
+        guard let data = await thumbnailData(id), let image = UIImage(data: data) else {
+            noPhoto.insert(id)
+            return nil
+        }
+        photos[id] = image
+        photoOrder.append(id)
+        if photoOrder.count > 50 { photos[photoOrder.removeFirst()] = nil }
+        return image
+    }
+
+    private nonisolated static func thumbnailData(_ id: String) async -> Data? {
+        let keys = [CNContactThumbnailImageDataKey as CNKeyDescriptor]
+        guard let person = try? CNContactStore().unifiedContact(withIdentifier: id, keysToFetch: keys),
+              let data = person.thumbnailImageData, data.count <= 1_024 * 1_024 else { return nil }
+        return data
     }
 
     /// Digits and a leading `+`, for `tel:` and `sms:`.
@@ -382,53 +428,127 @@ enum BighelpCardPlaces {
 
 // MARK: - Music
 
+/// Apple Music's own cell: the artwork large and rounded at the front (round
+/// for an artist), the kind, title and artist beside it, and Play and Open in
+/// Music under them. The object sits on a wash of the artwork's own color.
+/// At accessibility text sizes the artwork goes on top.
 struct BighelpCardMusicView: View {
     let music: BighelpCardMusic
     let elementID: String
+    /// Worked out once per card, not on every redraw of the chat.
+    private let artworkKey: String
 
     @Environment(\.openURL) private var openURL
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @BighelpThemeReader private var theme
     /// Music is on in Device access and iOS lets bighelp play it.
     @State private var playsHere = false
     @State private var isStarting = false
-    #if canImport(MusicKit)
-    @State private var artwork: Artwork?
-    #endif
+    @State private var loaded: BighelpCardMusicArtworkStore.Found?
 
-    private static let artworkSize: CGFloat = 56
+    private static let artworkSize: CGFloat = 96
+    private static let stackedArtworkSize: CGFloat = 168
+
+    init(music: BighelpCardMusic, elementID: String) {
+        self.music = music
+        self.elementID = elementID
+        artworkKey = BighelpCardMusicLookup.cacheKey(for: music)
+    }
+
+    /// A row scrolled back into view draws the kept picture in its first frame.
+    private var artwork: BighelpCardMusicArtworkStore.Found? {
+        loaded ?? BighelpCardMusicArtworkStore.shared.cached(artworkKey)
+    }
 
     var body: some View {
-        BighelpCardObjectRow(title: music.title, lines: [music.detail], actions: actions, elementID: elementID) {
-            picture
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: BighelpTokens.space12) {
+                    picture(size: Self.stackedArtworkSize)
+                    info
+                    buttons
+                }
+            } else {
+                HStack(alignment: .top, spacing: BighelpTokens.space12) {
+                    picture(size: Self.artworkSize)
+                    VStack(alignment: .leading, spacing: BighelpTokens.space8) {
+                        info
+                        Spacer(minLength: 0)
+                        buttons
+                    }
+                    .frame(maxWidth: .infinity, minHeight: Self.artworkSize, alignment: .topLeading)
+                }
+            }
         }
+        .padding(BighelpTokens.space12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background { wash }
+        .modifier(BighelpCardObjectMacMenu(actions: actions))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("card.object.\(elementID)")
         .task(id: music) { await load() }
     }
 
-    @ViewBuilder private var picture: some View {
-        let shape = RoundedRectangle(cornerRadius: BighelpTokens.radius12, style: .continuous)
-        Group {
-            #if canImport(MusicKit)
-            if let artwork {
-                ArtworkImage(artwork, width: Self.artworkSize, height: Self.artworkSize)
-            } else {
-                symbolTile
+    private var wash: some View {
+        let shape = RoundedRectangle(cornerRadius: BighelpTokens.radius16, style: .continuous)
+        return shape.fill(theme.incomingMessageBackground.opacity(0.55))
+            .overlay {
+                if let tint = artwork?.tint {
+                    shape.fill(tint.opacity(colorScheme == .dark ? 0.26 : 0.16))
+                }
             }
-            #else
-            symbolTile
-            #endif
-        }
-        .frame(width: Self.artworkSize, height: Self.artworkSize)
-        .clipShape(shape)
-        .overlay { shape.stroke(theme.separator, lineWidth: BighelpTokens.hairline) }
-        .accessibilityHidden(true)
+            .animation(.easeOut(duration: 0.25), value: artwork?.tint)
     }
 
-    private var symbolTile: some View {
+    private func picture(size: CGFloat) -> some View {
+        let shape: AnyShape = music.kind == .artist
+            ? AnyShape(Circle())
+            : AnyShape(RoundedRectangle(cornerRadius: size >= Self.stackedArtworkSize ? BighelpTokens.radius16
+                                            : BighelpTokens.radius12, style: .continuous))
+        let found = artwork
+        return ZStack {
+            placeholder(size: size)
+            if let found {
+                artworkImage(found, size: size)
+                    .transition(.opacity)
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(shape)
+        .overlay { shape.stroke(theme.separator, lineWidth: BighelpTokens.hairline) }
+        .shadow(color: .black.opacity(colorScheme == .dark ? 0.35 : 0.14), radius: 8, y: 3)
+        .accessibilityElement()
+        .accessibilityLabel(Text(music.artworkLabel))
+        .accessibilityAddTraits(.isImage)
+        .accessibilityIdentifier("card.music.artwork")
+        .accessibilityHidden(found == nil)
+    }
+
+    @ViewBuilder
+    private func artworkImage(_ found: BighelpCardMusicArtworkStore.Found, size: CGFloat) -> some View {
+        switch found {
+        case .picture(let picture):
+            Image(uiImage: picture.image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: size, height: size)
+        #if canImport(MusicKit)
+        case .musicKit(let artwork):
+            ArtworkImage(artwork, width: size, height: size)
+        #endif
+        }
+    }
+
+    /// While the artwork loads, and when there is none: the kind's symbol on
+    /// the card's own colors.
+    private func placeholder(size: CGFloat) -> some View {
         ZStack {
-            theme.incomingMessageBackground
+            LinearGradient(colors: [theme.incomingMessageBackground, theme.surface],
+                           startPoint: .topLeading, endPoint: .bottomTrailing)
             Image(systemName: symbol)
-                .font(.bighelp(.title2, weight: .semibold))
-                .foregroundStyle(theme.secondaryText)
+                .font(.system(size: size * 0.34, weight: .semibold))
+                .foregroundStyle(theme.tertiaryText)
         }
     }
 
@@ -438,6 +558,36 @@ struct BighelpCardMusicView: View {
         case .album: "square.stack.fill"
         case .playlist: "music.note.list"
         case .artist: "music.mic"
+        }
+    }
+
+    private var info: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(music.kindName)
+                .font(.bighelp(.caption2, weight: .semibold))
+                .textCase(.uppercase)
+                .tracking(0.6)
+                .foregroundStyle(theme.secondaryText)
+            Text(music.title)
+                .font(.bighelp(.headline))
+                .foregroundStyle(theme.primaryText)
+                .lineLimit(2)
+            if let artist = music.artist {
+                Text(artist)
+                    .font(.bighelp(.subheadline))
+                    .foregroundStyle(theme.secondaryText)
+                    .lineLimit(2)
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var buttons: some View {
+        HStack(spacing: BighelpTokens.space8) {
+            ForEach(actions) { action in
+                BighelpCardObjectButton(action: action)
+            }
         }
     }
 
@@ -454,19 +604,22 @@ struct BighelpCardMusicView: View {
 
     private func load() async {
         #if canImport(MusicKit)
-        guard BighelpCardObjectAccess.musicEnabled(), MusicAuthorization.currentStatus == .authorized else {
-            playsHere = false
-            artwork = nil
-            return
-        }
+        // Only what Music already allows; showing a card never asks.
+        let usesMusicKit = BighelpCardObjectAccess.musicEnabled() && MusicAuthorization.currentStatus == .authorized
         #if targetEnvironment(macCatalyst)
         // The Mac has no Music app player to start; Play opens Music.
         playsHere = false
         #else
-        playsHere = music.musicID != nil
+        playsHere = usesMusicKit && music.musicID != nil
         #endif
-        artwork = await BighelpCardMusicArtwork.artwork(for: music)
+        #else
+        let usesMusicKit = false
         #endif
+        guard loaded == nil else { return }
+        if let found = await BighelpCardMusicArtworkStore.shared.artwork(
+            for: music, key: artworkKey, usesMusicKit: usesMusicKit) {
+            withAnimation(.easeOut(duration: 0.25)) { loaded = found }
+        }
     }
 
     private func play() {
@@ -497,23 +650,107 @@ struct BighelpCardMusicView: View {
     }
 }
 
-#if canImport(MusicKit)
-/// Artwork by id, kept for the launch so a row scrolled back into view
-/// doesn't ask MusicKit again.
-@MainActor
-enum BighelpCardMusicArtwork {
-    private static var kept: [String: Artwork] = [:]
-    private static let limit = 100
+/// A finished artwork picture and its average color. Never changed after it's made.
+struct BighelpCardArtworkPicture: @unchecked Sendable {
+    let image: UIImage
+    let red: Double
+    let green: Double
+    let blue: Double
 
-    static func artwork(for music: BighelpCardMusic) async -> Artwork? {
-        guard let id = music.musicID else { return nil }
-        let source = music.source ?? .catalog
-        let key = "\(source.rawValue):\(music.kind.rawValue):\(id)"
-        if let artwork = kept[key] { return artwork }
-        guard let artwork = try? await fetch(MusicItemID(id), kind: music.kind, source: source) else { return nil }
-        if kept.count >= limit { kept.removeAll() }
-        kept[key] = artwork
-        return artwork
+    var tint: Color { Color(red: red, green: green, blue: blue) }
+}
+
+/// Music card artwork, found once per item and kept: in memory for the
+/// launch (the newest 60) and as files in Caches (`BighelpCardArtworkFiles`),
+/// so a chat full of cards neither asks again nor stutters while scrolling.
+///
+/// Where it comes from, in order: the kept file; MusicKit, when Music is on in
+/// Device access and the person has allowed Apple Music (the catalog item, or
+/// the library item for library ids); else Apple's public lookup by the
+/// link's or `music_id`'s store number, else its search by title and artist.
+/// Nothing found shows the card's placeholder; it's asked again after five minutes.
+@MainActor
+final class BighelpCardMusicArtworkStore {
+    enum Found: @unchecked Sendable {
+        case picture(BighelpCardArtworkPicture)
+        #if canImport(MusicKit)
+        /// Library artwork has no web address; only `ArtworkImage` draws it.
+        case musicKit(Artwork)
+        #endif
+
+        var tint: Color? {
+            switch self {
+            case .picture(let picture): picture.tint
+            #if canImport(MusicKit)
+            case .musicKit(let artwork): artwork.backgroundColor.map { Color(cgColor: $0) }
+            #endif
+            }
+        }
+    }
+
+    static let shared = BighelpCardMusicArtworkStore()
+    private static let limit = 60
+    private static let retryAfter: TimeInterval = 300
+    /// Demo mode draws a made-up cover and never goes online.
+    private static let isDemo = ProcessInfo.processInfo.arguments.contains("-use-demo-fixtures")
+
+    private var kept: [String: Found] = [:]
+    private var order: [String] = []
+    private var missing: [String: Date] = [:]
+    private var inFlight: [String: Task<Found?, Never>] = [:]
+
+    func cached(_ key: String) -> Found? { kept[key] }
+
+    /// The artwork for `music`, found once; cards waiting on the same item share it.
+    func artwork(for music: BighelpCardMusic, key: String, usesMusicKit: Bool) async -> Found? {
+        if let found = kept[key] { return found }
+        if let missed = missing[key], Date().timeIntervalSince(missed) < Self.retryAfter { return nil }
+        if let running = inFlight[key] { return await running.value }
+        // Not tied to the row: a card scrolled away still finishes and keeps it.
+        let task = Task { @MainActor in await Self.find(music, key: key, usesMusicKit: usesMusicKit) }
+        inFlight[key] = task
+        let found = await task.value
+        inFlight[key] = nil
+        if let found {
+            keep(found, key)
+            missing[key] = nil
+        } else {
+            missing[key] = Date()
+        }
+        return found
+    }
+
+    private func keep(_ found: Found, _ key: String) {
+        if kept[key] == nil { order.append(key) }
+        kept[key] = found
+        while order.count > Self.limit { kept[order.removeFirst()] = nil }
+    }
+
+    private static func find(_ music: BighelpCardMusic, key: String, usesMusicKit: Bool) async -> Found? {
+        if isDemo { return await BighelpCardArtworkFiles.demoCover(for: music).map(Found.picture) }
+        if let file = await BighelpCardArtworkFiles.read(key) { return .picture(file) }
+        #if canImport(MusicKit)
+        if usesMusicKit, let artwork = await musicKitArtwork(music) {
+            let pixels = BighelpCardMusicLookup.artworkPixels
+            if let url = artwork.url(width: pixels, height: pixels), url.scheme == "https",
+               let picture = await BighelpCardArtworkFiles.download(url, key: key) {
+                return .picture(picture)
+            }
+            return .musicKit(artwork)
+        }
+        #endif
+        guard let address = await BighelpCardArtworkFiles.publicArtworkURL(for: music),
+              let picture = await BighelpCardArtworkFiles.download(address, key: key) else { return nil }
+        return .picture(picture)
+    }
+
+    #if canImport(MusicKit)
+    /// A card without `source` reads library ids (`i.…`) from the library and
+    /// anything else from the catalog, including the store number in its link.
+    private static func musicKitArtwork(_ music: BighelpCardMusic) async -> Artwork? {
+        guard let id = music.musicID ?? BighelpCardMusicLookup.storeID(for: music)?.id else { return nil }
+        let source = music.source ?? (BighelpCardMusicLookup.isLibraryID(id) ? .library : .catalog)
+        return try? await fetch(MusicItemID(id), kind: music.kind, source: source)
     }
 
     private static func fetch(_ id: MusicItemID, kind: BighelpCardMusic.Kind,
@@ -557,5 +794,157 @@ enum BighelpCardMusicArtwork {
             return try await request.response().items.first?.artwork
         }
     }
+    #endif
 }
-#endif
+
+/// The network and file side of music artwork, off the main thread: bounded
+/// requests to Apple's lookup and picture servers, no cookies or cache, and at
+/// most 200 kept pictures in Caches (the oldest go first).
+enum BighelpCardArtworkFiles {
+    static let maximumFiles = 200
+
+    private static let session: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = BighelpCardMusicLookup.timeout
+        configuration.timeoutIntervalForResource = BighelpCardMusicLookup.timeout
+        configuration.httpCookieAcceptPolicy = .never
+        configuration.httpShouldSetCookies = false
+        configuration.urlCache = nil
+        configuration.httpMaximumConnectionsPerHost = 2
+        return URLSession(configuration: configuration)
+    }()
+
+    private static var folder: URL? {
+        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("BighelpCardArtwork", isDirectory: true)
+    }
+
+    /// Keys are SHA-256 hex (`BighelpCardMusicLookup.cacheKey`), so they're safe file names.
+    private static func file(_ key: String) -> URL? {
+        guard key.count == 64, key.allSatisfy({ $0.isHexDigit }) else { return nil }
+        return folder?.appendingPathComponent(key + ".image")
+    }
+
+    static func read(_ key: String) async -> BighelpCardArtworkPicture? {
+        guard let file = file(key), let data = try? Data(contentsOf: file),
+              data.count <= BighelpCardMusicLookup.maximumImageBytes,
+              let image = UIImage(data: data) else { return nil }
+        return picture(from: image)
+    }
+
+    /// The lookup by store number, else the search by title and artist.
+    static func publicArtworkURL(for music: BighelpCardMusic) async -> URL? {
+        if let id = BighelpCardMusicLookup.storeID(for: music), let lookup = BighelpCardMusicLookup.lookupURL(id),
+           let data = await get(lookup, limit: BighelpCardMusicLookup.maximumResponseBytes, accepts: isJSON),
+           let artwork = BighelpCardMusicLookup.artworkURL(in: data, for: music, matchingNames: false) {
+            return artwork
+        }
+        guard let search = BighelpCardMusicLookup.searchURL(for: music),
+              let data = await get(search, limit: BighelpCardMusicLookup.maximumResponseBytes, accepts: isJSON)
+        else { return nil }
+        return BighelpCardMusicLookup.artworkURL(in: data, for: music, matchingNames: true)
+    }
+
+    static func download(_ url: URL, key: String) async -> BighelpCardArtworkPicture? {
+        guard let checked = try? BighelpCardNetworkPolicy.validate(url),
+              let data = await get(checked.url, limit: BighelpCardMusicLookup.maximumImageBytes,
+                                   accepts: { $0.hasPrefix("image/") }),
+              let image = UIImage(data: data) else { return nil }
+        write(data, key: key)
+        return picture(from: image)
+    }
+
+    /// Apple's lookup answers `text/javascript`.
+    private static func isJSON(_ type: String) -> Bool {
+        ["application/json", "text/javascript", "application/javascript", "text/json"].contains(type)
+    }
+
+    private static func get(_ url: URL, limit: Int, accepts: (String) -> Bool) async -> Data? {
+        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData,
+                                 timeoutInterval: BighelpCardMusicLookup.timeout)
+        request.httpShouldHandleCookies = false
+        guard let answer = try? await session.data(for: request),
+              let http = answer.1 as? HTTPURLResponse, http.statusCode == 200,
+              http.expectedContentLength <= Int64(limit), answer.0.count <= limit,
+              let type = http.mimeType?.lowercased(), accepts(type) else { return nil }
+        return answer.0
+    }
+
+    private static func write(_ data: Data, key: String) {
+        guard let folder, let file = file(key) else { return }
+        let manager = FileManager.default
+        try? manager.createDirectory(at: folder, withIntermediateDirectories: true)
+        try? data.write(to: file, options: .atomic)
+        let keys: [URLResourceKey] = [.creationDateKey]
+        guard let files = try? manager.contentsOfDirectory(at: folder, includingPropertiesForKeys: keys),
+              files.count > maximumFiles else { return }
+        let oldestFirst = files.sorted {
+            let a = (try? $0.resourceValues(forKeys: Set(keys)).creationDate) ?? .distantPast
+            let b = (try? $1.resourceValues(forKeys: Set(keys)).creationDate) ?? .distantPast
+            return a < b
+        }
+        for old in oldestFirst.prefix(files.count - maximumFiles * 3 / 4) { try? manager.removeItem(at: old) }
+    }
+
+    /// Decoded once here, so the first draw on the main thread doesn't decode it.
+    static func picture(from image: UIImage) -> BighelpCardArtworkPicture? {
+        let ready = image.preparingForDisplay() ?? image
+        let (red, green, blue) = averageColor(ready) ?? (0.5, 0.5, 0.5)
+        return BighelpCardArtworkPicture(image: ready, red: red, green: green, blue: blue)
+    }
+
+    /// The mean of an 8 × 8 copy of the picture.
+    static func averageColor(_ image: UIImage) -> (Double, Double, Double)? {
+        guard let cgImage = image.cgImage else { return nil }
+        let side = 8
+        var pixels = [UInt8](repeating: 0, count: side * side * 4)
+        let drawn = pixels.withUnsafeMutableBytes { buffer -> Bool in
+            guard let context = CGContext(
+                data: buffer.baseAddress, width: side, height: side, bitsPerComponent: 8, bytesPerRow: side * 4,
+                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+            else { return false }
+            context.interpolationQuality = .medium
+            context.draw(cgImage, in: CGRect(x: 0, y: 0, width: side, height: side))
+            return true
+        }
+        guard drawn else { return nil }
+        var sums = (0.0, 0.0, 0.0)
+        for index in stride(from: 0, to: pixels.count, by: 4) {
+            sums.0 += Double(pixels[index])
+            sums.1 += Double(pixels[index + 1])
+            sums.2 += Double(pixels[index + 2])
+        }
+        let count = Double(side * side) * 255
+        return (sums.0 / count, sums.1 / count, sums.2 / count)
+    }
+
+    /// Demo mode's made-up cover: the brand's coral to violet with a record's
+    /// rings, so screenshots show where artwork sits without going online.
+    static func demoCover(for music: BighelpCardMusic) async -> BighelpCardArtworkPicture? {
+        let side = CGFloat(BighelpCardMusicLookup.artworkPixels)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+        let image = UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format).image { drawing in
+            let context = drawing.cgContext
+            let colors = [UIColor(red: 0xF2 / 255, green: 0x8B / 255, blue: 0x32 / 255, alpha: 1).cgColor,
+                          UIColor(red: 0xD3 / 255, green: 0x3F / 255, blue: 0x42 / 255, alpha: 1).cgColor,
+                          UIColor(red: 0x9A / 255, green: 0x6B / 255, blue: 0xFF / 255, alpha: 1).cgColor]
+            if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors as CFArray,
+                                         locations: [0, 0.5, 1]) {
+                context.drawLinearGradient(gradient, start: .zero, end: CGPoint(x: side, y: side), options: [])
+            }
+            let center = CGPoint(x: side * 0.62, y: side * 0.62)
+            context.setStrokeColor(UIColor.white.withAlphaComponent(0.22).cgColor)
+            for ring in stride(from: CGFloat(0.12), through: 0.5, by: 0.07) {
+                context.setLineWidth(side * 0.012)
+                context.strokeEllipse(in: CGRect(x: center.x - side * ring, y: center.y - side * ring,
+                                                 width: side * ring * 2, height: side * ring * 2))
+            }
+            context.setFillColor(UIColor.white.withAlphaComponent(0.85).cgColor)
+            context.fillEllipse(in: CGRect(x: center.x - side * 0.05, y: center.y - side * 0.05,
+                                           width: side * 0.1, height: side * 0.1))
+        }
+        return picture(from: image)
+    }
+}

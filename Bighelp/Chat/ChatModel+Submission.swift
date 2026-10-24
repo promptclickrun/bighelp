@@ -47,6 +47,16 @@ extension ChatModel {
         // (or queues) through sendMidSession, which has its own checks.
         guard permitsOrdinaryComposerSend, isBotMode || isMidSessionTurnLive
             || (orderedDraftAttachments.isEmpty ? composerTransportIsReady : directTransportIsReady) else { return }
+        // Send stays on while the chat opens from its saved copy. The message waits here, still in
+        // the box, until the chat has its own connection; a reconnect can start the open again.
+        if !isBotMode, !isSending, !directTransportIsReady, isOpening {
+            guard !isAwaitingCatchUp else { return }
+            isAwaitingCatchUp = true
+            while !Task.isCancelled, !directTransportIsReady, let wait = opening?.wait { await wait() }
+            isAwaitingCatchUp = false
+            guard !isSending, directTransportIsReady || nativeConversationClient?.acceptsSubmissionAfterCatchUp == true
+            else { return }
+        }
         // Send stays on while a working chat catches up. The message waits here, still in the box:
         // as a turn, the catch-up's idle readback would take it for a stale one and drop it.
         if !isBotMode, !isSending, !directTransportIsReady, let native = nativeConversationClient,

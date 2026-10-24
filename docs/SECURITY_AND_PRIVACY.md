@@ -37,6 +37,86 @@ Account erasure removes saved grants and the local mutation journal. See the
 [iPhone device-tools contract](IPHONE_DEVICE_TOOLS.md) for exact boundaries,
 Health empty-result semantics and the physical-device acceptance requirements.
 
+## Usage and diagnostics
+
+bighelp counts how it is used and how it performs so the maintainers can fix what is slow or
+broken. It is on by default and has an off switch: Settings › Permissions › Device access ›
+**Share usage and diagnostics**. What follows is what the code sends (`Bighelp/Telemetry/`).
+Nothing here is for advertising or sold, it holds no name, email or account, and bighelp does not
+track people across other companies' apps or sites. The numbers are tied to a random install ID, so
+the App Store privacy label declares them as linked to the device's ID (not to a person's identity),
+for app functionality and analytics, and never for tracking.
+
+### What is sent
+
+Each batch (at most 50 events) goes to `https://telemetry.bighelp.app/v1/batch`, over HTTPS,
+gzip-compressed when that is smaller, with a 5-second timeout. It holds:
+
+- **An install ID**: a random UUID the app makes and keeps in this device's Keychain (never in iCloud
+  Keychain or a backup restored elsewhere). It is not derived from anything on the phone, the Apple
+  ID, a host or a notification token. It never survives deleting the app: a launch that finds no marker
+  in the app's own preferences (a fresh install or a reinstall) deletes any ID the Keychain still holds.
+  A new **session ID** is made at each launch.
+- **Context**: app version and build, the OS name and version, the kind of device (iPhone, iPad, Mac,
+  Vision) and where the build came from (debug, TestFlight, App Store). No device name, no
+  language, no region, no advertising or vendor identifier.
+- **Events**, each a fixed name with a few numbers or fixed words:
+
+  | Event | What it carries |
+  |---|---|
+  | `app.opened`, `app.backgrounded`, `session.ended` | whether it was a cold start; time in the foreground; session length |
+  | `feature.used` | which of 14 fixed features was used: chat sent, card drawn, card answered, voice turn, live voice, workflow run, mode switched, agent opened, file opened, Shortcut run (counted after the AI-data agreement), widget opened (any `loopdy://` link the system opens: mostly widgets, also Live Activity and alert links), CarPlay voice, Watch chat, notification opened |
+  | `perf.first_token_ms`, `perf.reconnect` | milliseconds from Send to the first streamed word; how long a reconnect took and whether it worked |
+  | `perf.launch` | MetricKit's launch histograms: the middle bucket and how many launches |
+  | `hang`, `crash` | MetricKit's reports: exception type, code and signal as numbers, and up to 64 stack frames as a binary UUID, an offset and the binary's name |
+  | `notification.received` | whether a push was an alert or a wake, whether it came the new way or the old way, and how many milliseconds it took from the relay (and from the host event) to the phone |
+  | `telemetry.toggled` | sent once, when someone turns sharing back on |
+
+Crash and hang reports come from Apple's MetricKit only, with no third-party SDK. MetricKit's
+free-text fields (termination reason, exception reason, memory-region description) are never read.
+Stack frames are addresses, so a crash reads as numbers until a symbol file turns them into names, off
+the phone.
+
+### What is never sent
+
+Message text, prompts, replies, tool arguments or results, file names or paths, card contents, push
+tokens, agent or person names, emails, IP addresses, host addresses, chat or session IDs, event IDs,
+or anything from the Keychain except this install ID. Names, keys and values are Swift enums and
+numbers, so free text has no way into the code that builds a batch, and the service drops any
+name, key or value off its own allowlist. Tests feed realistic chat text, file paths and names
+through every entry point and check none of it reaches a batch.
+
+### Push delivery times
+
+The notification service extension makes no network calls for this. For each push it writes a
+receipt (alert or wake, which path it took, and the delivery time) to a small list of at most 200 in
+the app group it already shares with the app. The app reads and clears that list when it opens and
+comes forward, and sends the times as `notification.received` events. With sharing off, the
+extension writes nothing and the app throws away what is there.
+
+### Where it goes and how long it stays
+
+The service is a Cloudflare Worker (`telemetry.bighelp.app`). It checks every batch against an
+allowlist, rate-limits by install ID and by a keyed hash of the network address (the address itself is
+never stored, logged or forwarded), and forwards what passes to Microsoft Azure (Application Insights
+and Log Analytics), where it is kept for 90 days.
+
+### The off switch
+
+- Turning it off stops sending at once, throws away anything queued (in memory and on disk), deletes
+  the install ID, and stops the extension from noting pushes. A launch with it off deletes the queue
+  file and any ID again. Quick off and on changes run one after another, and each computer is asked
+  again whether the choice still stands just before it is told.
+- It also tells each connected computer that lists `native-host-telemetry-v1` to stop its own usage
+  reports (`PUT /api/plugins/loopdy/native/telemetry {"enabled": false}`). A computer that connects
+  later while sharing is off is told then. Computers without the feature are skipped.
+- Turning it back on makes a new install ID (so the two periods can't be joined), sends one
+  `telemetry.toggled` event, and sends `{"enabled": true}` to each connected computer that lists the
+  feature. The app sends `true` at no other time. A computer that wasn't connected at that moment keeps
+  its own switch off until the next time someone turns sharing on while it's connected.
+- Sharing never runs in tests, in UI tests, in demo mode (`-use-demo-fixtures`) or in a build from
+  Xcode (unless `-bighelp-telemetry` is passed).
+
 ## 1. Security goals
 
 bighelp aims to:

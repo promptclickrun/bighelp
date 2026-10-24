@@ -421,3 +421,43 @@ extension DirectHermesNativeContextTests {
         #expect(WorkflowsSupport(context: lenient.projection) == .missing)
     }
 }
+
+extension DirectHermesNativeContextTests {
+    /// The telemetry switch is the one plugin route that is a PUT. It still carries the context
+    /// guard and the request ID, and a host without the capability is never called.
+    @Test func theTelemetrySwitchIsAGuardedPutAndNeedsItsFeature() async throws {
+        let owner = try owner()
+        let http = HTTP()
+        http.handler = { request, guardValue in
+            if let guardValue {
+                return try self.response(request, body: ["version": .integer(1), "enabled": .boolean(false),
+                                                         "appEnabled": .boolean(false), "lockedOff": .boolean(false)],
+                                         headers: ["ETag": guardValue.etag, "X-Loopdy-Request-ID": guardValue.requestIDHeader,
+                                                   "Cache-Control": "no-store"])
+            }
+            return try self.response(request, body: self.context(features: [
+                "native-context-v1", "serving-profile-v1", "native-host-telemetry-v1",
+            ]))
+        }
+        let client = DirectHermesNativePluginClient(http: http, owner: owner, currentOwner: { owner })
+        let result = try await client.perform(.telemetrySet, payload: ["enabled": .boolean(false)])
+        #expect(result["appEnabled"] == .boolean(false))
+        #expect(http.calls.count == 2)
+        #expect(http.calls[1].request.method == .put)
+        #expect(http.calls[1].request.path == "/api/plugins/loopdy/native/telemetry")
+        #expect(http.calls[1].request.body == ["enabled": .boolean(false)])
+        #expect(http.calls[1].guardValue?.etag == etag)
+
+        // A host that doesn't list the capability is read once and never sent the switch.
+        let plain = HTTP()
+        plain.handler = { request, _ in
+            try self.response(request, body: self.context(features: ["native-context-v1", "serving-profile-v1"]))
+        }
+        let other = DirectHermesNativePluginClient(http: plain, owner: owner, currentOwner: { owner })
+        await #expect(throws: WorkspaceClientError.unavailable(.unsupportedOperation)) {
+            try await other.perform(.telemetrySet, payload: ["enabled": .boolean(false)])
+        }
+        #expect(plain.calls.count == 1)
+        #expect(plain.calls.allSatisfy { $0.request.method == .get })
+    }
+}

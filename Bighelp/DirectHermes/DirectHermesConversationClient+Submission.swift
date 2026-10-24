@@ -69,6 +69,7 @@ extension DirectHermesConversationClient {
         queuedVoiceAwaitingTurn = false
         pendingID = submission.id
         pendingTurnID = nil
+        promptSentAt = command || !Telemetry.isRecording ? nil : monotonicNow()
         admissionOverlapped = false
         submissionTurns = []
         settledSubmissionTurns = [:]
@@ -156,6 +157,7 @@ extension DirectHermesConversationClient {
                             // presentation; voice must retain its waiter until
                             // a native message.start gives us a turn owner.
                             self.status = "Accepted by Hermes"
+                            self.promptSentAt = nil
                             self.admitted = true
                             if self.returnsVoiceReply {
                                 self.queuedVoiceAwaitingTurn = self.submissionTurns.isEmpty

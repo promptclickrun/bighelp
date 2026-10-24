@@ -343,6 +343,9 @@ final class BighelpLinkApplicationDelegate: NSObject, UIApplicationDelegate,
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping @Sendable () -> Void
     ) {
+        if response.actionIdentifier == UNNotificationDefaultActionIdentifier {
+            Telemetry.featureUsed(.notificationOpened)
+        }
         // A question or approval alert opens its chat, where the request pops up.
         if response.actionIdentifier == UNNotificationDefaultActionIdentifier,
            let url = BighelpPromptAlertLink.url(in: response.notification.request.content.userInfo) {
@@ -411,6 +414,10 @@ final class BighelpLinkApplicationDelegate: NSObject, UIApplicationDelegate,
         didReceiveRemoteNotification userInfo: [AnyHashable: Any],
         fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
     ) {
+        // A sign-in wake never reaches the extension, so the app notes it (alerts are noted there).
+        if userInfo["bighelp_wake"] != nil {
+            BighelpDeliveryReceipts.record(userInfo: userInfo, receivedAt: Date())
+        }
         Task { @MainActor in
             let link = await BighelpLinkWakeCenter.shared.receive(userInfo)
             let data = try? JSONSerialization.data(withJSONObject: userInfo)

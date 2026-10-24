@@ -316,6 +316,13 @@ final class DirectHermesHTTP {
         }
     }
 
+    /// Plugin routes take the context guard on POST. The one exception is the telemetry switch,
+    /// which the plugin takes as `PUT` (`native-host-telemetry-v1`).
+    static func allowsNativeGuard(route: String, method: String) -> Bool {
+        route.hasPrefix("/api/plugins/loopdy/native/")
+            && (method == "POST" || (method == "PUT" && route == "/api/plugins/loopdy/native/telemetry"))
+    }
+
     func send(route: String, method: String = "GET", query: [URLQueryItem] = [],
               body: [String: BighelpJSONValue]? = nil, bearer: String? = nil,
               legacyToken: String? = nil, cookie: String? = nil, accept: String = "application/json",
@@ -337,7 +344,7 @@ final class DirectHermesHTTP {
         request.setValue(accept, forHTTPHeaderField: "Accept")
         request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
         if let nativeGuard {
-            guard route.hasPrefix("/api/plugins/loopdy/native/"), method == "POST",
+            guard Self.allowsNativeGuard(route: route, method: method),
                   (bearer != nil) != (legacyToken != nil), cookie == nil else {
                 throw DirectHermesError.invalidResponse
             }

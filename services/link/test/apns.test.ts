@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   apnsCollapseIdFor,
   apnsConfig,
+  apnsEnvironments,
   apnsIdFor,
   apnsProviderToken,
   apnsReasonCode,
@@ -14,7 +15,9 @@ import {
 import { canonicalDeviceRequest } from "../src/device-auth.js";
 import { handleLoopdyLinkRequest } from "../src/http.js";
 import { canonicalNotificationHostRequest } from "../src/notification-grants.js";
-import { directAttempt, liveActivitySpec, messageSpec, resetApnsBreaker, retryStillUseful } from "../src/push-delivery.js";
+import {
+  apnsBreakerOpen, directAttempt, liveActivitySpec, messageSpec, resetApnsBreaker, retryStillUseful,
+} from "../src/push-delivery.js";
 import { handleApnsRetryBatch, parseRetryMessage } from "../src/push-retry.js";
 import {
   allowTargetWrite, findPushTarget, openPushToken, putPushTarget, purgeExpiredPushState,
@@ -920,8 +923,8 @@ describe("choosing direct or BuzzKit", () => {
     expect(Object.keys(payload).sort()).toEqual(["aps", "bighelp_meta", "bk", "loopdy"]);
   });
 
-  it("uses the token's own environment: sandbox goes to the sandbox host", async () => {
-    const targetEnv = targetEnvironment();
+  it("uses the token's own environment when the Worker is told to: sandbox goes to the sandbox host", async () => {
+    const targetEnv = targetEnvironment({ APNS_ENVIRONMENTS: "production, sandbox" });
     await addTarget(targetEnv, installation, { environment: "sandbox" });
     await sendSealed(hostKeys, installation, targetEnv);
     expect(new URL(apnsCalls[0]!.url).host).toBe("api.sandbox.push.apple.com");
@@ -1418,7 +1421,7 @@ describe("Live Activity updates", () => {
   });
 
   it("goes direct to the activity's own token, with Unix-second dates and the same content state", async () => {
-    const targetEnv = targetEnvironment({}, state());
+    const targetEnv = targetEnvironment({ APNS_ENVIRONMENTS: "sandbox" }, state());
     await addTarget(targetEnv, installation, { kind: "liveactivity", activityId, token: OTHER_TOKEN, environment: "sandbox" });
     const response = await send(targetEnv, "using_tool");
     expect(response.status).toBe(202);
@@ -2538,5 +2541,164 @@ describe("microtask ordering inside the delivery code", () => {
     }, []);
     expect(result.outcome).toBe("sent");
     expect(ticksAtRequest).toBe(2);
+  });
+});
+
+// MARK: Environments
+
+describe("which APNs environments are used", () => {
+  let hostKeys: KeyPair;
+  let installation: Installation;
+
+  beforeEach(async () => {
+    hostKeys = await keys();
+    installation = await insertInstallation(await keys(), hostKeys);
+  });
+
+  const fallbackReasons = () =>
+    relayedEvents().filter((event) => event.name === "push.fallback_buzzkit").map((event) => event.p.reason);
+  const buzzKitPosts = () => buzzKitCalls.filter((call) => call.method === "POST");
+
+  it("reads APNS_ENVIRONMENTS: production unless it names more", () => {
+    expect([...apnsEnvironments({})]).toEqual(["production"]);
+    expect([...apnsEnvironments({ APNS_ENVIRONMENTS: "" })]).toEqual(["production"]);
+    expect([...apnsEnvironments({ APNS_ENVIRONMENTS: "staging, nonsense" })]).toEqual(["production"]);
+    expect([...apnsEnvironments({ APNS_ENVIRONMENTS: " Sandbox " })]).toEqual(["sandbox"]);
+    expect([...apnsEnvironments({ APNS_ENVIRONMENTS: "sandbox,production" })].sort()).toEqual(["production", "sandbox"]);
+  });
+
+  it("sends a sandbox target through BuzzKit without calling APNs, by default", async () => {
+    const targetEnv = targetEnvironment();
+    await addTarget(targetEnv, installation, { environment: "sandbox" });
+    const response = await sendSealed(hostKeys, installation, targetEnv);
+    expect(response.status).toBe(202);
+    expect(apnsCalls).toEqual([]);
+    expect(buzzKitPosts()).toHaveLength(1);
+    expect(fallbackReasons()).toEqual(["environment_disabled"]);
+    // Nothing was claimed or marked, so enabling sandbox later just works.
+    expect(await sendRows()).toEqual([]);
+    expect((await env.ACCOUNTS.prepare("SELECT invalid_at FROM push_targets").first<{ invalid_at: number | null }>())!.invalid_at).toBeNull();
+  });
+
+  it("keeps production targets direct when only production is listed, and follows the list otherwise", async () => {
+    const targetEnv = targetEnvironment({ APNS_ENVIRONMENTS: "production" });
+    await addTarget(targetEnv, installation);
+    expect(await (await sendSealed(hostKeys, installation, targetEnv)).json()).toMatchObject({ providerStatus: "sent" });
+    const sandboxOnly = targetEnvironment({ APNS_ENVIRONMENTS: "sandbox", PUSH_TOKEN_KEY: targetEnv.PUSH_TOKEN_KEY });
+    await sendSealed(hostKeys, installation, sandboxOnly, "d");
+    expect(apnsCalls).toHaveLength(1);
+    expect(fallbackReasons()).toEqual(["environment_disabled"]);
+  });
+
+  it("reports a shadow target in a disabled environment as one that would not go direct", async () => {
+    const targetEnv = targetEnvironment({ DIRECT_APNS: "shadow" });
+    await addTarget(targetEnv, installation, { environment: "sandbox" });
+    await sendSealed(hostKeys, installation, targetEnv);
+    expect(relayedEvents().filter((event) => event.name === "push.shadow").map((event) => event.p))
+      .toEqual([{ eventType: "session.completed", wouldUseDirect: false }]);
+  });
+
+  describe("a key that serves only production", () => {
+    const refuse = { status: 403, reason: "BadEnvironmentKeyInToken" };
+
+    it("classifies BadEnvironmentKey… as an unsupported environment, not a provider token problem", () => {
+      expect(classifyApnsResponse(403, "BadEnvironmentKeyInToken")).toBe("environment_unsupported");
+      expect(classifyApnsResponse(403, "BadEnvironmentKeyFutureReason")).toBe("environment_unsupported");
+      expect(classifyApnsResponse(403, "InvalidProviderToken")).toBe("provider_token");
+      expect(apnsReasonCode("BadEnvironmentKeyInToken")).toBe("bad_environment_key_in_token");
+      expect(apnsReasonCode("BadEnvironmentKeyFutureReason")).toBe("bad_environment_key");
+    });
+
+    it("stops after one request, without making a new provider token", async () => {
+      apnsAnswers.push(refuse, { status: 200 });
+      const importKey = vi.spyOn(crypto.subtle, "importKey");
+      const config = apnsConfig({ APNS_KEY_P8: providerKey.pem, APNS_KEY_ID: "ABC123DEFG", APNS_TEAM_ID: "TEAM123456" })!;
+      const result = await sendApns({
+        config, environment: "sandbox", tokenHex: TOKEN, pushType: "alert", priority: 10, expiration: NOW + 900,
+        apnsId: await apnsIdFor("env"), payload: {}, authorize: async () => { log.push("authorize"); },
+      });
+      expect(result).toMatchObject({ outcome: "environment_unsupported", status: 403, reason: "bad_environment_key_in_token" });
+      expect(apnsCalls).toHaveLength(1);
+      expect(log).toEqual(["authorize", "apns"]);
+      expect(importKey).toHaveBeenCalledTimes(1);
+    });
+
+    it("sends the message through BuzzKit at once and leaves the token alone", async () => {
+      apnsAnswers.push(refuse);
+      const targetEnv = targetEnvironment({ APNS_ENVIRONMENTS: "production,sandbox" });
+      await addTarget(targetEnv, installation, { environment: "sandbox" });
+      const response = await sendSealed(hostKeys, installation, targetEnv);
+      expect(response.status).toBe(202);
+      expect(apnsCalls).toHaveLength(1);
+      expect(buzzKitPosts()).toHaveLength(1);
+      expect(fallbackReasons()).toEqual(["environment_unsupported"]);
+      expect((await env.ACCOUNTS.prepare("SELECT invalid_at FROM push_targets").first<{ invalid_at: number | null }>())!.invalid_at).toBeNull();
+      expect(relayedEvents().find((event) => event.name === "push.token_invalid")).toBeUndefined();
+      // The Worker remembers: the next sandbox send doesn't ask APNs again.
+      await sendSealed(hostKeys, installation, targetEnv, "d");
+      expect(apnsCalls).toHaveLength(1);
+      expect(buzzKitPosts()).toHaveLength(2);
+      expect(fallbackReasons()).toEqual(["environment_unsupported", "environment_unsupported"]);
+    });
+
+    it("never counts toward a breaker, and never pauses production", async () => {
+      const targetEnv = targetEnvironment({ APNS_ENVIRONMENTS: "production,sandbox" });
+      const production = await insertInstallation(await keys(), hostKeys);
+      await addTarget(targetEnv, installation, { environment: "sandbox" });
+      await addTarget(targetEnv, production);
+      apnsAnswers.push(refuse);
+      await sendSealed(hostKeys, installation, targetEnv);
+      expect(apnsBreakerOpen("sandbox")).toBe(false);
+      expect(apnsBreakerOpen("production")).toBe(false);
+      const response = await handleLoopdyLinkRequest(
+        await hostRequest(hostKeys, production.grantId, "/events", await sealedBody(production, "e")), targetEnv,
+      );
+      expect(await response.json()).toMatchObject({ providerStatus: "sent" });
+    });
+  });
+
+  it("keeps a breaker for each environment: failing sandbox sends can't pause production", async () => {
+    const targetEnv = targetEnvironment({ APNS_ENVIRONMENTS: "production,sandbox" });
+    const sandbox = await insertInstallation(await keys(), hostKeys);
+    await addTarget(targetEnv, sandbox, { environment: "sandbox" });
+    await addTarget(targetEnv, installation);
+    for (let index = 0; index < 3; index += 1) apnsAnswers.push({ status: 400, reason: "BadTopic" });
+    for (let index = 0; index < 3; index += 1) {
+      await handleLoopdyLinkRequest(
+        await hostRequest(hostKeys, sandbox.grantId, "/events", await sealedBody(sandbox, String(index + 1))), targetEnv,
+      );
+    }
+    expect(apnsBreakerOpen("sandbox")).toBe(true);
+    expect(apnsBreakerOpen("production")).toBe(false);
+    // Sandbox is paused...
+    const calls = apnsCalls.length;
+    await handleLoopdyLinkRequest(
+      await hostRequest(hostKeys, sandbox.grantId, "/events", await sealedBody(sandbox, "4")), targetEnv,
+    );
+    expect(apnsCalls.length).toBe(calls);
+    expect(fallbackReasons().at(-1)).toBe("apns_breaker_open");
+    // ...and production still goes direct.
+    const response = await sendSealed(hostKeys, installation, targetEnv, "5");
+    expect(await response.json()).toMatchObject({ providerStatus: "sent" });
+    expect(apnsCalls.length).toBe(calls + 1);
+  });
+
+  it("applies the list to a queued message too", async () => {
+    const targetEnv = targetEnvironment();
+    await addTarget(targetEnv, installation);
+    apnsAnswers.push({ status: 503, reason: "ServiceUnavailable" });
+    await sendSealed(hostKeys, installation, targetEnv);
+    const body = retryQueue.send.mock.calls[0]![0];
+    apnsCalls = [];
+    const message = { id: "m", timestamp: new Date(), body, attempts: 1, ack: vi.fn(), retry: vi.fn() };
+    await handleApnsRetryBatch(
+      { queue: "q", messages: [message] } as never,
+      targetEnvironment({ APNS_ENVIRONMENTS: "sandbox", PUSH_TOKEN_KEY: targetEnv.PUSH_TOKEN_KEY }),
+      { waitUntil() {} } as never,
+    );
+    expect(message.ack).toHaveBeenCalled();
+    expect(apnsCalls).toEqual([]);
+    expect(buzzKitPosts()).toHaveLength(1);
+    expect(fallbackReasons().at(-1)).toBe("environment_disabled");
   });
 });

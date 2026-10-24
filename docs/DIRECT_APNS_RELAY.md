@@ -33,6 +33,7 @@ Before this Worker is deployed these routes answer 404. While the migration or `
 ```
 
 `environment` is `sandbox` or `production`. Xcode builds are sandbox. TestFlight and App Store builds are production.
+The Worker stores either, but only sends directly to the environments in `APNS_ENVIRONMENTS` (see below).
 `appVersion` matches `^[0-9]{1,4}(\.[0-9]{1,4}){0,3}\([0-9]{1,7}\)$`.
 
 Answer, HTTP 200:
@@ -99,6 +100,7 @@ Migration `0010_push_targets.sql` adds two tables to `loopdy-link-accounts`.
 |---|---|
 | `DIRECT_APNS` | `off` (the default when unset), `shadow` or `on` |
 | `DIRECT_APNS_CANARY` | Comma-separated installation IDs |
+| `APNS_ENVIRONMENTS` | `production` (the default), `sandbox` or both, comma-separated |
 
 A send goes direct when all of these are true:
 
@@ -107,6 +109,10 @@ A send goes direct when all of these are true:
 - The installation has a live target of the right kind: `alert` for alerts, wakes and the test notification, or
   `liveactivity` for that activity.
 - `DIRECT_APNS` is `on`, or it is `shadow` and the installation is in `DIRECT_APNS_CANARY`.
+- The target's environment is listed in `APNS_ENVIRONMENTS`. A key made for production only answers a sandbox token with
+  `403 BadEnvironmentKeyInToken`, so the default is `production`: sandbox targets (Xcode builds) go through BuzzKit
+  without calling APNs, and record `push.fallback_buzzkit` with `environment_disabled`. In `shadow`, such a target reports
+  `wouldUseDirect: false`.
 
 A target saved without a muted-topics list is not used for direct delivery: the Worker can't honour what it doesn't know.
 
@@ -120,6 +126,7 @@ The BuzzKit link wake for retired account pairing (`sendBuzzKitLinkWake`) always
 | APNs answer | What happens |
 |---|---|
 | 410, or 400 `BadDeviceToken` or `DeviceTokenNotForTopic` | The target is marked invalid and this message goes through BuzzKit |
+| 403 `BadEnvironmentKeyInToken` (any `BadEnvironmentKey…`) | The key doesn't serve this environment. The message goes through BuzzKit at once, with no new provider token. The target isn't blamed, nothing counts toward a breaker, and the Worker skips APNs for that environment for ten minutes (`environment_unsupported`) |
 | 403 `ExpiredProviderToken`, `InvalidProviderToken` or `MissingProviderToken` | A new provider token is made once and the push is sent again. If that fails too, the message goes through BuzzKit |
 | 429, 5xx or no answer in 5 seconds | The message goes on the retry queue and the host gets `accepted` with `providerStatus: "queued"`. With no queue, it goes through BuzzKit |
 | Any other 4xx | The message goes through BuzzKit |
@@ -143,7 +150,8 @@ Worker's `mutedTopics` is a copy that can be out of date, so it is never used to
 
 ### Circuit breaker
 
-Three failures in a row of the same setup kind pause direct sends in that Worker instance for a minute. The kinds are a
+Each environment has its own breaker, so failures on sandbox targets can never pause production. Three failures in a row
+of the same setup kind in one environment pause direct sends to it in that Worker instance for a minute. The kinds are a
 provider token APNs still refuses after it was replaced, and the refusals `BadTopic`, `TopicDisallowed`, `MissingTopic`,
 `Forbidden`, `BadCertificate`, `BadCertificateEnvironment` and a key that can't sign. A success resets the count. A dead
 token or a transient failure doesn't count. While the breaker is open every send goes through BuzzKit and records
@@ -158,6 +166,20 @@ When the message is queued, `providerStatus` is `queued` and `counts` is `null`.
 A BuzzKit send answers as before. `providerStatus` is the status in BuzzKit's create answer, or `accepted` if it has none.
 The Worker no longer reads the message back, which saved a round trip on every send. The test notification and the
 retired Link wake still read back, because they use `counts`.
+
+### Live Activities and the shared card
+
+Bighelp keeps one physical Live Activity for all of a phone's active chats ([Shared chat Live Activity](LIVE_ACTIVITY_GROUPS.md)).
+Which ID the Worker sends to depends on how the phone registered:
+
+- **Shared card (version 3 registration, with `groupId`).** The Worker sends one aggregate update to the physical card, from the
+  user's Durable Object. The push token to register with `live-activity-target` is the physical card's, with
+  **`activityId` set to the `groupId`** the phone registers with the grant route. Per-chat aliases (`activityId` in
+  `/live-activities/<alias>`) get no token. The aggregate is rebuilt for every send, so a direct push that fails is never
+  queued: it goes through BuzzKit at once (`group_not_queued`) with the same content. Its send key is
+  `installation|liveactivity|groupId|timestamp`, and the group's own authority check is still the last step before the request.
+- **Individual registration (version 2).** The Worker sends that activity's update to the token registered under its own
+  `activityId`, as described above, and a failed push may use the retry queue.
 
 ### Idempotency
 
@@ -282,7 +304,7 @@ a token, an ID, message text or a path.
 | `push.token_invalid` | `kind`, `reason` |
 | `push.retry` | `attempt`, `reason` |
 | `push.dlq` | `reason` |
-| `push.fallback_buzzkit` | `reason`: `apns_unconfigured`, `no_target`, `target_unreadable`, `target_incomplete`, `token_invalid`, `provider_token`, `no_queue`, `not_queued`, `plaintext_not_queued`, `queue_unavailable`, `retries_exhausted`, `apns_breaker_open`, `apns_deadline`, `topic_muted`, `consumer_error`, `payload_too_large`, `target_lookup_failed`, `claim_failed`, `already_with_buzzkit` or `apns_<apns reason>` |
+| `push.fallback_buzzkit` | `reason`: `apns_unconfigured`, `no_target`, `target_unreadable`, `target_incomplete`, `token_invalid`, `provider_token`, `no_queue`, `not_queued`, `plaintext_not_queued`, `queue_unavailable`, `retries_exhausted`, `apns_breaker_open`, `environment_disabled`, `environment_unsupported`, `group_not_queued`, `apns_deadline`, `topic_muted`, `consumer_error`, `payload_too_large`, `target_lookup_failed`, `claim_failed`, `already_with_buzzkit` or `apns_<apns reason>` |
 | `push.shadow` | `eventType`, `wouldUseDirect` |
 
 ### Workers Logs
@@ -312,7 +334,8 @@ installation, so keep it off hosts and rotate it if it ever reaches one. Make `P
 
 ## Rollout
 
-Each step is safe to stop at. The Worker changes nothing for anyone until step 6.
+Each step is safe to stop at. The Worker changes nothing for anyone until step 6. The planned APNs key is valid for
+production only, so leave `APNS_ENVIRONMENTS` at `production`: debug builds keep using BuzzKit.
 
 1. Create the queues: `wrangler queues create loopdy-link-apns-retry-dlq` and `wrangler queues create loopdy-link-apns-retry`.
 2. Apply migration 0010 to the remote `loopdy-link-accounts` database.

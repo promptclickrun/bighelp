@@ -184,6 +184,15 @@ import Testing
         var environment = BighelpLinkPushEnvironment.production
         /// What the settings screen says is turned off; nil when BuzzKit can't be asked.
         var muted: [String]? = []
+        /// The push-to-start token the system has now.
+        var currentPushToStart: Data?
+        /// Sleeps the registrar asked for; they end when the test lets them.
+        private(set) var sleepRequests: [Duration] = []
+        var sleepsAreReleased = false
+        func sleepForTest(_ duration: Duration) async {
+            sleepRequests.append(duration)
+            while !sleepsAreReleased && !Task.isCancelled { try? await Task.sleep(for: .milliseconds(2)) }
+        }
         private(set) var registerRequests = 0
         private(set) var pushToStartHandler: (@MainActor (Data) async -> Void)?
         private(set) var registrar: BighelpPushRegistrar!
@@ -216,6 +225,8 @@ import Testing
                 registerForRemoteNotifications: { [weak self] in self?.registerRequests += 1 },
                 startPushToStart: { [weak self] handler in self?.pushToStartHandler = handler },
                 mutedTopics: { [weak self] in self?.muted },
+                currentPushToStartToken: { [weak self] in self?.currentPushToStart },
+                sleep: { [weak self] in await self?.sleepForTest($0) },
                 debounce: .milliseconds(20),
                 removalTimeout: removalTimeout,
                 startsReady: startsReady,
@@ -934,6 +945,145 @@ import Testing
         for index in 0..<5 { await phone.registrar.registerActivity(id: "activity_one", token: Data(repeating: UInt8(index + 9), count: 32)) }
         #expect(phone.worker.puts.count == 2)
         #expect(phone.worker.rateLimited == 0)
+    }
+
+    // MARK: Clocks that jump
+
+    @Test func aClockSetBackDoesNotLeaveTheWriteBudgetStuck() async {
+        let phone = Phone()
+        defer { phone.cleanup() }
+        await phone.registrar.receiveToken(Data(repeating: 1, count: 32))
+        await phone.registrar.receiveToken(Data(repeating: 2, count: 32))
+        await phone.registrar.receiveToken(Data(repeating: 3, count: 32))
+        #expect(phone.worker.puts.count == 2, "The budget is spent")
+        // The date moves back a day: those writes are now "in the future" and no longer count.
+        phone.clock.advance(-Self.day)
+        await phone.registrar.receiveToken(Data(repeating: 3, count: 32))
+        #expect(phone.worker.puts.count == 3)
+    }
+
+    @Test func aWaitFurtherAheadThanTheLongestOneIsOver() async {
+        let phone = Phone()
+        defer { phone.cleanup() }
+        phone.worker.mode = .failing(status: 503, code: "notification_service_unavailable")
+        await phone.registrar.receiveToken(Self.token)
+        phone.clock.advance(-30 * Self.day) // the date was wrong, and is corrected
+        phone.worker.mode = .deployed
+        await phone.registrar.receiveToken(Self.token)
+        #expect(phone.worker.puts.count == 2, "Not stuck for a month")
+        // The same for the day-long wait after a 404.
+        let old = Phone()
+        defer { old.cleanup() }
+        old.worker.mode = .notDeployed
+        await old.registrar.receiveToken(Self.token)
+        old.clock.advance(-3 * Self.day)
+        old.worker.mode = .deployed
+        await old.registrar.receiveToken(Self.token)
+        #expect(old.worker.puts.count == 2)
+    }
+
+    @Test func aRegistrationDatedInTheFutureIsNotFresh() async {
+        let phone = Phone()
+        defer { phone.cleanup() }
+        await phone.registrar.receiveToken(Self.token)
+        phone.clock.advance(-30 * Self.day)
+        await phone.registrar.receiveToken(Self.token)
+        #expect(phone.worker.puts.count == 2, "Sent again, with today's date")
+        await phone.registrar.receiveToken(Self.token)
+        #expect(phone.worker.puts.count == 2)
+    }
+
+    // MARK: Setup, waits and choices
+
+    @Test func aFirstSetupDoesNotWaitOutABackoffFromBeforeIdentifying() async {
+        let phone = Phone()
+        defer { phone.cleanup() }
+        phone.muted = nil // BuzzKit hadn't identified the phone yet
+        await phone.registrar.receiveToken(Self.token)
+        #expect(phone.registrar.state.retryAfter != nil)
+        phone.muted = []
+        await phone.registrar.enrollmentFinished()
+        #expect(phone.worker.puts.count == 1, "Setup's own registration goes out at once")
+        #expect(phone.registrar.state.retryAfter == nil)
+    }
+
+    @Test func aChoicesChangeDuringABackoffGoesWhenItEnds() async {
+        let phone = Phone()
+        defer { phone.cleanup() }
+        phone.worker.mode = .failing(status: 503, code: "notification_service_unavailable")
+        await phone.registrar.receiveToken(Self.token)
+        phone.worker.mode = .deployed
+        phone.muted = ["questions-approvals"]
+        await phone.registrar.sendPreferenceChange()
+        #expect(phone.worker.puts.count == 1, "Still backing off")
+        for _ in 0..<500 where phone.sleepRequests.isEmpty { try? await Task.sleep(for: .milliseconds(5)) }
+        #expect(phone.sleepRequests.last == .seconds(5 * 60 + 1), "Scheduled for when the wait ends")
+        phone.clock.advance(5 * 60 + 1)
+        phone.sleepsAreReleased = true
+        for _ in 0..<500 where phone.worker.puts.count < 2 { try? await Task.sleep(for: .milliseconds(5)) }
+        #expect(phone.worker.puts.count == 2)
+        #expect(phone.worker.puts.last?.body["mutedTopics"] as? [String] == ["questions-approvals"])
+        #expect(phone.registrar.state.mutedPending == false)
+    }
+
+    @Test func aChoicesChangeDuringAnOldWorkersDayIsScheduledToo() async {
+        let phone = Phone()
+        defer { phone.cleanup() }
+        phone.worker.mode = .notDeployed
+        await phone.registrar.receiveToken(Self.token)
+        phone.muted = ["subagent-completions"]
+        await phone.registrar.sendPreferenceChange()
+        for _ in 0..<500 where phone.sleepRequests.isEmpty { try? await Task.sleep(for: .milliseconds(5)) }
+        #expect(phone.sleepRequests.last == .seconds(24 * 3600 + 1))
+        phone.sleepsAreReleased = true // let the sleeper end quietly
+    }
+
+    // MARK: Live Activity bookkeeping
+
+    @Test func twoIdenticalRegistrationsAtOnceSpendOneWrite() async {
+        let phone = Phone()
+        defer { phone.cleanup() }
+        phone.worker.suspends = true
+        async let one: Void = phone.registrar.registerActivity(id: "activity_one", token: Self.token)
+        async let two: Void = phone.registrar.registerActivity(id: "activity_one", token: Self.token)
+        _ = await (one, two)
+        #expect(phone.worker.puts.count == 1)
+    }
+
+    @Test func removingActivitiesNeverSpendsTheWriteBudget() async {
+        let phone = Phone()
+        defer { phone.cleanup() }
+        for index in 0..<8 { await phone.registrar.removeActivity(id: "activity_\(index)") }
+        #expect(phone.worker.deletes.count == 8)
+        await phone.registrar.receiveToken(Self.token)
+        await phone.registrar.registerPushToStart(Self.otherToken)
+        #expect(phone.worker.puts.count == 2, "Both launch writes are still there")
+        #expect(phone.worker.rateLimited == 0)
+    }
+
+    // MARK: Push-to-start
+
+    @Test func thePushToStartTokenIsReadAtEveryForegroundNotOnlyFromTheStream() async {
+        let phone = Phone()
+        defer { phone.cleanup() }
+        phone.currentPushToStart = Self.token
+        phone.worker.mode = .notDeployed
+        await phone.registrar.refreshAtForeground()
+        for _ in 0..<500 where phone.worker.puts.isEmpty { try? await Task.sleep(for: .milliseconds(5)) }
+        #expect(phone.worker.puts.count == 1)
+        #expect(phone.worker.targets["pts"] == nil)
+        // A day later, with no stream event at all, the next foreground finds it again.
+        phone.clock.advance(Self.day + 60)
+        phone.worker.mode = .deployed
+        await phone.registrar.refreshAtForeground()
+        for _ in 0..<500 where phone.worker.targets["pts"] == nil { try? await Task.sleep(for: .milliseconds(5)) }
+        #expect(phone.worker.targets["pts"]?["token"] as? String == Self.tokenHex)
+        // And once the service has it, it isn't written again.
+        let writes = phone.worker.puts.count
+        phone.clock.advance(3600)
+        await phone.registrar.refreshAtForeground()
+        try? await Task.sleep(for: .milliseconds(40))
+        #expect(phone.worker.puts.count == writes)
     }
 
     // MARK: Never in the way

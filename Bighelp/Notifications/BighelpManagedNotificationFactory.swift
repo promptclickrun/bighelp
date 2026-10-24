@@ -86,7 +86,8 @@ struct BighelpManagedNotificationFactory {
                 guard let preferences = try? await BighelpBuzzKitPreferencesClient().load(),
                       !preferences.isEmpty else { return nil }
                 return preferences.filter { !$0.enabled }.map(\.id)
-            })
+            },
+            currentPushToStartToken: { await BighelpPushToStartObserver.shared.currentToken() })
         BighelpPushPreferenceChanges.handler = { [weak registrar] in registrar?.preferencesChanged() }
         return registrar
     }

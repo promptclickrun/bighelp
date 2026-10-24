@@ -87,6 +87,8 @@ final class BighelpPushRegistrar {
     private let registerForRemoteNotifications: @MainActor () -> Void
     private let startPushToStart: @MainActor (@escaping @MainActor (Data) async -> Void) -> Void
     private let mutedTopics: @MainActor () async -> [String]?
+    private let currentPushToStartToken: @MainActor () async -> Data?
+    private let sleep: @Sendable (Duration) async -> Void
     private let debounce: Duration
     private let defaults: UserDefaults
     private let now: () -> Date
@@ -105,6 +107,7 @@ final class BighelpPushRegistrar {
     private var pending: [String: PendingTarget] = [:]
     private var deferredSend: Task<Void, Never>?
     private var pushToStartInFlight: String?
+    private var activityInFlight: [String: String] = [:]
     private var sentActivities: [String: String] = [:]
     private var activityWrites: [String: [Date]] = [:]
 
@@ -117,6 +120,8 @@ final class BighelpPushRegistrar {
          registerForRemoteNotifications: @escaping @MainActor () -> Void,
          startPushToStart: @escaping @MainActor (@escaping @MainActor (Data) async -> Void) -> Void = { _ in },
          mutedTopics: @escaping @MainActor () async -> [String]?,
+         currentPushToStartToken: @escaping @MainActor () async -> Data? = { nil },
+         sleep: @escaping @Sendable (Duration) async -> Void = { try? await Task.sleep(for: $0) },
          debounce: Duration = .seconds(2),
          removalTimeout: Duration = .seconds(5),
          startsReady: Bool = false,
@@ -127,7 +132,8 @@ final class BighelpPushRegistrar {
         self.appVersion = Self.valid(appVersion: appVersion) ? appVersion : "0(0)"
         self.registerForRemoteNotifications = registerForRemoteNotifications
         self.startPushToStart = startPushToStart
-        self.mutedTopics = mutedTopics; self.debounce = debounce; self.removalTimeout = removalTimeout
+        self.mutedTopics = mutedTopics; self.debounce = debounce
+        self.currentPushToStartToken = currentPushToStartToken; self.sleep = sleep; self.removalTimeout = removalTimeout
         isReady = startsReady
         self.defaults = defaults; self.now = now
     }
@@ -151,6 +157,9 @@ final class BighelpPushRegistrar {
         // A token that arrived earlier in the launch waits for this point.
         if latestToken != nil { Task { await runSendLoop() } }
         startPushToStart { [weak self] token in await self?.registerPushToStart(token) }
+        // The stream may not repeat the token it already gave, so the current one is read each time too.
+        // The same token is never written twice: it is compared with what the service has.
+        Task { if let token = await currentPushToStartToken() { await registerPushToStart(token) } }
         // Earlier Live Activity tries go again in the background; they never hold up the launch.
         if !pending.isEmpty { Task { await retryPending() } }
         if isWaiting { return }
@@ -207,8 +216,10 @@ final class BighelpPushRegistrar {
 
     /// Setup just finished for the first time on this phone: its token is already known.
     func enrollmentFinished() async {
-        // Setup identified the phone and moved the saved choices before this.
+        // Setup identified the phone and moved the saved choices before this. A wait from a read that
+        // failed before then is over: setup's own registration goes out at once.
         isReady = true
+        update { $0.retryAfter = nil; $0.failures = 0 }
         if let latestToken, let data = Self.data(hex: latestToken) {
             await receiveToken(data)
         } else {
@@ -221,11 +232,15 @@ final class BighelpPushRegistrar {
         guard let hex = latestToken, let credentials = await eligibleCredentials() else { return }
         let environment = environment()
         let digest = Self.digest(hex)
-        if isWaiting { return }
+        if isWaiting {
+            // A change to the choices must not sit until the next foreground: it goes when the wait ends.
+            if state.mutedPending, let end = waitEnd { scheduleSend(after: end.timeIntervalSince(now()) + 1) }
+            return
+        }
         let previous = state.alert
         let isCurrent = previous.map {
             $0.installationID == credentials.deviceID && $0.digest == digest
-                && $0.environment == environment.rawValue && now().timeIntervalSince($0.at) < Self.refreshInterval
+                && $0.environment == environment.rawValue && Self.isFresh($0.at, now: now())
         } ?? false
         guard Self.valid(alertToken: hex) else {
             fail(.directPushRefused, stage: "token", kind: .check("token_invalid"))
@@ -248,7 +263,9 @@ final class BighelpPushRegistrar {
         // A change to the person's choices has its own room in the budget.
         let isChoicesChange = isCurrent || state.mutedPending
         guard hasBudget(choicesChange: isChoicesChange) else {
-            if isChoicesChange { deferUntilBudgetFrees() }
+            if isChoicesChange, let oldest = writesInWindow().min() {
+                scheduleSend(after: oldest.addingTimeInterval(Self.writeWindow).timeIntervalSince(now()) + 1)
+            }
             return
         }
         spendWrite()
@@ -294,6 +311,8 @@ final class BighelpPushRegistrar {
     func removeActivity(id: String) async {
         pending[id] = nil
         sentActivities[id] = nil
+        pruneActivityWrites()
+        // A removal is a DELETE, which the service never limits; it spends none of the write budget.
         guard let credentials = installationCredentials(), !isWaitingForActivity else { return }
         do {
             _ = try await delete(Self.liveActivityTargetPath, credentials: credentials,
@@ -312,7 +331,7 @@ final class BighelpPushRegistrar {
         let digest = Self.digest(token)
         if isPushToStart, let sent = state.pushToStart, sent.installationID == credentials.deviceID,
            sent.digest == digest, sent.environment == environment.rawValue,
-           now().timeIntervalSince(sent.at) < Self.refreshInterval {
+           Self.isFresh(sent.at, now: now()) {
             pending[key] = nil
             return
         }
@@ -324,9 +343,11 @@ final class BighelpPushRegistrar {
             // The same token is never written twice at once, nor again while the service has it.
             guard pushToStartInFlight != digest else { return }
         } else {
-            if sentActivities[key] == digest { return }
-            let recent = (activityWrites[key] ?? []).filter { now().timeIntervalSince($0) < Self.writeWindow }
-            let all = activityWrites.values.flatMap { $0 }.filter { now().timeIntervalSince($0) < Self.writeWindow }
+            // Neither the same token again, nor the same one twice at once.
+            if sentActivities[key] == digest || activityInFlight[key] == digest { return }
+            pruneActivityWrites()
+            let recent = activityWrites[key] ?? []
+            let all = activityWrites.values.flatMap { $0 }
             if recent.count >= Self.activityWritePerIDLimit || all.count >= Self.activityWriteLimit {
                 hold(key: key, token: token, isPushToStart: false, whileUnavailable: false)
                 return
@@ -337,9 +358,9 @@ final class BighelpPushRegistrar {
             return
         }
         if isWaitingForActivity {
-            // Backing off, or the service has no such route yet. The push-to-start token is the same
-            // for days and the stream won't repeat it, so it waits; a Live Activity's token is
-            // worthless by the time a day passes, so only a short backoff keeps it.
+            // Backing off, or the service has no such route yet. The push-to-start token waits (the
+            // foreground pass also reads the current one, so it is found again either way); a Live
+            // Activity's token is worthless by the time a day passes, so only a short backoff keeps it.
             hold(key: key, token: token, isPushToStart: isPushToStart, whileUnavailable: isUnavailable)
             return
         }
@@ -353,8 +374,11 @@ final class BighelpPushRegistrar {
             spendWrite()
         } else {
             activityWrites[key, default: []].append(now())
+            activityInFlight[key] = digest
         }
-        defer { if isPushToStart { pushToStartInFlight = nil } }
+        defer {
+            if isPushToStart { pushToStartInFlight = nil } else { activityInFlight[key] = nil }
+        }
         do {
             let response = try await api.managedNotificationRequest(
                 path: Self.liveActivityTargetPath, method: "PUT",
@@ -364,7 +388,10 @@ final class BighelpPushRegistrar {
                 throw BighelpLinkAPIError.invalidResponse
             }
             pending[key] = nil
-            if !isPushToStart { sentActivities[key] = digest }
+            if !isPushToStart {
+                if sentActivities.count >= 64 { sentActivities.removeAll() }
+                sentActivities[key] = digest
+            }
             guard self.credentials() == credentials, !isTurningOff() else { return }
             update {
                 $0.activityRetryAfter = nil; $0.activityFailures = 0
@@ -462,19 +489,36 @@ final class BighelpPushRegistrar {
             credentials: credentials)
     }
 
-    /// The service said 404 not long ago.
-    private var isUnavailable: Bool {
-        state.unavailableUntil.map { now() < $0 } ?? false
+    /// A wait further ahead than the longest one we ever set means the clock moved: it is over.
+    private func isAhead(_ date: Date?, within maximum: TimeInterval) -> Bool {
+        guard let date else { return false }
+        let remaining = date.timeIntervalSince(now())
+        return remaining > 0 && remaining <= maximum
     }
 
-    /// Unavailable, or backing off after a failure.
-    private var isWaiting: Bool {
-        isUnavailable || (state.retryAfter.map { now() < $0 } ?? false)
+    private static var longestBackoff: TimeInterval { max(backoff.max() ?? 0, writeWindow) }
+
+    /// The service said 404 not long ago.
+    private var isUnavailable: Bool {
+        isAhead(state.unavailableUntil, within: Self.unavailableInterval)
     }
+
+    private var isBackingOff: Bool { isAhead(state.retryAfter, within: Self.longestBackoff) }
+
+    /// Unavailable, or backing off after a failure.
+    private var isWaiting: Bool { isUnavailable || isBackingOff }
 
     /// The same, and the Live Activity addresses' own backoff.
     private var isWaitingForActivity: Bool {
-        isWaiting || (state.activityRetryAfter.map { now() < $0 } ?? false)
+        isWaiting || isAhead(state.activityRetryAfter, within: Self.longestBackoff)
+    }
+
+    /// When the current wait for the alert address ends.
+    private var waitEnd: Date? {
+        var ends: [Date] = []
+        if isUnavailable, let until = state.unavailableUntil { ends.append(until) }
+        if isBackingOff, let until = state.retryAfter { ends.append(until) }
+        return ends.max()
     }
 
     /// The installation, only while it may be used: not while turning off, and (for alerts) only
@@ -518,8 +562,30 @@ final class BighelpPushRegistrar {
 
     // MARK: The service's write budget
 
+    /// Forgets the writes of activities whose last write left the window (ended or old ones).
+    private func pruneActivityWrites() {
+        let current = now()
+        activityWrites = activityWrites.compactMapValues { dates in
+            let recent = dates.filter { Self.isInWindow($0, now: current) }
+            return recent.isEmpty ? nil : recent
+        }
+    }
+
+    /// A write counts only if it is in the past and inside the window: a clock that was set back
+    /// can't leave the budget stuck.
+    private static func isInWindow(_ date: Date, now: Date) -> Bool {
+        let age = now.timeIntervalSince(date)
+        return age >= 0 && age < writeWindow
+    }
+
+    /// A registration younger than a week and not from the future.
+    private static func isFresh(_ date: Date, now: Date) -> Bool {
+        let age = now.timeIntervalSince(date)
+        return age >= 0 && age < refreshInterval
+    }
+
     private func writesInWindow() -> [Date] {
-        state.writes.filter { now().timeIntervalSince($0) < Self.writeWindow }
+        state.writes.filter { Self.isInWindow($0, now: now()) }
     }
 
     private func hasBudget(choicesChange: Bool) -> Bool {
@@ -532,13 +598,13 @@ final class BighelpPushRegistrar {
         update { $0.writes = recent }
     }
 
-    /// A change to the choices that has to wait for room goes out when the oldest write leaves the window.
-    private func deferUntilBudgetFrees() {
-        guard let oldest = writesInWindow().min() else { return }
-        let wait = max(1, oldest.addingTimeInterval(Self.writeWindow).timeIntervalSince(now()) + 1)
+    /// Runs the send loop again after `seconds` (at most a day; a newer call replaces an older one).
+    private func scheduleSend(after seconds: TimeInterval) {
+        let wait = min(max(1, seconds), Self.unavailableInterval + 60)
         deferredSend?.cancel()
+        let sleep = self.sleep
         deferredSend = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(wait))
+            await sleep(.seconds(wait))
             guard !Task.isCancelled, let self else { return }
             await self.runSendLoop()
         }

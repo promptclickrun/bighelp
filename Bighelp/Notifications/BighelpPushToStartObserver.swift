@@ -16,6 +16,17 @@ final class BighelpPushToStartObserver {
     private var task: Task<Void, Never>?
     private var handler: (@MainActor (Data) async -> Void)?
 
+    /// The token the system has now. Apple documents the stream as the way to hear changes but not that a new
+    /// iteration repeats the current token, so the registrar reads it here at each foreground as well.
+    func currentToken() async -> Data? {
+        #if canImport(ActivityKit) && os(iOS) && !targetEnvironment(macCatalyst)
+        if #available(iOS 17.2, *) {
+            return await ActivityKitSerialAccess.read { Activity<LoopdySessionActivityAttributes>.pushToStartToken }
+        }
+        #endif
+        return nil
+    }
+
     /// Starts watching once per launch. A later call only replaces who hears the tokens.
     func start(_ handler: @escaping @MainActor (Data) async -> Void) {
         self.handler = handler

@@ -411,10 +411,12 @@ final class ChatRowPresence {
 /// each time it comes and goes.
 struct ChatRowMotion: ViewModifier {
     let presence: ChatRowPresence
+    @Environment(\.bighelpLoaderMotionOverride) private var override
 
     func body(content: Content) -> some View {
-        let isOnScreen = presence.isOnScreen
-        content.transformEnvironment(\.bighelpLoaderMotionOverride) { if !isOnScreen { $0.sceneInactive = true } }
+        var motion = override
+        if !presence.isOnScreen { motion.sceneInactive = true }
+        return content.environment(\.bighelpLoaderMotionOverride, motion)
     }
 }
 
@@ -735,7 +737,7 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             cell.selectionStyle = .none
             let configuration = UIHostingConfiguration {
                 HostedRow(state: state)
-                    .transformEnvironment(\.self) { Self.applyHostedEnvironment(from: environment, to: &$0) }
+                    .transformEnvironment(\.self, transform: Self.hostedEnvironment(from: environment))
                     .buttonStyle(.plain)
             }.margins(.all, 0)
             // The bottom spacer, and activity lines (which set their own touch
@@ -884,7 +886,13 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             table.setNeedsLayout()
         }
 
-        private static func applyHostedEnvironment(from source: EnvironmentValues, to values: inout EnvironmentValues) {
+        /// SwiftUI can apply this off the main thread, while a row animates on its own renderer: made on the main
+        /// actor, the closure trapped there (Swift 6 isolation check). Rows hosted as a subview render that way.
+        nonisolated private static func hostedEnvironment(from source: EnvironmentValues) -> (inout EnvironmentValues) -> Void {
+            { applyHostedEnvironment(from: source, to: &$0) }
+        }
+
+        nonisolated private static func applyHostedEnvironment(from source: EnvironmentValues, to values: inout EnvironmentValues) {
             // Each hosting configuration owns its own layout/accessibility
             // bridge. Copy public presentation values and app dependencies,
             // never the parent hosting graph's private environment storage.

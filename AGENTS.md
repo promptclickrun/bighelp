@@ -339,7 +339,9 @@ change in both repos.
   of sight, before it waits in `parking`: first built anywhere else, its views were made again when it showed.
   A kept row is drawn again only when its row value or
   its part of `ChatCanvasRowContext` (grouping, density) changes, so anything else a row takes from `ChatView`
-  belongs in that context. Rows off screen hold their loaders still (`bighelpLoaderMotionOverride`).
+  belongs in that context. Rows off screen hold their loaders still (`bighelpLoaderMotionOverride`). SwiftUI
+  updates a hosted row on its own renderer thread while the row animates, so a closure it calls there (an
+  environment transform) must not be made on the main actor: it traps (`hostedEnvironment(from:)`).
 - **Type-checker timeouts:** very large `body`s (`RootShellView`, `BighelpApp`) time out the type checker. Pull
   pieces out into functions or named `ViewModifier`s.
 - **Text styling:** styled text in the composer must pass attributes and theme colors. Plain `String` replacements

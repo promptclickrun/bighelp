@@ -347,6 +347,66 @@ struct DirectHermesHistoryProjectionTests {
         #expect(client.historyProjections[record.id]?.rows.map(\.id) == Array(61...140))
     }
 
+    @Test func readingTheNewestPageAgainKeepsTheEarlierPagesTheChatHolds() async throws {
+        @MainActor final class FixtureState {
+            var newest = 140
+        }
+        let workspace = try SessionWorkspaceStub()
+        let state = FixtureState()
+        workspace.handler = { operation, payload in
+            switch operation {
+            case .profilesList: return DirectHermesSessionCatalogClientTests.profiles()
+            case .sessionsList:
+                return ["sessions": .array([DirectHermesSessionCatalogClientTests.session(id: "tip")]),
+                        "total": .integer(1), "offset": .integer(0), "limit": .integer(100)]
+            case .sessionHistory:
+                // Rows are numbered oldest first; the offset counts back from the newest.
+                let offset = try #require(payload["offset"]?.integer)
+                let limit = try #require(payload["limit"]?.integer)
+                let newest = state.newest - offset
+                return Self.page(Array(max(1, newest - limit + 1)...newest).map {
+                    Self.row(id: $0, role: "user", content: .string("Row \($0)"))
+                }, offset: offset, limit: limit, order: "latest")
+            default: throw WorkspaceClientError.invalidRequest
+            }
+        }
+        let client = DirectHermesSessionCatalogClientTests.client(workspace)
+        let record = try #require(try await client.list().first)
+        let initial = try await client.hydratePage(record, offset: nil, turnLimit: 1)
+        let earlier = try await client.hydratePage(initial.record, offset: 40, turnLimit: 1)
+        #expect(client.historyProjections[record.id]?.rows.map(\.id) == Array(61...140))
+
+        // The app comes back on a new connection with the same sign-in, and five rows arrived
+        // meanwhile: the newest page is read again.
+        let away = try #require(workspace.owner)
+        workspace.owner = WorkspaceOwner(authority: away.authority, authenticationGeneration: away.authenticationGeneration,
+                                         connectionGeneration: UUID())
+        let reconnected = DirectHermesSessionCatalogClientTests.client(workspace)
+        reconnected.adoptHistory(from: client)
+        _ = try await reconnected.list()
+        state.newest = 145
+        let refreshed = try await reconnected.hydratePage(earlier.record, offset: nil, turnLimit: 1)
+        #expect(reconnected.historyProjections[record.id]?.rows.map(\.id) == Array(61...145))
+        #expect(refreshed.record.items.count == 85)
+        #expect(refreshed.nextOffset == 85)
+        let older = try await reconnected.hydratePage(refreshed.record, offset: 85, turnLimit: 1)
+        #expect(reconnected.historyProjections[record.id]?.rows.map(\.id) == Array(21...145))
+        #expect(older.nextOffset == 125)
+
+        // More new rows than a page: they don't meet what the chat holds, so only the newest page stays.
+        state.newest = 300
+        let jumped = try await reconnected.hydratePage(older.record, offset: nil, turnLimit: 1)
+        #expect(reconnected.historyProjections[record.id]?.rows.map(\.id) == Array(261...300))
+        #expect(jumped.nextOffset == 40)
+
+        // Another sign-in starts with nothing.
+        workspace.owner = WorkspaceOwner(authority: away.authority, authenticationGeneration: UUID(),
+                                         connectionGeneration: UUID())
+        let other = DirectHermesSessionCatalogClientTests.client(workspace)
+        other.adoptHistory(from: reconnected)
+        #expect(other.historyProjections.isEmpty)
+    }
+
     static func row(id: Int, role: String, content: BighelpJSONValue, timestamp: Double = 1,
                     displayKind: String? = nil, turnDurationMilliseconds: Int? = nil) -> BighelpJSONValue {
         var value: [String: BighelpJSONValue] = [

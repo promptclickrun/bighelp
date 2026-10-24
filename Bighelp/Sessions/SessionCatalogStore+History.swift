@@ -215,6 +215,33 @@ extension SessionCatalogStore {
         }
     }
 
+    /// Brings an open chat up to date when the app comes back: its newest page, with the earlier
+    /// messages it already holds, and where "load earlier" goes on from. Reading its whole history
+    /// here swapped a long chat's page for every message it ever had, read and laid out on the main
+    /// thread just as the person scrolled.
+    func refreshHeldHistory(id: String) async throws -> SessionHydrationPage {
+        guard session(id: id) != nil else { throw SessionCatalogError.invalidSession }
+        if initialHistoryLoads[id] != nil {
+            let record = try await hydrateInitialPage(id: id)
+            return SessionHydrationPage(record: record, nextOffset: previousHistoryOffsetByID[id])
+        }
+        let record = try restoreSessionContent(id: id)
+        let generation = accountGeneration
+        let hydrationGeneration = (latestHydrationGenerationByID[id] ?? 0) &+ 1
+        latestHydrationGenerationByID[id] = hydrationGeneration
+        do {
+            let page = try await client.hydratePage(record, offset: nil, turnLimit: 8)
+            try Task.checkCancellation()
+            return page
+        } catch is CancellationError {
+            // Another read of this chat won (it was opened meanwhile): its result is current.
+            try Task.checkCancellation()
+            guard generation == accountGeneration, latestHydrationGenerationByID[id] != hydrationGeneration,
+                  let winner = session(id: id) else { throw CancellationError() }
+            return SessionHydrationPage(record: winner, nextOffset: previousHistoryOffsetByID[id])
+        }
+    }
+
     /// A confirmed history mutation cannot join a read started before that
     /// mutation. Retire only this session's old flight and fetch canonical state.
     func refreshAfterNativeHistoryMutation(id: String) async throws -> SessionRecord {

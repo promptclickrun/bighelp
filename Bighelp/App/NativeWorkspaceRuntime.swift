@@ -708,11 +708,9 @@ final class NativeWorkspaceRuntime {
                 refreshing?.beginHostRefresh()
                 defer { refreshing?.endHostRefresh() }
                 let source = try self.sessions.restoreSessionContent(id: id)
-                let recovered = try await self.sessions.refreshKnownSession(id: id)
+                let recovered = try await self.sessions.refreshHeldHistory(id: id)
                 try self.require(owner, request: request)
-                _ = try self.features.installSessionStateSnapshot(
-                    SessionHydrationPage(record: recovered, nextOffset: nil), source: source
-                )
+                _ = try self.features.installSessionStateSnapshot(recovered, source: source)
             }
             if let active = appState.activeConversationID, failedSessions.contains(active) {
                 unrecoveredActiveChatID = active

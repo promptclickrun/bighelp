@@ -28,6 +28,8 @@ class Rejection extends Error {
   }
 }
 
+const RETRY_AFTER_SECONDS = "60";
+
 function reply(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -35,6 +37,8 @@ function reply(body: unknown, status: number): Response {
       "content-type": "application/json; charset=utf-8",
       "cache-control": "no-store",
       "x-content-type-options": "nosniff",
+      // Both limits count per minute, so a minute is when a retry can first succeed.
+      ...(status === 429 ? { "retry-after": RETRY_AFTER_SECONDS } : {}),
     },
   });
 }
@@ -68,14 +72,22 @@ async function readCapped(stream: ReadableStream<Uint8Array> | null, cap: number
   return bytes;
 }
 
+// An empty Content-Encoding header means the same as none.
+function contentEncoding(request: Request): string {
+  return (request.headers.get("content-encoding") ?? "").trim().toLowerCase() || "identity";
+}
+
 async function readBody(request: Request): Promise<unknown> {
+  const encoding = contentEncoding(request);
+  // Refuse an encoding we cannot read before pulling a single byte of the body.
+  if (encoding !== "gzip" && encoding !== "identity") throw reject(415, "telemetry_content_type_invalid");
+
   const declared = Number(request.headers.get("content-length"));
   if (Number.isFinite(declared) && declared > limits.maxWireBytes) {
     throw reject(413, "telemetry_batch_too_large");
   }
   const wire = await readCapped(request.body, limits.maxWireBytes);
 
-  const encoding = (request.headers.get("content-encoding") ?? "identity").trim().toLowerCase();
   let bytes = wire;
   if (encoding === "gzip") {
     try {
@@ -85,8 +97,6 @@ async function readBody(request: Request): Promise<unknown> {
       if (error instanceof Rejection) throw error;
       throw reject(400, "telemetry_batch_invalid");
     }
-  } else if (encoding !== "identity") {
-    throw reject(415, "telemetry_content_type_invalid");
   }
   if (bytes.byteLength > limits.maxDecompressedBytes) throw reject(413, "telemetry_batch_too_large");
 
@@ -112,9 +122,11 @@ async function handleBatch(request: Request, env: TelemetryEnv, ctx: ExecutionCo
   const mediaType = (request.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
   if (mediaType !== "application/json") throw reject(415, "telemetry_content_type_invalid");
 
-  // The network key is a keyed hash of the address. The address itself goes no further than this line.
+  // The network key is a keyed hash of the address (the /64 for IPv6). The address itself goes no further than
+  // this line. If the key can't be made, everyone shares one key on the same limiter, so the limit still holds.
   const network = await networkKey(env.IP_HASH_KEY, request.headers.get("cf-connecting-ip"));
-  if (network && !(await allowed(env.RL_NET, `net:${network}`))) {
+  if (!network) console.warn("telemetry_network_key_missing");
+  if (!(await allowed(env.RL_NET, `net:${network ?? "unknown"}`))) {
     throw reject(429, "telemetry_rate_limited");
   }
 

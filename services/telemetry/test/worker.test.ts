@@ -103,6 +103,30 @@ describe("POST /v1/batch", () => {
       expect(response.status).toBe(415);
     });
 
+    it("refuses an unknown encoding before reading any of the body", async () => {
+      const stream = new ReadableStream<Uint8Array>({
+        pull(controller) {
+          controller.enqueue(new TextEncoder().encode("{}"));
+        },
+      });
+      const request = new Request("https://telemetry.example/v1/batch", {
+        method: "POST",
+        headers: { "content-type": "application/json", "content-encoding": "deflate" },
+        body: stream,
+        // @ts-expect-error Workers need duplex for streamed request bodies.
+        duplex: "half",
+      });
+      expect((await call(request)).status).toBe(415);
+      // Nobody took a reader on the body, so none of it was read.
+      expect(stream.locked).toBe(false);
+    });
+
+    it("treats an empty Content-Encoding as none", async () => {
+      captureForwards();
+      const response = await call(post(JSON.stringify(appBatch()), { "content-encoding": "" }));
+      expect(response.status).toBe(202);
+    });
+
     it("accepts a gzip body", async () => {
       captureForwards();
       const body = await gzip(JSON.stringify(appBatch()));
@@ -162,12 +186,47 @@ describe("POST /v1/batch", () => {
       expect((await call(post(body))).status).toBe(202);
     });
 
-    it("413 for a gzip bomb that is small on the wire", async () => {
-      const bomb = await gzip(new Uint8Array(32 * 1024 * 1024));
+    it("413 for a gzip bomb, and stops inflating as soon as the cap is passed", async () => {
+      const bombSize = 32 * 1024 * 1024;
+      const bomb = await gzip(new Uint8Array(bombSize));
       expect(bomb.byteLength).toBeLessThan(SCHEMA.limits.maxWireBytes);
-      const response = await call(post(bomb, { "content-encoding": "gzip" }));
-      expect(response.status).toBe(413);
-      expect(await errorCode(response)).toBe("telemetry_batch_too_large");
+
+      // Count what the Worker actually pulls out of the inflater.
+      const RealDecompressionStream = (
+        globalThis as unknown as {
+          DecompressionStream: new (format: string) => { readable: ReadableStream; writable: WritableStream };
+        }
+      ).DecompressionStream;
+      let inflated = 0;
+      vi.stubGlobal(
+        "DecompressionStream",
+        class {
+          readable: ReadableStream<Uint8Array>;
+          writable: WritableStream<Uint8Array>;
+          constructor(format: string) {
+            const real = new RealDecompressionStream(format);
+            this.writable = real.writable as WritableStream<Uint8Array>;
+            this.readable = (real.readable as ReadableStream<Uint8Array>).pipeThrough(
+              new TransformStream<Uint8Array, Uint8Array>({
+                transform(chunk, controller) {
+                  inflated += chunk.byteLength;
+                  controller.enqueue(chunk);
+                },
+              }),
+            );
+          }
+        },
+      );
+      try {
+        const response = await call(post(bomb, { "content-encoding": "gzip" }));
+        expect(response.status).toBe(413);
+        expect(await errorCode(response)).toBe("telemetry_batch_too_large");
+      } finally {
+        vi.unstubAllGlobals();
+      }
+      expect(inflated).toBeGreaterThan(SCHEMA.limits.maxDecompressedBytes);
+      // It stopped well short of the 32 MiB the bomb holds, not after reading all of it.
+      expect(inflated).toBeLessThan(SCHEMA.limits.maxDecompressedBytes * 8);
     });
 
     it("413 when the inflated body is just over 256 KiB, and accepts it just under", async () => {
@@ -314,6 +373,7 @@ describe("rate limits", () => {
     }
     expect(statuses.slice(0, 60).every((status) => status === 202)).toBe(true);
     expect(statuses.slice(60)).toEqual([429, 429]);
+    expect((await call(postJson(appBatch({ id })), noNetwork)).headers.get("retry-after")).toBe("60");
     // Another id is not affected.
     expect((await call(postJson(appBatch()), noNetwork)).status).toBe(202);
   });
@@ -322,6 +382,7 @@ describe("rate limits", () => {
     const { limiter } = recordingLimiter(false);
     const response = await call(postJson(appBatch()), { ...baseEnv(), RL_ID: limiter });
     expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBe("60");
     expect(await errorCode(response)).toBe("telemetry_rate_limited");
   });
 
@@ -358,6 +419,7 @@ describe("rate limits", () => {
     const id = recordingLimiter(true);
     const response = await call(postJson(appBatch()), { ...baseEnv(), RL_NET: net.limiter, RL_ID: id.limiter });
     expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBe("60");
     expect(await errorCode(response)).toBe("telemetry_rate_limited");
     expect(id.keys).toEqual([]);
   });
@@ -371,21 +433,52 @@ describe("rate limits", () => {
     ]);
   });
 
-  it("skips the per-network limit without IP_HASH_KEY and never falls back to the raw address", async () => {
+  it("uses one shared key without IP_HASH_KEY, and never the raw address", async () => {
     captureForwards();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const net = recordingLimiter(true);
-    const response = await call(postJson(appBatch()), { ...baseEnv(), RL_NET: net.limiter, IP_HASH_KEY: undefined });
-    expect(response.status).toBe(202);
-    expect(net.keys).toEqual([]);
+    const env = { ...baseEnv(), RL_NET: net.limiter, IP_HASH_KEY: undefined };
+    expect((await call(postJson(appBatch()), env)).status).toBe(202);
+    await call(postJson(appBatch(), { "cf-connecting-ip": "198.51.100.5" }), env);
+    expect(net.keys).toEqual(["net:unknown", "net:unknown"]);
+    expect(JSON.stringify(net.keys)).not.toContain(CLIENT_IP);
+    expect(warn.mock.calls.filter((call) => call[0] === "telemetry_network_key_missing")).toHaveLength(2);
   });
 
-  it("skips the per-network limit when the address header is missing", async () => {
+  it("uses the shared key when the address header is missing", async () => {
     captureForwards();
-    const net = recordingLimiter(false);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const net = recordingLimiter(true);
     const request = post(JSON.stringify(appBatch()));
     request.headers.delete("cf-connecting-ip");
     expect((await call(request, { ...baseEnv(), RL_NET: net.limiter })).status).toBe(202);
-    expect(net.keys).toEqual([]);
+    expect(net.keys).toEqual(["net:unknown"]);
+    expect(warn).toHaveBeenCalledWith("telemetry_network_key_missing");
+  });
+
+  it("still limits everyone together when the key is missing", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const net = recordingLimiter(false);
+    const response = await call(postJson(appBatch()), { ...baseEnv(), RL_NET: net.limiter, IP_HASH_KEY: undefined });
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBe("60");
+  });
+
+  it("gives all addresses in one IPv6 /64 the same key, and other prefixes another", async () => {
+    captureForwards();
+    const net = recordingLimiter(true);
+    const env = { ...baseEnv(), RL_NET: net.limiter };
+    for (const ip of [
+      "2001:db8:1:2:aaaa:bbbb:cccc:dddd",
+      "2001:db8:1:2::1",
+      "2001:0DB8:0001:0002:0000:0000:0000:0042",
+      "2001:db8:1:3::1",
+    ]) {
+      await call(postJson(appBatch(), { "cf-connecting-ip": ip }), env);
+    }
+    expect(net.keys[1]).toBe(net.keys[0]);
+    expect(net.keys[2]).toBe(net.keys[0]);
+    expect(net.keys[3]).not.toBe(net.keys[0]);
   });
 
   it("lets a batch through if the limiter itself fails", async () => {

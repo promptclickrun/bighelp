@@ -59,12 +59,15 @@ describe("envelope", () => {
   it("drops unknown context keys and bad context values, and counts them", () => {
     const result = accept(
       appBatch({
-        context: { appVersion: "2.7.0", os: "Android", hostname: "my-laptop", deviceClass: "iPhone", __proto__: "x" },
+        // JSON.parse makes a real own "__proto__" key. An object literal would set the prototype instead.
+        context: JSON.parse(
+          '{"appVersion":"2.7.0","os":"Android","hostname":"my-laptop","deviceClass":"iPhone","__proto__":"x"}',
+        ),
         events: [event("app.opened")],
       }),
     );
     expect(result.ok && result.batch.context).toEqual({ appVersion: "2.7.0", deviceClass: "iPhone" });
-    expect(result.ok && result.batch.dropped).toBe(2);
+    expect(result.ok && result.batch.dropped).toBe(3);
   });
 
   it("uses the context list of the batch's own source", () => {

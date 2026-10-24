@@ -62,6 +62,24 @@ struct WorkspaceManagementTests {
         #expect(listing.path == "/workspace")
     }
 
+    /// Project and chat folders come in the host's own style; Windows hosts use drive letters and
+    /// shares (#563). Escapes and device paths stay refused in either style.
+    @Test func hostFoldersAcceptWindowsStylesAndRefuseEscapes() throws {
+        for folder in ["/workspace/notes", #"D:\Projects\notes"#, "D:/Projects/notes", #"D:\"#,
+                       #"\\nas\share\notes"#, #"\\nas\share"#] {
+            #expect(try WorkspaceManagementDecoder.hostFolder(.string(folder)) == folder)
+        }
+        for folder in ["notes", "D:", "D:notes", #"D:\Projects\..\keys"#, "D:/Projects/./notes",
+                       #"D:\Projects\\notes"#, #"D:\Projects\"#, #"\\?\C:\notes"#, #"\\.\pipe\notes"#,
+                       #"\\nas"#, "/workspace/../keys", "//nas/share", "D:\\Projects\u{0}\\notes"] {
+            #expect(throws: WorkspaceManagementError.invalidResponse, "\(folder)") {
+                try WorkspaceManagementDecoder.hostFolder(.string(folder))
+            }
+        }
+        #expect(DirectHermesSessionValidation.sameFolder(#"D:\Projects\Notes"#, "d:/projects/notes"))
+        #expect(!DirectHermesSessionValidation.sameFolder("/workspace/Notes", "/workspace/notes"))
+    }
+
     @Test func fileBrowserRejectsSiblingRootTraversalAndChangedPolicy() throws {
         #expect(!WorkspaceManagementDecoder.contains(root: "/workspace", path: "/workspace-private/secret"))
         for path in ["/workspace/../secret", "/workspace/./secret", "/workspace//secret", "file:///workspace/a", "/workspace\\secret"] {

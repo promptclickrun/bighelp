@@ -648,6 +648,32 @@ struct DirectHermesSessionCatalogClientTests {
         #expect(workspace.calls.filter { $0.operation == .projectsForCwd }.count == 1)
     }
 
+    /// One chat in a Windows folder used to fail the whole list (#563). Hermes names the folder
+    /// its own way (`D:\…`) whichever way it was sent.
+    @Test func catalogListsChatsInWindowsFoldersWithTheirProject() async throws {
+        let workspace = try SessionWorkspaceStub()
+        workspace.handler = { operation, payload in
+            switch operation {
+            case .profilesList:
+                return Self.profiles()
+            case .sessionsList:
+                return ["sessions": .array([
+                    Self.session(id: "drive", cwd: #"D:\Projects\notes"#),
+                    Self.session(id: "forward", cwd: "D:/Projects/notes"),
+                ]), "total": .integer(2), "offset": .integer(0), "limit": .integer(100)]
+            case .projectsForCwd:
+                return ["cwd": .string(#"D:\Projects\notes"#), "project": .object(Self.project(id: "notes", name: "Notes"))]
+            default:
+                throw WorkspaceClientError.invalidRequest
+            }
+        }
+
+        let records = try await Self.client(workspace).list()
+
+        #expect(records.count == 2)
+        #expect(records.allSatisfy { $0.workspaceID == "notes" })
+    }
+
     @Test func catalogKeepsSessionUnassignedWhenHermesProjectReadbackIsNull() async throws {
         let workspace = try SessionWorkspaceStub()
         workspace.handler = { operation, _ in

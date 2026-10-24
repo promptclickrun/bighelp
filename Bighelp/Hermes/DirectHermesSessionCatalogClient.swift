@@ -745,7 +745,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
             let receipt = try await resume(profileID: profileID, storedID: stored)
             binding = try attachedBinding(receipt.response, original: candidate, profile: profile, receiptEpoch: receipt.epoch)
             if let requested = state.requestedCWD,
-               binding.cwd.map({ DirectHermesSessionValidation.same($0, requested) }) != true {
+               binding.cwd.map({ DirectHermesSessionValidation.sameFolder($0, requested) }) != true {
                 throw DirectHermesSessionError.workspaceNotConfirmed
             }
         } else {
@@ -2084,7 +2084,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
     /// payloads and transport responses still fail the authoritative load.
     private func projectAssociation(for cwd: String, profile: Profile,
                                     prefetch: DirectHermesCatalogPrefetch? = nil) async throws -> ProjectAssociation? {
-        let path = try WorkspaceManagementDecoder.path(.string(cwd))
+        let path = try WorkspaceManagementDecoder.hostFolder(.string(cwd))
         do {
             let payload: [String: BighelpJSONValue] = ["profile": .string(profile.id), "cwd": .string(path)]
             let response: [String: BighelpJSONValue]
@@ -2099,7 +2099,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
             // completion cwd. That fallback is not evidence for a project
             // association: keep this row unassigned while allowing the rest
             // of the authoritative catalog to load.
-            guard response["cwd"]?.string == path else { return nil }
+            guard response["cwd"]?.string.map({ DirectHermesSessionValidation.sameFolder($0, path) }) == true else { return nil }
             switch response["project"] {
             case .null:
                 return nil
@@ -2156,7 +2156,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
             if options.archived == .include, !options.keepsDeliberatelyArchived,
                Self.isDeliberatelyArchived(object) { continue }
             guard let cwd = object["cwd"]?.string, !cwd.isEmpty,
-                  let path = try? WorkspaceManagementDecoder.path(.string(cwd)) else { continue }
+                  let path = try? WorkspaceManagementDecoder.hostFolder(.string(cwd)) else { continue }
             prefetch.start(.folder(projectAssociationKey(profile: profile, cwd: cwd)), .projectsForCwd,
                            ["profile": .string(profile.id), "cwd": .string(path)])
         }
@@ -2363,7 +2363,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         )
         let binding = try attachedBinding(response, original: original, profile: profile, receiptEpoch: receipt.epoch)
         if let requested = state.requestedCWD,
-           binding.cwd.map({ DirectHermesSessionValidation.same($0, requested) }) != true {
+           binding.cwd.map({ DirectHermesSessionValidation.sameFolder($0, requested) }) != true {
             throw DirectHermesSessionError.workspaceNotConfirmed
         }
         return binding

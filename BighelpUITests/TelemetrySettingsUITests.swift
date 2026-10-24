@@ -66,7 +66,9 @@ final class TelemetrySettingsUITests: BighelpUITestCase {
         settingsRow("settings.menu.permissions", in: app).tap()
         let form = app.descendants(matching: .any)["settings.permissions"].firstMatch
         let target = app.switches["settings.telemetry.toggle"].firstMatch
-        for _ in 0..<10 where !target.exists || !target.isHittable { form.swipeUp() }
+        // Scroll until the switch and the line under it sit well inside the screen, not on its edge.
+        let bottom = app.windows.firstMatch.frame.maxY
+        for _ in 0..<12 where !target.exists || !target.isHittable || target.frame.maxY > bottom - 220 { form.swipeUp() }
         XCTAssertTrue(target.waitForExistence(timeout: 5))
         return target
     }

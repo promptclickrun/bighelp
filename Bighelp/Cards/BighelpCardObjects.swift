@@ -430,7 +430,9 @@ enum BighelpCardMusicLookup {
     private static func folded(_ text: String) -> String {
         let plain = text.folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: nil)
         var result = String.UnicodeScalarView()
-        for scalar in plain.unicodeScalars where CharacterSet.alphanumerics.contains(scalar) {
+        // Scalar properties, not `CharacterSet`, which has rejected plain text on some iPhones.
+        for scalar in plain.unicodeScalars
+        where scalar.properties.isAlphabetic || scalar.properties.numericType != nil {
             result.append(scalar)
         }
         return String(result)

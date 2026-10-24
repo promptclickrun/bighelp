@@ -256,6 +256,14 @@ struct BighelpCardObjectsTests {
     }
 
     /// One kept picture per item: the same card shares it, any other item doesn't.
+    @Test func namesMatchAcrossCaseAccentsAndPunctuation() {
+        #expect(BighelpCardMusicLookup.sameName("Café Sample!", "cafe sample"))
+        #expect(BighelpCardMusicLookup.sameName("Sample Song (Remastered)", "Sample Song"))
+        #expect(BighelpCardMusicLookup.sameName("サンプル 2", "サンプル2"))
+        #expect(!BighelpCardMusicLookup.sameName("Other Song", "Sample Song"))
+        #expect(!BighelpCardMusicLookup.sameName("!!!", "???"), "Names with no letters never match")
+    }
+
     @Test func artworkIsKeptByTheCardsItem() throws {
         func key(_ props: [String: BighelpJSONValue]) throws -> String {
             BighelpCardMusicLookup.cacheKey(for: try music(props))

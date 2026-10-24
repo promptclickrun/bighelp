@@ -64,6 +64,58 @@ struct SessionOpenLatencyTests {
         #expect(!features.canReturnToWarmSession(id: client.record.id))
     }
 
+    @Test func aReconnectDuringAnOpenOpensTheChatAgainOnTheNewConnection() async throws {
+        let connection = HeldConnection(id: "reconnect-during-open")
+        let client = HeldSessionPageClient()
+        let catalog = SessionCatalogStore(client: client, records: [client.record])
+        let features = ShellFeatureStore(timing: .immediate, catalog: catalog, navigationWorkspaceOwner: { connection.owner })
+        let route = AppRoute.chat(conversationID: client.record.id)
+        #expect(try features.prepareCachedForUserNavigation(route))
+        guard case .chat(let model)? = features.preparedModel(for: route) else { Issue.record("No model"); return }
+        let first = try features.startNavigationHydration(id: client.record.id)
+        for _ in 0..<100 where client.calls == 0 { try await Task.sleep(for: .milliseconds(5)) }
+
+        // The app reconnects (a new connection, the same sign-in) while the history read is out.
+        connection.reconnect()
+        client.release()
+        await #expect(throws: CancellationError.self) { try await first.value() }
+
+        // The chat isn't left without a connection of its own: it opens again on the new one.
+        for _ in 0..<100 where client.calls < 2 { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(client.calls == 2)
+        let again = try features.startNavigationHydration(id: client.record.id)
+        client.release()
+        _ = try await again.value()
+        #expect(client.calls == 2)
+        #expect(model.items.last?.content == .message("Canonical answer"))
+        #expect(!model.isHydratingHistory)
+    }
+
+    @Test func aChatOpenedWhileTheHostWasAwayOpensOnceTheConnectionReturns() async throws {
+        let connection = HeldConnection(id: "opened-while-away")
+        connection.owner = nil
+        let client = HeldSessionPageClient()
+        let catalog = SessionCatalogStore(client: client, records: [client.record])
+        let features = ShellFeatureStore(timing: .immediate, catalog: catalog, navigationWorkspaceOwner: { connection.owner })
+        let route = AppRoute.chat(conversationID: client.record.id)
+        // The saved copy shows while the host is away; there is no connection to open it on.
+        #expect(try features.prepareCachedForUserNavigation(route))
+        guard case .chat(let model)? = features.preparedModel(for: route) else { Issue.record("No model"); return }
+        #expect(throws: CancellationError.self) { try features.startNavigationHydration(id: client.record.id) }
+
+        connection.reconnect()
+        features.openDetachedChat(id: client.record.id)
+        for _ in 0..<100 where client.calls == 0 { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(client.calls == 1)
+        client.release()
+        _ = try await features.startNavigationHydration(id: client.record.id).value()
+        #expect(model.items.last?.content == .message("Canonical answer"))
+        // Opened on this connection, it isn't opened a second time.
+        features.openDetachedChat(id: client.record.id)
+        for _ in 0..<10 { await Task.yield() }
+        #expect(client.calls == 1)
+    }
+
     @Test func navigationDeadlineReleasesItsFooterAndRejectsLateHistory() async throws {
         let client = HeldSessionPageClient()
         let catalog = SessionCatalogStore(client: client, records: [client.record])
@@ -191,6 +243,23 @@ struct SessionOpenLatencyTests {
         #expect(model.draft == "Edited during refresh")
         guard case .chat(let retained)? = features.preparedModel(for: route) else { Issue.record("Lost cached owner"); return }
         #expect(retained === model)
+    }
+}
+
+/// The host connection a test changes: `reconnect()` is a new connection with the same sign-in.
+@MainActor
+private final class HeldConnection {
+    private let authority: WorkspaceAuthority
+    private let signIn = UUID()
+    var owner: WorkspaceOwner?
+
+    init(id: String) {
+        authority = try! .fixture(id: id)
+        reconnect()
+    }
+
+    func reconnect() {
+        owner = WorkspaceOwner(authority: authority, authenticationGeneration: signIn, connectionGeneration: UUID())
     }
 }
 

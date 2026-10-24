@@ -699,8 +699,9 @@ final class NativeWorkspaceRuntime {
             try publishCapabilities()
             // Reattach the visible conversation before optional workspace reads.
             // Failures remain isolated; a deleted chat cannot disable features.
+            let retained = bridge.retainedSessionIDs
             let failedSessions = try await NativeWorkspaceSessionRecovery.recover(
-                bridge.retainedSessionIDs, prioritizing: appState.activeConversationID,
+                retained, prioritizing: appState.activeConversationID,
                 requireCurrent: { try self.require(owner, request: request) }
             ) { id in
                 guard self.sessions.session(id: id) != nil else { return }
@@ -714,6 +715,12 @@ final class NativeWorkspaceRuntime {
             }
             if let active = appState.activeConversationID, failedSessions.contains(active) {
                 unrecoveredActiveChatID = active
+            }
+            // The chat on screen has no connection of its own when it opened while the host was
+            // away, or this reconnect cut its open short. The recovery above reattaches only chats
+            // that had one, so open it the way a tap does.
+            if let active = appState.activeConversationID, !retained.contains(active) {
+                features.openDetachedChat(id: active)
             }
             do {
                 _ = try await workspace.perform(.nativeContext, payload: [:], owner: owner)

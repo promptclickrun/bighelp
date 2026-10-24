@@ -609,6 +609,16 @@ final class ShellFeatureStore {
         try await task.value
     }
 
+    /// Opens a chat again, the way a tap does, when it has no connection of its own: it was opened
+    /// while the host was away and shows its saved copy, or a reconnect cut its open short. The
+    /// runtime calls this for the chat on screen once it has reconnected. Without it, Send stayed
+    /// off until the person backed out and opened the chat again.
+    func openDetachedChat(id: String) {
+        guard ownsNativeNavigationHydration, navigationHydrations[id] == nil, let model = chatModels[id],
+              hydratedNavigationModels[id] != ObjectIdentifier(model) else { return }
+        _ = try? startNavigationHydration(id: id)
+    }
+
     /// Admit synchronously, before creating a view-owned Task. A second open
     /// joins the exact flight, so A -> B -> A cannot replace A's native lease.
     /// Explicit callers may also exercise this seam with a fixture catalog;
@@ -718,10 +728,15 @@ final class ShellFeatureStore {
     ) {
         guard let flight = navigationHydrations[id], flight.handle.id == flightID else { return }
 
-        guard flight.accountGeneration == accountGeneration,
-              flight.owner == navigationWorkspaceOwner?(), chatModels[id] === flight.model,
+        guard flight.accountGeneration == accountGeneration, chatModels[id] === flight.model,
               let current = catalog.session(id: id) else {
             cancelNavigationHydration(id: id)
+            return
+        }
+        guard flight.owner == navigationWorkspaceOwner?() else {
+            // A reconnect cut this open short: open the chat again on the new connection.
+            cancelNavigationHydration(id: id)
+            openDetachedChat(id: id)
             return
         }
         var completion = result

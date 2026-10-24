@@ -1,10 +1,11 @@
-import { env } from "cloudflare:test";
+import { env, runInDurableObject } from "cloudflare:test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buzzKitIdentity, sendBuzzKitLinkWake as sendWakeWithSource } from "../src/buzzkit.js";
 import { canonicalDeviceRequest } from "../src/device-auth.js";
 import { handleLoopdyLinkRequest } from "../src/http.js";
 import {
   canonicalNotificationHostRequest,
+  notificationSessionReference,
   type NotificationEgressSnapshot,
 } from "../src/notification-grants.js";
 import { LoopdyLinkError } from "../src/contracts.js";
@@ -362,7 +363,7 @@ async function notificationInstallationRequest(
   installationId: string,
   path: string,
   body: object | null,
-  method: "GET" | "POST" = "POST",
+  method: "GET" | "POST" | "PUT" = "POST",
 ): Promise<Request> {
   const raw = body === null ? "" : JSON.stringify(body);
   const nonce = encoded(crypto.getRandomValues(new Uint8Array(24)));
@@ -464,6 +465,48 @@ describe("post-migration Link wake ownership", () => {
     await env.ACCOUNTS.prepare(
       "UPDATE device_directory SET public_key_spki=? WHERE device_id=?",
     ).bind(accountKeys.publicKeySPKI, DEVICE).run();
+  });
+
+  it("registers v2 and v3 through signed mobile requests and preserves host readback", async () => {
+    const installationKeys = await keys();
+    const hostKeys = await keys();
+    const coordinate = `group-contract-${crypto.randomUUID()}`;
+    const grant = await insertInstallation(coordinate, installationKeys, hostKeys);
+    const targetEnv = { ...targetEnvironment(), USER_LINKS: env.USER_LINKS } as LinkEnv;
+    const common = { profile: "default", sessionId: "fixture-chat",
+      sessionReference: await notificationSessionReference("default", "fixture-chat"),
+      attributesType: "LoopdySessionActivityAttributes", revision: 1, timestamp: NOW, leaseExpires: NOW + 900 };
+    for (const version of [2, 3]) {
+      const activityId = `contract-v${version}`;
+      const path = `/v1/notifications/host-grants/${grant.grantId}/live-activities/${activityId}`;
+      const extras = version === 3 ? { groupId: "fixture-physical-card", rowId: `native-${"r".repeat(43)}`, rowRevision: 1 } : {};
+      const result = await handleLoopdyLinkRequest(await notificationInstallationRequest(
+        installationKeys, grant.installationId, path, { ...common, version, ...extras }, "PUT",
+      ), targetEnv);
+      expect(result.status).toBe(200);
+      expect(await result.json()).toMatchObject({ activity: {
+        activityId, grantId: grant.grantId, status: "active", sessionReference: common.sessionReference,
+        leaseExpires: common.leaseExpires, ...extras,
+      } });
+      const readback = await handleLoopdyLinkRequest(await accountHostRequest(hostKeys, grant.grantId,
+        grant.hostKeyId, `/live-activities/${activityId}`, "GET"), targetEnv);
+      expect(readback.status).toBe(200);
+      expect(await readback.json()).toMatchObject({ activity: { activityId, status: "active", ...extras } });
+    }
+    await runInDurableObject(env.USER_LINKS.getByName(coordinate), (_instance, state) => {
+      state.storage.sql.exec("UPDATE managed_activity_groups SET ended=1 WHERE group_id=?", "fixture-physical-card");
+    });
+    const closed = await handleLoopdyLinkRequest(await notificationInstallationRequest(
+      installationKeys, grant.installationId,
+      `/v1/notifications/host-grants/${grant.grantId}/live-activities/next-row`,
+      { ...common, version: 3, groupId: "fixture-physical-card", rowId: `native-${"r".repeat(43)}`, rowRevision: 2 }, "PUT",
+    ), targetEnv);
+    expect(closed.status).toBe(409);
+    expect(await closed.json()).toMatchObject({ error: { code: "notification_activity_group_ended" } });
+    await notificationOwnerStub(coordinate).authorizeNotificationEgress({
+      ownerKind: "notification-instance", credentialId: grant.installationId, authorizationEpoch: 1, now: NOW,
+      grant: { grantId: grant.grantId, revision: 1, expiresAt: NOW + 1800 },
+    });
   });
 
   it("fences a legacy host grant when retirement survives partial cleanup", async () => {

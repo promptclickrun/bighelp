@@ -72,6 +72,10 @@ export interface NotificationActivity {
   revision: number;
   leaseExpires: number;
   status: "active" | "revoked" | "ended";
+  groupId?: string;
+  rowId?: string;
+  rowRevision?: number;
+  credentialId?: string;
 }
 
 export interface NotificationAsset {
@@ -91,9 +95,13 @@ export interface NotificationEgressSnapshot {
 }
 
 export interface ManagedNotificationStateBinding {
+  sendNotificationActivityGroup(input: {
+    ownerCoordinate: string; activityId: string; state: import("./activity-group.js").ActivityGroupRow;
+    authority: NotificationEgressSnapshot; externalId: string;
+  }): Promise<import("./buzzkit.js").BuzzKitLiveActivityReceipt>;
   putNotificationAsset(input: NotificationAsset): Promise<NotificationAsset>;
   notificationAsset(input: { assetId: string; now: number }): Promise<NotificationAsset | null>;
-  registerNotificationActivity(input: NotificationActivity & { timestamp: number }): Promise<NotificationActivity>;
+  registerNotificationActivity(input: NotificationActivity & { timestamp: number; authority?: NotificationEgressSnapshot }): Promise<NotificationActivity>;
   notificationActivity(input: { grantId: string; activityId: string; now: number }): Promise<NotificationActivity>;
   revokeNotificationActivity(input: { grantId: string; activityId: string; revision: number; timestamp: number }): Promise<NotificationActivity>;
   revokeNotificationGrantActivities(input: { grantId: string; timestamp: number }): Promise<void>;
@@ -435,7 +443,7 @@ interface NotificationEgressAuthority {
 
 async function readNotificationEgressAuthority(
   env: LinkEnv,
-  row: GrantRow,
+  row: Pick<GrantRow, "grant_id" | "owner_kind" | "owner_coordinate" | "credential_id" | "authorization_epoch">,
 ): Promise<NotificationEgressAuthority | null> {
   if (row.owner_kind === "account") {
     return env.ACCOUNTS.prepare(`SELECT grant_row.expires_at,grant_row.revision,
@@ -470,6 +478,26 @@ async function readNotificationEgressAuthority(
       AND installation.authorization_epoch=grant_row.authorization_epoch`)
     .bind(row.grant_id, row.owner_coordinate, row.credential_id, row.authorization_epoch)
     .first<NotificationEgressAuthority>();
+}
+
+export async function requireNotificationGroupGrantEgressActive(
+  env: LinkEnv,
+  ownerCoordinate: string,
+  authority: NotificationEgressSnapshot,
+  grants: NonNullable<NotificationEgressSnapshot["grant"]>[],
+): Promise<void> {
+  // Each included host grant must still authorize this credential, even when
+  // another host triggered the push or directory revocation is mid-cleanup.
+  await Promise.all(grants.map(async (grant) => {
+    const current = await readNotificationEgressAuthority(env, {
+      grant_id: grant.grantId, owner_kind: authority.ownerKind, owner_coordinate: ownerCoordinate,
+      credential_id: authority.credentialId, authorization_epoch: authority.authorizationEpoch,
+    });
+    assertNotificationEgressAuthority(current);
+    if (current.revision !== grant.revision || current.expires_at !== grant.expiresAt) {
+      fail(410, "notification_grant_inactive");
+    }
+  }));
 }
 
 function assertNotificationEgressAuthority(
@@ -1430,8 +1458,12 @@ export async function handleNotificationRequest(
       exact(body, [
         "version", "profile", "sessionId", "sessionReference", "attributesType",
         "revision", "timestamp", "leaseExpires",
+        ...(body.version === 3 ? ["groupId", "rowId", "rowRevision"] : []),
       ]);
-      if (body.version !== 2 || body.profile !== grant.profile || typeof body.sessionId !== "string"
+      if ((body.version !== 2 && body.version !== 3)
+          || (body.version === 3 && (typeof body.groupId !== "string" || !IDENTIFIER.test(body.groupId)
+            || typeof body.rowId !== "string" || !/^native-[A-Za-z0-9_-]{43}$/.test(body.rowId)
+            || !boundedInteger(body.rowRevision, 1, 9e15))) || body.profile !== grant.profile || typeof body.sessionId !== "string"
           || !IDENTIFIER.test(body.sessionId) || body.sessionReference !== await notificationSessionReference(grant.profile, body.sessionId)
           || body.attributesType !== "LoopdySessionActivityAttributes" || !integer(body.revision)
           || !integer(body.timestamp) || !integer(body.leaseExpires) || body.leaseExpires > grant.expiresAt) {
@@ -1445,6 +1477,13 @@ export async function handleNotificationRequest(
         leaseExpires: body.leaseExpires,
         status: "active",
         timestamp: body.timestamp,
+        ...(body.version === 3 ? {
+          groupId: String(body.groupId), rowId: String(body.rowId), rowRevision: Number(body.rowRevision),
+          credentialId: auth.credentialId,
+          authority: { ownerKind: auth.ownerKind, credentialId: auth.credentialId,
+            authorizationEpoch: auth.authorizationEpoch, now,
+            grant: { grantId: grant.grantId, revision: grant.revision, expiresAt: grant.expiresAt } },
+        } : {}),
       });
       return response({ version: 1, activity });
     }
@@ -1528,6 +1567,25 @@ export async function handleNotificationRequest(
       if (reservation.status === "duplicate") {
         return response({ version: 1, status: "duplicate", deliveryId: body.updateId }, 202);
       }
+      if (activity.groupId) {
+        await requireNotificationActivityEgressActive(env, row, activity);
+        const receipt = await notificationStateBinding(env, row.owner_coordinate).sendNotificationActivityGroup({
+          ownerCoordinate: row.owner_coordinate, activityId: activity.activityId,
+          state: { id: activity.rowId!, phase: String(body.phase), timestamp: Number(body.timestamp),
+            activeSubagentCount: Number(body.activeSubagentCount), latestTool: body.latestTool as string | null },
+          externalId,
+          authority: { ownerKind: row.owner_kind, credentialId: row.credential_id,
+            authorizationEpoch: row.authorization_epoch, now,
+            grant: { grantId: grant.grantId, revision: grant.revision, expiresAt: grant.expiresAt },
+            activity: { activityId: activity.activityId, sessionReference: activity.sessionReference,
+              leaseExpires: activity.leaseExpires } },
+        });
+        await notificationStateBinding(env, row.owner_coordinate).completeNotificationActivityUpdate({
+          grantId: grant.grantId, activityId: activity.activityId, updateId: String(body.updateId),
+          timestamp: Number(body.timestamp), terminal,
+        });
+        return response({ version: 1, ...receipt }, 202);
+      }
       const contentState = {
         phase: body.phase,
         currentAction: body.currentAction,
@@ -1573,6 +1631,12 @@ export async function handleNotificationRequest(
     }
     return fail(404, "notification_route_unknown");
   } catch (error) {
+    // RPC preserves serialized fields, not a custom Error prototype. The phone
+    // must distinguish an irreversibly ended group from a retryable outage.
+    if (error instanceof Error && error.name === "LoopdyLinkError"
+        && "code" in error && error.code === "notification_activity_group_ended") {
+      return response({ version: 1, error: { code: error.code, message: error.code } }, 409);
+    }
     if (error instanceof NotificationError || error instanceof BuzzKitBackendError
         || error instanceof NotificationIdentityError) {
       return response({ version: 1, error: { code: error.code, message: error.code } }, error.status);

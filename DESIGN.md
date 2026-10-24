@@ -94,8 +94,9 @@ phones with a Dynamic Island, the island names the work. In the app it grows int
 it out (chasing a brain while thinking, code streaming from its laptop, fixing a computer, painting, paper
 planes…). The status bar hides while it shows, and the app moves down (root `additionalSafeAreaInsets`) so nothing
 is covered. Tap for a compact pill, touch and hold to open the chat. Settings › Chat › Agent in the Dynamic Island
-turns it off. Outside the app the Live Activity shows the agent's picture and the same icon (the plugin sends only
-a fixed category). Every phone chat uses this big-avatar header and keeps the tab bar under its message box (All
+turns it off. Outside the app, one Live Activity holds the active chats as compact rows: title, agent and a
+fixed status icon. Chats needing attention come first. Each row opens its own chat; extra chats show as a count.
+The expanded Dynamic Island shows three rows, while the compact island keeps a quiet work or attention symbol. Every phone chat uses this big-avatar header and keeps the tab bar under its message box (All
 agents' chats excepted). Every chat has ☰ in the top left, like the other root screens; a chat opened from the
 list, Agents, Feed or a task goes back to it with the edge swipe. A group chat's name opens its Chat Info. The line under
 the name says "Updating…" while a chat reloads from Hermes, the agent's activity while it works, and otherwise the
@@ -127,7 +128,9 @@ Widgets (`BighelpActivityShared`, rendered by the Live Activity extension) use t
 `BighelpWidgetSnapshot` palettes and show real agent pictures (`BighelpActivityAvatarStore`). **Your Agent** is the
 lead widget: the agent's face ringed while it works with a badge for the work, its latest Feed posts and Goals,
 New chat, and Chat/Feed/Ideas/Goals links (`loopdy://agent/<tab>`); it also comes in Lock Screen sizes. Active
-Chats, Scheduled Tasks, New Chat and Recent Chats share the same look. Tinted and Lock Screen modes fall back to
+Chats and Recent Chats keep working chats ahead of replies, show compact title/status rows with agent pictures,
+and mark stale status as Updates paused without removing the chat. Their links retain the correct gateway.
+Scheduled Tasks and New Chat share the same palette. Tinted and Lock Screen modes fall back to
 system styles. **Kanban** shows cards from the boards, filtered by board, status and agent and grouped by status,
 agent or board; tapping a card opens it in the app. **Feed**, **Ideas** and **Goals** each show one board, for an
 agent picked in the widget or Auto (the agent picked in the app). The app reads only the boards widgets are set to

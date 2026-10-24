@@ -470,6 +470,127 @@ import UserNotifications
         #expect(fixture.ledger.enrollments.isEmpty)
     }
 
+    @Test func activityStartsBeforeSlowWorkSnapshotAndFailedStartRetries() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+        let driver = NativeActivityDriver()
+        let runtime = BighelpManagedNativeActivityRuntime(service: fixture.service, driver: driver,
+            environment: .sandbox, topic: "app.loopdy.mobile", now: { Date(timeIntervalSince1970: 1_800_000_100) })
+        fixture.service.activityRuntime = runtime
+        let client = try DirectHermesConversationClient(rpc: UnenrolledChatRPC(), hostIdentity: fixture.host.principalIdentity,
+            profile: "default", runtimeID: "runtime", storedID: "saved", title: "Chat", epoch: "epoch",
+            drafts: .init(root: fixture.root.appending(path: "drafts")))
+        defer { client.suspend() }
+        let model = ChatModel(conversationID: client.conversationID, client: client, initialItems: [])
+        client.model = model
+        let chat = DirectHermesChat(id: "saved", client: client, model: model)
+        fixture.hostAPI.holdWorkSnapshot = true
+        client.receive(.init(type: "message.start", sessionID: "runtime", payload: [:], sequence: 1))
+        BighelpManagedActivityBridge.bind(service: fixture.service, host: fixture.host, chat: chat)
+        for _ in 0..<1_000 where fixture.hostAPI.workContinuation == nil { await Task.yield() }
+        #expect(fixture.hostAPI.workContinuation != nil)
+        #expect(driver.starts == 1, "ActivityKit must run before the suspended network read")
+        fixture.hostAPI.workContinuation?.resume(); fixture.hostAPI.workContinuation = nil
+        client.suspend()
+        await runtime.resetForAccountBoundary()
+
+        driver.refuseStart = true
+        let event = ChatActivityEvent(eventID: "work", sessionID: client.conversationID, turnID: "retry-turn",
+            kind: .reasoning, lifecycle: .running, title: "Working", summary: nil, detail: nil, occurredAt: 1_800_000_100)
+        try await runtime.receive(host: fixture.host, chat: chat, event: event, canonicalHostTurnID: nil)
+        #expect(driver.starts == 1)
+        driver.refuseStart = false
+        try await runtime.receive(host: fixture.host, chat: chat, event: event, canonicalHostTurnID: nil)
+        #expect(driver.starts == 2)
+        await runtime.resetForAccountBoundary()
+    }
+
+    @Test func endedSharedCardRecreatesStillRunningWorkAndNextTurnStartsBeforeSnapshot() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+        let system = NativeActivityDriver()
+        var infos: [String: BighelpActivitySessionInfo] = [:]
+        let group = BighelpActivityGroupDriver(underlying: system, loadInfos: { infos }, saveInfos: { infos = $0 })
+        let runtime = BighelpManagedNativeActivityRuntime(service: fixture.service, driver: group,
+            environment: .sandbox, topic: "app.loopdy.mobile", now: { Date(timeIntervalSince1970: 1_800_000_100) })
+        let client = try DirectHermesConversationClient(rpc: UnenrolledChatRPC(), hostIdentity: fixture.host.principalIdentity,
+            profile: "default", runtimeID: "runtime", storedID: "saved", title: "Chat", epoch: "epoch",
+            drafts: .init(root: fixture.root.appending(path: "drafts")))
+        defer { client.suspend() }
+        let model = ChatModel(conversationID: client.conversationID, client: client, initialItems: [])
+        client.model = model
+        let chat = DirectHermesChat(id: "saved", client: client, model: model)
+        client.receive(.init(type: "message.start", sessionID: "runtime", payload: [:], sequence: 1))
+        let firstTurn = client.projection.turnID
+        func event(_ turn: String) -> ChatActivityEvent {
+            .init(eventID: "start-" + turn, sessionID: client.conversationID, turnID: turn,
+                kind: .reasoning, lifecycle: .running, title: "Working", summary: nil, detail: nil, occurredAt: 1_800_000_100)
+        }
+        try await runtime.receive(host: fixture.host, chat: chat, event: event(firstTurn), canonicalHostTurnID: nil)
+        let grant = try #require(fixture.ledger.record(host: fixture.host, profile: "default")?.grant)
+        let promoted = try await runtime.promote(host: fixture.host, chat: chat, localTurn: firstTurn,
+            snapshot: .init(version: 1, grantId: grant.grantId, work: .init(profile: "default", sessionId: "saved",
+                turnId: "canonical-first", phase: .thinking, activeSubagentCount: 0, terminal: false,
+                outcome: nil, observedAt: 1_800_000_100)))
+        #expect(promoted)
+        let firstOwner = try #require(fixture.ledger.activities.first)
+        let completedTool = ChatActivityEvent(eventID: "finished-tool", sessionID: client.conversationID,
+            turnID: firstTurn, kind: .tool, lifecycle: .succeeded, title: "Tool finished", summary: nil,
+            detail: nil, occurredAt: 1_800_000_100)
+        try await runtime.receive(host: fixture.host, chat: chat, event: completedTool, canonicalHostTurnID: nil)
+        // The server ended its known group while this local row awaited registration.
+        system.snapshots.removeAll()
+        await runtime.flushPendingOperations()
+        #expect(system.starts == 2)
+        #expect(system.snapshots.count == 1)
+        #expect(fixture.ledger.activity(firstOwner.relayActivityID)?.retired == true)
+        let restored = try #require(fixture.ledger.activities.first { !$0.retired })
+        #expect(restored.canonicalTurnID == "canonical-first")
+        #expect(restored.nativeActivityID != firstOwner.nativeActivityID)
+
+        client.receive(.init(type: "message.start", sessionID: "runtime", payload: [:], sequence: 2))
+        let secondSegment = client.projection.turnID
+        // This segment's snapshot failed, so only its admitted local event arrives.
+        try await runtime.receive(host: fixture.host, chat: chat, event: event(secondSegment), canonicalHostTurnID: nil)
+        client.receive(.init(type: "session.info", sessionID: "runtime", payload: ["running": .boolean(false)], sequence: 3))
+        try await runtime.finish(host: fixture.host, profile: "default", storedSessionID: "saved",
+                                 originalLocalTurnID: secondSegment, outcome: .succeeded)
+        client.receive(.init(type: "message.start", sessionID: "runtime", payload: [:], sequence: 4))
+        let nextTurn = client.projection.turnID
+        #expect(nextTurn != firstTurn)
+        // Remote completion for the previous canonical work has not arrived.
+        try await runtime.receive(host: fixture.host, chat: chat, event: event(nextTurn), canonicalHostTurnID: nil)
+        let next = try #require(fixture.ledger.activities.first { !$0.retired })
+        #expect(next.nativeActivityID != restored.nativeActivityID)
+        #expect(next.localTurnID == nextTurn)
+        #expect(next.canonicalTurnID == nil)
+        #expect(system.starts == 2, "The accepted next turn reuses the one still-active physical card")
+        await runtime.resetForAccountBoundary()
+    }
+
+    @MainActor private final class NativeActivityDriver: BighelpLiveActivityDriving {
+        var starts = 0
+        var refuseStart = false
+        var snapshots: [String: BighelpLiveActivitySnapshot] = [:]
+        func existingActivities() -> [BighelpLiveActivitySnapshot] { Array(snapshots.values) }
+        func start(attributes: LoopdySessionActivityAttributes, state: LoopdySessionActivityAttributes.ContentState) throws -> String {
+            if refuseStart { throw DirectHermesError.notConnected }
+            starts += 1
+            let id = UUID().uuidString
+            snapshots[id] = .init(nativeActivityID: id, attributes: attributes, state: state, pushToken: nil)
+            return id
+        }
+        func update(id: String, state: LoopdySessionActivityAttributes.ContentState) async {
+            guard let old = snapshots[id] else { return }
+            snapshots[id] = .init(nativeActivityID: id, attributes: old.attributes, state: state, pushToken: nil)
+        }
+        func end(id: String, state: LoopdySessionActivityAttributes.ContentState) async { snapshots[id] = nil }
+        func currentPushToken(id: String) -> Data? { nil }
+        func pushTokenUpdates(id: String) -> AsyncStream<Data> { AsyncStream { $0.finish() } }
+    }
+
     @Test func openingChatBeforeNotificationOptInIsANoOp() async throws {
         let fixture = try Fixture(independent: true)
         defer { fixture.cleanup() }
@@ -971,11 +1092,17 @@ import UserNotifications
         var recipientKeys: [String] = []
         init(_ account: Account, _ trust: BighelpNotificationHostTrustStore) { self.account=account;self.trust=trust }
         var offline = false
+        var holdWorkSnapshot = false
+        var workContinuation: CheckedContinuation<Void, Never>?
         var enrollRejection: DirectHostNotificationError?
         var removedGrants: [String] = []
         func request(_ suffix: String, method: String, body: [String: BighelpJSONValue]?, isCurrent: @escaping @MainActor () -> Bool) async throws -> BighelpJSONValue {
             guard isCurrent() else { throw DirectHermesError.secureStorageChanged }
             if offline { throw DirectHermesError.notConnected }
+            if suffix.hasSuffix("/work"), method == "POST" {
+                if holdWorkSnapshot { await withCheckedContinuation { workContinuation = $0 } }
+                return .object(["version": .integer(1), "grantId": .string(account.template.grantId), "work": .null])
+            }
             if method == "DELETE", suffix.hasPrefix("/enrollments/"), !suffix.dropFirst(13).contains("/") {
                 // The plugin's remove(): deletes the grant's subscriptions, pending
                 // alerts, Live Activities, recipient key and avatar keys.

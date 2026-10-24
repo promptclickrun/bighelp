@@ -162,6 +162,80 @@ struct ChatTimelineKeptRowsTests {
         #expect(probe() == "divider:Row 29 moving")
     }
 
+    /// A chat screen whose scene phase and card actions a test changes, the way returning to the
+    /// app and the host connection closing and opening again change them.
+    private static func returningScreen(_ values: ChatScreenValues, rows: [ChatCanvasRow], owner: NSObject) async throws
+        -> (UIWindow, ChatTimelineTableView, (Int) -> UIButton?) {
+        let root = UIHostingController(rootView: ChatScreen(values: values, owner: owner, rows: rows))
+        let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        window.frame = CGRect(x: 0, y: 0, width: 402, height: 874)
+        window.rootViewController = root
+        window.makeKeyAndVisible()
+        // The rows above are built one at a time once the chat is still.
+        try await Task.sleep(for: .seconds(1))
+        let table = try #require(Host.descendants(root.view, of: ChatTimelineTableView.self).first)
+        return (window, table, { row in
+            Host.descendants(table, of: UIButton.self).first { $0.title(for: .normal)?.hasPrefix("divider:Row \(row) ") == true }
+        })
+    }
+
+    @Test func comingBackToTheAppKeepsTheRowsItBuilt() async throws {
+        let values = ChatScreenValues()
+        let owner = NSObject()
+        let rows = (0..<40).map { ChatCanvasRow.divider("Row \($0)") }
+        let (window, table, button) = try await Self.returningScreen(values, rows: rows, owner: owner)
+        defer { window.isHidden = true }
+        let ahead = try #require(button(25), "Row 25 must be built before it's on screen.")
+        let shown = try #require(button(39))
+
+        for phase in [ScenePhase.inactive, .background] {
+            values.scenePhase = phase
+            try await Task.sleep(for: .milliseconds(200))
+        }
+        #expect(shown.title(for: .normal) == "divider:Row 39 background none", "Rows see the scene phase as it changes.")
+        for phase in [ScenePhase.inactive, .active] {
+            values.scenePhase = phase
+            try await Task.sleep(for: .milliseconds(200))
+        }
+        try await Task.sleep(for: .seconds(1))
+
+        #expect(button(39) === shown)
+        #expect(button(25) === ahead, "A trip to the background must not build the rows above again.")
+        table.followsTail = false
+        table.scrollToRow(at: IndexPath(row: 25, section: 0), at: .top, animated: false)
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(ahead.title(for: .normal) == "divider:Row 25 active none")
+    }
+
+    @Test func aReconnectGivesKeptRowsTheNewCardActionsWithoutBuildingThemAgain() async throws {
+        func cards(_ name: String) -> ChatCardInteractionHandler {
+            ChatCardInteractionHandler(
+                scope: ChatCardInteractionScope(authorityID: "host", profileID: "default", conversationID: "cards"),
+                store: BighelpCardInteractionStore(), currentDraft: { name }, stageComposer: { _, _ in },
+                currentScope: { nil })
+        }
+        let values = ChatScreenValues()
+        values.cards = cards("first")
+        let owner = NSObject()
+        let rows = (0..<40).map { ChatCanvasRow.divider("Row \($0)") }
+        let (window, _, button) = try await Self.returningScreen(values, rows: rows, owner: owner)
+        defer { window.isHidden = true }
+        let ahead = try #require(button(25), "Row 25 must be built before it's on screen.")
+        let shown = try #require(button(39))
+        #expect(shown.title(for: .normal) == "divider:Row 39 active first")
+
+        // No card actions while the connection is closed, then the new connection's.
+        values.cards = nil
+        try await Task.sleep(for: .milliseconds(200))
+        values.cards = cards("second")
+        try await Task.sleep(for: .seconds(1))
+
+        #expect(button(39) === shown)
+        #expect(shown.title(for: .normal) == "divider:Row 39 active second")
+        #expect(button(25) === ahead, "A reconnect must not build the rows above again.")
+    }
+
     @Test func aMessageThatGainsAFollowerInItsGroupClosesUpToIt() async throws {
         let model = ChatModel(conversationID: "regrouped-rows", client: ConversationFixtureClient(), initialItems: [
             Self.message("question", .human, "What changed in the build?"),
@@ -185,6 +259,36 @@ private struct LoaderMotionProbe: View {
     @Environment(\.bighelpLoaderMotionOverride) private var override
 
     var body: some View { ProbeTitle(title: "\(id) \(override.sceneInactive ? "still" : "moving")") }
+}
+
+@MainActor @Observable private final class ChatScreenValues {
+    var scenePhase = ScenePhase.active
+    var cards: ChatCardInteractionHandler?
+}
+
+/// A timeline under the scene phase and card actions in `values`.
+private struct ChatScreen: View {
+    let values: ChatScreenValues
+    let owner: NSObject
+    let rows: [ChatCanvasRow]
+
+    var body: some View {
+        NativeChatTimeline(conversationID: "returning", ownerID: ObjectIdentifier(owner), rows: rows,
+                           controller: ChatTimelineController(), entryCount: rows.count) { row in
+            ReturnProbe(id: row.id).frame(height: 100)
+        }
+        .environment(\.scenePhase, values.scenePhase)
+        .environment(\.chatCardInteractions, values.cards)
+    }
+}
+
+/// Says which scene phase and card actions its row sees.
+private struct ReturnProbe: View {
+    let id: String
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.chatCardInteractions) private var cards
+
+    var body: some View { ProbeTitle(title: "\(id) \(scenePhase) \(cards?.currentDraft() ?? "none")") }
 }
 
 private struct ProbeTitle: UIViewRepresentable {

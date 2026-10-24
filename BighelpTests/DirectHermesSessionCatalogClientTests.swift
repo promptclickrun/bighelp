@@ -1281,9 +1281,12 @@ struct DirectHermesSessionCatalogClientTests {
     /// (`canonical_session`): each refresh keeps it, rather than dropping the agent's chat from the app.
     @Test func everyRefreshKeepsTheAgentsHiddenBotChat() async throws {
         let workspace = try SessionWorkspaceStub()
-        workspace.handler = { operation, _ in
+        workspace.handler = { operation, payload in
             switch operation {
-            case .profilesList: return Self.profiles(canonical: "bot-chat")
+            case .profilesList:
+                // Like Hermes: the agent list names each Bot Chat only with the agents' sessions
+                // (`include_sessions`, on unless it's turned off).
+                return payload["include_sessions"] == .boolean(false) ? Self.profiles() : Self.profiles(canonical: "bot-chat")
             case .sessionsList: return Self.ownershipPage([Self.session(id: "other")])
             default: throw WorkspaceClientError.invalidRequest
             }

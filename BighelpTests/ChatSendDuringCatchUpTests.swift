@@ -35,6 +35,54 @@ struct ChatSendDuringCatchUpTests {
         await send.value
     }
 
+    /// A chat opening from its saved copy keeps Send on: the message waits in the box until the
+    /// chat has its own connection, then goes out.
+    @Test func sendStaysOnWhileAChatOpensFromItsSavedCopy() async throws {
+        let fixture = try CatchUpFixture()
+        defer { fixture.close() }
+        try await fixture.client.recover(epoch: "epoch")
+        let model = ChatModel(conversationID: fixture.client.conversationID, client: NativeWorkspaceUnavailableClient(),
+                              initialItems: [])
+        model.draft = "Hello there"
+        #expect(!model.canSend, "No connection and no open under way")
+
+        let opening = UUID()
+        let opened = OpenGate()
+        model.beginOpening(opening) { await opened.wait() }
+        #expect(model.canSend, "Opening must not grey out Send")
+        let send = Task { await model.send() }
+        for _ in 0..<50 { await Task.yield() }
+        #expect(fixture.rpc.submits.isEmpty, "The message waits for the open")
+        #expect(model.draft == "Hello there")
+        #expect(!model.canSend, "A second tap can't send it twice")
+
+        model.client = fixture.client
+        fixture.client.model = model
+        model.endOpening(opening)
+        opened.open()
+        try await fixture.waitUntil { !fixture.rpc.submits.isEmpty }
+        #expect(fixture.rpc.submits == ["Hello there"])
+        #expect(model.draft.isEmpty)
+        send.cancel()
+        await send.value
+    }
+
+    /// An open that fails keeps the message in the box, and Send goes off with the reason.
+    @Test func aFailedOpenKeepsTheMessageInTheBox() async throws {
+        let model = ChatModel(conversationID: "failed-open", client: NativeWorkspaceUnavailableClient(), initialItems: [])
+        model.draft = "Hello there"
+        let opening = UUID()
+        let opened = OpenGate()
+        model.beginOpening(opening) { await opened.wait() }
+        let send = Task { await model.send() }
+        for _ in 0..<50 { await Task.yield() }
+        model.endOpening(opening)
+        opened.open()
+        await send.value
+        #expect(model.draft == "Hello there")
+        #expect(!model.canSend)
+    }
+
     /// A chat that hasn't loaded yet keeps Send off until it has.
     @Test func sendStaysOffWhileAChatFirstLoads() async throws {
         let fixture = try CatchUpFixture()
@@ -47,6 +95,24 @@ struct ChatSendDuringCatchUpTests {
         fixture.rpc.releaseActivation()
         try await load.value
         #expect(fixture.model.canSend)
+    }
+}
+
+/// Holds an open under way until `open()`.
+@MainActor
+private final class OpenGate {
+    private var isOpen = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func wait() async {
+        guard !isOpen else { return }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+
+    func open() {
+        isOpen = true
+        waiters.forEach { $0.resume() }
+        waiters = []
     }
 }
 

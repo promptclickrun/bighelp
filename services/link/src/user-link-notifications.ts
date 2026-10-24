@@ -1,4 +1,4 @@
-import { aggregateActivityRows, type ActivityGroupRow } from "./activity-group.js";
+import { aggregateActivityRows, NATIVE_ROW_ID, type ActivityGroupRow } from "./activity-group.js";
 import { LoopdyLinkError } from "./contracts.js";
 import type { NotificationActivity, NotificationAsset, NotificationEgressSnapshot } from "./notification-grants.js";
 import type { UserLinkAccount } from "./user-link-account.js";
@@ -105,7 +105,7 @@ export class UserLinkNotificationStore {
       const current = this.readManagedNotificationActivity(input.activityId);
       const group = this.groupRow(input.activityId);
       if ((input.groupId !== undefined && (!DEVICE_COORDINATE.test(input.groupId)
-          || !/^native-[A-Za-z0-9_-]{43}$/.test(input.rowId ?? "") || !DEVICE_COORDINATE.test(input.credentialId ?? "")))
+          || !NATIVE_ROW_ID.test(input.rowId ?? "") || !DEVICE_COORDINATE.test(input.credentialId ?? "")))
           || (current && (group?.group_id !== input.groupId || group?.row_id !== input.rowId
             || group?.credential_id !== input.credentialId || group?.row_revision !== input.rowRevision))) {
         throw new LoopdyLinkError("notification_activity_conflict", "Activity group ownership changed");

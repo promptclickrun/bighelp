@@ -7,6 +7,9 @@ export interface ActivityGroupRow {
   latestTool?: string | null;
 }
 
+/** A chat row on a shared card. The app names a row "native-" and the SHA-256 of its chat in hex; the 43-character base64url form is kept for rows registered before that was settled. */
+export const NATIVE_ROW_ID = /^native-(?:[0-9a-f]{64}|[A-Za-z0-9_-]{43})$/;
+
 export function activityRowPriority(phase: string): number {
   return phase === "waiting" ? 0 : phase === "failed" ? 2 : phase === "completed" ? 3 : 1;
 }

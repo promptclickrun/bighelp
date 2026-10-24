@@ -1,4 +1,5 @@
 import { encodeSmallBase64URL as notificationBase64, decodeBase64URL, sha256Bytes as digest } from "./encoding.js";
+import { NATIVE_ROW_ID } from "./activity-group.js";
 import { privateJSON as response, readByteStream } from "./http-primitives.js";
 export { encodeSmallBase64URL as notificationBase64 } from "./encoding.js";
 import { DEVICE_AUTH_HEADERS, verifyDeviceRequest, type VerifiedDeviceRequest } from "./device-auth.js";
@@ -1462,7 +1463,7 @@ export async function handleNotificationRequest(
       ]);
       if ((body.version !== 2 && body.version !== 3)
           || (body.version === 3 && (typeof body.groupId !== "string" || !IDENTIFIER.test(body.groupId)
-            || typeof body.rowId !== "string" || !/^native-[A-Za-z0-9_-]{43}$/.test(body.rowId)
+            || typeof body.rowId !== "string" || !NATIVE_ROW_ID.test(body.rowId)
             || !boundedInteger(body.rowRevision, 1, 9e15))) || body.profile !== grant.profile || typeof body.sessionId !== "string"
           || !IDENTIFIER.test(body.sessionId) || body.sessionReference !== await notificationSessionReference(grant.profile, body.sessionId)
           || body.attributesType !== "LoopdySessionActivityAttributes" || !integer(body.revision)

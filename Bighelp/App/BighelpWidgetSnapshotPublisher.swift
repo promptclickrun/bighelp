@@ -14,6 +14,11 @@ final class BighelpWidgetSnapshotPublisher {
     /// The gateway this workspace is on; widgets set to it keep its data.
     private let hostID: String?
     private var pending: Task<Void, Never>?
+    private var heartbeat: Task<Void, Never>?
+    private let isLive: @MainActor () -> Bool
+    /// True only after this connection has observed the host's sessions, never just a loaded disk cache.
+    private let sessionsAreLive: @MainActor () -> Bool
+    private let now: @MainActor () -> Date
     private var lastPublished: BighelpWidgetSnapshot?
     private var retired = false
     private let interval: Duration
@@ -23,12 +28,23 @@ final class BighelpWidgetSnapshotPublisher {
 
     init(sessions: SessionCatalogStore, scheduledTasks: ScheduledTasksStore?, agents: AgentDirectoryStore,
          hostID: String? = nil, extras: BighelpWidgetExtras = .shared, interval: Duration = .seconds(2),
-         saved: BighelpWidgetSnapshot? = nil,
+         saved: BighelpWidgetSnapshot? = nil, isLive: @escaping @MainActor () -> Bool = { true },
+         sessionsAreLive: @escaping @MainActor () -> Bool = { false }, now: @escaping @MainActor () -> Date = { .now },
          write: @escaping (BighelpWidgetSnapshot) -> Void = BighelpWidgetSnapshotPublisher.persist) {
         self.sessions = sessions; self.scheduledTasks = scheduledTasks; self.agents = agents; self.extras = extras
-        self.hostID = hostID; self.interval = interval; self.write = write
+        self.hostID = hostID; self.interval = interval; self.write = write; self.isLive = isLive
+        self.sessionsAreLive = sessionsAreLive; self.now = now
         self.saved = saved.flatMap { $0.hostID == hostID ? $0 : nil }
         observe()
+        heartbeat = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(60))
+                guard let self, !Task.isCancelled, !self.retired else { return }
+                if self.isLive(), self.sessionsAreLive(), self.sessions?.hasLoadedState == true {
+                    self.publishNow()
+                }
+            }
+        }
     }
 
     /// `next`: the gateway that took over. Widgets that follow the gateway in use show its copy from
@@ -36,6 +52,7 @@ final class BighelpWidgetSnapshotPublisher {
     func retire(next: BighelpWidgetSnapshot? = nil) {
         retired = true
         pending?.cancel(); pending = nil
+        heartbeat?.cancel(); heartbeat = nil
         write(next ?? .empty)
     }
 
@@ -61,24 +78,29 @@ final class BighelpWidgetSnapshotPublisher {
     func publishNow() {
         // Until the gateway's agents are known (a launch, or bighelp woken in the background, before
         // the computer answers), the widgets keep what they show.
-        guard !retired, agents?.knowsProfiles == true else { return }
-        var snapshot = makeSnapshot()
-        if var previous = lastPublished {
+        guard !retired, isLive(), agents?.knowsProfiles == true else { return }
+        let snapshot = makeSnapshot()
+        if let lastPublished {
+            var previous = lastPublished
             previous.generatedAt = snapshot.generatedAt
-            guard previous != snapshot else { return }
+            previous.sessionsUpdatedAt = snapshot.sessionsUpdatedAt
+            let becameFresh = lastPublished.chatsAreStale(at: snapshot.generatedAt)
+                && !snapshot.chatsAreStale(at: snapshot.generatedAt)
+            guard previous != snapshot || becameFresh
+                || snapshot.generatedAt.timeIntervalSince(lastPublished.generatedAt) >= 60 else { return }
         }
-        snapshot.generatedAt = .now
         lastPublished = snapshot
         write(snapshot)
     }
 
     func makeSnapshot() -> BighelpWidgetSnapshot {
+        let date = now()
         let profiles = agents?.profiles ?? []
         let names = Dictionary(profiles.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
         let defaultAgent = agents?.resolvedAgent(explicitID: nil) ?? profiles.first
         let records = (sessions?.presentedRecords ?? [])
             .filter { $0.parentSessionID == nil && !$0.isWorkflowSession && ($0.hasAcceptedMessage || $0.hasActiveWork) }
-            .sorted { $0.updatedAt > $1.updatedAt }
+            .sorted(by: SessionCatalogReconciliation.activitySort)
             .prefix(12)
         let sessionRows = records.map { record -> BighelpWidgetSnapshot.Session in
             let agentName = record.agentIDs.first.flatMap { names[$0] } ?? defaultAgent?.name ?? "Agent"
@@ -103,7 +125,7 @@ final class BighelpWidgetSnapshotPublisher {
         let boards = extras.agentBoards.values.filter { names[$0.agentID] != nil }.sorted { $0.agentID < $1.agentID }
         let limit = BighelpWidgetSnapshot.maximumPinnedAgents
         var snapshot = BighelpWidgetSnapshot(defaultAgentID: defaultAgent?.id, defaultAgentName: defaultAgent?.name,
-                                    sessions: Array(sessionRows), tasks: Array(taskRows), generatedAt: .now,
+                                    sessions: Array(sessionRows), tasks: Array(taskRows), generatedAt: date,
                                     feed: extras.feed, goals: extras.goals, ideas: extras.ideas,
                                     agents: Array(agentRows), boards: boards,
                                     lightPalette: extras.lightPalette, darkPalette: extras.darkPalette,
@@ -130,6 +152,11 @@ final class BighelpWidgetSnapshotPublisher {
                 snapshot.allPinnedAgents = saved.allPinnedAgents
             }
         }
+        let previous = lastPublished ?? saved
+        let hasLiveSessions = isLive() && sessionsAreLive() && sessions?.hasLoadedState == true
+            && sessions?.loadErrorMessage == nil && sessions?.refreshErrorMessage == nil
+        snapshot.sessionsUpdatedAt = hasLiveSessions ? date
+            : previous?.sessionsUpdatedAt ?? previous?.generatedAt ?? .distantPast
         return snapshot
     }
 

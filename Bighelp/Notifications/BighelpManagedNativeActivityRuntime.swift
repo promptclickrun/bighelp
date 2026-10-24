@@ -10,22 +10,31 @@ final class BighelpManagedNativeActivityRuntime {
         let profile: String
         let session: String
         let localTurn: String
-        let canonicalTurn: String?
+        var canonicalTurn: String?
         let grantID: String
         let opaqueID: String
         let coordinator: BighelpLiveActivityCoordinator
         let driver: BighelpManagedActivityDriver
         let registrar: BighelpManagedLiveActivityRegistrar
+        weak var client: DirectHermesConversationClient?
+        var pendingEvent: ChatActivityEvent?
+        var lastEvent: ChatActivityEvent?
+        var canonicalState: LoopdySessionActivityAttributes.ContentState?
+        var nativeParentFinished = false
+        var nativeTurns = Set<String>()
+        var excludedCanonicalTurns = Set<String>()
+        var agentName = "Your agent"
         init(host: BighelpConfiguredHost, grantID: String, profile: String, session: String, localTurn: String, canonicalTurn: String?,
              coordinator: BighelpLiveActivityCoordinator, driver: BighelpManagedActivityDriver,
              registrar: BighelpManagedLiveActivityRegistrar) {
             self.host = host; self.profile = profile; self.session = session; self.localTurn = localTurn
-            self.grantID = grantID; self.canonicalTurn = canonicalTurn; self.coordinator = coordinator; self.driver = driver; self.registrar = registrar
+            self.grantID = grantID; self.canonicalTurn = canonicalTurn; nativeTurns = [localTurn]; self.coordinator = coordinator; self.driver = driver; self.registrar = registrar
             opaqueID = ManagedNotificationValidation.nativeSessionID(host: host, profile: profile, session: session)
         }
     }
     private weak var service: BighelpManagedNotificationService?
     private let nativeDriver: any BighelpLiveActivityDriving
+    let physicalTokenRegistrar = BighelpPhysicalActivityTokenRegistrar()
     private let environment: BighelpLinkPushEnvironment
     private let topic: String
     private let now: () -> Date
@@ -35,6 +44,18 @@ final class BighelpManagedNativeActivityRuntime {
     init(service: BighelpManagedNotificationService, driver: any BighelpLiveActivityDriving = BighelpActivityKitDriver(),
          environment: BighelpLinkPushEnvironment, topic: String, now: @escaping () -> Date = Date.init) {
         self.service = service; nativeDriver = driver; self.environment = environment; self.topic = topic; self.now = now
+    }
+
+    func currentPushToken(for owner: BighelpManagedActivityOwner) -> Data? {
+        guard service?.ledger.activity(owner.relayActivityID)?.retired == false,
+              nativeDriver.existingActivities().contains(where: { $0.nativeActivityID == owner.nativeActivityID }) else { return nil }
+        return nativeDriver.currentPushToken(id: owner.nativeActivityID)
+    }
+
+    func invalidatePhysicalActivity(for owner: BighelpManagedActivityOwner) async {
+        guard let group = nativeDriver as? BighelpActivityGroupDriver else { return }
+        await group.invalidate(id: owner.nativeActivityID)
+        Task { @MainActor [weak self] in await self?.flushPendingOperations() }
     }
 
     /// canonicalHostTurnID must be supplied from a real authenticated producer,
@@ -60,6 +81,18 @@ final class BighelpManagedNativeActivityRuntime {
                 throw DirectHermesError.identityChanged
             }
         }
+        try repairInvalidatedEntries(host: host)
+        pruneFinishedEntries()
+        if canonicalHostTurnID == nil, let existing = entries.values.first(where: {
+            $0.host.id == host.id && $0.host.notificationScope == host.notificationScope && $0.profile == profile
+                && $0.session == session && $0.canonicalTurn != nil && !$0.nativeParentFinished
+        }) {
+            // Track the native parent boundary even if this segment's snapshot
+            // fails. A message segment is not a new canonical host turn.
+            existing.nativeTurns.insert(event.turnID)
+            existing.lastEvent = event; existing.client = chat.client
+            return
+        }
         if let canonicalHostTurnID {
             // Several native message.start segments can select the SAME public
             // work. Keep one Activity and never feed their unrelated local unit
@@ -68,9 +101,15 @@ final class BighelpManagedNativeActivityRuntime {
                 $0.host.notificationScope == host.notificationScope && $0.host.id == host.id
                     && $0.grantID == grant.grantId && $0.profile == profile && $0.session == session && $0.canonicalTurn == canonicalHostTurnID
             }) {
+                selected.client = chat.client
+                selected.lastEvent = event
+                selected.nativeTurns.insert(event.turnID)
                 if workSnapshot?.work?.outcome == .cancelled {
                     try await cancel(host: host, profile: profile, storedSessionID: session,
                         originalLocalTurnID: selected.localTurn)
+                } else if selected.coordinator.activeSessionIDs.isEmpty {
+                    await selected.coordinator.receive(event.routed(to: selected.opaqueID), sessionTitle: "Active session",
+                        agentID: profile, agentName: "Your agent")
                 } else {
                     await selected.coordinator.flushPendingOperations()
                 }
@@ -84,7 +123,7 @@ final class BighelpManagedNativeActivityRuntime {
             if service.ledger.activities.contains(where: {
                 $0.accountScope == host.notificationScope && $0.hostConnectionID == host.hostConnectionID
                     && $0.grantID == grant.grantId && $0.profile == profile
-                    && $0.storedSessionID == session && $0.canonicalTurnID == canonicalHostTurnID
+                    && $0.storedSessionID == session && $0.canonicalTurnID == canonicalHostTurnID && !$0.retired
             }) { return }
         }
         let key = Self.key(host: host, profile: profile, session: session, turn: event.turnID)
@@ -95,13 +134,8 @@ final class BighelpManagedNativeActivityRuntime {
             entry = current
         } else {
             guard !event.lifecycle.isTerminal, entries.count < 64 else { return }
-            // One live card on the Lock Screen at a time: the newest chat's work
-            // replaces an older card (whose reply still arrives as a notification)
-            // instead of stacking a card per chat.
-            for (otherKey, other) in Array(entries) where otherKey != key {
-                try? await cancel(host: other.host, profile: other.profile, storedSessionID: other.session,
-                                  originalLocalTurnID: other.localTurn)
-            }
+            // Per-turn ownership is independent; the group driver combines rows
+            // into one native card without cancelling another chat.
             guard !retired.contains(key) else { return }
             if let raced = entries[key] {
                 // Another update for this chat made its card while older ones were closing.
@@ -111,14 +145,116 @@ final class BighelpManagedNativeActivityRuntime {
                 entry = try makeEntry(host: host, grant: grant, session: session, localTurn: event.turnID,
                     canonicalTurn: canonicalHostTurnID, firstObservedAt: workSnapshot?.work?.observedAt ?? event.occurredAt,
                     observedState: workSnapshot?.work?.contentState)
+                entry.excludedCanonicalTurns = Set(entries.values.compactMap { previous in
+                    guard previous.host.id == host.id, previous.host.notificationScope == host.notificationScope,
+                          previous.profile == profile, previous.session == session, previous.nativeParentFinished else { return nil }
+                    return previous.canonicalTurn
+                })
                 entries[key] = entry
             }
         }
         // Coalescing and exact child/parent ownership are in the existing reducer.
         // The driver stops local content writes as soon as cloud ownership begins.
         let configuredName = service.registry.workspace(for: host).profiles.first(where: { $0.id == profile })?.name ?? "Your agent"
+        if let attributes = LoopdySessionActivityAttributes.make(sessionID: entry.opaqueID, sessionTitle: "Chat",
+            agentID: profile, agentName: configuredName) {
+            var infos = BighelpActivitySessionInfo.load()
+            let title = String(chat.client.title.split(whereSeparator: \.isWhitespace).joined(separator: " ").prefix(60))
+            infos[entry.opaqueID] = .init(attributes: attributes, title: title.isEmpty ? "Chat" : title,
+                virtualID: infos[entry.opaqueID]?.virtualID, state: infos[entry.opaqueID]?.state)
+            BighelpActivitySessionInfo.save(infos)
+        }
+        entry.client = chat.client
+        entry.agentName = configuredName
+        entry.pendingEvent = event
+        entry.lastEvent = event
         await entry.coordinator.receive(event.routed(to: entry.opaqueID), sessionTitle: "Active session",
             agentID: profile, agentName: configuredName)
+        if !entry.coordinator.activeSessionIDs.isEmpty {
+            entry.pendingEvent = nil
+            // The replacement is now accepted. Late writes from the earlier
+            // owner cannot remove or update this chat's new virtual row.
+            for (oldKey, old) in entries where oldKey != key && old.host.id == host.id
+                && old.host.notificationScope == host.notificationScope && old.profile == profile && old.session == session {
+                try retireOwner(old)
+                old.driver.retire(); entries[oldKey] = nil
+                if retired.count < 512 { retired.insert(oldKey) }
+            }
+        }
+    }
+
+    private func retireOwner(_ entry: Entry) throws {
+        guard let service else { return }
+        for var owner in service.ledger.activities where owner.hostConnectionID == entry.host.hostConnectionID
+            && owner.accountScope == entry.host.notificationScope && owner.profile == entry.profile
+            && owner.storedSessionID == entry.session && owner.localTurnID == entry.localTurn && !owner.retired {
+            owner.retired = true
+            try service.ledger.save(owner)
+        }
+    }
+
+    /// The remote group may end while a locally admitted row is still awaiting
+    /// registration. Its old physical token can never be reused; retain the live
+    /// event and make a fresh exact owner when the next foreground window allows.
+    private func repairInvalidatedEntries(host: BighelpConfiguredHost) throws {
+        guard nativeDriver is BighelpActivityGroupDriver, let service else { return }
+        let active = Set(nativeDriver.existingActivities().map(\.nativeActivityID))
+        for (key, entry) in entries where entry.host.id == host.id && entry.host.notificationScope == host.notificationScope {
+            guard let event = entry.lastEvent, let client = entry.client, client.connected,
+                  client.projection.running, client.projection.turnID == event.turnID,
+                  !entry.nativeParentFinished, !entry.coordinator.activeSessionIDs.isEmpty,
+                  let grant = service.ledger.record(host: host, profile: entry.profile)?.grant else { continue }
+            let owners = service.ledger.activities.filter { $0.hostConnectionID == host.hostConnectionID
+                && $0.accountScope == host.notificationScope && $0.profile == entry.profile
+                && $0.storedSessionID == entry.session && $0.localTurnID == entry.localTurn && !$0.retired }
+            guard !owners.isEmpty, owners.allSatisfy({ !active.contains($0.nativeActivityID) }) else { continue }
+            try retireOwner(entry)
+            entry.driver.retire()
+            let replacement = try makeEntry(host: host, grant: grant, session: entry.session,
+                localTurn: entry.localTurn, canonicalTurn: entry.canonicalTurn,
+                firstObservedAt: event.occurredAt, observedState: entry.canonicalState)
+            replacement.client = client; replacement.agentName = entry.agentName
+            let restart = event.lifecycle.isTerminal ? ChatActivityEvent(
+                eventID: "restore-parent-" + event.turnID, sessionID: event.sessionID, turnID: event.turnID,
+                kind: .reasoning, lifecycle: .running, title: "Working", summary: nil, detail: nil,
+                occurredAt: Int(now().timeIntervalSince1970)) : event
+            replacement.pendingEvent = restart; replacement.lastEvent = restart
+            replacement.nativeTurns = entry.nativeTurns
+            replacement.excludedCanonicalTurns = entry.excludedCanonicalTurns
+            entries[key] = replacement
+        }
+    }
+
+    private func pruneFinishedEntries() {
+        let active = Set(nativeDriver.existingActivities().map(\.nativeActivityID))
+        guard let service else { return }
+        for (key, entry) in entries where entry.pendingEvent == nil && entry.driver.remoteOwned {
+            let owners = service.ledger.activities.filter { $0.hostConnectionID == entry.host.hostConnectionID
+                && $0.accountScope == entry.host.notificationScope && $0.profile == entry.profile
+                && $0.storedSessionID == entry.session && $0.localTurnID == entry.localTurn && !$0.retired }
+            if !owners.isEmpty && owners.allSatisfy({ !active.contains($0.nativeActivityID) }) {
+                entry.driver.retire(); entries[key] = nil
+                if retired.count < 512 { retired.insert(key) }
+            }
+        }
+    }
+
+    /// The snapshot belongs to the captured session/epoch/turn. Never adopt a
+    /// later turn merely because a token or retry arrives late.
+    func promote(host: BighelpConfiguredHost, chat: DirectHermesChat, localTurn: String,
+                 snapshot: BighelpManagedWorkSnapshot) async throws -> Bool {
+        let key = Self.key(host: host, profile: chat.client.profile, session: chat.client.storedID, turn: localTurn)
+        guard let entry = entries[key], entry.canonicalTurn == nil,
+              let work = snapshot.work, !work.terminal, !entry.excludedCanonicalTurns.contains(work.turnId),
+              snapshot.version == 1, snapshot.grantId == entry.grantID,
+              work.profile == entry.profile, work.sessionId == entry.session,
+              chat.client.projection.turnID == localTurn, service?.ownsChat(host: host, client: chat.client) == true else { return false }
+        try await entry.driver.promote(to: work.turnId, state: work.contentState)
+        guard entries[key] === entry, !entry.driver.isRetired else { return false }
+        entry.canonicalTurn = work.turnId
+        entry.canonicalState = work.contentState
+        await entry.coordinator.flushPendingOperations()
+        return true
     }
 
     /// Correlate the admitted native running->false terminal, NOT message.complete.
@@ -128,7 +264,13 @@ final class BighelpManagedNativeActivityRuntime {
                 originalLocalTurnID: String, outcome: BighelpLiveActivityOutcome) async throws {
         guard let service else { return }
         _ = try service.credentials(for: host)
-        let key = Self.key(host: host, profile: profile, session: storedSessionID, turn: originalLocalTurnID)
+        let directKey = Self.key(host: host, profile: profile, session: storedSessionID, turn: originalLocalTurnID)
+        let key = entries[directKey] != nil ? directKey : entries.first(where: {
+            $0.value.host.id == host.id && $0.value.host.notificationScope == host.notificationScope
+                && $0.value.profile == profile && $0.value.session == storedSessionID
+                && $0.value.nativeTurns.contains(originalLocalTurnID)
+        })?.key ?? directKey
+        entries[key]?.nativeParentFinished = true
         // A local frame final is not proof about selected authoritative work,
         // including the interval BEFORE its APNs token has registered.
         guard let entry = entries[key], entry.canonicalTurn == nil, !entry.driver.remoteOwned else { return }
@@ -216,7 +358,16 @@ final class BighelpManagedNativeActivityRuntime {
         }
     }
     func flushPendingOperations() async {
-        for entry in Array(entries.values) { await entry.coordinator.flushPendingOperations() }
+        for host in service?.registry.hosts ?? [] { try? repairInvalidatedEntries(host: host) }
+        for entry in Array(entries.values) {
+            if let event = entry.pendingEvent, let client = entry.client,
+               client.connected, client.projection.running, client.projection.turnID == event.turnID {
+                await entry.coordinator.receive(event.routed(to: entry.opaqueID), sessionTitle: "Active session",
+                    agentID: entry.profile, agentName: entry.agentName)
+                if !entry.coordinator.activeSessionIDs.isEmpty { entry.pendingEvent = nil }
+            }
+            await entry.coordinator.flushPendingOperations()
+        }
     }
     func retire(host: BighelpConfiguredHost) {
         for (key, entry) in entries where entry.host.notificationScope == host.notificationScope && entry.host.id == host.id {
@@ -229,6 +380,7 @@ final class BighelpManagedNativeActivityRuntime {
         let previous = Array(entries.values); entries.removeAll(); retired.removeAll()
         for entry in previous { entry.driver.retire() }
         for entry in previous { await entry.coordinator.resetForAccountBoundary() }
+        BighelpActivitySessionInfo.save([:])
     }
     /// For `loopdy://chat/native-*` ActivityKit taps: only a local scoped mapping
     /// is returned. Main may use the same exact host/profile/session open flow;
@@ -249,56 +401,21 @@ final class BighelpManagedNativeActivityRuntime {
                            localTurn: String, canonicalTurn: String?, firstObservedAt: Int,
                            observedState: LoopdySessionActivityAttributes.ContentState? = nil) throws -> Entry {
         guard let service else { throw DirectHermesError.secureStorageChanged }
-        let source: any BighelpLiveActivityDriving = canonicalTurn == nil ? nativeDriver
-            : BighelpManagedObservedActivityDriver(underlying: nativeDriver, initialState: observedState)
-        let driver = BighelpManagedActivityDriver(underlying: source, ledger: service.ledger,
+        let driver = BighelpManagedActivityDriver(underlying: nativeDriver, ledger: service.ledger,
             activityKeys: service.activityKeys, host: host, grantID: grant.grantId, profile: grant.profile,
-            sessionID: session, localTurnID: localTurn, canonicalTurnID: canonicalTurn, firstObservedAt: firstObservedAt)
+            sessionID: session, localTurnID: localTurn, canonicalTurnID: canonicalTurn, firstObservedAt: firstObservedAt, initialState: observedState)
         let registrar = try BighelpManagedLiveActivityRegistrar(service: service, host: host, grant: grant,
             environment: environment, topic: topic)
         registrar.onRegistrationConfirmed = { [weak driver] in driver?.registrationConfirmed() }
         let coordinator = BighelpLiveActivityCoordinator(driver: driver, registrar: registrar, now: now)
-        return Entry(host: host, grantID: grant.grantId, profile: grant.profile, session: session, localTurn: localTurn, canonicalTurn: canonicalTurn,
+        let entry = Entry(host: host, grantID: grant.grantId, profile: grant.profile, session: session, localTurn: localTurn, canonicalTurn: canonicalTurn,
             coordinator: coordinator, driver: driver, registrar: registrar)
+        entry.canonicalState = observedState
+        return entry
     }
     private static func key(host: BighelpConfiguredHost, profile: String, session: String, turn: String) -> String {
         ManagedNotificationValidation.digest([host.notificationScope, host.hostConnectionID, profile, session, turn].joined(separator: "\0"))
     }
-}
-
-/// A canonical selection is server-owned from intent, not only token admission.
-/// Bootstrap the native card from the bounded snapshot; local segment changes
-/// may trigger registration retries but never overwrite or end that projection.
-@MainActor
-private final class BighelpManagedObservedActivityDriver: BighelpLiveActivityDriving {
-    private let underlying: any BighelpLiveActivityDriving
-    private let initialState: LoopdySessionActivityAttributes.ContentState?
-    init(underlying: any BighelpLiveActivityDriving, initialState: LoopdySessionActivityAttributes.ContentState?) {
-        self.underlying = underlying; self.initialState = initialState
-    }
-    func existingActivities() -> [BighelpLiveActivitySnapshot] {
-        underlying.existingActivities().map { snapshot in
-            guard snapshot.state.phase.isTerminal else { return snapshot }
-            // The coordinator only restores running bookkeeping. Keep a token
-            // observer for a live system card seeded terminal before its token
-            // arrived. This control-only state is NEVER written to ActivityKit;
-            // the system retains the actual authoritative terminal projection.
-            return BighelpLiveActivitySnapshot(nativeActivityID: snapshot.nativeActivityID,
-                attributes: snapshot.attributes,
-                state: .initial(agentName: snapshot.attributes.agentName, timestamp: snapshot.state.timestamp),
-                pushToken: snapshot.pushToken)
-        }
-    }
-    func start(attributes: LoopdySessionActivityAttributes, state: LoopdySessionActivityAttributes.ContentState) throws -> String {
-        try underlying.start(attributes: attributes, state: initialState ?? state)
-    }
-    func update(id: String, state: LoopdySessionActivityAttributes.ContentState) async {}
-    func end(id: String, state: LoopdySessionActivityAttributes.ContentState) async {}
-    func dismiss(id: String, state: LoopdySessionActivityAttributes.ContentState) async {
-        await underlying.dismiss(id: id, state: state)
-    }
-    func currentPushToken(id: String) -> Data? { underlying.currentPushToken(id: id) }
-    func pushTokenUpdates(id: String) -> AsyncStream<Data> { underlying.pushTokenUpdates(id: id) }
 }
 
 /// Inject this wrapper into the EXISTING Link coordinator. A legacy driver must

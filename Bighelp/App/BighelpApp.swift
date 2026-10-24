@@ -468,6 +468,68 @@ struct BighelpApp: App {
         )
     }
 
+    private func handleScenePhase(_ phase: ScenePhase, native: NativeWorkspaceRuntime?) {
+        if phase == .active {
+            _ = notificationComposition.retryAfterForeground()
+        }
+        #if DEBUG && targetEnvironment(simulator)
+        // "-test-badge-on-background 3": stand in for a push that badges the icon.
+        let arguments = ProcessInfo.processInfo.arguments
+        if phase == .background, !BighelpTestBadge.applied,
+           let index = arguments.firstIndex(of: "-test-badge-on-background"),
+           arguments.indices.contains(index + 1), let count = Int(arguments[index + 1]) {
+            BighelpTestBadge.applied = true
+            let task = UIApplication.shared.beginBackgroundTask(withName: "test badge")
+            Task { @MainActor in
+                try? await UNUserNotificationCenter.current().setBadgeCount(count)
+                UIApplication.shared.endBackgroundTask(task)
+            }
+        }
+        #endif
+        if !usesDemoFixtures, phase == .background {
+            native?.publishWidgetsNow()
+            #if os(iOS) && !targetEnvironment(macCatalyst)
+            BighelpWidgetBackgroundRefresh.scheduleIfWidgets()
+            #endif
+            (native?.features ?? featureStore).flushChatPersistence()
+            // Keep the workspace through a quick trip away; mark the
+            // presentation boundary only if the app stays away.
+            BighelpBackgroundGrace.shared.begin("workspace") { [nativeWorkspaces, hostRegistry] in
+                // Work started outside the app (a Shortcut, CarPlay, an arrival, a run out in
+                // Shortcuts) still needs the socket, as RootShellView's closer knows.
+                guard BighelpShortcutService.holdsHostConnection == 0 else { return }
+                nativeWorkspaces.suspend()
+                // Other gateways kept connected for the all-hosts view or Multi-gateway close too.
+                hostRegistry.keepsOtherHostsConnected = false
+            }
+        }
+        if phase == .active { BighelpBackgroundGrace.shared.cancel() }
+        #if os(iOS) && !targetEnvironment(macCatalyst)
+        if phase == .active { Task { await BighelpActivityKitDriver.dismissFinishedActivities() } }
+        #endif
+        Task { @MainActor in
+            // A newer scene transition may have arrived before this task starts.
+            guard scenePhase == phase else { return }
+            if phase == .active {
+                if !usesFixtureWorkspace {
+                    await nativeWorkspaces.refreshCurrentRuntimeForForeground()
+                    guard scenePhase == .active, !usesFixtureWorkspace else { return }
+                    await permissionCenter.refresh()
+                    await reflectiveVisionCamera.update(enabled: settings.reflectiveVisionEnabled)
+                    return
+                }
+                await featureStore.dashboardModel.refreshAfterExternalChange()
+                await permissionCenter.refresh()
+                await reflectiveVisionCamera.update(
+                    enabled: settings.reflectiveVisionEnabled
+                )
+            } else {
+                (native?.features ?? featureStore).flushChatPersistence()
+                reflectiveVisionCamera.suspend()
+            }
+        }
+    }
+
     var body: some Scene {
         WindowGroup(id: SpatialAvatarSceneID.main) {
             if isInjectedUnitTestHost {
@@ -632,66 +694,7 @@ struct BighelpApp: App {
                 guard status == .authorized, settings.reflectiveVisionEnabled else { return }
                 Task { await reflectiveVisionCamera.update(enabled: true) }
             }
-            .onChange(of: scenePhase) { _, phase in
-                if phase == .active {
-                    _ = notificationComposition.retryAfterForeground()
-                }
-                #if DEBUG && targetEnvironment(simulator)
-                // "-test-badge-on-background 3": stand in for a push that badges the icon.
-                let arguments = ProcessInfo.processInfo.arguments
-                if phase == .background, !BighelpTestBadge.applied,
-                   let index = arguments.firstIndex(of: "-test-badge-on-background"),
-                   arguments.indices.contains(index + 1), let count = Int(arguments[index + 1]) {
-                    BighelpTestBadge.applied = true
-                    let task = UIApplication.shared.beginBackgroundTask(withName: "test badge")
-                    Task { @MainActor in
-                        try? await UNUserNotificationCenter.current().setBadgeCount(count)
-                        UIApplication.shared.endBackgroundTask(task)
-                    }
-                }
-                #endif
-                if !usesDemoFixtures, phase == .background {
-                    #if os(iOS) && !targetEnvironment(macCatalyst)
-                    BighelpWidgetBackgroundRefresh.scheduleIfWidgets()
-                    #endif
-                    (native?.features ?? featureStore).flushChatPersistence()
-                    // Keep the workspace through a quick trip away; mark the
-                    // presentation boundary only if the app stays away.
-                    BighelpBackgroundGrace.shared.begin("workspace") { [nativeWorkspaces, hostRegistry] in
-                        // Work started outside the app (a Shortcut, CarPlay, an arrival, a run out in
-                        // Shortcuts) still needs the socket, as RootShellView's closer knows.
-                        guard BighelpShortcutService.holdsHostConnection == 0 else { return }
-                        nativeWorkspaces.suspend()
-                        // Other gateways kept connected for the all-hosts view or Multi-gateway close too.
-                        hostRegistry.keepsOtherHostsConnected = false
-                    }
-                }
-                if phase == .active { BighelpBackgroundGrace.shared.cancel() }
-                #if os(iOS) && !targetEnvironment(macCatalyst)
-                if phase == .active { Task { await BighelpActivityKitDriver.dismissFinishedActivities() } }
-                #endif
-                Task { @MainActor in
-                    // A newer scene transition may have arrived before this task starts.
-                    guard scenePhase == phase else { return }
-                    if phase == .active {
-                        if !usesFixtureWorkspace {
-                            await nativeWorkspaces.refreshCurrentRuntimeForForeground()
-                            guard scenePhase == .active, !usesFixtureWorkspace else { return }
-                            await permissionCenter.refresh()
-                            await reflectiveVisionCamera.update(enabled: settings.reflectiveVisionEnabled)
-                            return
-                        }
-                        await featureStore.dashboardModel.refreshAfterExternalChange()
-                        await permissionCenter.refresh()
-                        await reflectiveVisionCamera.update(
-                            enabled: settings.reflectiveVisionEnabled
-                        )
-                    } else {
-                        (native?.features ?? featureStore).flushChatPersistence()
-                        reflectiveVisionCamera.suspend()
-                    }
-                }
-            }
+            .onChange(of: scenePhase) { _, phase in handleScenePhase(phase, native: native) }
             }
         }
         .commands { BighelpMenuCommands() }

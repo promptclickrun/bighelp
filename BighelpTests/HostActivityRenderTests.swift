@@ -4,6 +4,46 @@ import XCTest
 
 final class HostActivityRenderTests: XCTestCase {
     @MainActor
+    func testSharedChatRowsRenderAtPhoneWidth() throws {
+        let now = Int(Date().timeIntervalSince1970)
+        let rows: [BighelpActivitySession] = [
+            .init(id: "review", phase: .waiting, timestamp: now),
+            .init(id: "code", phase: .usingTool, timestamp: now, latestTool: "terminal"),
+            .init(id: "plan", phase: .thinking, timestamp: now - 180),
+            .init(id: "team", phase: .delegating, timestamp: now, activeSubagentCount: 2),
+            .init(id: "done", phase: .completed, timestamp: now)
+        ]
+        let titles = ["Review the weekend plan", "Update the project", "Plan a garden", "Gather ideas", "Draft the invitation"]
+        var infos: [String: BighelpActivitySessionInfo] = [:]
+        for (index, row) in rows.enumerated() {
+            let attributes = try XCTUnwrap(LoopdySessionActivityAttributes.make(sessionID: row.id, sessionTitle: "Chat",
+                agentID: "agent", agentName: index.isMultiple(of: 2) ? "Juno" : "Avery"))
+            infos[row.id] = .init(attributes: attributes, title: titles[index])
+        }
+        var state = BighelpActivitySession.aggregate(rows, timestamp: now)
+        state.activeCount = 8
+        let out = ProcessInfo.processInfo.environment["BIGHELP_WIDGET_RENDER_DIR"].map(URL.init(fileURLWithPath:))
+        if let out { try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true) }
+        for dark in [false, true] {
+            for accessible in [false, true] {
+                let view = BighelpActivityRowsView(state: state, infos: infos)
+                    .padding(12).frame(width: 364)
+                    .background(dark ? Color.black : Color.white)
+                    .environment(\.colorScheme, dark ? .dark : .light)
+                    .environment(\.dynamicTypeSize, accessible ? .accessibility3 : .large)
+                let renderer = ImageRenderer(content: view)
+                renderer.scale = 2
+                let image = try XCTUnwrap(renderer.uiImage)
+                XCTAssertLessThanOrEqual(image.size.height, 220)
+                let name = "shared-card-\(dark ? "dark" : "light")-\(accessible ? "accessibility" : "standard")"
+                let attachment = XCTAttachment(image: image)
+                attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
+                if let out { try XCTUnwrap(image.pngData()).write(to: out.appendingPathComponent(name + ".png")) }
+            }
+        }
+    }
+
+    @MainActor
     func testProductionActivityCardsRenderAtPhoneWidth() throws {
         let attributes = try XCTUnwrap(LoopdySessionActivityAttributes.make(sessionID: "session-render",
             sessionTitle: "PRIVATE TITLE", agentID: "agent", agentName: "Juno"))

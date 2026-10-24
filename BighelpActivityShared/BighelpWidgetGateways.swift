@@ -90,9 +90,17 @@ struct GatewayWidgetProvider: AppIntentTimelineProvider {
 
     func timeline(for configuration: GatewayWidgetIntent, in context: Context) async -> Timeline<BighelpWidgetEntry> {
         let snapshot = BighelpWidgetSnapshot.load(gateway: configuration.gateway?.hostID)
+        return Self.timeline(snapshot: snapshot, now: .now)
+    }
+
+    static func timeline(snapshot: BighelpWidgetSnapshot, now: Date) -> Timeline<BighelpWidgetEntry> {
         // The app reloads timelines on every change; this is only a safety net.
-        let refresh = Date.now.addingTimeInterval(snapshot.runningSessions.isEmpty ? 30 * 60 : 5 * 60)
-        return Timeline(entries: [BighelpWidgetEntry(date: .now, snapshot: snapshot)], policy: .after(refresh))
+        let refresh = now.addingTimeInterval(snapshot.runningSessions.isEmpty ? 30 * 60 : 5 * 60)
+        var entries = [BighelpWidgetEntry(date: now, snapshot: snapshot)]
+        if !snapshot.runningSessions.isEmpty, snapshot.chatsStaleAt > now {
+            entries.append(BighelpWidgetEntry(date: snapshot.chatsStaleAt, snapshot: snapshot))
+        }
+        return Timeline(entries: entries, policy: .after(refresh))
     }
 }
 

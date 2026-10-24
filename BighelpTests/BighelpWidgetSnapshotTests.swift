@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import WidgetKit
 @testable import Bighelp
 
 @MainActor
@@ -39,6 +40,136 @@ struct BighelpWidgetSnapshotTests {
         #expect(decoded == snapshot)
         #expect(decoded.feedSessions.map(\.id) == ["running-old", "idle-new"])
         #expect(decoded.runningSessions.map(\.id) == ["running-old"])
+    }
+
+    @Test func recentIdleChatsCannotPushWorkingChatsOutOfTheSnapshot() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let idle = (0..<20).map { index in
+            SessionRecord(id: "idle-\(index)", kind: .direct, agentIDs: ["default"], title: "Finished chat",
+                          createdAt: now, updatedAt: now.addingTimeInterval(Double(index)), hasAcceptedMessage: true)
+        }
+        let working = SessionRecord(id: "working", kind: .direct, agentIDs: ["default"], title: "Long task",
+                                    isActive: true, createdAt: now.addingTimeInterval(-600))
+        var delegating = SessionRecord(id: "delegating", kind: .direct, agentIDs: ["default"], title: "Team task",
+                                       createdAt: now.addingTimeInterval(-900))
+        delegating.sessionSubagents = .init(sessionID: delegating.id, subagents: [
+            .init(id: "worker", sessionID: "child", parentID: delegating.id, role: "worker", goal: "Task", startedAt: 1)
+        ], updatedAt: 10)
+        let catalog = SessionCatalogStore(client: SessionCatalogFixtureClient(), records: idle + [working, delegating],
+                                          defaults: isolatedDefaults())
+        let agents = AgentDirectoryStore(client: AgentDirectoryFixtureClient(profiles: []), defaults: isolatedDefaults())
+        let publisher = BighelpWidgetSnapshotPublisher(sessions: catalog, scheduledTasks: nil, agents: agents,
+                                                       extras: BighelpWidgetExtras(), write: { _ in })
+        defer { publisher.retire() }
+        let snapshot = publisher.makeSnapshot()
+        #expect(snapshot.sessions.count == 12)
+        #expect(snapshot.runningSessions.map(\.id) == ["working", "delegating"])
+        #expect(snapshot.feedSessions.prefix(3).map(\.id) == ["working", "delegating", "idle-19"])
+    }
+
+    @Test func chatFreshnessExpiresExactlyAtTheTimelineTransition() throws {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        var snapshot = BighelpWidgetSnapshot.preview
+        snapshot.generatedAt = now.addingTimeInterval(100)
+        snapshot.sessionsUpdatedAt = now
+        let timeline = GatewayWidgetProvider.timeline(snapshot: snapshot, now: now.addingTimeInterval(119))
+        #expect(timeline.entries.map(\.date) == [now.addingTimeInterval(119), now.addingTimeInterval(120)])
+        #expect(!snapshot.chatsAreStale(at: timeline.entries[0].date))
+        #expect(snapshot.chatsAreStale(at: timeline.entries[1].date))
+        #expect(timeline.entries[1].snapshot.sessions == snapshot.sessions, "Stale work stays visible.")
+        let expired = GatewayWidgetProvider.timeline(snapshot: snapshot, now: now.addingTimeInterval(120))
+        #expect(expired.entries.count == 1, "Never schedule a past or duplicate transition.")
+        snapshot.sessions = []
+        #expect(GatewayWidgetProvider.timeline(snapshot: snapshot, now: now).entries.count == 1)
+
+        let legacy = #"{"sessions":[],"tasks":[],"generatedAt":1800000000}"#
+        let decoded = try JSONDecoder.bighelpWidget.decode(BighelpWidgetSnapshot.self, from: Data(legacy.utf8))
+        #expect(decoded.sessionsUpdatedAt == nil)
+        #expect(decoded.chatsStaleAt == now.addingTimeInterval(120))
+    }
+
+    @Test func aLoadedDiskCacheAndUnrelatedUpdatesDoNotMakeChatsFresh() async throws {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let cached = SessionRecord(id: "cached", kind: .direct, agentIDs: ["finance"], title: "Long task",
+                                   isActive: true, createdAt: now.addingTimeInterval(-600))
+        let repository = DemoRepository(directory: directory, name: "sessions", seed: [cached])
+        let catalog = SessionCatalogStore(client: SessionCatalogFixtureClient(), repository: repository,
+                                          defaults: isolatedDefaults())
+        #expect(catalog.hasLoadedState, "A disk cache counts as loaded, but is not a live observation.")
+        let agents = AgentDirectoryStore(client: AgentDirectoryFixtureClient(profiles: [.financeFixture]),
+                                         defaults: isolatedDefaults())
+        try await agents.load()
+        var saved = BighelpWidgetSnapshot.empty
+        saved.generatedAt = now.addingTimeInterval(-300)
+        saved.sessionsUpdatedAt = now.addingTimeInterval(-600)
+        let extras = BighelpWidgetExtras()
+        var writes: [BighelpWidgetSnapshot] = []
+        let publisher = BighelpWidgetSnapshotPublisher(sessions: catalog, scheduledTasks: nil, agents: agents,
+            extras: extras, saved: saved, now: { now }, write: { writes.append($0) })
+        defer { publisher.retire() }
+        publisher.publishNow()
+        extras.feed = [.init(id: "post", title: "A new idea", icon: "💡", date: now)]
+        publisher.publishNow()
+        #expect(writes.count == 2)
+        #expect(writes.allSatisfy { $0.sessionsUpdatedAt == saved.sessionsUpdatedAt && $0.chatsAreStale(at: now) })
+        #expect(writes.last?.runningSessions.map(\.id) == [cached.id])
+    }
+
+    @Test func liveHeartbeatRefreshesUnchangedWorkAndStopsWhenDisconnected() async throws {
+        var now = Date(timeIntervalSince1970: 1_800_000_000)
+        var live = true
+        let catalog = SessionCatalogStore(client: SessionCatalogFixtureClient(), records: [
+            SessionRecord(id: "work", kind: .direct, agentIDs: ["finance"], title: "Task", isActive: true, createdAt: now)
+        ], defaults: isolatedDefaults())
+        let agents = AgentDirectoryStore(client: AgentDirectoryFixtureClient(profiles: [.financeFixture]),
+                                         defaults: isolatedDefaults())
+        try await agents.load()
+        var writes: [BighelpWidgetSnapshot] = []
+        let publisher = BighelpWidgetSnapshotPublisher(sessions: catalog, scheduledTasks: nil, agents: agents,
+            extras: BighelpWidgetExtras(), isLive: { live }, sessionsAreLive: { live }, now: { now },
+            write: { writes.append($0) })
+        defer { publisher.retire() }
+        publisher.publishNow()
+        now += 59
+        publisher.publishNow()
+        #expect(writes.count == 1)
+        now += 1
+        publisher.publishNow()
+        #expect(writes.count == 2)
+        #expect(writes.last?.sessionsUpdatedAt == now)
+        live = false
+        now += 120
+        publisher.publishNow()
+        #expect(writes.count == 2)
+        #expect(try #require(writes.last).chatsAreStale(at: now))
+        #expect(publisher.makeSnapshot().sessionsUpdatedAt == writes.last?.sessionsUpdatedAt)
+        live = true
+        catalog.refreshErrorMessage = "Sessions could not be refreshed."
+        publisher.publishNow()
+        #expect(writes.count == 3)
+        #expect(try #require(writes.last).chatsAreStale(at: now), "A connected host with a failed read is not fresh.")
+        catalog.refreshErrorMessage = nil
+        publisher.publishNow()
+        #expect(writes.count == 4, "A fresh observation replaces stale status without waiting another minute.")
+        #expect(writes.last?.sessionsUpdatedAt == now)
+    }
+
+    @Test func eachChatRowLinkRetainsItsSessionAndGateway() {
+        let hosts = ["11111111-0000-4000-8000-000000000001", "11111111-0000-4000-8000-000000000002"]
+        for host in hosts {
+            var snapshot = BighelpWidgetSnapshot.preview
+            snapshot.hostID = host
+            let sessions = snapshot.feedSessions
+            #expect(Set(sessions.map { snapshot.chatURL($0.id) }).count == sessions.count)
+            for session in sessions {
+                let url = snapshot.chatURL(session.id)
+                #expect(BighelpIncomingURLRoute.parse(url) == .chat(sessionID: session.id))
+                #expect(BighelpIncomingURLRoute.hostID(in: url) == UUID(uuidString: host))
+                #expect(url != snapshot.sessionsURL)
+            }
+        }
     }
 
     /// bighelp woken in the background (a Shortcut, the Watch, a widget refresh) or launched before the

@@ -470,6 +470,40 @@ import UserNotifications
         #expect(fixture.ledger.enrollments.isEmpty)
     }
 
+    /// Hermes leaves every Bot Chat out of `session.list`, so a tap that looked its chat up there
+    /// said "unavailable" every time in Bots mode (#571). The tap hands the shell its exact chat.
+    @Test func liveActivityTapOpensItsChatWithoutListingTheHost() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+        fixture.service.activityRuntime = BighelpManagedNativeActivityRuntime(service: fixture.service,
+            driver: NativeActivityDriver(), environment: .sandbox, topic: "app.loopdy.mobile",
+            now: { Date(timeIntervalSince1970: 1_800_000_100) })
+        let owner = try fixture.saveActivityOwner(storedSessionID: "bot-chat")
+        let opens = BighelpExternalSessionOpenCenter()
+        try fixture.service.openActivity(opaqueSessionID: owner.opaqueSessionID, opens: opens)
+        #expect(opens.pending?.target == .stored(hostID: fixture.host.id, profileID: "default", storedSessionID: "bot-chat"))
+    }
+
+    /// A link alone never picks a computer or a chat: a card this phone no longer owns, or one
+    /// whose computer isn't in bighelp, opens nothing.
+    @Test(arguments: [false, true])
+    func liveActivityTapWithoutItsOwnerOpensNothing(retired: Bool) async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+        fixture.service.activityRuntime = BighelpManagedNativeActivityRuntime(service: fixture.service,
+            driver: NativeActivityDriver(), environment: .sandbox, topic: "app.loopdy.mobile",
+            now: { Date(timeIntervalSince1970: 1_800_000_100) })
+        let owner = try fixture.saveActivityOwner(storedSessionID: "bot-chat",
+            hostConnectionID: retired ? nil : UUID().uuidString, retired: retired)
+        let opens = BighelpExternalSessionOpenCenter()
+        #expect(throws: (any Error).self) {
+            try fixture.service.openActivity(opaqueSessionID: owner.opaqueSessionID, opens: opens)
+        }
+        #expect(opens.pending == nil)
+    }
+
     @Test func activityStartsBeforeSlowWorkSnapshotAndFailedStartRetries() async throws {
         let fixture = try Fixture()
         defer { fixture.cleanup() }
@@ -1394,6 +1428,24 @@ import UserNotifications
             service=BighelpManagedNotificationService(identity:identity,api:account,requestPermission:{permissionGranted},registry:registry,ledger:ledger,
                 activityKeys:BighelpManagedActivityKeychain(service:"app.loopdy.test.activities."+UUID().uuidString),hostClient:{_ in hostClient},now:{Date(timeIntervalSince1970:1_800_000_100)},buzzKit:providerOverride ?? provider,
                 sealedRecipientKeys:sealedKeys,sealedSenders:sealedSenders,defaults:defaults)
+        }
+        /// A Live Activity's owner as the registrar saves it when the activity starts.
+        @discardableResult
+        func saveActivityOwner(storedSessionID: String, hostConnectionID: String? = nil,
+                               retired: Bool = false) throws -> BighelpManagedActivityOwner {
+            let grant = try #require(ledger.record(host: host, profile: "default")?.grant)
+            let hostConnection = hostConnectionID ?? host.hostConnectionID
+            let nativeID = UUID().uuidString
+            let owner = BighelpManagedActivityOwner(accountScope: host.notificationScope,
+                accountID: try host.notificationAccountID(), hostConnectionID: hostConnection,
+                grantID: grant.grantId, profile: "default", storedSessionID: storedSessionID,
+                opaqueSessionID: "native-" + ManagedNotificationValidation.digest(
+                    [host.notificationScope, hostConnection, "default", storedSessionID].joined(separator: "\0")),
+                nativeActivityID: nativeID, relayActivityID: BighelpManagedActivityDriver.relayID(nativeID),
+                canonicalTurnID: nil, localTurnID: "turn", firstObservedAt: 1_800_000_100,
+                remoteOwned: false, retired: retired)
+            try ledger.save(owner)
+            return owner
         }
         func cleanup(){ defaults.removePersistentDomain(forName: defaultsSuite); try? trust.removeAll(); try? sealedKeys.remove(); try? sealedSenders.removeAll(); registry.bind(deviceID:nil,authorizationEpoch:nil); try? FileManager.default.removeItem(at:root) }
     }

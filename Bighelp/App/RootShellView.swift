@@ -1536,10 +1536,9 @@ struct RootShellView: View {
         // A chat's own ID starts "native-session-v1:"; only the scoped digest is an activity link.
         if ManagedNotificationValidation.isOpaqueSessionID(sessionID), let managedNotifications {
             sessionRestoreTask?.cancel()
-            sessionRestoreTask = Task { @MainActor in
-                do { try await managedNotifications.openActivity(opaqueSessionID: sessionID) }
-                catch { actionErrorMessage = "The original activity conversation is unavailable. No other host was opened." }
-            }
+            // Only a card this phone no longer owns, or whose computer is gone, gets here.
+            do { try managedNotifications.openActivity(opaqueSessionID: sessionID) }
+            catch { actionErrorMessage = "This chat can't be opened from here anymore. Find it in bighelp instead." }
             return
         }
         // Demo data opens links the way a real host does.
@@ -1627,12 +1626,30 @@ struct RootShellView: View {
             return
         case .reference(let profileID, let reference, let isScheduledRun):
             openNotifiedChat(open, profileID: profileID, reference: reference, isScheduledRun: isScheduledRun)
-            return
-        case .stored:
-            break
+        case .stored(let hostID, let profileID, let storedSessionID):
+            openStoredChat(open, hostID: hostID, profileID: profileID, storedSessionID: storedSessionID)
         }
-        guard nativeRuntime != nil, case .stored(let profileID, let storedSessionID) = open.target,
-              BighelpExternalSessionOpenCenter.shared.consume(open) else { return }
+    }
+
+    /// A verified chat (a Live Activity, a managed alert). Saved on the phone, it opens at once from
+    /// its saved history and catches up when the host answers, as a tapped alert does; a chat the
+    /// phone hasn't seen yet waits for the host's list.
+    private func openStoredChat(_ open: BighelpExternalSessionOpen, hostID: UUID?, profileID: String,
+                                storedSessionID: String) {
+        // bighelp holds only the selected computer's chats: while it switches to the card's
+        // computer it has none yet, and a switch that was given back opens nothing.
+        guard nativeRuntime != nil else { return }
+        if let hostID, hostRegistry?.selectedHostID != hostID {
+            _ = BighelpExternalSessionOpenCenter.shared.consume(open)
+            return
+        }
+        if let record = SessionRecord.matching(storedID: storedSessionID, profileID: profileID,
+                                               in: sessionCatalog.records) {
+            guard BighelpExternalSessionOpenCenter.shared.consume(open) else { return }
+            openSession(record.summary)
+            return
+        }
+        guard acceptsIncomingLinks, BighelpExternalSessionOpenCenter.shared.consume(open) else { return }
         Task { @MainActor in
             do {
                 let record = try await sessionCatalog.resolveStoredSession(

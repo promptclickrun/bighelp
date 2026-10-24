@@ -40,7 +40,11 @@ const PARAMETER_ROUTES = [
   { method: "DELETE", path: /^\/v1\/devices\/([A-Za-z0-9_-]{1,96})$/, handle: revokeDevice },
 ] as const;
 
-export async function handleLoopdyLinkRequest(request: Request, env: LinkEnv): Promise<Response> {
+export async function handleLoopdyLinkRequest(
+  request: Request,
+  env: LinkEnv,
+  ctx?: ExecutionContext,
+): Promise<Response> {
   try {
     const url = new URL(request.url);
     if (url.protocol !== "https:") {
@@ -72,7 +76,7 @@ export async function handleLoopdyLinkRequest(request: Request, env: LinkEnv): P
       },
     );
     if (notificationIdentityResponse) return notificationIdentityResponse;
-    const notificationResponse = await handleNotificationRequest(request, env, now);
+    const notificationResponse = await handleNotificationRequest(request, env, now, ctx);
     if (notificationResponse) return notificationResponse;
 
     // Forward the handshake directly, preserving both Request identity and the

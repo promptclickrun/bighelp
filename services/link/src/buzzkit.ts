@@ -59,6 +59,8 @@ export interface BuzzKitSealedNotificationEvent {
   sealed: Record<string, unknown>;
   avatar: { mimeType: "application/octet-stream"; sha256: string; data: string };
   sound: boolean;
+  /** Unix seconds the host gave the event; the phone uses it to measure delay. */
+  occurredAt?: number;
 }
 
 export interface BuzzKitRichNotificationEvent {
@@ -96,6 +98,37 @@ export interface BuzzKitMessageReceipt {
 }
 
 export type BuzzKitWakeReceipt = BuzzKitMessageReceipt;
+
+/**
+ * A message in BuzzKit's shape, minus the recipient. The direct APNs path
+ * builds its payload from this same object, so both routes deliver one thing.
+ * `data` never holds `bighelp_meta`; each route adds its own when it sends.
+ */
+export interface ManagedMessage {
+  body: Record<string, unknown>;
+  idempotencyKey: string;
+  /** Unix milliseconds the host gave the event, when it did. */
+  occurredAtMs?: number;
+}
+
+/** Added to `data` on every send, so the phone can tell which route brought it. */
+export function attachDeliveryMeta(
+  body: Record<string, unknown>,
+  path: "direct" | "buzzkit",
+  sentAt: number,
+  occurredAtMs?: number,
+): Record<string, unknown> {
+  return {
+    ...body,
+    data: {
+      ...(body.data as Record<string, unknown>),
+      bighelp_meta: {
+        v: 1, path, sentAt,
+        ...(occurredAtMs !== undefined ? { occurredAt: occurredAtMs } : {}),
+      },
+    },
+  };
+}
 
 export interface BuzzKitWakeSource {
   hostDeviceId: string;
@@ -178,6 +211,24 @@ export async function buzzKitIdentity(
   return { externalId, identityHash: hex(new Uint8Array(signature)) };
 }
 
+export const TEST_NOTIFICATION_TTL_SECONDS = 300;
+
+/** The test notification, in BuzzKit's shape and without its recipient. */
+export function testNotificationBody(requestId: string): Record<string, unknown> {
+  return {
+    title: "Loopdy test notification",
+    body: "This is your requested BuzzKit notification test.",
+    data: { loopdy_test: { version: 1, requestId } },
+    channel: "push",
+    sound: "default",
+    ttlSeconds: TEST_NOTIFICATION_TTL_SECONDS,
+  };
+}
+
+export function isTestRequestId(requestId: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(requestId);
+}
+
 export async function sendBuzzKitTestNotification(
   env: BuzzKitEnvironment,
   ownerCoordinate: string,
@@ -185,7 +236,7 @@ export async function sendBuzzKitTestNotification(
   scope: BuzzKitIdentityScope,
   authorizeEgress: BuzzKitEgressAuthorization,
 ): Promise<{ id: string; state: "accepted" | "failed"; providerStatus: string }> {
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(requestId)) {
+  if (!isTestRequestId(requestId)) {
     throw new BuzzKitBackendError(400, "notification_test_invalid");
   }
   const externalId = await buzzKitRecipientExternalId(env, ownerCoordinate, scope);
@@ -195,12 +246,7 @@ export async function sendBuzzKitTestNotification(
     idempotencyKey: `loopdy-test:${externalId}:${requestId}`,
     body: {
       to: externalId,
-      title: "Loopdy test notification",
-      body: "This is your requested BuzzKit notification test.",
-      data: { loopdy_test: { version: 1, requestId } },
-      channel: "push",
-      sound: "default",
-      ttlSeconds: 300,
+      ...attachDeliveryMeta(testNotificationBody(requestId), "buzzkit", Date.now()),
     },
   });
   const messageId = requiredIdentifier(requiredObject(created.data, "buzzkit_response_invalid").id, "buzzkit_response_invalid");
@@ -213,15 +259,10 @@ export async function sendBuzzKitTestNotification(
   return { id: messageId, state: failed ? "failed" : "accepted", providerStatus };
 }
 
-export async function sendBuzzKitRichNotification(
-  env: BuzzKitEnvironment,
-  ownerCoordinate: string,
+export function richMessage(
   event: BuzzKitRichNotificationEvent,
   avatar: BuzzKitNotificationAssetReference,
-  scope: BuzzKitIdentityScope,
-  authorizeEgress: BuzzKitEgressAuthorization,
-): Promise<BuzzKitMessageReceipt> {
-  const externalId = await buzzKitRecipientExternalId(env, ownerCoordinate, scope);
+): ManagedMessage {
   const presentation = presentationFor(event.eventType);
   const deepLink = `loopdy:///dashboard?eventId=${encodeURIComponent(event.eventId)}`;
   const data = {
@@ -243,7 +284,6 @@ export async function sendBuzzKitRichNotification(
     },
   };
   const body: Record<string, unknown> = {
-    to: externalId,
     topic: presentation.topic,
     title: event.agent.name,
     body: event.content.text,
@@ -259,25 +299,30 @@ export async function sendBuzzKitRichNotification(
     interruptionLevel: presentation.interruptionLevel,
     ttlSeconds: presentation.ttlSeconds,
   };
-  return sendManagedMessage(env, body, event.eventId, authorizeEgress);
+  return managedMessage(body, event.eventId, event.occurredAt * 1_000);
 }
 
-/**
- * Sends a sealed alert. BuzzKit and this service only see a neutral placeholder;
- * the phone replaces it with the host's title, text and avatar.
- */
-export async function sendBuzzKitSealedNotification(
+export async function sendBuzzKitRichNotification(
   env: BuzzKitEnvironment,
   ownerCoordinate: string,
-  event: BuzzKitSealedNotificationEvent,
+  event: BuzzKitRichNotificationEvent,
   avatar: BuzzKitNotificationAssetReference,
   scope: BuzzKitIdentityScope,
   authorizeEgress: BuzzKitEgressAuthorization,
 ): Promise<BuzzKitMessageReceipt> {
-  const externalId = await buzzKitRecipientExternalId(env, ownerCoordinate, scope);
+  return sendBuzzKitMessage(env, ownerCoordinate, scope, richMessage(event, avatar), authorizeEgress);
+}
+
+/**
+ * A sealed alert. BuzzKit and this service only see a neutral placeholder;
+ * the phone replaces it with the host's title, text and avatar.
+ */
+export function sealedMessage(
+  event: BuzzKitSealedNotificationEvent,
+  avatar: BuzzKitNotificationAssetReference,
+): ManagedMessage {
   const presentation = presentationFor(event.eventType);
   const body: Record<string, unknown> = {
-    to: externalId,
     topic: presentation.topic,
     title: "bighelp",
     body: presentation.placeholder,
@@ -305,17 +350,48 @@ export async function sendBuzzKitSealedNotification(
     interruptionLevel: presentation.interruptionLevel,
     ttlSeconds: presentation.ttlSeconds,
   };
-  return sendManagedMessage(env, body, event.eventId, authorizeEgress);
+  return managedMessage(
+    body, event.eventId, event.occurredAt === undefined ? undefined : event.occurredAt * 1_000,
+  );
+}
+
+/**
+ * Sends a sealed alert through BuzzKit.
+ */
+export async function sendBuzzKitSealedNotification(
+  env: BuzzKitEnvironment,
+  ownerCoordinate: string,
+  event: BuzzKitSealedNotificationEvent,
+  avatar: BuzzKitNotificationAssetReference,
+  scope: BuzzKitIdentityScope,
+  authorizeEgress: BuzzKitEgressAuthorization,
+): Promise<BuzzKitMessageReceipt> {
+  return sendBuzzKitMessage(env, ownerCoordinate, scope, sealedMessage(event, avatar), authorizeEgress);
 }
 
 /** How often a host may wake the phone; repeats inside a window are one send. */
 export const SIGN_IN_WAKE_WINDOW_SECONDS = 21_600;
+
+/** Collapses wakes on the phone, whichever route brings them. */
+export const SIGN_IN_WAKE_COLLAPSE_ID = "bighelp-renew-sign-in";
 
 /**
  * A data-only wake asking the phone to renew its sign-in to this host before a
  * rotating sign-in (the Nous Portal's lasts a day) runs out while bighelp is
  * closed. It carries no content, makes no sound and shows nothing.
  */
+export function signInWakeMessage(grantId: string, now: number): ManagedMessage {
+  const window = Math.floor(now / SIGN_IN_WAKE_WINDOW_SECONDS);
+  return managedMessage({
+    data: { bighelp_wake: { version: 1, type: "renew-sign-in", grantId } },
+    collapseId: SIGN_IN_WAKE_COLLAPSE_ID,
+    priority: "normal",
+    ttlSeconds: SIGN_IN_WAKE_WINDOW_SECONDS,
+    policy: "ignore",
+    apns: { payload: { aps: { "content-available": 1 } } },
+  }, `bighelp-renew-${grantId}-${window}`);
+}
+
 export async function sendBuzzKitSignInWake(
   env: BuzzKitEnvironment,
   ownerCoordinate: string,
@@ -324,17 +400,33 @@ export async function sendBuzzKitSignInWake(
   now: number,
   authorizeEgress: BuzzKitEgressAuthorization,
 ): Promise<BuzzKitMessageReceipt> {
+  return sendBuzzKitMessage(
+    env, ownerCoordinate, scope, signInWakeMessage(grantId, now), authorizeEgress,
+  );
+}
+
+function managedMessage(
+  body: Record<string, unknown>,
+  idempotencyKey: string,
+  occurredAtMs?: number,
+): ManagedMessage {
+  for (const key of Object.keys(body)) if (body[key] === undefined) delete body[key];
+  return { body, idempotencyKey, ...(occurredAtMs !== undefined ? { occurredAtMs } : {}) };
+}
+
+/** Sends a message through BuzzKit, for the recipient's stored identity. */
+export async function sendBuzzKitMessage(
+  env: BuzzKitEnvironment,
+  ownerCoordinate: string,
+  scope: BuzzKitIdentityScope,
+  message: ManagedMessage,
+  authorizeEgress: BuzzKitEgressAuthorization,
+): Promise<BuzzKitMessageReceipt> {
   const externalId = await buzzKitRecipientExternalId(env, ownerCoordinate, scope);
-  const window = Math.floor(now / SIGN_IN_WAKE_WINDOW_SECONDS);
   return sendManagedMessage(env, {
     to: externalId,
-    data: { bighelp_wake: { version: 1, type: "renew-sign-in", grantId } },
-    collapseId: "bighelp-renew-sign-in",
-    priority: "normal",
-    ttlSeconds: SIGN_IN_WAKE_WINDOW_SECONDS,
-    policy: "ignore",
-    apns: { payload: { aps: { "content-available": 1 } } },
-  }, `bighelp-renew-${grantId}-${window}`, authorizeEgress);
+    ...attachDeliveryMeta(message.body, "buzzkit", Date.now(), message.occurredAtMs),
+  }, message.idempotencyKey, authorizeEgress);
 }
 
 async function sendManagedMessage(
@@ -353,17 +445,15 @@ async function sendManagedMessage(
   });
   const message = requiredObject(created.data, "buzzkit_response_invalid");
   const messageId = requiredIdentifier(message.id, "buzzkit_response_invalid");
-  const readback = await buzzKitRequest(env, `/v1/messages/${encodeURIComponent(messageId)}`, {
-    method: "GET",
-  });
-  const confirmed = requiredObject(readback.data, "buzzkit_response_invalid");
-  if (confirmed.id !== messageId) throw new BuzzKitBackendError(502, "buzzkit_readback_mismatch");
-  const providerStatus = requiredIdentifier(confirmed.status, "buzzkit_response_invalid");
+  // The create answer is enough. A second read to confirm it only added a round
+  // trip to every send, and BuzzKit's own status can still change afterwards.
+  const providerStatus = typeof message.status === "string"
+    && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(message.status) ? message.status : "accepted";
   return {
     status: created.replayed ? "duplicate" : "accepted",
     deliveryId: messageId,
     providerStatus,
-    counts: numericRecord(confirmed.counts),
+    counts: numericRecord(message.counts),
   };
 }
 

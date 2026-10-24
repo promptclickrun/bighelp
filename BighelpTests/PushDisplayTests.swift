@@ -289,17 +289,17 @@ import UserNotifications
         override func stopLoading() {}
     }
 
-    private static func stubbedSession() -> URLSession {
+    private static func stubbedConfiguration() -> URLSessionConfiguration {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [StubPicture.self]
-        return URLSession(configuration: configuration)
+        return configuration
     }
 
     @Test func aPictureThatSaysItIsTooBigIsRefusedBeforeItsBody() async throws {
         StubPicture.status = 200
         StubPicture.headers = ["Content-Length": String(BighelpPushDisplay.maximumImageBytes + 1)]
         StubPicture.body = Data(count: 16)
-        let download = BighelpPushDisplay.download(using: Self.stubbedSession())
+        let download = BighelpPushDisplay.download(using: Self.stubbedConfiguration())
         await #expect(throws: URLError.self) { _ = try await download(URL(string: "https://example.com/big.png")!) }
         // And attaching it leaves the notification alone.
         let display = try #require(BighelpPushDisplay(userInfo: Self.alert(.direct)))
@@ -312,7 +312,7 @@ import UserNotifications
         StubPicture.status = 200
         StubPicture.headers = [:]
         StubPicture.body = Data(count: 5_000)
-        let download = BighelpPushDisplay.download(using: Self.stubbedSession(), maximumBytes: 1_000)
+        let download = BighelpPushDisplay.download(using: Self.stubbedConfiguration(), maximumBytes: 1_000)
         await #expect(throws: URLError.self) { _ = try await download(URL(string: "https://example.com/long.png")!) }
     }
 
@@ -320,7 +320,7 @@ import UserNotifications
         StubPicture.status = 200
         StubPicture.headers = ["Content-Length": String(Self.png.count)]
         StubPicture.body = Self.png
-        let download = BighelpPushDisplay.download(using: Self.stubbedSession())
+        let download = BighelpPushDisplay.download(using: Self.stubbedConfiguration())
         let (file, response) = try await download(URL(string: "https://example.com/ok.png")!)
         defer { try? FileManager.default.removeItem(at: file) }
         #expect((response as? HTTPURLResponse)?.statusCode == 200)
@@ -331,7 +331,7 @@ import UserNotifications
         StubPicture.status = 404
         StubPicture.headers = [:]
         StubPicture.body = Self.png
-        let download = BighelpPushDisplay.download(using: Self.stubbedSession())
+        let download = BighelpPushDisplay.download(using: Self.stubbedConfiguration())
         await #expect(throws: URLError.self) { _ = try await download(URL(string: "https://example.com/gone.png")!) }
     }
 

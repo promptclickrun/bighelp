@@ -18,8 +18,8 @@ extension UNUserNotificationCenter: BighelpNotificationCategoryStore {
 ///
 /// Pushes the notification service sends through BuzzKit and pushes it sends straight to
 /// Apple carry the same `bk` object (CONTRACTS §2), so both show the same way. The only
-/// difference is that a direct push has no `bk.messageId`; bighelp sends no delivery
-/// receipts for either.
+/// difference is that a direct push has no `bk.messageId`, so it gets no BuzzKit delivered
+/// receipt (`BighelpNotificationProcessor` sends that for pushes that have one).
 struct BighelpPushDisplay: Equatable, Sendable {
     struct Action: Equatable, Sendable {
         let id: String
@@ -66,35 +66,24 @@ struct BighelpPushDisplay: Equatable, Sendable {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = 10
         configuration.timeoutIntervalForResource = 20
-        return URLSession(configuration: configuration)
+        return configuration
     }())
 
-    /// Reads the answer's head first and gives up at once on a picture that says it is too big, or
-    /// stops once it has read too much, instead of downloading all of it to find out.
-    static func download(using session: URLSession, maximumBytes: Int = maximumImageBytes) -> Download {
+    /// Reads the answer's head first and gives up at once on a picture that says it is too big, then
+    /// writes what arrives to a file in the pieces the system hands over, and cancels the moment it has
+    /// more than the cap, instead of downloading all of it to find out.
+    static func download(using configuration: URLSessionConfiguration, maximumBytes: Int = maximumImageBytes) -> Download {
         { url in
-            let (bytes, response) = try await session.bytes(from: url)
-            guard (response as? HTTPURLResponse)?.statusCode == 200,
-                  response.expectedContentLength <= Int64(maximumBytes) else {
-                throw URLError(.dataLengthExceedsMaximum)
-            }
-            let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-            guard FileManager.default.createFile(atPath: file.path, contents: nil) else { throw URLError(.cannotCreateFile) }
-            do {
-                let handle = try FileHandle(forWritingTo: file)
-                defer { try? handle.close() }
-                var chunk = Data(); var total = 0
-                for try await byte in bytes {
-                    chunk.append(byte); total += 1
-                    guard total <= maximumBytes else { throw URLError(.dataLengthExceedsMaximum) }
-                    if chunk.count >= 65_536 { try handle.write(contentsOf: chunk); chunk.removeAll(keepingCapacity: true) }
+            let loader = PictureLoader(maximumBytes: maximumBytes)
+            let session = URLSession(configuration: configuration, delegate: loader, delegateQueue: nil)
+            defer { session.finishTasksAndInvalidate() }
+            return try await withTaskCancellationHandler {
+                try await withCheckedThrowingContinuation { continuation in
+                    loader.start(session.dataTask(with: url), continuation)
                 }
-                try handle.write(contentsOf: chunk)
-            } catch {
-                try? FileManager.default.removeItem(at: file)
-                throw error
+            } onCancel: {
+                loader.cancel()
             }
-            return (file, response)
         }
     }
 
@@ -151,6 +140,84 @@ struct BighelpPushDisplay: Equatable, Sendable {
             }
         } catch {
             return
+        }
+    }
+}
+
+/// One picture's download: checks the head, writes the pieces to a file, stops past the cap.
+private final class PictureLoader: NSObject, URLSessionDataDelegate, @unchecked Sendable {
+    private let maximumBytes: Int
+    private let lock = NSLock()
+    private var task: URLSessionDataTask?
+    private var continuation: CheckedContinuation<(URL, URLResponse), Error>?
+    private var file: URL?
+    private var handle: FileHandle?
+    private var response: HTTPURLResponse?
+    private var total = 0
+    private var failure: (any Error)?
+
+    init(maximumBytes: Int) { self.maximumBytes = maximumBytes }
+
+    func start(_ task: URLSessionDataTask, _ continuation: CheckedContinuation<(URL, URLResponse), Error>) {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        if FileManager.default.createFile(atPath: file.path, contents: nil), let handle = try? FileHandle(forWritingTo: file) {
+            lock.withLock { self.file = file; self.handle = handle; self.task = task; self.continuation = continuation }
+            task.resume()
+        } else {
+            continuation.resume(throwing: URLError(.cannotCreateFile))
+        }
+    }
+
+    func cancel() {
+        let task = lock.withLock { () -> URLSessionDataTask? in
+            failure = failure ?? CancellationError()
+            return self.task
+        }
+        task?.cancel()
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
+                    completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            lock.withLock { failure = URLError(.badServerResponse) }
+            completionHandler(.cancel)
+            return
+        }
+        guard response.expectedContentLength <= Int64(maximumBytes) else {
+            lock.withLock { failure = URLError(.dataLengthExceedsMaximum) }
+            completionHandler(.cancel)
+            return
+        }
+        lock.withLock { self.response = http }
+        completionHandler(.allow)
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        let tooMuch: Bool = lock.withLock {
+            total += data.count
+            guard total <= maximumBytes else { failure = URLError(.dataLengthExceedsMaximum); return true }
+            do { try handle?.write(contentsOf: data) } catch { failure = error; return true }
+            return false
+        }
+        if tooMuch { dataTask.cancel() }
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: (any Error)?) {
+        let (continuation, file, response, failure) = lock.withLock { () -> (CheckedContinuation<(URL, URLResponse), Error>?, URL?, HTTPURLResponse?, (any Error)?) in
+            try? handle?.close()
+            handle = nil
+            defer { self.continuation = nil }
+            return (self.continuation, self.file, self.response, self.failure ?? error)
+        }
+        guard let file else { continuation?.resume(throwing: failure ?? URLError(.unknown)); return }
+        if let failure {
+            try? FileManager.default.removeItem(at: file)
+            continuation?.resume(throwing: failure)
+        } else if let response {
+            continuation?.resume(returning: (file, response))
+        } else {
+            try? FileManager.default.removeItem(at: file)
+            continuation?.resume(throwing: URLError(.badServerResponse))
         }
     }
 }

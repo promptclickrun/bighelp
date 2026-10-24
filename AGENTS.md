@@ -113,6 +113,7 @@ change in both repos.
 | `Bighelp/CarPlay/` | CarPlay's hands-free voice chat (`CarPlayVoiceSession`) and its scene |
 | `Bighelp/DesignSystem/` | `BighelpTheme`, `BighelpTokens`, glass surfaces, fonts, provider logos, `BighelpDeferredSection`, the Noodle brand and its motions (`Noodle/`) |
 | `Bighelp/Hosts/`, `Bighelp/LiveActivity/`, `Bighelp/Notifications/`, `Bighelp/Shortcuts/` | Host setup, Live Activities, notifications, App Intents |
+| `Bighelp/Telemetry/` | Usage and crash numbers (Settings › Permissions › Device access › Share usage and diagnostics): the client, MetricKit, the switch that also tells hosts |
 | `BighelpTests/` (Swift Testing), `BighelpUITests/` (XCUITest) | Tests. The UI test base class `BighelpUITestCase` is in `ReferenceHubUITests.swift` |
 | `BighelpVisionUITests/` | Vision Pro UI tests, run with the `BighelpVision` scheme |
 | `Scripts/` | Real-host probes, logo export, CI helpers, Mac release |
@@ -619,6 +620,19 @@ Helpful, never a pile to clear (`BighelpNotificationGrouping`):
   the phase Hermes reports, never a guessed percentage.
 - Every setup failure gets its own code where it happens (`BighelpNotificationErrorCode`, never reused or renumbered);
   the FAQ is [docs/NOTIFICATION_ERROR_CODES.md](docs/NOTIFICATION_ERROR_CODES.md).
+
+### Usage and diagnostics (telemetry)
+
+- On by default, with an off switch in Settings › Permissions › Device access. What is sent, and what never is:
+  [docs/SECURITY_AND_PRIVACY.md](docs/SECURITY_AND_PRIVACY.md). Keep that page and `PrivacyInfo.xcprivacy` true.
+- Everything goes through `Telemetry` (`Bighelp/Telemetry/`). Event names, props and values are enums and numbers
+  (`TelemetryEvent`); never add a `String` parameter that could carry chat text, a file name or a path. A new event
+  also needs a row in the ingestion Worker's allowlist, or the Worker drops it.
+- It never runs in tests, UI tests, demo mode or Xcode builds (`TelemetryEnvironment`). Tests use a fake transport.
+- The switch (`TelemetryController`) also tells hosts that list `native-host-telemetry-v1` (`PUT …/native/telemetry`).
+  The app sends `{"enabled": true}` only when someone turns sharing back on, never when it connects.
+- The notification extension only writes receipts (`BighelpDeliveryReceipts`, in the shared app group) and makes no
+  network calls. The app sends them.
 
 ### Names that must stay "loopdy"
 

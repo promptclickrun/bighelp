@@ -3,7 +3,7 @@ import { readByteStream } from "./http-primitives.js";
 
 const DEFAULT_API_URL = "https://api.buzzkit.dev";
 const MAX_RESPONSE_BYTES = 65_536;
-const MAX_APNS_PAYLOAD_BYTES = 3_800;
+export const MAX_APNS_PAYLOAD_BYTES = 3_800;
 const ACCOUNT_EXTERNAL_ID_DOMAIN = "loopdy-buzzkit-account-v1\0";
 const NOTIFICATION_EXTERNAL_ID_DOMAIN = "loopdy-buzzkit-notification-instance-v1\0";
 const REQUIRED_IDENTITY_SECRET_GENERATION = "notification-instance-v2";
@@ -115,7 +115,7 @@ export interface ManagedMessage {
 export function attachDeliveryMeta(
   body: Record<string, unknown>,
   path: "direct" | "buzzkit",
-  sentAt: number,
+  sentAt: number | undefined,
   occurredAtMs?: number,
 ): Record<string, unknown> {
   return {
@@ -123,11 +123,22 @@ export function attachDeliveryMeta(
     data: {
       ...(body.data as Record<string, unknown>),
       bighelp_meta: {
-        v: 1, path, sentAt,
+        v: 1, path,
+        ...(sentAt !== undefined ? { sentAt } : {}),
         ...(occurredAtMs !== undefined ? { occurredAt: occurredAtMs } : {}),
       },
     },
   };
+}
+
+/**
+ * The BuzzKit copy of the key is the same for every send of one event: it has no
+ * send time, so a host retry sends a byte-identical body under one idempotency
+ * key. It is left out when it would push the message past BuzzKit's budget.
+ */
+export function withBuzzKitMeta(body: Record<string, unknown>, occurredAtMs?: number): Record<string, unknown> {
+  const withMeta = attachDeliveryMeta(body, "buzzkit", undefined, occurredAtMs);
+  return apnsBudgetBytes(withMeta) <= MAX_APNS_PAYLOAD_BYTES ? withMeta : body;
 }
 
 export interface BuzzKitWakeSource {
@@ -246,7 +257,7 @@ export async function sendBuzzKitTestNotification(
     idempotencyKey: `loopdy-test:${externalId}:${requestId}`,
     body: {
       to: externalId,
-      ...attachDeliveryMeta(testNotificationBody(requestId), "buzzkit", Date.now()),
+      ...withBuzzKitMeta(testNotificationBody(requestId)),
     },
   });
   const messageId = requiredIdentifier(requiredObject(created.data, "buzzkit_response_invalid").id, "buzzkit_response_invalid");
@@ -425,7 +436,7 @@ export async function sendBuzzKitMessage(
   const externalId = await buzzKitRecipientExternalId(env, ownerCoordinate, scope);
   return sendManagedMessage(env, {
     to: externalId,
-    ...attachDeliveryMeta(message.body, "buzzkit", Date.now(), message.occurredAtMs),
+    ...withBuzzKitMeta(message.body, message.occurredAtMs),
   }, message.idempotencyKey, authorizeEgress);
 }
 
@@ -920,7 +931,8 @@ function presentationFor(eventType: BuzzKitRichNotificationEvent["eventType"]) {
   }
 }
 
-function assertAPNsBudget(message: Record<string, unknown>): void {
+/** What BuzzKit will turn this message into, close enough to compare with APNs' limit. */
+export function apnsBudgetBytes(message: Record<string, unknown>): number {
   const estimate = {
     aps: {
       alert: { title: message.title, body: message.body },
@@ -939,7 +951,11 @@ function assertAPNsBudget(message: Record<string, unknown>): void {
       actions: message.actions,
     },
   };
-  if (new TextEncoder().encode(JSON.stringify(estimate)).length > MAX_APNS_PAYLOAD_BYTES) {
+  return new TextEncoder().encode(JSON.stringify(estimate)).length;
+}
+
+function assertAPNsBudget(message: Record<string, unknown>): void {
+  if (apnsBudgetBytes(message) > MAX_APNS_PAYLOAD_BYTES) {
     throw new BuzzKitBackendError(422, "buzzkit_apns_payload_too_large");
   }
 }

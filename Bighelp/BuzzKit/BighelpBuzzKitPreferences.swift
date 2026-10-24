@@ -53,6 +53,8 @@ struct BighelpBuzzKitPreferencesClient: Sendable {
         if topic == .questionsAndApprovals {
             await MainActor.run { BighelpPromptAlerts.shared.questionsAndApprovalsChanged(enabled: enabled) }
         }
+        // The notification service applies these itself when it sends straight to Apple.
+        await MainActor.run { BighelpPushPreferenceChanges.notify() }
         return preferences
     }
 

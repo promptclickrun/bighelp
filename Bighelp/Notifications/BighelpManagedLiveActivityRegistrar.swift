@@ -77,6 +77,8 @@ final class BighelpManagedLiveActivityRegistrar: BighelpLiveActivityRegistering 
             guard let token = Self.tokenData(registration.pushToken) else { throw RegistrationError.ownerChanged }
             try await BuzzKit.activities.register(id: owner.relayActivityID, token: token,
                 attributesType: "LoopdySessionActivityAttributes")
+            // Also directly, for sending straight to Apple. Best effort: it never fails the registration.
+            await service.pushRegistrar?.registerActivity(id: owner.relayActivityID, token: token)
         }
         // An already acknowledged unchanged registration need not replay an old
         // mobile timestamp. The host PUT below performs CURRENT cloud readback of
@@ -118,6 +120,7 @@ final class BighelpManagedLiveActivityRegistrar: BighelpLiveActivityRegistering 
         try check()
         try validateActivity(response, owner: owner, revision: revision, lease: nil, status: "revoked")
         try await BuzzKit.activities.end(id: owner.relayActivityID)
+        await service.pushRegistrar?.removeActivity(id: owner.relayActivityID)
         // Host removal only stops this local subscription; it is NOT revocation.
         let client = try service.client(for: host)
         _ = try await client.request("/enrollments/\(grant.grantId)/live-activities/\(owner.relayActivityID)", method: "DELETE", body: nil,

@@ -1,4 +1,6 @@
 import Foundation
+import UIKit
+import UserNotifications
 
 @MainActor
 struct BighelpManagedNotificationFactory {
@@ -51,7 +53,42 @@ struct BighelpManagedNotificationFactory {
         #endif
         service.activityRuntime = BighelpManagedNativeActivityRuntime(service: service,
             environment: environment, topic: Bundle.main.bundleIdentifier ?? "app.loopdy.mobile")
+        service.pushRegistrar = Self.makePushRegistrar(service: service, api: broker)
         return service
+    }
+
+    /// The direct push registration (see `BighelpPushRegistrar`). The token's environment is the one
+    /// BuzzKit was given: the simulator is sandbox, a provisioning profile wins, and the build
+    /// configuration is the fallback.
+    private static func makePushRegistrar(service: BighelpManagedNotificationService,
+                                          api: any BighelpManagedNotificationAccountAPI) -> BighelpPushRegistrar {
+        let registrar = BighelpPushRegistrar(
+            api: api,
+            credentials: { [weak service] in service?.installationCredentials() },
+            isTurningOff: { [weak service] in service?.turnOffPending ?? true },
+            isAuthorized: {
+                switch await UNUserNotificationCenter.current().notificationSettings().authorizationStatus {
+                case .authorized, .provisional, .ephemeral: true
+                default: false
+                }
+            },
+            environment: {
+                switch BighelpBuzzKitPushEnvironmentResolver.live.resolve(bundle: .main) {
+                case .sandbox: .sandbox
+                case .production: .production
+                }
+            },
+            appVersion: BighelpPushRegistrar.currentAppVersion(),
+            registerForRemoteNotifications: { UIApplication.shared.registerForRemoteNotifications() },
+            startPushToStart: { handler in BighelpPushToStartObserver.shared.start(handler) },
+            mutedTopics: {
+                // The same choices Settings shows. Nothing readable, or none of the topics, means unknown.
+                guard let preferences = try? await BighelpBuzzKitPreferencesClient().load(),
+                      !preferences.isEmpty else { return nil }
+                return preferences.filter { !$0.enabled }.map(\.id)
+            })
+        BighelpPushPreferenceChanges.handler = { [weak registrar] in registrar?.preferencesChanged() }
+        return registrar
     }
 }
 
@@ -124,6 +161,9 @@ struct BighelpManagedNotificationIntegration {
                     // Launch identification is retried on the next foreground or
                     // explicit enable. It must not block app-owned grant recovery.
                 }
+                // A phone that already has notifications sends its direct push address now, with nothing
+                // shown. After BuzzKit identified, because the person's alert choices come from BuzzKit.
+                await service.pushRegistrar?.refreshAtForeground()
                 try await recoverDelivery(isCurrent)
             },
             // A content-free wake reconciles existing delivery state. It must
@@ -131,6 +171,7 @@ struct BighelpManagedNotificationIntegration {
             recoverWake: recoverDelivery,
             didRegisterAPNSToken: { token in
                 BighelpBuzzKitRuntime.shared.noteAPNSToken(token)
+                service.pushRegistrar?.tokenReceived(token)
             },
             didFailAPNsRegistration: { error in
                 BighelpBuzzKitRuntime.shared.noteAPNsRegistrationFailure(error)

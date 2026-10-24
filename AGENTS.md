@@ -617,6 +617,11 @@ Helpful, never a pile to clear (`BighelpNotificationGrouping`):
   and opening the app clears any still there.
 - The Live Activity uses the app's palette from the widget snapshot, like the Home widgets. Its four steps come from
   the phase Hermes reports, never a guessed percentage.
+- Direct push (`BighelpPushRegistrar`, docs/ARCHITECTURE.md › Direct push registration): a phone that already has a
+  notification installation and permission gives the notification service its Apple push address at launch, with
+  nothing shown, in addition to BuzzKit (which stays). A 404 means the Worker doesn't have the route yet: no error, ask
+  again in a day. Other failures get NS-123 to NS-126 in the log only. The notification service extension shows every
+  alert itself (`BighelpPushDisplay`), for BuzzKit pushes and direct ones alike, and sends no BuzzKit receipts.
 - Every setup failure gets its own code where it happens (`BighelpNotificationErrorCode`, never reused or renumbered);
   the FAQ is [docs/NOTIFICATION_ERROR_CODES.md](docs/NOTIFICATION_ERROR_CODES.md).
 

@@ -131,6 +131,15 @@ deliberately reduced, generic progress projection suitable for a Lock Screen
 surface. They must not contain prompts, tool inputs, unrestricted model output,
 credentials, or private attachments.
 
+### Direct APNs delivery from the Link Worker
+
+The Link Worker (`loopdy-link`) can also send a push straight to APNs for installations whose app registered a push
+token with it. The token is stored encrypted in the `loopdy-link-accounts` database. Transient APNs failures wait in a
+retry queue with a dead-letter queue, and a message that cannot be sent directly falls back to BuzzKit. The Worker has
+Workers Logs on (sampled), an optional service binding to the telemetry Worker, and these secrets: `APNS_KEY_P8`,
+`APNS_KEY_ID`, `APNS_TEAM_ID` and `PUSH_TOKEN_KEY`. `DIRECT_APNS` (`off`, `shadow` or `on`) turns it on and `off` is the
+way back. See [Direct APNs relay](DIRECT_APNS_RELAY.md) for the routes, payloads and rollout.
+
 ## 5. What Cloudflare can and cannot see
 
 ### Cloudflare can process

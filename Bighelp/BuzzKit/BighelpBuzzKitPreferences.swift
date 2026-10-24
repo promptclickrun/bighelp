@@ -29,6 +29,11 @@ struct BighelpBuzzKitPreferencesClient: Sendable {
     /// never overwrites an explicit value on the new topic.
     func migrateLegacyPreferences() async throws {
         var topics = try await BuzzKit.preferences.all()
+        var changed = false
+        defer {
+            // The service applies these choices when it sends straight to Apple; tell it about the move.
+            if changed { Task { @MainActor in BighelpPushPreferenceChanges.notify() } }
+        }
         for migration in Self.legacyMigrations {
             guard let replacement = topics.first(where: { $0.slug == migration.topic.rawValue }),
                   let replacementPush = replacement.channels[.push], replacementPush.isDefault else { continue }
@@ -43,6 +48,7 @@ struct BighelpBuzzKitPreferencesClient: Sendable {
                 channel: .push,
                 enabled: enabled
             )
+            changed = true
         }
     }
 
@@ -53,6 +59,8 @@ struct BighelpBuzzKitPreferencesClient: Sendable {
         if topic == .questionsAndApprovals {
             await MainActor.run { BighelpPromptAlerts.shared.questionsAndApprovalsChanged(enabled: enabled) }
         }
+        // The notification service applies these itself when it sends straight to Apple.
+        await MainActor.run { BighelpPushPreferenceChanges.notify() }
         return preferences
     }
 

@@ -89,6 +89,9 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
     private var opening: UUID?
     private var retiredHosts = Set<String>()
     var activityRuntime: BighelpManagedNativeActivityRuntime?
+    /// Gives the notification service this device's push address, so it can send straight to Apple.
+    /// Set by the app's composition; absent in tests that don't cover it.
+    var pushRegistrar: BighelpPushRegistrar?
 
     /// Main's exact admitted projection seam. A raw event callback after model
     /// application is not enough to reconstruct parent final/turn ownership.
@@ -209,6 +212,8 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
             }
         }
         try check()
+        // Alongside BuzzKit's registration, on its own task: it never stops or delays setup.
+        if let registrar = pushRegistrar { Task { await registrar.enrollmentFinished() } }
         let client = try at(.computerCheck) { try hostClient(host) }
         let loaded: BighelpManagedCapabilities? = try await during(.computerCheck) {
             do {
@@ -968,6 +973,9 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
         } catch {
             // Revoking the installation below revokes every grant it holds.
         }
+        // The service drops this phone's push addresses with the installation below; asking first
+        // also clears them if revoking is out of reach. Best effort.
+        await pushRegistrar?.removeAll()
         let erasure = try await identity.erase()
 
         progress(.device)
@@ -1042,6 +1050,9 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
 
     static let turnOffPendingKey = "bighelp.notifications.turn-off-pending"
     static let pendingHostCleanupKey = "bighelp.notifications.pending-host-cleanup"
+
+    /// The notification installation this phone has, if any. Setup made it; turning notifications off deletes it.
+    func installationCredentials() -> BighelpManagedNotificationCredentials? { try? identity.current() }
 
     func credentials(for host: BighelpConfiguredHost) throws -> BighelpManagedNotificationCredentials {
         guard let credentials = try identity.current() else { throw DirectHermesError.invalidCredentials }

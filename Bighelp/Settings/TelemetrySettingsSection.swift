@@ -17,7 +17,7 @@ struct TelemetrySettingsSection: View {
             )) {
                 VStack(alignment: .leading, spacing: BighelpTokens.space4) {
                     Text("Share usage and diagnostics").bighelpFont(.body, weight: .semibold)
-                    Text("Anonymous counts and crash reports. Never your messages, files or names.")
+                    Text("Counts and crash reports tied to a random ID. Never your messages, files or names.")
                         .bighelpFont(.metadata).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -26,10 +26,21 @@ struct TelemetrySettingsSection: View {
         } header: {
             Text("Usage and diagnostics")
         } footer: {
-            Text("Turning it off also tells your connected computers to stop theirs.")
+            Text("Turning it off also tells your connected computers to stop sending their usage reports.")
                 .bighelpFont(.metadata)
+                .accessibilityIdentifier("settings.telemetry.footer")
+                .accessibilityValue(demoToldDescription)
         }
         .listRowBackground(theme.surface)
+    }
+
+    /// Demo runs only: what the stand-in computer was told, for UI tests to check.
+    private var demoToldDescription: String {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains("-use-demo-fixtures") ? DemoTelemetryHosts.shared.toldDescription : ""
+        #else
+        ""
+        #endif
     }
 
     @BighelpThemeReader private var theme

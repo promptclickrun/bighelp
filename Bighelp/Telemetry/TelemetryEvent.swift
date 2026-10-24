@@ -126,7 +126,7 @@ struct TelemetryRecord: Equatable, Codable, Sendable {
     var wire: TelemetryWireEvent { TelemetryWireEvent(event, timeMilliseconds: time) }
 }
 
-enum TelemetrySource: String, Codable, Sendable {
+enum TelemetrySource: String, CaseIterable, Codable, Sendable {
     case app
     case nse
 }

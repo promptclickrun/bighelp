@@ -11,7 +11,9 @@ enum TelemetryResponse: Equatable, Sendable {
     case accepted
     /// Slow down (429); `after` is the service's Retry-After, in seconds.
     case rateLimited(after: TimeInterval?)
-    /// Anything else, including no answer. Telemetry never retries these.
+    /// No answer, or a server error (5xx). The events are kept and tried again later.
+    case failed
+    /// Any other answer (a 4xx that isn't 429). The service refused it; it is not sent again.
     case dropped
 }
 
@@ -48,14 +50,15 @@ struct URLSessionTelemetryTransport: TelemetryTransport {
         urlRequest.httpBody = request.body
         do {
             let (_, response) = try await session.data(for: urlRequest)
-            guard let http = response as? HTTPURLResponse else { return .dropped }
+            guard let http = response as? HTTPURLResponse else { return .failed }
             switch http.statusCode {
             case 202: return .accepted
             case 429: return .rateLimited(after: http.value(forHTTPHeaderField: "Retry-After").flatMap(TimeInterval.init))
+            case 500...599: return .failed
             default: return .dropped
             }
         } catch {
-            return .dropped
+            return .failed
         }
     }
 }

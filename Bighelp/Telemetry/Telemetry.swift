@@ -39,16 +39,35 @@ struct TelemetryPreference: @unchecked Sendable {
     }
 }
 
+/// Telemetry's ID must not outlive the app. The Keychain keeps an item after the app is deleted, but
+/// UserDefaults goes with it, so a launch with no marker is a fresh install or a reinstall: any ID the
+/// Keychain still holds is from before and is deleted before it can be used.
+enum TelemetryInstallMarker {
+    static let key = "bighelp.telemetry.install-marker"
+
+    static func reconcile(defaults: UserDefaults = .standard, identity: any TelemetryIdentityStore) {
+        guard defaults.object(forKey: key) == nil else { return }
+        identity.delete()
+        defaults.set(true, forKey: key)
+    }
+}
+
 /// The app's one door to telemetry. Everything here is cheap, never blocks and does
 /// nothing when telemetry is off or isn't allowed (tests, demo).
 enum Telemetry {
     private final class Box: @unchecked Sendable {
         private let lock = NSLock()
         private var value: TelemetryClient?
+        private var enabled = true
         private var seen: [Int] = []
 
         var client: TelemetryClient? { lock.withLock { value } }
-        func set(_ client: TelemetryClient?) { lock.withLock { value = client } }
+        /// A client exists and sharing is on. Read before anything else is done for telemetry.
+        var isRecording: Bool { lock.withLock { value != nil && enabled } }
+        func set(_ client: TelemetryClient?, enabled: Bool = true) {
+            lock.withLock { value = client; self.enabled = enabled }
+        }
+        func setEnabled(_ flag: Bool) { lock.withLock { enabled = flag } }
 
         /// True the first time a key shows up; keys are kept as hashes, bounded, in memory only.
         func isFirst(_ key: String) -> Bool {
@@ -66,6 +85,12 @@ enum Telemetry {
 
     static var client: TelemetryClient? { box.client }
     static var isActive: Bool { box.client != nil }
+    /// True only when a client exists and sharing is on. With it false every call here does nothing:
+    /// no task, no date, no hashing, no MetricKit parsing.
+    static var isRecording: Bool { box.isRecording }
+
+    /// Kept in step with the person's choice, so the check above is one lock and no `await`.
+    static func markEnabled(_ enabled: Bool) { box.setEnabled(enabled) }
 
     /// Makes the client when this run may send. Call once, early.
     @MainActor
@@ -79,27 +104,32 @@ enum Telemetry {
             box.set(nil)
             return nil
         }
+        let identity = KeychainTelemetryIdentityStore()
         let client = TelemetryClient(
-            transport: URLSessionTelemetryTransport(), identity: KeychainTelemetryIdentityStore(),
+            transport: URLSessionTelemetryTransport(), identity: identity,
             disk: FileTelemetryDiskStore.standard, context: TelemetryContext.current(),
             isEnabled: preference.isEnabled)
-        box.set(client)
-        Task { await client.start() }
+        box.set(client, enabled: preference.isEnabled)
+        Task {
+            // Before the client can make or read an ID.
+            TelemetryInstallMarker.reconcile(defaults: preference.defaults, identity: identity)
+            await client.start()
+        }
         return client
     }
 
     /// For tests: use this client instead of making one.
-    static func install(_ client: TelemetryClient?) { box.set(client) }
+    static func install(_ client: TelemetryClient?, enabled: Bool = true) { box.set(client, enabled: enabled) }
 
     static func record(_ event: TelemetryEvent) {
-        guard let client = box.client else { return }
+        guard box.isRecording, let client = box.client else { return }
         let date = Date()
         Task { await client.record(event, at: date) }
     }
 
     /// For an event that already happened (a MetricKit report, a push the extension saw).
     static func record(_ event: TelemetryEvent, at date: Date) {
-        guard let client = box.client else { return }
+        guard box.isRecording, let client = box.client else { return }
         Task { await client.record(event, at: date) }
     }
 
@@ -110,11 +140,12 @@ enum Telemetry {
     /// Counts a feature once per `key` per run (a card drawn again after a scroll is the same card).
     /// The key is only compared in memory; it is never sent or saved.
     static func featureUsedOnce(_ feature: TelemetryFeature, key: String) {
-        guard box.client != nil, box.isFirst(feature.rawValue + ":" + key) else { return }
+        guard box.isRecording, box.isFirst(feature.rawValue + ":" + key) else { return }
         featureUsed(feature)
     }
 
     static func flushForBackground() async {
+        guard box.isRecording else { return }
         await box.client?.flushForBackground()
     }
 }

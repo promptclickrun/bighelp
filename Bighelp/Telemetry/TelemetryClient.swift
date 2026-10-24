@@ -5,8 +5,8 @@ import Foundation
 ///
 /// - Flushes every 60 seconds, at 50 queued events, and when the app goes to the background.
 /// - The queue is bounded and drops the oldest. A bounded copy is kept on disk so a kill doesn't lose it all.
-/// - 429 backs off (the service's Retry-After, else 1, 2, 4 ... minutes up to an hour) and keeps the events.
-///   Any other failure drops the batch without a word.
+/// - 429, no answer and 5xx back off (the service's Retry-After, else 1, 2, 4 ... minutes up to an hour) and
+///   keep the events, within the queue's bound. Any other answer (a refusal) drops the batch without a word.
 actor TelemetryClient {
     struct Configuration: Sendable {
         var endpoint = URLSessionTelemetryTransport.endpoint
@@ -63,7 +63,12 @@ actor TelemetryClient {
 
     /// Picks up what a kill left on disk and starts the 60-second timer.
     func start() {
-        guard isEnabled else { return }
+        // Off at launch: nothing from an earlier run may linger (a file a kill left, an ID the Keychain kept).
+        guard isEnabled else {
+            disk.delete()
+            identity.delete()
+            return
+        }
         restore()
         guard timer == nil else { return }
         timer = Task { [configuration] in
@@ -119,6 +124,8 @@ actor TelemetryClient {
             queue.append(record.time > latest ? TelemetryRecord(record.event, at: current) : record)
         }
         trim()
+        // A batch of receipts the extension wrote is already gone from its file: keep it safe now.
+        if records.count > 1 { persistNow() }
         if queue.count >= configuration.flushThreshold {
             Task { await self.flush() }
         } else {
@@ -159,7 +166,9 @@ actor TelemetryClient {
             case .accepted:
                 backoff = 0
                 retryNotBefore = nil
-            case .rateLimited(let after):
+            case .rateLimited, .failed:
+                var after: TimeInterval?
+                if case .rateLimited(let seconds) = response { after = seconds }
                 backoff = backoff == 0 ? configuration.firstBackoff : min(backoff * 2, configuration.longestBackoff)
                 let wait = min(max(after ?? 0, backoff), configuration.longestBackoff)
                 retryNotBefore = now().addingTimeInterval(wait)

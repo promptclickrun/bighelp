@@ -32,8 +32,9 @@ struct BighelpDeliveryReceipt: Codable, Equatable, Sendable {
 /// The extension only writes here: it makes no network calls for telemetry. The app
 /// reads the list when it opens and comes forward, sends it and clears it.
 ///
-/// Both processes lock the file (`flock`), so a push arriving while the app drains
-/// neither loses nor repeats a receipt.
+/// Both processes take a lock file (`flock`) without waiting, and the list is replaced by renaming a temporary
+/// file, so a push arriving while the app drains neither repeats nor garbles a receipt. A receipt that can't get
+/// the lock in about 50 ms is skipped: the extension never waits on this file.
 struct BighelpDeliveryReceipts: @unchecked Sendable {
     /// The group the extension's entitlements and `BighelpRecentAlerts` already use.
     static let appGroup = "group.app.loopdy.mobile.buzzkit"
@@ -66,9 +67,14 @@ struct BighelpDeliveryReceipts: @unchecked Sendable {
 
     func setRecording(_ recording: Bool) { defaults?.set(recording, forKey: Self.recordingKey) }
 
-    /// Called by the notification service extension once per push, and by the app for a wake.
+    /// Called by the notification service extension once per push, and by the app for a wake. It returns
+    /// at once: the file work runs on a utility queue, so it never delays the alert (or the main thread).
     static func record(userInfo: [AnyHashable: Any], receivedAt: Date) {
-        shared.record(userInfo: userInfo, receivedAt: receivedAt)
+        // The receipt is made here, from what the push carries, and only that crosses to the queue.
+        let receipt = receipt(userInfo: userInfo, receivedAt: receivedAt)
+        let store = shared
+        guard store.isRecording else { return }
+        DispatchQueue.global(qos: .utility).async { store.append(receipt) }
     }
 
     /// The oldest `limit` receipts, removed from the file.
@@ -155,27 +161,43 @@ struct BighelpDeliveryReceipts: @unchecked Sendable {
 
     // MARK: - The file
 
+    /// One try, then up to five more 10 ms apart. The extension must never wait on this file for long,
+    /// so a receipt that can't get the lock is skipped.
+    static let lockAttempts = 6
+    static let lockPause: useconds_t = 10_000
+
+    /// The lock lives in its own file, apart from the data, so the data can be replaced whole.
+    var lockURL: URL? { fileURL.map { $0.appendingPathExtension("lock") } }
+
     private func update<T>(_ body: (inout [BighelpDeliveryReceipt]) -> T) -> T? {
-        guard let fileURL else { return nil }
-        Self.processLock.lock()
-        defer { Self.processLock.unlock() }
-        let descriptor = open(fileURL.path, O_RDWR | O_CREAT, 0o600)
+        guard let fileURL, let lockURL else { return nil }
+        let descriptor = open(lockURL.path, O_RDWR | O_CREAT, 0o600)
         guard descriptor >= 0 else { return nil }
         defer { close(descriptor) }
-        guard flock(descriptor, LOCK_EX) == 0 else { return nil }
-        defer { flock(descriptor, LOCK_UN) }
 
-        let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: false)
+        // Neither lock is waited for: another thread here, or the other process, may hold them.
+        var held = false
+        for attempt in 0..<Self.lockAttempts {
+            if Self.processLock.try() {
+                if flock(descriptor, LOCK_EX | LOCK_NB) == 0 { held = true; break }
+                Self.processLock.unlock()
+            }
+            if attempt + 1 < Self.lockAttempts { usleep(Self.lockPause) }
+        }
+        guard held else { return nil }
+        defer {
+            flock(descriptor, LOCK_UN)
+            Self.processLock.unlock()
+        }
+
         var receipts: [BighelpDeliveryReceipt] = []
-        if let data = try? handle.readToEnd(), !data.isEmpty, data.count <= Self.maximumFileBytes,
+        if let data = try? Data(contentsOf: fileURL), !data.isEmpty, data.count <= Self.maximumFileBytes,
            let saved = try? JSONDecoder().decode([BighelpDeliveryReceipt].self, from: data) {
             receipts = saved
         }
         let result = body(&receipts)
-        guard let data = try? JSONEncoder().encode(receipts) else { return result }
-        ftruncate(descriptor, 0)
-        lseek(descriptor, 0, SEEK_SET)
-        _ = data.withUnsafeBytes { write(descriptor, $0.baseAddress, data.count) }
+        // Written to a temporary file and renamed over the old one, so a reader never sees half a list.
+        if let data = try? JSONEncoder().encode(receipts) { try? data.write(to: fileURL, options: .atomic) }
         return result
     }
 }

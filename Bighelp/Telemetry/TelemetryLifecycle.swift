@@ -42,7 +42,7 @@ final class TelemetryLifecycle {
 
     /// iOS gives a few seconds after the background; use them to send.
     private func sendBeforeSuspending() {
-        guard Telemetry.isActive else { return }
+        guard Telemetry.isRecording else { return }
         endBackgroundTask()
         backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "bighelp usage") {
             MainActor.assumeIsolated { TelemetryLifecycle.shared.endBackgroundTask() }

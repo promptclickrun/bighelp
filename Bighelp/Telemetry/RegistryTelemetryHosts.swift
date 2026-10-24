@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 
 /// How the app reaches its connected hosts for the telemetry switch. The computer in use
 /// is live already; another one is visited only if it's connected right now, and its
@@ -38,10 +39,13 @@ enum RegistryTelemetryHosts {
 /// switch can be tried, and UI tests can check what a host would be told, with nothing leaving
 /// the app.
 @MainActor
+@Observable
 final class DemoTelemetryHosts {
     static let shared = DemoTelemetryHosts()
     /// What the stand-in host was told, in order.
     private(set) var told: [Bool] = []
+    /// "false,true": for the UI test, which can't read the app's memory.
+    var toldDescription: String { told.map { $0 ? "true" : "false" }.joined(separator: ",") }
 
     private final class Endpoint: TelemetryHostEndpoint {
         unowned let owner: DemoTelemetryHosts

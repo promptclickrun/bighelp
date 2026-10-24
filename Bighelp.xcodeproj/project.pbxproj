@@ -1108,6 +1108,7 @@
 		A09FD744A8019E2B3283A4E0 /* BighelpManagedNotificationNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 344FB8E575EFBAACC708770D /* BighelpManagedNotificationNavigation.swift */; };
 		A0BB3492DAADA98516423A3E /* ProviderAssetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71D0B88F66012F6BCA6356E3 /* ProviderAssetTests.swift */; };
 		A0C67B059552067AB9F7E0C0 /* BighelpThinkingOrb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25F0B1E9D31F4CF2DAC474EC /* BighelpThinkingOrb.swift */; };
+		A119BE08B4D79B6F6959A1D1 /* telemetry-v1.json in Resources */ = {isa = PBXBuildFile; fileRef = 2FA73AFA26F8900D33EE46AF /* telemetry-v1.json */; };
 		A129D7E6BC717107345F0A63 /* ChatSurfaceCapabilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE5ED0C7B4DDB04466FB3210 /* ChatSurfaceCapabilities.swift */; };
 		A138436680C4F4EAEC752163 /* ChatComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A196AB02B4F486670EB8CBFB /* ChatComposer.swift */; };
 		A141FCDA6C5235EC836EDA8E /* BighelpSealedAlertPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33E9FF3390300F44BE3F8C60 /* BighelpSealedAlertPresentation.swift */; };
@@ -1446,6 +1447,7 @@
 		D1386D1026662E7C9DEE47A5 /* LocalizationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CAC3D993B2C6404E9FD7484 /* LocalizationUITests.swift */; };
 		D144791ABF58FAD459BA8C7E /* TeamCallSpeechPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = F19950FC182073DB19EF1F9D /* TeamCallSpeechPipeline.swift */; };
 		D14FB27BEBC4C430D21B637F /* ReflectiveVision.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47D139E0BC6C72AB3D35EA19 /* ReflectiveVision.swift */; };
+		D170D566E9EDC320B680D342 /* TelemetryContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70339C8FEB156C746058A7E5 /* TelemetryContractTests.swift */; };
 		D19162FEC5D4CA68432C141F /* DirectHermesInterfaces.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6B24A7BAABCEB7CB0F47D9F /* DirectHermesInterfaces.swift */; };
 		D194A8FBF949A2AB4FE2058E /* NativeDeviceToolSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97EA4A5348E78AB7B934304D /* NativeDeviceToolSession.swift */; };
 		D19C5B82C73E00C2A54290EA /* RichDraftEditorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1475E8250D6EC1379E34013D /* RichDraftEditorTests.swift */; };
@@ -2210,6 +2212,7 @@
 		2F5AB4DD1555D26C17AE0E7F /* ComposioCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposioCatalog.swift; sourceTree = "<group>"; };
 		2F68507D37E222AAAD79CE5B /* TemplatePickerParts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplatePickerParts.swift; sourceTree = "<group>"; };
 		2F69DF4D8979ACD704171100 /* DirectHermesVoiceConfigurationClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectHermesVoiceConfigurationClient.swift; sourceTree = "<group>"; };
+		2FA73AFA26F8900D33EE46AF /* telemetry-v1.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "telemetry-v1.json"; sourceTree = "<group>"; };
 		30032BB7A11575E32DECD170 /* BotChatActivityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BotChatActivityTests.swift; sourceTree = "<group>"; };
 		301F7F2D182A2BEC6F9B21B1 /* BighelpLoaderGallery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpLoaderGallery.swift; sourceTree = "<group>"; };
 		302F46ED6E8E91351466F5B3 /* TelemetryLifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelemetryLifecycle.swift; sourceTree = "<group>"; };
@@ -2644,6 +2647,7 @@
 		6F4DD82DEE8EB5910B718623 /* SimpleBotsStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimpleBotsStyle.swift; sourceTree = "<group>"; };
 		6F5FF17BC71838B082AEF9FC /* VoiceWireModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceWireModels.swift; sourceTree = "<group>"; };
 		6FB92C87FA3C2AEFE88CC27F /* ProjectsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectsStore.swift; sourceTree = "<group>"; };
+		70339C8FEB156C746058A7E5 /* TelemetryContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelemetryContractTests.swift; sourceTree = "<group>"; };
 		707DEB68CC2E0A81E7A559C9 /* BighelpWidgetRenderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpWidgetRenderTests.swift; sourceTree = "<group>"; };
 		70F41C7DEF199504BEC6D9A4 /* VisionFirstRunConsentUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisionFirstRunConsentUITests.swift; sourceTree = "<group>"; };
 		70FA79D8173E1F90C3B949A5 /* UsageLimitsComputers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageLimitsComputers.swift; sourceTree = "<group>"; };
@@ -5013,6 +5017,7 @@
 				72B7397F7D4D61EB688CC8B4 /* SubagentControlTests.swift */,
 				CE55F4616453540B7AC56768 /* TeamCallTests.swift */,
 				0D97E5402CF9055B231A0336 /* TelemetryClientTests.swift */,
+				70339C8FEB156C746058A7E5 /* TelemetryContractTests.swift */,
 				67B1DBC4A63038C4E21F709E /* TelemetryControllerTests.swift */,
 				44E09E40FC51388583D55E26 /* TelemetryEncodingTests.swift */,
 				01A7DA853F11B75A534629DC /* TelemetryGlobalTests.swift */,
@@ -5409,6 +5414,7 @@
 				EB4B40CF599F55FC346E7816 /* home-work-completion-workspace.json */,
 				55564C451754194E0EF381FF /* inbox-card-workspace.json */,
 				4D5BB3FF93B2BFBE1309307F /* sealed-alert-v2-vector.json */,
+				2FA73AFA26F8900D33EE46AF /* telemetry-v1.json */,
 				C0CE1E19E9A636C4F4384691 /* CardExamples */,
 				FEB73B139567EA4146800F9E /* GenerativeUIV2 */,
 				683787982A643F47A7E2874A /* HermesGroups */,
@@ -6557,6 +6563,7 @@
 				5FFD77BE4D90A9010292FDA4 /* status-offline.json in Resources */,
 				142F9375293DC17B5E1CEFCA /* status-v2.json in Resources */,
 				B2D7B0A255CCAF48495AD44A /* status.json in Resources */,
+				A119BE08B4D79B6F6959A1D1 /* telemetry-v1.json in Resources */,
 				ABD009A027CB30C4ECD5FA0A /* template-research-draft-review.json in Resources */,
 				FC8B63F88356489245773591 /* templates-delete.json in Resources */,
 				8A059B101B283EDE48EB2BCE /* templates-list-code.json in Resources */,
@@ -8177,6 +8184,7 @@
 				B3EC5789602FB904AEA7AF78 /* SubagentControlTests.swift in Sources */,
 				26DACF622E681A594FD09C8B /* TeamCallTests.swift in Sources */,
 				986C8A1687765DE27416B37A /* TelemetryClientTests.swift in Sources */,
+				D170D566E9EDC320B680D342 /* TelemetryContractTests.swift in Sources */,
 				25C23B2CFD93B91257724C71 /* TelemetryControllerTests.swift in Sources */,
 				EA2012CDDFF088E90E12C654 /* TelemetryEncodingTests.swift in Sources */,
 				37CCD9CFCCB46617045FF15D /* TelemetryGlobalTests.swift in Sources */,

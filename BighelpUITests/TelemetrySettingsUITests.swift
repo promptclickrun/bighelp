@@ -19,19 +19,27 @@ final class TelemetrySettingsUITests: BighelpUITestCase {
         let toggle = openSwitch(in: app)
         XCTAssertEqual(toggle.value as? String, "1", "On until the person turns it off")
         XCTAssertTrue(app.staticTexts["Share usage and diagnostics"].exists)
-        XCTAssertTrue(app.staticTexts["Anonymous counts and crash reports. Never your messages, files or names."].exists)
+        XCTAssertTrue(app.staticTexts["Counts and crash reports tied to a random ID. Never your messages, files or names."].exists)
         capture("telemetry-switch-on-\(appearance)", in: app)
     }
 
     @MainActor
-    func testTurningItOffAndBackOnKeepsTheChoice() throws {
+    func testTurningItOffAndBackOnKeepsTheChoiceAndToldTheStandInComputer() throws {
         let app = launch(appearance: "light")
         var toggle = openSwitch(in: app)
+        // Leave the preference on whatever happens below.
+        addTeardownBlock { @MainActor in
+            if toggle.exists, toggle.value as? String == "0" {
+                toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
+            }
+        }
+        XCTAssertEqual(told(in: app), "", "Nothing is told while it stays on")
         toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
         expectation(for: NSPredicate(format: "value == '0'"), evaluatedWith: toggle)
-        waitForExpectations(timeout: 5)
+        waitForExpectations(timeout: 15)
         capture("telemetry-switch-off-light", in: app)
         XCTAssertEqual(app.alerts.count, 0, "No iOS permission is asked for")
+        expectToldValue("false", in: app)
 
         // The choice is kept when Settings is closed and opened again.
         closeSettings(in: app)
@@ -39,7 +47,23 @@ final class TelemetrySettingsUITests: BighelpUITestCase {
         XCTAssertEqual(toggle.value as? String, "0")
         toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
         expectation(for: NSPredicate(format: "value == '1'"), evaluatedWith: toggle)
-        waitForExpectations(timeout: 5)
+        waitForExpectations(timeout: 15)
+        expectToldValue("false,true", in: app)
+    }
+
+    /// What the demo's stand-in computer was told, in order ("false,true").
+    @MainActor
+    private func told(in app: XCUIApplication) -> String {
+        let footer = app.descendants(matching: .any)["settings.telemetry.footer"].firstMatch
+        return footer.exists ? (footer.value as? String ?? "") : ""
+    }
+
+    @MainActor
+    private func expectToldValue(_ expected: String, in app: XCUIApplication) {
+        let footer = app.descendants(matching: .any)["settings.telemetry.footer"].firstMatch
+        XCTAssertTrue(footer.waitForExistence(timeout: 5))
+        expectation(for: NSPredicate(format: "value == %@", expected), evaluatedWith: footer)
+        waitForExpectations(timeout: 15)
     }
 
     @MainActor

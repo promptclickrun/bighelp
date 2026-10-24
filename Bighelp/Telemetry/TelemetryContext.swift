@@ -3,7 +3,7 @@ import Foundation
 import UIKit
 #endif
 
-enum TelemetryChannel: String, Sendable {
+enum TelemetryChannel: String, CaseIterable, Sendable {
     case debug
     case testflight
     case appstore

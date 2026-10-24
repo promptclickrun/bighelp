@@ -319,7 +319,8 @@ Touch and hold lifts an agent: drag it to reorder (the order is kept per host), 
 
 **Settings** is one short list where every row opens one page: you, Assistants (default model, providers,
 personalities), then Appearance, Chat, Voice and Notifications, then Hosts, Permissions, Apple
-Watch, Companion pet and Help. Don't add sections that compete with these; add to the page a row already opens.
+Watch, Companion pet and Help. Don't add sections that compete with these; add to the page a row already opens
+(Permissions' page, Device access, also holds Share usage and diagnostics, on by default).
 Settings › Default model leads with **Agent**: tap it for a rail of cards, one per agent (picture and name, the
 chosen one filled with the accent, `BighelpRailCard`), and the page shows and changes that agent's own default.
 Settings › Chat starts with **When bighelp opens**: Open on (Agents, Agents (multi), Last chat, Feed, Ideas, Goals,

@@ -164,7 +164,55 @@ struct BighelpDeliveryReceiptsTests {
         #expect(Set(keys).isSubset(of: ["kind", "path", "receivedAt", "sentAt", "occurredAt"]))
     }
 
-    @Test func twoProcessesWritingAtOnceLoseNothing() async throws {
+    /// Holds the receipts' lock file the way the other process would: its own file handle, `flock` on it.
+    private final class OtherLockOwner: @unchecked Sendable {
+        private let descriptor: Int32
+        init?(lock: URL) {
+            descriptor = open(lock.path, O_RDWR | O_CREAT, 0o600)
+            guard descriptor >= 0, flock(descriptor, LOCK_EX | LOCK_NB) == 0 else { return nil }
+        }
+        func release() { flock(descriptor, LOCK_UN); close(descriptor) }
+    }
+
+    @Test func aReceiptSkipsRatherThanWaitsWhenTheOtherProcessHoldsTheLock() throws {
+        let store = try receipts()
+        store.record(userInfo: push(), receivedAt: arrival(afterSent: 1))
+        #expect(store.count == 1)
+        let lockURL = try #require(store.lockURL)
+        let owner = try #require(OtherLockOwner(lock: lockURL))
+        let started = ContinuousClock.now
+        store.record(userInfo: push(), receivedAt: arrival(afterSent: 2))
+        let waited = ContinuousClock.now - started
+        #expect(waited < .milliseconds(400), "five 10 ms pauses at most, then it gives up")
+        #expect(store.drain(limit: 10).isEmpty, "the app can't read while the other side writes either")
+        owner.release()
+        #expect(store.count == 1, "the skipped receipt was dropped, the saved one is intact")
+        store.record(userInfo: push(), receivedAt: arrival(afterSent: 3))
+        #expect(store.count == 2)
+    }
+
+    @Test func aLockReleasedWithinThePauseLetsTheReceiptIn() async throws {
+        let store = try receipts()
+        let lockURL = try #require(store.lockURL)
+        let owner = try #require(OtherLockOwner(lock: lockURL))
+        Task.detached { try? await Task.sleep(for: .milliseconds(20)); owner.release() }
+        store.record(userInfo: push(), receivedAt: arrival(afterSent: 1))
+        #expect(store.count == 1)
+    }
+
+    @Test func theListIsReplacedWholeAndTheLockIsItsOwnFile() throws {
+        let store = try receipts()
+        store.record(userInfo: push(), receivedAt: arrival(afterSent: 1))
+        let data = try Data(contentsOf: try #require(store.fileURL))
+        #expect((try JSONDecoder().decode([BighelpDeliveryReceipt].self, from: data)).count == 1)
+        #expect(try #require(store.lockURL).lastPathComponent == "receipts.json.lock")
+        #expect(FileManager.default.fileExists(atPath: try #require(store.lockURL).path))
+        let leftovers = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+            .filter { $0 != "receipts.json" && $0 != "receipts.json.lock" }
+        #expect(leftovers.isEmpty, "no temporary file is left behind")
+    }
+
+    @Test func writersOnSeveralThreadsNeverGarbleTheFile() async throws {
         let store = try receipts()
         await withTaskGroup(of: Void.self) { group in
             for worker in 0..<4 {
@@ -177,7 +225,10 @@ struct BighelpDeliveryReceiptsTests {
                 }
             }
         }
-        #expect(store.count == 120)
+        // A writer that couldn't get the lock in time skipped; what is saved is whole and has no repeats.
+        let saved = store.drain(limit: 1_000)
+        #expect(!saved.isEmpty && saved.count <= 120)
+        #expect(Set(saved.map(\.receivedAt)).count == saved.count)
     }
 
     // MARK: - The app's side

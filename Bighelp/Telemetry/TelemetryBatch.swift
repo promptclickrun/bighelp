@@ -25,6 +25,22 @@ enum TelemetryBatchEncoder {
 
     static func newID() -> String { UUID().uuidString.lowercased() }
 
+    /// The Worker takes `frames` as at most 64 entries and 8,192 characters of compact JSON. Outermost
+    /// frames (the end of the list) are dropped until it fits; the innermost, nearest the fault, stay.
+    static let maximumFramesJSONCharacters = 8_192
+
+    static func fittingFrames(_ frames: [TelemetryFrame]) -> [[String: Any]] {
+        var kept = frames.prefix(TelemetryFrame.maximumPerEvent).map {
+            ["b": $0.binaryUUID, "o": $0.offset, "n": $0.name] as [String: Any]
+        }
+        while !kept.isEmpty {
+            let size = (try? JSONSerialization.data(withJSONObject: kept).count) ?? Int.max
+            if size <= maximumFramesJSONCharacters { break }
+            kept.removeLast()
+        }
+        return kept
+    }
+
     static func object(_ event: TelemetryWireEvent) -> [String: Any] {
         var props: [String: Any] = [:]
         for (key, value) in event.props {
@@ -33,9 +49,7 @@ enum TelemetryBatchEncoder {
             case .integer(let number): props[key] = number
             case .code(let code): props[key] = code
             case .frames(let frames):
-                props[key] = frames.prefix(TelemetryFrame.maximumPerEvent).map {
-                    ["b": $0.binaryUUID, "o": $0.offset, "n": $0.name] as [String: Any]
-                }
+                props[key] = fittingFrames(frames)
             }
         }
         return ["name": event.name, "t": event.time, "p": props]

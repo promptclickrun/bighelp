@@ -103,6 +103,63 @@ struct TelemetryClientTests {
         #expect(await rig.client.nextAttempt == nil)
     }
 
+    @Test func noAnswerOrAServerErrorKeepsTheEventsAndBacksOff() async throws {
+        let rig = TelemetryTestRig.make(responses: [.failed, .failed, .accepted])
+        await fill(rig, 3)
+        await rig.client.flush()
+        #expect(await rig.client.queuedCount == 3, "a failed send is put back, not lost")
+        #expect(await rig.client.nextAttempt == rig.clock.now.addingTimeInterval(60))
+        rig.clock.advance(61)
+        await rig.client.flush()
+        #expect(await rig.client.nextAttempt == rig.clock.now.addingTimeInterval(120))
+        rig.clock.advance(121)
+        await rig.client.flush()
+        #expect(await rig.client.queuedCount == 0 && rig.transport.requests.count == 3)
+    }
+
+    @Test func receiptsDrainedThenFailedToSendAreKeptAndSavedAtOnce() async throws {
+        let rig = TelemetryTestRig.make(responses: [.failed])
+        let now = rig.clock.now
+        let records = (0..<5).map { TelemetryRecord(.notificationReceived(kind: .alert, path: .direct, delayMs: $0, hostToPhoneMs: nil), at: now) }
+        await rig.client.record(records)
+        #expect(rig.disk.saved.count == 5, "saved as soon as they are taken from the extension's file")
+        await rig.client.flush()
+        #expect(await rig.client.queuedCount == 5)
+        #expect(rig.disk.saved.count == 5)
+    }
+
+    @Test func aLaunchWithItOffDeletesTheQueueFileAndAnyID() async throws {
+        let stale = TelemetryRecord(.appOpened(coldStart: true), at: Date())
+        let rig = TelemetryTestRig.make(enabled: false, disk: FakeTelemetryDisk([stale]))
+        _ = rig.identity.create()
+        #expect(rig.identity.current != nil)
+        await rig.client.start()
+        #expect(rig.disk.saved.isEmpty && rig.disk.deleted >= 1)
+        #expect(rig.identity.current == nil)
+        #expect(await rig.client.queuedCount == 0)
+    }
+
+    @Test func aLaunchWithItOnKeepsWhatIsThere() async throws {
+        let rig = TelemetryTestRig.make(disk: FakeTelemetryDisk([TelemetryRecord(.appOpened(coldStart: true), at: Date())]))
+        _ = rig.identity.create()
+        await rig.client.start()
+        #expect(await rig.client.queuedCount == 1 && rig.identity.current != nil)
+    }
+
+    @Test func theIDDoesNotSurviveDeletingTheApp() throws {
+        let defaults = UserDefaults(suiteName: "marker-\(UUID().uuidString)")!
+        let identity = FakeTelemetryIdentity()
+        let old = try #require(identity.create())
+        // No marker in the app's own preferences: a fresh install or a reinstall. The Keychain's ID is from before.
+        TelemetryInstallMarker.reconcile(defaults: defaults, identity: identity)
+        #expect(identity.current == nil && identity.deleted == 1)
+        let fresh = try #require(identity.create())
+        #expect(fresh != old)
+        // The next launch finds the marker and leaves the ID alone.
+        TelemetryInstallMarker.reconcile(defaults: defaults, identity: identity)
+        #expect(identity.current == fresh && identity.deleted == 1, "the second launch deletes nothing")
+    }
+
     @Test func theQueueIsBoundedAndDropsTheOldest() async throws {
         var configuration = TelemetryClient.Configuration()
         configuration.memoryCapacity = 500

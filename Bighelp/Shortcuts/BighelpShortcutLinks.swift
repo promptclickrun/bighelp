@@ -20,7 +20,9 @@ final class BighelpIncomingLinkCenter {
 
     /// The latest one wins, like links tapped while the app starts.
     func open(_ url: URL) {
-        Telemetry.featureUsed(.shortcutRun)
+        // Counted only once the person has agreed to share data with AI providers (as Shortcuts that
+        // send are, by `liveWorkspace`).
+        if AIDataConsent.isAgreed() { Telemetry.featureUsed(.shortcutRun) }
         pending = BighelpIncomingLink(url: url)
     }
 

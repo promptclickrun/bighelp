@@ -17,6 +17,8 @@ final class TelemetryMetricKit: NSObject, MXMetricManagerSubscriber, @unchecked 
     }
 
     func didReceive(_ payloads: [MXMetricPayload]) {
+        // Sharing off: leave the reports unread.
+        guard Telemetry.isRecording else { return }
         for payload in payloads {
             guard let launch = payload.applicationLaunchMetrics else { continue }
             let when = payload.timeStampEnd
@@ -41,6 +43,7 @@ final class TelemetryMetricKit: NSObject, MXMetricManagerSubscriber, @unchecked 
     }
 
     func didReceive(_ payloads: [MXDiagnosticPayload]) {
+        guard Telemetry.isRecording else { return }
         for payload in payloads {
             let when = payload.timeStampEnd
             for crash in payload.crashDiagnostics ?? [] {

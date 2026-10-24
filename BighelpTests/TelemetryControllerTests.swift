@@ -32,7 +32,7 @@ struct TelemetryControllerTests {
         let directory = FileManager.default.temporaryDirectory.appending(path: "telemetry-\(UUID().uuidString)")
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let receipts = BighelpDeliveryReceipts(fileURL: directory.appending(path: "r.json"), defaults: defaults)
-        let controller = TelemetryController(preference: preference, client: { rig.client }, receipts: receipts,
+        let controller = TelemetryController(preference: preference, client: { rig.client }, receipts: receipts, markEnabled: { _ in },
                                              visitHosts: { body in for host in hosts { await body(host) } })
         return Setup(controller: controller, rig: rig, preference: preference, receipts: receipts)
     }
@@ -40,9 +40,9 @@ struct TelemetryControllerTests {
     @Test func itIsOnUntilSomeoneTurnsItOff() {
         let defaults = UserDefaults(suiteName: "telemetry-\(UUID().uuidString)")!
         #expect(TelemetryPreference(defaults: defaults).isEnabled)
-        #expect(TelemetryController(preference: TelemetryPreference(defaults: defaults), client: { nil }).isEnabled)
+        #expect(TelemetryController(preference: TelemetryPreference(defaults: defaults), client: { nil }, markEnabled: { _ in }).isEnabled)
         TelemetryPreference(defaults: defaults).isEnabled = false
-        #expect(!TelemetryController(preference: TelemetryPreference(defaults: defaults), client: { nil }).isEnabled)
+        #expect(!TelemetryController(preference: TelemetryPreference(defaults: defaults), client: { nil }, markEnabled: { _ in }).isEnabled)
     }
 
     @Test func turningItOffStopsSendingClearsTheQueueAndTheIDAndTellsCapableHosts() async throws {
@@ -128,6 +128,49 @@ struct TelemetryControllerTests {
         #expect(host.told == [false])
     }
 
+    /// A host that was about to be told "off" when the person switched back on is not told: the host
+    /// stays on, matching the app. And the reverse, so a quick on then off can't leave a host on.
+    @Test func quickChangesNeverLeaveAHostDifferentFromTheApp() async throws {
+        final class SlowHost: TelemetryHostEndpoint {
+            let supportsTelemetrySwitch = true
+            private(set) var told: [Bool] = []
+            func setTelemetry(enabled: Bool) async throws {
+                for _ in 0..<5 { await Task.yield() }
+                told.append(enabled)
+            }
+        }
+        let host = SlowHost()
+        let defaults = UserDefaults(suiteName: "telemetry-\(UUID().uuidString)")!
+        let preference = TelemetryPreference(defaults: defaults)
+        let rig = TelemetryTestRig.make()
+        var marks: [Bool] = []
+        let controller = TelemetryController(preference: preference, client: { rig.client },
+                                             receipts: BighelpDeliveryReceipts(fileURL: nil),
+                                             markEnabled: { marks.append($0) },
+                                             visitHosts: { body in await body(host) })
+        // Off, on, off, started without waiting for each other.
+        async let first: Void = controller.setEnabled(false)
+        async let second: Void = controller.setEnabled(true)
+        async let third: Void = controller.setEnabled(false)
+        _ = await (first, second, third)
+        #expect(!controller.isEnabled && !preference.isEnabled)
+        #expect(host.told.last == false, "the host's last word matches the app")
+        #expect(!host.told.contains(true), "no PUT of true goes out for a change already undone")
+        #expect(await !rig.client.enabled && rig.identity.current == nil)
+        #expect(marks == [false, true, false])
+
+        // And ending on: a host told off earlier is told on at the end, and never the other way round.
+        let ending = TelemetryController(preference: TelemetryPreference(defaults: UserDefaults(suiteName: "telemetry-\(UUID().uuidString)")!),
+                                         client: { rig.client }, receipts: BighelpDeliveryReceipts(fileURL: nil),
+                                         markEnabled: { _ in }, visitHosts: { body in await body(host) })
+        let before = host.told.count
+        async let a: Void = ending.setEnabled(false)
+        async let b: Void = ending.setEnabled(true)
+        _ = await (a, b)
+        #expect(ending.isEnabled)
+        #expect(host.told.dropFirst(before).last != false, "never left off while the app is on")
+    }
+
     @Test func aHostThatFailsNeverBlocksTheSwitch() async throws {
         let broken = FakeHost(), fine = FakeHost()
         broken.failing = true
@@ -141,7 +184,7 @@ struct TelemetryControllerTests {
         let host = FakeHost()
         let defaults = UserDefaults(suiteName: "telemetry-\(UUID().uuidString)")!
         let controller = TelemetryController(preference: TelemetryPreference(defaults: defaults), client: { nil },
-                                             receipts: BighelpDeliveryReceipts(fileURL: nil),
+                                             receipts: BighelpDeliveryReceipts(fileURL: nil), markEnabled: { _ in },
                                              visitHosts: { body in await body(host) })
         await controller.setEnabled(false)
         await controller.setEnabled(true)
@@ -152,7 +195,8 @@ struct TelemetryControllerTests {
         let demo = DemoTelemetryHosts()
         let defaults = UserDefaults(suiteName: "telemetry-\(UUID().uuidString)")!
         let controller = TelemetryController(preference: TelemetryPreference(defaults: defaults), client: { nil },
-                                             receipts: BighelpDeliveryReceipts(fileURL: nil), visitHosts: demo.visitor)
+                                             receipts: BighelpDeliveryReceipts(fileURL: nil), markEnabled: { _ in },
+                                             visitHosts: demo.visitor)
         await controller.setEnabled(false)
         #expect(demo.told == [false])
     }

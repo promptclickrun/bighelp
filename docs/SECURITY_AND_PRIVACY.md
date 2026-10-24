@@ -42,8 +42,10 @@ Health empty-result semantics and the physical-device acceptance requirements.
 bighelp counts how it is used and how it performs so the maintainers can fix what is slow or
 broken. It is on by default and has an off switch: Settings › Permissions › Device access ›
 **Share usage and diagnostics**. What follows is what the code sends (`Bighelp/Telemetry/`).
-Nothing here is for advertising, nothing is linked to a name or an account, and bighelp does not
-track people across other companies' apps or sites.
+Nothing here is for advertising or sold, it holds no name, email or account, and bighelp does not
+track people across other companies' apps or sites. The numbers are tied to a random install ID, so
+the App Store privacy label declares them as linked to the device's ID (not to a person's identity),
+for app functionality and analytics, and never for tracking.
 
 ### What is sent
 
@@ -52,7 +54,9 @@ gzip-compressed when that is smaller, with a 5-second timeout. It holds:
 
 - **An install ID**: a random UUID the app makes and keeps in this device's Keychain (never in iCloud
   Keychain or a backup restored elsewhere). It is not derived from anything on the phone, the Apple
-  ID, a host or a notification token. A new **session ID** is made at each launch.
+  ID, a host or a notification token. It never survives deleting the app: a launch that finds no marker
+  in the app's own preferences (a fresh install or a reinstall) deletes any ID the Keychain still holds.
+  A new **session ID** is made at each launch.
 - **Context**: app version and build, the OS name and version, the kind of device (iPhone, iPad, Mac,
   Vision) and where the build came from (debug, TestFlight, App Store). No device name, no
   language, no region, no advertising or vendor identifier.
@@ -61,7 +65,7 @@ gzip-compressed when that is smaller, with a 5-second timeout. It holds:
   | Event | What it carries |
   |---|---|
   | `app.opened`, `app.backgrounded`, `session.ended` | whether it was a cold start; time in the foreground; session length |
-  | `feature.used` | which of 14 fixed features was used: chat sent, card drawn, card answered, voice turn, live voice, workflow run, mode switched, agent opened, file opened, Shortcut run, widget opened, CarPlay voice, Watch chat, notification opened |
+  | `feature.used` | which of 14 fixed features was used: chat sent, card drawn, card answered, voice turn, live voice, workflow run, mode switched, agent opened, file opened, Shortcut run (counted after the AI-data agreement), widget opened (any `loopdy://` link the system opens: mostly widgets, also Live Activity and alert links), CarPlay voice, Watch chat, notification opened |
   | `perf.first_token_ms`, `perf.reconnect` | milliseconds from Send to the first streamed word; how long a reconnect took and whether it worked |
   | `perf.launch` | MetricKit's launch histograms: the middle bucket and how many launches |
   | `hang`, `crash` | MetricKit's reports: exception type, code and signal as numbers, and up to 64 stack frames as a binary UUID, an offset and the binary's name |
@@ -100,7 +104,9 @@ and Log Analytics), where it is kept for 90 days.
 ### The off switch
 
 - Turning it off stops sending at once, throws away anything queued (in memory and on disk), deletes
-  the install ID, and stops the extension from noting pushes.
+  the install ID, and stops the extension from noting pushes. A launch with it off deletes the queue
+  file and any ID again. Quick off and on changes run one after another, and each computer is asked
+  again whether the choice still stands just before it is told.
 - It also tells each connected computer that lists `native-host-telemetry-v1` to stop its own usage
   reports (`PUT /api/plugins/loopdy/native/telemetry {"enabled": false}`). A computer that connects
   later while sharing is off is told then. Computers without the feature are skipped.

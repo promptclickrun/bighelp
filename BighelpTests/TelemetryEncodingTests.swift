@@ -175,6 +175,28 @@ struct TelemetryEncodingTests {
         #expect(Set(try #require(encoded.first).keys) == ["b", "o", "n"])
     }
 
+    @Test func frameListsAreCutToTheWorkersEightKilobyteLimit() throws {
+        // 64 frames with long names and big offsets are about 9,600 characters of JSON.
+        let long = String(repeating: "n", count: 64)
+        let frames = (0..<64).compactMap {
+            TelemetryFrame(binaryUUID: "3F2A9C1E-5B7D-4E8F-9A10-2C4D6E8F0A1B", offset: 4_000_000_000 + $0, name: long)
+        }
+        #expect(frames.count == 64)
+        let wire = TelemetryWireEvent(.crash(exceptionType: 1, exceptionCode: 2, signal: 6, frames: frames), timeMilliseconds: 1)
+        let object = TelemetryBatchEncoder.object(wire)
+        let kept = try #require((object["p"] as? [String: Any])?["frames"] as? [[String: Any]])
+        let json = try JSONSerialization.data(withJSONObject: kept)
+        #expect(json.count <= 8_192)
+        #expect(kept.count < 64 && kept.count > 40)
+        #expect(kept.first?["o"] as? Int == 4_000_000_000, "the innermost frame stays; the outermost go first")
+        // A list that already fits is left whole.
+        let small = TelemetryBatchEncoder.fittingFrames(Self.frames)
+        #expect(small.count == 2)
+        // The whole batch carrying it still encodes.
+        #expect(TelemetryBatchEncoder.body(source: .app, id: TelemetryBatchEncoder.newID(), session: nil, context: .test,
+                                           events: [wire]) != nil)
+    }
+
     @Test func aBodyOverAKilobyteIsGzippedWhenThatIsSmaller() throws {
         let id = TelemetryBatchEncoder.newID()
         let events = (0..<50).map { _ in TelemetryWireEvent(.featureUsed(.chatSent), timeMilliseconds: 1_800_000_000_000) }

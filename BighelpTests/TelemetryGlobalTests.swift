@@ -54,15 +54,41 @@ struct TelemetryGlobalTests {
         Telemetry.record(TelemetryLifecycle.record(receipt).event, at: Date())
 
         // Let the fire-and-forget tasks land, then send.
-        for _ in 0..<200 where await rig.client.queuedCount < 8 { try? await Task.sleep(for: .milliseconds(5)) }
+        // All ten events: a card, a send, a file, a first token, a reconnect, three hangs, a crash and a receipt.
+        for _ in 0..<600 where await rig.client.queuedCount < 10 { try? await Task.sleep(for: .milliseconds(5)) }
+        #expect(await rig.client.queuedCount == 10, "every event made it into the queue before anything is checked")
         await rig.client.flush()
-        #expect(await rig.transport.waitForRequests(2))
+        #expect(await rig.transport.waitForRequests(2), "app events and the receipt go in two batches")
         let text = rig.transport.allText
         #expect(!text.isEmpty)
         for secret in Self.secrets { #expect(!text.contains(secret), "\(secret) reached a batch") }
         // Nothing but allowlisted event names went out.
         let names = Set(rig.transport.batches.flatMap { ($0["events"] as? [[String: Any]]) ?? [] }.compactMap { $0["name"] as? String })
         #expect(names.isSubset(of: Set(TelemetryEncodingTests.allowedProps.keys)))
+    }
+
+    @Test func withSharingOffEveryCallIsANoOp() async throws {
+        let rig = TelemetryTestRig.make()
+        Telemetry.install(rig.client, enabled: false)
+        defer { Telemetry.install(nil) }
+        #expect(!Telemetry.isRecording && Telemetry.isActive)
+        Telemetry.featureUsed(.chatSent)
+        Telemetry.record(.appOpened(coldStart: true))
+        Telemetry.record(.firstToken(ms: 5), at: Date())
+        Telemetry.featureUsedOnce(.cardRendered, key: UUID().uuidString)
+        await Telemetry.flushForBackground()
+        try? await Task.sleep(for: .milliseconds(50))
+        #expect(await rig.client.queuedCount == 0)
+        // Switching it on (as the Settings switch does) makes the same calls count.
+        Telemetry.markEnabled(true)
+        #expect(Telemetry.isRecording)
+        Telemetry.featureUsed(.chatSent)
+        for _ in 0..<200 where await rig.client.queuedCount < 1 { try? await Task.sleep(for: .milliseconds(5)) }
+        #expect(await rig.client.queuedCount == 1)
+        Telemetry.markEnabled(false)
+        Telemetry.featureUsed(.chatSent)
+        try? await Task.sleep(for: .milliseconds(50))
+        #expect(await rig.client.queuedCount == 1)
     }
 
     @Test func aCardCountsOncePerRunNoMatterHowOftenItIsDrawn() async throws {

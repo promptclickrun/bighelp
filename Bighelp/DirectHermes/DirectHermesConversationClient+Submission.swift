@@ -69,7 +69,7 @@ extension DirectHermesConversationClient {
         queuedVoiceAwaitingTurn = false
         pendingID = submission.id
         pendingTurnID = nil
-        promptSentAt = command ? nil : monotonicNow()
+        promptSentAt = command || !Telemetry.isRecording ? nil : monotonicNow()
         admissionOverlapped = false
         submissionTurns = []
         settledSubmissionTurns = [:]

@@ -170,9 +170,12 @@ final class DirectHermesWorkspaceStore {
             if owner == generation {
                 isConnecting = false
                 // Counted when the connection came back or the attempt gave up, not when it was overtaken.
-                let elapsed = reconnectStart.duration(to: .now).components
-                Telemetry.record(.reconnect(ms: Int(elapsed.seconds) * 1_000 + Int(elapsed.attoseconds / 1_000_000_000_000_000),
-                                            attempts: 1, outcome: reconnectOutcome))
+                // One call of `reconnect()` is one attempt, so no attempt count is sent.
+                if Telemetry.isRecording {
+                    let elapsed = reconnectStart.duration(to: .now).components
+                    Telemetry.record(.reconnect(ms: max(0, Int(elapsed.seconds) * 1_000 + Int(elapsed.attoseconds / 1_000_000_000_000_000)),
+                                                attempts: nil, outcome: reconnectOutcome))
+                }
             }
         }
         await previous?.disconnect()

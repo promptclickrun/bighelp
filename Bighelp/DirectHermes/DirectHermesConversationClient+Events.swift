@@ -86,7 +86,11 @@ extension DirectHermesConversationClient {
         if event.type == "message.delta", !isReplayingActivity, let sent = promptSentAt,
            pendingID != nil, pendingTurnID == projection.turnID {
             promptSentAt = nil
-            Telemetry.record(.firstToken(ms: Int(monotonicNow() &- sent) / 1_000_000))
+            // Nothing is worked out when sharing is off, and a clock that went backwards gives no number.
+            if Telemetry.isRecording {
+                let now = monotonicNow()
+                if now >= sent { Telemetry.record(.firstToken(ms: Int(min((now - sent) / 1_000_000, 86_400_000)))) }
+            }
         }
         if event.type == "session.info" {
             if let value = event.payload["model"]?.string { modelName = value }

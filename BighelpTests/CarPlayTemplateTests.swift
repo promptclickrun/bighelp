@@ -39,5 +39,31 @@ struct CarPlayTemplateTests {
         #expect(home.listHeader?.title == "Atlas")
         #expect(home.listHeader?.subtitle == "Searching the web…")
     }
+
+    @Test func theHomeAlwaysOffersTalkAndEndWhileTalking() {
+        let idle = CarPlayHeaderContent(agentID: "atlas", name: "Atlas", status: "Tap Talk to start",
+                                        earlierSteps: [], isTalking: false)
+        #expect(idle.actions.map(\.title) == ["Talk"])
+        var talking = idle
+        talking.isTalking = true
+        // Talk goes back to the voice screen if the car closed it.
+        #expect(talking.actions.map(\.title) == ["Talk", "End"])
+    }
+
+    @Test func talkGoesBackToTheConversationThatsOnAndStartsOneOtherwise() {
+        // Nothing runs before the first start, so the car's first Talk starts a conversation.
+        #expect(CarPlayVoiceSession().phase == .paused)
+        for phase in [CarPlayVoiceSession.Phase.paused, .problem("Couldn't connect")] {
+            #expect(CarPlayTalkAction.for(phase: phase, currentAgentID: "atlas", requestedID: nil) == .startCall)
+            #expect(CarPlayTalkAction.for(phase: phase, currentAgentID: "atlas", requestedID: "atlas") == .startCall)
+        }
+        for phase in [CarPlayVoiceSession.Phase.connecting, .listening, .working, .speaking] {
+            // Talk, or tapping the agent in the conversation, shows it again instead of restarting it.
+            #expect(CarPlayTalkAction.for(phase: phase, currentAgentID: "atlas", requestedID: nil) == .showCall)
+            #expect(CarPlayTalkAction.for(phase: phase, currentAgentID: "atlas", requestedID: "atlas") == .showCall)
+            // Another agent starts a conversation with it.
+            #expect(CarPlayTalkAction.for(phase: phase, currentAgentID: "atlas", requestedID: "finance") == .startCall)
+        }
+    }
 }
 #endif

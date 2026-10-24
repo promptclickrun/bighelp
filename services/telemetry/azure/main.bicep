@@ -20,8 +20,17 @@ param alertWebhookUrl string = ''
 param dailyQuotaGb int = 1
 
 @description('How long Log Analytics and Application Insights keep telemetry, in days.')
-@minValue(30)
-@maxValue(730)
+@allowed([
+  30
+  60
+  90
+  120
+  180
+  270
+  365
+  550
+  730
+])
 param retentionInDays int = 90
 
 @description('Turn all alert rules off without deleting them.')
@@ -96,14 +105,16 @@ resource actionGroup 'Microsoft.Insights/actionGroups@2023-01-01' = {
 // Interpretations (see README.md):
 // - Push latency and failures look at direct sends only. BuzzKit sends stay about 10 s late until cutover.
 // - Each rule needs a minimum number of samples, so one slow push does not page anyone.
-// - The baseline rules ask for 7 days of history. Azure caps a rule window at 2 days, so the baseline may be
-//   the last 2 days. The workbook shows the full 7 days.
+// - Azure caps a rule window at 2 days, so the baseline rules use the previous 2 days, not 7. The workbook
+//   shows the full range.
+// - Public sources (app, nse, host) can send forged events, so a rule built on them can be triggered by
+//   anyone. Only push-failures and push-dlq read relay events, which arrive over a service binding.
 var alertRules = [
   {
     id: 'push-latency'
     displayName: 'bighelp push latency'
-    description: 'p95 of notification.received delayMs is over 6 seconds for 15 minutes (direct sends, at least 5 samples).'
-    severity: 2
+    description: 'p95 of notification.received delayMs is over 6 seconds for 15 minutes (direct sends, at least 5 samples). Fed by public events, so it can be forged.'
+    severity: 3
     frequency: 'PT5M'
     window: 'PT15M'
     query: '''
@@ -119,14 +130,15 @@ customEvents
   {
     id: 'push-failures'
     displayName: 'bighelp push failures'
-    description: 'More than 5 percent of direct push.sent events had a status other than 200 in 15 minutes (at least 10 sends).'
+    description: 'More than 5 percent of direct push.sent events from the relay had a status other than 200 in 15 minutes (at least 10 sends).'
     severity: 1
     frequency: 'PT5M'
     window: 'PT15M'
     query: '''
 customEvents
-| where timestamp > ago(15m) and name == "push.sent"
+| where timestamp > ago(15m) and name == "push.sent" and cloud_RoleName == "bighelp-relay"
 | where tostring(customDimensions.path) == "direct"
+| where isnotnull(customMeasurements.status)
 | summarize total = count(), failed = countif(todouble(customMeasurements.status) != 200)
 | extend failedPercent = failed * 100.0 / total
 | where total >= 10 and failedPercent > 5
@@ -141,23 +153,23 @@ customEvents
     window: 'PT15M'
     query: '''
 customEvents
-| where timestamp > ago(15m) and name == "push.dlq"
+| where timestamp > ago(15m) and name == "push.dlq" and cloud_RoleName == "bighelp-relay"
 | summarize dlq = count()
 '''
   }
   {
     id: 'crash-spike'
     displayName: 'bighelp crash spike'
-    description: 'Crashes in the last hour are more than 3 times the hourly average of the previous 7 days (at least 4).'
+    description: 'Crashes in the last hour are more than 3 times the hourly average of the 47 hours before (at least 4). Fed by public events, so it can be forged.'
     severity: 1
     frequency: 'PT15M'
     window: 'P2D'
     query: '''
 let baselinePerHour = toscalar(
     customEvents
-    | where timestamp between (ago(7d) .. ago(1h)) and name == "crash"
+    | where timestamp between (ago(2d) .. ago(1h)) and name == "crash"
     | summarize crashes = count()
-    | extend perHour = todouble(crashes) / (7.0 * 24.0 - 1.0)
+    | extend perHour = todouble(crashes) / 47.0
     | project perHour);
 customEvents
 | where timestamp > ago(1h) and name == "crash"
@@ -169,14 +181,14 @@ customEvents
   {
     id: 'host-turn-latency'
     displayName: 'bighelp host turn latency'
-    description: 'p95 time to first token of host turns in the last hour is over 2 times the p95 of the previous 7 days (at least 10 turns).'
+    description: 'p95 time to first token of host turns in the last hour is over 2 times the p95 of the 47 hours before (at least 10 turns).'
     severity: 2
     frequency: 'PT15M'
     window: 'P2D'
     query: '''
 let baselineP95 = toscalar(
     customEvents
-    | where timestamp between (ago(7d) .. ago(1h)) and name == "turn.completed"
+    | where timestamp between (ago(2d) .. ago(1h)) and name == "turn.completed"
     | extend firstTokenMs = todouble(customMeasurements.firstTokenMs)
     | where isnotnull(firstTokenMs)
     | summarize p95Ms = percentile(firstTokenMs, 95));
@@ -191,7 +203,7 @@ customEvents
   {
     id: 'ingestion-stalled'
     displayName: 'bighelp ingestion stalled'
-    description: 'No app.opened event arrived in 2 hours. The query always returns one row and the rule fires when its count is 0.'
+    description: 'No app.opened event arrived in 2 hours. The query returns one row only when the count is 0. Fed by public events, so it can be forged.'
     severity: 2
     frequency: 'PT15M'
     window: 'PT2H'
@@ -296,18 +308,24 @@ customEvents
 '''
   }
   {
-    title: 'Daily active installs (DAU) and weekly active installs (WAU)'
+    title: 'Daily active installs (DAU) and trailing 7-day active installs (WAU). The first 6 days of the range are partial.'
     visualization: 'timechart'
     query: '''
-let dau = customEvents
+let opens = customEvents
     | where name == "app.opened"
-    | summarize dailyActive = dcount(user_Id) by day = bin(timestamp, 1d);
-let wau = customEvents
-    | where name == "app.opened"
-    | summarize weeklyActive = dcount(user_Id) by day = bin(timestamp, 7d);
-dau
-| join kind=leftouter wau on day
-| project day, dailyActive, weeklyActive
+    | distinct user_Id, day = bin(timestamp, 1d);
+let dau = opens
+    | summarize dailyActive = dcount(user_Id) by day;
+// Each install counts on its own day and the 6 days after, so every day shows the distinct installs of the
+// 7 days that end on it.
+let wau = opens
+    | mv-expand offset = range(0, 6, 1) to typeof(long)
+    | extend activeDay = day + offset * 1d
+    | where activeDay <= bin(now(), 1d)
+    | summarize weeklyActive = dcount(user_Id) by day = activeDay;
+wau
+| join kind=leftouter dau on day
+| project day, dailyActive = coalesce(dailyActive, 0L), weeklyActive
 | order by day asc
 '''
   }

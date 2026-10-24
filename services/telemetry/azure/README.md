@@ -44,7 +44,8 @@ az deployment group create \
 
 Optional parameters:
 - `alertWebhookUrl="<https URL>"`: also post alerts to a webhook (for example the bighelp Feed).
-- `dailyQuotaGb=1` and `retentionInDays=90`: the defaults, from the plan.
+- `dailyQuotaGb=1` and `retentionInDays=90`: the defaults, from the plan. Retention must be one of Azure's values for
+  Application Insights: 30, 60, 90, 120, 180, 270, 365, 550 or 730.
 - `alertsEnabled=false`: deploy the rules switched off, then turn them on once data flows.
 
 The deployment prints the Application Insights resource ID. It never prints the connection string.
@@ -58,7 +59,7 @@ expects about $2 to $10 a month for the alert rules.
 az deployment sub create \
   --location centralus \
   --template-file budget.bicep \
-  --parameters amount=<monthly credit amount> alertEmail="<your alert email>"
+  --parameters amount=<monthly credit amount> alertEmail="<your alert email>" startDate=<first day of this month, yyyy-MM-dd>
 ```
 
 The budget covers the whole subscription. This subscription runs on monthly credit with a spending limit. When the
@@ -106,23 +107,47 @@ customEvents | where timestamp > ago(30m) | where name == "app.opened" | project
 
 That test event stays in the data for 90 days. Use the `debug` channel so it is easy to filter out.
 
+## Abuse limits
+
+The Worker's rate limits (60 batches a minute per ID, 600 per network, with `Retry-After: 60` on every 429) slow a
+casual sender. They do not stop a determined one, because anyone can make new IDs and the limits are per Cloudflare
+location.
+
+The hard backstop is the workspace's 1 GB daily ingestion cap (`dailyQuotaGb`). When the cap is reached, Azure
+stops storing data until the next day. That protects the budget, but it also means forged traffic can crowd out real
+events for the rest of the day.
+
+Optionally, add a Cloudflare WAF rate-limiting rule on the route to stop floods before they reach the Worker, for
+example: requests to `telemetry.bighelp.app` with path `/v1/batch`, over 300 requests per 10 seconds from one IP,
+action Block for 10 minutes. This needs no code change.
+
 ## What the alerts do
 
 All rules read `customEvents` from `appi-bighelp`. The event name is `name`, numbers are in `customMeasurements`,
 strings are in `customDimensions`, and the install or host ID is `user_Id`. In the Log Analytics workspace the same
 rows are in the `AppEvents` table, with `Name`, `Measurements` and `Properties`.
 
-| Alert | Fires when | Notes |
-|---|---|---|
-| `push-latency` | p95 `notification.received` `delayMs` is over 6 s in 15 min | Direct sends only, at least 5 samples. BuzzKit sends stay about 10 s late until cutover |
-| `push-failures` | More than 5% of `push.sent` have a status other than 200 in 15 min | Direct sends only, at least 10 sends |
-| `push-dlq` | Any `push.dlq` in 15 min | |
-| `crash-spike` | Crashes in 1 h are more than 3 times the hourly average, and at least 4 | See the baseline note below |
-| `host-turn-latency` | p95 `firstTokenMs` of `turn.completed` in 1 h is over 2 times the baseline | At least 10 turns |
-| `ingestion-stalled` | No `app.opened` in 2 h | Quiet nights can trigger it. Raise the window once you know your traffic |
+| Alert | Severity | Fires when | Notes |
+|---|---|---|---|
+| `push-latency` | 3 | p95 `notification.received` `delayMs` is over 6 s in 15 min | Direct sends only, at least 5 samples. Forgeable (see below). BuzzKit sends stay about 10 s late until cutover |
+| `push-failures` | 1 | More than 5% of the relay's `push.sent` have a status other than 200 in 15 min | Relay events only, direct sends only, at least 10 sends. Events with no `status` are ignored |
+| `push-dlq` | 1 | Any relay `push.dlq` in 15 min | Relay events only |
+| `crash-spike` | 1 | Crashes in 1 h are more than 3 times the hourly average of the 47 hours before, and at least 4 | Forgeable (see below) |
+| `host-turn-latency` | 2 | p95 `firstTokenMs` of `turn.completed` in 1 h is over 2 times the p95 of the 47 hours before | At least 10 turns. Fed by host events, so also forgeable |
+| `ingestion-stalled` | 2 | No `app.opened` in 2 h | Quiet nights can trigger it. Raise the window once you know your traffic. Forgeable (see below) |
 
-Baseline note: Azure limits a log alert window to 2 days. The two baseline rules ask for 7 days of history, so
-Azure may use only the last 2 days. The workbook shows the full range.
+Azure limits a log alert window to 2 days, so the baseline rules compare the last hour with the 47 hours before it,
+not 7 days. The workbook shows the full range.
+
+**Forged events.** The app, notification extension and host sources are public: anyone can post a valid batch for
+them. The relay's events arrive over a service binding, which the public internet cannot call. So `push-failures` and
+`push-dlq` can be trusted, and these can be triggered, or silenced, by forged public events:
+- `push-latency` (a flood of slow `notification.received` events raises it)
+- `crash-spike` (a flood of `crash` events raises it)
+- `ingestion-stalled` (a steady trickle of `app.opened` events keeps it quiet)
+- `host-turn-latency` (same, with `turn.completed`)
+
+Treat those alerts as hints to look at the workbook, not as proof. The `push-failures` alert is the one to act on.
 
 To alert on BuzzKit sends too, remove the `path == "direct"` line from the first two rules.
 

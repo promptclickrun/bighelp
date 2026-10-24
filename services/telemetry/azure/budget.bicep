@@ -15,8 +15,10 @@ param alertEmail string
 @description('Budget name.')
 param budgetName string = 'bighelp-monthly'
 
-@description('First day of the month the budget starts. Azure needs a first-of-month date; the default is this month.')
-param startDate string = utcNow('yyyy-MM-01')
+@description('First day of the month the budget starts, as yyyy-MM-dd. Azure needs a first-of-month date, for example 2026-11-01.')
+@minLength(10)
+@maxLength(10)
+param startDate string
 
 resource budget 'Microsoft.Consumption/budgets@2023-11-01' = {
   name: budgetName

@@ -8,8 +8,13 @@
   "preview_urls": false,
   "routes": [{ "pattern": "link.loopdy.app", "custom_domain": true }],
   // Workers Logs on, sampled. The Worker logs fixed codes only: no tokens, IDs
-  // that name a person, message text or exception text.
-  "observability": { "enabled": true, "head_sampling_rate": 0.2 },
+  // that name a person, message text or exception text. Invocation logs are off,
+  // because they store each request's URL, and a URL here carries a grant ID.
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 0.2,
+    "logs": { "invocation_logs": false }
+  },
   "send_metrics": false,
   "dependencies_instrumentation": { "enabled": false },
   "limits": { "cpu_ms": 1000 },

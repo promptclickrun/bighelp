@@ -34,10 +34,12 @@ import {
 } from "./push-delivery.js";
 import {
   ACTIVITY_ID_PATTERN,
+  allowTargetWrite,
   APP_VERSION_PATTERN,
   deleteInstallationPushState,
   deletePushTarget,
   isMissingPushTable,
+  parseMutedTopics,
   purgeExpiredPushState,
   putPushTarget,
   pushTokenKeyConfigured,
@@ -1070,12 +1072,14 @@ async function handlePushTarget(
   if (path === PUSH_TARGET_PATH) {
     if (body.version !== 1) invalid();
     if (request.method === "PUT") {
-      if (keys !== "appVersion,environment,token,version" || typeof body.token !== "string"
+      const mutedTopics = parseMutedTopics(body.mutedTopics);
+      if (keys !== "appVersion,environment,mutedTopics,token,version" || typeof body.token !== "string"
           || !TOKEN_PATTERN.test(body.token) || (environment !== "sandbox" && environment !== "production")
-          || typeof body.appVersion !== "string" || !APP_VERSION_PATTERN.test(body.appVersion)) invalid();
+          || typeof body.appVersion !== "string" || !APP_VERSION_PATTERN.test(body.appVersion)
+          || mutedTopics === null) invalid();
       input = {
         kind, activityId, token: body.token as string, environment: environment as "sandbox" | "production",
-        appVersion: body.appVersion as string,
+        appVersion: body.appVersion as string, mutedTopics: mutedTopics!,
       };
     } else if (keys !== "version") invalid();
   } else {
@@ -1099,19 +1103,26 @@ async function handlePushTarget(
 
   const target = { installationId: auth.credentialId, ownerCoordinate: auth.ownerCoordinate };
   try {
+    // Small, bounded housekeeping; it never delays the answer.
+    const purge = () => {
+      const pending = purgeExpiredPushState(env, now).catch(() => undefined);
+      try { ctx?.waitUntil(pending); } catch { /* the request is already over */ }
+    };
     if (request.method === "DELETE") {
       await deletePushTarget(env, target.installationId, kind, activityId);
+      purge();
       return response({ version: 1, target: null });
     }
     if (!pushTokenKeyConfigured(env)) return fail(503, "notification_push_target_unavailable");
+    if (!await allowTargetWrite(env, auth.credentialId, now)) {
+      return fail(429, "notification_push_target_rate_limited");
+    }
     const stored = await putPushTarget(env, {
       installationId: auth.credentialId, ownerCoordinate: auth.ownerCoordinate,
       authorizationEpoch: auth.authorizationEpoch,
     }, input!, now);
     if (!stored) return fail(403, "notification_credentials_revoked");
-    // Small, bounded housekeeping; it never delays the answer.
-    const purge = purgeExpiredPushState(env, now).catch(() => undefined);
-    try { ctx?.waitUntil(purge); } catch { /* the request is already over */ }
+    purge();
     return response({
       version: 1,
       target: {

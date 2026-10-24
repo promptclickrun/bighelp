@@ -239,6 +239,23 @@
         }
       }
     },
+    "%@ is working": {
+      "comment": "Simplified Chinese draft for Settings › Chat › Agent's work and the chat's work block (#564); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is working"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ 正在工作"
+          }
+        }
+      }
+    },
     "%@ is working on it": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -525,6 +542,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "2 分钟前"
+          }
+        }
+      }
+    },
+    "A card shows the newest steps while your agent works.": {
+      "comment": "Simplified Chinese draft for Settings › Chat › Agent's work and the chat's work block (#564); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A card shows the newest steps while your agent works."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "智能体工作时，卡片会显示最新的步骤。"
           }
         }
       }
@@ -916,6 +950,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "智能体模板"
+          }
+        }
+      }
+    },
+    "Agent's work": {
+      "comment": "Simplified Chinese draft for Settings › Chat › Agent's work and the chat's work block (#564); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent's work"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "智能体的工作"
           }
         }
       }
@@ -2157,6 +2208,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "此 Hermes 电脑上的功能"
+          }
+        }
+      }
+    },
+    "Card": {
+      "comment": "Simplified Chinese draft for Settings › Chat › Agent's work and the chat's work block (#564); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Card"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "卡片"
           }
         }
       }
@@ -4173,6 +4241,23 @@
         }
       }
     },
+    "Every step, message and thought, open as it happens.": {
+      "comment": "Simplified Chinese draft for Settings › Chat › Agent's work and the chat's work block (#564); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every step, message and thought, open as it happens."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "每个步骤、消息和想法都会在发生时展开显示。"
+          }
+        }
+      }
+    },
     "Expand message editor": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -4186,40 +4271,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "展开消息编辑器"
-          }
-        }
-      }
-    },
-    "Expand reasoning": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Expand reasoning"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "展开推理"
-          }
-        }
-      }
-    },
-    "Expand tool calls": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Expand tool calls"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "展开工具调用"
           }
         }
       }
@@ -4683,6 +4734,23 @@
         }
       }
     },
+    "Full": {
+      "comment": "Simplified Chinese draft for Settings › Chat › Agent's work and the chat's work block (#564); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Full"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "完整"
+          }
+        }
+      }
+    },
     "GPT Live 1 · a live conversation": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -5036,6 +5104,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "隐藏"
+          }
+        }
+      }
+    },
+    "Hides the steps.": {
+      "comment": "Simplified Chinese draft for Settings › Chat › Agent's work and the chat's work block (#564); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hides the steps."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "隐藏步骤。"
           }
         }
       }
@@ -5567,40 +5652,6 @@
         }
       }
     },
-    "Keep reasoning folders open while a turn runs.": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Keep reasoning folders open while a turn runs."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "回合进行时保持推理文件夹展开。"
-          }
-        }
-      }
-    },
-    "Keep tool folder summaries open while a turn runs.": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Keep tool folder summaries open while a turn runs."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "回合进行时保持工具文件夹摘要展开。"
-          }
-        }
-      }
-    },
     "Know when your agents reply, finish a task, or need you.": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -5682,6 +5733,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "上次的聊天"
+          }
+        }
+      }
+    },
+    "Last said: %@": {
+      "comment": "Simplified Chinese draft for Settings › Chat › Agent's work and the chat's work block (#564); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last said: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "最后说：%@"
           }
         }
       }
@@ -6226,6 +6294,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "麦克风、相机、照片等"
+          }
+        }
+      }
+    },
+    "Minimal": {
+      "comment": "Simplified Chinese draft for Settings › Chat › Agent's work and the chat's work block (#564); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Minimal"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "简洁"
           }
         }
       }
@@ -7550,6 +7635,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "设置步骤"
+          }
+        }
+      }
+    },
+    "One line while your agent works. Its steps wait under the answer.": {
+      "comment": "Simplified Chinese draft for Settings › Chat › Agent's work and the chat's work block (#564); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "One line while your agent works. Its steps wait under the answer."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "智能体工作时只显示一行，步骤放在回答下方。"
           }
         }
       }
@@ -10708,6 +10810,23 @@
         }
       }
     },
+    "Shows every step.": {
+      "comment": "Simplified Chinese draft for Settings › Chat › Agent's work and the chat's work block (#564); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shows every step."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "显示每个步骤。"
+          }
+        }
+      }
+    },
     "Shows the selected host's agents and chats again.": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -10721,6 +10840,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "重新显示所选电脑的智能体和聊天。"
+          }
+        }
+      }
+    },
+    "Shows the steps.": {
+      "comment": "Simplified Chinese draft for Settings › Chat › Agent's work and the chat's work block (#564); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shows the steps."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "显示步骤。"
           }
         }
       }

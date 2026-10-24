@@ -382,6 +382,17 @@ hand them the work their roles cover, without being asked.
 
 An opened "Worked for…" fold shows its tools directly, never a "Called N tools" folder inside it.
 
+Settings › Chat › Agent's work (`ChatWorkStyle`) picks how one-to-one chats show an agent's work; group chats
+keep their folders. **Card** (the default): while the agent works, one soft card says who's working, how long and
+how many steps, with its newest four steps under that, older ones fading out at the top (`ChatLiveWorkView`).
+While the answer streams it says what the agent did, still; when the turn ends it becomes a "Worked for 18s ·
+4 steps" card above the answer. **Minimal**: one line with the
+current step and the agent's newest note under it; when the turn ends, a small "18s · 4 steps" receipt sits under
+the answer (`ChatWorkReceipt`). **Full**: every note, tool call and thought shows in place and open as it
+happens, then folds under "Worked for…". A tap on the card, line or receipt lists every step under it, each its
+own row. The agent's notes between steps go with Show reasoning; Show reasoning (on by default) and Show tool
+calls decide what's in the work, and Fold finished turns (off) leaves finished work open in the chat.
+
 A file in a chat opens in the native preview with Save and Share. A Markdown file opens rendered
 (`MarkdownMessageView`, as chat messages are), with a Preview and Raw switch under its name.
 
@@ -432,10 +443,9 @@ text is SF Pro, as everywhere.
 - **Chat**: Back, the bot's name (its profile) and ⋯; no New chat button. Voice is a bar over the chat, under
   its header (`SimpleBotVoiceBar`), and the chat stays in use: the bot's face, a visualizer from the real audio
   levels (your voice in the page's ink, the bot's in its color, dots while nobody speaks), voice choices (live
-  or TTS, the bot's voice on or off), the microphone and End. With Show reasoning on, the notes the bot writes
-  on the way to its answer go into one "{Bot}'s reasoning" folder (`ChatInterimReasoningHeader`): open while the
-  bot works, closed in place when the turn ends, and a tap opens or closes it any time. It never becomes a
-  second folder; the answer always shows.
+  or TTS, the bot's voice on or off), the microphone and End. The bot's work shows as Settings › Chat › Agent's
+  work says, as in every one-to-one chat: the notes it writes on the way to its answer go with its steps, in
+  order, and the answer always shows.
 - **Swipes**: from the left edge back to your bots; from the right, this bot's profile (the primary bot's on
   the home). The full app's swipe choices lead to places this mode hides, so they don't apply here.
 - **Profile**: the mark, name and role, then Info (Character, Instructions, Default Model, Routines) and
@@ -541,7 +551,7 @@ Mode and in the background. The loader gallery (`-bighelp-loader-gallery`, Noodl
 | bunny | Three taps on the wordmark under Settings › Help & feedback |
 | pull | Pull to refresh (`bighelpRefreshable`): its frames follow the pull, then the loader plays |
 
-**The chat plays one loader at a time**: on its newest live tool folder or thinking row
+**The chat plays one loader at a time**: on its newest live tool folder, thinking row or running turn's block
 (`ChatCanvasTranscriptProjection.activeLoaderID`, `BighelpActivityLoaderFocus`). Every other row, and each tool step
 inside a folder, stays still.
 

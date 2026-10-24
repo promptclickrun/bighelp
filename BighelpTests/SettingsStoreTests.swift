@@ -18,22 +18,25 @@ struct SettingsStoreTests {
         #expect(SettingsStore(defaults: defaults).systemManagesAllGateways)
     }
 
-    @Test func activeTurnExpansionPreferencesPersistAndDefaultOff() {
+    /// Agent's work starts on Card with reasoning shown; anyone who turned on an old Expand switch
+    /// asked to see everything, which is Full.
+    @Test func agentWorkStyleDefaultsToCardAndAnOldExpandChoiceBecomesFull() {
         let suiteName = #function
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let initial = SettingsStore(defaults: defaults)
-        #expect(!initial.expandReasoningByDefault)
-        #expect(!initial.expandToolCallsByDefault)
+        #expect(initial.chatWorkStyle == .card)
+        #expect(initial.showReasoningByDefault)
+        initial.chatWorkStyle = .minimal
+        #expect(SettingsStore(defaults: defaults).chatWorkStyle == .minimal)
 
-        initial.expandReasoningByDefault = true
-        initial.expandToolCallsByDefault = true
-
-        let restored = SettingsStore(defaults: defaults)
-        #expect(restored.expandReasoningByDefault)
-        #expect(restored.expandToolCallsByDefault)
+        for key in ["loopdy.chat.expandReasoningByDefault", "loopdy.chat.expandToolCallsByDefault"] {
+            defaults.removePersistentDomain(forName: suiteName)
+            defaults.set(true, forKey: key)
+            #expect(SettingsStore(defaults: defaults).chatWorkStyle == .full, "\(key)")
+        }
     }
 
     @Test func everyStoredLegacyInterfaceUsesV3WithoutChangingAppearanceBytes() throws {

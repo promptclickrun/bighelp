@@ -71,10 +71,10 @@ enum ChatCanvasRow: Identifiable, Equatable {
     static func == (lhs: Self, rhs: Self) -> Bool {
         switch (lhs, rhs) {
         case (.transcript(.entry(let a)), .transcript(.entry(let b))): a == b
-        case (.transcript(.reasoning(let a)), .transcript(.reasoning(let b))): a == b
+        case (.transcript(.liveWork(let a)), .transcript(.liveWork(let b))): a == b
         case (.transcript(.completed(let a)), .transcript(.completed(let b))):
             a.id == b.id && a.entries == b.entries && a.elapsedSeconds == b.elapsedSeconds && a.stepCount == b.stepCount
-                && a.summary == b.summary
+                && a.summary == b.summary && a.style == b.style
         case (.workTrailHeader(let a, let liveA), .workTrailHeader(let b, let liveB)): a == b && liveA == liveB
         case (.activityDetail(let a), .activityDetail(let b)): a == b
         case (.workTrailEnd(let a), .workTrailEnd(let b)): a == b
@@ -198,30 +198,33 @@ enum ChatCanvasTranscriptProjection {
                 // Keep the existing accessible disclosure control, with its
                 // expanded content projected as sibling native rows.
                 let header = ChatCompletedTurn(id: turn.id, entries: [], elapsedSeconds: turn.elapsedSeconds,
-                                               stepCount: turn.stepCount, summary: turn.summary)
+                                               stepCount: turn.stepCount, summary: turn.summary, style: turn.style)
                 result.append(.transcript(.completed(header)))
-                if disclosures.isCompletedTurnExpanded(turn.id) {
+                if disclosures.isWorkExpanded(turn.id) {
                     turn.expandedEntries.forEach { append($0, inOpenedTurn: true) }
                 }
-            case .reasoning(let group):
-                // The folder names the bot; while it's open its messages follow as their own rows, in
-                // reasoning's look. It closes in place when the turn ends.
-                result.append(.transcript(.reasoning(ChatInterimReasoning(id: group.id, agentName: group.agentName,
-                                                                         entries: [], isLive: group.isLive))))
-                if disclosures.isExpanded(group) { group.entries.forEach { append($0) } }
+            case .liveWork(let work):
+                // The block keeps its entries: Card previews its newest steps, Minimal its newest note.
+                // Opened, every step follows as its own row, as in an opened "Worked for…".
+                result.append(.transcript(.liveWork(work)))
+                if disclosures.isWorkExpanded(work.id) {
+                    work.entries.forEach { append($0, inOpenedTurn: true) }
+                }
             }
         }
         return result
     }
 
-    /// The chat plays one loader at a time: on the newest live tool folder or running
-    /// thinking row while a turn runs. Every other row stays still.
+    /// The chat plays one loader at a time: on the newest live tool folder, running
+    /// thinking row or running turn's block while a turn runs. Every other row stays still.
     static func activeLoaderID(in rows: [ChatCanvasRow], isSending: Bool) -> String? {
         guard isSending else { return nil }
         for row in rows.reversed() {
             switch row {
             case .workTrailHeader(let trail, let isLive) where isLive:
                 return ChatLoaderID.workTrail(trail)
+            case .transcript(.liveWork(let work)) where !work.isAnswering:
+                return work.id
             case .transcript(.entry(.activity(let turn))):
                 if !turn.events.isEmpty, turn.events.allSatisfy({ $0.kind == .reasoning }),
                    turn.events.contains(where: { $0.lifecycle == .running }) {
@@ -233,6 +236,21 @@ enum ChatCanvasTranscriptProjection {
             }
         }
         return nil
+    }
+}
+
+extension ChatCanvasTranscriptProjection {
+    /// The running turn's work is one block (Card, Minimal), which says the agent is working itself.
+    /// Only the newest turn can hold one, so the search stops at its question.
+    static func hasLiveWork(in rows: [ChatCanvasRow]) -> Bool {
+        for row in rows.reversed() {
+            switch row {
+            case .transcript(.liveWork): return true
+            case .transcript(.entry(.message(let item))) where item.role == .human: return false
+            default: continue
+            }
+        }
+        return false
     }
 }
 

@@ -179,7 +179,13 @@ final class CanvasStreamingFixtureClient: ConversationFixtureClient, StreamingCo
         let final = TimelineItem(id: tailID, role: .assistant,
             sender: .agent(id: senderID, snapshot: .init(name: "Canvas fixture")),
             content: .message(tail + "TOOL STREAM COMPLETE \(toolRun)\n" + metrics), metadata: .init(source: "UI fixture", delivery: "Delivered"))
-        return ConversationResponse(items: completed + [final])
+        // `-test-tool-stream-settles`: the notes come back delivered, as a real host's saved turn does,
+        // so the finished turn folds.
+        let settled = args.contains("-test-tool-stream-settles")
+            ? completed.map { TimelineItem(id: $0.id, role: $0.role, sender: $0.sender, content: $0.content,
+                                           metadata: .init(source: "UI fixture", delivery: "Delivered")) }
+            : completed
+        return ConversationResponse(items: settled + [final])
     }
 
     private func prepareBackgroundChat() async throws -> ChatModel {

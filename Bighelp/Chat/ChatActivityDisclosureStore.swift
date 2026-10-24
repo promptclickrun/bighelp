@@ -13,67 +13,30 @@ final class ChatActivityDisclosureStore {
         let identity: String
     }
 
-    private var completedTurnChoices: [String: Bool] = [:] {
+    /// Choices on a turn's "Worked for…" and on the running turn's block, by their row IDs. The two
+    /// IDs differ, so a block opened while the agent works closes in place when the answer comes.
+    private var turnChoices: [String: Bool] = [:] {
         didSet { revision &+= 1 }
     }
     /// Bumped by every choice, so the chat's rows can be kept until one changes.
     private(set) var revision: UInt64 = 0
 
-    private var activeTurnID: String?
-    private var isActiveTurn = false
-    private var expandReasoningDuringActiveTurn = false
-    private var expandToolCallsDuringActiveTurn = false
-    private var showsReasoning = true
-    private var showsToolCalls = true
+    /// The chat's `ChatWorkStyle`; nil in a group chat. Full opens every folder and thought.
+    private(set) var style: ChatWorkStyle?
 
-    func configureActiveTurn(
-        isSending: Bool,
-        turnID: String?,
-        expandReasoning: Bool = false,
-        expandToolCalls: Bool = false,
-        showReasoning: Bool = true,
-        showToolCalls: Bool = true
-    ) {
-        let changed = self.isActiveTurn != isSending
-            || activeTurnID != turnID
-            || expandReasoningDuringActiveTurn != expandReasoning
-            || expandToolCallsDuringActiveTurn != expandToolCalls
-            || showsReasoning != showReasoning
-            || showsToolCalls != showToolCalls
-        guard changed else { return }
-        isActiveTurn = isSending
-        activeTurnID = turnID
-        expandReasoningDuringActiveTurn = expandReasoning
-        expandToolCallsDuringActiveTurn = expandToolCalls
-        showsReasoning = showReasoning
-        showsToolCalls = showToolCalls
+    func configure(style: ChatWorkStyle?) {
+        guard self.style != style else { return }
+        self.style = style
         revision &+= 1
     }
 
-    func isCompletedTurnExpanded(_ id: String) -> Bool {
-        completedTurnChoices[id] ?? false
+    /// A "Worked for…" (`ChatCompletedTurn`) or running block (`ChatLiveWork`), by its ID: closed until opened.
+    func isWorkExpanded(_ id: String) -> Bool {
+        turnChoices[id] ?? false
     }
 
-    func setCompletedTurnExpanded(_ expanded: Bool, id: String) {
-        completedTurnChoices[id] = expanded
-    }
-
-    /// Simple Bot reasoning folders, by folder and by whether its turn was running: a choice made while
-    /// the bot works ends with the turn, so the folder always closes in place when the answer comes.
-    private var reasoningFolderChoices: [String: Bool] = [:] {
-        didSet { revision &+= 1 }
-    }
-
-    func isExpanded(_ reasoning: ChatInterimReasoning) -> Bool {
-        reasoningFolderChoices[Self.choiceKey(reasoning)] ?? reasoning.isLive
-    }
-
-    func setExpanded(_ expanded: Bool, for reasoning: ChatInterimReasoning) {
-        reasoningFolderChoices[Self.choiceKey(reasoning)] = expanded
-    }
-
-    private static func choiceKey(_ reasoning: ChatInterimReasoning) -> String {
-        "\(reasoning.id)|\(reasoning.isLive ? "live" : "done")"
+    func setWorkExpanded(_ expanded: Bool, id: String) {
+        turnChoices[id] = expanded
     }
 
     private var eventChoices: [Key: Bool] = [:] {
@@ -92,16 +55,12 @@ final class ChatActivityDisclosureStore {
     }
 
     /// Back-to-back reasoning opens and closes as one row. A choice made on any
-    /// entry holds as more thinking arrives; otherwise it's open while thinking.
+    /// entry holds as more thinking arrives; otherwise it's open while thinking, and always in Full.
     func isExpanded(reasoning events: [ChatActivityEvent]) -> Bool {
         let choices = events.compactMap { eventChoices[key(for: $0)] }
         if choices.contains(true) { return true }
         if choices.contains(false) { return false }
-        if isActiveTurn, showsReasoning, expandReasoningDuringActiveTurn,
-           events.contains(where: { activeTurnID == $0.turnID }) {
-            return true
-        }
-        return events.contains { $0.lifecycle == .running }
+        return style == .full || events.contains { $0.lifecycle == .running }
     }
 
     func setExpanded(_ expanded: Bool, reasoning events: [ChatActivityEvent]) {
@@ -112,16 +71,13 @@ final class ChatActivityDisclosureStore {
 
     /// A folder the agent is still working on (`isLive`) lists its calls as
     /// they happen, then closes once it's finished, unless the reader chose.
+    /// Full keeps every folder open.
     func isExpanded(_ turn: ChatActivityTurn, isLive: Bool = false) -> Bool {
         let choices = turn.events.compactMap { trailChoices[key(for: $0)] }
         // Event-keyed choices survive segment regrouping and canonical event-ID changes.
         if choices.contains(true) { return true }
         if choices.contains(false) { return false }
-        if isActiveTurn, showsToolCalls, expandToolCallsDuringActiveTurn,
-           (isLive || turn.events.contains(where: { activeTurnID == $0.turnID })) {
-            return true
-        }
-        return isLive || turn.events.contains { isExpanded($0) }
+        return style == .full || isLive || turn.events.contains { isExpanded($0) }
     }
 
     func setExpanded(_ expanded: Bool, for turn: ChatActivityTurn) {

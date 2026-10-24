@@ -147,7 +147,7 @@ struct ChatLongHistoryTests {
             if case .transcript(.completed(let turn)) = row { return turn.id }
             return nil
         }.first)
-        model.activityDisclosures.setCompletedTurnExpanded(true, id: fold)
+        model.activityDisclosures.setWorkExpanded(true, id: fold)
         try await Task.sleep(for: .milliseconds(400))
         #expect(model.transcriptCanvas.buildCount > built)
         #expect(table.numberOfRows(inSection: 0) > folded)
@@ -196,24 +196,24 @@ struct ChatLongHistoryTests {
         }
         let model = ChatModel(conversationID: sessionID, client: ConversationFixtureClient(), initialItems: items,
                               initialActivityEvents: events)
-        let caches = (0..<8).map { _ in ChatTranscriptCanvasCache() }
+        let caches = (0..<18).map { _ in ChatTranscriptCanvasCache() }
         var foldedRows: [ChatCanvasRow] = []
         func check(_ step: String) {
             var index = 0
             for folds in [true, false] {
                 for placement in [ChatInterimReplyPlacement.inline, .fold, .hidden] {
-                    for simpleBots in [false, true] where !simpleBots || placement == .inline {
+                    // The work styles always place notes by Show reasoning (`.fold` or `.hidden`).
+                    for style in [ChatWorkStyle?.none, .full, .card, .minimal] where style == nil || placement != .inline {
                         let context = ChatTranscriptCanvasCache.DisplayContext(
                             ledgerRevision: model.activityLedgerRevision, isSending: model.isSending, isBotMode: false,
-                            foldsCompletedTurns: folds, interimReplies: placement,
-                            simpleBotsReasoning: simpleBots ? .init(agentName: "Juno", showsReasoning: true) : nil)
+                            foldsCompletedTurns: folds, interimReplies: placement, workStyle: style)
                         let kept = caches[index].buildCanvas(
                             from: model.transcriptEntries, activityEvents: { model.activityLedger.allEvents },
                             context: context, disclosures: model.activityDisclosures, readsAgentMessages: true)
                         let whole = ChatTranscriptCanvasCache.wholeCanvas(
                             from: model.transcriptEntries, activityEvents: model.activityLedger.allEvents,
                             context: context, disclosures: model.activityDisclosures, readsAgentMessages: true)
-                        let setting = "\(step): folds \(folds), \(placement), simple bots \(simpleBots)"
+                        let setting = "\(step): folds \(folds), \(placement), \(String(describing: style))"
                         if index == 0 { foldedRows = kept.rows }
                         #expect(kept.rows == whole.rows, "\(setting)")
                         #expect(kept.groupedIDs == whole.groupedIDs, "\(setting)")
@@ -228,7 +228,7 @@ struct ChatLongHistoryTests {
             if case .transcript(.completed(let turn)) = row { return turn.id }
             return nil
         }.dropFirst(2).first)
-        model.activityDisclosures.setCompletedTurnExpanded(true, id: fold)
+        model.activityDisclosures.setWorkExpanded(true, id: fold)
         check("folder opened")
         model.isSending = true
         model.acceptExternal([TimelineItem(id: "q-new", role: .human, sender: .user(snapshot: .init(name: "You")),
@@ -262,7 +262,7 @@ struct ChatLongHistoryTests {
         check("answer")
         model.isSending = false
         check("turn ended")
-        model.activityDisclosures.setCompletedTurnExpanded(false, id: fold)
+        model.activityDisclosures.setWorkExpanded(false, id: fold)
         check("folder closed")
         let folded = caches[0].turnBuildCount
         model.acceptExternal([Self.answer("a-late", "Two of them are late.", order: 504)])

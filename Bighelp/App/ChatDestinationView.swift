@@ -378,6 +378,7 @@ struct ChatDestinationView: View {
             referenceSkills: skillsAndTools,
             onReferenceSend: sendReferences.action,
             foldCompletedTurns: settings.foldCompletedTurns,
+            workStyle: settings.chatWorkStyle,
             sessionAppearance: sessionAppearance?.snapshot ?? .inherited,
             onForceRefresh: forceRefreshAction
         )

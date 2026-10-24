@@ -71,14 +71,9 @@ struct ChatToolFolderTests {
         #expect(!store.isExpanded(grown, isLive: true), "…and as more calls arrive")
     }
 
-    @Test func activeToolSettingOpensParentWithoutOpeningIndividualCalls() {
+    @Test func fullOpensTheParentWithoutOpeningIndividualCalls() {
         let store = ChatActivityDisclosureStore()
-        store.configureActiveTurn(
-            isSending: true,
-            turnID: "active-turn",
-            expandReasoning: true,
-            expandToolCalls: true
-        )
+        store.configure(style: .full)
         let parentTool = ChatActivityEvent(
             eventID: "active-parent", sessionID: "session", turnID: "active-turn",
             kind: .tool, lifecycle: .running, title: "Read file", summary: nil, detail: nil,
@@ -248,7 +243,7 @@ struct ChatToolFolderTests {
         #expect(display.last?.id == "message:\(projection.messages.last!.id)", "The answer stays outside the fold")
         // Unfolded, it shows its tools: no second "Called 2 tools" folder inside it.
         let store = ChatActivityDisclosureStore()
-        store.setCompletedTurnExpanded(true, id: folds[0].id)
+        store.setWorkExpanded(true, id: folds[0].id)
         let canvas = ChatCanvasTranscriptProjection.rows(from: display, disclosures: store)
         #expect(!canvas.contains { if case .workTrailHeader = $0 { true } else { false } })
         let tools = canvas.compactMap { row -> ChatActivityEvent? in

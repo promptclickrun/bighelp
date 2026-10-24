@@ -157,7 +157,7 @@ struct ChatAgentTalkIndex {
             switch row {
             case .entry(let entry): entries.append(entry)
             case .completed(let turn): entries += turn.entries
-            case .reasoning(let group): entries += group.entries
+            case .liveWork(let work): entries += work.entries
             }
         }
         var incoming: [(TimelineItem, AgentTalkIncomingMessage)] = []
@@ -249,7 +249,7 @@ struct ChatAgentTalkIndex {
             switch row {
             case .entry(let entry): links(entry)
             case .completed(let turn): turn.entries.contains(where: links)
-            case .reasoning(let group): group.entries.contains(where: links)
+            case .liveWork(let work): work.entries.contains(where: links)
             }
         }
     }

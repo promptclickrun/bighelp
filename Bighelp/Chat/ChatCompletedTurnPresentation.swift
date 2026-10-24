@@ -12,6 +12,8 @@ struct ChatCompletedTurn: Identifiable {
     /// What the turn did ("Searched the web, read 2 files"), for a turn
     /// without a recorded time. Nil when it has one.
     var summary: String?
+    /// How the chat draws it: a line (Full), a card (Card) or a receipt under the answer (Minimal).
+    var style: ChatWorkStyle = .full
 
     /// The fold's content in order: each folder and note as it was during
     /// the turn, so unfolding shows the same steps the reader watched.
@@ -36,31 +38,39 @@ struct ChatCompletedTurn: Identifiable {
 enum ChatTurnDisplayRow: Identifiable {
     case entry(ChatTranscriptEntry)
     case completed(ChatCompletedTurn)
-    /// Bots mode: a turn's interim messages under one "{Agent}'s reasoning" row.
-    case reasoning(ChatInterimReasoning)
+    /// Card and Minimal: the work of the turn being answered, as one block.
+    case liveWork(ChatLiveWork)
 
     var id: String {
         switch self {
         case .entry(let entry): entry.id
         case .completed(let turn): turn.id
-        case .reasoning(let group): group.id
+        case .liveWork(let work): work.id
         }
     }
 }
 
-/// The messages a bot wrote on the way to a turn's answer, in Bots mode: one folder named for the bot,
-/// its messages under it in reasoning's quiet look. Open while the turn runs (`isLive`), closed once it ends.
-struct ChatInterimReasoning: Identifiable, Equatable {
+/// The running turn's work as one block (`ChatWorkStyle.gathersLiveWork`): its tool calls, thinking and
+/// the agent's notes so far, in order. Card shows the newest of them; Minimal, one line. A tap lists them all.
+/// A note joins the block once more work follows it; until then it's the agent's newest message, under it.
+struct ChatLiveWork: Identifiable, Equatable {
+    /// Named for the turn's question, so it stays the same row as work arrives.
     let id: String
-    let agentName: String
-    var entries: [ChatTranscriptEntry]
-    var isLive = false
+    let style: ChatWorkStyle
+    let entries: [ChatTranscriptEntry]
+    /// The tool calls and helper agents the turn ran so far, shown or hidden.
+    let stepCount: Int
+    /// When the question was sent, for how long the agent has worked.
+    let startedAt: Date?
+    /// The agent is writing its answer under the block: the work is done, so the block says what it did.
+    var isAnswering = false
 }
 
-/// Where a finished turn's interim notes go. For Claude they're the only
-/// readable reasoning (its thinking is saved blank), so they follow Show
-/// reasoning, not Show tool calls: into the fold with the work, or out of
-/// sight. A turn still running keeps them in place either way.
+/// Where a turn's interim notes go. For Claude they're the only readable
+/// reasoning (its thinking is saved blank), so they follow Show reasoning,
+/// not Show tool calls: into the fold with the work, or out of sight. A turn
+/// still running keeps them in place, unless its work is one block
+/// (`ChatLiveWork`), which takes them too.
 enum ChatInterimReplyPlacement: Equatable, Sendable {
     case inline, fold, hidden
 
@@ -88,17 +98,20 @@ enum ChatCompletedTurnProjection {
         }
     }
 
+    /// `enabled`: Fold finished turns. `style`: the chat's `ChatWorkStyle`; nil in a group chat, whose
+    /// running turns stay in place and whose folds are lines.
     static func rows(
         from entries: [ChatTranscriptEntry],
         isSending: Bool,
         enabled: Bool,
         activityEvents: [ChatActivityEvent] = [],
-        interimReplies: ChatInterimReplyPlacement = .inline
+        interimReplies: ChatInterimReplyPlacement = .inline,
+        style: ChatWorkStyle? = nil
     ) -> [ChatTurnDisplayRow] {
-        let ledger = Ledger(enabled ? activityEvents : [])
+        let ledger = Ledger(enabled || style?.gathersLiveWork == true ? activityEvents : [])
         return ChatTranscriptTurn.split(entries).flatMap { turn in
             rows(ofTurn: entries[turn.range], endOrder: turn.nextQuestionOrder, isActive: turn.isLast && isSending,
-                 enabled: enabled, ledger: ledger, interimReplies: interimReplies)
+                 enabled: enabled, ledger: ledger, interimReplies: interimReplies, style: style)
         }
     }
 
@@ -110,7 +123,8 @@ enum ChatCompletedTurnProjection {
         isActive: Bool,
         enabled: Bool,
         ledger: Ledger,
-        interimReplies: ChatInterimReplyPlacement
+        interimReplies: ChatInterimReplyPlacement,
+        style: ChatWorkStyle? = nil
     ) -> [ChatTurnDisplayRow] {
         // Incremental activity updates can leave a terminal reasoning marker
         // in the cached transcript after its content has been settled away.
@@ -126,7 +140,7 @@ enum ChatCompletedTurnProjection {
                 return .activity(ChatActivityTurn(id: turn.id, events: events))
             }
         }
-        guard enabled else { return presentableEntries.map(ChatTurnDisplayRow.entry) }
+        guard enabled || style?.gathersLiveWork == true else { return presentableEntries.map(ChatTurnDisplayRow.entry) }
         var rows: [ChatTurnDisplayRow] = []
         var work = presentableEntries[...]
         var startedAt: Date?
@@ -137,15 +151,18 @@ enum ChatCompletedTurnProjection {
             startOrder = item.metadata.sourceOrder
             work = work.dropFirst()
         }
-        // Never fold the turn being delivered, including gaps between batches.
+        // A turn with no question of its own (the chat's first, or one Hermes ran) is only ever the last.
+        let anchorID = rows.first?.id ?? "turn"
         rows += fold(Array(work), isActive: isActive, startedAt: startedAt, startOrder: startOrder,
-                     endOrder: endOrder, ledger: ledger, interimReplies: interimReplies)
+                     endOrder: endOrder, ledger: ledger, interimReplies: interimReplies,
+                     foldsFinished: enabled, style: style, anchorID: anchorID)
         return rows
     }
 
     private static func fold(
         _ work: [ChatTranscriptEntry], isActive: Bool, startedAt: Date?, startOrder: Int?, endOrder: Int?,
-        ledger: Ledger, interimReplies: ChatInterimReplyPlacement
+        ledger: Ledger, interimReplies: ChatInterimReplyPlacement, foldsFinished: Bool, style: ChatWorkStyle?,
+        anchorID: String
     ) -> [ChatTurnDisplayRow] {
         let hasUnsettledContent = work.contains { entry in
             switch entry {
@@ -153,7 +170,12 @@ enum ChatCompletedTurnProjection {
             case .activity(let turn): turn.events.contains { $0.lifecycle == .running }
             }
         }
-        guard !isActive, !hasUnsettledContent, !work.isEmpty else {
+        // Never fold the turn being delivered, including gaps between batches: it stays in place,
+        // or Card and Minimal gather its work into one block. An older turn with a step that never
+        // settled stays in place too, rather than a block that says the agent is still working.
+        let isLive = isActive || hasUnsettledContent
+        let gathersLive = isActive && style?.gathersLiveWork == true
+        guard !work.isEmpty, isLive ? gathersLive : foldsFinished else {
             return work.map(ChatTurnDisplayRow.entry)
         }
         // Assistant text has no trustworthy "disposable progress" marker.
@@ -211,19 +233,33 @@ enum ChatCompletedTurnProjection {
                 }
             }
         }
-        if let foldPosition, let first = folded.first {
-            let elapsed = elapsed(work, startedAt: startedAt, startOrder: startOrder, endOrder: endOrder,
-                                  timedReasoning: ledger.timedReasoning)
-            let steps = steps(folded, startOrder: startOrder, endOrder: endOrder, chatSteps: ledger.chatSteps)
-            turnRows.insert(.completed(ChatCompletedTurn(
-                id: "completed-turn:\(first.id)",
-                entries: folded,
-                elapsedSeconds: elapsed,
-                stepCount: steps.count,
-                // Only a turn without a real time needs the words.
-                summary: elapsed == nil ? ChatToolSummary.summary(of: steps) : nil
-            )), at: foldPosition)
+        guard let foldPosition, let first = folded.first else { return turnRows }
+        let steps = steps(folded, startOrder: startOrder, endOrder: endOrder, chatSteps: ledger.chatSteps)
+        if gathersLive, let style {
+            let isAnswering = turnRows[foldPosition...].contains { row in
+                guard case .entry(.message(let item)) = row, item.role == .assistant,
+                      case .message = item.content else { return false }
+                return true
+            }
+            turnRows.insert(.liveWork(ChatLiveWork(id: "live-work:\(anchorID)", style: style, entries: folded,
+                                                   stepCount: steps.count, startedAt: startedAt,
+                                                   isAnswering: isAnswering)),
+                            at: foldPosition)
+            return turnRows
         }
+        let elapsed = elapsed(work, startedAt: startedAt, startOrder: startOrder, endOrder: endOrder,
+                              timedReasoning: ledger.timedReasoning)
+        let style = style ?? .full
+        // Minimal's receipt goes under the answer; the others sit where the work began.
+        turnRows.insert(.completed(ChatCompletedTurn(
+            id: "completed-turn:\(first.id)",
+            entries: folded,
+            elapsedSeconds: elapsed,
+            stepCount: steps.count,
+            // Only a turn without a real time needs the words.
+            summary: elapsed == nil ? ChatToolSummary.summary(of: steps) : nil,
+            style: style
+        )), at: style == .minimal ? turnRows.count : foldPosition)
         return turnRows
     }
 
@@ -330,21 +366,22 @@ struct ChatCompletedTurnView<Content: View>: View {
     let onDisclosureChange: () -> Void
     @ViewBuilder let content: (ChatTranscriptEntry) -> Content
 
-    private var isExpanded: Bool { disclosures.isCompletedTurnExpanded(turn.id) }
+    private var isExpanded: Bool { disclosures.isWorkExpanded(turn.id) }
 
     var body: some View {
         let disclosures = disclosures
         let id = turn.id
+        let expansion = Binding(get: { disclosures.isWorkExpanded(id) },
+                                set: { disclosures.setWorkExpanded($0, id: id) })
         VStack(alignment: .leading, spacing: BighelpTokens.space12) {
-            BighelpActivityRow(
-                phase: turn.phase,
-                stepCount: turn.stepCount,
-                detailsBelow: true,
-                isExpanded: Binding(get: { disclosures.isCompletedTurnExpanded(id) },
-                                    set: { disclosures.setCompletedTurnExpanded($0, id: id) }),
-                onDisclosureChange: onDisclosureChange,
-                accessibilityIdentifier: "chat.\(turn.id)"
-            )
+            switch turn.style {
+            case .minimal:
+                ChatWorkReceipt(turn: turn, isExpanded: expansion, onDisclosureChange: onDisclosureChange)
+            case .card:
+                header(expansion).modifier(ChatWorkCardSurface())
+            case .full:
+                header(expansion)
+            }
 
             if isExpanded {
                 ForEach(turn.expandedEntries) { entry in
@@ -352,5 +389,88 @@ struct ChatCompletedTurnView<Content: View>: View {
                 }
             }
         }
+    }
+
+    private func header(_ expansion: Binding<Bool>) -> some View {
+        BighelpActivityRow(
+            phase: turn.phase,
+            stepCount: turn.stepCount,
+            detailsBelow: true,
+            isExpanded: expansion,
+            onDisclosureChange: onDisclosureChange,
+            accessibilityIdentifier: "chat.\(turn.id)"
+        )
+    }
+}
+
+/// Card's soft surface, for the running turn's card and the "Worked for…" line it becomes.
+struct ChatWorkCardSurface: ViewModifier {
+    @BighelpThemeReader private var theme
+
+    func body(content: Content) -> some View {
+        content
+            .padding(.horizontal, BighelpTokens.space8)
+            .padding(.vertical, BighelpTokens.space4)
+            .background(theme.surface, in: RoundedRectangle(cornerRadius: BighelpTokens.radius16, style: .continuous))
+    }
+}
+
+/// Minimal: a finished turn's work as a small line under its answer ("18s · 4 steps"). A tap lists the
+/// steps under it.
+struct ChatWorkReceipt: View {
+    let turn: ChatCompletedTurn
+    @Binding var isExpanded: Bool
+    let onDisclosureChange: () -> Void
+    @BighelpThemeReader private var theme
+    @BighelpLoaderMotionReader private var motion
+    @State private var isHovered = false
+
+    var body: some View {
+        Button {
+            onDisclosureChange()
+            withAnimation(motion.moves ? BighelpLoaderCurve.site.animation(duration: BighelpTokens.transitionDuration)
+                                       : .easeOut(duration: BighelpTokens.stateDuration)) {
+                isExpanded.toggle()
+            }
+        } label: {
+            HStack(spacing: BighelpTokens.space4) {
+                Image(systemName: "checkmark")
+                    .font(.bighelp(.caption2, weight: .bold))
+                    .foregroundStyle(theme.success)
+                Text([Self.label(for: turn), BighelpActivitySummary.stepCountLabel(turn.stepCount)]
+                    .compactMap { $0 }.joined(separator: " "))
+                    .font(.bighelp(.caption))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .foregroundStyle(theme.tertiaryText)
+                Image(systemName: "chevron.right")
+                    .font(.bighelp(.caption2, weight: .bold))
+                    .foregroundStyle(theme.tertiaryText)
+                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                Spacer(minLength: 0)
+            }
+            .padding(.leading, BighelpTokens.space12)
+            .frame(maxWidth: .infinity, minHeight: BighelpPlatform.isMac ? BighelpTokens.scaled(28) : BighelpTokens.hitTarget,
+                   alignment: .leading)
+            .contentShape(.rect)
+            .modifier(BighelpActivityHover(isHovered: $isHovered))
+        }
+        .buttonStyle(BighelpActivityHeaderPressStyle())
+        .accessibilityLabel([BighelpActivitySummary.label(for: turn.phase),
+                             BighelpActivitySummary.stepCountLabel(turn.stepCount).map { String($0.dropFirst(2)) }]
+            .compactMap { $0 }.joined(separator: ", "))
+        .accessibilityValue(ChatActivityDisclosureAccessibility.value(isExpanded: isExpanded))
+        .accessibilityHint(isExpanded ? "Hides the steps." : "Shows the steps.")
+        .accessibilityIdentifier("chat.\(turn.id)")
+    }
+
+    /// "18s" from the turn's real time, else what it did: a receipt, so shorter than "Worked for 18s".
+    static func label(for turn: ChatCompletedTurn) -> String {
+        guard case .done(let elapsed) = turn.phase, let elapsed else { return BighelpActivitySummary.label(for: turn.phase) }
+        let seconds = Int(elapsed.rounded())
+        if seconds < 1 { return "Under 1s" }
+        if seconds < 60 { return "\(seconds)s" }
+        if seconds < 3_600 { return "\(seconds / 60)m \(seconds % 60)s" }
+        return "\(seconds / 3_600)h \((seconds % 3_600) / 60)m"
     }
 }

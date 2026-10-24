@@ -19,11 +19,8 @@ final class ChatTranscriptCanvasCache {
         let isSending: Bool
         let isBotMode: Bool
         let foldsCompletedTurns: Bool
-        let isSimpleBots: Bool
         let visibility: ChatActivityVisibility
-        let agentName: String
-        let expandReasoningDuringActiveTurn: Bool
-        let expandToolCallsDuringActiveTurn: Bool
+        let workStyle: ChatWorkStyle?
     }
 
     struct Canvas {
@@ -40,13 +37,8 @@ final class ChatTranscriptCanvasCache {
         let isBotMode: Bool
         let foldsCompletedTurns: Bool
         let interimReplies: ChatInterimReplyPlacement
-        /// Bots mode: interim messages go under the bot's reasoning folder.
-        let simpleBotsReasoning: SimpleBotsReasoning?
-    }
-
-    struct SimpleBotsReasoning: Equatable {
-        let agentName: String
-        let showsReasoning: Bool
+        /// The chat's `ChatWorkStyle`; nil in a group chat.
+        let workStyle: ChatWorkStyle?
     }
 
     private var key: Key?
@@ -108,7 +100,7 @@ final class ChatTranscriptCanvasCache {
         let isBotMode: Bool
         let foldsCompletedTurns: Bool
         let interimReplies: ChatInterimReplyPlacement
-        let simpleBotsReasoning: SimpleBotsReasoning?
+        let workStyle: ChatWorkStyle?
         let durableCardIDs: Set<String>
 
         init(_ display: DisplayContext, durableCardIDs: Set<String>) {
@@ -116,7 +108,7 @@ final class ChatTranscriptCanvasCache {
             isBotMode = display.isBotMode
             foldsCompletedTurns = display.foldsCompletedTurns
             interimReplies = display.interimReplies
-            simpleBotsReasoning = display.simpleBotsReasoning
+            workStyle = display.workStyle
             self.durableCardIDs = durableCardIDs
         }
     }
@@ -248,17 +240,12 @@ final class ChatTranscriptCanvasCache {
         disclosures: ChatActivityDisclosureStore,
         readsAgentMessages: Bool
     ) -> Canvas {
-        var displayRows = ChatCompletedTurnProjection.rows(
+        let displayRows = ChatCompletedTurnProjection.rows(
             from: ChatInterimReplies.marking(
                 ChatCardTranscriptProjection.removingSupersededLiveCards(from: transcript),
                 isSending: context.isSending, isBotMode: context.isBotMode, activityEvents: activityEvents),
             isSending: context.isSending, enabled: context.foldsCompletedTurns, activityEvents: activityEvents,
-            interimReplies: context.interimReplies)
-        if let simpleBots = context.simpleBotsReasoning {
-            displayRows = ChatInterimReplies.groupingForSimpleBots(displayRows, agentName: simpleBots.agentName,
-                                                                   showsReasoning: simpleBots.showsReasoning,
-                                                                   isSending: context.isSending)
-        }
+            interimReplies: context.interimReplies, style: context.workStyle)
         let rows = ChatCanvasTranscriptProjection.rows(from: displayRows, disclosures: disclosures,
                                                         isSending: context.isSending,
                                                         readsAgentMessages: readsAgentMessages)
@@ -312,11 +299,9 @@ final class ChatTranscriptCanvasCache {
             ? Array(entries)
             : ChatInterimReplies.marking(turn: entries, nextQuestionOrder: turn.nextQuestionOrder,
                                          inFlight: inFlight, workOrders: ledger.workOrders)
-        let rows = ChatCompletedTurnProjection.rows(
+        return ChatCompletedTurnProjection.rows(
             ofTurn: marked[...], endOrder: turn.nextQuestionOrder, isActive: inFlight,
-            enabled: context.foldsCompletedTurns, ledger: ledger.folds, interimReplies: context.interimReplies)
-        guard let simpleBots = context.simpleBotsReasoning else { return rows }
-        return ChatInterimReplies.groupingForSimpleBots(rows, agentName: simpleBots.agentName,
-                                                        showsReasoning: simpleBots.showsReasoning, isSending: inFlight)
+            enabled: context.foldsCompletedTurns, ledger: ledger.folds, interimReplies: context.interimReplies,
+            style: context.workStyle)
     }
 }

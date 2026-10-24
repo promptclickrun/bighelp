@@ -35,7 +35,7 @@ extension ChatView {
             let typing = model.botModeTypingSenders
             rows += typing.map(ChatCanvasRow.botTyping)
             if typing.isEmpty, model.isBotModeWorking { rows.append(.pending(agentName, true)) }
-        } else if showsPendingMessage {
+        } else if showsPendingMessage, !ChatCanvasTranscriptProjection.hasLiveWork(in: rows) {
             rows.append(.pending(model.workingAgentName ?? agentName, false))
         }
         if let message = model.failureMessage { rows.append(.failure(message)) }
@@ -55,9 +55,7 @@ extension ChatView {
             transcriptRevision: model.transcriptRevision, ledgerRevision: model.activityLedgerRevision,
             disclosureRevision: model.activityDisclosures.revision, isSending: model.isSending,
             isBotMode: model.isBotMode, foldsCompletedTurns: foldCompletedTurns,
-            isSimpleBots: homeChrome.isSimpleBots, visibility: model.activityVisibility, agentName: agentName,
-            expandReasoningDuringActiveTurn: expandReasoningByDefault,
-            expandToolCallsDuringActiveTurn: expandToolCallsByDefault)
+            visibility: model.activityVisibility, workStyle: workStyleInUse)
         return model.transcriptCanvas.canvas(for: key) {
             ChatPerformanceProbe.measure("chat.projection") {
                 model.transcriptCanvas.buildCanvas(from: model.transcriptEntries,
@@ -303,18 +301,22 @@ extension ChatView {
         let prompts = (model.nativeConversationClient ?? directHermesClient)?.prompts ?? []
         return ChatActivityWaiting.resolve(prompts: prompts, events: turn.events)
     }
+    /// What the running turn's block is paused on, like a live tool folder (`activityWaiting(for:)`).
+    private func liveWorkWaiting(for work: ChatLiveWork) -> ChatActivityWaiting? {
+        let events = work.entries.flatMap { entry -> [ChatActivityEvent] in
+            guard case .activity(let turn) = entry else { return [] }
+            return turn.events
+        }
+        return activityWaiting(for: ChatActivityTurn(id: work.id, events: events))
+    }
     private var transcriptDisplayContext: ChatTranscriptCanvasCache.DisplayContext {
-        // Bots mode keeps interim messages out of the "Worked for" fold: they go under the
-        // bot's own reasoning row instead (`groupingForSimpleBots`).
-        let simpleBots = homeChrome.isSimpleBots && !model.isBotMode
-        return ChatTranscriptCanvasCache.DisplayContext(
+        ChatTranscriptCanvasCache.DisplayContext(
             ledgerRevision: model.activityLedgerRevision,
             isSending: model.isSending,
             isBotMode: model.isBotMode,
             foldsCompletedTurns: foldCompletedTurns,
-            interimReplies: simpleBots ? .inline : .following(model.activityVisibility),
-            simpleBotsReasoning: simpleBots
-                ? .init(agentName: agentName, showsReasoning: model.activityVisibility.showReasoning) : nil)
+            interimReplies: .following(model.activityVisibility),
+            workStyle: workStyleInUse)
     }
     @ViewBuilder
     private func transcriptRow(_ row: ChatTurnDisplayRow) -> some View {
@@ -330,12 +332,14 @@ extension ChatView {
                 transcriptEntry(entry)
             }
             .id(row.id)
-        case .reasoning(let group):
+        case .liveWork(let work):
             let disclosures = model.activityDisclosures
-            ChatInterimReasoningHeader(
-                agentName: group.agentName,
-                isExpanded: Binding(get: { disclosures.isExpanded(group) },
-                                    set: { disclosures.setExpanded($0, for: group) }),
+            ChatLiveWorkView(
+                work: work,
+                agentName: model.workingAgentName ?? agentName,
+                waiting: liveWorkWaiting(for: work),
+                isExpanded: Binding(get: { disclosures.isWorkExpanded(work.id) },
+                                    set: { disclosures.setWorkExpanded($0, id: work.id) }),
                 onDisclosureChange: beginDisclosureReview
             )
             .id(row.id)

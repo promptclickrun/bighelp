@@ -64,101 +64,17 @@ struct ChatInterimRepliesTests {
         #expect(interimIDs(ChatInterimReplies.marking(finishing, isSending: true, isBotMode: false)) == ["note"])
         let ownTurn = [human("q"), answer("answer"), work("w2"), answer("follow-up")]
         #expect(interimIDs(ChatInterimReplies.marking(ownTurn, isSending: false, isBotMode: false)).isEmpty)
-        let rows = ChatInterimReplies.groupingForSimpleBots(
-            ChatCompletedTurnProjection.rows(from: ChatInterimReplies.marking(ownTurn, isSending: false, isBotMode: false),
-                                             isSending: false, enabled: false, interimReplies: .inline),
-            agentName: "Avery", showsReasoning: false)
-        #expect(rows.map(\.id) == ["message:q", "message:answer", "activity:w2", "message:follow-up"])
+        let rows = ChatCompletedTurnProjection.rows(
+            from: ChatInterimReplies.marking(ownTurn, isSending: false, isBotMode: false),
+            isSending: false, enabled: true, interimReplies: .hidden, style: .card)
+        #expect(rows.map(\.id) == ["message:q", "message:answer", "completed-turn:activity:w2", "message:follow-up"],
+                "Both answers show, even with reasoning hidden")
     }
 
     @Test func roomRepliesAreEachAgentsAnswer() {
         let entries = [human("q"), reply("a"), work("w"), reply("b")]
         #expect(interimIDs(ChatInterimReplies.marking(entries, isSending: false, isBotMode: true)).isEmpty)
     }
-
-    /// Bots mode: a turn's interim messages go under one "{Agent}'s reasoning" row where the first
-    /// was, shown with Show reasoning on and hidden with it off. The message that ends the turn is its
-    /// answer and always shows.
-    @Test func simpleBotChatsGroupInterimMessagesUnderTheBotsReasoning() {
-        func ids(_ rows: [ChatTurnDisplayRow]) -> [String] { rows.map(\.id) }
-        let entries = [human("q"), reply("a"), work("w1"), reply("b"), work("w2"), reply("answer")]
-        let rows = ChatCompletedTurnProjection.rows(
-            from: ChatInterimReplies.marking(entries, isSending: false, isBotMode: false),
-            isSending: false, enabled: false, interimReplies: .inline)
-
-        let shown = ChatInterimReplies.groupingForSimpleBots(rows, agentName: "Avery", showsReasoning: true)
-        #expect(ids(shown) == ["message:q", "reasoning:a", "activity:w1", "activity:w2", "message:answer"])
-        guard case .reasoning(let group)? = shown.first(where: { $0.id == "reasoning:a" }) else {
-            Issue.record("No reasoning row")
-            return
-        }
-        #expect(group.agentName == "Avery")
-        #expect(group.entries.map(\.id) == ["message:a", "message:b"])
-
-        let hidden = ChatInterimReplies.groupingForSimpleBots(rows, agentName: "Avery", showsReasoning: false)
-        #expect(ids(hidden) == ["message:q", "activity:w1", "activity:w2", "message:answer"],
-                "The answer shows even with reasoning hidden")
-
-        // While the bot works, its newest message stays a message until more work follows it.
-        let working = ChatCompletedTurnProjection.rows(
-            from: ChatInterimReplies.marking([human("q"), reply("a"), work("w"), reply("latest")],
-                                             isSending: true, isBotMode: false),
-            isSending: true, enabled: false, interimReplies: .inline)
-        #expect(ids(ChatInterimReplies.groupingForSimpleBots(working, agentName: "Avery", showsReasoning: false))
-                == ["message:q", "activity:w", "message:latest"])
-    }
-
-    /// The reasoning row is one folder: open while its turn runs, closed in place when the turn ends.
-    /// The reader can open or close it at any time; a choice made during the turn ends with the turn.
-    @Test func simpleBotReasoningIsAFolderThatClosesWhenTheTurnEnds() throws {
-        func group(_ rows: [ChatTurnDisplayRow]) throws -> ChatInterimReasoning {
-            guard case .reasoning(let group)? = rows.first(where: { $0.id == "reasoning:a" }) else {
-                throw ReasoningRowMissing()
-            }
-            return group
-        }
-        func grouped(_ entries: [ChatTranscriptEntry], isSending: Bool) -> [ChatTurnDisplayRow] {
-            ChatInterimReplies.groupingForSimpleBots(
-                ChatCompletedTurnProjection.rows(
-                    from: ChatInterimReplies.marking(entries, isSending: isSending, isBotMode: false),
-                    isSending: isSending, enabled: true, interimReplies: .inline),
-                agentName: "Avery", showsReasoning: true, isSending: isSending)
-        }
-        let running = grouped([human("q"), reply("a"), work("w"), reply("b"), work("w2")], isSending: true)
-        let finished = grouped([human("q"), reply("a"), work("w"), reply("b"), work("w2"), reply("answer")],
-                               isSending: false)
-        #expect(try group(running).isLive)
-        #expect(try !group(finished).isLive)
-        // An earlier turn's reasoning is finished even while a later turn runs.
-        let later = grouped([human("q"), reply("a"), work("w"), reply("answer"), human("q2"), reply("c"), work("w3")],
-                            isSending: true)
-        #expect(try !group(later).isLive)
-
-        let store = ChatActivityDisclosureStore()
-        #expect(store.isExpanded(try group(running)), "Open while the bot works")
-        #expect(!store.isExpanded(try group(finished)), "Closed in place when the turn ends")
-
-        func notes(_ rows: [ChatTurnDisplayRow]) -> [String] {
-            ChatCanvasTranscriptProjection.rows(from: rows, disclosures: store).compactMap { row in
-                guard case .transcript(.entry(.message(let item))) = row, item.metadata.isInterimReply else { return nil }
-                return row.id
-            }
-        }
-        #expect(notes(running) == ["message:a", "message:b"])
-        #expect(notes(finished).isEmpty, "A closed folder hides its notes")
-        #expect(ChatCanvasTranscriptProjection.rows(from: finished, disclosures: store)
-            .contains { $0.id == "reasoning:a" }, "The folder itself stays where it was")
-
-        store.setExpanded(false, for: try group(running))
-        #expect(!store.isExpanded(try group(running)), "The reader can close it while the bot works")
-        store.setExpanded(true, for: try group(running))
-        #expect(!store.isExpanded(try group(finished)), "A choice made during the turn ends with it")
-        store.setExpanded(true, for: try group(finished))
-        #expect(store.isExpanded(try group(finished)), "The reader can open it after the turn")
-        #expect(notes(finished) == ["message:a", "message:b"])
-    }
-
-    private struct ReasoningRowMissing: Error {}
 
     /// With tool calls hidden the transcript shows no work, but the agent kept
     /// working after its notes (Claude's thinking arrives blank, so the notes

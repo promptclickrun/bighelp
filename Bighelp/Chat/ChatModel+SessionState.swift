@@ -119,6 +119,7 @@ extension ChatModel {
     /// background task beside the running turn, so a new request never waits for the last
     /// one. Returns the answer for the call.
     func runNativeVoiceRequest(_ message: String) async throws -> String {
+        guard !referenceOwnerRetired, !isBotMode else { throw ChatQueuedSubmissionError.busy }
         if let native = nativeConversationClient, isSending || native.sessionActionsAreRunning {
             return try await native.runBackgroundTask(message)
         }

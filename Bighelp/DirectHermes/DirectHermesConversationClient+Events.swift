@@ -6,6 +6,11 @@ extension DirectHermesConversationClient {
     /// running turn, and returns the task's answer. Live voice uses it while the chat is busy,
     /// so a new request never waits for the one before it.
     func runBackgroundTask(_ text: String) async throws -> String {
+        // A chat catching up can't take it yet; it waits, as a turn does.
+        if let admission = rpc as? any DirectHermesAdmissionPreparing {
+            try await admission.prepareForAdmission()
+        }
+        try await awaitHydrationIfNeeded()
         let owner = generation
         let receipt = try await sessionActions.startBackgroundTask(text)
         guard connected, generation == owner else { throw DirectHermesError.notConnected }

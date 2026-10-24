@@ -314,9 +314,10 @@ struct DirectHermesVoiceClientTests {
         conversation.receive(.init(type: "message.start", sessionID: "voice-runtime", payload: [:], sequence: 1))
 
         let answer = Task { try await chat.runNativeVoiceRequest("What's the weather tomorrow?") }
-        for _ in 0..<100 where rpc.requests.isEmpty { await Task.yield() }
-        #expect(rpc.requests.map(\.method) == ["prompt.background"])
-        #expect(rpc.requests.first?.params["text"] == .string("What's the weather tomorrow?"))
+        let background = { rpc.requests.filter { $0.method == "prompt.background" } }
+        for _ in 0..<100 where background().isEmpty { await Task.yield() }
+        #expect(background().map { $0.params["text"] } == [.string("What's the weather tomorrow?")])
+        #expect(!rpc.requests.contains { $0.method == "prompt.submit" }, "no second turn in the busy chat")
 
         // Another task's answer is not this one's.
         conversation.receive(.init(type: "background.complete", sessionID: "voice-runtime",
@@ -338,6 +339,7 @@ struct DirectHermesVoiceClientTests {
 
         let answer = Task { try await conversation.runBackgroundTask("Check my inbox") }
         for _ in 0..<100 where conversation.backgroundTaskWaiters.isEmpty { await Task.yield() }
+        #expect(!conversation.backgroundTaskWaiters.isEmpty, "the task was accepted and its answer awaited")
         conversation.suspend()
         await #expect(throws: DirectHermesError.notConnected) { try await answer.value }
     }

@@ -66,6 +66,49 @@ struct DirectHermesReconnectParityTests {
     }
 }
 
+extension DirectHermesReconnectParityTests {
+    @Test func aReclaimDuringCatchUpReleasesAMessageWaitingForIt() async throws {
+        @MainActor final class Released { var done = false }
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let rpc = HeldReplayRPC()
+        let client = try DirectHermesConversationClient(rpc: rpc, hostIdentity: "host", profile: "research",
+            runtimeID: "runtime", storedID: "saved", title: "Chat", epoch: "epoch", drafts: .init(root: root))
+        let recovery = Task { try await client.recover(epoch: "epoch") }
+        for _ in 0..<100 where !rpc.isHolding { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(client.isHydrating)
+
+        // A message sent now waits for the catch-up (`isAwaitingCatchUp` keeps Send off meanwhile).
+        let released = Released()
+        let waiter = Task {
+            defer { released.done = true }
+            try await client.awaitHydrationIfNeeded()
+        }
+        for _ in 0..<10 { await Task.yield() }
+        client.receive(.init(type: "session.reclaimed", sessionID: nil, payload: [
+            "session_id": .string("runtime"), "stored_session_id": .string("saved"), "reason": .string("reassigned")], sequence: nil))
+        for _ in 0..<100 where !released.done { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(released.done, "Hermes taking the session back must release the message waiting for the catch-up.")
+        if released.done { await #expect(throws: (any Error).self) { try await waiter.value } }
+        rpc.release()
+        _ = try? await recovery.value
+    }
+}
+
+/// Holds `session.events.since`, so a catch-up stays under way until `release()`.
+@MainActor
+private final class HeldReplayRPC: DirectHermesRPC {
+    var onEvent: ((DirectHermesEvent) -> Void)?
+    private var held: CheckedContinuation<Void, Never>?
+    var isHolding: Bool { held != nil }
+    func request(_ method: String, params: [String: BighelpJSONValue]) async throws -> BighelpJSONValue {
+        await withCheckedContinuation { held = $0 }
+        throw DirectHermesError.notConnected
+    }
+    func release() { let pending = held; held = nil; pending?.resume() }
+    func disconnect() async {}
+}
+
 @MainActor
 private final class ReconnectParityRPC: DirectHermesRPC {
     var onEvent: ((DirectHermesEvent) -> Void)?

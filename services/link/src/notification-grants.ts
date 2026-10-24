@@ -11,16 +11,43 @@ import {
   buzzKitRecipientExternalId,
   deleteBuzzKitSubscriber,
   readBuzzKitReadiness,
+  richMessage,
+  sealedMessage,
   sendBuzzKitLiveActivity,
-  sendBuzzKitSignInWake,
-  sendBuzzKitRichNotification,
-  sendBuzzKitSealedNotification,
+  sendBuzzKitMessage,
   sendBuzzKitTestNotification,
+  signInWakeMessage,
+  testNotificationBody,
   type BuzzKitAgentAvatar,
   type BuzzKitAssetMimeType,
   type BuzzKitRichNotificationEvent,
   type BuzzKitSealedNotificationEvent,
+  type ManagedMessage,
 } from "./buzzkit.js";
+import { logPush } from "./push-telemetry.js";
+import {
+  deliverLiveActivity,
+  deliverMessage,
+  deliverTest,
+  type DeliveryEnv,
+  type DeliveryOwner,
+  type LiveActivityMessage,
+} from "./push-delivery.js";
+import {
+  ACTIVITY_ID_PATTERN,
+  allowTargetWrite,
+  APP_VERSION_PATTERN,
+  deleteInstallationPushState,
+  deletePushTarget,
+  isMissingPushTable,
+  parseMutedTopics,
+  purgeExpiredPushState,
+  putPushTarget,
+  pushTokenKeyConfigured,
+  TOKEN_PATTERN,
+  type PushTargetInput,
+  type PushTargetKind,
+} from "./push-targets.js";
 
 export interface NotificationGrant {
   grantId: string;
@@ -97,7 +124,7 @@ export interface ManagedNotificationStateBinding {
   retireNotificationScope(): Promise<void>;
 }
 
-interface GrantRow {
+export interface GrantRow {
   grant_id: string;
   owner_kind: "account" | "notification-instance";
   owner_coordinate: string;
@@ -122,6 +149,8 @@ const IDENTITY_PATH = `${ROOT}/buzzkit/identity`;
 const STATUS_PATH = `${ROOT}/buzzkit/status`;
 const ACCOUNT_BINDING_PATH = "/v1/notifications/installations/current/account-binding";
 const ASSET_ROOT = "/v1/notifications/buzzkit/assets";
+const PUSH_TARGET_PATH = "/v1/notifications/push-target";
+const LIVE_ACTIVITY_TARGET_PATH = "/v1/notifications/live-activity-target";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const PROFILE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
@@ -144,7 +173,7 @@ const MAX_NOTIFICATION_TEXT = 1_600;
 const MAX_SEALED_BYTES = 2_300;
 const ASSET_CAPABILITY_SECONDS = 1_200;
 
-class NotificationError extends Error {
+export class NotificationError extends Error {
   constructor(readonly status: number, readonly code: string) {
     super(code);
   }
@@ -197,11 +226,11 @@ function publicGrant(row: GrantRow): NotificationGrant {
   return { ...JSON.parse(row.public_json) as NotificationGrant, state: row.state, revision: row.revision };
 }
 
-function stateBinding(env: LinkEnv, ownerCoordinate: string): ManagedNotificationStateBinding {
+export function notificationStateBinding(env: LinkEnv, ownerCoordinate: string): ManagedNotificationStateBinding {
   return env.USER_LINKS.getByName(ownerCoordinate) as unknown as ManagedNotificationStateBinding;
 }
 
-async function load(env: LinkEnv, id: string): Promise<GrantRow> {
+export async function loadNotificationGrant(env: LinkEnv, id: string): Promise<GrantRow> {
   const row = await env.ACCOUNTS.prepare(`
     SELECT grant_id,'notification-instance' AS owner_kind,
       notification_coordinate AS owner_coordinate,installation_id AS credential_id,
@@ -316,7 +345,7 @@ async function bindWakeInstallation(
     .bind(body.grantId, installation.ownerCoordinate, installation.credentialId)
     .first<GrantRow>();
   if (!row) return fail(403, "notification_grant_inactive");
-  const grant = await active(env, row, now);
+  const grant = await requireActiveGrant(env, row, now);
 
   const result = await env.ACCOUNTS.prepare(`INSERT INTO notification_account_installations(
       installation_id,notification_coordinate,account_coordinate,account_device_id,
@@ -378,7 +407,7 @@ function owner(row: GrantRow, auth: NotificationPrincipal) {
   }
 }
 
-async function active(env: LinkEnv, row: GrantRow, now: number, allowIssued = false): Promise<NotificationGrant> {
+export async function requireActiveGrant(env: LinkEnv, row: GrantRow, now: number, allowIssued = false): Promise<NotificationGrant> {
   const grant = publicGrant(row);
   if (grant.provider !== "buzzkit" || grant.subscriberScope !== row.owner_kind
       || grant.state === "revoked" || (!allowIssued && grant.state !== "active") || grant.expiresAt <= now) {
@@ -487,7 +516,7 @@ async function finalOwnerDecision(
   activity?: NotificationActivity,
 ): Promise<void> {
   try {
-    await stateBinding(env, principal.ownerCoordinate).authorizeNotificationEgress({
+    await notificationStateBinding(env, principal.ownerCoordinate).authorizeNotificationEgress({
       ownerKind: principal.ownerKind,
       credentialId: principal.credentialId,
       authorizationEpoch: principal.authorizationEpoch,
@@ -511,7 +540,7 @@ async function finalOwnerDecision(
   }
 }
 
-async function requireNotificationEgressActive(env: LinkEnv, row: GrantRow): Promise<void> {
+export async function requireNotificationEgressActive(env: LinkEnv, row: GrantRow): Promise<void> {
   const authority = await readNotificationEgressAuthority(env, row);
   assertNotificationEgressAuthority(authority);
   await finalOwnerDecision(env, {
@@ -560,7 +589,7 @@ async function requireNotificationPrincipalEgressActive(
   await finalOwnerDecision(env, principal);
 }
 
-async function requireNotificationActivityEgressActive(
+export async function requireNotificationActivityEgressActive(
   env: LinkEnv,
   row: GrantRow,
   expected: NotificationActivity,
@@ -621,7 +650,7 @@ async function revoke(
   const table = row.owner_kind === "account" ? "notification_grants" : "notification_instance_grants";
   // Retire the monotonic owner record first. A stale D1 snapshot can no longer
   // seed active authority after this serialized Durable Object mutation.
-  const owner = stateBinding(env, row.owner_coordinate);
+  const owner = notificationStateBinding(env, row.owner_coordinate);
   const retirement = {
     grantId: row.grant_id,
     credentialId: row.credential_id,
@@ -636,7 +665,7 @@ async function revoke(
   await env.ACCOUNTS.prepare(
     `UPDATE ${table} SET state='revoked',revision=revision+1 WHERE grant_id=? AND state!='revoked'`,
   ).bind(row.grant_id).run();
-  return publicGrant(await load(env, row.grant_id));
+  return publicGrant(await loadNotificationGrant(env, row.grant_id));
 }
 
 export async function beginNotificationDeviceRevocation(
@@ -722,6 +751,15 @@ export async function revokeNotificationInstallationGrants(
   coordinate: string,
   installationId: string,
 ): Promise<void> {
+  // Push tokens go first. The installation is already revoked, so no send can
+  // reach them, but there is no reason to keep them. A hiccup here must never
+  // stop the revocation: the egress checks refuse a revoked installation anyway,
+  // and the rows expire.
+  try {
+    await deleteInstallationPushState(env, installationId);
+  } catch {
+    logPush("cleanup_failed", "push_state");
+  }
   const rows = await env.ACCOUNTS.prepare(`SELECT grant_id,'notification-instance' AS owner_kind,
       notification_coordinate AS owner_coordinate,installation_id AS credential_id,
       authorization_epoch,request_digest,public_json,revision,state,expires_at
@@ -739,7 +777,7 @@ async function retireAccountNotificationAuthorityWithMode(
 ): Promise<void> {
   // Make the owner irrevocably retired before the D1 directory marker commits.
   // Final sends serialize behind this call even when they already read D1.
-  await stateBinding(env, account).retireNotificationScope();
+  await notificationStateBinding(env, account).retireNotificationScope();
   await env.ACCOUNTS.prepare(`INSERT INTO notification_account_scope_retirements(
     account_coordinate,retired_at) VALUES (?,?) ON CONFLICT(account_coordinate) DO NOTHING`)
     .bind(account, now).run();
@@ -795,7 +833,7 @@ async function serveAsset(request: Request, env: LinkEnv, now: number): Promise<
   if (!/^[A-Za-z0-9_-]{22,256}$/.test(accountCoordinate)) {
     return response({ version: 1, error: { code: "notification_asset_unknown" } }, 404);
   }
-  const asset = await stateBinding(env, accountCoordinate).notificationAsset({
+  const asset = await notificationStateBinding(env, accountCoordinate).notificationAsset({
     assetId: assetMatch[1]!,
     now,
   });
@@ -937,6 +975,7 @@ function sealedEvent(
     sealed,
     avatar: { mimeType: "application/octet-stream", sha256: avatar.sha256, data: avatar.data },
     sound: body.sound,
+    occurredAt: body.occurredAt,
   };
 }
 
@@ -958,7 +997,7 @@ async function persistAvatar(
   const sha = Array.from(await digest(data), (byte) => byte.toString(16).padStart(2, "0")).join("");
   if (sha !== avatar.sha256) return fail(422, "notification_avatar_invalid");
   const assetId = notificationBase64(await digest(data));
-  const asset = await stateBinding(env, accountCoordinate).putNotificationAsset({
+  const asset = await notificationStateBinding(env, accountCoordinate).putNotificationAsset({
     assetId,
     mimeType: avatar.mimeType,
     data,
@@ -1041,16 +1080,134 @@ async function verifyAssetCapability(
   );
 }
 
+/**
+ * The phone's own push token, for direct APNs delivery. Signed by the
+ * notification installation like every other installation route. Account
+ * credentials are refused: a token belongs to one installation.
+ */
+async function handlePushTarget(
+  request: Request,
+  env: LinkEnv,
+  ctx: ExecutionContext | undefined,
+  path: string,
+  raw: Uint8Array,
+  body: Record<string, unknown>,
+  now: number,
+): Promise<Response> {
+  if (request.method !== "PUT" && request.method !== "DELETE") return fail(405, "notification_method_invalid");
+  const auth = await mobile(env, request, raw, now);
+  if (auth.ownerKind !== "notification-instance") return fail(403, "notification_scope_invalid");
+  const invalid = (): never => fail(400, "notification_push_target_invalid");
+  const keys = Object.keys(body).sort().join(",");
+  const environment = body.environment;
+  let kind: PushTargetKind = "alert";
+  let activityId = "";
+  let input: PushTargetInput | null = null;
+
+  if (path === PUSH_TARGET_PATH) {
+    if (body.version !== 1) invalid();
+    if (request.method === "PUT") {
+      const mutedTopics = parseMutedTopics(body.mutedTopics);
+      if (keys !== "appVersion,environment,mutedTopics,token,version" || typeof body.token !== "string"
+          || !TOKEN_PATTERN.test(body.token) || (environment !== "sandbox" && environment !== "production")
+          || typeof body.appVersion !== "string" || !APP_VERSION_PATTERN.test(body.appVersion)
+          || mutedTopics === null) invalid();
+      input = {
+        kind, activityId, token: body.token as string, environment: environment as "sandbox" | "production",
+        appVersion: body.appVersion as string, mutedTopics: mutedTopics!,
+      };
+    } else if (keys !== "version") invalid();
+  } else {
+    kind = body.kind === "liveactivity" || body.kind === "pts" ? body.kind : invalid();
+    if (body.version !== 1) invalid();
+    if (kind === "liveactivity") {
+      if (typeof body.activityId !== "string" || !ACTIVITY_ID_PATTERN.test(body.activityId)) invalid();
+      activityId = body.activityId as string;
+    }
+    const fields = kind === "liveactivity" ? "activityId,kind,version" : "kind,version";
+    if (request.method === "PUT") {
+      if (keys !== (kind === "liveactivity" ? "activityId,environment,kind,token,version" : "environment,kind,token,version")
+          || typeof body.token !== "string" || !TOKEN_PATTERN.test(body.token)
+          || (environment !== "sandbox" && environment !== "production")) invalid();
+      input = {
+        kind, activityId, token: body.token as string, environment: environment as "sandbox" | "production",
+        appVersion: "",
+      };
+    } else if (keys !== fields) invalid();
+  }
+
+  const target = { installationId: auth.credentialId, ownerCoordinate: auth.ownerCoordinate };
+  try {
+    // Small, bounded housekeeping; it never delays the answer.
+    const purge = () => {
+      const pending = purgeExpiredPushState(env, now).catch(() => undefined);
+      try { ctx?.waitUntil(pending); } catch { /* the request is already over */ }
+    };
+    if (request.method === "DELETE") {
+      await deletePushTarget(env, target.installationId, kind, activityId);
+      purge();
+      return response({ version: 1, target: null });
+    }
+    if (!pushTokenKeyConfigured(env)) return fail(503, "notification_push_target_unavailable");
+    if (!await allowTargetWrite(env, auth.credentialId, kind, activityId, now)) {
+      return fail(429, "notification_push_target_rate_limited");
+    }
+    const stored = await putPushTarget(env, {
+      installationId: auth.credentialId, ownerCoordinate: auth.ownerCoordinate,
+      authorizationEpoch: auth.authorizationEpoch,
+    }, input!, now);
+    if (!stored) return fail(403, "notification_credentials_revoked");
+    purge();
+    return response({
+      version: 1,
+      target: {
+        kind,
+        ...(kind === "liveactivity" ? { activityId } : {}),
+        environment: input!.environment,
+        updatedAt: stored.updatedAt,
+      },
+    });
+  } catch (error) {
+    // Migration 0010 isn't applied yet: the app tries again later.
+    if (isMissingPushTable(error)) return fail(503, "notification_push_target_unavailable");
+    throw error;
+  }
+}
+
+function deliveryOwner(row: GrantRow): DeliveryOwner {
+  return { kind: row.owner_kind, coordinate: row.owner_coordinate, credentialId: row.credential_id };
+}
+
+/** Sends an alert or wake by direct APNs when it can, otherwise through BuzzKit. */
+function deliver(
+  env: LinkEnv,
+  ctx: ExecutionContext | undefined,
+  row: GrantRow,
+  grantId: string,
+  kind: "alert" | "wake",
+  eventType: string,
+  message: ManagedMessage,
+) {
+  const authorize = () => requireNotificationEgressActive(env, row);
+  return deliverMessage({
+    env: env as unknown as DeliveryEnv, ctx, owner: deliveryOwner(row), grantId, kind, eventType,
+    message, authorize,
+    sendViaBuzzKit: () => sendBuzzKitMessage(env, row.owner_coordinate, row.owner_kind, message, authorize),
+  });
+}
+
 export async function handleNotificationRequest(
   request: Request,
   env: LinkEnv,
   now: number,
+  ctx?: ExecutionContext,
 ): Promise<Response | null> {
   const url = new URL(request.url);
   try {
     const assetResponse = await serveAsset(request, env, now);
     if (assetResponse) return assetResponse;
-    if (!(url.pathname === ROOT || url.pathname.startsWith(`${ROOT}/`)
+    const pushTargetRoute = url.pathname === PUSH_TARGET_PATH || url.pathname === LIVE_ACTIVITY_TARGET_PATH;
+    if (!(pushTargetRoute || url.pathname === ROOT || url.pathname.startsWith(`${ROOT}/`)
         || url.pathname === ACCOUNT_BINDING_PATH)) return null;
     if (url.search || url.hash) return fail(400, "notification_path_invalid");
     const raw = await rawBody(request);
@@ -1058,13 +1215,19 @@ export async function handleNotificationRequest(
     if (raw.length) {
       try {
         const value: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(raw));
-        if (!value || typeof value !== "object" || Array.isArray(value)) return fail(400, "notification_request_invalid");
+        if (!value || typeof value !== "object" || Array.isArray(value)) {
+          return fail(400, pushTargetRoute ? "notification_push_target_invalid" : "notification_request_invalid");
+        }
         body = value as Record<string, unknown>;
-      } catch { return fail(400, "notification_request_invalid"); }
+      } catch { return fail(400, pushTargetRoute ? "notification_push_target_invalid" : "notification_request_invalid"); }
     }
 
     if (url.pathname === ACCOUNT_BINDING_PATH) {
       return await bindWakeInstallation(request, raw, body, env, now);
+    }
+
+    if (pushTargetRoute) {
+      return await handlePushTarget(request, env, ctx, url.pathname, raw, body, now);
     }
 
     if (url.pathname === IDENTITY_PATH) {
@@ -1119,12 +1282,20 @@ export async function handleNotificationRequest(
       if (body.version !== 1 || typeof body.requestId !== "string" || !UUID.test(body.requestId)) {
         return fail(400, "notification_test_invalid");
       }
+      const authorize = () => requireNotificationPrincipalEgressActive(env, auth);
+      const requestId = body.requestId;
       return response({
         version: 1,
-        test: await sendBuzzKitTestNotification(
-          env, auth.ownerCoordinate, body.requestId, auth.ownerKind,
-          () => requireNotificationPrincipalEgressActive(env, auth),
-        ),
+        test: await deliverTest({
+          env: env as unknown as DeliveryEnv, ctx,
+          owner: { kind: auth.ownerKind, coordinate: auth.ownerCoordinate, credentialId: auth.credentialId },
+          requestId,
+          body: testNotificationBody(requestId),
+          authorize,
+          sendViaBuzzKit: () => sendBuzzKitTestNotification(
+            env, auth.ownerCoordinate, requestId, auth.ownerKind, authorize,
+          ),
+        }),
       });
     }
 
@@ -1253,7 +1424,7 @@ export async function handleNotificationRequest(
     const parts = url.pathname.slice(ROOT.length + 1).split("/");
     const id = parts[0]!;
     if (!UUID.test(id)) return fail(404, "notification_grant_unknown");
-    let row = await load(env, id);
+    let row = await loadNotificationGrant(env, id);
     const activityId = parts[2];
     const isActivity = parts[1] === "live-activities" && typeof activityId === "string" && IDENTIFIER.test(activityId);
     const mobileRequest = (parts.length === 1 && request.method === "DELETE")
@@ -1270,13 +1441,13 @@ export async function handleNotificationRequest(
         }
         return response({ version: 1, grant: await revoke(env, row) });
       }
-      const grant = await active(env, row, now);
+      const grant = await requireActiveGrant(env, row, now);
       if (request.method === "DELETE") {
         exact(body, ["version", "revision", "timestamp"]);
         if (body.version !== 2 || !integer(body.revision) || !integer(body.timestamp)) {
           return fail(400, "notification_activity_invalid");
         }
-        const activity = await stateBinding(env, row.owner_coordinate).revokeNotificationActivity({
+        const activity = await notificationStateBinding(env, row.owner_coordinate).revokeNotificationActivity({
           grantId: grant.grantId,
           activityId: activityId!,
           revision: body.revision,
@@ -1298,7 +1469,7 @@ export async function handleNotificationRequest(
           || !integer(body.timestamp) || !integer(body.leaseExpires) || body.leaseExpires > grant.expiresAt) {
         return fail(400, "notification_activity_invalid");
       }
-      const activity = await stateBinding(env, row.owner_coordinate).registerNotificationActivity({
+      const activity = await notificationStateBinding(env, row.owner_coordinate).registerNotificationActivity({
         grantId: grant.grantId,
         activityId: activityId!,
         sessionReference: String(body.sessionReference),
@@ -1323,47 +1494,41 @@ export async function handleNotificationRequest(
       if (body.version !== 2 || typeof body.idempotencyKey !== "string" || !UUID.test(body.idempotencyKey)) {
         fail(400, "notification_request_invalid");
       }
-      await active(env, row, now, true);
+      await requireActiveGrant(env, row, now, true);
       const table = row.owner_kind === "account" ? "notification_grants" : "notification_instance_grants";
       await env.ACCOUNTS.prepare(`UPDATE ${table} SET state='active' WHERE grant_id=? AND state='issued'`)
         .bind(id).run();
-      row = await load(env, id);
-      return response({ version: 1, grant: await active(env, row, now) });
+      row = await loadNotificationGrant(env, id);
+      return response({ version: 1, grant: await requireActiveGrant(env, row, now) });
     }
 
-    const grant = await active(env, row, now);
+    const grant = await requireActiveGrant(env, row, now);
     if (parts.length === 1 && request.method === "GET") return response({ version: 1, grant });
     if (parts.length === 2 && parts[1] === "events" && request.method === "POST" && body.version === 3) {
       const event = sealedEvent(body, grant, now);
       const avatar = await persistAvatar(request, env, row.owner_coordinate, event.avatar, now);
-      const receipt = await sendBuzzKitSealedNotification(
-        env, row.owner_coordinate, event, avatar, row.owner_kind,
-        () => requireNotificationEgressActive(env, row),
-      );
+      const receipt = await deliver(env, ctx, row, grant.grantId, "alert", event.eventType,
+        sealedMessage(event, avatar));
       return response({ version: 1, ...receipt }, 202);
     }
     if (parts.length === 2 && parts[1] === "wake" && request.method === "POST") {
       exact(body, ["version", "reason"]);
       if (body.version !== 1 || body.reason !== "renew-sign-in") fail(400, "notification_request_invalid");
-      const receipt = await sendBuzzKitSignInWake(
-        env, row.owner_coordinate, grant.grantId, row.owner_kind, now,
-        () => requireNotificationEgressActive(env, row),
-      );
+      const receipt = await deliver(env, ctx, row, grant.grantId, "wake", "wake",
+        signInWakeMessage(grant.grantId, now));
       return response({ version: 1, ...receipt }, 202);
     }
     if (parts.length === 2 && parts[1] === "events" && request.method === "POST") {
       const event = richEvent(body, grant, now);
       const avatar = await persistAvatar(request, env, row.owner_coordinate, event.agent.avatar, now);
-      const receipt = await sendBuzzKitRichNotification(
-        env, row.owner_coordinate, event, avatar, row.owner_kind,
-        () => requireNotificationEgressActive(env, row),
-      );
+      const receipt = await deliver(env, ctx, row, grant.grantId, "alert", event.eventType,
+        richMessage(event, avatar));
       return response({ version: 1, ...receipt }, 202);
     }
     if (isActivity && parts.length === 3 && request.method === "GET") {
       return response({
         version: 1,
-        activity: await stateBinding(env, row.owner_coordinate).notificationActivity({
+        activity: await notificationStateBinding(env, row.owner_coordinate).notificationActivity({
           grantId: grant.grantId,
           activityId: activityId!,
           now,
@@ -1384,7 +1549,7 @@ export async function handleNotificationRequest(
           || !integer(body.timestamp) || !integer(body.expires) || body.expires <= body.timestamp) {
         return fail(400, "notification_activity_invalid");
       }
-      const activity = await stateBinding(env, row.owner_coordinate).notificationActivity({
+      const activity = await notificationStateBinding(env, row.owner_coordinate).notificationActivity({
         grantId: grant.grantId,
         activityId: activityId!,
         now,
@@ -1393,7 +1558,7 @@ export async function handleNotificationRequest(
           || activity.leaseExpires <= now) return fail(403, "notification_activity_inactive");
       const externalId = await buzzKitRecipientExternalId(env, row.owner_coordinate, row.owner_kind);
       const terminal = body.phase === "completed" || body.phase === "failed";
-      const reservation = await stateBinding(env, row.owner_coordinate).beginNotificationActivityUpdate({
+      const reservation = await notificationStateBinding(env, row.owner_coordinate).beginNotificationActivityUpdate({
         grantId: grant.grantId,
         activityId: activity.activityId,
         updateId: body.updateId,
@@ -1404,7 +1569,7 @@ export async function handleNotificationRequest(
       }
       if (activity.groupId) {
         await requireNotificationActivityEgressActive(env, row, activity);
-        const receipt = await stateBinding(env, row.owner_coordinate).sendNotificationActivityGroup({
+        const receipt = await notificationStateBinding(env, row.owner_coordinate).sendNotificationActivityGroup({
           ownerCoordinate: row.owner_coordinate, activityId: activity.activityId,
           state: { id: activity.rowId!, phase: String(body.phase), timestamp: Number(body.timestamp),
             activeSubagentCount: Number(body.activeSubagentCount), latestTool: body.latestTool as string | null },
@@ -1415,34 +1580,47 @@ export async function handleNotificationRequest(
             activity: { activityId: activity.activityId, sessionReference: activity.sessionReference,
               leaseExpires: activity.leaseExpires } },
         });
-        await stateBinding(env, row.owner_coordinate).completeNotificationActivityUpdate({
+        await notificationStateBinding(env, row.owner_coordinate).completeNotificationActivityUpdate({
           grantId: grant.grantId, activityId: activity.activityId, updateId: String(body.updateId),
           timestamp: Number(body.timestamp), terminal,
         });
         return response({ version: 1, ...receipt }, 202);
       }
-      const receipt = await sendBuzzKitLiveActivity(env, {
-        externalId,
-        activityId: activity.activityId,
-        event: terminal ? "end" : "update",
-        contentState: {
-          phase: body.phase,
-          currentAction: body.currentAction,
-          progress: body.progress,
-          completedSteps: body.completedSteps,
-          activeSubagentCount: body.activeSubagentCount,
-          latestTool: body.latestTool,
-          timestamp: body.timestamp,
-        },
+      const contentState = {
+        phase: body.phase,
+        currentAction: body.currentAction,
+        progress: body.progress,
+        completedSteps: body.completedSteps,
+        activeSubagentCount: body.activeSubagentCount,
+        latestTool: body.latestTool,
         timestamp: body.timestamp,
-        staleDate: new Date(Number(body.expires) * 1_000).toISOString(),
+      };
+      const live: LiveActivityMessage = {
+        event: terminal ? "end" : "update",
+        activityId: activity.activityId,
+        contentState,
+        timestamp: body.timestamp,
+        staleDate: Number(body.expires),
         // A finished card leaves the Lock Screen shortly after: its reply is already a
         // notification, and an end without a dismissal date stays for up to four hours.
-        ...(terminal ? {
-          dismissalDate: new Date(Math.min(Number(body.timestamp) + 30, Number(body.expires)) * 1_000).toISOString(),
-        } : {}),
-      }, () => requireNotificationActivityEgressActive(env, row, activity));
-      await stateBinding(env, row.owner_coordinate).completeNotificationActivityUpdate({
+        ...(terminal ? { dismissalDate: Math.min(Number(body.timestamp) + 30, Number(body.expires)) } : {}),
+      };
+      const authorize = () => requireNotificationActivityEgressActive(env, row, activity);
+      const receipt = await deliverLiveActivity({
+        env: env as unknown as DeliveryEnv, ctx,
+        owner: deliveryOwner(row), grantId: grant.grantId, updateId: body.updateId, live, authorize,
+        sendViaBuzzKit: () => sendBuzzKitLiveActivity(env, {
+          externalId,
+          activityId: live.activityId,
+          event: live.event,
+          contentState,
+          timestamp: live.timestamp,
+          staleDate: new Date(live.staleDate * 1_000).toISOString(),
+          ...(live.dismissalDate !== undefined
+            ? { dismissalDate: new Date(live.dismissalDate * 1_000).toISOString() } : {}),
+        }, authorize),
+      });
+      await notificationStateBinding(env, row.owner_coordinate).completeNotificationActivityUpdate({
         grantId: grant.grantId,
         activityId: activity.activityId,
         updateId: body.updateId,

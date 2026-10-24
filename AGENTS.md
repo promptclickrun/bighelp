@@ -596,6 +596,9 @@ sections can crash only on devices ("Thread stack size exceeded").
 - A chat is on the navigation stack at most once. Opening one that's there (a notification, widget or link)
   goes back to it (`AppState.activateConversation`): two copies shared one `ChatModel`, both redrew every
   change, and Back showed the same chat again.
+- The chat on screen always gets a connection of its own. One opened while the host was away (its saved copy
+  shows), or whose open a reconnect cut short, opens again once the runtime reconnects (`openDetachedChat`); the
+  reconnect's recovery reattaches only chats that had one, and Send stayed off until you backed out and back in.
 - The connection pill at the top (`ConnectionIsland`) has its own pass-through window so it shows over sheets. iOS
   hides an app's own Live Activity while the app is open, so it can't be the real Dynamic Island.
 

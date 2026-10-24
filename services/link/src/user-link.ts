@@ -19,6 +19,7 @@ import {
 } from "./contracts.js";
 import { lookupDeviceAccountCoordinate, verifyDeviceRequest } from "./device-auth.js";
 import { sendBuzzKitLiveActivity, sendBuzzKitLinkWake } from "./buzzkit.js";
+import { deliverLiveActivity, type DeliveryEnv } from "./push-delivery.js";
 import { acceptedFrame, backpressureFrame, type EncryptedLinkFrame, parseEncryptedFrame } from "./frame.js";
 import {
   ACTIVE_DEVICE_LIMIT, DELIVERY_BYTE_WINDOW, DELIVERY_WINDOW, PendingDeliveryStore,
@@ -253,12 +254,7 @@ export class UserLink extends DurableObject<LinkEnv> {
         this.notificationState.activityDeliveryTimestamp(input.activityId) + 1);
       const content = this.notificationState.activityGroup(input.activityId, now, input.authority);
       const terminal = content.activeCount === 0;
-      const receipt = await sendBuzzKitLiveActivity(this.env, {
-        externalId: input.externalId, activityId: content.groupId,
-        event: terminal ? "end" : "update", contentState: content, timestamp: now,
-        staleDate: new Date((now + 120) * 1_000).toISOString(),
-        ...(terminal ? { dismissalDate: new Date((now + 30) * 1_000).toISOString() } : {}),
-      }, async () => {
+      const authorize = async () => {
         const grants = this.notificationState.activityGroupGrants(input.activityId);
         await requireNotificationGroupGrantEgressActive(this.env, input.ownerCoordinate, input.authority, grants);
         const freshGrants = this.notificationState.activityGroupGrants(input.activityId);
@@ -269,6 +265,29 @@ export class UserLink extends DurableObject<LinkEnv> {
           throw new LoopdyLinkError("notification_activity_conflict", "Activity group changed before delivery");
         }
         this.notificationState.reserveActivityDelivery(input.activityId, now, terminal);
+      };
+      const event = terminal ? "end" : "update";
+      // The physical card is addressed by its group ID, so that is the ID whose push token the
+      // phone registers for direct delivery too. The aggregate is rebuilt for every send, so a
+      // failed direct push is never queued for later: it goes through BuzzKit at once.
+      const receipt = await deliverLiveActivity({
+        env: this.env as unknown as DeliveryEnv, ctx: this.ctx,
+        owner: {
+          kind: input.authority.ownerKind, coordinate: input.ownerCoordinate,
+          credentialId: input.authority.credentialId,
+        },
+        grantId: input.authority.grant?.grantId ?? "", updateId: String(now), queueable: false,
+        live: {
+          event, activityId: content.groupId, contentState: content, timestamp: now, staleDate: now + 120,
+          ...(terminal ? { dismissalDate: now + 30 } : {}),
+        },
+        authorize,
+        sendViaBuzzKit: () => sendBuzzKitLiveActivity(this.env, {
+          externalId: input.externalId, activityId: content.groupId,
+          event, contentState: content, timestamp: now,
+          staleDate: new Date((now + 120) * 1_000).toISOString(),
+          ...(terminal ? { dismissalDate: new Date((now + 30) * 1_000).toISOString() } : {}),
+        }, authorize),
       });
       return receipt;
     } finally { release(); }

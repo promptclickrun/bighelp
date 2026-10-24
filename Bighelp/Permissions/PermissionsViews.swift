@@ -57,6 +57,8 @@ struct PermissionsSettingsView: View {
                     .bighelpFont(.metadata)
             }
             .listRowBackground(theme.surface)
+
+            TelemetrySettingsSection()
         }
         .bighelpFormSurface()
         .environment(\.defaultMinListRowHeight, BighelpTokens.hitTarget)

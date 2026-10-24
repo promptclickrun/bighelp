@@ -219,7 +219,7 @@ final class DirectHermesNativePluginClient {
         }
         let requestGuard = try DirectHermesNativeRequestGuard(etag: context.etag)
         let request = DirectHermesHTTPRequest(
-            path: "/api/plugins/loopdy/native/" + route.path, method: .post, body: payload,
+            path: "/api/plugins/loopdy/native/" + route.path, method: route.method, body: payload,
             maximumResponseBytes: route.maximumResponseBytes, timeout: route.timeout
         )
         let response: DirectHermesHTTP.Response
@@ -293,6 +293,7 @@ final class DirectHermesNativePluginClient {
         let isMutation: Bool
         var maximumResponseBytes = DirectHermesWire.maximumMessageBytes
         var timeout: TimeInterval = 20
+        var method: DirectHermesHTTPRequest.Method = .post
     }
 
     private static func route(_ operation: WorkspaceOperation) throws -> Route {
@@ -407,6 +408,10 @@ final class DirectHermesNativePluginClient {
         case .myTemplatesDelete:
             return Route(path: "my-templates/delete", feature: MyTemplatesWire.feature, isMutation: true,
                          maximumResponseBytes: 16_384)
+        case .telemetrySet:
+            // The switch for the host's own usage reports; `{"enabled": bool}`, answered the same as a read.
+            return Route(path: "telemetry", feature: WorkspaceTelemetryHostEndpoint.feature, isMutation: true,
+                         maximumResponseBytes: 16_384, timeout: 10, method: .put)
         case .peopleSpeaking:
             // Sent before each message; a slow host never holds a message for long.
             return Route(path: "people/speaking", feature: "native-people-v1", isMutation: true,

@@ -197,6 +197,9 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     case liveAlertsListen = "alerts.listen"
     case liveAlertsAck = "alerts.ack"
     case liveAlertsStop = "alerts.stop"
+    /// Tells the host to stop (or resume) its own usage reports, from Settings › Device access
+    /// (plugin, `native-host-telemetry-v1`).
+    case telemetrySet = "telemetry.set"
     case providerSignInList = "provider-sign-in.list"
     case providerSignInStart = "provider-sign-in.start"
     case providerSignInStatus = "provider-sign-in.status"

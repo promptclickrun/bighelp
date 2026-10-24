@@ -737,6 +737,12 @@ final class NativeWorkspaceRuntime {
                 if context.features.contains("native-agent-board-answers-v1") { supported.insert(.agentBoardAnswers) }
             }
             configureRoomActivity(workspace: workspace, owner: owner, features: workspace.nativeContext?.features ?? [])
+            // While "Share usage and diagnostics" is off, this computer is told to stop its own reports too.
+            let telemetryHost = WorkspaceTelemetryHostEndpoint(
+                workspace: workspace, owner: owner, features: { [weak workspace] in workspace?.nativeContext?.features ?? [] })
+            Task { @MainActor in
+                await TelemetryController.shared.hostConnected(telemetryHost, connection: owner.connectionGeneration)
+            }
             pluginFeaturesKnown = true
             try publishCapabilities()
             try await agents.load()

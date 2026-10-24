@@ -17,8 +17,9 @@ struct BighelpSessionLiveActivity: Widget {
             )
             .activityBackgroundTint(BighelpActivityColors.canvas(snapshot: snapshot))
             .activitySystemActionForegroundColor(BighelpActivityColors.accent(snapshot: snapshot))
-            .widgetURL(context.attributes.deepLink)
+            .widgetURL(context.state.sessions == nil ? context.attributes.deepLink : BighelpWidgetSnapshot.sessionsURL)
         } dynamicIsland: { context in
+            if context.state.sessions != nil { return sharedIsland(context) }
             let presentation = BighelpActivityPresentation(
                 attributes: context.attributes,
                 state: context.state,
@@ -88,6 +89,34 @@ struct BighelpSessionLiveActivity: Widget {
             .keylineTint(Color(widgetHex: BighelpWidgetSnapshot.Palette.emberDark.accentHex))
             .widgetURL(context.attributes.deepLink)
         }
+    }
+
+    private func sharedIsland(_ context: ActivityViewContext<LoopdySessionActivityAttributes>) -> DynamicIsland {
+        let rows = context.state.sessions ?? []
+        let attention = !context.isStale && rows.contains { $0.phase == .waiting }
+        let count = context.state.activeCount ?? rows.filter { !$0.phase.isTerminal }.count
+        let symbol = context.isStale ? "pause.circle" : attention ? "questionmark.circle.fill" : count == 0 ? "checkmark.circle" : "circle.dashed"
+        return DynamicIsland {
+            DynamicIslandExpandedRegion(.leading) {
+                Text("bighelp").font(.system(.caption, design: .rounded, weight: .bold))
+            }
+            DynamicIslandExpandedRegion(.trailing) {
+                Text(context.isStale ? "Paused" : attention ? "Needs you" : "\(count) active")
+                    .font(.caption.weight(.semibold)).foregroundStyle(attention ? .orange : .secondary)
+            }
+            DynamicIslandExpandedRegion(.bottom) {
+                BighelpActivityRowsView(state: context.state, isStale: context.isStale, maximumRows: 3, showsHeader: false)
+                    .padding(.vertical, 4)
+            }
+        } compactLeading: {
+            Image(systemName: "bubble.left.and.bubble.right.fill").accessibilityLabel("bighelp")
+        } compactTrailing: {
+            Image(systemName: symbol).foregroundStyle(attention ? .orange : .secondary)
+                .accessibilityLabel(context.isStale ? "Updates paused" : "\(count) active chats")
+        } minimal: {
+            Image(systemName: symbol).foregroundStyle(attention ? .orange : .secondary)
+        }
+        .widgetURL(rows.first.map { BighelpWidgetSnapshot.chatURL($0.id) } ?? BighelpWidgetSnapshot.sessionsURL)
     }
 
     /// The kind of work on the avatar's corner: code, globe, paintbrush…

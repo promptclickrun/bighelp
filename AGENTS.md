@@ -612,11 +612,12 @@ Helpful, never a pile to clear (`BighelpNotificationGrouping`):
   again (`formerStoredIDs`, the saved row). Compaction gives a chat a new stored ID and Hermes' alert for that turn
   can name it first, so a chat compacted in the last two minutes answers for its agent's unknown references
   (`lastCompactionAt`).
-- One Live Activity at a time: a new chat's card replaces the older one (`BighelpManagedNativeActivityRuntime`).
-  Finished cards leave the Lock Screen about 30 seconds after the end (the Link service sends a dismissal date),
-  and opening the app clears any still there.
-- The Live Activity uses the app's palette from the widget snapshot, like the Home widgets. Its four steps come from
-  the phase Hermes reports, never a guessed percentage.
+- One Live Activity holds the active chats as independently linked rows (`BighelpActivityGroupDriver`).
+  Attention comes first; the payload holds five rows and a total count. A chat finishing cannot end another chat's card.
+  The service aggregates scoped per-turn updates before sending to the shared native token (docs/LIVE_ACTIVITY_GROUPS.md).
+  The finished card leaves about 30 seconds after all work ends, and opening the app clears it.
+- The Live Activity uses the app's palette and real host phases, never a guessed percentage. Titles stay in the
+  phone's App Group; only opaque row IDs and bounded status reach the push service. Stale rows say Paused.
 - Every setup failure gets its own code where it happens (`BighelpNotificationErrorCode`, never reused or renumbered);
   the FAQ is [docs/NOTIFICATION_ERROR_CODES.md](docs/NOTIFICATION_ERROR_CODES.md).
 

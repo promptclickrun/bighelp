@@ -4,6 +4,7 @@
 import CryptoKit
 import BuzzKit
 import Foundation
+import OSLog
 
 struct BighelpLiveActivityRegistration: Equatable, Sendable {
     let activityID: String
@@ -391,7 +392,13 @@ final class BighelpLiveActivityCoordinator {
             let initial = LoopdySessionActivityAttributes.ContentState.initial(
                 agentName: attributes.agentName, timestamp: max(1, event.occurredAt)
             )
-            guard let nativeID = try? driver.start(attributes: attributes, state: initial) else { return }
+            let nativeID: String
+            do { nativeID = try driver.start(attributes: attributes, state: initial) }
+            catch {
+                Logger(subsystem: "app.loopdy.mobile", category: "LiveActivity")
+                    .error("Could not start Live Activity: \(String(describing: error), privacy: .private)")
+                return
+            }
             session = ActiveSession(
                 nativeActivityID: nativeID,
                 relayActivityID: Self.relayActivityID(nativeID),
@@ -757,6 +764,14 @@ final class BighelpActivityKitDriver: BighelpLiveActivityDriving {
             pushType: .token
         )
         known[activity.id] = activity
+        if state.sessions != nil {
+            let old = Activity<LoopdySessionActivityAttributes>.activities.filter {
+                $0.id != activity.id && $0.attributes.sessionID.hasPrefix("native-")
+            }
+            Task { @MainActor in
+                for previous in old { await previous.end(nil, dismissalPolicy: .immediate) }
+            }
+        }
         return activity.id
     }
 
@@ -834,7 +849,8 @@ final class BighelpActivityKitDriver: BighelpLiveActivityDriving {
 
     func existingActivities() -> [BighelpLiveActivitySnapshot] {
         Activity<LoopdySessionActivityAttributes>.activities.compactMap { activity in
-            guard !activity.content.state.phase.isTerminal else { return nil }
+            guard (activity.activityState == .active || activity.activityState == .stale),
+                  !activity.content.state.phase.isTerminal else { return nil }
             return BighelpLiveActivitySnapshot(
                 nativeActivityID: activity.id,
                 attributes: activity.attributes,

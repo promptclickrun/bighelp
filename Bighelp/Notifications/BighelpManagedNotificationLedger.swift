@@ -116,7 +116,7 @@ struct BighelpManagedActivityOwner: Codable, Equatable {
     let nativeActivityID: String
     let relayActivityID: String
     /// Proven host turn only. Projection-generated turn IDs must never go here.
-    let canonicalTurnID: String?
+    var canonicalTurnID: String?
     let localTurnID: String
     let firstObservedAt: Int
     var remoteOwned: Bool
@@ -224,6 +224,19 @@ final class BighelpManagedNotificationLedger {
         next.activities[owner.relayActivityID] = owner
         try persist(next)
     }
+    func promote(_ owner: BighelpManagedActivityOwner) throws {
+        guard let old = snapshot.activities[owner.relayActivityID], old.canonicalTurnID == nil,
+              owner.canonicalTurnID != nil, !old.remoteOwned, !old.retired else {
+            throw DirectHermesError.secureStorageChanged
+        }
+        var unchanged = owner
+        unchanged.canonicalTurnID = nil
+        guard unchanged == old else { throw DirectHermesError.identityChanged }
+        var next = snapshot
+        next.activities[owner.relayActivityID] = owner
+        try persist(next)
+    }
+
     /// Preserve revocation tombstones even when the host credentials are removed.
     func retire(host: BighelpConfiguredHost) throws {
         var next = snapshot

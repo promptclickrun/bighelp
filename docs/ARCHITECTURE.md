@@ -693,14 +693,22 @@ An update enrolls a phone that already has notifications, with nothing shown and
    `MARKETING(BUILD)`.
 4. It sends again when the token, the installation or the environment changes, when the last
    successful send is a week old, and (after a short wait, because people change several at once)
-   when the person changes what they want to hear about. BuzzKit still saves those choices as before. It keeps a digest of the token, never the token.
+   when the person changes what they want to hear about. BuzzKit still saves those choices as before.
+   A change is marked pending on the phone before anything is sent and cleared only by a send that
+   carried it, so a failed send or a quit app can't lose it; every pass also reads the choices again
+   and compares them with what the service has. Nothing is sent before BuzzKit identified the phone
+   and moved the saved choices; a token that arrives earlier waits for the foreground pass.
+   The service counts address writes in ten-minute windows (four for the alert and push-to-start
+   addresses together). The phone keeps launches to two of them, so a change to the choices always
+   has room; a write waiting for room goes out when the window passes. A 429 backs off a whole window. It keeps a digest of the token, never the token.
 5. Live Activities: each push token that goes to BuzzKit also goes to
    `PUT /v1/notifications/live-activity-target` (`kind: liveactivity`, the activity ID), and a
    finished activity sends `DELETE`. On iOS 17.2 and later the push-to-start token goes there too
-   (`kind: pts`); nothing sends to it yet. ActivityKit streams open through BuzzKit's serial lane,
+   (`kind: pts`); nothing sends to it yet. These run on their own tasks, never before the host
+   subscription or the end of setup, and honor the same backoff. ActivityKit streams open through BuzzKit's serial lane,
    because ActivityKit can deadlock when several threads open them at once.
 6. Turning notifications off sends `DELETE` for the push address and the push-to-start token
-   (best effort, because revoking the installation removes them too) and clears the saved state.
+   (both at once, for five seconds at most, best effort, because revoking the installation removes them too) and clears the saved state.
 
 An older Worker answers 404, because it has no such route. The app treats that as "not available
 yet": it logs no error, shows nothing, and asks again after 24 hours. Every other failure gets a
@@ -708,9 +716,11 @@ code (NS-123 to NS-126, [NOTIFICATION_ERROR_CODES.md](NOTIFICATION_ERROR_CODES.m
 log only, and is retried at the next launch or foreground, after 5 minutes, 15 minutes, an hour,
 then 6 hours. Registration never changes what setup, BuzzKit or the alerts do.
 
-The notification service extension no longer builds on BuzzKit's extension product. It shows every
+The notification service extension no longer builds on BuzzKit's extension product. The extension class
+is a thin shell around `BighelpNotificationProcessor`, which opens sealed alerts, stacks them, and hands the
+system exactly one notification before time runs out (tests run it with fakes). It shows every
 alert itself (`BighelpPushDisplay`): it registers the push's `bk.category` and `bk.actions` as a
-category, attaches `bk.image` (HTTPS, status 200, at most 10 MB) and finishes before the system's
+category, attaches `bk.image` (HTTPS, status 200, at most 10 MB; a picture that says it is bigger is refused before its body is read) and finishes before the system's
 time limit. Pushes through BuzzKit and pushes sent straight to Apple carry the same `bk` object and
 look the same. The one difference is that bighelp sends no BuzzKit delivered receipts; a direct
 push has no `bk.messageId` for them anyway. Taps are handled by the app's own notification

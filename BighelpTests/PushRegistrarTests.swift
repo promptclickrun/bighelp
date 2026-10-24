@@ -39,6 +39,14 @@ import Testing
         var mode = Mode.deployed
         /// Gives other work a turn while a request is out, like a real network.
         var suspends = false
+        /// DELETE requests that never answer (until cancelled).
+        var hangsOnDelete = false
+        /// Like the service: ten-minute windows per installation. Four alert and push-to-start writes,
+        /// forty Live Activity writes, two per activity. Needs a clock.
+        var clock: TestClock?
+        private(set) var rateLimited = 0
+        private var addressWrites: [Date] = []
+        private var activityWrites: [(id: String, at: Date)] = []
         private(set) var calls: [Call] = []
         private(set) var targets: [String: [String: Any]] = [:]
         private(set) var badSignatures = 0
@@ -58,6 +66,7 @@ import Testing
             let body = (try? JSONSerialization.jsonObject(with: bodyData)) as? [String: Any] ?? [:]
             calls.append(Call(method: method, path: path, body: body))
             if suspends { await Task.yield() }
+            if hangsOnDelete, method == "DELETE" { try await Task.sleep(for: .seconds(60)) }
             func reply(_ status: Int, _ object: Any?) throws -> (Data, HTTPURLResponse) {
                 let response = try #require(HTTPURLResponse(url: url, statusCode: status, httpVersion: nil, headerFields: nil))
                 guard let object else { return (Data("Not Found".utf8), response) }
@@ -75,6 +84,21 @@ import Testing
             }
             let invalid = ["version": 1, "error": ["code": "notification_push_target_invalid"]] as [String: Any]
             let updatedAt = 1_767_225_600
+            if method == "PUT", let clock {
+                let window = clock.now.addingTimeInterval(-600)
+                let isActivity = path == BighelpPushRegistrar.liveActivityTargetPath && body["kind"] as? String == "liveactivity"
+                addressWrites.removeAll { $0 <= window }
+                activityWrites.removeAll { $0.at <= window }
+                let id = body["activityId"] as? String ?? ""
+                let over = isActivity
+                    ? activityWrites.count >= 40 || activityWrites.filter { $0.id == id }.count >= 2
+                    : addressWrites.count >= 4
+                if over {
+                    rateLimited += 1
+                    return try reply(429, ["version": 1, "error": ["code": "notification_push_target_rate_limited"]])
+                }
+                if isActivity { activityWrites.append((id, clock.now)) } else { addressWrites.append(clock.now) }
+            }
             switch (method, path) {
             case ("PUT", BighelpPushRegistrar.pushTargetPath):
                 let topics = ["chat-replies-completions", "scheduled-tasks-deliveries", "questions-approvals", "subagent-completions"]
@@ -164,28 +188,39 @@ import Testing
         private(set) var pushToStartHandler: (@MainActor (Data) async -> Void)?
         private(set) var registrar: BighelpPushRegistrar!
 
-        init(appVersion: String = "2.7.0(160)") {
+        init(appVersion: String = "2.7.0(160)", startsReady: Bool = true) {
             defaults = UserDefaults(suiteName: suite)!
+            self.appVersion = appVersion
+            worker.publicKey = signingKey.publicKey
+            worker.clock = clock
+            syncWorkerIdentity()
+            registrar = makeRegistrar(startsReady: startsReady)
+        }
+
+        private let appVersion: String
+
+        /// A registrar for this phone: another one is the app after a quit and a new launch.
+        func makeRegistrar(startsReady: Bool = false, removalTimeout: Duration = .seconds(5)) -> BighelpPushRegistrar {
             let broker = BighelpNotificationBrokerClient(transport: worker, now: { [clock] in clock.now })
-            registrar = BighelpPushRegistrar(
+            return BighelpPushRegistrar(
                 api: broker,
-                credentials: { [unowned self] in
-                    installationID.map {
-                        BighelpManagedNotificationCredentials(deviceID: $0, authorizationEpoch: 1, signingPrivateKey: signingKey)
-                    }
+                // Weak, because a background retry can outlive the test that started it.
+                credentials: { [weak self] in
+                    guard let self, let id = installationID else { return nil }
+                    return BighelpManagedNotificationCredentials(deviceID: id, authorizationEpoch: 1, signingPrivateKey: signingKey)
                 },
-                isTurningOff: { [unowned self] in turningOff },
-                isAuthorized: { [unowned self] in authorized },
-                environment: { [unowned self] in environment },
+                isTurningOff: { [weak self] in self?.turningOff ?? true },
+                isAuthorized: { [weak self] in self?.authorized ?? false },
+                environment: { [weak self] in self?.environment ?? .production },
                 appVersion: appVersion,
-                registerForRemoteNotifications: { [unowned self] in registerRequests += 1 },
-                startPushToStart: { [unowned self] handler in pushToStartHandler = handler },
-                mutedTopics: { [unowned self] in muted },
+                registerForRemoteNotifications: { [weak self] in self?.registerRequests += 1 },
+                startPushToStart: { [weak self] handler in self?.pushToStartHandler = handler },
+                mutedTopics: { [weak self] in self?.muted },
                 debounce: .milliseconds(20),
+                removalTimeout: removalTimeout,
+                startsReady: startsReady,
                 defaults: defaults,
                 now: { [clock] in clock.now })
-            worker.publicKey = signingKey.publicKey
-            syncWorkerIdentity()
         }
 
         func syncWorkerIdentity() { worker.installationID = installationID ?? "" }
@@ -317,6 +352,7 @@ import Testing
         phone.syncWorkerIdentity()
         await phone.registrar.receiveToken(Self.token)
         #expect(phone.worker.puts.count == 2, "Turning notifications off and on again makes a new installation")
+        phone.clock.advance(11 * 60) // the service's window
         phone.environment = .sandbox
         await phone.registrar.receiveToken(Self.token)
         #expect(phone.worker.puts.count == 3)
@@ -511,7 +547,6 @@ import Testing
     @Test(arguments: [
         (500, "internal_error", BighelpNotificationErrorCode.directPushUnreachable),
         (503, "notification_service_unavailable", .directPushUnreachable),
-        (429, "rate_limited", .directPushUnreachable),
         (400, "notification_push_target_invalid", .directPushRefused),
         (401, "notification_signature_invalid", .directPushRefused),
         (403, "notification_scope_invalid", .directPushRefused),
@@ -625,6 +660,10 @@ import Testing
         #expect(phone.worker.targets.isEmpty)
         phone.worker.mode = .deployed
         await phone.registrar.refreshAtForeground()
+        try? await Task.sleep(for: .milliseconds(30))
+        #expect(phone.worker.targets.isEmpty, "Backing off: not yet")
+        phone.clock.advance(6 * 60)
+        await phone.registrar.refreshAtForeground()
         for _ in 0..<500 where phone.worker.targets.isEmpty { try? await Task.sleep(for: .milliseconds(5)) }
         #expect(phone.worker.targets["liveactivity:activity_one"] != nil)
         let calls = phone.worker.calls.count
@@ -640,6 +679,7 @@ import Testing
         await phone.registrar.registerActivity(id: "activity_one", token: Self.token)
         await phone.registrar.removeActivity(id: "activity_one")
         phone.worker.mode = .deployed
+        phone.clock.advance(6 * 60)
         await phone.registrar.refreshAtForeground()
         try? await Task.sleep(for: .milliseconds(30))
         #expect(phone.worker.targets.isEmpty)
@@ -676,7 +716,8 @@ import Testing
         #expect(phone.worker.targets.keys.sorted() == ["alert", "pts"])
         await phone.registrar.removeAll()
         #expect(phone.worker.targets.isEmpty)
-        #expect(phone.worker.deletes.map(\.path) == [BighelpPushRegistrar.pushTargetPath, BighelpPushRegistrar.liveActivityTargetPath])
+        #expect(phone.worker.deletes.map(\.path).sorted()
+            == [BighelpPushRegistrar.liveActivityTargetPath, BighelpPushRegistrar.pushTargetPath])
         #expect(phone.registrar.state == BighelpPushRegistrar.State())
         #expect(phone.worker.badSignatures == 0)
         // Turned on again later: sent again.
@@ -700,6 +741,272 @@ import Testing
         phone.worker.mode = .notDeployed
         await phone.registrar.removeAll()
         #expect(phone.registrar.state == BighelpPushRegistrar.State())
+    }
+
+    // MARK: Choices that must not be lost
+
+    @Test func aChangeThatFailedToSendIsSentAtTheNextLaunch() async throws {
+        let phone = Phone()
+        defer { phone.cleanup() }
+        await phone.registrar.receiveToken(Self.token)
+        #expect(phone.worker.puts.last?.body["mutedTopics"] as? [String] == [])
+        // The person mutes a topic; the send fails; the app is quit.
+        phone.muted = ["questions-approvals"]
+        phone.worker.mode = .failing(status: 503, code: "notification_service_unavailable")
+        await phone.registrar.sendPreferenceChange()
+        #expect(phone.worker.puts.count == 2)
+        #expect(phone.registrar.state.mutedPending)
+        #expect(phone.registrar.state.alert?.mutedTopics == [], "The service still has the old list")
+        // The next launch: a new registrar on the same saved state, the same token, the service back.
+        phone.worker.mode = .deployed
+        phone.clock.advance(6 * 60)
+        let relaunched = phone.makeRegistrar()
+        #expect(relaunched.state.mutedPending, "Kept on the phone")
+        await relaunched.refreshAtForeground()
+        await relaunched.receiveToken(Self.token)
+        #expect(phone.worker.puts.count == 3)
+        #expect(phone.worker.puts.last?.body["mutedTopics"] as? [String] == ["questions-approvals"])
+        #expect(relaunched.state.mutedPending == false)
+        #expect(relaunched.state.alert?.mutedTopics == ["questions-approvals"])
+    }
+
+    @Test func aLaunchComparesTheChoicesEvenWithNothingMarkedPending() async {
+        let phone = Phone()
+        defer { phone.cleanup() }
+        await phone.registrar.receiveToken(Self.token)
+        phone.muted = ["subagent-completions"] // changed while the app wasn't running
+        let relaunched = phone.makeRegistrar()
+        await relaunched.refreshAtForeground()
+        await relaunched.receiveToken(Self.token)
+        #expect(phone.worker.puts.count == 2)
+        #expect(phone.worker.puts.last?.body["mutedTopics"] as? [String] == ["subagent-completions"])
+        // And the same choices again send nothing.
+        let again = phone.makeRegistrar()
+        await again.refreshAtForeground()
+        await again.receiveToken(Self.token)
+        #expect(phone.worker.puts.count == 2)
+    }
+
+    @Test func aChangeDuringASendIsNotClearedByThatSend() async {
+        let phone = Phone()
+        defer { phone.cleanup() }
+        phone.worker.suspends = true
+        let first = Task { await phone.registrar.receiveToken(Self.token) }
+        await Task.yield()
+        phone.muted = ["chat-replies-completions"]
+        await phone.registrar.sendPreferenceChange() // arrives while the first send is out
+        await first.value
+        #expect(phone.worker.puts.last?.body["mutedTopics"] as? [String] == ["chat-replies-completions"])
+        #expect(phone.registrar.state.mutedPending == false)
+    }
+
+    @Test func nothingIsSentBeforeBuzzKitHasIdentifiedAndMovedTheChoices() async {
+        let phone = Phone(startsReady: false)
+        defer { phone.cleanup() }
+        // A cold start: iOS hands over a token before the launch work ran.
+        await phone.registrar.receiveToken(Self.token)
+        #expect(phone.worker.calls.isEmpty)
+        // The saved choices are moved; the change is kept for the foreground pass.
+        phone.muted = ["questions-approvals"]
+        await phone.registrar.sendPreferenceChange()
+        #expect(phone.worker.calls.isEmpty)
+        #expect(phone.registerRequests == 0)
+        #expect(phone.registrar.state.mutedPending)
+        // The foreground pass runs after identify: now the token goes, with the right list.
+        await phone.registrar.refreshAtForeground()
+        for _ in 0..<500 where phone.worker.puts.isEmpty { try? await Task.sleep(for: .milliseconds(5)) }
+        #expect(phone.worker.puts.count == 1)
+        #expect(phone.worker.puts.first?.body["mutedTopics"] as? [String] == ["questions-approvals"])
+        #expect(phone.registrar.state.mutedPending == false)
+    }
+
+    // MARK: The service's write budget
+
+    @Test func aBurstOfLaunchesCannotSpendTheBudgetAChoicesChangeNeeds() async throws {
+        let phone = Phone()
+        defer { phone.cleanup() }
+        // Ten launches in a few minutes, each with a different token (a development phone, say).
+        var registrar = phone.registrar!
+        for index in 0..<10 {
+            registrar = phone.makeRegistrar()
+            await registrar.refreshAtForeground()
+            await registrar.receiveToken(Data(repeating: UInt8(index + 1), count: 32))
+            phone.clock.advance(20)
+        }
+        #expect(phone.worker.puts.count == BighelpPushRegistrar.launchWriteLimit, "Launches use two of the four")
+        #expect(phone.worker.rateLimited == 0)
+        // The person turns a topic off: it gets through.
+        phone.muted = ["questions-approvals"]
+        await registrar.sendPreferenceChange()
+        #expect(phone.worker.puts.count == BighelpPushRegistrar.launchWriteLimit + 1)
+        #expect(phone.worker.puts.last?.body["mutedTopics"] as? [String] == ["questions-approvals"])
+        #expect(phone.registrar.state.mutedPending == false)
+        #expect(phone.worker.rateLimited == 0)
+        // Quick changes beyond the room wait for the window instead of being refused.
+        phone.muted = ["questions-approvals", "subagent-completions"]
+        await registrar.sendPreferenceChange()
+        #expect(phone.worker.rateLimited == 0)
+        #expect(phone.registrar.state.mutedPending, "Still to be sent")
+        phone.clock.advance(11 * 60)
+        await registrar.sendPreferenceChange()
+        #expect(phone.worker.puts.last?.body["mutedTopics"] as? [String] == ["questions-approvals", "subagent-completions"])
+        #expect(phone.registrar.state.mutedPending == false)
+        #expect(phone.worker.rateLimited == 0)
+    }
+
+    @Test func aTokenWaitingForRoomIsSentOnceTheWindowPasses() async {
+        let phone = Phone()
+        defer { phone.cleanup() }
+        await phone.registrar.receiveToken(Data(repeating: 1, count: 32))
+        await phone.registrar.receiveToken(Data(repeating: 2, count: 32))
+        await phone.registrar.receiveToken(Data(repeating: 3, count: 32))
+        #expect(phone.worker.puts.count == 2)
+        phone.clock.advance(11 * 60)
+        await phone.registrar.receiveToken(Data(repeating: 3, count: 32))
+        #expect(phone.worker.puts.count == 3)
+        #expect(phone.worker.targets["alert"]?["token"] as? String == String(repeating: "03", count: 32))
+        #expect(phone.worker.rateLimited == 0)
+    }
+
+    @Test func aRateLimitAnswerIsTreatedLikeAnyTransientFailure() async {
+        let phone = Phone()
+        defer { phone.cleanup() }
+        phone.muted = ["questions-approvals"]
+        phone.worker.mode = .failing(status: 429, code: "notification_push_target_rate_limited")
+        await phone.registrar.sendPreferenceChange()
+        await phone.registrar.receiveToken(Self.token)
+        #expect(phone.registrar.state.lastErrorCode == BighelpNotificationErrorCode.directPushUnreachable.rawValue)
+        #expect(phone.registrar.state.mutedPending, "The value is kept")
+        #expect(phone.registrar.state.retryAfter == phone.clock.now.addingTimeInterval(BighelpPushRegistrar.writeWindow),
+                "A whole window, not five minutes")
+        phone.clock.advance(5 * 60)
+        await phone.registrar.receiveToken(Self.token)
+        #expect(phone.worker.puts.count == 1)
+        phone.worker.mode = .deployed
+        phone.clock.advance(6 * 60)
+        await phone.registrar.receiveToken(Self.token)
+        #expect(phone.worker.puts.last?.body["mutedTopics"] as? [String] == ["questions-approvals"])
+        #expect(phone.registrar.state.mutedPending == false)
+    }
+
+    @Test func aRateLimitedPushToStartTokenIsKeptAndSentLater() async throws {
+        let phone = Phone()
+        defer { phone.cleanup() }
+        await phone.registrar.refreshAtForeground()
+        let handler = try #require(phone.pushToStartHandler)
+        phone.worker.mode = .failing(status: 429, code: "notification_push_target_rate_limited")
+        await handler(Self.token)
+        #expect(phone.registrar.state.activityRetryAfter == phone.clock.now.addingTimeInterval(BighelpPushRegistrar.writeWindow))
+        phone.worker.mode = .deployed
+        phone.clock.advance(11 * 60)
+        await phone.registrar.refreshAtForeground()
+        for _ in 0..<500 where phone.worker.targets["pts"] == nil { try? await Task.sleep(for: .milliseconds(5)) }
+        #expect(phone.worker.targets["pts"] != nil)
+    }
+
+    @Test func anUnchangedPushToStartTokenIsNeverWrittenAgain() async throws {
+        let phone = Phone()
+        defer { phone.cleanup() }
+        await phone.registrar.refreshAtForeground()
+        let handler = try #require(phone.pushToStartHandler)
+        phone.worker.suspends = true
+        // The stream can repeat itself while a write is out, and again at each launch.
+        async let one: Void = handler(Self.token)
+        async let two: Void = handler(Self.token)
+        _ = await (one, two)
+        #expect(phone.worker.puts.count == 1)
+        for launch in 0..<5 {
+            let relaunched = phone.makeRegistrar()
+            await relaunched.refreshAtForeground()
+            await phone.pushToStartHandler?(Self.token)
+            phone.clock.advance(Double(launch + 1) * 30)
+        }
+        #expect(phone.worker.puts.count == 1)
+        #expect(phone.worker.rateLimited == 0)
+    }
+
+    @Test func aLiveActivityIsNotWrittenAgainWithTheSameToken() async {
+        let phone = Phone()
+        defer { phone.cleanup() }
+        for _ in 0..<5 { await phone.registrar.registerActivity(id: "activity_one", token: Self.token) }
+        #expect(phone.worker.puts.count == 1)
+        // A rotating token is sent, but never more than twice an activity per window.
+        for index in 0..<5 { await phone.registrar.registerActivity(id: "activity_one", token: Data(repeating: UInt8(index + 9), count: 32)) }
+        #expect(phone.worker.puts.count == 2)
+        #expect(phone.worker.rateLimited == 0)
+    }
+
+    // MARK: Never in the way
+
+    @Test func liveActivityAddressesHonorTheBackoffAndTheOldWorker() async {
+        let phone = Phone()
+        defer { phone.cleanup() }
+        phone.worker.mode = .failing(status: 503, code: "notification_service_unavailable")
+        await phone.registrar.receiveToken(Self.token)
+        #expect(phone.worker.calls.count == 1)
+        await phone.registrar.registerActivity(id: "activity_one", token: Self.token)
+        #expect(phone.worker.calls.count == 1, "Waiting after a failure: nothing more is asked of the service")
+        phone.worker.mode = .deployed
+        phone.clock.advance(6 * 60)
+        await phone.registrar.refreshAtForeground()
+        for _ in 0..<500 where phone.worker.targets["liveactivity:activity_one"] == nil {
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(phone.worker.targets["liveactivity:activity_one"] != nil, "Kept, and sent after the wait")
+    }
+
+    @Test func aLiveActivityProblemNeverHoldsUpTheAlertAddress() async {
+        let phone = Phone()
+        defer { phone.cleanup() }
+        phone.worker.mode = .failing(status: 400, code: "notification_push_target_invalid")
+        await phone.registrar.registerActivity(id: "activity_one", token: Self.token)
+        #expect(phone.registrar.state.activityFailures == 1)
+        #expect(phone.registrar.state.retryAfter == nil)
+        phone.worker.mode = .deployed
+        await phone.registrar.receiveToken(Self.token)
+        #expect(phone.worker.targets["alert"] != nil)
+    }
+
+    @Test func thePushToStartTokenIsKeptThroughAnOldWorkersDay() async throws {
+        let phone = Phone()
+        defer { phone.cleanup() }
+        phone.worker.mode = .notDeployed
+        await phone.registrar.refreshAtForeground()
+        let handler = try #require(phone.pushToStartHandler)
+        await handler(Self.token) // the only time the system gives it
+        #expect(phone.worker.puts.count == 1)
+        #expect(phone.worker.targets["pts"] == nil)
+        phone.clock.advance(Self.day + 60)
+        phone.worker.mode = .deployed
+        await phone.registrar.refreshAtForeground()
+        for _ in 0..<500 where phone.worker.targets["pts"] == nil { try? await Task.sleep(for: .milliseconds(5)) }
+        #expect(phone.worker.targets["pts"]?["token"] as? String == Self.tokenHex)
+    }
+
+    @Test func aLiveActivityTokenIsNotKeptThroughAnOldWorkersDay() async {
+        let phone = Phone()
+        defer { phone.cleanup() }
+        phone.worker.mode = .notDeployed
+        await phone.registrar.registerActivity(id: "activity_one", token: Self.token)
+        phone.clock.advance(Self.day + 60)
+        phone.worker.mode = .deployed
+        await phone.registrar.refreshAtForeground()
+        try? await Task.sleep(for: .milliseconds(40))
+        #expect(phone.worker.targets["liveactivity:activity_one"] == nil)
+    }
+
+    @Test func turningOffSendsBothRemovalsAtOnceAndNeverWaitsLong() async {
+        let phone = Phone()
+        defer { phone.cleanup() }
+        let registrar = phone.makeRegistrar(startsReady: true, removalTimeout: .milliseconds(150))
+        await registrar.receiveToken(Self.token)
+        phone.worker.hangsOnDelete = true
+        let started = ContinuousClock.now
+        await registrar.removeAll()
+        let elapsed = ContinuousClock.now - started
+        #expect(elapsed < .seconds(5), "Cut off by the cap, not the 60 seconds the service would take")
+        #expect(phone.worker.deletes.count == 2, "Both were sent without waiting for the first")
+        #expect(registrar.state == BighelpPushRegistrar.State(), "The phone still forgets")
     }
 
     // MARK: The signed request

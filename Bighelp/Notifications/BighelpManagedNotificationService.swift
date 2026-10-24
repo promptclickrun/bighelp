@@ -212,8 +212,8 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
             }
         }
         try check()
-        // Alongside BuzzKit's registration: the direct one never stops setup.
-        await pushRegistrar?.enrollmentFinished()
+        // Alongside BuzzKit's registration, on its own task: it never stops or delays setup.
+        if let registrar = pushRegistrar { Task { await registrar.enrollmentFinished() } }
         let client = try at(.computerCheck) { try hostClient(host) }
         let loaded: BighelpManagedCapabilities? = try await during(.computerCheck) {
             do {

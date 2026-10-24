@@ -1,0 +1,587 @@
+{
+  "$comment": "Canonical bighelp telemetry schema v1. The Worker (services/telemetry/src/schema.ts) enforces it; the app and the plugin mirror it. Edit both together: a test fails when they differ.",
+  "version": 1,
+  "limits": {
+    "minEvents": 1,
+    "maxEvents": 50,
+    "maxWireBytes": 65536,
+    "maxDecompressedBytes": 262144,
+    "maxAgeMs": 604800000,
+    "maxFutureMs": 3600000,
+    "maxFrames": 64,
+    "maxFramesJsonChars": 8192
+  },
+  "publicSources": [
+    "app",
+    "nse",
+    "host"
+  ],
+  "rpcOnlySources": [
+    "relay"
+  ],
+  "types": {
+    "ms": {
+      "kind": "integer",
+      "min": 0,
+      "max": 86400000
+    },
+    "count": {
+      "kind": "integer",
+      "min": 0,
+      "max": 100000
+    },
+    "bool": {
+      "kind": "boolean"
+    },
+    "version": {
+      "kind": "pattern",
+      "pattern": "^[0-9]{1,4}(\\.[0-9]{1,4}){0,3}$"
+    },
+    "code": {
+      "kind": "pattern",
+      "pattern": "^[a-z0-9_]{1,64}$"
+    },
+    "uuid": {
+      "kind": "pattern",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "hexuuid": {
+      "kind": "pattern",
+      "pattern": "^[0-9a-fA-F-]{32,36}$",
+      "normalize": "lowercase"
+    },
+    "frames": {
+      "kind": "frames",
+      "entry": {
+        "b": {
+          "type": "hexuuid"
+        },
+        "o": {
+          "type": "offset",
+          "min": 0
+        },
+        "n": {
+          "type": "pattern",
+          "pattern": "^[A-Za-z0-9_.+-]{1,64}$"
+        }
+      }
+    }
+  },
+  "context": {
+    "app": {
+      "appVersion": {
+        "type": "version"
+      },
+      "build": {
+        "type": "pattern",
+        "pattern": "^[0-9]{1,7}$"
+      },
+      "os": {
+        "type": "enum",
+        "values": [
+          "iOS",
+          "iPadOS",
+          "macOS",
+          "visionOS",
+          "watchOS"
+        ]
+      },
+      "osVersion": {
+        "type": "version"
+      },
+      "deviceClass": {
+        "type": "enum",
+        "values": [
+          "iPhone",
+          "iPad",
+          "Mac",
+          "Vision",
+          "Watch"
+        ]
+      },
+      "channel": {
+        "type": "enum",
+        "values": [
+          "debug",
+          "testflight",
+          "appstore"
+        ]
+      }
+    },
+    "nse": {
+      "appVersion": {
+        "type": "version"
+      },
+      "build": {
+        "type": "pattern",
+        "pattern": "^[0-9]{1,7}$"
+      },
+      "os": {
+        "type": "enum",
+        "values": [
+          "iOS",
+          "iPadOS",
+          "macOS",
+          "visionOS",
+          "watchOS"
+        ]
+      },
+      "osVersion": {
+        "type": "version"
+      },
+      "deviceClass": {
+        "type": "enum",
+        "values": [
+          "iPhone",
+          "iPad",
+          "Mac",
+          "Vision",
+          "Watch"
+        ]
+      },
+      "channel": {
+        "type": "enum",
+        "values": [
+          "debug",
+          "testflight",
+          "appstore"
+        ]
+      }
+    },
+    "host": {
+      "pluginVersion": {
+        "type": "version"
+      },
+      "hermesVersion": {
+        "type": "pattern",
+        "pattern": "^[0-9]{1,4}(\\.[0-9]{1,4}){0,3}([.+-][0-9A-Za-z]{1,16})?$"
+      },
+      "osFamily": {
+        "type": "enum",
+        "values": [
+          "linux",
+          "macos",
+          "windows",
+          "other"
+        ]
+      },
+      "python": {
+        "type": "pattern",
+        "pattern": "^3\\.[0-9]{1,2}$"
+      },
+      "agentCount": {
+        "type": "enum",
+        "values": [
+          "1",
+          "2-5",
+          "6-20",
+          "21+"
+        ]
+      }
+    }
+  },
+  "events": {
+    "app": {
+      "app.opened": {
+        "props": {
+          "coldStart": {
+            "type": "bool"
+          }
+        }
+      },
+      "app.backgrounded": {
+        "props": {
+          "foregroundMs": {
+            "type": "ms"
+          }
+        }
+      },
+      "session.ended": {
+        "props": {
+          "durationMs": {
+            "type": "ms"
+          }
+        }
+      },
+      "feature.used": {
+        "props": {
+          "feature": {
+            "type": "enum",
+            "required": true,
+            "values": [
+              "chat_sent",
+              "card_rendered",
+              "form_submitted",
+              "voice_turn",
+              "voice_live",
+              "workflow_run",
+              "mode_switched",
+              "agent_opened",
+              "file_opened",
+              "shortcut_run",
+              "widget_opened",
+              "carplay_voice",
+              "watch_chat",
+              "notification_opened"
+            ]
+          }
+        }
+      },
+      "perf.launch": {
+        "props": {
+          "kind": {
+            "type": "enum",
+            "required": true,
+            "values": [
+              "first_draw",
+              "resume",
+              "optimized_first_draw"
+            ]
+          },
+          "medianMs": {
+            "type": "ms"
+          },
+          "samples": {
+            "type": "count"
+          }
+        }
+      },
+      "perf.first_token_ms": {
+        "props": {
+          "ms": {
+            "type": "ms",
+            "required": true
+          }
+        }
+      },
+      "perf.reconnect": {
+        "props": {
+          "ms": {
+            "type": "ms"
+          },
+          "attempts": {
+            "type": "count"
+          },
+          "outcome": {
+            "type": "enum",
+            "values": [
+              "ok",
+              "failed"
+            ]
+          }
+        }
+      },
+      "hang": {
+        "props": {
+          "durationMs": {
+            "type": "ms"
+          },
+          "frames": {
+            "type": "frames"
+          }
+        }
+      },
+      "crash": {
+        "props": {
+          "exceptionType": {
+            "type": "count"
+          },
+          "exceptionCode": {
+            "type": "count"
+          },
+          "signal": {
+            "type": "count"
+          },
+          "frames": {
+            "type": "frames"
+          }
+        }
+      },
+      "telemetry.toggled": {
+        "props": {
+          "enabled": {
+            "type": "bool"
+          }
+        }
+      }
+    },
+    "nse": {
+      "notification.received": {
+        "props": {
+          "kind": {
+            "type": "enum",
+            "required": true,
+            "values": [
+              "alert",
+              "wake"
+            ]
+          },
+          "path": {
+            "type": "enum",
+            "values": [
+              "direct",
+              "buzzkit",
+              "unknown"
+            ]
+          },
+          "delayMs": {
+            "type": "ms"
+          },
+          "hostToPhoneMs": {
+            "type": "ms"
+          }
+        }
+      }
+    },
+    "host": {
+      "host.started": {
+        "props": {}
+      },
+      "turn.completed": {
+        "props": {
+          "durationMs": {
+            "type": "ms"
+          },
+          "firstTokenMs": {
+            "type": "ms"
+          },
+          "toolCalls": {
+            "type": "count"
+          },
+          "outcome": {
+            "type": "enum",
+            "values": [
+              "ok",
+              "failed",
+              "cancelled"
+            ]
+          },
+          "provider": {
+            "type": "pattern",
+            "pattern": "^[a-z0-9][a-z0-9_-]{0,31}$"
+          },
+          "model": {
+            "type": "pattern",
+            "pattern": "^[a-z0-9][a-z0-9._:/-]{0,63}$"
+          },
+          "sessionSource": {
+            "type": "enum",
+            "values": [
+              "bighelp",
+              "cli",
+              "cron",
+              "api",
+              "telegram",
+              "discord",
+              "slack",
+              "whatsapp",
+              "signal",
+              "email",
+              "webhook",
+              "other"
+            ]
+          }
+        }
+      },
+      "tool.completed": {
+        "props": {
+          "durationMs": {
+            "type": "ms"
+          },
+          "outcome": {
+            "type": "enum",
+            "values": [
+              "ok",
+              "failed"
+            ]
+          },
+          "tool": {
+            "type": "pattern",
+            "pattern": "^[a-z][a-z0-9_]{0,63}$"
+          }
+        }
+      },
+      "alert.queued": {
+        "props": {
+          "eventType": {
+            "type": "enum",
+            "values": [
+              "session.completed",
+              "session.failed",
+              "scheduled.completed",
+              "scheduled.failed",
+              "approval.required",
+              "clarification.required",
+              "subagent.completed",
+              "subagent.failed",
+              "wake",
+              "liveactivity"
+            ]
+          },
+          "queueMs": {
+            "type": "ms"
+          }
+        }
+      },
+      "alert.sent": {
+        "props": {
+          "eventType": {
+            "type": "enum",
+            "values": [
+              "session.completed",
+              "session.failed",
+              "scheduled.completed",
+              "scheduled.failed",
+              "approval.required",
+              "clarification.required",
+              "subagent.completed",
+              "subagent.failed",
+              "wake",
+              "liveactivity"
+            ]
+          },
+          "relayMs": {
+            "type": "ms"
+          },
+          "result": {
+            "type": "code"
+          },
+          "attempt": {
+            "type": "count"
+          }
+        }
+      },
+      "error": {
+        "props": {
+          "code": {
+            "type": "code",
+            "required": true
+          },
+          "stage": {
+            "type": "code"
+          }
+        }
+      }
+    },
+    "relay": {
+      "push.sent": {
+        "props": {
+          "eventType": {
+            "type": "enum",
+            "values": [
+              "session.completed",
+              "session.failed",
+              "scheduled.completed",
+              "scheduled.failed",
+              "approval.required",
+              "clarification.required",
+              "subagent.completed",
+              "subagent.failed",
+              "wake",
+              "test",
+              "liveactivity"
+            ]
+          },
+          "path": {
+            "type": "enum",
+            "values": [
+              "direct",
+              "buzzkit"
+            ]
+          },
+          "priority": {
+            "type": "intEnum",
+            "values": [
+              5,
+              10
+            ]
+          },
+          "result": {
+            "type": "code"
+          },
+          "status": {
+            "type": "count"
+          },
+          "environment": {
+            "type": "enum",
+            "values": [
+              "sandbox",
+              "production"
+            ]
+          },
+          "hostToWorkerMs": {
+            "type": "ms"
+          },
+          "providerMs": {
+            "type": "ms"
+          },
+          "attempt": {
+            "type": "count"
+          }
+        }
+      },
+      "push.token_invalid": {
+        "props": {
+          "kind": {
+            "type": "enum",
+            "values": [
+              "alert",
+              "liveactivity",
+              "pts"
+            ]
+          },
+          "reason": {
+            "type": "code"
+          }
+        }
+      },
+      "push.retry": {
+        "props": {
+          "attempt": {
+            "type": "count"
+          },
+          "reason": {
+            "type": "code"
+          }
+        }
+      },
+      "push.dlq": {
+        "props": {
+          "reason": {
+            "type": "code"
+          }
+        }
+      },
+      "push.fallback_buzzkit": {
+        "props": {
+          "reason": {
+            "type": "code"
+          }
+        }
+      },
+      "push.shadow": {
+        "props": {
+          "eventType": {
+            "type": "enum",
+            "values": [
+              "session.completed",
+              "session.failed",
+              "scheduled.completed",
+              "scheduled.failed",
+              "approval.required",
+              "clarification.required",
+              "subagent.completed",
+              "subagent.failed",
+              "wake",
+              "test",
+              "liveactivity"
+            ]
+          },
+          "wouldUseDirect": {
+            "type": "bool"
+          }
+        }
+      }
+    }
+  }
+}

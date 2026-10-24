@@ -7,11 +7,11 @@ import UserNotifications
 /// A push shows the same whether the notification service sent it through BuzzKit or straight to
 /// Apple (CONTRACTS §2): the same action buttons, picture, tap and quiet-chat rules. The only
 /// difference is that a direct push has no `bk.messageId`, so bighelp sends no receipt for it.
-@MainActor struct PushDisplayTests {
+@MainActor @Suite(.serialized) struct PushDisplayTests {
     private static let grantID = "0b3f1c2e-4d5a-4b6c-8d7e-9f0a1b2c3d4e"
     private static let eventID = grantID + ":" + String(repeating: "ab", count: 32)
     /// A 1 by 1 PNG.
-    private static let png = Data(base64Encoded:
+    nonisolated private static let png = Data(base64Encoded:
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")!
 
     enum Path: String, CaseIterable { case buzzkit, direct }
@@ -250,12 +250,103 @@ import UserNotifications
     }
 
     @Test(arguments: Path.allCases)
-    func theSignInWakeIsRecognizedWithItsMetaKey(path: Path) {
+    func theSignInWakeIsRecognizedWithItsMetaKey(path: Path) throws {
         let info = Self.wake(path)
         #expect(BighelpSignInWake.isRenewal(info))
         #expect(!BighelpBuzzKitWakePayload.isWake(info), "It is not the retired account wake")
-        // BuzzKit's parser ignores a wake without its own object, and sees a direct one as not its own.
-        #expect(PushPayload(userInfo: info) == nil || path == .buzzkit)
+        #expect(BighelpPushDisplay(userInfo: info) == nil || path == .buzzkit)
+        switch path {
+        case .direct:
+            // No `bk` and no message ID: BuzzKit's parser sees nothing of its own.
+            #expect(PushPayload(userInfo: info) == nil)
+        case .buzzkit:
+            // Through BuzzKit it carries a message ID and nothing else of BuzzKit's.
+            let payload = try #require(PushPayload(userInfo: info))
+            #expect(payload.messageId == "msg_0456")
+            #expect(payload.deepLink == nil && payload.action == nil && payload.actions.isEmpty)
+            #expect(payload.data["bighelp_wake"] != nil && payload.data["bighelp_meta"] != nil)
+        }
+    }
+
+    // MARK: The picture's size
+
+    /// Answers every request with the stub's head and body, so the downloader's early checks can be seen.
+    final class StubPicture: URLProtocol {
+        nonisolated(unsafe) static var headers: [String: String] = [:]
+        nonisolated(unsafe) static var status = 200
+        nonisolated(unsafe) static var body = Data()
+        nonisolated(unsafe) static var bodyWasRead = false
+
+        override class func canInit(with request: URLRequest) -> Bool { true }
+        override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+        override func startLoading() {
+            let response = HTTPURLResponse(url: request.url!, statusCode: Self.status, httpVersion: nil, headerFields: Self.headers)!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            Self.bodyWasRead = true
+            client?.urlProtocol(self, didLoad: Self.body)
+            client?.urlProtocolDidFinishLoading(self)
+        }
+        override func stopLoading() {}
+    }
+
+    private static func stubbedSession() -> URLSession {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StubPicture.self]
+        return URLSession(configuration: configuration)
+    }
+
+    @Test func aPictureThatSaysItIsTooBigIsRefusedBeforeItsBody() async throws {
+        StubPicture.status = 200
+        StubPicture.headers = ["Content-Length": String(BighelpPushDisplay.maximumImageBytes + 1)]
+        StubPicture.body = Data(count: 16)
+        let download = BighelpPushDisplay.download(using: Self.stubbedSession())
+        await #expect(throws: URLError.self) { _ = try await download(URL(string: "https://example.com/big.png")!) }
+        // And attaching it leaves the notification alone.
+        let display = try #require(BighelpPushDisplay(userInfo: Self.alert(.direct)))
+        let content = UNMutableNotificationContent()
+        await display.attachImage(to: content, download: download)
+        #expect(content.attachments.isEmpty)
+    }
+
+    @Test func aPictureThatTurnsOutBiggerThanItSaidStopsAtTheCap() async {
+        StubPicture.status = 200
+        StubPicture.headers = [:]
+        StubPicture.body = Data(count: 5_000)
+        let download = BighelpPushDisplay.download(using: Self.stubbedSession(), maximumBytes: 1_000)
+        await #expect(throws: URLError.self) { _ = try await download(URL(string: "https://example.com/long.png")!) }
+    }
+
+    @Test func aPictureWithinTheCapIsSavedWhole() async throws {
+        StubPicture.status = 200
+        StubPicture.headers = ["Content-Length": String(Self.png.count)]
+        StubPicture.body = Self.png
+        let download = BighelpPushDisplay.download(using: Self.stubbedSession())
+        let (file, response) = try await download(URL(string: "https://example.com/ok.png")!)
+        defer { try? FileManager.default.removeItem(at: file) }
+        #expect((response as? HTTPURLResponse)?.statusCode == 200)
+        #expect(try Data(contentsOf: file) == Self.png)
+    }
+
+    @Test func aFailedAnswerIsNotDownloaded() async {
+        StubPicture.status = 404
+        StubPicture.headers = [:]
+        StubPicture.body = Self.png
+        let download = BighelpPushDisplay.download(using: Self.stubbedSession())
+        await #expect(throws: URLError.self) { _ = try await download(URL(string: "https://example.com/gone.png")!) }
+    }
+
+    @Test func aSeamAnswerThatClaimsTooMuchIsRefusedEvenIfItWroteAFile() async throws {
+        let display = try #require(BighelpPushDisplay(userInfo: Self.alert(.direct)))
+        let download: BighelpPushDisplay.Download = { url in
+            let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            try Self.png.write(to: file)
+            let head = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil,
+                                       headerFields: ["Content-Length": String(BighelpPushDisplay.maximumImageBytes + 1)])!
+            return (file, head)
+        }
+        let content = UNMutableNotificationContent()
+        await display.attachImage(to: content, download: download)
+        #expect(content.attachments.isEmpty)
     }
 
     // MARK: Finishing in time

@@ -62,13 +62,40 @@ struct BighelpPushDisplay: Equatable, Sendable {
     typealias Download = @Sendable (URL) async throws -> (URL, URLResponse)
 
     /// The picture's download, with a short timeout: the extension has about 30 seconds in all.
-    static let download: Download = { url in
+    static let download: Download = download(using: {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = 10
         configuration.timeoutIntervalForResource = 20
-        let session = URLSession(configuration: configuration)
-        defer { session.finishTasksAndInvalidate() }
-        return try await session.download(from: url)
+        return URLSession(configuration: configuration)
+    }())
+
+    /// Reads the answer's head first and gives up at once on a picture that says it is too big, or
+    /// stops once it has read too much, instead of downloading all of it to find out.
+    static func download(using session: URLSession, maximumBytes: Int = maximumImageBytes) -> Download {
+        { url in
+            let (bytes, response) = try await session.bytes(from: url)
+            guard (response as? HTTPURLResponse)?.statusCode == 200,
+                  response.expectedContentLength <= Int64(maximumBytes) else {
+                throw URLError(.dataLengthExceedsMaximum)
+            }
+            let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            guard FileManager.default.createFile(atPath: file.path, contents: nil) else { throw URLError(.cannotCreateFile) }
+            do {
+                let handle = try FileHandle(forWritingTo: file)
+                defer { try? handle.close() }
+                var chunk = Data(); var total = 0
+                for try await byte in bytes {
+                    chunk.append(byte); total += 1
+                    guard total <= maximumBytes else { throw URLError(.dataLengthExceedsMaximum) }
+                    if chunk.count >= 65_536 { try handle.write(contentsOf: chunk); chunk.removeAll(keepingCapacity: true) }
+                }
+                try handle.write(contentsOf: chunk)
+            } catch {
+                try? FileManager.default.removeItem(at: file)
+                throw error
+            }
+            return (file, response)
+        }
     }
 
     /// Registers the action buttons and attaches the picture. Anything that fails leaves the
@@ -107,6 +134,7 @@ struct BighelpPushDisplay: Equatable, Sendable {
         do {
             let (location, response) = try await download(url)
             guard (response as? HTTPURLResponse)?.statusCode == 200,
+                  response.expectedContentLength <= Int64(Self.maximumImageBytes),
                   let size = try? location.resourceValues(forKeys: [.fileSizeKey]).fileSize,
                   size <= Self.maximumImageBytes else {
                 try? FileManager.default.removeItem(at: location)

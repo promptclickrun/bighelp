@@ -356,6 +356,7 @@ extension RootShellView {
     /// asks for: its Bot Chat, its latest chat, or a new one. The all-hosts view
     /// keeps its Back navigation (`openFleetAgent` is its version).
     func openAgentChat(_ agentID: String) {
+        Telemetry.featureUsed(.agentOpened)
         agents.select(agentID)
         switch settings.botChatExperience {
         case .botChat:

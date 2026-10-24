@@ -100,6 +100,7 @@ final class CarPlayVoiceSession {
             phase = .problem(Self.permissionProblem)
             return
         }
+        Telemetry.featureUsed(.carplayVoice)
         // Keep the host connection while the car is connected, even with the iPhone locked.
         releaseHost = BighelpShortcutService.holdHostConnection()
         waitingOn = .computer

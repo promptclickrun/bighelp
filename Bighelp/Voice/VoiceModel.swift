@@ -497,6 +497,7 @@ final class VoiceModel {
             )
         )
         onStartedTurn(transcript)
+        Telemetry.featureUsed(.voiceTurn)
         isAgentRunActive = true
         status = .working
         turnTask = Task { @MainActor [weak self] in

@@ -125,6 +125,7 @@ final class WatchRelay: NSObject {
             try await workspace.readyChat(agentID: agent.id, reusing: outgoing.sessionID)
         }
         remember(outgoing.id, sessionID: sessionID)
+        Telemetry.featureUsed(.watchChat)
 
         // The phone's own draft for this chat comes back after the Watch's message.
         let phoneDraft = chat.draft

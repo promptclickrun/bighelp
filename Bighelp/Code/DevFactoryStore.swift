@@ -78,6 +78,7 @@ final class DevFactoryStore {
             let started = try await client.startCodeRun(workflowID: recipe.id, revision: revision, inputs: inputs,
                                                         clientRunToken: UUID().uuidString.lowercased(),
                                                         projects: projects)
+            Telemetry.featureUsed(.workflowRun)
             await load()
             errorMessage = nil
             return started.groupID.isEmpty ? started.first.id : started.groupID

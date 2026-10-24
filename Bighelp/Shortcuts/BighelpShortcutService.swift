@@ -344,6 +344,8 @@ final class BighelpShortcutService: @unchecked Sendable {
         }
         try Task.checkCancellation()
         let workspace = try await liveWorkspace()
+        // Past the AI-data agreement (`liveWorkspace` refuses before it), so this run counts.
+        Telemetry.featureUsed(.shortcutRun)
         let agent = try resolveAgent(explicitID: request.agentID, in: workspace)
         defer { workspace.featureStore.flushChatPersistence() }
         let session = try await workspace.catalog.createDirect(agentID: agent.id)

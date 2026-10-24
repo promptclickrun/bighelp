@@ -173,6 +173,7 @@ extension ChatModel {
         }
 
         isSending = true
+        if restoresDraft { Telemetry.featureUsed(.chatSent) }
         let generation = beginOwnerGeneration()
         hasLocallyPendingPrimaryTurn = true
         failureMessage = nil
@@ -445,6 +446,7 @@ extension ChatModel {
         }
         do { try validateAttachmentSupport(attachments) }
         catch { failureMessage = error.localizedDescription; return }
+        if restoresDraft { Telemetry.featureUsed(.chatSent) }
         let priorGeneration = ownerGeneration
         let native = nativeConversationClient
         let existingNativeSubmissionIDs = Set(native?.journal.unresolved.map(\.id) ?? [])

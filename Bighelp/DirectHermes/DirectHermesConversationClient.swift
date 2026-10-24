@@ -204,6 +204,9 @@ final class DirectHermesConversationClient: StreamingConversationClient, Stoppab
     @ObservationIgnored var voiceReplyUnavailable = false
     @ObservationIgnored let monotonicNow: @MainActor () -> UInt64
     @ObservationIgnored var liveTurnStart: (epoch: String, turnID: String, nanoseconds: UInt64)?
+    /// When the pending prompt left for the host, for `perf.first_token_ms`. Nil once the first
+    /// token of its turn came, or when the prompt wasn't a plain new turn (a command, a queued one).
+    @ObservationIgnored var promptSentAt: UInt64?
     /// A queued voice receipt has admitted the prompt, but Hermes does not
     /// include the eventual turn identity in that receipt. Keep the waiter
     /// until the first native `message.start` for this submission establishes

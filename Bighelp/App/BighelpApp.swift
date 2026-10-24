@@ -140,6 +140,12 @@ struct BighelpApp: App {
             guard let owner = connections.owner else { return nil }
             return (owner.cacheScopeID, DirectHermesMyTemplatesClient(workspace: { connections.workspace }))
         }
+        // Usage and crash numbers, unless this run is a test or demo (then nothing is made and nothing sent).
+        Telemetry.bootstrap()
+        TelemetryMetricKit.shared.start()
+        TelemetryController.shared.visitHosts = usesDemoWorkspace
+            ? DemoTelemetryHosts.shared.visitor
+            : RegistryTelemetryHosts.visitor(registry: hostRegistry, connections: connections)
         let nativeWorkspaceKey: @MainActor () -> BighelpShortcutWorkspaceKey? = {
             if usesDemoWorkspace, !connections.isDirectSelected { return nil }
             guard hostRegistry.connectionMode == .independent || connections.isDirectSelected else { return nil }
@@ -679,6 +685,8 @@ struct BighelpApp: App {
             .preferredColorScheme(settings.appearance.preferredColorScheme)
             .onChange(of: settings.appearance) { _, appearance in BighelpWindowAppearance.apply(appearance) }
             .task(id: scenePhase) {
+                // Opened and backgrounded for usage numbers; also sends what the notification extension counted.
+                TelemetryLifecycle.shared.scenePhaseChanged(to: scenePhase)
                 guard scenePhase == .active else { return }
                 BighelpWindowAppearance.apply(settings.appearance)
                 // Opening bighelp is "I've seen it": the icon badge goes away.

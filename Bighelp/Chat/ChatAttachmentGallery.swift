@@ -210,6 +210,7 @@ struct ChatAttachmentPreviewView: View {
             }
         }
         .task {
+            Telemetry.featureUsed(.fileOpened)
             saveDestination = await ChatAttachmentMediaValidator.destination(for: attachment)
             do {
                 previewURL = try ChatAttachmentTemporaryFile.write(attachment)

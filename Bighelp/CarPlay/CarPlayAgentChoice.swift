@@ -59,9 +59,11 @@ enum CarPlayAgentChoice {
     }
 }
 
-/// The agent last picked in the car, saved on this device.
+/// The agent CarPlay talks to and the computer it's on, saved on this device: picked in
+/// Settings › CarPlay, or last in the car. No computer means the one bighelp is using.
 struct CarPlayAgentPreference {
     static let key = "bighelp.carplay.agentID"
+    static let hostKey = "bighelp.carplay.hostID"
     static let maximumIDLength = 128
 
     private let defaults: UserDefaults
@@ -81,6 +83,13 @@ struct CarPlayAgentPreference {
             } else {
                 defaults.removeObject(forKey: Self.key)
             }
+        }
+    }
+
+    var hostID: UUID? {
+        get { defaults.string(forKey: Self.hostKey).flatMap(UUID.init(uuidString:)) }
+        nonmutating set {
+            if let newValue { defaults.set(newValue.uuidString, forKey: Self.hostKey) } else { defaults.removeObject(forKey: Self.hostKey) }
         }
     }
 

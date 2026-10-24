@@ -9,6 +9,15 @@ import Speech
 enum BighelpCarPlayServices {
     static var workspace: (@MainActor () async throws -> BighelpShortcutWorkspace)?
     static var settings: SettingsStore?
+    /// Makes a computer the one bighelp uses (Settings › CarPlay's), as a Shortcut does.
+    static var useGateway: (@MainActor (UUID) throws -> Void)?
+    /// The computers, for Settings › CarPlay.
+    static var gateways: (@MainActor () -> [BighelpShortcutGateway])?
+    /// The agents on a computer (nil: the one in use), for Settings › CarPlay.
+    static var agents: (@MainActor (UUID?) async throws -> [BighelpShortcutAgent])?
+    /// Faces: saved characters and the computer they're saved for.
+    static var companion: CompanionStore?
+    static var companionScope: (@MainActor () -> String)?
 }
 
 /// A hands-free voice chat with the agent last picked in the car (else the
@@ -25,6 +34,16 @@ final class CarPlayVoiceSession {
 
     private(set) var phase: Phase = .connecting
     private(set) var agentName = "your agent"
+    /// The agent being talked to, and its picture, for the car's screen.
+    private(set) var agent: CarPlayAgent?
+    private(set) var agentImageURL: URL?
+    /// The agents on this computer, for the car's list (names and pictures only).
+    private(set) var agents: [CarPlayAgent] = []
+    private(set) var agentImageURLs: [String: URL] = [:]
+    /// The step the agent is on, in plain words, as voice mode shows it; nil between steps.
+    private(set) var step: String?
+    /// This turn's earlier steps, newest first, a few at most.
+    private(set) var earlierSteps: [String] = []
     /// The chat this car connection is in; Talk after a pause goes on in it.
     private(set) var chatID: String?
     private(set) var isMuted = false
@@ -38,8 +57,15 @@ final class CarPlayVoiceSession {
     private var voice: VoiceModel?
     private var live: LiveVoiceModel?
     private var following: Task<Void, Never>?
+    /// The chat's live state, for its steps.
+    private var chat: ChatModel?
     private var releaseHost: (@MainActor () -> Void)?
     private var generation = 0
+    /// What a start is waiting on, so a stall says which step it was.
+    private var waitingOn = CarPlayConnectStep.computer
+    private var watchdog: Task<Void, Never>?
+    /// How long a start may take before the car says what's wrong instead of "Connecting…".
+    var connectLimit: Duration = .seconds(20)
 
     init(
         workspace: @escaping () async throws -> BighelpShortcutWorkspace = {
@@ -75,10 +101,18 @@ final class CarPlayVoiceSession {
         }
         // Keep the host connection while the car is connected, even with the iPhone locked.
         releaseHost = BighelpShortcutService.holdHostConnection()
+        waitingOn = .computer
+        watch(current)
+        // The computer picked in Settings › CarPlay, if bighelp is using another one.
+        if let host = preference.hostID { try? BighelpCarPlayServices.useGateway?(host) }
         do {
             let workspace = try await workspace()
             guard current == generation else { return }
             let agents = workspace.agents.profiles.map(CarPlayAgent.init)
+            self.agents = agents
+            agentImageURLs = Dictionary(workspace.agents.profiles.compactMap { profile in
+                workspace.agents.avatarURL(for: profile).map { (profile.id, $0) }
+            }, uniquingKeysWith: { first, _ in first })
             guard let agent = CarPlayAgentChoice.resolve(
                 requestedID: agentID ?? continuity.agentID ?? preference.agentID, in: agents,
                 fallbackID: workspace.agents.resolvedAgent(explicitID: nil)?.id)
@@ -88,11 +122,18 @@ final class CarPlayVoiceSession {
             }
             if agentID == agent.id { preference.agentID = agent.id }
             agentName = agent.name
+            self.agent = agent
+            agentImageURL = agentImageURLs[agent.id]
+            chat = nil
+            step = nil
+            earlierSteps = []
+            waitingOn = .chat
             let (sessionID, _) = try await workspace.readyChat(
                 agentID: agent.id, reusing: continuity.reusableSessionID(for: agent.id))
             guard current == generation else { return }
             continuity.remember(sessionID: sessionID, agentID: agent.id)
             chatID = sessionID
+            chat = workspace.featureStore.preparedChatModel(id: sessionID)
             let presentation = workspace.featureStore.makeVoicePresentation(
                 for: sessionID,
                 mode: .pressToTalk,
@@ -102,9 +143,15 @@ final class CarPlayVoiceSession {
                 liveVoice: settings().map { $0.liveVoice(for: $0.liveVoiceProvider) }
                     ?? LiveVoiceProvider.codexSubscription.defaultVoice
             )
+            waitingOn = .voice
             if let live = presentation.liveModel {
                 self.live = live
                 live.start()
+                // Live voice declines quietly when its connection is from before a reconnect.
+                if live.phase == .idle {
+                    phase = .problem(CarPlayConnectStep.voice.problem)
+                    return releaseHostConnection()
+                }
             } else {
                 // Without live voice, this device hears the words itself.
                 guard speechAllowed() else {
@@ -126,6 +173,8 @@ final class CarPlayVoiceSession {
     func stop() {
         // A start still connecting must not begin listening after this.
         generation += 1
+        watchdog?.cancel()
+        watchdog = nil
         following?.cancel()
         following = nil
         live?.end()
@@ -162,6 +211,20 @@ final class CarPlayVoiceSession {
         sync()
     }
 
+    /// A start that's still connecting after `connectLimit` stops and says which step stalled,
+    /// so the car never sits on "Connecting…".
+    private func watch(_ current: Int) {
+        watchdog?.cancel()
+        let limit = connectLimit
+        watchdog = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: limit)
+            guard !Task.isCancelled, let self, self.generation == current, self.phase == .connecting else { return }
+            let step = self.waitingOn
+            self.stop()
+            self.phase = .problem(step.problem)
+        }
+    }
+
     private func releaseHostConnection() {
         releaseHost?()
         releaseHost = nil
@@ -190,6 +253,8 @@ final class CarPlayVoiceSession {
                 _ = live?.phase
                 _ = live?.workStatus
                 _ = live?.errorMessage
+                _ = chat?.liveStepPhrase
+                _ = chat?.isSending
             } onChange: {
                 once.resume()
             }
@@ -202,6 +267,7 @@ final class CarPlayVoiceSession {
     }
 
     private func sync() {
+        followSteps()
         if let live {
             phase = switch live.phase {
             case .idle, .preparing, .connecting: .connecting
@@ -223,6 +289,43 @@ final class CarPlayVoiceSession {
             phase = .problem("bighelp can't hear you. Check microphone access for bighelp on your iPhone.")
         } else if voice.allowsInputMonitoring, voice.meterState == .idle {
             Task { await voice.startMonitoring() }
+        }
+    }
+}
+
+extension CarPlayVoiceSession {
+    /// How many earlier steps the car shows under the current one.
+    nonisolated static let earlierStepLimit = 3
+
+    /// The chat's current step, and the ones before it this turn; a new turn starts over.
+    fileprivate func followSteps() {
+        let next = chat?.liveStepPhrase
+        guard next != step else {
+            if chat?.isSending != true, step == nil, !earlierSteps.isEmpty { earlierSteps = [] }
+            return
+        }
+        (step, earlierSteps) = Self.steps(after: step, earlier: earlierSteps, next: next, isWorking: chat?.isSending == true)
+    }
+
+    /// Plain rules for the car's step lines: a new step pushes the last one down; the turn's end
+    /// clears them; the same step twice in a row is one line.
+    nonisolated static func steps(after current: String?, earlier: [String], next: String?,
+                                  isWorking: Bool) -> (String?, [String]) {
+        guard isWorking else { return (nil, []) }
+        guard let current, current != next else { return (next, earlier) }
+        return (next, Array(([current] + earlier.filter { $0 != current }).prefix(earlierStepLimit)))
+    }
+}
+
+/// The steps a car's start goes through, each with what the car says if it stalls there.
+enum CarPlayConnectStep: Equatable {
+    case computer, chat, voice
+
+    var problem: String {
+        switch self {
+        case .computer: "bighelp couldn't reach your computer. Check that it's on and online."
+        case .chat: "Your computer answered, but the chat didn't start. Try again."
+        case .voice: "The chat is ready, but voice didn't start. Try again."
         }
     }
 }

@@ -539,8 +539,18 @@ sections can crash only on devices ("Thread stack size exceeded").
   `BighelpCarPlay.entitlements` (`CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]` and `[sdk=iphonesimulator*]`). Vision Pro and
   the Mac have no CarPlay and keep `Bighelp.entitlements`, so a change to the shared keys goes in both files.
 - Voice buttons belong to each `CPVoiceControlState` (`actionButtons`); the template only has bar buttons.
+- CarPlay calls every handler (`CPButton`, `CPBarButton`, `CPAlertAction`, `CPListItem`) on its own queue. A
+  main-actor closure traps there (the 2.6.17 Agents button crash), so make them with `CarPlayCallbacks`, which hop.
+- The root is a list (`CPListTemplate`): its header (`CPListTemplateDetailsHeader`) has the agent's face, what it's
+  doing (`liveStepPhrase`, as in voice mode) and its last steps; the other agents are under it. The voice screen
+  shows over it while you talk (iOS 27's overlay, else presented). A voice template can't be the root, and
+  nothing may be pushed over it.
+- The car is in use from connect to disconnect: the scene holds the host connection (`holdHostConnection`) so the
+  background closers leave it, and `audio` in `UIBackgroundModes` keeps voice going with the iPhone locked. A step
+  that doesn't finish in 20 s ends with a message that names it (`CarPlayConnectStep`), never an endless Connecting.
+- Settings › CarPlay picks the computer and the agent (`CarPlayAgentPreference`); a pick in the car changes it too.
 - Tests can't open the simulator's CarPlay window. `CarPlayVoiceUITests` drives the same session through the
-  DEBUG `-test-carplay-session` screen on the demo data.
+  DEBUG `-test-carplay-session` screen on the demo data; `CarPlayTemplateTests` builds the car's templates.
 
 ### Connections, widgets and Shortcuts
 

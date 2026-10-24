@@ -187,7 +187,7 @@ struct SettingsView: View {
             BighelpDeferredSection { SpatialAvatarSettingsSection(settings: settings) }
             #endif
             BighelpDeferredSection {
-                settingsMenuGroup(sections: [.connectivityAndNotifications, .permissions] + Self.watchSection
+                settingsMenuGroup(sections: [.connectivityAndNotifications, .permissions] + Self.watchSection + Self.carPlaySection
                                   + (companionStore == nil ? [] : [.companion]) + [.help])
             }
             BighelpDeferredSection { nerdModeToggle }
@@ -469,6 +469,12 @@ struct SettingsView: View {
             settingsPage(title: section.title) { helpAndFeedback }
         case .watch:
             settingsPage(title: section.title) { appleWatch }
+        case .carPlay:
+            #if os(iOS) && !targetEnvironment(macCatalyst)
+            settingsPage(title: section.title) { CarPlaySettingsSection() }
+            #else
+            EmptyView()
+            #endif
         case .connectivityAndNotifications:
             systemPage
         }
@@ -495,6 +501,15 @@ struct SettingsView: View {
         notificationContext?.turnOff ?? BighelpNotificationTurnOff.demoShared
         #else
         notificationContext?.turnOff
+        #endif
+    }
+
+    /// Only an iPhone connects to CarPlay.
+    private static var carPlaySection: [SettingsMenuSection] {
+        #if os(iOS) && !targetEnvironment(macCatalyst)
+        UIDevice.current.userInterfaceIdiom == .phone ? [.carPlay] : []
+        #else
+        []
         #endif
     }
 

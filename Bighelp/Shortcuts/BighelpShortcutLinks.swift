@@ -20,6 +20,7 @@ final class BighelpIncomingLinkCenter {
 
     /// The latest one wins, like links tapped while the app starts.
     func open(_ url: URL) {
+        Telemetry.featureUsed(.shortcutRun)
         pending = BighelpIncomingLink(url: url)
     }
 

@@ -82,6 +82,12 @@ extension DirectHermesConversationClient {
             }
             model?.adoptNativeTurn(from: self, turnID: projection.turnID, running: true)
         }
+        // The first streamed token of the turn this prompt started: time from Send to it.
+        if event.type == "message.delta", !isReplayingActivity, let sent = promptSentAt,
+           pendingID != nil, pendingTurnID == projection.turnID {
+            promptSentAt = nil
+            Telemetry.record(.firstToken(ms: Int(monotonicNow() &- sent) / 1_000_000))
+        }
         if event.type == "session.info" {
             if let value = event.payload["model"]?.string { modelName = value }
             if let value = event.payload["reasoning_effort"]?.string {

@@ -330,6 +330,7 @@ final class BighelpShortcutService: @unchecked Sendable {
         let message = request.message.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !message.isEmpty else { throw BighelpShortcutServiceError.emptyMessage }
         try Task.checkCancellation()
+        Telemetry.featureUsed(.shortcutRun)
         // Waiting no longer requires bighelp in the foreground. The intent runs
         // in the app process, which keeps the Hermes socket alive while
         // Shortcuts waits. The hook stays for callers that still opt in.

@@ -232,6 +232,7 @@ final class SettingsStore {
     /// Switches to `mode`. The shell follows `experience` and `simpleBotsEnabled` to that mode's home.
     func switchMode(_ mode: BighelpMode) {
         guard availableModes.contains(mode), mode != currentMode else { return }
+        Telemetry.featureUsed(.modeSwitched)
         switch mode {
         case .bots:
             simpleBotsEnabled = true

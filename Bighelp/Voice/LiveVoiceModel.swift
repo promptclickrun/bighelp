@@ -143,6 +143,7 @@ final class LiveVoiceModel {
     /// No auto-start in onAppear. A Start tap is the sole microphone/auth gate.
     func start() {
         guard canStart else { return }
+        Telemetry.featureUsed(.voiceLive)
         generation = UUID()
         let token = generation
         let id = "voice_\(UUID().uuidString)"

@@ -53,7 +53,11 @@ struct BighelpCardView: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(card.spokenSummary)
-        .task { updatedAt = Date() }
+        .task {
+            updatedAt = Date()
+            // Counted once per card per run (a scroll draws it again). The ID is only compared here.
+            if renderer.isValid { Telemetry.featureUsedOnce(.cardRendered, key: card.id) }
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { updatedAt = Date() }
         }

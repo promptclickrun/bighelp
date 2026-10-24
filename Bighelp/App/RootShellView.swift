@@ -1939,7 +1939,11 @@ private struct IncomingLinks: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .onOpenURL(perform: open)
+            .onOpenURL { url in
+                // A loopdy:// link the system handed over: a widget, a Live Activity or a link in an alert.
+                if BighelpIncomingURLRoute.parse(url) != nil { Telemetry.featureUsed(.widgetOpened) }
+                open(url)
+            }
             .onContinueUserActivity(WatchPhoneLink.handoffActivityType) { activity in
                 if let link = activity.userInfo?["url"] as? String, let url = URL(string: link) { open(url) }
             }

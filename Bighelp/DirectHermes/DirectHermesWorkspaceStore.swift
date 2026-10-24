@@ -164,7 +164,17 @@ final class DirectHermesWorkspaceStore {
         let owner = generation
         isConnecting = true
         status = "Reconnecting to your selected host…"
-        defer { if owner == generation { isConnecting = false } }
+        let reconnectStart = ContinuousClock.now
+        var reconnectOutcome = TelemetryOutcome.failed
+        defer {
+            if owner == generation {
+                isConnecting = false
+                // Counted when the connection came back or the attempt gave up, not when it was overtaken.
+                let elapsed = reconnectStart.duration(to: .now).components
+                Telemetry.record(.reconnect(ms: Int(elapsed.seconds) * 1_000 + Int(elapsed.attoseconds / 1_000_000_000_000_000),
+                                            attempts: 1, outcome: reconnectOutcome))
+            }
+        }
         await previous?.disconnect()
         guard owner == generation else { return }
         do {
@@ -181,6 +191,7 @@ final class DirectHermesWorkspaceStore {
             catch { await connection.disconnect(); throw error }
             try await discoverProfiles(owner: owner)
             guard owner == generation else { return }
+            reconnectOutcome = .ok
             await recoverRetainedChats(connection, owner: owner)
         } catch {
             guard owner == generation else { return }

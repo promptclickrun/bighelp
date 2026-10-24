@@ -238,6 +238,7 @@ struct ChatCardInteractionHandler {
         guard isCurrent, identity.scope.exactlyMatches(scope) else { throw ChatCardInteractionError.ownerChanged }
         guard sendReply(text) else { throw ChatCardInteractionError.notReady }
         store.setReply(text, for: identity)
+        Telemetry.featureUsed(.formSubmitted)
     }
 
     var isCurrent: Bool {

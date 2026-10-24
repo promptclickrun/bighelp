@@ -476,6 +476,7 @@ final class WorkflowEditorModel {
                                                 clientRunToken: token)
             pendingRunToken = nil
             message = nil
+            Telemetry.featureUsed(.workflowRun)
             return run
         } catch WorkspaceClientError.rejected(let code, _) where code == "not_valid" {
             message = "Your computer found a problem with this workflow. Fix it, then run it again."

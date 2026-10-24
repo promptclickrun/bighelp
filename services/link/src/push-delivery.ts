@@ -12,6 +12,8 @@ import {
 import {
   attachDeliveryMeta,
   BuzzKitBackendError,
+  buzzKitConfigured,
+  type BuzzKitEnvironment,
   type BuzzKitMessageReceipt,
   type ManagedMessage,
 } from "./buzzkit.js";
@@ -567,10 +569,15 @@ export async function deliverMessage(input: DeliverMessageInput): Promise<BuzzKi
   }
   const dedupeKey = sendKey(owner.credentialId, kind, message.idempotencyKey);
   const apnsId = await apnsIdFor(dedupeKey);
-  // A topic this person turned off is not sent. BuzzKit accepts such a message and
-  // delivers it to nobody, and the host is told the same. Wakes ignore topics.
+  // A topic this person turned off. Wakes ignore topics.
   const topic = message.body.topic;
   if (kind === "alert" && typeof topic === "string" && route.target.mutedTopics?.includes(topic)) {
+    // BuzzKit holds the person's real settings, and the Worker's list may be out of date. While
+    // BuzzKit is there, let it decide, so a stale list can never hide an alert someone wants.
+    if (buzzKitConfigured(env as unknown as BuzzKitEnvironment)) {
+      fallbackEvent(env, ctx, "topic_muted");
+      return viaBuzzKit(env, ctx, info, input.sendViaBuzzKit, (value) => value.status);
+    }
     return {
       status: "accepted", deliveryId: apnsId, providerStatus: "suppressed", counts: { total: 0, sent: 0 },
     };

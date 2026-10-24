@@ -193,6 +193,12 @@ export const LOOPDY_BUZZKIT_TOPICS = [
   { slug: "subagent-completions", name: "Subagent Completions" },
 ] as const;
 
+/** True when this Worker can send through BuzzKit, which then holds the person's real topic settings. */
+export function buzzKitConfigured(env: BuzzKitEnvironment): boolean {
+  return Boolean(env.BUZZKIT_API_KEY?.trim() && env.BUZZKIT_IDENTITY_SECRET?.trim())
+    && env.BUZZKIT_IDENTITY_SECRET_GENERATION?.trim() === REQUIRED_IDENTITY_SECRET_GENERATION;
+}
+
 export class BuzzKitBackendError extends Error {
   constructor(readonly status: number, readonly code: string) {
     super(code);

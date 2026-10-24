@@ -3,8 +3,8 @@ import type { PushTargetEnv } from "./push-targets.js";
 export type PushSendState = "sending" | "sent" | "queued" | "buzzkit";
 
 export const PUSH_SEND_RETENTION_SECONDS = 86_400;
-/** A claim that never finished (the Worker was cut off) can be taken over after this. */
-export const PUSH_SEND_STALE_SECONDS = 60;
+/** A claim that never finished (the Worker was cut off) can be taken over after this. The direct path ends by 8 s. */
+export const PUSH_SEND_STALE_SECONDS = 20;
 
 export type PushSendClaim =
   | { status: "claimed" }

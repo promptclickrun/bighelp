@@ -1,6 +1,7 @@
 import { apnsConfig, apnsIdFor } from "./apns.js";
 import {
   BuzzKitBackendError,
+  buzzKitConfigured,
   buzzKitRecipientExternalId,
   sendBuzzKitLiveActivity,
   sendBuzzKitMessage,
@@ -210,53 +211,74 @@ async function processOne(message: Message<unknown>, env: LinkEnv, events: Relay
     }
   };
 
-  // A repeat from the host already gave this message to BuzzKit.
-  if (sendState === "buzzkit") return fallBack("already_with_buzzkit");
-  if (apnsBreakerOpen()) return fallBack("apns_breaker_open");
+  /**
+   * Everything that can go wrong with the direct send. It returns a reason to go through BuzzKit,
+   * or null once the message has been settled (acked, retried or dropped).
+   */
+  const direct = async (): Promise<string | null> => {
+    // A repeat from the host already gave this message to BuzzKit.
+    if (sendState === "buzzkit") return "already_with_buzzkit";
+    if (apnsBreakerOpen()) return "apns_breaker_open";
 
-  const config = apnsConfig(env);
-  if (!config) return fallBack("apns_unconfigured");
-  const lookup = await findPushTarget(
-    env, { installationId: owner.credentialId, ownerCoordinate: owner.coordinate }, spec.kind === "liveactivity"
-      ? "liveactivity" : "alert", retry.live?.activityId ?? "", nowSeconds,
-  );
-  if (lookup.status !== "found") return fallBack(lookup.status === "unreadable" ? "target_unreadable" : "no_target");
-  const target = lookup.target;
-  if (target.kind === "alert" && target.mutedTopics === null) return fallBack("target_incomplete");
-  // The person may have muted this topic while the message waited.
-  const topic = retry.message?.body.topic;
-  if (retry.kind === "alert" && typeof topic === "string" && target.mutedTopics?.includes(topic)) {
-    await finishPushSend(deliveryEnv, dedupeKey, "sent").catch(() => undefined);
-    message.ack();
-    return;
-  }
-
-  let result;
-  try {
-    result = await directAttempt({
-      env: deliveryEnv, owner, config, target, spec, apnsId: await apnsIdFor(dedupeKey), startedAt,
-      attempt: message.attempts + 1, authorize,
-    }, events);
-  } catch (error) {
-    if (error instanceof NotificationError) return drop("egress_denied");
-    throw error;
-  }
-  if (result.outcome === "sent") {
-    await finishPushSend(deliveryEnv, dedupeKey, "sent").catch(() => undefined);
-    message.ack();
-    return;
-  }
-  if (result.outcome === "retryable") {
-    // The first try was inline, so this was the second failure or later. One more wait is only
-    // worth it if the push would still be fresh, and the rule keeps it to two tries in all.
-    const delay = backoff(message.attempts);
-    if (retryStillUseful(message.attempts + 1, nowSeconds, expiry, delay)) {
-      events.push(relayEvent("push.retry", { attempt: message.attempts + 1, reason: safeCode(result.reason) }));
-      logPush("retry", result.reason);
-      message.retry({ delaySeconds: delay });
-      return;
+    const config = apnsConfig(env);
+    if (!config) return "apns_unconfigured";
+    const lookup = await findPushTarget(
+      env, { installationId: owner.credentialId, ownerCoordinate: owner.coordinate }, spec.kind === "liveactivity"
+        ? "liveactivity" : "alert", retry.live?.activityId ?? "", nowSeconds,
+    );
+    if (lookup.status !== "found") return lookup.status === "unreadable" ? "target_unreadable" : "no_target";
+    const target = lookup.target;
+    if (target.kind === "alert" && target.mutedTopics === null) return "target_incomplete";
+    // The person may have muted this topic while the message waited. BuzzKit holds the real
+    // settings, so it decides while it is there.
+    const topic = retry.message?.body.topic;
+    if (retry.kind === "alert" && typeof topic === "string" && target.mutedTopics?.includes(topic)) {
+      if (buzzKitConfigured(env)) return "topic_muted";
+      await finishPushSend(deliveryEnv, dedupeKey, "sent").catch(() => undefined);
+      message.ack();
+      return null;
     }
-    return fallBack("retries_exhausted");
+
+    let result;
+    try {
+      result = await directAttempt({
+        env: deliveryEnv, owner, config, target, spec, apnsId: await apnsIdFor(dedupeKey), startedAt,
+        attempt: message.attempts + 1, authorize,
+      }, events);
+    } catch (error) {
+      if (error instanceof NotificationError) {
+        await drop("egress_denied");
+        return null;
+      }
+      throw error;
+    }
+    if (result.outcome === "sent") {
+      await finishPushSend(deliveryEnv, dedupeKey, "sent").catch(() => undefined);
+      message.ack();
+      return null;
+    }
+    if (result.outcome === "retryable") {
+      // The first try was inline, so this was the second failure or later. One more wait is only
+      // worth it if the push would still be fresh, and the rule keeps it to two tries in all.
+      const delay = backoff(message.attempts);
+      if (retryStillUseful(message.attempts + 1, nowSeconds, expiry, delay)) {
+        events.push(relayEvent("push.retry", { attempt: message.attempts + 1, reason: safeCode(result.reason) }));
+        logPush("retry", result.reason);
+        message.retry({ delaySeconds: delay });
+        return null;
+      }
+      return "retries_exhausted";
+    }
+    return fallbackReason(result);
+  };
+
+  let reason: string | null;
+  try {
+    reason = await direct();
+  } catch {
+    // A database or decryption error, or anything else: the push is time sensitive, so send it
+    // through BuzzKit now instead of waiting to fail the same way again.
+    reason = "consumer_error";
   }
-  return fallBack(fallbackReason(result));
+  if (reason) await fallBack(reason);
 }

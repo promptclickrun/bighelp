@@ -69,6 +69,14 @@ final class CarPlayVoiceController: NSObject, CPInterfaceControllerDelegate {
     /// The voice screen on the car, or on its way there. A new one each time: one the car
     /// closed isn't shown again.
     private var voice: CPVoiceControlTemplate?
+    /// The agent `voice` shows; nil when it was made before the agent was known.
+    private var voiceAgentID: String?
+    /// A voice screen CarPlay is still bringing up, and what to do if it's hidden meanwhile
+    /// (it's taken down once it's up, then this runs).
+    private var arriving: CPVoiceControlTemplate?
+    private var afterArrival: (@MainActor @Sendable () -> Void)?
+    /// Refused shows in a row; retries stop after a few, until the next Talk.
+    private var refusedShows = 0
     /// Whether the conversation should have its screen up. Talk (or an agent) asks for it;
     /// End, a problem or the car closing the screen drop it.
     private var wantsVoice = false
@@ -121,6 +129,9 @@ final class CarPlayVoiceController: NSObject, CPInterfaceControllerDelegate {
     /// Talk, or a tap on an agent: back to the conversation that's on with that agent, else a new one.
     private func talk(agentID: String? = nil) {
         wantsVoice = true
+        refusedShows = 0
+        // A tap on the home means no voice screen covers it, whatever the car said or didn't.
+        if voice != nil, arriving == nil { voice = nil }
         switch CarPlayTalkAction.for(phase: session.phase, currentAgentID: session.agent?.id, requestedID: agentID) {
         case .showCall:
             showVoice()
@@ -158,6 +169,9 @@ final class CarPlayVoiceController: NSObject, CPInterfaceControllerDelegate {
         case .connecting, .listening, .working, .speaking:
             if voice == nil {
                 if wantsVoice { showVoice() }
+            } else if arriving == nil, let agentID = session.agent?.id, agentID != voiceAgentID {
+                // Made before the agent was known, or for the last one: show its own face.
+                hideVoice { [weak self] in self?.showVoice() }
             } else {
                 showVoiceState()
             }
@@ -219,18 +233,31 @@ final class CarPlayVoiceController: NSObject, CPInterfaceControllerDelegate {
 
     /// Over the home while you talk. It's never the root and nothing is pushed over it.
     private func showVoice() {
-        guard #available(iOS 26.4, *), voice == nil else { return }
+        guard #available(iOS 26.4, *), voice == nil, arriving == nil else { return }
         let template = voiceTemplate()
         voice = template
+        voiceAgentID = session.agent?.id
+        arriving = template
         let done = CarPlayCallbacks.done { [weak self] success in
-            guard let self, self.voice === template else { return }
+            guard let self, self.arriving === template else { return }
+            self.arriving = nil
+            guard self.voice === template else {
+                // Hidden while it was on its way: take it down now that it's up.
+                let next = self.afterArrival
+                self.afterArrival = nil
+                self.shownPhase = nil
+                if success { self.dismiss(template, then: next) } else { next?() }
+                return
+            }
             if success {
+                self.refusedShows = 0
                 // A state set before the screen is up does nothing (CarPlay's rule), so set it now.
                 self.showVoiceState()
             } else {
-                // Refused (say, the last one was still leaving): the next refresh tries again.
+                // Refused (say, the last one was still leaving): the next refresh tries again, a few times.
                 self.voice = nil
-                self.shownPhase = nil
+                self.refusedShows += 1
+                if self.refusedShows < 4 { self.shownPhase = nil }
             }
         }
         if #available(iOS 27.0, *) {
@@ -241,16 +268,28 @@ final class CarPlayVoiceController: NSObject, CPInterfaceControllerDelegate {
     }
 
     private func hideVoice(then next: (@MainActor @Sendable () -> Void)? = nil) {
-        guard voice != nil else {
+        guard let shown = voice else {
             next?()
             return
         }
         voice = nil
+        // Hiding a screen that isn't up yet does nothing, so it goes once it's up.
+        if arriving === shown {
+            afterArrival = next
+            return
+        }
+        dismiss(shown, then: next)
+    }
+
+    private func dismiss(_ template: CPVoiceControlTemplate, then next: (@MainActor @Sendable () -> Void)?) {
         let done = CarPlayCallbacks.done { _ in next?() }
         if #available(iOS 27.0, *) {
             interface.hideOverlayTemplate(animated: true, completion: done)
-        } else {
+        } else if interface.presentedTemplate === template {
             interface.dismissTemplate(animated: true, completion: done)
+        } else {
+            // Already gone, or an alert is up instead: dismissing would close the alert.
+            next?()
         }
     }
 

@@ -62,14 +62,16 @@ enum CarPlayCallbacks {
 }
 
 @MainActor
-final class CarPlayVoiceController {
+final class CarPlayVoiceController: NSObject, CPInterfaceControllerDelegate {
     private let interface: CPInterfaceController
     private let session: CarPlayVoiceSession
     private var home: CPListTemplate?
+    /// The voice screen on the car, or on its way there. A new one each time: one the car
+    /// closed isn't shown again.
     private var voice: CPVoiceControlTemplate?
-    /// The agent the voice screen's faces are for.
-    private var voiceAgentID: String?
-    private var isVoiceShown = false
+    /// Whether the conversation should have its screen up. Talk (or an agent) asks for it;
+    /// End, a problem or the car closing the screen drop it.
+    private var wantsVoice = false
     private var mirroring: Task<Void, Never>?
     private var shownPhase: CarPlayVoiceSession.Phase?
     private var shownHeader: CarPlayHeaderContent?
@@ -79,6 +81,8 @@ final class CarPlayVoiceController {
     init(interface: CPInterfaceController, session: CarPlayVoiceSession = CarPlayVoiceSession()) {
         self.interface = interface
         self.session = session
+        super.init()
+        interface.delegate = self
     }
 
     func begin() {
@@ -114,12 +118,20 @@ final class CarPlayVoiceController {
 
     // MARK: Talking
 
+    /// Talk, or a tap on an agent: back to the conversation that's on with that agent, else a new one.
     private func talk(agentID: String? = nil) {
-        shownPhase = nil
-        Task { await session.start(agentID: agentID) }
+        wantsVoice = true
+        switch CarPlayTalkAction.for(phase: session.phase, currentAgentID: session.agent?.id, requestedID: agentID) {
+        case .showCall:
+            showVoice()
+        case .startCall:
+            shownPhase = nil
+            Task { await session.start(agentID: agentID) }
+        }
     }
 
     private func end() {
+        wantsVoice = false
         session.stop()
         hideVoice()
     }
@@ -144,14 +156,17 @@ final class CarPlayVoiceController {
         shownPhase = phase
         switch phase {
         case .connecting, .listening, .working, .speaking:
-            showVoice()
-            voice?.activateVoiceControlState(withIdentifier: CarPlayVoiceStates.identifier(for: phase))
-            updateMute()
+            if voice == nil {
+                if wantsVoice { showVoice() }
+            } else {
+                showVoiceState()
+            }
         case .paused:
             hideVoice()
         case .problem(let message):
-            hideVoice()
-            showProblem(message)
+            wantsVoice = false
+            // One template is presented at a time: the alert waits for the voice screen to go.
+            hideVoice { [weak self] in self?.showProblem(message) }
         }
     }
 
@@ -167,13 +182,17 @@ final class CarPlayVoiceController {
     private func header(for content: CarPlayHeaderContent) -> CPListTemplateDetailsHeader {
         let face = content.agentID.flatMap { id in session.agent.map { faceImage(for: $0, id: id) } }
             ?? CarPlayVoiceStates.symbol("waveform", size: 80)
-        let button: CPButton = content.isTalking
-            ? CPButton(image: CarPlayVoiceStates.symbol("xmark"), handler: CarPlayCallbacks.button { [weak self] in self?.end() })
-            : CPButton(image: CarPlayVoiceStates.symbol("waveform"), handler: CarPlayCallbacks.button { [weak self] in self?.talk() })
-        button.title = content.isTalking ? "End" : "Talk"
+        let buttons = content.actions.map { action in
+            let button = switch action {
+            case .talk: CPButton(image: CarPlayVoiceStates.symbol("waveform"), handler: CarPlayCallbacks.button { [weak self] in self?.talk() })
+            case .end: CPButton(image: CarPlayVoiceStates.symbol("xmark"), handler: CarPlayCallbacks.button { [weak self] in self?.end() })
+            }
+            button.title = action.title
+            return button
+        }
         let body = content.earlierSteps.isEmpty ? [] : [NSAttributedString(string: content.earlierSteps.joined(separator: "\n"))]
         return CPListTemplateDetailsHeader(thumbnail: CPThumbnailImage(image: face), title: content.name,
-                                           subtitle: content.status, bodyVariants: body, actionButtons: [button])
+                                           subtitle: content.status, bodyVariants: body, actionButtons: buttons)
     }
 
     private func item(for row: CarPlayAgentRow) -> CPListItem {
@@ -182,7 +201,8 @@ final class CarPlayVoiceController {
         let mark = row.isCurrent ? CarPlayVoiceStates.symbol("checkmark", size: 24) : nil
         let item = CPListItem(text: row.title, detailText: row.detail, image: face, accessoryImage: mark, accessoryType: .none)
         let id = row.id
-        // Another agent: a new conversation with it, saved as the one the car talks to.
+        // The agent in the conversation: back to it. Another: a new conversation with it, saved
+        // as the one the car talks to.
         item.handler = CarPlayCallbacks.listItem { [weak self] in self?.talk(agentID: id) }
         return item
     }
@@ -199,10 +219,20 @@ final class CarPlayVoiceController {
 
     /// Over the home while you talk. It's never the root and nothing is pushed over it.
     private func showVoice() {
-        guard #available(iOS 26.4, *), !isVoiceShown else { return }
+        guard #available(iOS 26.4, *), voice == nil else { return }
         let template = voiceTemplate()
-        isVoiceShown = true
-        let done = CarPlayCallbacks.done { [weak self] success in if !success { self?.isVoiceShown = false } }
+        voice = template
+        let done = CarPlayCallbacks.done { [weak self] success in
+            guard let self, self.voice === template else { return }
+            if success {
+                // A state set before the screen is up does nothing (CarPlay's rule), so set it now.
+                self.showVoiceState()
+            } else {
+                // Refused (say, the last one was still leaving): the next refresh tries again.
+                self.voice = nil
+                self.shownPhase = nil
+            }
+        }
         if #available(iOS 27.0, *) {
             interface.showOverlayTemplate(template, animated: true, completion: done)
         } else {
@@ -210,42 +240,58 @@ final class CarPlayVoiceController {
         }
     }
 
-    private func hideVoice() {
-        guard isVoiceShown else { return }
-        isVoiceShown = false
+    private func hideVoice(then next: (@MainActor @Sendable () -> Void)? = nil) {
+        guard voice != nil else {
+            next?()
+            return
+        }
+        voice = nil
+        let done = CarPlayCallbacks.done { _ in next?() }
         if #available(iOS 27.0, *) {
-            interface.hideOverlayTemplate(animated: true, completion: nil)
+            interface.hideOverlayTemplate(animated: true, completion: done)
         } else {
-            interface.dismissTemplate(animated: true, completion: nil)
+            interface.dismissTemplate(animated: true, completion: done)
         }
     }
 
-    /// The voice screen for the agent in use, with its face; made again when the agent changes.
+    private func showVoiceState() {
+        voice?.activateVoiceControlState(withIdentifier: CarPlayVoiceStates.identifier(for: session.phase))
+        updateMute()
+    }
+
+    /// The voice screen for the agent in use, with its face.
     @available(iOS 26.4, *)
     private func voiceTemplate() -> CPVoiceControlTemplate {
-        if let voice, voiceAgentID == session.agent?.id { return voice }
         let face = session.agent.map { faceImage(for: $0, id: $0.id, size: CarPlayFaces.voiceSize) }
-        let template = CPVoiceControlTemplate(voiceControlStates: CarPlayVoiceStates.all(
+        return CPVoiceControlTemplate(voiceControlStates: CarPlayVoiceStates.all(
             face: face, name: session.agent?.name,
             end: { [weak self] in self?.end() },
             // Stops listening and shows the agents under it, to pick another.
             agents: { [weak self] in self?.end() }))
-        voice = template
-        voiceAgentID = session.agent?.id
-        return template
+    }
+
+    /// The car closed the voice screen itself. The conversation goes on; Talk brings it back.
+    nonisolated func templateDidDisappear(_ aTemplate: CPTemplate, animated: Bool) {
+        let gone = ObjectIdentifier(aTemplate)
+        Task { @MainActor [weak self] in
+            guard let self, let voice = self.voice, ObjectIdentifier(voice) == gone else { return }
+            self.voice = nil
+            self.wantsVoice = false
+        }
     }
 
     private func showProblem(_ message: String) {
         let alert = CPAlertTemplate(titleVariants: [message], actions: [
             CPAlertAction(title: "Try Again", style: .default, handler: CarPlayCallbacks.alert { [weak self] in
-                self?.interface.dismissTemplate(animated: true, completion: nil)
-                self?.talk()
+                // Once the alert is gone, so a quick second problem can show its own.
+                self?.interface.dismissTemplate(animated: true, completion: CarPlayCallbacks.done { [weak self] _ in self?.talk() })
             }),
             CPAlertAction(title: "OK", style: .cancel, handler: CarPlayCallbacks.alert { [weak self] in
                 self?.interface.dismissTemplate(animated: true, completion: nil)
             }),
         ])
-        interface.presentTemplate(alert, animated: true, completion: nil)
+        // CarPlay throws when a presentation without a completion fails.
+        interface.presentTemplate(alert, animated: true, completion: CarPlayCallbacks.done { _ in })
     }
 
     /// Mute sits in the voice screen's top bar while the conversation runs.
@@ -283,6 +329,33 @@ struct CarPlayHeaderContent: Equatable {
         case .connecting, .listening, .working, .speaking: true
         case .paused, .problem: false
         }
+    }
+
+    /// Talk is always there: it starts a conversation, or goes back to the one that's on.
+    var actions: [CarPlayHeaderAction] { isTalking ? [.talk, .end] : [.talk] }
+}
+
+enum CarPlayHeaderAction: Equatable {
+    case talk, end
+
+    var title: String {
+        switch self {
+        case .talk: "Talk"
+        case .end: "End"
+        }
+    }
+}
+
+/// What Talk, or a tap on an agent, does: back to the conversation that's on with that agent
+/// (restarting it would drop what it's doing), else a new one.
+enum CarPlayTalkAction: Equatable {
+    case showCall, startCall
+
+    static func `for`(phase: CarPlayVoiceSession.Phase, currentAgentID: String?, requestedID: String?) -> Self {
+        guard CarPlayHeaderContent.isTalking(phase), requestedID == nil || requestedID == currentAgentID else {
+            return .startCall
+        }
+        return .showCall
     }
 }
 

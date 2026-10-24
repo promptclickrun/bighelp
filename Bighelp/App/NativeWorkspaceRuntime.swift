@@ -391,11 +391,7 @@ final class NativeWorkspaceRuntime {
                 )
             }, submit: { [weak chat] text in
                 guard let chat else { throw LiveVoiceControlError.wrongOwner }
-                let response = try await chat.sendNativeVoiceMessage(text)
-                return response.items.compactMap { item -> String? in
-                    guard item.role == .assistant, case .message(let text) = item.content else { return nil }
-                    return text
-                }.joined(separator: "\n\n")
+                return try await chat.runNativeVoiceRequest(text)
             })
             return voice.makeModel(agentName: agent?.name ?? "Hermes")
         }

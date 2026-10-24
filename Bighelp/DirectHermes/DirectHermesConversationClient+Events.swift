@@ -2,6 +2,32 @@ import Foundation
 
 /// Sequence-covered event reduction, held-event replay and live-turn timing.
 extension DirectHermesConversationClient {
+    /// Runs `text` as a Hermes background task for this chat (`prompt.background`) beside its
+    /// running turn, and returns the task's answer. Live voice uses it while the chat is busy,
+    /// so a new request never waits for the one before it.
+    func runBackgroundTask(_ text: String) async throws -> String {
+        let owner = generation
+        let receipt = try await sessionActions.startBackgroundTask(text)
+        guard connected, generation == owner else { throw DirectHermesError.notConnected }
+        let answer: String
+        if let done = sideTaskResults.first(where: {
+            $0.kind == .background && Data($0.taskID.utf8) == Data(receipt.taskID.utf8)
+        }) {
+            answer = done.text
+        } else {
+            answer = try await withCheckedThrowingContinuation { backgroundTaskWaiters[receipt.taskID] = $0 }
+        }
+        // Hermes reports a side agent that threw as its text.
+        if answer.hasPrefix("error: ") { throw DirectHermesError.invalidResponse }
+        return answer
+    }
+
+    func settleBackgroundTaskWaiters() {
+        let waiters = backgroundTaskWaiters.values
+        backgroundTaskWaiters.removeAll()
+        for continuation in waiters { continuation.resume(throwing: DirectHermesError.notConnected) }
+    }
+
     func acceptSideTask(_ acceptance: DirectHermesSideTaskAcceptance) {
         retainVisibleState()
         let change = projection.acceptSideTask(acceptance)
@@ -38,6 +64,9 @@ extension DirectHermesConversationClient {
         let change = projection.accept(event)
         var observedDurationItem: TimelineItem?
         if let sequence = event.sequence, sequence <= previousSequence { return }
+        if let result = change.sideTaskResult, result.kind == .background {
+            backgroundTaskWaiters.removeValue(forKey: result.taskID)?.resume(returning: result.text)
+        }
         if event.type.hasPrefix("subagent.") {
             // A list response that began before this event cannot replace the
             // newer add/remove decision, even when the event was malformed.
@@ -234,6 +263,7 @@ extension DirectHermesConversationClient {
         // The catch-up settles its waiters only for its own generation: release a message waiting
         // on it here, as `suspend()` does, or Send stays off until the chat is opened again.
         settleHydrationWaiters(throwing: DirectHermesError.notConnected)
+        settleBackgroundTaskWaiters()
         recoveryTask?.cancel()
         recoveryTask = nil
         rosterTask?.cancel()

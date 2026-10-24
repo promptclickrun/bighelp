@@ -2,6 +2,8 @@ import Foundation
 
 /// Media control uses authenticated native plugin HTTP. Work uses the existing
 /// ChatModel and Hermes submission journal; this class owns no remote job queue.
+/// Each request the voice model hands over starts at once and answers on its own,
+/// so the call keeps talking while earlier work runs.
 @MainActor
 final class NativeLiveVoiceSession {
     typealias Operation = @MainActor (WorkspaceOperation, [String: BighelpJSONValue]) async throws -> [String: BighelpJSONValue]
@@ -13,7 +15,6 @@ final class NativeLiveVoiceSession {
         var cursor = 0
         var seen: [String: String] = [:]
         var pending: [String: Task<String, Never>] = [:]
-        var tail: Task<String, Never>?
         var transcripts: [(Int, String)] = []
         var contextOffset = -1
         var contextIncomplete = false
@@ -164,16 +165,13 @@ final class NativeLiveVoiceSession {
                 append("There is already pending work. Check the chat before asking for more.", delegationID: id, call: call)
                 return
             }
-            let previous = call.tail
             work = Task { [self, call, text] in
-                _ = await previous?.value
                 defer { call.pending[text] = nil }
                 guard !retired, isCurrent() else { return "The host connection changed. Check the chat before resending." }
                 do { return Self.boundedResult(try await submit(text)) }
                 catch { return "This request was not confirmed. Check the chat and its pending approvals before requesting it again." }
             }
             call.pending[text] = work
-            call.tail = work
         }
         emitWorkStatus("working", delegationID: id, voiceID: voiceID)
         Task { [self, call] in

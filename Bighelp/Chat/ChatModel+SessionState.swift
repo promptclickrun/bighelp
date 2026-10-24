@@ -115,6 +115,20 @@ extension ChatModel {
         subagentCanvases.seed(items)
     }
 
+    /// Live voice's work, side by side: a turn in this chat when it's free, else a Hermes
+    /// background task beside the running turn, so a new request never waits for the last
+    /// one. Returns the answer for the call.
+    func runNativeVoiceRequest(_ message: String) async throws -> String {
+        if let native = nativeConversationClient, isSending || native.sessionActionsAreRunning {
+            return try await native.runBackgroundTask(message)
+        }
+        let response = try await sendNativeVoiceMessage(message)
+        return response.items.compactMap { item -> String? in
+            guard item.role == .assistant, case .message(let text) = item.content else { return nil }
+            return text
+        }.joined(separator: "\n\n")
+    }
+
     /// Sends voice work without changing the user's composer or retry intent.
     func sendNativeVoiceMessage(_ message: String) async throws -> ConversationResponse {
         guard !referenceOwnerRetired, !isBotMode, !isSending, referenceSubmission == nil,

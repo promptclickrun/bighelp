@@ -185,6 +185,10 @@ change in both repos.
 - **A turn stays pending while it streams:** after `prompt.submit` returns `streaming`, the chat isn't "ready for a
   new turn" until the turn ends. A mid-turn Send must go through the steer/queue path (`sendMidSession`). Steer is
   the default.
+- **Live voice multitasks:** requests from the voice model never wait for each other. One runs as a turn in
+  the chat when it's free; one made while the chat works runs at once as a Hermes background task for it
+  (`ChatModel.runNativeVoiceRequest`, `prompt.background`) and answers the call on its own. Background tasks
+  can't reach the phone's tools.
 - **Hermes reaps and prunes app sessions:** 20 s after an app's socket goes, Hermes reclaims the session's
   runtime and, for any source but `desktop`, ends its row (`ws_orphan_reap`); `sessions.auto_prune` then
   deletes ended chats idle past `retention_days`. Plugin 3.18.0 (`durable_sessions.py`) gives `bighelp`

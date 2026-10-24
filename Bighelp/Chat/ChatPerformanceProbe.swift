@@ -56,6 +56,12 @@ final class ChatPerformanceRecorder: NSObject {
     private var stats: [String: Stat] = [:]
     private var queueGaps: [Double] = []
     private var frameGaps: [Double] = []
+    /// How long each turn of the main run loop worked, from waking to sleeping again.
+    /// Unlike frame gaps this doesn't depend on the simulator's display: a turn over
+    /// 8.3 ms is a dropped frame on a 120 Hz iPhone.
+    private var busyTurns: [Double] = []
+    private var wokeAt: CFTimeInterval?
+    private var observer: CFRunLoopObserver?
     private var lastTick: CFTimeInterval?
     private var lastFrame: CFTimeInterval?
     private var phaseStart = CACurrentMediaTime()
@@ -91,6 +97,22 @@ final class ChatPerformanceRecorder: NSObject {
         link.preferredFrameRateRange = CAFrameRateRange(minimum: 60, maximum: 60, preferred: 60)
         link.add(to: .main, forMode: .common)
         self.link = link
+        let activities = CFRunLoopActivity.afterWaiting.rawValue | CFRunLoopActivity.beforeWaiting.rawValue
+        let observer = CFRunLoopObserverCreateWithHandler(nil, activities, true, 0) { _, activity in
+            MainActor.assumeIsolated { ChatPerformanceRecorder.shared?.runLoop(activity) }
+        }
+        CFRunLoopAddObserver(CFRunLoopGetMain(), observer, .commonModes)
+        self.observer = observer
+    }
+
+    private func runLoop(_ activity: CFRunLoopActivity) {
+        let now = CACurrentMediaTime()
+        if activity == .afterWaiting {
+            wokeAt = now
+        } else if let wokeAt {
+            busyTurns.append((now - wokeAt) * 1_000)
+            self.wokeAt = nil
+        }
     }
 
     private let autopilot = ChatPerformanceAutopilot()
@@ -126,6 +148,7 @@ final class ChatPerformanceRecorder: NSObject {
         stats.removeAll()
         queueGaps.removeAll()
         frameGaps.removeAll()
+        busyTurns.removeAll()
         lastTick = nil
         lastFrame = nil
         phaseStart = CACurrentMediaTime()
@@ -148,6 +171,10 @@ final class ChatPerformanceRecorder: NSObject {
             "stats": stats.mapValues { ["count": $0.count, "total_ms": $0.total, "max_ms": $0.max] },
             "main_queue_gaps_ms": summary(queueGaps),
             "frame_gaps_ms": summary(frameGaps),
+            "main_busy_ms": [
+                "total": busyTurns.reduce(0, +), "max": busyTurns.max() ?? 0,
+                "over_8ms": busyTurns.filter { $0 > 8.3 }.count, "over_16ms": busyTurns.filter { $0 > 16.7 }.count,
+            ],
             "footprint_mib": Double(Self.footprintBytes()) / 1_048_576,
             "live": Self.liveCounts.withLock { $0 },
         ]

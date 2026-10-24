@@ -231,6 +231,9 @@ extension DirectHermesConversationClient {
         generation = UUID()
         isHydrating = false
         heldEvents = []
+        // The catch-up settles its waiters only for its own generation: release a message waiting
+        // on it here, as `suspend()` does, or Send stays off until the chat is opened again.
+        settleHydrationWaiters(throwing: DirectHermesError.notConnected)
         recoveryTask?.cancel()
         recoveryTask = nil
         rosterTask?.cancel()

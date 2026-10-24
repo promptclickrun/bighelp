@@ -29,7 +29,7 @@ Before this Worker is deployed these routes answer 404. While the migration or `
 ### `PUT /v1/notifications/push-target`
 
 ```json
-{"version":1,"token":"<lowercase hex, even length, 64 to 200 characters>","environment":"sandbox","appVersion":"2.7.0(160)"}
+{"version":1,"token":"<lowercase hex, even length, 64 to 200 characters>","environment":"sandbox","appVersion":"2.7.0(160)","mutedTopics":["scheduled-tasks-deliveries"]}
 ```
 
 `environment` is `sandbox` or `production`. Xcode builds are sandbox. TestFlight and App Store builds are production.
@@ -41,7 +41,14 @@ Answer, HTTP 200:
 {"version":1,"target":{"kind":"alert","environment":"sandbox","updatedAt":1767225600}}
 ```
 
-A body with other keys, or a value that doesn't match, is `400 notification_push_target_invalid`.
+`mutedTopics` is required. It lists the topics this person turned off in Settings › Notifications › Notify Me About: a
+unique subset of `chat-replies-completions`, `scheduled-tasks-deliveries`, `questions-approvals` and
+`subagent-completions`, possibly empty. The app sends it with every `PUT`, and again whenever those settings change.
+BuzzKit applies the same settings to its own sends, so the Worker has to apply them to direct ones (see "Muted topics").
+
+A body with other keys, an unknown or repeated topic, or a value that doesn't match, is
+`400 notification_push_target_invalid`. An installation may write to the two target routes 30 times an hour. After that
+a `PUT` answers `429 notification_push_target_rate_limited`. A `DELETE` is never limited.
 
 ### `DELETE /v1/notifications/push-target`
 
@@ -74,11 +81,13 @@ Migration `0010_push_targets.sql` adds two tables to `loopdy-link-accounts`.
   copied to another row doesn't open.
 - Alert and `pts` rows last 60 days, and every `PUT` refreshes them. A Live Activity row lasts 12 hours. An installation
   keeps at most eight Live Activity rows.
-- Expired rows are deleted in batches of 50, on `PUT`, `DELETE` and each queue batch.
 - A token APNs reports as dead is marked `invalid_at` and not used again. A new `PUT` clears the mark.
 - Revoking an installation (`DELETE /v1/notifications/installations/current`) deletes its tokens and send records. Even
   before that finishes, a revoked installation's rows are never read, and the egress check refuses the send.
-- `push_sends` has one row per direct send. It is the idempotency record (below) and is deleted after 24 hours.
+- `push_sends` has one row per direct send. It is the idempotency record (below), kept for 24 hours and purged an hour
+  after that. `push_target_writes` counts the hourly writes.
+- Housekeeping deletes up to 100 expired rows of each table. It runs after a `PUT` or `DELETE` on either route, at the
+  start of every queue batch and after about one direct send in sixteen. It never delays an answer.
 
 ## Choosing the route
 
@@ -95,6 +104,8 @@ A send goes direct when all of these are true:
   `liveactivity` for that activity.
 - `DIRECT_APNS` is `on`, or it is `shadow` and the installation is in `DIRECT_APNS_CANARY`.
 
+A target saved without a muted-topics list is not used for direct delivery: the Worker can't honour what it doesn't know.
+
 Everything else goes through BuzzKit. In `shadow`, a BuzzKit send for an installation that has a target also records
 `push.shadow`. With `DIRECT_APNS=off` the send path doesn't read the push tables at all.
 
@@ -109,8 +120,26 @@ The BuzzKit link wake for retired account pairing (`sendBuzzKitLinkWake`) always
 | 429, 5xx or no answer in 5 seconds | The message goes on the retry queue and the host gets `accepted` with `providerStatus: "queued"`. With no queue, it goes through BuzzKit |
 | Any other 4xx | The message goes through BuzzKit |
 
-Anything unexpected before the request (a database error, a key that can't sign) also falls back to BuzzKit. The test
-notification never queues, because the person is waiting: a transient failure goes straight to BuzzKit.
+Anything unexpected before the request (a database error, a key that can't sign) also falls back to BuzzKit. So does a
+direct path that runs past eight seconds in all (database, provider token and both APNs tries), so it can't outlast the
+host's own 12 second timeout. The test notification never queues, because the person is waiting: a transient failure
+goes straight to BuzzKit. A rich (unsealed) alert never queues either, because its text is plain: it goes to BuzzKit at once.
+
+### Muted topics
+
+BuzzKit applies each person's topic settings to every message by its `topic`. A direct alert whose topic is in the
+target's `mutedTopics` is not sent. The host gets `202` with `status: "accepted"`, `providerStatus: "suppressed"` and
+`counts: {"total":0,"sent":0}`, which is what BuzzKit answers for a message nobody is subscribed to. Nothing is recorded.
+The sign-in wake, the test notification and Live Activity updates ignore muted topics, as they do on BuzzKit.
+
+### Circuit breaker
+
+Three failures in a row of the same setup kind pause direct sends in that Worker instance for a minute. The kinds are a
+provider token APNs still refuses after it was replaced, and the refusals `BadTopic`, `TopicDisallowed`, `MissingTopic`,
+`Forbidden`, `BadCertificate`, `BadCertificateEnvironment` and a key that can't sign. A success resets the count. A dead
+token or a transient failure doesn't count. While the breaker is open every send goes through BuzzKit and records
+`push.fallback_buzzkit` with `apns_breaker_open`. Without it, a bad key would add round trips to every send and could make
+APNs refuse the new tokens with `TooManyProviderTokenUpdates`.
 
 ### The host's answer for a direct send
 
@@ -127,9 +156,14 @@ A direct send claims a `push_sends` row first. The key is `installation|kind|key
 alerts, `bighelp-renew-<grantId>-<window>` for wakes (a window is six hours), the request ID for the test notification and
 `activityId|updateId` for Live Activity updates.
 
-- A repeat answers `status: "duplicate"` and sends nothing.
-- A send that fails or falls back to BuzzKit deletes its row, so the host's retry isn't blocked.
-- A row left in `sending` by a Worker that was cut off can be taken over after 60 seconds.
+- A repeat of a message that was sent, or is waiting in the retry queue, answers `status: "duplicate"` and sends nothing.
+- A repeat that arrives while the first request is still sending answers `503 push_in_flight`. Nothing has been sent
+  that an "accepted" could stand for, and a host retries a 503. The Worker never answers this case with 400, 401, 403,
+  404, 410 or 422, because a host drops its grant on some of those.
+- A record left in `sending` by a Worker that was cut off can be taken over after 60 seconds.
+- A message that fell back to BuzzKit is marked `buzzkit`. A repeat goes to BuzzKit too, which deduplicates by the same
+  key, so the phone can't get it by both routes. If the BuzzKit call failed, the repeat tries BuzzKit again.
+- If the send was stopped before anything left (egress authority withdrawn, an unexpected error), the record is deleted.
 - A Live Activity update is also deduplicated by its Durable Object, as before.
 
 ### Egress authorization
@@ -195,21 +229,34 @@ Sealed alert (`alert`):
 
 ### `bighelp_meta`
 
-Every alert, wake and test push carries `bighelp_meta` at the top level of the payload: `v` is 1, `path` is `direct` or
-`buzzkit`, `sentAt` is when the Worker sent it (Unix milliseconds) and `occurredAt` is when the host made the event, when
-it says. BuzzKit sends it too. It goes into `data`, which BuzzKit puts at the top level. The notification extension reads
-it to record the delay. The app ignores unknown top-level keys: `PushPayload`, `BighelpSealedNotification`,
+Every alert, wake and test push carries `bighelp_meta` at the top level of the payload. A direct push has
+`{"v":1,"path":"direct","sentAt":<ms>,"occurredAt":<ms>}`: `sentAt` is when the Worker sent it and `occurredAt` is when the
+host made the event, when it says.
+
+The BuzzKit copy goes into `data`, which BuzzKit puts at the top level, and is only `{"v":1,"path":"buzzkit","occurredAt":<ms>}`.
+It has no `sentAt`, because a host retry must send a body identical to the first one under the same idempotency key. When
+the key would push a message past BuzzKit's payload budget, it is left out and the send goes ahead. The notification
+extension reads it to record the delay. The app ignores unknown top-level keys: `PushPayload`, `BighelpSealedNotification`,
 `BighelpProactiveNotificationOpen` and the wake checks each read named keys only.
 
 ## Retry queue
 
-`loopdy-link-apns-retry`, with the dead-letter queue `loopdy-link-apns-retry-dlq`. A message is delivered up to six times
-(`max_retries` 5), waiting 5, 15, 45, 120, 300 and 600 seconds. A message holds the grant ID, kind, event type, send key
-and the message in BuzzKit's shape. It holds no push token and no ciphertext of one.
+`loopdy-link-apns-retry`, with the dead-letter queue `loopdy-link-apns-retry-dlq` (`max_retries` 5). Only sealed alerts, wakes
+and Live Activity updates wait here. A message holds the grant ID, kind, event type, send key and the message in
+BuzzKit's shape. It holds no push token and no ciphertext of one.
 
-Each attempt checks the grant and installation again, opens the stored token again and asks for egress authority again.
-A message whose authority is gone, whose push has expired or that has already been sent is dropped. The last attempt
-goes through BuzzKit. If that fails too, the message goes to the dead-letter queue and the send record is deleted.
+A push is worth little once it is late, so a message gets one more direct try and then goes through BuzzKit:
+
+- The inline send is the first try. If it fails in a way worth retrying, the message waits 5 seconds.
+- If the second try fails too, or the next wait would end after the push expires, the message goes through BuzzKit at
+  once. An alert lives 900 seconds, a question 300 and an approval 60.
+- If BuzzKit can't take it, the message waits (15, 45, 120, 300 and 600 seconds) as long as the push is still fresh. A
+  message that would be stale by its next try is dropped. A wake lives six hours, so it can use every try and then land
+  in the dead-letter queue.
+
+Each attempt checks the grant and installation again, opens the stored token again, checks the person's muted topics
+again and asks for egress authority again. A message whose authority is gone, whose push has expired or that has already
+been sent is dropped.
 
 ## Telemetry
 
@@ -223,12 +270,20 @@ a token, an ID, message text or a path.
 | `push.token_invalid` | `kind`, `reason` |
 | `push.retry` | `attempt`, `reason` |
 | `push.dlq` | `reason` |
-| `push.fallback_buzzkit` | `reason`: `apns_unconfigured`, `no_target`, `token_invalid`, `provider_token`, `no_queue`, `queue_unavailable`, `retries_exhausted`, `payload_too_large`, `target_lookup_failed`, `claim_failed` or `apns_<apns reason>` |
+| `push.fallback_buzzkit` | `reason`: `apns_unconfigured`, `no_target`, `target_unreadable`, `target_incomplete`, `token_invalid`, `provider_token`, `no_queue`, `not_queued`, `plaintext_not_queued`, `queue_unavailable`, `retries_exhausted`, `apns_breaker_open`, `apns_deadline`, `payload_too_large`, `target_lookup_failed`, `claim_failed`, `already_with_buzzkit` or `apns_<apns reason>` |
 | `push.shadow` | `eventType`, `wouldUseDirect` |
 
-The Worker's own log lines (Workers Logs, sampled at 20 percent) are `[loopdy-link] push_<event>: <code>`. An unexpected
-error logs only its class name. It no longer logs the exception itself, because Workers Logs now keeps what a Worker
-prints.
+### Workers Logs
+
+Workers Logs is on, sampled at 20 percent, with invocation logs off (`"logs": {"invocation_logs": false}`). What it keeps:
+
+- The lines the Worker prints itself: `[loopdy-link] push_<event>: <code>`, `[loopdy-link] request_failed: <error class>` and
+  the older socket and delivery lines. They hold fixed codes. An unexpected error logs only its class name, not the
+  exception, which can carry paths or secrets.
+- The metadata Cloudflare adds to any log line: time, the Worker's name, the outcome and the data centre.
+
+What it does not keep: request URLs (which carry grant and device IDs), headers, request or response bodies, push tokens,
+installation IDs and message text. Don't add a log line that does.
 
 ## Settings
 

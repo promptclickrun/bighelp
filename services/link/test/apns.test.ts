@@ -14,11 +14,13 @@ import {
 import { canonicalDeviceRequest } from "../src/device-auth.js";
 import { handleLoopdyLinkRequest } from "../src/http.js";
 import { canonicalNotificationHostRequest } from "../src/notification-grants.js";
-import { liveActivitySpec, messageSpec } from "../src/push-delivery.js";
+import { liveActivitySpec, messageSpec, resetApnsBreaker, retryStillUseful } from "../src/push-delivery.js";
 import { handleApnsRetryBatch, parseRetryMessage } from "../src/push-retry.js";
 import { openPushToken, putPushTarget, purgeExpiredPushState } from "../src/push-targets.js";
 import { LoopdyLinkError } from "../src/contracts.js";
-import { sealedMessage } from "../src/buzzkit.js";
+import {
+  apnsBudgetBytes, attachDeliveryMeta, MAX_APNS_PAYLOAD_BYTES, sealedMessage, sendBuzzKitMessage,
+} from "../src/buzzkit.js";
 import pushTargetsMigrationSql from "../migrations/0010_push_targets.sql?raw";
 import type { LinkEnv } from "../src/user-link.js";
 
@@ -68,6 +70,9 @@ interface BuzzKitCall { method: string; path: string; body: Record<string, unkno
 let apnsCalls: ApnsCall[];
 let buzzKitCalls: BuzzKitCall[];
 let apnsAnswers: Array<{ status: number; reason?: string } | "timeout">;
+let buzzKitKeys: Set<string>;
+/** Holds every APNs answer until it settles. */
+let apnsGate: Promise<void> | null;
 
 /** Answers APNs from `apnsAnswers` (200 when it runs out) and BuzzKit the way it does today. */
 function installFakeProviders(): void {
@@ -79,6 +84,7 @@ function installFakeProviders(): void {
         url: url.toString(), headers: new Headers(init?.headers),
         payload: JSON.parse(String(init?.body)) as Record<string, unknown>,
       });
+      if (apnsGate) await apnsGate;
       const answer = apnsAnswers.shift() ?? { status: 200 };
       if (answer === "timeout") throw new DOMException("timed out", "TimeoutError");
       return new Response(answer.reason ? JSON.stringify({ reason: answer.reason }) : null, {
@@ -97,7 +103,14 @@ function installFakeProviders(): void {
     if (url.pathname === "/v1/live-activities/send") {
       return Response.json({ success: true, data: { results: [{ ok: true, id: "live_buzzkit_1" }] } });
     }
-    return Response.json({ success: true, data: { id: "msg_buzzkit_1", status: "queued", counts: { total: 1 } } });
+    // Like BuzzKit, a repeated idempotency key is the same message, flagged as a replay.
+    const key = new Headers(init?.headers).get("idempotency-key");
+    const replayed = key !== null && buzzKitKeys.has(key);
+    if (key) buzzKitKeys.add(key);
+    return Response.json(
+      { success: true, data: { id: "msg_buzzkit_1", status: "queued", counts: { total: 1 } } },
+      replayed ? { headers: { "Idempotent-Replayed": "true" } } : {},
+    );
   });
 }
 
@@ -147,7 +160,9 @@ function targetEnvironment(
   } as unknown as LinkEnv;
 }
 
-async function insertInstallation(installationKeys: KeyPair, hostKeys: KeyPair, eventTypes = ["session.completed"]) {
+async function insertInstallation(
+  installationKeys: KeyPair, hostKeys: KeyPair, eventTypes = ["session.completed"], profile = "default",
+) {
   const installationId = crypto.randomUUID();
   const grantId = crypto.randomUUID();
   const coordinate = `notify_${crypto.randomUUID().replaceAll("-", "")}`;
@@ -155,7 +170,7 @@ async function insertInstallation(installationKeys: KeyPair, hostKeys: KeyPair, 
   const hostKeyId = encoded(await crypto.subtle.digest("SHA-256", hostRaw));
   const grant = {
     grantId, instanceId: crypto.randomUUID(), hostKeyId, hostPublicKey: encoded(hostRaw),
-    authorizationEpoch: 1, profile: "default", eventTypes, createdAt: NOW, expiresAt: NOW + 1_800,
+    authorizationEpoch: 1, profile, eventTypes, createdAt: NOW, expiresAt: NOW + 1_800,
     revision: 1, provider: "buzzkit", subscriberScope: "notification-instance", state: "active",
   };
   await env.ACCOUNTS.batch([
@@ -237,12 +252,16 @@ async function sendSealed(
 
 async function addTarget(
   targetEnv: LinkEnv, installation: Installation,
-  overrides: Partial<{ kind: "alert" | "liveactivity" | "pts"; activityId: string; token: string; environment: "sandbox" | "production" }> = {},
+  overrides: Partial<{
+    kind: "alert" | "liveactivity" | "pts"; activityId: string; token: string;
+    environment: "sandbox" | "production"; mutedTopics: string[];
+  }> = {},
 ) {
   await putPushTarget(targetEnv, {
     installationId: installation.installationId, ownerCoordinate: installation.coordinate, authorizationEpoch: 1,
   }, {
-    kind: "alert", activityId: "", token: TOKEN, environment: "production", appVersion: "2.7.0(160)", ...overrides,
+    kind: "alert", activityId: "", token: TOKEN, environment: "production", appVersion: "2.7.0(160)",
+    mutedTopics: [], ...overrides,
   }, NOW);
 }
 
@@ -270,6 +289,10 @@ async function installationRequest(
   });
 }
 
+async function sendRows(): Promise<Array<{ state: string }>> {
+  return (await env.ACCOUNTS.prepare("SELECT state FROM push_sends").all<{ state: string }>()).results;
+}
+
 function relayedEvents(): Array<{ name: string; t: number; p: Record<string, unknown> }> {
   return telemetry.mock.calls.flatMap((call) => call[0] as never);
 }
@@ -280,6 +303,9 @@ beforeEach(async () => {
   apnsCalls = [];
   buzzKitCalls = [];
   apnsAnswers = [];
+  buzzKitKeys = new Set();
+  apnsGate = null;
+  resetApnsBreaker();
   telemetry = vi.fn(async () => {});
   retryQueue = { send: vi.fn(async () => {}) };
   resetApnsTokenCache();
@@ -303,7 +329,44 @@ beforeEach(async () => {
   installFakeProviders();
 });
 
-afterEach(() => vi.restoreAllMocks());
+/** The relay events the telemetry Worker accepts (CONTRACTS section 3, `relay`). Anything else it drops. */
+const ALERT_EVENT_TYPES = [
+  "session.completed", "session.failed", "scheduled.completed", "scheduled.failed",
+  "approval.required", "clarification.required", "subagent.completed", "subagent.failed",
+];
+const isInt = (low: number, high: number) => (value: unknown) =>
+  typeof value === "number" && Number.isInteger(value) && value >= low && value <= high;
+const ms = isInt(0, 86_400_000);
+const count = isInt(0, 100_000);
+const code = (value: unknown) => typeof value === "string" && /^[a-z0-9_]{1,64}$/.test(value);
+const oneOf = (...values: Array<string | number>) => (value: unknown) => values.includes(value as never);
+const EVENT_TYPE = oneOf(...ALERT_EVENT_TYPES, "wake", "test", "liveactivity");
+export const RELAY_ALLOWLIST: Record<string, Record<string, (value: unknown) => boolean>> = {
+  "push.sent": {
+    eventType: EVENT_TYPE, path: oneOf("direct", "buzzkit"), priority: oneOf(5, 10), result: code, status: count,
+    environment: oneOf("sandbox", "production"), hostToWorkerMs: ms, providerMs: ms, attempt: count,
+  },
+  "push.token_invalid": { kind: oneOf("alert", "liveactivity", "pts"), reason: code },
+  "push.retry": { attempt: count, reason: code },
+  "push.dlq": { reason: code },
+  "push.fallback_buzzkit": { reason: code },
+  "push.shadow": { eventType: EVENT_TYPE, wouldUseDirect: (value) => typeof value === "boolean" },
+};
+
+afterEach(() => {
+  // Whatever a test caused the relay to report must be something the telemetry Worker keeps.
+  const problems: string[] = [];
+  for (const event of telemetry.mock.calls.flatMap((call) => call[0] as never[]) as Array<{ name: string; t: number; p: Record<string, unknown> }>) {
+    const allowed = RELAY_ALLOWLIST[event.name];
+    if (!allowed) { problems.push(`unknown event ${event.name}`); continue; }
+    if (!Number.isInteger(event.t)) problems.push(`${event.name}: t`);
+    for (const [key, value] of Object.entries(event.p)) {
+      if (!allowed[key]?.(value)) problems.push(`${event.name}.${key}=${String(value)}`);
+    }
+  }
+  expect(problems).toEqual([]);
+  vi.restoreAllMocks();
+});
 
 // MARK: APNs client
 
@@ -483,7 +546,7 @@ describe("push target routes", () => {
       .then((request) => handleLoopdyLinkRequest(request, targetEnv));
 
   it("stores the token sealed and answers with the target", async () => {
-    const response = await put({ version: 1, token: TOKEN, environment: "production", appVersion: "2.7.0(160)" });
+    const response = await put({ version: 1, token: TOKEN, environment: "production", appVersion: "2.7.0(160)", mutedTopics: [] });
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(await response.json()).toEqual({
@@ -505,9 +568,9 @@ describe("push target routes", () => {
   });
 
   it("replaces the token on a second PUT and clears an invalid mark", async () => {
-    await put({ version: 1, token: TOKEN, environment: "production", appVersion: "2.7.0(160)" });
+    await put({ version: 1, token: TOKEN, environment: "production", appVersion: "2.7.0(160)", mutedTopics: [] });
     await env.ACCOUNTS.prepare("UPDATE push_targets SET invalid_at=?").bind(NOW).run();
-    await put({ version: 1, token: OTHER_TOKEN, environment: "sandbox", appVersion: "2.7.0(161)" });
+    await put({ version: 1, token: OTHER_TOKEN, environment: "sandbox", appVersion: "2.7.0(161)", mutedTopics: ["subagent-completions"] });
     const rows = await env.ACCOUNTS.prepare("SELECT environment,invalid_at,app_version FROM push_targets WHERE installation_id=?")
       .bind(installation.installationId).all();
     expect(rows.results).toEqual([{ environment: "sandbox", invalid_at: null, app_version: "2.7.0(161)" }]);
@@ -522,10 +585,14 @@ describe("push target routes", () => {
     ["unknown environment", { environment: "staging" }],
     ["bad app version", { appVersion: "2.7.0" }],
     ["extra key", { extra: true }],
+    ["an unknown topic", { mutedTopics: ["made-up-topic"] }],
+    ["a repeated topic", { mutedTopics: ["questions-approvals", "questions-approvals"] }],
+    ["topics that aren't a list", { mutedTopics: "questions-approvals" }],
+    ["no topics key", { mutedTopics: undefined }],
     ["wrong version", { version: 2 }],
   ])("refuses %s", async (_name, change) => {
     const response = await put({
-      version: 1, token: TOKEN, environment: "production", appVersion: "2.7.0(160)", ...change,
+      version: 1, token: TOKEN, environment: "production", appVersion: "2.7.0(160)", mutedTopics: [], ...change,
     });
     expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({ error: { code: "notification_push_target_invalid" } });
@@ -533,7 +600,7 @@ describe("push target routes", () => {
   });
 
   it("deletes the target, and deleting again is fine", async () => {
-    await put({ version: 1, token: TOKEN, environment: "production", appVersion: "2.7.0(160)" });
+    await put({ version: 1, token: TOKEN, environment: "production", appVersion: "2.7.0(160)", mutedTopics: [] });
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const response = await installationRequest(
         installationKeys, installation.installationId, "DELETE", "/v1/notifications/push-target", { version: 1 },
@@ -610,7 +677,7 @@ describe("push target routes", () => {
     const accountKeys = await keys();
     await env.ACCOUNTS.prepare("UPDATE device_directory SET public_key_spki=? WHERE device_id=?")
       .bind(accountKeys.publicKeySPKI, DEVICE).run();
-    const raw = JSON.stringify({ version: 1, token: TOKEN, environment: "production", appVersion: "2.7.0(160)" });
+    const raw = JSON.stringify({ version: 1, token: TOKEN, environment: "production", appVersion: "2.7.0(160)", mutedTopics: [] });
     const nonce = encoded(crypto.getRandomValues(new Uint8Array(24)));
     const canonical = await canonicalDeviceRequest({
       method: "PUT", path: "/v1/notifications/push-target", deviceId: DEVICE, timestamp: NOW,
@@ -638,7 +705,7 @@ describe("push target routes", () => {
 
   it("answers 503 while the token key is not set, and stores nothing", async () => {
     targetEnv = targetEnvironment({ PUSH_TOKEN_KEY: undefined });
-    const response = await put({ version: 1, token: TOKEN, environment: "production", appVersion: "2.7.0(160)" });
+    const response = await put({ version: 1, token: TOKEN, environment: "production", appVersion: "2.7.0(160)", mutedTopics: [] });
     expect(response.status).toBe(503);
     expect(await response.json()).toMatchObject({ error: { code: "notification_push_target_unavailable" } });
   });
@@ -646,7 +713,7 @@ describe("push target routes", () => {
   it("refuses a replayed request", async () => {
     const request = await installationRequest(
       installationKeys, installation.installationId, "PUT", "/v1/notifications/push-target",
-      { version: 1, token: TOKEN, environment: "production", appVersion: "2.7.0(160)" },
+      { version: 1, token: TOKEN, environment: "production", appVersion: "2.7.0(160)", mutedTopics: [] },
     );
     expect((await handleLoopdyLinkRequest(request.clone(), targetEnv)).status).toBe(200);
     expect((await handleLoopdyLinkRequest(request.clone(), targetEnv)).status).toBe(409);
@@ -673,21 +740,21 @@ describe("push target routes", () => {
     const { findPushTarget } = await import("../src/push-targets.js");
     expect(await findPushTarget(targetEnv, {
       installationId: installation.installationId, ownerCoordinate: installation.coordinate,
-    }, "alert", "", NOW)).toBeNull();
+    }, "alert", "", NOW)).toEqual({ status: "none" });
     expect(await putPushTarget(targetEnv, {
       installationId: installation.installationId, ownerCoordinate: installation.coordinate, authorizationEpoch: 2,
-    }, { kind: "alert", activityId: "", token: TOKEN, environment: "production", appVersion: "" }, NOW)).toBeNull();
+    }, { kind: "alert", activityId: "", token: TOKEN, environment: "production", appVersion: "", mutedTopics: [] }, NOW)).toBeNull();
   });
 
   it("purges expired rows in small batches", async () => {
-    for (let index = 0; index < 60; index += 1) {
+    for (let index = 0; index < 150; index += 1) {
       await env.ACCOUNTS.prepare(`INSERT INTO push_targets(installation_id,kind,activity_id,environment,
         token_ciphertext,app_version,authorization_epoch,updated_at,expires_at)
         VALUES(?,'liveactivity',?,'production','v1.x','',1,?,?)`)
         .bind(installation.installationId, `old-${index}`, NOW - 100, NOW - 1).run();
     }
     await purgeExpiredPushState(targetEnv, NOW);
-    expect(await env.ACCOUNTS.prepare("SELECT COUNT(*) AS n FROM push_targets").first()).toEqual({ n: 10 });
+    expect(await env.ACCOUNTS.prepare("SELECT COUNT(*) AS n FROM push_targets").first()).toEqual({ n: 50 });
     await purgeExpiredPushState(targetEnv, NOW);
     expect(await env.ACCOUNTS.prepare("SELECT COUNT(*) AS n FROM push_targets").first()).toEqual({ n: 0 });
   });
@@ -730,7 +797,7 @@ describe("choosing direct or BuzzKit", () => {
     const body = buzzKitMessages()[0]!.body!;
     expect(body.data).toMatchObject({
       loopdy: { version: 2, eventType: "session.completed", grantId: installation.grantId },
-      bighelp_meta: { v: 1, path: "buzzkit", sentAt: expect.any(Number), occurredAt: NOW * 1_000 },
+      bighelp_meta: { v: 1, path: "buzzkit", occurredAt: NOW * 1_000 },
     });
     expect(body).toMatchObject({ title: "bighelp", body: "New reply", sound: "default", priority: "high" });
   });
@@ -942,7 +1009,7 @@ describe("choosing direct or BuzzKit", () => {
 
       const route = await installationRequest(
         installationKeys, installation.installationId, "PUT", "/v1/notifications/push-target",
-        { version: 1, token: TOKEN, environment: "production", appVersion: "2.7.0(160)" },
+        { version: 1, token: TOKEN, environment: "production", appVersion: "2.7.0(160)", mutedTopics: [] },
       ).then((request) => handleLoopdyLinkRequest(request, targetEnv));
       expect(route.status).toBe(503);
       expect(await route.json()).toMatchObject({ error: { code: "notification_push_target_unavailable" } });
@@ -1017,8 +1084,8 @@ describe("choosing direct or BuzzKit", () => {
       expect(buzzKitMessages()).toHaveLength(1);
       expect((await env.ACCOUNTS.prepare("SELECT invalid_at FROM push_targets").first<{ invalid_at: number }>())!.invalid_at)
         .toBeGreaterThan(0);
-      // The failed attempt left no row, so the host's retry isn't called a duplicate.
-      expect(await env.ACCOUNTS.prepare("SELECT COUNT(*) AS n FROM push_sends").first()).toEqual({ n: 0 });
+      // The message now belongs to BuzzKit, so a repeat goes there and not to the phone twice.
+      expect(await sendRows()).toEqual([{ state: "buzzkit" }]);
       const names = relayedEvents().map((event) => event.name);
       expect(names).toEqual(expect.arrayContaining(["push.token_invalid", "push.fallback_buzzkit", "push.sent"]));
       expect(relayedEvents().find((event) => event.name === "push.token_invalid")!.p).toEqual({
@@ -1042,7 +1109,7 @@ describe("choosing direct or BuzzKit", () => {
       expect(apnsCalls[1]!.url).toContain(OTHER_TOKEN);
     });
 
-    it("sends through BuzzKit on another rejection, and a host retry works", async () => {
+    it("sends through BuzzKit on another rejection, and a host retry doesn't reach the phone twice", async () => {
       apnsAnswers.push({ status: 400, reason: "BadTopic" });
       const targetEnv = targetEnvironment();
       await addTarget(targetEnv, installation);
@@ -1052,9 +1119,13 @@ describe("choosing direct or BuzzKit", () => {
         .toEqual([{ reason: "apns_bad_topic" }]);
       // The token was not blamed.
       expect((await env.ACCOUNTS.prepare("SELECT invalid_at FROM push_targets").first<{ invalid_at: number | null }>())!.invalid_at).toBeNull();
+      // The host's retry goes to BuzzKit too, which knows the key. The phone gets one copy.
       const retried = await sendSealed(hostKeys, installation, targetEnv);
-      expect(await retried.json()).toMatchObject({ status: "accepted", providerStatus: "sent" });
-      expect(apnsCalls).toHaveLength(2);
+      expect(await retried.json()).toMatchObject({ status: "duplicate", deliveryId: "msg_buzzkit_1" });
+      expect(apnsCalls).toHaveLength(1);
+      expect(buzzKitMessages()).toHaveLength(2);
+      expect(buzzKitCalls.filter((call) => call.method === "POST")[1]!.body)
+        .toEqual(buzzKitCalls.filter((call) => call.method === "POST")[0]!.body);
     });
 
     it("sends through BuzzKit after a provider token is refused twice", async () => {
@@ -1108,7 +1179,7 @@ describe("choosing direct or BuzzKit", () => {
       await addTarget(targetEnv, installation);
       const response = await sendSealed(hostKeys, installation, targetEnv);
       expect(await response.json()).toMatchObject({ status: "accepted", deliveryId: "msg_buzzkit_1" });
-      expect(await env.ACCOUNTS.prepare("SELECT COUNT(*) AS n FROM push_sends").first()).toEqual({ n: 0 });
+      expect(await sendRows()).toEqual([{ state: "buzzkit" }]);
     });
 
     it("falls back to BuzzKit when the queue refuses the message", async () => {
@@ -1118,16 +1189,21 @@ describe("choosing direct or BuzzKit", () => {
       await addTarget(targetEnv, installation);
       const response = await sendSealed(hostKeys, installation, targetEnv);
       expect(await response.json()).toMatchObject({ status: "accepted", deliveryId: "msg_buzzkit_1" });
-      expect(await env.ACCOUNTS.prepare("SELECT COUNT(*) AS n FROM push_sends").first()).toEqual({ n: 0 });
+      expect(await sendRows()).toEqual([{ state: "buzzkit" }]);
     });
 
-    it("leaves no row when the fallback fails too, so the host can retry", async () => {
-      apnsAnswers.push({ status: 410, reason: "Unregistered" });
-      const targetEnv = targetEnvironment({ BUZZKIT_API_KEY: undefined });
+    it("keeps a retry possible when the fallback fails too: it goes to BuzzKit again", async () => {
+      apnsAnswers.push({ status: 400, reason: "BadTopic" });
+      const targetEnv = targetEnvironment();
       await addTarget(targetEnv, installation);
-      const response = await sendSealed(hostKeys, installation, targetEnv);
+      const response = await sendSealed(hostKeys, installation, { ...targetEnv, BUZZKIT_API_KEY: undefined } as LinkEnv);
       expect(response.status).toBe(503);
-      expect(await env.ACCOUNTS.prepare("SELECT COUNT(*) AS n FROM push_sends").first()).toEqual({ n: 0 });
+      expect(await sendRows()).toEqual([{ state: "buzzkit" }]);
+      // BuzzKit is back. The retry goes there, not to the phone by another route.
+      const retried = await sendSealed(hostKeys, installation, targetEnv);
+      expect(retried.status).toBe(202);
+      expect(await retried.json()).toMatchObject({ status: "accepted", deliveryId: "msg_buzzkit_1" });
+      expect(apnsCalls).toHaveLength(1);
     });
   });
 
@@ -1449,42 +1525,83 @@ describe("retry queue", () => {
     expect(apnsCalls).toHaveLength(1);
   });
 
-  it("tries again later with a longer wait, and reports the retry", async () => {
+  it("sends through BuzzKit on the first queue delivery that fails: two failed tries in all", async () => {
     const body = await queuedMessage();
     apnsAnswers.push({ status: 503, reason: "ServiceUnavailable" });
-    const message = fakeMessage(body, 2);
-    await run([message]);
-    expect(message.ack).not.toHaveBeenCalled();
-    expect(message.retry).toHaveBeenCalledWith({ delaySeconds: 45 });
-    expect(relayedEvents().find((event) => event.name === "push.retry")!.p).toEqual({ attempt: 3, reason: "service_unavailable" });
-    expect(buzzKitCalls).toEqual([]);
-  });
-
-  it("falls back to BuzzKit on the last attempt", async () => {
-    const body = await queuedMessage();
-    apnsAnswers.push({ status: 503, reason: "ServiceUnavailable" });
-    const message = fakeMessage(body, 6);
+    const message = fakeMessage(body, 1);
     await run([message]);
     expect(message.ack).toHaveBeenCalled();
     expect(message.retry).not.toHaveBeenCalled();
     const posts = buzzKitCalls.filter((call) => call.method === "POST");
     expect(posts).toHaveLength(1);
-    expect(posts[0]!.body).toMatchObject({ data: { bighelp_meta: { path: "buzzkit" }, loopdy: { eventType: "session.completed" } } });
+    expect(posts[0]!.body).toMatchObject({
+      data: { bighelp_meta: { v: 1, path: "buzzkit" }, loopdy: { eventType: "session.completed" } },
+    });
     expect(relayedEvents().find((event) => event.name === "push.fallback_buzzkit")!.p).toEqual({ reason: "retries_exhausted" });
     expect(log.slice(-2)).toEqual(["authorize", "buzzkit"]);
-    expect(await env.ACCOUNTS.prepare("SELECT state FROM push_sends").first()).toEqual({ state: "sent" });
+    expect(await sendRows()).toEqual([{ state: "sent" }]);
+    // And a repeat delivery of the same queue message does nothing more.
+    const again = fakeMessage(body, 2);
+    await run([again]);
+    expect(again.ack).toHaveBeenCalled();
+    expect(buzzKitCalls.filter((call) => call.method === "POST")).toHaveLength(1);
   });
 
-  it("goes to the dead-letter queue when BuzzKit can't take it either", async () => {
+  it("is told of the push's real life: the first retry lands well before an alert expires", () => {
+    // The producer waits 5 s, a push lives 900 s (approvals 60 s).
+    expect(retryStillUseful(1, NOW, NOW + 900, 5)).toBe(true);
+    expect(retryStillUseful(1, NOW, NOW + 60, 5)).toBe(true);
+    // The wait would run past the expiry.
+    expect(retryStillUseful(1, NOW + 58, NOW + 60, 5)).toBe(false);
+    expect(retryStillUseful(1, NOW + 55, NOW + 60, 5)).toBe(false);
+    // Two tries are enough.
+    expect(retryStillUseful(2, NOW, NOW + 900, 15)).toBe(false);
+  });
+
+  it("waits and tries BuzzKit again while the push is still fresh when BuzzKit is down", async () => {
     const body = await queuedMessage();
     apnsAnswers.push({ status: 503, reason: "ServiceUnavailable" });
-    const message = fakeMessage(body, 6);
+    const message = fakeMessage(body, 1);
+    await run([message], consumerEnv({ BUZZKIT_API_KEY: undefined }));
+    expect(message.ack).not.toHaveBeenCalled();
+    expect(message.retry).toHaveBeenCalledWith({ delaySeconds: 15 });
+    expect(relayedEvents().find((event) => event.name === "push.dlq")).toBeUndefined();
+    // The message is BuzzKit's now: a host retry goes there too.
+    expect(await sendRows()).toEqual([{ state: "buzzkit" }]);
+    // The retry skips APNs and uses BuzzKit, which is up again.
+    apnsCalls = [];
+    const next = fakeMessage(body, 2);
+    await run([next]);
+    expect(apnsCalls).toEqual([]);
+    expect(next.ack).toHaveBeenCalled();
+    expect(buzzKitCalls.filter((call) => call.method === "POST")).toHaveLength(1);
+  });
+
+  it("drops the message instead of waiting past the push's expiry", async () => {
+    const body = await queuedMessage() as { enqueuedAt: number };
+    apnsAnswers.push({ status: 503, reason: "ServiceUnavailable" });
+    // Ten seconds of life left. The next wait is 15.
+    const message = fakeMessage({ ...body, enqueuedAt: (NOW - 890) * 1_000 }, 1);
+    await run([message], consumerEnv({ BUZZKIT_API_KEY: undefined }));
+    expect(message.ack).toHaveBeenCalled();
+    expect(message.retry).not.toHaveBeenCalled();
+    expect(await sendRows()).toEqual([]);
+  });
+
+  it("goes to the dead-letter queue when a long-lived wake can't be sent after every try", async () => {
+    // A wake lives six hours, so it really can reach its last delivery. Its first four waits add up to 485 s.
+    apnsAnswers.push({ status: 503, reason: "ServiceUnavailable" });
+    const wakeResponse = await hostRequest(hostKeys, installation.grantId, "/wake", { version: 1, reason: "renew-sign-in" })
+      .then((request) => handleLoopdyLinkRequest(request, targetEnv));
+    expect(wakeResponse.status).toBe(202);
+    const body = retryQueue.send.mock.calls.at(-1)![0] as { enqueuedAt: number; kind: string };
+    expect(body.kind).toBe("wake");
+    apnsAnswers.push({ status: 503, reason: "ServiceUnavailable" });
+    const message = fakeMessage({ ...body, enqueuedAt: Date.now() - 1_100_000 }, 6);
     await run([message], consumerEnv({ BUZZKIT_API_KEY: undefined }));
     expect(message.ack).not.toHaveBeenCalled();
     expect(message.retry).toHaveBeenCalledWith();
     expect(relayedEvents().find((event) => event.name === "push.dlq")!.p).toEqual({ reason: "buzzkit_server_key_unconfigured" });
-    // The host can send it again.
-    expect(await env.ACCOUNTS.prepare("SELECT COUNT(*) AS n FROM push_sends").first()).toEqual({ n: 0 });
   });
 
   it("falls back at once for a token APNs refuses", async () => {
@@ -1671,5 +1788,535 @@ describe("what is logged and reported", () => {
     const response = await sendSealed(hostKeys, installation, targetEnv, "c", { waitUntil: (p: Promise<unknown>) => pending.push(p) } as never);
     expect(response.status).toBe(202);
     await expect(Promise.all(pending)).resolves.toBeDefined();
+  });
+});
+
+// MARK: Review follow-ups
+
+describe("a send that is already running", () => {
+  let hostKeys: KeyPair;
+  let installation: Installation;
+  let targetEnv: LinkEnv;
+
+  beforeEach(async () => {
+    hostKeys = await keys();
+    installation = await insertInstallation(await keys(), hostKeys);
+    targetEnv = targetEnvironment();
+    await addTarget(targetEnv, installation);
+  });
+
+  it("answers a concurrent repeat with 503 push_in_flight, and the first send still lands", async () => {
+    let release!: () => void;
+    apnsGate = new Promise<void>((resolve) => { release = resolve; });
+    const first = sendSealed(hostKeys, installation, targetEnv);
+    await vi.waitFor(() => expect(apnsCalls).toHaveLength(1));
+    const repeat = await sendSealed(hostKeys, installation, targetEnv);
+    // 503 is what a host retries. Never a status that makes it drop the grant.
+    expect(repeat.status).toBe(503);
+    expect(await repeat.json()).toMatchObject({ error: { code: "push_in_flight" } });
+    expect(apnsCalls).toHaveLength(1);
+    expect(buzzKitCalls).toEqual([]);
+    release();
+    const done = await first;
+    expect(done.status).toBe(202);
+    expect(await done.json()).toMatchObject({ status: "accepted", providerStatus: "sent" });
+    // Once it is done, the repeat is an honest duplicate.
+    expect(await (await sendSealed(hostKeys, installation, targetEnv)).json())
+      .toMatchObject({ status: "duplicate", providerStatus: "sent" });
+    expect(apnsCalls).toHaveLength(1);
+  });
+
+  it("takes over a record left in `sending` by a Worker that was cut off", async () => {
+    const event = await sealedBody(installation);
+    const key = `${installation.installationId}|alert|${event.eventId}`;
+    const insert = (age: number) => env.ACCOUNTS.prepare(`INSERT OR REPLACE INTO push_sends(
+      dedupe_key,installation_id,apns_id,state,created_at,expires_at) VALUES(?,?,'old-id','sending',?,?)`)
+      .bind(key, installation.installationId, NOW - age, NOW + 3_600).run();
+    // Fresh: someone is on it.
+    await insert(5);
+    expect((await sendSealed(hostKeys, installation, targetEnv)).status).toBe(503);
+    expect(apnsCalls).toEqual([]);
+    // Stale: nobody is, so this request sends it.
+    await insert(120);
+    const response = await sendSealed(hostKeys, installation, targetEnv);
+    expect(response.status).toBe(202);
+    expect(await response.json()).toMatchObject({ status: "accepted", providerStatus: "sent" });
+    expect(apnsCalls).toHaveLength(1);
+    expect(await sendRows()).toEqual([{ state: "sent" }]);
+  });
+
+  it("answers a repeat of a queued message as a duplicate, since it is queued", async () => {
+    apnsAnswers.push({ status: 503, reason: "ServiceUnavailable" });
+    await sendSealed(hostKeys, installation, targetEnv);
+    expect(await (await sendSealed(hostKeys, installation, targetEnv)).json())
+      .toMatchObject({ status: "duplicate", providerStatus: "queued" });
+  });
+
+  it("gives up on the direct path after about eight seconds and uses BuzzKit", async () => {
+    const realNow = Date.now.bind(Date);
+    let skew = 0;
+    vi.spyOn(Date, "now").mockImplementation(() => realNow() + skew);
+    // The first answer is slow, and refuses the provider token, so a second try would follow.
+    apnsAnswers.push({ status: 403, reason: "ExpiredProviderToken" });
+    const fetchMock = vi.mocked(globalThis.fetch);
+    const original = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation(async (input, init) => {
+      const result = await original(input, init);
+      if (String(input).includes("push.apple.com")) skew = 9_000;
+      return result;
+    });
+    const response = await sendSealed(hostKeys, installation, targetEnv);
+    expect(response.status).toBe(202);
+    expect(apnsCalls).toHaveLength(1);
+    expect(buzzKitCalls.filter((call) => call.method === "POST")).toHaveLength(1);
+    expect(relayedEvents().find((event) => event.name === "push.fallback_buzzkit")!.p).toEqual({ reason: "apns_deadline" });
+  });
+
+  it("starts no request, and cuts a running one short, at the deadline", async () => {
+    const config = apnsConfig({
+      APNS_KEY_P8: providerKey.pem, APNS_KEY_ID: "ABC123DEFG", APNS_TEAM_ID: "TEAM123456",
+    })!;
+    const input = {
+      config, environment: "production" as const, tokenHex: TOKEN, pushType: "alert" as const, priority: 10 as const,
+      expiration: NOW + 900, apnsId: await apnsIdFor("x"), payload: {}, authorize: async () => { log.push("authorize"); },
+    };
+    expect(await sendApns({ ...input, deadlineAt: Date.now() - 1 })).toMatchObject({ outcome: "rejected", reason: "deadline" });
+    expect(log).toEqual([]);
+    const timeout = vi.spyOn(AbortSignal, "timeout");
+    await sendApns({ ...input, deadlineAt: Date.now() + 2_000 });
+    expect(timeout.mock.calls[0]![0]).toBeLessThanOrEqual(2_000);
+  });
+});
+
+describe("what BuzzKit gets", () => {
+  let hostKeys: KeyPair;
+
+  const posts = () => buzzKitCalls.filter((call) => call.method === "POST" && call.path === "/v1/messages");
+
+  beforeEach(() => { hostKeys = undefined as never; });
+
+  it("is the same body for the same event, so a host retry is byte for byte the same", async () => {
+    hostKeys = await keys();
+    const installation = await insertInstallation(await keys(), hostKeys);
+    const targetEnv = targetEnvironment({ DIRECT_APNS: "off" });
+    await sendSealed(hostKeys, installation, targetEnv);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    await sendSealed(hostKeys, installation, targetEnv);
+    expect(posts()).toHaveLength(2);
+    // The avatar link carries a signature that moves with time, so compare the rest.
+    const strip = (body: Record<string, any>) => {
+      const copy = structuredClone(body);
+      delete copy.data.loopdy.avatar;
+      return JSON.stringify(copy);
+    };
+    expect(strip(posts()[0]!.body!)).toBe(strip(posts()[1]!.body!));
+    expect((posts()[0]!.body!.data as Record<string, unknown>).bighelp_meta)
+      .toEqual({ v: 1, path: "buzzkit", occurredAt: NOW * 1_000 });
+  });
+
+  it("carries the key at the largest sealed envelope, a 64-character profile and a long avatar link", async () => {
+    hostKeys = await keys();
+    const profile = `p${"x".repeat(63)}`;
+    const installation = await insertInstallation(await keys(), hostKeys, ["session.completed"], profile);
+    const event = await sealedBody(installation);
+    const sealed = { ...event.sealed, ciphertext: "A" };
+    sealed.ciphertext = "A".repeat(2_300 - new TextEncoder().encode(JSON.stringify(sealed)).length + 1);
+    expect(new TextEncoder().encode(JSON.stringify(sealed)).length).toBe(2_300);
+    const origin = `https://${"a".repeat(60)}.${"b".repeat(60)}.example.com`;
+    const targetEnv = targetEnvironment({ DIRECT_APNS: "off", BUZZKIT_ASSET_ORIGIN: origin });
+    const response = await handleLoopdyLinkRequest(
+      await hostRequest(hostKeys, installation.grantId, "/events", { ...event, sealed }), targetEnv,
+    );
+    expect(response.status).toBe(202);
+    const body = posts()[0]!.body!;
+    expect((body.data as { loopdy: { avatar: { url: string } } }).loopdy.avatar.url.length).toBeGreaterThan(200);
+    expect(apnsBudgetBytes(body)).toBeLessThanOrEqual(MAX_APNS_PAYLOAD_BYTES);
+  });
+
+  it("leaves the key out, and still sends, when it would push the message past the budget", async () => {
+    const base = (padding: number) => sealedMessage({
+      eventId: `${crypto.randomUUID()}:${"c".repeat(64)}`, eventType: "session.completed", grantId: crypto.randomUUID(),
+      profile: "p".repeat(64), sessionReference: "a".repeat(43), sealed: { ciphertext: "A".repeat(2_000) },
+      avatar: { mimeType: "application/octet-stream", sha256: "0".repeat(64), data: "" }, sound: true, occurredAt: NOW,
+    }, { url: `https://x.example/${"u".repeat(padding)}`, mimeType: "application/octet-stream", sha256: "0".repeat(64) });
+    // Find a size where the message fits alone but not with the key.
+    let padding = 0;
+    while (apnsBudgetBytes(attachDeliveryMeta(base(padding).body, "buzzkit", undefined, NOW * 1_000)) <= MAX_APNS_PAYLOAD_BYTES) padding += 1;
+    const message = base(padding);
+    expect(apnsBudgetBytes(message.body)).toBeLessThanOrEqual(MAX_APNS_PAYLOAD_BYTES);
+    expect(apnsBudgetBytes(attachDeliveryMeta(message.body, "buzzkit", undefined, NOW * 1_000))).toBeGreaterThan(MAX_APNS_PAYLOAD_BYTES);
+
+    const targetEnv = targetEnvironment();
+    const receipt = await sendBuzzKitMessage(targetEnv, "notify_x", "notification-instance", message, async () => {});
+    expect(receipt.status).toBe("accepted");
+    expect((posts()[0]!.body!.data as Record<string, unknown>)).not.toHaveProperty("bighelp_meta");
+    // A message too big even without the key still fails, as it always did.
+    await expect(sendBuzzKitMessage(targetEnv, "notify_x", "notification-instance", base(padding + 200), async () => {}))
+      .rejects.toMatchObject({ code: "buzzkit_apns_payload_too_large" });
+  });
+});
+
+describe("muted topics", () => {
+  let installationKeys: KeyPair;
+  let hostKeys: KeyPair;
+  let installation: Installation;
+  let targetEnv: LinkEnv;
+  const ALL = ["chat-replies-completions", "scheduled-tasks-deliveries", "questions-approvals", "subagent-completions"];
+
+  beforeEach(async () => {
+    installationKeys = await keys();
+    hostKeys = await keys();
+    installation = await insertInstallation(installationKeys, hostKeys, [
+      "session.completed", "scheduled.completed", "approval.required", "clarification.required", "subagent.completed",
+    ]);
+    targetEnv = targetEnvironment();
+  });
+
+  const post = async (eventType: string, hex: string) => handleLoopdyLinkRequest(
+    await hostRequest(hostKeys, installation.grantId, "/events", { ...(await sealedBody(installation, hex)), eventType }),
+    targetEnv,
+  );
+
+  it("accepts a muted alert and sends it nowhere, as BuzzKit does for a topic nobody listens to", async () => {
+    await addTarget(targetEnv, installation, { mutedTopics: ["chat-replies-completions"] });
+    const response = await post("session.completed", "1");
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual({
+      version: 1, status: "accepted", deliveryId: expect.any(String), providerStatus: "suppressed",
+      counts: { total: 0, sent: 0 },
+    });
+    expect(apnsCalls).toEqual([]);
+    expect(buzzKitCalls).toEqual([]);
+    expect(await sendRows()).toEqual([]);
+  });
+
+  it.each([
+    ["session.completed", "chat-replies-completions"],
+    ["scheduled.completed", "scheduled-tasks-deliveries"],
+    ["approval.required", "questions-approvals"],
+    ["clarification.required", "questions-approvals"],
+    ["subagent.completed", "subagent-completions"],
+  ])("suppresses %s when %s is muted, and sends it when only the others are", async (eventType, topic) => {
+    await addTarget(targetEnv, installation, { mutedTopics: [topic] });
+    expect(await (await post(eventType, "2")).json()).toMatchObject({ providerStatus: "suppressed" });
+    expect(apnsCalls).toEqual([]);
+    await addTarget(targetEnv, installation, { mutedTopics: ALL.filter((candidate) => candidate !== topic) });
+    expect(await (await post(eventType, "3")).json()).toMatchObject({ providerStatus: "sent" });
+    expect(apnsCalls).toHaveLength(1);
+  });
+
+  it("sends the sign-in wake and the test notification even with every topic muted", async () => {
+    await addTarget(targetEnv, installation, { mutedTopics: ALL });
+    const wake = await hostRequest(hostKeys, installation.grantId, "/wake", { version: 1, reason: "renew-sign-in" })
+      .then((request) => handleLoopdyLinkRequest(request, targetEnv));
+    expect(await wake.json()).toMatchObject({ providerStatus: "sent" });
+    const test = await installationRequest(
+      installationKeys, installation.installationId, "POST", "/v1/notifications/host-grants/buzzkit/test",
+      { version: 1, requestId: crypto.randomUUID() },
+    ).then((request) => handleLoopdyLinkRequest(request, targetEnv));
+    expect(await test.json()).toMatchObject({ test: { state: "accepted", providerStatus: "sent" } });
+    expect(apnsCalls).toHaveLength(2);
+  });
+
+  it("keeps Live Activity updates out of it", async () => {
+    await addTarget(targetEnv, installation, { mutedTopics: ALL });
+    const activityId = "activity-muted-1";
+    const sessionReference = "a".repeat(43);
+    const liveEnv = targetEnvironment({ PUSH_TOKEN_KEY: targetEnv.PUSH_TOKEN_KEY }, {
+      notificationActivity: async () => ({
+        activityId, grantId: installation.grantId, sessionReference, revision: 1, leaseExpires: NOW + 900, status: "active",
+      }),
+      beginNotificationActivityUpdate: async () => ({ status: "send" }),
+      completeNotificationActivityUpdate: async () => {},
+    });
+    await addTarget(liveEnv, installation, { kind: "liveactivity", activityId });
+    const response = await hostRequest(hostKeys, installation.grantId, `/live-activities/${activityId}/updates`, {
+      version: 2, updateId: "m".repeat(43), sessionReference, phase: "using_tool", currentAction: "Working",
+      progress: 1, completedSteps: 0, activeSubagentCount: 0, latestTool: null, timestamp: NOW, expires: NOW + 900,
+    }).then((request) => handleLoopdyLinkRequest(request, liveEnv));
+    expect(response.status).toBe(202);
+    expect(apnsCalls).toHaveLength(1);
+  });
+
+  it("never sends directly to a target saved without a list", async () => {
+    await putPushTarget(targetEnv, {
+      installationId: installation.installationId, ownerCoordinate: installation.coordinate, authorizationEpoch: 1,
+    }, { kind: "alert", activityId: "", token: TOKEN, environment: "production", appVersion: "2.7.0(160)" }, NOW);
+    expect((await env.ACCOUNTS.prepare("SELECT muted_topics FROM push_targets").first())).toEqual({ muted_topics: null });
+    const response = await post("session.completed", "4");
+    expect(response.status).toBe(202);
+    expect(apnsCalls).toEqual([]);
+    expect(buzzKitCalls.filter((call) => call.method === "POST")).toHaveLength(1);
+    expect(relayedEvents().find((event) => event.name === "push.fallback_buzzkit")!.p).toEqual({ reason: "target_incomplete" });
+  });
+
+  it("stores the list sorted, with the target", async () => {
+    const response = await installationRequest(
+      installationKeys, installation.installationId, "PUT", "/v1/notifications/push-target",
+      { version: 1, token: TOKEN, environment: "production", appVersion: "2.7.0(160)",
+        mutedTopics: ["subagent-completions", "chat-replies-completions"] },
+    ).then((request) => handleLoopdyLinkRequest(request, targetEnv));
+    expect(response.status).toBe(200);
+    expect(await env.ACCOUNTS.prepare("SELECT muted_topics FROM push_targets").first())
+      .toEqual({ muted_topics: '["chat-replies-completions","subagent-completions"]' });
+  });
+
+  it("honours a topic muted while the message waits in the queue", async () => {
+    await addTarget(targetEnv, installation);
+    apnsAnswers.push({ status: 503, reason: "ServiceUnavailable" });
+    await post("session.completed", "5");
+    const body = retryQueue.send.mock.calls[0]![0];
+    await addTarget(targetEnv, installation, { mutedTopics: ["chat-replies-completions"] });
+    apnsCalls = [];
+    const message = { id: "m", timestamp: new Date(), body, attempts: 1, ack: vi.fn(), retry: vi.fn() };
+    await handleApnsRetryBatch({ queue: "q", messages: [message] } as never, targetEnv, { waitUntil() {} } as never);
+    expect(message.ack).toHaveBeenCalled();
+    expect(apnsCalls).toEqual([]);
+    expect(buzzKitCalls).toEqual([]);
+  });
+});
+
+describe("rich alerts", () => {
+  let hostKeys: KeyPair;
+  let installation: Installation;
+  let targetEnv: LinkEnv;
+
+  async function richBody(grantId: string) {
+    const avatar = new Uint8Array([1, 2, 3]);
+    const sha256 = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", avatar)),
+      (byte) => byte.toString(16).padStart(2, "0")).join("");
+    return {
+      version: 2, eventId: `${grantId}:${"e".repeat(64)}`, eventType: "session.completed",
+      sessionReference: "a".repeat(43), turnId: "turn-rich", occurredAt: NOW,
+      agent: { id: "default", name: "Made Up Agent", avatar: { mimeType: "image/png", sha256, data: "data:image/png;base64,AQID" } },
+      content: { kind: "reply", text: "All three checks passed." }, sound: false,
+    };
+  }
+
+  beforeEach(async () => {
+    hostKeys = await keys();
+    installation = await insertInstallation(await keys(), hostKeys);
+    targetEnv = targetEnvironment();
+    await addTarget(targetEnv, installation);
+  });
+
+  const send = async () => handleLoopdyLinkRequest(
+    await hostRequest(hostKeys, installation.grantId, "/events", await richBody(installation.grantId)), targetEnv,
+  );
+
+  it("goes direct with the agent's name, the text and the avatar link as bk.image", async () => {
+    const response = await send();
+    expect(response.status).toBe(202);
+    expect(await response.json()).toMatchObject({ status: "accepted", providerStatus: "sent" });
+    const payload = apnsCalls[0]!.payload as Record<string, any>;
+    expect(payload.aps).toEqual({
+      alert: { title: "Made Up Agent", body: "All three checks passed." },
+      category: "LOOPDY_AGENT_UPDATE", "mutable-content": 1, "thread-id": "a".repeat(43), "interruption-level": "active",
+    });
+    expect(payload.loopdy).toMatchObject({
+      version: 2, turnId: "turn-rich", contentKind: "reply", profile: "default",
+      agent: { id: "default", name: "Made Up Agent", avatar: { mimeType: "image/png" } },
+    });
+    expect(payload.bk.image).toMatch(/\.png\?expires=/);
+    expect(payload.bk.image).toBe(payload.loopdy.agent.avatar.url);
+    expect(payload.bk).toMatchObject({ category: "LOOPDY_AGENT_UPDATE", actions: [{ id: "open", title: "Open", foreground: true }] });
+    expect(payload.bighelp_meta).toMatchObject({ v: 1, path: "direct", occurredAt: NOW * 1_000 });
+  });
+
+  it("never waits on the queue, since its text is plain: a transient failure goes to BuzzKit", async () => {
+    apnsAnswers.push({ status: 503, reason: "ServiceUnavailable" });
+    const response = await send();
+    expect(response.status).toBe(202);
+    expect(retryQueue.send).not.toHaveBeenCalled();
+    expect(buzzKitCalls.filter((call) => call.method === "POST")).toHaveLength(1);
+    expect(relayedEvents().find((event) => event.name === "push.fallback_buzzkit")!.p).toEqual({ reason: "plaintext_not_queued" });
+    // The queue would not take one either.
+    expect(parseRetryMessage({
+      v: 1, kind: "alert", grantId: installation.grantId, eventType: "session.completed", dedupeKey: "k", enqueuedAt: 1,
+      message: { body: { title: "t", body: "plain text", data: { loopdy: { version: 2 } } }, idempotencyKey: "k" },
+    })).toBeNull();
+  });
+});
+
+describe("the APNs circuit breaker", () => {
+  let hostKeys: KeyPair;
+  let installation: Installation;
+  let targetEnv: LinkEnv;
+
+  beforeEach(async () => {
+    hostKeys = await keys();
+    installation = await insertInstallation(await keys(), hostKeys);
+    targetEnv = targetEnvironment();
+    await addTarget(targetEnv, installation);
+  });
+
+  it("stops trying APNs for a minute after three setup failures in a row, then tries again", async () => {
+    const realNow = Date.now.bind(Date);
+    let skew = 0;
+    vi.spyOn(Date, "now").mockImplementation(() => realNow() + skew);
+    for (let index = 0; index < 3; index += 1) apnsAnswers.push({ status: 400, reason: "BadTopic" });
+    for (let index = 0; index < 3; index += 1) {
+      expect((await sendSealed(hostKeys, installation, targetEnv, String(index + 1))).status).toBe(202);
+    }
+    expect(apnsCalls).toHaveLength(3);
+    // The breaker is open: no APNs call, no extra round trips.
+    expect((await sendSealed(hostKeys, installation, targetEnv, "4")).status).toBe(202);
+    expect(apnsCalls).toHaveLength(3);
+    expect(buzzKitCalls.filter((call) => call.method === "POST")).toHaveLength(4);
+    expect(relayedEvents().filter((event) => event.name === "push.fallback_buzzkit").map((event) => event.p).at(-1))
+      .toEqual({ reason: "apns_breaker_open" });
+    // The target is not blamed for any of it.
+    expect((await env.ACCOUNTS.prepare("SELECT invalid_at FROM push_targets").first<{ invalid_at: number | null }>())!.invalid_at).toBeNull();
+    // A minute later it tries again, and a success closes it for good.
+    skew = 61_000;
+    expect((await sendSealed(hostKeys, installation, targetEnv, "5")).status).toBe(202);
+    expect(apnsCalls).toHaveLength(4);
+    expect(await sendRows()).toContainEqual({ state: "sent" });
+  });
+
+  it("also opens for a provider token that stays refused, and a success in between resets the count", async () => {
+    for (let index = 0; index < 2; index += 1) {
+      apnsAnswers.push({ status: 403, reason: "InvalidProviderToken" }, { status: 403, reason: "InvalidProviderToken" });
+      await sendSealed(hostKeys, installation, targetEnv, String(index + 1));
+    }
+    await sendSealed(hostKeys, installation, targetEnv, "3"); // succeeds
+    for (let index = 0; index < 2; index += 1) {
+      apnsAnswers.push({ status: 403, reason: "InvalidProviderToken" }, { status: 403, reason: "InvalidProviderToken" });
+      await sendSealed(hostKeys, installation, targetEnv, String(index + 4));
+    }
+    const before = apnsCalls.length;
+    await sendSealed(hostKeys, installation, targetEnv, "6");
+    expect(apnsCalls.length).toBe(before + 1); // still closed: only two in a row
+  });
+
+  it("does not count a dead token or a transient failure", async () => {
+    for (let index = 0; index < 4; index += 1) apnsAnswers.push({ status: 503, reason: "ServiceUnavailable" });
+    for (let index = 0; index < 4; index += 1) await sendSealed(hostKeys, installation, targetEnv, String(index + 1));
+    const calls = apnsCalls.length;
+    await sendSealed(hostKeys, installation, targetEnv, "5");
+    expect(apnsCalls.length).toBe(calls + 1);
+  });
+});
+
+describe("a target the Worker can't use", () => {
+  it("is reported as unreadable, not as missing", async () => {
+    const hostKeys = await keys();
+    const installation = await insertInstallation(await keys(), hostKeys);
+    await addTarget(targetEnvironment(), installation); // sealed with another key
+    const response = await sendSealed(hostKeys, installation, targetEnvironment());
+    expect(response.status).toBe(202);
+    expect(apnsCalls).toEqual([]);
+    expect(relayedEvents().find((event) => event.name === "push.fallback_buzzkit")!.p).toEqual({ reason: "target_unreadable" });
+  });
+});
+
+describe("target route limits", () => {
+  it("allows 30 writes an hour per installation, then answers 429, and still lets a delete through", async () => {
+    const installationKeys = await keys();
+    const installation = await insertInstallation(installationKeys, await keys());
+    const targetEnv = targetEnvironment();
+    const put = (path: string, body: object) =>
+      installationRequest(installationKeys, installation.installationId, "PUT", path, body)
+        .then((request) => handleLoopdyLinkRequest(request, targetEnv));
+    for (let index = 0; index < 20; index += 1) {
+      expect((await put("/v1/notifications/push-target", {
+        version: 1, token: TOKEN, environment: "production", appVersion: "2.7.0(160)", mutedTopics: [],
+      })).status).toBe(200);
+    }
+    for (let index = 0; index < 10; index += 1) {
+      expect((await put("/v1/notifications/live-activity-target", {
+        version: 1, kind: "liveactivity", activityId: `activity-${index}`, token: TOKEN, environment: "production",
+      })).status).toBe(200);
+    }
+    const limited = await put("/v1/notifications/push-target", {
+      version: 1, token: OTHER_TOKEN, environment: "production", appVersion: "2.7.0(160)", mutedTopics: [],
+    });
+    expect(limited.status).toBe(429);
+    expect(await limited.json()).toMatchObject({ error: { code: "notification_push_target_rate_limited" } });
+    // The stored token is the last one accepted.
+    const ciphertext = (await env.ACCOUNTS.prepare("SELECT token_ciphertext FROM push_targets WHERE kind='alert'")
+      .first<{ token_ciphertext: string }>())!.token_ciphertext;
+    expect(await openPushToken(targetEnv, installation.installationId, "alert", "", ciphertext)).toBe(TOKEN);
+    const removed = await installationRequest(
+      installationKeys, installation.installationId, "DELETE", "/v1/notifications/push-target", { version: 1 },
+    ).then((request) => handleLoopdyLinkRequest(request, targetEnv));
+    expect(removed.status).toBe(200);
+    // Another installation has its own allowance.
+    const other = await insertInstallation(installationKeys, await keys());
+    expect((await installationRequest(
+      installationKeys, other.installationId, "PUT", "/v1/notifications/push-target",
+      { version: 1, token: TOKEN, environment: "production", appVersion: "2.7.0(160)", mutedTopics: [] },
+    ).then((request) => handleLoopdyLinkRequest(request, targetEnv))).status).toBe(200);
+  });
+
+  it("purges expired rows on a delete too", async () => {
+    const installationKeys = await keys();
+    const installation = await insertInstallation(installationKeys, await keys());
+    const targetEnv = targetEnvironment();
+    await env.ACCOUNTS.prepare(`INSERT INTO push_targets(installation_id,kind,activity_id,environment,
+      token_ciphertext,app_version,authorization_epoch,updated_at,expires_at)
+      VALUES(?,'liveactivity','old-1','production','v1.x','',1,?,?)`)
+      .bind(installation.installationId, NOW - 100_000, NOW - 1).run();
+    const pending: Promise<unknown>[] = [];
+    const response = await handleLoopdyLinkRequest(await installationRequest(
+      installationKeys, installation.installationId, "DELETE", "/v1/notifications/push-target", { version: 1 },
+    ), targetEnv, { waitUntil: (promise: Promise<unknown>) => pending.push(promise) } as never);
+    expect(response.status).toBe(200);
+    await Promise.all(pending);
+    expect(await env.ACCOUNTS.prepare("SELECT COUNT(*) AS n FROM push_targets").first()).toEqual({ n: 0 });
+  });
+});
+
+describe("microtask ordering", () => {
+  it("starts the APNs request in the same turn that egress authority is granted", async () => {
+    const config = apnsConfig({
+      APNS_KEY_P8: providerKey.pem, APNS_KEY_ID: "ABC123DEFG", APNS_TEAM_ID: "TEAM123456",
+    })!;
+    // A chain of microtasks counts the turns between authority being granted and the request starting.
+    let running = false;
+    let ticks = 0;
+    const tick = () => { if (running) { ticks += 1; queueMicrotask(tick); } };
+    let ticksAtRequest = -1;
+    vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+      ticksAtRequest = ticks;
+      running = false;
+      return new Response(null, { status: 200 });
+    });
+    await sendApns({
+      config, environment: "production", tokenHex: TOKEN, pushType: "alert", priority: 10, expiration: NOW + 900,
+      apnsId: await apnsIdFor("ticks"), payload: {},
+      authorize: async () => { running = true; tick(); },
+    });
+    // Awaiting the authority call costs this many turns. Any await added after it costs one more.
+    expect(ticksAtRequest).toBe(2);
+  });
+});
+
+describe("the Worker's entry point", () => {
+  it("exports a queue handler that runs the retry consumer", async () => {
+    const { default: worker } = await import("../src/index.js");
+    expect(typeof worker.queue).toBe("function");
+    expect(typeof worker.fetch).toBe("function");
+    const garbage = { id: "m", timestamp: new Date(), body: { v: 9 }, attempts: 1, ack: vi.fn(), retry: vi.fn() };
+    await worker.queue!({ queue: "loopdy-link-apns-retry", messages: [garbage] } as never, targetEnvironment(), { waitUntil() {} } as never);
+    expect(garbage.ack).toHaveBeenCalledTimes(1);
+    expect(garbage.retry).not.toHaveBeenCalled();
+  });
+
+  it("hands the request context to the send path so telemetry runs after the answer", async () => {
+    const { default: worker } = await import("../src/index.js");
+    const hostKeys = await keys();
+    const installation = await insertInstallation(await keys(), hostKeys);
+    const targetEnv = targetEnvironment();
+    await addTarget(targetEnv, installation);
+    const pending: Promise<unknown>[] = [];
+    const response = await worker.fetch(
+      await hostRequest(hostKeys, installation.grantId, "/events", await sealedBody(installation)), targetEnv,
+      { waitUntil: (promise: Promise<unknown>) => pending.push(promise) } as never,
+    );
+    expect(response.status).toBe(202);
+    expect(pending.length).toBeGreaterThan(0);
+    await Promise.all(pending);
+    expect(relayedEvents().some((event) => event.name === "push.sent")).toBe(true);
   });
 });

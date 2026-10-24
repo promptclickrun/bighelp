@@ -8,6 +8,7 @@ import XCTest
 /// - BIGHELP_STORE_SCREENSHOTS: the output folder
 /// - BIGHELP_STORE_HOST: the host's address
 /// - BIGHELP_STORE_TZ: the host's time zone, so chat times read just before 9:41
+/// - BIGHELP_STORE_PREFIX: the set's file prefix (iphone, ipad, duo)
 final class AppStoreScreenshotUITests: BighelpUITestCase {
     private var folder = ""
     private var prefix = "iphone"
@@ -26,8 +27,12 @@ final class AppStoreScreenshotUITests: BighelpUITestCase {
         save("10-connect", app)
         address.tap()
         address.typeText(try XCTUnwrap(environment("BIGHELP_STORE_HOST")))
-        // A friendly name, as someone would give their computer.
-        app.buttons["More options"].firstMatch.tap()
+        // A friendly name, as someone would give their computer. On a short screen (the Duo's
+        // cover) the keyboard hides the row: put it away first.
+        let more = app.buttons["More options"].firstMatch
+        if !more.waitForExistence(timeout: 2) || !more.isHittable { BighelpKeyboardDismissal.dismiss(in: app) }
+        XCTAssertTrue(more.waitForExistence(timeout: 5))
+        more.tap()
         let name = app.textFields["host-setup.name"]
         if name.waitForExistence(timeout: 3) {
             name.tap()
@@ -58,6 +63,7 @@ final class AppStoreScreenshotUITests: BighelpUITestCase {
                 until: "dining budget", in: app)
         try expectCard("September spending", chat: "September spending", in: app)
         scrollToCard(in: app, by: 0)
+        revealCardTop("September spending", in: app)
         save("01-spending", app)
 
         try openAgent("atlas", in: app)
@@ -65,6 +71,7 @@ final class AppStoreScreenshotUITests: BighelpUITestCase {
                 until: "reminder the night before", in: app)
         try expectCard("Lisbon packing list", chat: "Lisbon packing list", in: app)
         scrollToCard(in: app, by: 0)
+        revealCardTop("Lisbon packing list", in: app)
         save("02-packing", app)
 
         // Bots mode's home on the same host, after the agents' chats above. The same app
@@ -84,9 +91,21 @@ final class AppStoreScreenshotUITests: BighelpUITestCase {
             .firstMatch.waitForExistence(timeout: 30)
         sleep(3)
         save("11-bots", app)
+        if prefix == "duo" {
+            // The Duo's cover screen: a bot's chat with the switcher in the side strip.
+            app.descendants(matching: .any).matching(NSPredicate(format: "identifier IN %@",
+                ["simple-bots.bot.atlas", "simple-bots.pinned.atlas"])).firstMatch.tap()
+            XCTAssertTrue(app.descendants(matching: .any)["chat-switcher"].waitForExistence(timeout: 30),
+                          "The switcher sits beside the chat")
+            _ = app.descendants(matching: .any)["Lisbon packing list"].waitForExistence(timeout: 20)
+            sleep(3)
+            save("12-switcher", app)
+        }
         app.terminate()
         app.launchArguments.removeLast(2)
         app.launch()
+        // The home chat opens over the launch screen: let it settle before reaching for ☰.
+        sleep(4)
 
         openMenu(in: app)
         save("06-menu", app)
@@ -108,7 +127,7 @@ final class AppStoreScreenshotUITests: BighelpUITestCase {
             throw XCTSkip("Run Scripts/AppStoreScreenshots.sh to capture the App Store set.")
         }
         folder = output
-        prefix = UIDevice.current.userInterfaceIdiom == .pad ? "ipad" : "iphone"
+        prefix = environment("BIGHELP_STORE_PREFIX") ?? (UIDevice.current.userInterfaceIdiom == .pad ? "ipad" : "iphone")
         addUIInterruptionMonitor(withDescription: "System prompts") { dialog in
             for label in ["Not Now", "Don’t Allow", "Don't Allow", "Allow"] where dialog.buttons[label].exists {
                 dialog.buttons[label].tap()
@@ -155,6 +174,9 @@ final class AppStoreScreenshotUITests: BighelpUITestCase {
         openMenu(in: app)
         tapMenuRow("menu.agents", in: app)
         let row = app.buttons["agent.\(id)"].firstMatch
+        // A short screen (the Duo's cover) draws the rows below the fold once scrolled to.
+        let list = app.descendants(matching: .any)["agents.screen"].firstMatch
+        for _ in 0..<4 where !row.waitForExistence(timeout: 3) || !row.isHittable { list.swipeUp() }
         XCTAssertTrue(row.waitForExistence(timeout: 15), "\(id) is in Agents")
         row.tap()
         sleep(2)
@@ -233,6 +255,22 @@ final class AppStoreScreenshotUITests: BighelpUITestCase {
             let to = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4 + share))
             from.press(forDuration: 0.1, thenDragTo: to, withVelocity: .slow, thenHoldForDuration: 0.5)
         }
+        sleep(2)
+    }
+
+    /// A short screen (the Duo's cover) can't show a tall card and the reply under it: the card's
+    /// top comes out from under the chat's header.
+    @MainActor
+    private func revealCardTop(_ title: String, in app: XCUIApplication) {
+        guard prefix == "duo" else { return }
+        let heading = app.staticTexts[title].firstMatch
+        let window = app.windows.firstMatch
+        guard heading.exists, window.frame.height > 0 else { return }
+        let below = 150 - heading.frame.minY
+        guard below > 4 else { return }
+        let from = window.coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0.45))
+        from.press(forDuration: 0.1, thenDragTo: from.withOffset(CGVector(dx: 0, dy: below)),
+                   withVelocity: .slow, thenHoldForDuration: 0.6)
         sleep(2)
     }
 

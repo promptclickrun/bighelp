@@ -1,8 +1,9 @@
 #!/bin/zsh
 # The App Store screenshot set from the real app on a real, isolated Hermes host.
 # Usage: Scripts/AppStoreScreenshots.sh <hermes from a throwaway checkout> <bighelp plugin folder> <output folder>
-# Uses its own iPhone 17 Pro Max (6.9") and iPad Pro 13" simulators, erased first
-# (BIGHELP_STORE_DEVICES="iphone" or "ipad" takes just one set),
+# Uses its own iPhone 17 Pro Max (6.9"), iPad Pro 13" and iPhone Duo simulators, erased first
+# (BIGHELP_STORE_DEVICES="iphone", "ipad" or "duo" takes just one set; the Duo needs its iOS 27.1
+# runtime and gives the cover screen's set, as its simulator can't be opened),
 # with the status bar at 9:41, full signal and a full battery.
 set -euo pipefail
 hermes=$1 plugin=$2 output=$3
@@ -10,15 +11,20 @@ repo=${0:A:h:h}
 derived=${BIGHELP_STORE_DERIVED:-/tmp/bighelp-store-dd}
 port=${BIGHELP_STORE_PORT:-9333}
 typeset -A devices=(iphone com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro-Max
-                    ipad com.apple.CoreSimulator.SimDeviceType.iPad-Pro-13-inch-M5-12GB)
-runtime=$(xcrun simctl list runtimes -j | python3 -c "import json,sys; print([r['identifier'] for r in json.load(sys.stdin)['runtimes'] if r['platform']=='iOS' and r['isAvailable']][-1])")
+                    ipad com.apple.CoreSimulator.SimDeviceType.iPad-Pro-13-inch-M5-12GB
+                    duo com.apple.CoreSimulator.SimDeviceType.iPhone-Duo)
+# Newest first: a runtime can be for one device only (iOS 27.1 runs just the Duo).
+runtimes=($(xcrun simctl list runtimes -j | python3 -c "import json,sys; print(' '.join(reversed([r['identifier'] for r in json.load(sys.stdin)['runtimes'] if r['platform']=='iOS' and r['isAvailable']])))"))
 # 9:41 on Apple's day, written in UTC for this Mac's time zone.
 clock=$(python3 -c "from datetime import datetime, timezone; print(datetime(2007,1,9,9,41).astimezone().astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.000Z'))")
 mkdir -p "$output"
 for kind in ${=BIGHELP_STORE_DEVICES:-iphone ipad}; do
   name=bighelp-store-$kind
   udid=$(xcrun simctl list devices -j | python3 -c "import json,sys; print(next((d['udid'] for r in json.load(sys.stdin)['devices'].values() for d in r if d['name']=='$name'), ''))")
-  [[ -n $udid ]] || udid=$(xcrun simctl create $name ${devices[$kind]} $runtime)
+  if [[ -z $udid ]]; then
+    for runtime in $runtimes; do udid=$(xcrun simctl create $name ${devices[$kind]} $runtime 2>/dev/null) && break; done
+  fi
+  [[ -n $udid ]] || { echo "$kind: no runtime for ${devices[$kind]}"; exit 1; }
   xcrun simctl shutdown $udid 2>/dev/null || true
   xcrun simctl erase $udid
   xcrun simctl boot $udid
@@ -34,7 +40,7 @@ for kind in ${=BIGHELP_STORE_DEVICES:-iphone ipad}; do
   until grep -q '"address"' $log; do kill -0 $host || { cat $log; exit 1 }; sleep 1; done
   zone=$(python3 -c "import json,sys; print(json.loads(open('$log').read().splitlines()[-1])['time_zone'])")
   TEST_RUNNER_BIGHELP_STORE_SCREENSHOTS="$output" TEST_RUNNER_BIGHELP_STORE_HOST=127.0.0.1:$port \
-  TEST_RUNNER_BIGHELP_STORE_TZ=$zone xcodebuild test-without-building -project "$repo/Bighelp.xcodeproj" \
+  TEST_RUNNER_BIGHELP_STORE_TZ=$zone TEST_RUNNER_BIGHELP_STORE_PREFIX=$kind xcodebuild test-without-building -project "$repo/Bighelp.xcodeproj" \
     -scheme Bighelp -destination "id=$udid" -derivedDataPath "$derived" \
     -only-testing:BighelpUITests/AppStoreScreenshotUITests || echo "$kind: some screens failed"
   kill $host; wait $host 2>/dev/null || true

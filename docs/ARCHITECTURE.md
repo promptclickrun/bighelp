@@ -140,7 +140,11 @@ which step failed (`CarPlayConnectStep`). The CarPlay scene is declared in the
 iOS Info.plist; visionOS generates its own scene manifest, which wins there.
 The root is a list of up to 12 agents under a header with the agent's face, its
 live step and its last three steps; the voice screen shows over it while you
-talk (an overlay on iOS 27, presented before). Each voice state's second
+talk (an overlay on iOS 27, presented before). Talk, or the agent in the
+conversation, shows the voice screen again rather than restarting the talk
+(`CarPlayTalkAction`); another agent starts one. Each showing is a new voice
+template, its state is set once CarPlay says it's up, and the car closing it is
+noticed (`CPInterfaceControllerDelegate`). Each voice state's second
 button, Agents, ends the talk and shows that list; a pick starts talking to it.
 Talk after a pause continues the same car chat; another agent or a new car
 connection starts a new one. CarPlay calls handlers off the main thread, so
@@ -665,6 +669,70 @@ This sender-key provisioning protects against modification in APNs transit and
 relay storage. It is not an independent transparency log or out-of-band
 continuity pin against compromise of the account service that provisions the
 key set.
+
+#### Direct push registration
+
+Alerts reach the phone two ways. BuzzKit is the original way and stays in place for this
+release. The notification service can also send straight to Apple, which skips BuzzKit's queue.
+For that it needs this phone's Apple push address, so the app gives it one
+(`BighelpPushRegistrar`).
+
+An update enrolls a phone that already has notifications, with nothing shown and nothing to tap:
+
+1. At launch and whenever bighelp comes back to the front, the foreground recovery
+   (`recoverForeground`) calls `refreshAtForeground()`. It acts only if the phone has a
+   notification installation (the identity that setup made) and notification permission is
+   authorized, provisional or ephemeral. It is not running during a turn-off.
+2. It asks iOS for the token (`registerForRemoteNotifications`, at most every 30 minutes).
+   iOS answers through the app delegate, which already hands the token to BuzzKit
+   (`BighelpAPNSTokenHookCenter`); the same hook now also gives it to the registrar.
+3. The registrar sends `PUT /v1/notifications/push-target` with `{version, token, environment,
+   appVersion, mutedTopics}`. `mutedTopics` lists the topics the person turned off in Settings ›
+   Notifications › Notify Me About (read from BuzzKit's preferences, as the settings screen does), because
+   the service applies those choices itself when it sends straight to Apple. If they can't be read, nothing
+   is sent and it tries again later; an empty list would wrongly say "nothing is turned off". The request is signed by the same code as every other installation request
+   (`BighelpNotificationBrokerClient`, the `loopdy-notification-device-v1` transcript). The
+   environment is the one BuzzKit was configured with: the simulator is sandbox, an embedded
+   provisioning profile wins, and the build configuration is the fallback. `appVersion` is
+   `MARKETING(BUILD)`.
+4. It sends again when the token, the installation or the environment changes, when the last
+   successful send is a week old, and (after a short wait, because people change several at once)
+   when the person changes what they want to hear about. BuzzKit still saves those choices as before.
+   A change is marked pending on the phone before anything is sent and cleared only by a send that
+   carried it, so a failed send or a quit app can't lose it; every pass also reads the choices again
+   and compares them with what the service has. Nothing is sent before BuzzKit identified the phone
+   and moved the saved choices; a token that arrives earlier waits for the foreground pass.
+   The service counts address writes in ten-minute windows (four for the alert and push-to-start
+   addresses together). The phone keeps launches to two of them, so a change to the choices always
+   has room; a write waiting for room goes out when the window passes. A 429 backs off a whole window. It keeps a digest of the token, never the token.
+5. Live Activities: each push token that goes to BuzzKit also goes to
+   `PUT /v1/notifications/live-activity-target` (`kind: liveactivity`, the activity ID), and a
+   finished activity sends `DELETE`. On iOS 17.2 and later the push-to-start token goes there too
+   (`kind: pts`); nothing sends to it yet. These run on their own tasks, never before the host
+   subscription or the end of setup, and honor the same backoff. ActivityKit streams open through BuzzKit's serial lane,
+   because ActivityKit can deadlock when several threads open them at once.
+6. Turning notifications off sends `DELETE` for the push address and the push-to-start token
+   (both at once, for five seconds at most, best effort, because revoking the installation removes them too) and clears the saved state.
+
+An older Worker answers 404, because it has no such route. The app treats that as "not available
+yet": it logs no error, shows nothing, and asks again after 24 hours. Every other failure gets a
+code (NS-123 to NS-126, [NOTIFICATION_ERROR_CODES.md](NOTIFICATION_ERROR_CODES.md)) in the device
+log only, and is retried at the next launch or foreground, after 5 minutes, 15 minutes, an hour,
+then 6 hours. Registration never changes what setup, BuzzKit or the alerts do.
+
+The notification service extension no longer builds on BuzzKit's extension product. The extension class
+is a thin shell around `BighelpNotificationProcessor`, which opens sealed alerts, stacks them, and hands the
+system exactly one notification before time runs out (tests run it with fakes). It shows every
+alert itself (`BighelpPushDisplay`): it registers the push's `bk.category` and `bk.actions` as a
+category, attaches `bk.image` (HTTPS, status 200, at most 10 MB, written to a file in pieces; a picture that says it is bigger is refused before its body is read, and one that turns out bigger is cut off) and finishes before the system's
+time limit. Pushes through BuzzKit and pushes sent straight to Apple carry the same `bk` object and
+look the same. For this release the extension still sends BuzzKit's delivered receipt
+(`BuzzKitExtensionSupport.trackDelivered`, app group `group.app.loopdy.mobile.buzzkit`) for a push that
+carries `bk.messageId`, beside the display work and without holding it back. That is why the extension
+still links the BuzzKit library. A push sent straight to Apple has no message ID and gets no receipt.
+The receipt starts when the push arrives; BuzzKit keeps a failed one for later, but one the system cuts
+off mid-request can be lost, which the old extension avoided by making the alert wait for it. Taps are handled by the app's own notification
+delegate from the `loopdy` object, so they work without a message ID.
 
 ### Live Activities
 

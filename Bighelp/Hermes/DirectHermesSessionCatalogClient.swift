@@ -605,7 +605,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
 
     func resolveSession(_ record: SessionRecord) async throws -> DirectHermesResolvedSession {
         let candidate = try candidate(for: record)
-        let profile = try await requireProfile(candidate.coordinate.profileID)
+        let profile = try await knownProfile(candidate.coordinate.profileID)
         let receipt: (response: [String: BighelpJSONValue], epoch: String?)
         let live = hasOwnership(candidate) ? candidate.coordinate.runtimeSessionID : nil
         if let live {
@@ -658,9 +658,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         // The agent picker/catalog already loaded this owner-scoped profile.
         // Canonical registry resolution keeps its fresh discovery path; an
         // ordinary new chat needs only the chosen profile and Hermes create.
-        let profile: Profile
-        if let cached = profiles[DirectHermesSessionIdentity.key(profileID)] { profile = cached }
-        else { profile = try await requireProfile(profileID) }
+        let profile = try await knownProfile(profileID)
         let key = DirectHermesSessionIdentity.key(profileID)
         try beginCreation(key: key, profileID: profileID)
         defer { creatingProfiles.remove(key) }
@@ -1444,7 +1442,10 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
     }
 
     private func loadProfiles() async throws -> [Profile] {
-        let response = try await perform(.profilesList, ["include_sessions": .boolean(false)])
+        // With the agents' sessions: only then does Hermes name each agent's Bot Chat (`canonical_session`),
+        // which the chat list adds (`canonicalBotChat`). Without them every refresh dropped the saved Bot
+        // Chat, and the first tap on a bot after launch waited on a full lookup. Hermes caches them.
+        let response = try await perform(.profilesList, ["include_sessions": .boolean(true)])
         guard let rows = response["profiles"]?.array, rows.count <= 512 else {
             throw WorkspaceClientError.invalidResponse
         }
@@ -1464,6 +1465,14 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         }
         profiles = map
         return loaded
+    }
+
+    /// The profile this owner's catalog already loaded (the agent list and every chat list read it),
+    /// else read from the host. Opening a chat asked the host for every agent again, one more round
+    /// trip before the chat could take a message. Canonical registry resolution keeps its fresh read.
+    private func knownProfile(_ profileID: String) async throws -> Profile {
+        if let cached = profiles[DirectHermesSessionIdentity.key(profileID)] { return cached }
+        return try await requireProfile(profileID)
     }
 
     private func requireProfile(_ profileID: String) async throws -> Profile {

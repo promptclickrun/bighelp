@@ -186,6 +186,10 @@ change in both repos.
 - **A turn stays pending while it streams:** after `prompt.submit` returns `streaming`, the chat isn't "ready for a
   new turn" until the turn ends. A mid-turn Send must go through the steer/queue path (`sendMidSession`). Steer is
   the default.
+- **Live voice multitasks:** requests from the voice model never wait for each other. One runs as a turn in
+  the chat when it's free; one made while the chat works runs at once as a Hermes background task for it
+  (`ChatModel.runNativeVoiceRequest`, `prompt.background`) and answers the call on its own. Background tasks
+  can't reach the phone's tools.
 - **Hermes reaps and prunes app sessions:** 20 s after an app's socket goes, Hermes reclaims the session's
   runtime and, for any source but `desktop`, ends its row (`ws_orphan_reap`); `sessions.auto_prune` then
   deletes ended chats idle past `retention_days`. Plugin 3.18.0 (`durable_sessions.py`) gives `bighelp`
@@ -196,13 +200,16 @@ change in both repos.
   profiles differ. Go by what `groups.capabilities` and each pending action say, never the version
   (docs/HERMES_BOT_MODE.md, vectors in `BighelpTests/Fixtures/HermesGroups`).
 - **Bot Chats are hidden in Hermes:** `GET /api/sessions` never returns them; the catalog list adds each
-  agent's (`canonical_session`, `canonicalBotChat`) so a refresh can't drop it.
+  agent's (`canonical_session`, `canonicalBotChat`) so a refresh can't drop it. Hermes names it only when
+  `profiles.list` asks for the agents' sessions (`include_sessions`, its default), so the catalog asks; without
+  them every refresh dropped the saved Bot Chat, and the first tap on a bot waited on a full lookup.
 - **Archived:** the catalog lists `archived=include` and keeps rows Hermes' idle sweep archived
   (`auto_archived`); deliberately archived chats live in Archived Chats (`archivedChats`, Restore).
 - **Rereads keep Send on:** while agents work together, an open chat rereads what Hermes saved every few seconds,
   and each reread recovers the chat's connection. Send stays on through it (`acceptsSubmissionAfterCatchUp`); a
   message sent then waits in the box until the recovery ends (`isAwaitingCatchUp`). As a turn, the recovery's idle
-  readback would take it for a stale one and drop it.
+  readback would take it for a stale one and drop it. Opening keeps Send on too: while a chat opens from its saved
+  copy (`isOpening`, a navigation open), a message waits the same way and goes out once the chat is connected.
 - **Who's working:** Bots mode's home and the Agents screen show each agent's Bot Chat working or needing
   you from the plugin's `agents/activity` (`native-agents-activity-v1`): Hermes' turn leases in any process
   (the app, `message_agent`, `chat -q`) and the dashboard's open prompts, for up to 64 agents in one read.
@@ -597,6 +604,9 @@ sections can crash only on devices ("Thread stack size exceeded").
 - A chat is on the navigation stack at most once. Opening one that's there (a notification, widget or link)
   goes back to it (`AppState.activateConversation`): two copies shared one `ChatModel`, both redrew every
   change, and Back showed the same chat again.
+- The chat on screen always gets a connection of its own. One opened while the host was away (its saved copy
+  shows), or whose open a reconnect cut short, opens again once the runtime reconnects (`openDetachedChat`); the
+  reconnect's recovery reattaches only chats that had one, and Send stayed off until you backed out and back in.
 - The connection pill at the top (`ConnectionIsland`) has its own pass-through window so it shows over sheets. iOS
   hides an app's own Live Activity while the app is open, so it can't be the real Dynamic Island.
 
@@ -624,6 +634,14 @@ Helpful, never a pile to clear (`BighelpNotificationGrouping`):
   The finished card leaves about 30 seconds after all work ends, and opening the app clears it.
 - The Live Activity uses the app's palette and real host phases, never a guessed percentage. Titles stay in the
   phone's App Group; only opaque row IDs and bounded status reach the push service. Stale rows say Paused.
+- Direct push (`BighelpPushRegistrar`, docs/ARCHITECTURE.md › Direct push registration): a phone that already has a
+  notification installation and permission gives the notification service its Apple push address at launch, with
+  nothing shown, in addition to BuzzKit (which stays). A 404 means the Worker doesn't have the route yet: no error, ask
+  again in a day. Other failures get NS-123 to NS-126 in the log only. The notification service extension shows every
+  alert itself (`BighelpPushDisplay`), for BuzzKit pushes and direct ones alike. This release it still sends BuzzKit's
+  delivered receipt for a push that has a `bk.messageId`; a direct push gets none. The shared Live Activity's token is
+  registered directly under its group ID (the `groupId` of the version 3 registration), never a per-turn or per-chat
+  alias, and removed when the physical card ends.
 - Every setup failure gets its own code where it happens (`BighelpNotificationErrorCode`, never reused or renumbered);
   the FAQ is [docs/NOTIFICATION_ERROR_CODES.md](docs/NOTIFICATION_ERROR_CODES.md).
 

@@ -32,6 +32,12 @@ enum BighelpNotificationErrorCode: String, CaseIterable, Codable, Sendable {
     case requestRepeated = "NS-120"
     case oldSignUpNotRemoved = "NS-121"
     case pushCleanupUnavailable = "NS-122"
+    // 123 to 126: the device's direct push address. Background steps that are only logged,
+    // never shown, because alerts keep arriving the other way.
+    case directPushRefused = "NS-123"
+    case directPushUnreachable = "NS-124"
+    case directPushActivityFailed = "NS-125"
+    case directPushRemoveFailed = "NS-126"
 
     // MARK: 2 this device
     case permissionOff = "NS-201"
@@ -222,6 +228,14 @@ enum BighelpNotificationErrorCode: String, CaseIterable, Codable, Sendable {
             "bighelp's notification service didn't confirm that it removed this device's old sign-up. Try again later."
         case .pushCleanupUnavailable:
             "bighelp's notification service couldn't finish removing this device from the push service. Try again later."
+        case .directPushRefused:
+            "bighelp's notification service didn't accept this device's notification address. bighelp will try again later. Alerts still arrive."
+        case .directPushUnreachable:
+            "bighelp couldn't reach its notification service to register this device's notification address. bighelp will try again later. Alerts still arrive."
+        case .directPushActivityFailed:
+            "bighelp couldn't register a Live Activity with its notification service. The next update will try again. Alerts still arrive."
+        case .directPushRemoveFailed:
+            "bighelp couldn't remove this device's notification address from its notification service. The service removes it by itself after a while."
 
         case .permissionOff:
             "Notifications for bighelp are off. In \(Self.settingsApp), go to Notifications › bighelp and turn on Allow Notifications. Then try again."
@@ -401,7 +415,7 @@ enum BighelpNotificationErrorCode: String, CaseIterable, Codable, Sendable {
              .oldAccountRetired, .computerKeyChanged, .manyOldGrants, .manyMatchingGrants, .grantDiffersFromSaved,
              .savedGrantRequestDamaged, .newGrantDiffers, .grantFailedChecks, .grantBelongsToOtherComputer,
              .setUpAgainComputerKeptCopy, .setUpAgainServiceKeptGrant, .setUpAgainCouldNotListGrants,
-             .setUpAgainCouldNotClearPhone, .appProblem:
+             .setUpAgainCouldNotClearPhone, .directPushRemoveFailed, .appProblem:
             false
         default:
             true

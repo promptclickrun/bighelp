@@ -118,6 +118,22 @@ final class ChatModel {
     @ObservationIgnored internal(set) var lastCompactionAt: Date?
     /// Send was tapped while the chat catches up; the message waits in the box until it ends.
     var isAwaitingCatchUp = false
+    /// An open under way (`ShellFeatureStore.startNavigationHydration`) while the chat shows its saved
+    /// copy. Send stays on: a message waits in the box until the open ends, then goes out.
+    private(set) var isOpening = false
+    @ObservationIgnored private(set) var opening: (token: UUID, wait: @MainActor () async -> Void)?
+
+    func beginOpening(_ token: UUID, until wait: @escaping @MainActor () async -> Void) {
+        opening = (token, wait)
+        isOpening = true
+    }
+
+    /// Ends the open `token` began; a newer one stays.
+    func endOpening(_ token: UUID) {
+        guard opening?.token == token else { return }
+        opening = nil
+        isOpening = false
+    }
     var isSending = false {
         didSet {
             // The runtime controls are the authority for whether a model or
@@ -441,9 +457,10 @@ final class ChatModel {
     }
 
     /// Send's readiness: also on while a working chat only catches up with what Hermes saved,
-    /// which happens every few seconds while agents work together. A message waits it out.
+    /// which happens every few seconds while agents work together, and while the chat opens from
+    /// its saved copy. A message waits either out.
     var composerTransportIsReady: Bool {
-        directTransportIsReady || nativeConversationClient?.acceptsSubmissionAfterCatchUp == true
+        directTransportIsReady || isOpening || nativeConversationClient?.acceptsSubmissionAfterCatchUp == true
     }
 
     var canSend: Bool {

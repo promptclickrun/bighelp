@@ -4,30 +4,28 @@ import Testing
 
 @MainActor
 struct NativeLiveVoiceTests {
-    @Test func distinctDelegationsKeepResultIDsBoundToTheirSerializedTurns() async throws {
+    @Test func distinctDelegationsRunSideBySideAndKeepTheirResultIDs() async throws {
         let fixture = VoiceFixture()
         let voice = fixture.makeSession()
         _ = try await voice.perform("voice.live.offer", fields: ["voiceId": .string("voice-one")])
-        defer { fixture.reply?.resume(returning: "Fixture ended"); fixture.reply = nil }
+        defer { fixture.finishAll() }
 
         voice.receiveEvent(["kind": .string("delegation"), "id": .string("delegation-a"),
             "text": .string("First request")], voiceID: "voice-one")
         voice.receiveEvent(["kind": .string("delegation"), "id": .string("delegation-b"),
             "text": .string("Second request")], voiceID: "voice-one")
-        for _ in 0..<100 where fixture.reply == nil { await Task.yield() }
-        #expect(fixture.submitted == ["First request"])
-
-        let first = try #require(fixture.reply)
-        fixture.reply = nil
-        first.resume(returning: "First result")
-        for _ in 0..<100 where fixture.submitted.count < 2 { await Task.yield() }
+        // The second starts while the first still works.
+        for _ in 0..<100 where fixture.replies.count < 2 { await Task.yield() }
         #expect(fixture.submitted == ["First request", "Second request"])
 
-        let second = try #require(fixture.reply)
-        fixture.reply = nil
-        second.resume(returning: "Second result")
+        // The quicker one answers first, under its own ID.
+        try #require(fixture.take("Second request")).resume(returning: "Second result")
+        for _ in 0..<100 where fixture.results.isEmpty { await Task.yield() }
+        #expect(fixture.results == ["delegation-b"])
+
+        try #require(fixture.take("First request")).resume(returning: "First result")
         for _ in 0..<100 where fixture.results.count < 2 { await Task.yield() }
-        #expect(fixture.results == ["delegation-a", "delegation-b"])
+        #expect(fixture.results == ["delegation-b", "delegation-a"])
         _ = try await voice.perform("voice.live.close", fields: ["voiceId": .string("voice-one")])
     }
 
@@ -35,15 +33,13 @@ struct NativeLiveVoiceTests {
         let fixture = VoiceFixture()
         let voice = fixture.makeSession()
         _ = try await voice.perform("voice.live.offer", fields: ["voiceId": .string("voice-one")])
-        defer { fixture.reply?.resume(returning: "Fixture ended"); fixture.reply = nil }
+        defer { fixture.finishAll() }
         voice.receiveEvent(["kind": .string("delegation"), "id": .string("one"), "text": .string("Check tomorrow")], voiceID: "voice-one")
         voice.receiveEvent(["kind": .string("delegation"), "id": .string("two"), "text": .string("Check tomorrow")], voiceID: "voice-one")
         voice.receiveEvent(["kind": .string("delegation"), "id": .string("one"), "text": .string("Check tomorrow")], voiceID: "voice-one")
-        for _ in 0..<100 where fixture.reply == nil { await Task.yield() }
+        for _ in 0..<100 where fixture.replies.isEmpty { await Task.yield() }
         #expect(fixture.submitted == ["Check tomorrow"])
-        let pending = try #require(fixture.reply)
-        fixture.reply = nil
-        pending.resume(returning: "Three events")
+        try #require(fixture.take("Check tomorrow")).resume(returning: "Three events")
         for _ in 0..<100 where fixture.results.count < 2 { await Task.yield() }
         #expect(Set(fixture.results) == ["one", "two"])
         #expect(fixture.submitted.count == 1)
@@ -55,9 +51,8 @@ struct NativeLiveVoiceTests {
         let voice = fixture.makeSession()
         _ = try await voice.perform("voice.live.offer", fields: ["voiceId": .string("voice-one")])
         voice.receiveEvent(["kind": .string("delegation"), "id": .string("one"), "text": .string("Do work")], voiceID: "voice-one")
-        for _ in 0..<100 where fixture.reply == nil { await Task.yield() }
-        let pending = try #require(fixture.reply)
-        fixture.reply = nil
+        for _ in 0..<100 where fixture.replies.isEmpty { await Task.yield() }
+        let pending = try #require(fixture.take("Do work"))
         _ = try await voice.perform("voice.live.close", fields: ["voiceId": .string("voice-one")])
         _ = try await voice.perform("voice.live.offer", fields: ["voiceId": .string("voice-two")])
         pending.resume(returning: "Work completed in Hermes")
@@ -144,8 +139,17 @@ struct NativeLiveVoiceTests {
         var submitted: [String] = []
         var results: [String] = []
         var voiceID = ""
-        var reply: CheckedContinuation<String, Never>?
+        /// Each pending request's answer, by its text.
+        var replies: [String: CheckedContinuation<String, Never>] = [:]
         var submitWasCancelled = false
+        /// The pending request's answer, taken out of `replies`.
+        func take(_ text: String) -> CheckedContinuation<String, Never>? {
+            replies.removeValue(forKey: text)
+        }
+        func finishAll() {
+            for reply in replies.values { reply.resume(returning: "Fixture ended") }
+            replies = [:]
+        }
         func makeSession() -> NativeLiveVoiceSession {
             NativeLiveVoiceSession(owner: .init(hostID: "native", authorizationID: "auth", agentID: "default", sessionID: "stored"),
                 operation: { operation, payload in
@@ -163,7 +167,7 @@ struct NativeLiveVoiceTests {
                     }
                 }, isCurrent: { true }, submit: { text in
                     self.submitted.append(text)
-                    let result = await withCheckedContinuation { self.reply = $0 }
+                    let result = await withCheckedContinuation { self.replies[text] = $0 }
                     self.submitWasCancelled = Task.isCancelled
                     return result
                 })
@@ -184,10 +188,8 @@ struct NativeLiveVoiceTests {
         voice.receiveEvent(["kind": .string("delegation"), "id": .string("delegation-status"),
             "text": .string("Check tomorrow")], voiceID: fixture.voiceID)
         #expect(model.workStatus == .working)
-        for _ in 0..<100 where fixture.reply == nil { await Task.yield() }
-        let reply = try #require(fixture.reply)
-        fixture.reply = nil
-        reply.resume(returning: "Tomorrow is clear")
+        for _ in 0..<100 where fixture.replies.isEmpty { await Task.yield() }
+        try #require(fixture.take("Check tomorrow")).resume(returning: "Tomorrow is clear")
         for _ in 0..<100 where fixture.results.isEmpty { await Task.yield() }
         #expect(fixture.results == ["delegation-status"])
         #expect(model.workStatus == .resultSent)
@@ -219,11 +221,14 @@ struct NativeLiveVoiceTests {
         #expect(response.items.count == 1)
         #expect(!chat.isSending)
         #expect(chat.items.contains { $0.content == .message("Check my calendar") })
+        // A free chat takes voice work as its own turn and hands back the answer.
+        #expect(try await chat.runNativeVoiceRequest("Check tomorrow") == "Tomorrow is clear.")
+        #expect(client.messages == ["Check my calendar", "Check tomorrow"])
         client.fail = true
         await #expect(throws: WorkspaceClientError.outcomeUnknown) {
             _ = try await chat.sendNativeVoiceMessage("Uncertain work")
         }
-        #expect(client.messages == ["Check my calendar", "Uncertain work"])
+        #expect(client.messages == ["Check my calendar", "Check tomorrow", "Uncertain work"])
         #expect(!chat.isSending)
     }
 
@@ -240,7 +245,7 @@ struct NativeLiveVoiceTests {
         func send(message: String, conversationID: String) async throws -> ConversationResponse {
             messages.append(message)
             if fail { throw WorkspaceClientError.outcomeUnknown }
-            return ConversationResponse(items: [TimelineItem(id: "answer", role: .assistant,
+            return ConversationResponse(items: [TimelineItem(id: "answer-\(messages.count)", role: .assistant,
                 sender: .agent(id: "default", snapshot: .init(name: "Hermes")),
                 content: .message("Tomorrow is clear."), metadata: .init(source: "Hermes", delivery: "Received"))])
         }

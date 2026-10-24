@@ -85,6 +85,15 @@ Some problems do not go away when you try again. For these problems, bighelp doe
 | NS-121 | The notification service did not confirm that it removed an old sign-up of your device. | Try again later. | If the problem continues, the code and its details. |
 | NS-122 | The notification service could not remove your device from the push service. | Try again later. | If the problem continues, the code and its details. |
 
+**Direct push address.** bighelp gives the notification service the address that Apple gives your device, so that alerts arrive faster. This happens in the background, with no screen. If it fails, bighelp does not show the code. The code is in the device log only, and alerts keep arriving the way they did before. These codes help us when you tell us that alerts are slow.
+
+| Code | What happened | What to do | What we need |
+|---|---|---|---|
+| NS-123 | The notification service did not accept the address of your device. | Nothing. bighelp tries again later. | If alerts are slow for many days, the code and its details. |
+| NS-124 | bighelp could not connect to the notification service to give it the address of your device. | Nothing. bighelp tries again later. | If alerts are slow for many days, the code and its details. |
+| NS-125 | bighelp could not give a Live Activity to the notification service. | Nothing. The next update tries again. | Nothing. |
+| NS-126 | bighelp could not tell the notification service to remove the address of your device. | Nothing. The notification service removes it after some time. | Nothing. |
+
 ## NS-2xx: your device
 
 | Code | What happened | What to do | What we need |

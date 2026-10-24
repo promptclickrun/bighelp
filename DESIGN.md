@@ -165,7 +165,8 @@ the iPhone.
 
 **CarPlay** is voice first: opening bighelp in the car starts a new chat with the agent from Settings › CarPlay
 (else the last one picked in the car, else the default) and listens. The home shows that agent's face, what it's
-doing in one line and its last steps, with Talk or End, and the other agents under it. While you talk, the voice
+doing in one line and its last steps, with Talk (and End while you talk), and the other agents under it. Talk, or
+tapping the agent you talk to, opens the voice screen: a new conversation, or back to the one that's on. The voice
 screen shows the face in a ring that moves with Connecting, Listening, Working and Speaking, with End, Agents and
 Mute. If the computer doesn't answer, it says which step failed instead of connecting forever.
 

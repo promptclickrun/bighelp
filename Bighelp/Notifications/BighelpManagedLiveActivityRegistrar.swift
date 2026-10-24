@@ -91,6 +91,8 @@ final class BighelpManagedLiveActivityRegistrar: BighelpLiveActivityRegistering 
             guard service.ledger.activity(owner.relayActivityID)?.retired == false else { throw RegistrationError.ownerChanged }
             try validateActivity(response, owner: owner, revision: registration.revision, lease: lease, status: "active")
             guard let token = Self.tokenData(registration.pushToken) else { throw RegistrationError.ownerChanged }
+            let direct = service.pushRegistrar
+            let targetID = BighelpPushRegistrar.targetID(nativeActivityID: owner.nativeActivityID, relayActivityID: owner.relayActivityID)
             if let groupID {
                 guard let runtime = service.activityRuntime else { throw RegistrationError.ownerChanged }
                 let capturedOwner = owner
@@ -99,10 +101,16 @@ final class BighelpManagedLiveActivityRegistrar: BighelpLiveActivityRegistering 
                     isCurrent: { (try? self.check()) != nil && self.service.ledger.activity(capturedOwner.relayActivityID)?.retired == false },
                     send: { id, current in
                         try await BuzzKit.activities.register(id: id, token: current, attributesType: "LoopdySessionActivityAttributes")
+                        // Also directly, for sending straight to Apple. The shared card's token goes under its
+                        // group ID (the `groupId` sent above, as BuzzKit has it), never a per-turn or per-chat
+                        // alias. On its own task: it never fails or delays this registration.
+                        Task { await direct?.registerActivity(id: targetID, token: current) }
                     })
             } else {
                 try await BuzzKit.activities.register(id: owner.relayActivityID, token: token,
                     attributesType: "LoopdySessionActivityAttributes")
+                // An individual (version 2) registration keeps its own activity's ID.
+                Task { await direct?.registerActivity(id: targetID, token: token) }
             }
         }
         // An already acknowledged unchanged registration need not replay an old
@@ -146,6 +154,9 @@ final class BighelpManagedLiveActivityRegistrar: BighelpLiveActivityRegistering 
         try validateActivity(response, owner: owner, revision: revision, lease: nil, status: "revoked")
         if BighelpActivityGroupDriver.physicalID(owner.nativeActivityID) == nil {
             try await BuzzKit.activities.end(id: owner.relayActivityID)
+            // The shared card's address goes when the physical card ends (`onPhysicalEnded`), not with a row.
+            let direct = service.pushRegistrar, relayID = owner.relayActivityID
+            Task { await direct?.removeActivity(id: relayID) }
         }
         // Host removal only stops this local subscription; it is NOT revocation.
         let client = try service.client(for: host)

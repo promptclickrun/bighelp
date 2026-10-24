@@ -20,6 +20,8 @@ final class BighelpActivityGroupDriver: BighelpLiveActivityDriving {
     private var writeTail: Task<Void, Never>?
     private var revision = 0
     private var nextRowRevision = 0
+    /// Called with the physical card's ID when it ends or is dismissed, so its push address can be removed.
+    var onPhysicalEnded: (@MainActor (String) -> Void)?
 
     init(underlying: any BighelpLiveActivityDriving,
          loadInfos: @escaping () -> [String: BighelpActivitySessionInfo] = BighelpActivitySessionInfo.load,
@@ -162,6 +164,7 @@ final class BighelpActivityGroupDriver: BighelpLiveActivityDriving {
                 // Detach before awaiting ActivityKit. A new turn must never reuse
                 // the card whose irreversible end is already in flight.
                 self.endingIDs.insert(id); self.clear()
+                self.onPhysicalEnded?(id)
                 if dismiss { await self.underlying.dismiss(id: id, state: state) }
                 else { await self.underlying.end(id: id, state: state) }
                 self.endingIDs.remove(id)
@@ -174,6 +177,7 @@ final class BighelpActivityGroupDriver: BighelpLiveActivityDriving {
         let state = lastSystemState ?? BighelpActivitySession.aggregate([], timestamp: 1)
         let pending = writeTail
         revision += 1; writeTail = nil; endingIDs.insert(id); clear()
+        onPhysicalEnded?(id)
         await pending?.value
         await underlying.dismiss(id: id, state: state)
         endingIDs.remove(id)

@@ -391,11 +391,7 @@ final class NativeWorkspaceRuntime {
                 )
             }, submit: { [weak chat] text in
                 guard let chat else { throw LiveVoiceControlError.wrongOwner }
-                let response = try await chat.sendNativeVoiceMessage(text)
-                return response.items.compactMap { item -> String? in
-                    guard item.role == .assistant, case .message(let text) = item.content else { return nil }
-                    return text
-                }.joined(separator: "\n\n")
+                return try await chat.runNativeVoiceRequest(text)
             })
             return voice.makeModel(agentName: agent?.name ?? "Hermes")
         }
@@ -699,8 +695,9 @@ final class NativeWorkspaceRuntime {
             try publishCapabilities()
             // Reattach the visible conversation before optional workspace reads.
             // Failures remain isolated; a deleted chat cannot disable features.
+            let retained = bridge.retainedSessionIDs
             let failedSessions = try await NativeWorkspaceSessionRecovery.recover(
-                bridge.retainedSessionIDs, prioritizing: appState.activeConversationID,
+                retained, prioritizing: appState.activeConversationID,
                 requireCurrent: { try self.require(owner, request: request) }
             ) { id in
                 guard self.sessions.session(id: id) != nil else { return }
@@ -714,6 +711,12 @@ final class NativeWorkspaceRuntime {
             }
             if let active = appState.activeConversationID, failedSessions.contains(active) {
                 unrecoveredActiveChatID = active
+            }
+            // The chat on screen has no connection of its own when it opened while the host was
+            // away, or this reconnect cut its open short. The recovery above reattaches only chats
+            // that had one, so open it the way a tap does.
+            if let active = appState.activeConversationID, !retained.contains(active) {
+                features.openDetachedChat(id: active)
             }
             do {
                 _ = try await workspace.perform(.nativeContext, payload: [:], owner: owner)

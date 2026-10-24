@@ -329,7 +329,8 @@ final class BighelpNotificationBrokerClient: BighelpManagedNotificationAccountAP
     private func signedRequest(path: String, method: String, body: Data,
                                credentials: BighelpManagedNotificationCredentials) async throws -> BighelpJSONValue {
         guard path == Self.currentInstallationPath || path == BighelpManagedNotificationService.root
-                || path.hasPrefix(BighelpManagedNotificationService.root + "/"),
+                || path.hasPrefix(BighelpManagedNotificationService.root + "/")
+                || path == BighelpPushRegistrar.pushTargetPath || path == BighelpPushRegistrar.liveActivityTargetPath,
               !path.contains(".."), !path.contains("%"), !path.contains("?"), !path.contains("#"),
               path.utf8.count <= 512, body.count <= 262_144,
               ["GET", "POST", "PUT", "DELETE"].contains(method), method != "GET" || body.isEmpty else {

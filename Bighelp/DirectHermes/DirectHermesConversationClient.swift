@@ -188,6 +188,8 @@ final class DirectHermesConversationClient: StreamingConversationClient, Stoppab
     @ObservationIgnored var heldEvents: [DirectHermesEvent] = []
     @ObservationIgnored var heldEventsOverflowed = false
     @ObservationIgnored var hydrationWaiters: [UUID: CheckedContinuation<Void, any Error>] = [:]
+    /// Background tasks someone waits on (`runBackgroundTask`), by Hermes' task ID.
+    @ObservationIgnored var backgroundTaskWaiters: [String: CheckedContinuation<String, any Error>] = [:]
     @ObservationIgnored var onAdmittedActivity: ((DirectHermesProjection.Change, String, Bool) -> Void)?
     @ObservationIgnored var isReplayingActivity = false
     @ObservationIgnored var workspaceRecord: SessionRecord?
@@ -406,6 +408,7 @@ final class DirectHermesConversationClient: StreamingConversationClient, Stoppab
         heldEvents = []
         heldEventsOverflowed = false
         settleHydrationWaiters(throwing: DirectHermesError.notConnected)
+        settleBackgroundTaskWaiters()
         resetPromptContract()
         model?.suspendNativeTurn(from: self)
         connected = false

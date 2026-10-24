@@ -145,14 +145,22 @@ code.
 - `music`: `kind` (required: `song`, `album`, `playlist` or `artist`), `title`
   (required, 1–200), `artist` (≤ 200), `music_id` and `source` (`catalog` or
   `library`) from `iphone_music`, `url` (≤ 500, only `https://music.apple.com/…`).
-  The artwork comes from MusicKit by id only while Music is on in Device access;
-  otherwise the row shows a music symbol. Play plays it through the Music app
+  The artwork leads the object. It comes from MusicKit by id while Music is on
+  in Device access and Apple Music is allowed (catalog item, or library item
+  for library ids like `i.…`); otherwise from Apple's public lookup
+  (`itunes.apple.com/lookup`) by the store number in `url` or a numeric
+  `music_id`, else its search by title and artist, kept only when the answer
+  names the same title and artist. Pictures are kept in memory and in Caches
+  by item (`BighelpCardMusicLookup.cacheKey`); until one comes, and when none
+  does, the object shows the kind's symbol. Play plays it through the Music app
   when Music is on, else opens it in Music; Open in Music opens `url` or the id.
 - Object props are plain JSON values, never `{ "literal": … }` or other
   bindings, and objects take no children. A phone's or email's `label` may be
   left out; an `address` with every part empty reads as no address.
 - What the app does (`BighelpCardObjects`, `BighelpCardObjectViews`):
-  - Contact: a round initials picture. Call and Message open `tel:` and `sms:`
+  - Contact: the saved person's photo when the card has a `contact_id` and
+    Contacts access already lets bighelp read it, else a round initials
+    picture. Call and Message open `tel:` and `sms:`
     with the first phone's digits, Email opens `mailto:`, Directions opens
     Maps' driving directions to the written address. The Contacts button reads
     Open in Contacts when the card has a `contact_id` and Contacts access

@@ -55,6 +55,13 @@ are historical (`docs/ui-v3-design.md`).
 - Links in a chat open where they belong (`ChatLinkRoute`): Maps, Music, the App Store, Podcasts, TV, Books and
   News links in those apps, any other link in an installed app that claims it, and only web pages in the browser
   picked in Settings › Chat. A card's Directions opens Apple Maps, never a map website.
+- Object cards look like Apple's own: a music card leads with the item's real artwork, large and rounded like a
+  Music cell (round for an artist), on a wash of the artwork's color, with the kind, title and artist beside it;
+  a place card leads with a still map of the spot (`BighelpCardMapPicture`, light or dark with the app) that
+  opens Maps; a contact shows the saved person's photo when Contacts already allows it, else their initials.
+  Artwork comes from MusicKit when Music is allowed, else Apple's public lookup and search with a name match
+  (`BighelpCardMusicLookup`), kept in memory and Caches; until then, and when there is none, a quiet tile with
+  the kind's symbol. Showing a card never asks for a permission.
 - Attachments in a draft are one small glass tag above the message box, lined up with the field
   (`DraftAttachmentRail`): the count first, then the kinds ("4 attached · 3 photos, 1 PDF"), with photos leading a
   stack of up to three thumbnails. One photo says "1 photo"; one file shows its name and size. While photos or files

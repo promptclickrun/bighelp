@@ -55,6 +55,14 @@ export interface SendApnsInput {
 export const DEFAULT_APNS_TOPIC = "app.loopdy.mobile";
 /** APNs rejects a new token under 20 minutes old and one over 60 minutes old. */
 export const APNS_TOKEN_MAX_AGE_MS = 40 * 60 * 1_000;
+/**
+ * A token's `iat` is rounded down to a boundary this far apart, so every instance of the
+ * Worker that mints in the same window signs the same issue time, and APNs sees one token
+ * rather than a refresh storm (`TooManyProviderTokenUpdates`).
+ */
+export const APNS_TOKEN_IAT_STEP_MS = 30 * 60 * 1_000;
+/** The rounding can make `iat` up to 30 minutes older than the mint, so a token is used for 50 minutes of `iat` at most. */
+export const APNS_TOKEN_MAX_IAT_AGE_MS = 50 * 60 * 1_000;
 export const APNS_TIMEOUT_MS = 5_000;
 /** A request is not started with less time than this left. */
 export const APNS_MIN_ATTEMPT_MS = 500;
@@ -73,7 +81,7 @@ const KNOWN_REASONS = new Set([
   "TooManyRequests", "TopicDisallowed", "Unregistered",
 ]);
 
-let cachedToken: { fingerprint: string; token: string; mintedAt: number } | null = null;
+let cachedToken: { fingerprint: string; token: string; mintedAt: number; issuedAtMs: number } | null = null;
 
 /** Drops the cached provider token. For tests. */
 export function resetApnsTokenCache(): void {
@@ -122,10 +130,10 @@ function pemToDer(pem: string): Uint8Array {
   return Uint8Array.from(atob(normalized), (character) => character.charCodeAt(0));
 }
 
-async function mintProviderToken(config: ApnsConfig, nowMs: number): Promise<string> {
+async function mintProviderToken(config: ApnsConfig, issuedAtMs: number): Promise<string> {
   const header = encodeBase64URL(new TextEncoder().encode(JSON.stringify({ alg: "ES256", kid: config.keyId })));
   const claims = encodeBase64URL(new TextEncoder().encode(
-    JSON.stringify({ iss: config.teamId, iat: Math.floor(nowMs / 1_000) }),
+    JSON.stringify({ iss: config.teamId, iat: Math.floor(issuedAtMs / 1_000) }),
   ));
   const key = await crypto.subtle.importKey(
     "pkcs8", pemToDer(config.privateKeyPem), { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"],
@@ -146,11 +154,13 @@ export async function apnsProviderToken(config: ApnsConfig, rejected?: string): 
   const fingerprint = `${config.keyId}\0${config.teamId}\0${config.privateKeyPem}`;
   if (cachedToken && cachedToken.fingerprint === fingerprint
       && nowMs - cachedToken.mintedAt >= 0 && nowMs - cachedToken.mintedAt < APNS_TOKEN_MAX_AGE_MS
+      && nowMs - cachedToken.issuedAtMs < APNS_TOKEN_MAX_IAT_AGE_MS
       && cachedToken.token !== rejected) {
     return cachedToken.token;
   }
-  const token = await mintProviderToken(config, nowMs);
-  cachedToken = { fingerprint, token, mintedAt: nowMs };
+  const issuedAtMs = Math.floor(nowMs / APNS_TOKEN_IAT_STEP_MS) * APNS_TOKEN_IAT_STEP_MS;
+  const token = await mintProviderToken(config, issuedAtMs);
+  cachedToken = { fingerprint, token, mintedAt: nowMs, issuedAtMs };
   return token;
 }
 
@@ -224,6 +234,11 @@ export async function sendApns(input: SendApnsInput): Promise<ApnsResult> {
     if (input.collapseId) headers.set("apns-collapse-id", input.collapseId);
     // Egress authority is the final decision. Keep it the last await before the request.
     await input.authorize();
+    // Synchronous, so nothing is awaited between the authority decision and the request. A slow
+    // authorize may have used up the time, and a request with a millisecond to live is only ambiguous.
+    if (input.deadlineAt !== undefined && Date.now() >= input.deadlineAt - APNS_MIN_ATTEMPT_MS) {
+      return { outcome: "rejected", status: 0, reason: "deadline", providerMs: 0 };
+    }
     const startedAt = Date.now();
     const timeoutMs = input.deadlineAt === undefined
       ? APNS_TIMEOUT_MS : Math.max(1, Math.min(APNS_TIMEOUT_MS, input.deadlineAt - startedAt));

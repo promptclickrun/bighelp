@@ -1,0 +1,192 @@
+[
+ {
+  "data_sources": [],
+  "elements": {
+   "draft": {
+    "children": [],
+    "props": {
+     "config_revision": 1,
+     "draft_id": "d_0f1e2d3c4b5a69788796a5b4c3d2e1f0",
+     "fields": {
+      "emails": [
+       {
+        "label": "work",
+        "value": "riley@example.com"
+       }
+      ],
+      "family_name": "Moss",
+      "given_name": "Riley",
+      "job_title": "Designer",
+      "organization": "Sample Studio",
+      "phones": [
+       {
+        "label": "work",
+        "value": "+1 555 0142"
+       }
+      ],
+      "postal_address": {
+       "city": "Sampleton",
+       "country": "Exampleland",
+       "street": "1 Sample Street"
+      }
+     },
+     "marks": [
+      {
+       "field": "job_title",
+       "reason": "unclear"
+      },
+      {
+       "field": "postal_address.country",
+       "reason": "guessed"
+      }
+     ],
+     "messages": {
+      "failed": "That didn't save. {{reason}}",
+      "missing_fields": "Please check: {{fields}}.",
+      "outcome_unknown": "It's not clear the contact saved. Check Contacts before you try again.",
+      "review": "Check the details before saving to {{destination}}.",
+      "saved": "Saved {{name}} to {{destination}}."
+     },
+     "preset": "business_card",
+     "source": {
+      "height": 800,
+      "image_id": "5f0c3a9e1b7d4c2a8e6f0b1d3c5a7e9f",
+      "mime_type": "image/jpeg",
+      "width": 1200
+     }
+    },
+    "type": "contact_draft"
+   }
+  },
+  "root": "draft",
+  "schema": "loopdy.card",
+  "spoken_summary": "A contact draft for Riley Moss to review in bighelp. Nothing is saved yet.",
+  "title": "Contact draft: Riley Moss",
+  "version": 1,
+  "content_hash": "5602702a431ffebf612bc2076aeae8c3d4d96943208a5099bab0782a6da08500",
+  "card_id": "5602702a431ffebf612bc2076aeae8c3",
+  "created_at": "2026-10-24T12:00:00Z",
+  "origin": "live"
+ },
+ {
+  "data_sources": [],
+  "elements": {
+   "draft": {
+    "children": [],
+    "props": {
+     "config_revision": 1,
+     "draft_id": "d_8a7b6c5d4e3f20112233445566778899",
+     "fields": {
+      "all_day": false,
+      "end": "2030-06-15T19:00:00-07:00",
+      "location": "Harbor Hall",
+      "start": "2030-06-15T18:00:00-07:00",
+      "time_zone": "America/Los_Angeles",
+      "title": "Night Market"
+     },
+     "marks": [
+      {
+       "field": "time_zone",
+       "reason": "guessed"
+      },
+      {
+       "field": "end",
+       "reason": "unclear"
+      }
+     ],
+     "messages": {
+      "failed": "That didn't save. {{reason}}",
+      "missing_fields": "Please check: {{fields}}.",
+      "outcome_unknown": "It's not clear the event saved. Check Calendar before you try again.",
+      "review": "Check the date and time before adding it to {{destination}}.",
+      "saved": "Added {{name}} to {{destination}}."
+     },
+     "preset": "event_poster",
+     "source": {
+      "image_id": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+      "mime_type": "image/png"
+     }
+    },
+    "type": "event_draft"
+   }
+  },
+  "root": "draft",
+  "schema": "loopdy.card",
+  "spoken_summary": "An event draft for Night Market to review in bighelp. Nothing is saved yet.",
+  "title": "Event draft: Night Market",
+  "version": 1,
+  "content_hash": "23c8e423fc378579c58f61efc5d2473be91bcb861d2ad493ee3474ed7ef76ab9",
+  "card_id": "23c8e423fc378579c58f61efc5d2473b",
+  "created_at": "2026-10-24T12:00:00Z",
+  "origin": "live"
+ },
+ {
+  "data_sources": [],
+  "elements": {
+   "draft": {
+    "children": [],
+    "props": {
+     "config_revision": 1,
+     "draft_id": "d_11111111111111111111111111111111",
+     "fields": {
+      "emails": [
+       {
+        "label": "work",
+        "value": "riley@example.com"
+       }
+      ],
+      "family_name": "Moss",
+      "given_name": "Zoë",
+      "job_title": "Designer/Lead",
+      "organization": "Café \"Ünïcode\" \\ Co — 東京 🌸",
+      "phones": [
+       {
+        "label": "work",
+        "value": "+1 555 0142"
+       }
+      ],
+      "postal_address": {
+       "city": "Sampleton",
+       "country": "Exampleland",
+       "street": "1 Sample Street"
+      }
+     },
+     "marks": [
+      {
+       "field": "job_title",
+       "reason": "unclear"
+      },
+      {
+       "field": "postal_address.country",
+       "reason": "guessed"
+      }
+     ],
+     "messages": {
+      "failed": "That didn't save. {{reason}}",
+      "missing_fields": "Please check: {{fields}}.",
+      "outcome_unknown": "It's not clear the contact saved. Check Contacts before you try again.",
+      "review": "Check the details before saving to {{destination}}.",
+      "saved": "Saved {{name}} to {{destination}}."
+     },
+     "preset": "business_card",
+     "source": {
+      "height": 800,
+      "image_id": "5f0c3a9e1b7d4c2a8e6f0b1d3c5a7e9f",
+      "mime_type": "image/jpeg",
+      "width": 1200
+     }
+    },
+    "type": "contact_draft"
+   }
+  },
+  "root": "draft",
+  "schema": "loopdy.card",
+  "spoken_summary": "A contact draft for Riley Moss to review in bighelp. Nothing is saved yet.",
+  "title": "Contact draft: Zoë",
+  "version": 1,
+  "content_hash": "54554584ef4a6ac9df1525f86c0c37e4e873a8c195e297f995d8f78e9e44e06a",
+  "card_id": "54554584ef4a6ac9df1525f86c0c37e4",
+  "created_at": "2026-10-24T12:00:00Z",
+  "origin": "live"
+ }
+]

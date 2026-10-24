@@ -475,10 +475,11 @@ Native ordinary-file uploads use the public session-bound `file.attach` call,
 never a host-path upload or Link fallback. They retain the 8 MiB per-file and 24 MiB per-message limits, validate
 the whole batch first, and serialize staging. Only acknowledged `ref_text`
 values are appended to `prompt.submit`; the original local caption and selected
-attachment disclosure are preserved. Native image uploads are disabled pending
-an official message-bound contract, not routed through the session-global
-pending-image queue. Unknown or cancelled upload attempts remain reviewable
-without automatic replay.
+attachment disclosure are preserved. Photos use Hermes' `image.attach_bytes`
+on the same live session, one at a time, right before `prompt.submit`, which
+takes the staged pictures with the message. Unknown or cancelled upload attempts
+remain reviewable without automatic replay. A contact or event made from a
+picture is a reviewed draft, never a write ([Image drafts](IMAGE_DRAFTS.md)).
 
 The app processes and stores avatar images locally; avatar
 image bytes are not part of the cloud account directory.

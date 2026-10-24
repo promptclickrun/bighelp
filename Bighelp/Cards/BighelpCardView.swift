@@ -34,6 +34,16 @@ struct BighelpCardView: View {
     }
 
     var body: some View {
+        // A photo draft is the card's one object and draws its own card: the review, not a display.
+        if let draft = ImageDraftCard.draft(in: card) {
+            ImageDraftCardView(draft: draft, cardHash: card.document["content_hash"]?.string,
+                               isIntact: card.isDraftContentIntact)
+        } else {
+            displayCard
+        }
+    }
+
+    private var displayCard: some View {
         VStack(alignment: .leading, spacing: BighelpCardDesignTokens.spacing) {
             renderer
             HStack(spacing: 6) {

@@ -146,6 +146,29 @@ struct BighelpApp: App {
         TelemetryController.shared.visitHosts = usesDemoWorkspace
             ? DemoTelemetryHosts.shared.visitor
             : RegistryTelemetryHosts.visitor(registry: hostRegistry, connections: connections)
+        // Photo drafts and Photo actions settings: the computer in use, and this phone's Contacts and
+        // Calendar. The demo's own computer gets the demo's address book, which never asks iOS; a real
+        // computer (also one added in demo mode) gets this phone's.
+        let demoImageDraftWriter = usesDemoWorkspace ? ImageDraftWriter.demo(arguments: ProcessInfo.processInfo.arguments) : nil
+        let liveImageDraftWriter = ImageDraftWriter(contacts: LiveImageDraftContacts(), calendar: LiveImageDraftCalendar())
+        let demoHosts = composition.demoHosts
+        // Drafts are kept per computer by the shell's own cache scope, the demo's too.
+        let imageDraftsConnection: @MainActor () -> (scope: String, api: ImageDraftsAPI, isDemo: Bool)? = {
+            if usesDemoWorkspace, !connections.isDirectSelected {
+                let scope = (try? WorkspaceAuthority.fixture(id: demoHosts.selectedHostID ?? "demo"))?.cacheScopeID ?? "demo"
+                return (scope, ImageDraftsAPI(client: DemoImageDraftsClient.shared), true)
+            }
+            guard let owner = connections.owner else { return nil }
+            return (owner.cacheScopeID, ImageDraftsAPI(client: DirectHermesImageDraftsClient(workspace: { connections.workspace })),
+                    false)
+        }
+        ImageDraftStore.shared.connection = {
+            imageDraftsConnection().map { connection in
+                (connection.scope, connection.api,
+                 connection.isDemo ? demoImageDraftWriter ?? liveImageDraftWriter : liveImageDraftWriter)
+            }
+        }
+        PhotoActionsSettingsStore.shared.connection = { imageDraftsConnection().map { ($0.scope, $0.api) } }
         let nativeWorkspaceKey: @MainActor () -> BighelpShortcutWorkspaceKey? = {
             if usesDemoWorkspace, !connections.isDirectSelected { return nil }
             guard hostRegistry.connectionMode == .independent || connections.isDirectSelected else { return nil }

@@ -6,6 +6,7 @@ import UIKit
 struct AgentEditorView: View {
     private enum Destination: Hashable {
         case advanced
+        case photoActions
     }
 
     @State private var model: AgentEditorModel
@@ -93,6 +94,9 @@ struct AgentEditorView: View {
                 )
                 instructionsSection(model: model, instructions: $model.draft.instructions)
                     .onChange(of: model.draft.name) { _, _ in model.nameDidChange() }
+                if model.editingAgentID != nil {
+                    photoActionsSection
+                }
                 if let defaults = runtimeDefaultsModel {
                     AgentRuntimeDefaultsSection(
                         model: defaults,
@@ -202,6 +206,10 @@ struct AgentEditorView: View {
                 switch destination {
                 case .advanced:
                     advancedForm(model: model)
+                case .photoActions:
+                    if let agentID = model.editingAgentID {
+                        PhotoActionsSettingsView(agentID: agentID, agentName: heroTitle)
+                    }
                 }
             }
             .toolbar {
@@ -929,6 +937,30 @@ struct AgentEditorView: View {
                         .accessibilityIdentifier("agent.editor.clone-note")
                 }
             }
+        }
+        .listRowBackground(theme.surface)
+    }
+
+    /// Business cards and event posters, beside the instructions they work with. Only a saved agent
+    /// has settings on its computer.
+    private var photoActionsSection: some View {
+        Section {
+            NavigationLink(value: Destination.photoActions) {
+                Label {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Photo actions")
+                            .foregroundStyle(theme.primaryText)
+                        Text("Business cards, event posters")
+                            .font(.bighelp(.footnote))
+                            .foregroundStyle(theme.secondaryText)
+                    }
+                } icon: {
+                    Image(systemName: "photo.badge.checkmark")
+                        .foregroundStyle(theme.secondaryText)
+                }
+                .frame(minHeight: BighelpTokens.hitTarget)
+            }
+            .accessibilityIdentifier("agent.editor.photo-actions")
         }
         .listRowBackground(theme.surface)
     }

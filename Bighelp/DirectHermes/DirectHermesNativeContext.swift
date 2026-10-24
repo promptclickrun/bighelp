@@ -274,7 +274,7 @@ final class DirectHermesNativePluginClient {
     /// Features whose plugin routes refuse requests over 192 KB.
     private static let smallRequestFeatures: Set<String> = ["native-card-templates-v1", workflowsFeature,
                                                             workflowsEditFeature, workflowsTriggerFeature,
-                                                            MyTemplatesWire.feature]
+                                                            MyTemplatesWire.feature, ImageDraftWire.feature]
 
     /// Workflows: stages run by agents on the host, with your sign-off.
     static let workflowsFeature = "native-workflows-v1"
@@ -285,6 +285,13 @@ final class DirectHermesNativePluginClient {
 
     static func supports(_ operation: WorkspaceOperation) -> Bool {
         operation == .nativeContext || (try? route(operation)) != nil
+    }
+
+    /// A route's full path and the largest answer it allows, for checking it against the HTTP
+    /// client's own size fence (`DirectHermesHTTP.responseLimit`).
+    static func responseBudget(_ operation: WorkspaceOperation) -> (path: String, maximumResponseBytes: Int)? {
+        guard let route = try? route(operation) else { return nil }
+        return ("/api/plugins/loopdy/native/" + route.path, route.maximumResponseBytes)
     }
 
     private struct Route {
@@ -412,6 +419,24 @@ final class DirectHermesNativePluginClient {
             // The switch for the host's own usage reports; `{"enabled": bool}`, answered the same as a read.
             return Route(path: "telemetry", feature: WorkspaceTelemetryHostEndpoint.feature, isMutation: true,
                          maximumResponseBytes: 16_384, timeout: 10, method: .put)
+        case .imageActionsGet:
+            return Route(path: "image-actions/get", feature: ImageDraftWire.feature, isMutation: false,
+                         maximumResponseBytes: 65_536)
+        case .imageActionsSave:
+            return Route(path: "image-actions/save", feature: ImageDraftWire.feature, isMutation: true,
+                         maximumResponseBytes: 65_536)
+        case .imageDraftsStates:
+            // Read every few seconds while a chat shows drafts; at most 50 a call.
+            return Route(path: "image-drafts/states", feature: ImageDraftWire.feature, isMutation: false,
+                         maximumResponseBytes: 65_536, timeout: 10)
+        case .imageDraftsSource:
+            // About 3 MB of picture a piece, base64 in JSON.
+            return Route(path: "image-drafts/source", feature: ImageDraftWire.feature, isMutation: false,
+                         maximumResponseBytes: 4 * 1_024 * 1_024 + 65_536, timeout: 60)
+        case .imageDraftsClaim, .imageDraftsFinish, .imageDraftsDiscard, .imageDraftsReopen:
+            // image-drafts.claim -> image-drafts/claim
+            return Route(path: operation.rawValue.replacingOccurrences(of: ".", with: "/"),
+                         feature: ImageDraftWire.feature, isMutation: true, maximumResponseBytes: 16_384)
         case .peopleSpeaking:
             // Sent before each message; a slow host never holds a message for long.
             return Route(path: "people/speaking", feature: "native-people-v1", isMutation: true,

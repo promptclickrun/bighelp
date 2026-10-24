@@ -429,6 +429,17 @@ the person types the names their agents may run in Device access › Shortcuts
   `loopdy://device-tool/shortcuts/<success|cancel|error>/<run id>`; callbacks
   for unknown or finished runs are ignored.
 
+## Pictures need the person's review
+
+A contact or event read from a picture goes through a reviewed draft
+([Image drafts](IMAGE_DRAFTS.md)), never straight to Contacts or Calendar. So in
+a chat that holds a picture the person sent, or one where `photos.get` gave the
+agent a photo, the phone answers `contacts.create` and `calendar.create` with
+`failed` and code `review_required` before it journals or touches anything, and
+`payload.note` tells the agent to use `bighelp_draft_contact` or
+`bighelp_draft_event`. Lists, updates, deletes, every other tool, and every chat
+without a picture behave as before, standing grants included.
+
 ## Mutation reconciliation
 
 Persist the request fingerprint as started before calling EventKit. Completed

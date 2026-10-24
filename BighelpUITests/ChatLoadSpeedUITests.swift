@@ -18,6 +18,8 @@ final class ChatLoadSpeedUITests: BighelpUITestCase {
         ProcessInfo.processInfo.environment["BIGHELP_SPEED_TURNS"].flatMap(Int.init) ?? 300
     }
     private static var isHeavy: Bool { ProcessInfo.processInfo.environment["BIGHELP_SPEED_HEAVY"] != nil }
+    /// BIGHELP_SPEED_DRAFTS ends every tenth answer with a photo draft card (`-test-long-chat-drafts`).
+    private static var hasDrafts: Bool { ProcessInfo.processInfo.environment["BIGHELP_SPEED_DRAFTS"] != nil }
 
     override func setUpWithError() throws {
         try super.setUpWithError()
@@ -279,6 +281,7 @@ final class ChatLoadSpeedUITests: BighelpUITestCase {
     private func realisticArguments(opensChat: Bool) -> [String] {
         ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3", "-test-long-chat", "\(Self.turns)",
          "-test-chat-performance-probe"] + (Self.isHeavy ? ["-test-long-chat-heavy"] : [])
+            + (Self.hasDrafts ? ["-test-long-chat-drafts"] : [])
             + (opensChat ? ["-start-long-chat"] : [])
     }
 

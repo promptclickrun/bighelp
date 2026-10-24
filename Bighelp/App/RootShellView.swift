@@ -197,6 +197,14 @@ struct RootShellView: View {
                 guard currentWorkspaceOwner == owner,
                       model.memberIDs.first == profile else { return nil }
                 return scope
+            },
+            storedSessionID: {
+                guard currentWorkspaceOwner == owner else { return nil }
+                if let coordinate = nativeRuntime?.bridge.currentCoordinate(for: model.conversationID) {
+                    return coordinate.storedSessionID ?? coordinate.runtimeSessionID
+                }
+                // The demo's drafts belong to the chat itself.
+                return usesWorkspaceFixtures ? model.conversationID : nil
             }
         )
     }

@@ -1,0 +1,96 @@
+[
+  {
+    "schema": "loopdy.card",
+    "version": 1,
+    "title": "Contact draft",
+    "spoken_summary": "A contact draft for Riley Moss is ready to review. Nothing is saved yet.",
+    "data_sources": [],
+    "root": "card",
+    "elements": {
+      "card": {
+        "type": "card",
+        "props": { "title": "Riley Moss", "subtitle": "From your photo" },
+        "children": ["draft"]
+      },
+      "draft": {
+        "type": "contact_draft",
+        "props": {
+          "draft_id": "d_0123456789abcdef0123456789abcdef",
+          "preset": "business_card",
+          "source": { "image_id": "fedcba9876543210fedcba9876543210", "mime_type": "image/jpeg", "width": 1200, "height": 800 },
+          "config_revision": 1,
+          "messages": {
+            "review": "Check the details before saving to {{destination}}.",
+            "missing_fields": "Please check: {{fields}}.",
+            "saved": "Saved {{name}} to {{destination}}.",
+            "failed": "That didn't save. {{reason}}",
+            "outcome_unknown": "It's not clear the contact saved. Check Contacts before you try again."
+          },
+          "marks": [
+            { "field": "phones.0", "reason": "unclear" },
+            { "field": "postal_address.country", "reason": "guessed" }
+          ],
+          "fields": {
+            "given_name": "Riley",
+            "family_name": "Moss",
+            "organization": "Sample Studio",
+            "job_title": "Designer",
+            "phones": [{ "label": "work", "value": "+1 555 0142" }],
+            "emails": [{ "label": "work", "value": "riley@example.com" }],
+            "postal_address": {
+              "street": "1 Harbor Way",
+              "city": "Testville",
+              "region": "CA",
+              "postal_code": "90000",
+              "country": "United States"
+            }
+          }
+        },
+        "children": []
+      }
+    }
+  },
+  {
+    "schema": "loopdy.card",
+    "version": 1,
+    "title": "Event draft",
+    "spoken_summary": "An event draft for Night Market is ready to review. Nothing is saved yet.",
+    "data_sources": [],
+    "root": "card",
+    "elements": {
+      "card": {
+        "type": "card",
+        "props": { "title": "Night Market", "subtitle": "From your photo" },
+        "children": ["draft"]
+      },
+      "draft": {
+        "type": "event_draft",
+        "props": {
+          "draft_id": "d_abcdef0123456789abcdef0123456789",
+          "preset": "event_poster",
+          "source": { "image_id": "0123456789abcdef0123456789abcdef", "mime_type": "image/png" },
+          "config_revision": 1,
+          "messages": {
+            "review": "Check the date and time before adding it to {{destination}}.",
+            "missing_fields": "Please check: {{fields}}.",
+            "saved": "Added {{name}} to {{destination}}.",
+            "failed": "That didn't save. {{reason}}",
+            "outcome_unknown": "It's not clear the event saved. Check Calendar before you try again."
+          },
+          "marks": [
+            { "field": "start", "reason": "guessed" }
+          ],
+          "fields": {
+            "title": "Night Market",
+            "location": "Harbor Hall",
+            "all_day": false,
+            "start": "2030-06-15T18:00:00Z",
+            "end": "2030-06-15T19:00:00Z",
+            "time_zone": "UTC"
+          }
+        },
+        "children": []
+      }
+    }
+  }
+]

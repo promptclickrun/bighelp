@@ -676,6 +676,16 @@ extension SessionSummary {
 }
 
 extension SessionRecord {
+    /// The saved one-agent chat with this Hermes stored ID (Bot Chats too, which Hermes' own
+    /// listing leaves out).
+    static func matching(storedID: String, profileID: String, in records: [SessionRecord]) -> SessionRecord? {
+        let matches = records.filter { record in
+            record.kind == .direct && record.agentIDs == [profileID]
+                && record.remoteStoredID.map { $0.utf8.elementsEqual(storedID.utf8) } == true
+        }
+        return matches.count == 1 ? matches[0] : nil
+    }
+
     /// The saved one-agent chat a notification names by `ManagedNotificationValidation.sessionReference`.
     static func matching(reference: String, profileID: String, in records: [SessionRecord]) -> SessionRecord? {
         let matches = records.filter { record in

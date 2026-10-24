@@ -18,7 +18,7 @@ struct BighelpWidgetSnapshotTests {
         let center = BighelpExternalSessionOpenCenter()
         center.request(profileID: "default", storedSessionID: "20260923_101500_abc")
         let first = try! #require(center.pending)
-        #expect(first.target == .stored(profileID: "default", storedSessionID: "20260923_101500_abc"))
+        #expect(first.target == .stored(hostID: nil, profileID: "default", storedSessionID: "20260923_101500_abc"))
         center.request(catalogSessionID: "session-1")
         #expect(!center.consume(first))
         let second = try! #require(center.pending)

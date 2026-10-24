@@ -6,8 +6,9 @@ import Observation
 /// own catalog, so the coordinate is handed across here and consumed once.
 struct BighelpExternalSessionOpen: Equatable, Sendable {
     enum Target: Equatable, Sendable {
-        /// A durable Hermes coordinate verified by a native host.
-        case stored(profileID: String, storedSessionID: String)
+        /// A durable Hermes coordinate verified by a native host. A Live Activity names its
+        /// computer too (`hostID`): only that computer's saved chats may answer for it.
+        case stored(hostID: UUID?, profileID: String, storedSessionID: String)
         /// A shell catalog session ID (bighelp Link notifications).
         case catalog(sessionID: String)
         /// A notification's chat by its reference, found in the saved chat list. A scheduled run's
@@ -25,8 +26,9 @@ final class BighelpExternalSessionOpenCenter {
     init() {}
     private(set) var pending: BighelpExternalSessionOpen?
 
-    func request(profileID: String, storedSessionID: String) {
-        pending = BighelpExternalSessionOpen(target: .stored(profileID: profileID, storedSessionID: storedSessionID))
+    func request(hostID: UUID? = nil, profileID: String, storedSessionID: String) {
+        pending = BighelpExternalSessionOpen(target: .stored(hostID: hostID, profileID: profileID,
+                                                            storedSessionID: storedSessionID))
     }
 
     func request(profileID: String, sessionReference: String, isScheduledRun: Bool = false) {

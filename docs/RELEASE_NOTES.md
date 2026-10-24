@@ -3,6 +3,72 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.20
+
+### Highlights
+
+- **Share usage and diagnostics:** a new switch in **Settings** › **Permissions** › **Device access**. It is on by
+  default. You can turn it off at any time. Details are under **Privacy** below.
+- **One Live Activity:** one Live Activity holds all your active chats. A tap on it opens the chat, also a Bot Chat.
+- **Faster chats:** Send stays on while a chat opens. Bot Chats open from their saved copy. Scrolling up right after
+  you return to bighelp is smooth.
+- **Voice:** live voice keeps talking while earlier work runs. In CarPlay, **Talk** and a tap on an agent open the
+  voice call.
+
+### Privacy
+
+- **Share usage and diagnostics:** to see the switch, go to **Settings** › **Permissions** › **Device access**. The
+  switch is on by default. It sends:
+  - counts of the features that you use
+  - launch times and reply times
+  - crash reports and hang reports
+  - the time that an alert takes to arrive
+- bighelp ties each item to a random ID. It never sends your messages, files or names.
+- When you turn the switch off, bighelp stops at once. It deletes the items that it did not send yet, and it deletes
+  the random ID. If you turn the switch on again, bighelp makes a new random ID.
+- A computer with a newer bighelp plugin also stops its own sharing when you turn the switch off. That plugin is not
+  released yet.
+
+### Live Activities and widgets
+
+- **One Live Activity:** one Live Activity holds all your active chats. The chats that need you are first. If
+  there are more chats than the Live Activity can show, it tells you how many more there are. Before, a text-only
+  turn could miss its Live Activity.
+- **Tap to open:** a tap on a Live Activity opens its chat. This also works for a Bot Chat. Before, bighelp showed
+  "Unable to open" for a Bot Chat.
+- **Widgets:** **Active Chats** and **Recent Chats** show your working chats first. When updates pause, the
+  widgets say so.
+
+### Chat
+
+- **Send stays on:** Send no longer stays off when you open a chat around a reconnect. If the chat is not yet
+  connected, your message waits in the message box. It goes out when the chat is ready.
+- **Bot Chats open faster:** a Bot Chat opens from the copy that your iPhone saved. In Bots mode, the first tap
+  on a bot after you start bighelp is faster.
+- **Smooth scrolling up:** after you return to bighelp, you can scroll up at once. Before, the chat could drop
+  frames for a few seconds.
+- **Windows:** **New Chat** starts in project folders on a Windows computer, for example `D:\Projects\app`. Before,
+  bighelp showed "New chat could not be opened" for an agent with such a project. If bighelp cannot use a project
+  folder, it now says so.
+
+### Voice
+
+- **Earlier work:** you can ask for something new while your agent does earlier work. Live voice
+  does not wait. If the chat is busy, the new request runs as a background task in that chat.
+- The chat shows the background task and its answer.
+
+### CarPlay
+
+- **Talk and agent taps:** **Talk** and a tap on the agent at the top of the list open the voice call. Before, the
+  voice screen did not appear.
+- **During a call:** the home screen has **Talk** and **End**. A tap on the agent in the call shows the call again.
+  A tap on a different agent starts a call with that agent.
+
+### Notifications
+
+- Alerts arrive the same way as before. bighelp now gives its notification service the push address of your iPhone,
+  for faster alerts in a later release. You see no change now.
+
 ## 2.6.19
 
 ### Highlights

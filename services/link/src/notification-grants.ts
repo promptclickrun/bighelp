@@ -1448,12 +1448,25 @@ export async function handleNotificationRequest(
         if (body.version !== 2 || !integer(body.revision) || !integer(body.timestamp)) {
           return fail(400, "notification_activity_invalid");
         }
-        const activity = await notificationStateBinding(env, row.owner_coordinate).revokeNotificationActivity({
-          grantId: grant.grantId,
-          activityId: activityId!,
-          revision: body.revision,
-          timestamp: body.timestamp,
-        });
+        let activity: Awaited<ReturnType<ReturnType<typeof notificationStateBinding>["revokeNotificationActivity"]>>;
+        try {
+          activity = await notificationStateBinding(env, row.owner_coordinate).revokeNotificationActivity({
+            grantId: grant.grantId,
+            activityId: activityId!,
+            revision: body.revision,
+            timestamp: body.timestamp,
+          });
+        } catch (error) {
+          // Phone-side only. A card whose registration the service refused was never stored, so the phone
+          // must hear "unknown" (404) or "conflict" (409), not a 500 it retries forever. The host routes keep
+          // their own mapping: the plugin reads 403/404 there as "remove the grant".
+          // RPC preserves serialized fields, not a custom Error prototype.
+          const code = error instanceof Error && error.name === "LoopdyLinkError" && "code" in error
+            ? String(error.code) : "";
+          if (code === "notification_activity_unknown") fail(404, code);
+          if (code === "notification_activity_conflict") fail(409, code);
+          throw error;
+        }
         return response({ version: 1, activity });
       }
       exact(body, [

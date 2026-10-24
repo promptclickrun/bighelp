@@ -363,7 +363,7 @@ async function notificationInstallationRequest(
   installationId: string,
   path: string,
   body: object | null,
-  method: "GET" | "POST" | "PUT" = "POST",
+  method: "GET" | "POST" | "PUT" | "DELETE" = "POST",
 ): Promise<Request> {
   const raw = body === null ? "" : JSON.stringify(body);
   const nonce = encoded(crypto.getRandomValues(new Uint8Array(24)));
@@ -507,6 +507,54 @@ describe("post-migration Link wake ownership", () => {
       ownerKind: "notification-instance", credentialId: grant.installationId, authorizationEpoch: 1, now: NOW,
       grant: { grantId: grant.grantId, revision: 1, expiresAt: NOW + 1800 },
     });
+  });
+
+  it("answers the phone's row DELETE with 404 unknown or 409 conflict, and leaves host routes alone", async () => {
+    const installationKeys = await keys();
+    const hostKeys = await keys();
+    const coordinate = `row-delete-${crypto.randomUUID()}`;
+    const grant = await insertInstallation(coordinate, installationKeys, hostKeys);
+    const targetEnv = { ...targetEnvironment(), USER_LINKS: env.USER_LINKS } as LinkEnv;
+    const activityPath = (id: string) => `/v1/notifications/host-grants/${grant.grantId}/live-activities/${id}`;
+    const deleteRow = async (id: string, revision: number) => handleLoopdyLinkRequest(
+      await notificationInstallationRequest(installationKeys, grant.installationId, activityPath(id),
+        { version: 2, revision, timestamp: NOW }, "DELETE"), targetEnv);
+
+    // A card the service refused at registration was never stored. Its saved revocation gets a plain 404.
+    const unknown = await deleteRow("never-registered", 2);
+    expect(unknown.status).toBe(404);
+    expect(await unknown.json()).toEqual({ version: 1, error: {
+      code: "notification_activity_unknown", message: "notification_activity_unknown" } });
+
+    const sessionReference = await notificationSessionReference("default", "fixture-chat");
+    const registered = await handleLoopdyLinkRequest(await notificationInstallationRequest(
+      installationKeys, grant.installationId, activityPath("row-delete-live"), {
+        version: 3, profile: "default", sessionId: "fixture-chat", sessionReference,
+        attributesType: "LoopdySessionActivityAttributes", revision: 1, timestamp: NOW, leaseExpires: NOW + 900,
+        groupId: "fixture-physical-card", rowId: `native-${"0f".repeat(32)}`, rowRevision: 1,
+      }, "PUT"), targetEnv);
+    expect(registered.status).toBe(200);
+
+    // A stored card with a revision the service doesn't expect is a real conflict, not "gone".
+    const stale = await deleteRow("row-delete-live", 5);
+    expect(stale.status).toBe(409);
+    expect(await stale.json()).toEqual({ version: 1, error: {
+      code: "notification_activity_conflict", message: "notification_activity_conflict" } });
+
+    // The normal revoke still works, and replaying it is still answered the same way.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const revoked = await deleteRow("row-delete-live", 2);
+      expect(revoked.status).toBe(200);
+      expect(await revoked.json()).toMatchObject({ activity: {
+        activityId: "row-delete-live", status: "revoked", revision: 2 } });
+    }
+
+    // Host routes keep their old mapping: the plugin treats 403/404 there as "remove the grant", so an
+    // unknown activity must not turn into a 404 on the host's readback. It stays the generic 500 it was.
+    const hostRead = await handleLoopdyLinkRequest(await accountHostRequest(hostKeys, grant.grantId,
+      grant.hostKeyId, "/live-activities/never-registered", "GET"), targetEnv);
+    expect(hostRead.status).toBe(500);
+    expect(await hostRead.json()).toMatchObject({ error: "internal_error" });
   });
 
   it("fences a legacy host grant when retirement survives partial cleanup", async () => {

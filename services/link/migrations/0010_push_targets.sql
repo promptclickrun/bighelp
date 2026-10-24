@@ -33,11 +33,14 @@ CREATE TABLE IF NOT EXISTS push_sends (
 CREATE INDEX IF NOT EXISTS push_sends_expiry ON push_sends(expires_at);
 CREATE INDEX IF NOT EXISTS push_sends_installation ON push_sends(installation_id);
 
--- Writes to the two target routes in each hour, per installation, so a stuck app can't hammer the database.
+-- Writes to the target routes in each ten-minute window, per installation and bucket, so a stuck
+-- app can't hammer the database and a busy Live Activity user can't block an alert target update.
+-- Buckets are alert (alert and push-to-start tokens), live, and live then a colon and the activity ID.
 CREATE TABLE IF NOT EXISTS push_target_writes (
   installation_id TEXT NOT NULL,
+  bucket TEXT NOT NULL,
   window_start INTEGER NOT NULL,
   writes INTEGER NOT NULL CHECK(writes > 0),
-  PRIMARY KEY(installation_id, window_start)
+  PRIMARY KEY(installation_id, bucket, window_start)
 );
 CREATE INDEX IF NOT EXISTS push_target_writes_window ON push_target_writes(window_start);

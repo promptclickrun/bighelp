@@ -24,6 +24,7 @@ import {
   type BuzzKitSealedNotificationEvent,
   type ManagedMessage,
 } from "./buzzkit.js";
+import { logPush } from "./push-telemetry.js";
 import {
   deliverLiveActivity,
   deliverMessage,
@@ -723,8 +724,14 @@ export async function revokeNotificationInstallationGrants(
   installationId: string,
 ): Promise<void> {
   // Push tokens go first. The installation is already revoked, so no send can
-  // reach them, but there is no reason to keep them.
-  await deleteInstallationPushState(env, installationId);
+  // reach them, but there is no reason to keep them. A hiccup here must never
+  // stop the revocation: the egress checks refuse a revoked installation anyway,
+  // and the rows expire.
+  try {
+    await deleteInstallationPushState(env, installationId);
+  } catch {
+    logPush("cleanup_failed", "push_state");
+  }
   const rows = await env.ACCOUNTS.prepare(`SELECT grant_id,'notification-instance' AS owner_kind,
       notification_coordinate AS owner_coordinate,installation_id AS credential_id,
       authorization_epoch,request_digest,public_json,revision,state,expires_at
@@ -1114,7 +1121,7 @@ async function handlePushTarget(
       return response({ version: 1, target: null });
     }
     if (!pushTokenKeyConfigured(env)) return fail(503, "notification_push_target_unavailable");
-    if (!await allowTargetWrite(env, auth.credentialId, now)) {
+    if (!await allowTargetWrite(env, auth.credentialId, kind, activityId, now)) {
       return fail(429, "notification_push_target_rate_limited");
     }
     const stored = await putPushTarget(env, {

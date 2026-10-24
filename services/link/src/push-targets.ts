@@ -42,7 +42,10 @@ export const MAX_LIVE_ACTIVITY_TARGETS = 8;
 const PURGE_BATCH = 100;
 /** Send records are kept this long past their expiry before they are purged. */
 const SEND_PURGE_MARGIN_SECONDS = 3_600;
-export const TARGET_WRITES_PER_HOUR = 30;
+/** Writes allowed in one ten-minute window (so a block never lasts longer than that): about 20 an hour for alert
+ * and push-to-start tokens, about 240 for Live Activity tokens and about 12 for any one activity. */
+export const TARGET_WRITE_WINDOW_SECONDS = 600;
+export const TARGET_WRITE_LIMITS = { alert: 4, live: 40, activity: 2 } as const;
 const CIPHERTEXT_VERSION = "v1.";
 
 export const TOKEN_PATTERN = /^(?:[0-9a-f]{2}){32,100}$/;
@@ -246,16 +249,30 @@ export async function findPushTarget(
   };
 }
 
+async function countWrite(
+  env: PushTargetEnv, installationId: string, bucket: string, window: number, limit: number,
+): Promise<boolean> {
+  const result = await env.ACCOUNTS.prepare(`INSERT INTO push_target_writes(installation_id,bucket,window_start,writes)
+    VALUES(?,?,?,1) ON CONFLICT(installation_id,bucket,window_start) DO UPDATE SET writes=writes+1
+    WHERE writes<?`).bind(installationId, bucket, window, limit).run();
+  return result.meta.changes === 1;
+}
+
 /**
  * Counts one write to a target route. False once the installation has made too
- * many in this hour.
+ * many in this window. Alert and push-to-start tokens share one allowance, Live
+ * Activity tokens another, and each activity has its own on top of that, so a
+ * heavy Live Activity user never blocks an alert target update.
  */
-export async function allowTargetWrite(env: PushTargetEnv, installationId: string, now: number): Promise<boolean> {
-  const window = Math.floor(now / 3_600) * 3_600;
-  const result = await env.ACCOUNTS.prepare(`INSERT INTO push_target_writes(installation_id,window_start,writes)
-    VALUES(?,?,1) ON CONFLICT(installation_id,window_start) DO UPDATE SET writes=writes+1
-    WHERE writes<?`).bind(installationId, window, TARGET_WRITES_PER_HOUR).run();
-  return result.meta.changes === 1;
+export async function allowTargetWrite(
+  env: PushTargetEnv, installationId: string, kind: PushTargetKind, activityId: string, now: number,
+): Promise<boolean> {
+  const window = Math.floor(now / TARGET_WRITE_WINDOW_SECONDS) * TARGET_WRITE_WINDOW_SECONDS;
+  if (kind !== "liveactivity") {
+    return countWrite(env, installationId, "alert", window, TARGET_WRITE_LIMITS.alert);
+  }
+  return await countWrite(env, installationId, `live:${activityId}`, window, TARGET_WRITE_LIMITS.activity)
+    && await countWrite(env, installationId, "live", window, TARGET_WRITE_LIMITS.live);
 }
 
 /** Marks the exact token APNs refused. A newer token for the same slot is left alone. */
@@ -295,7 +312,7 @@ export async function purgeExpiredPushState(env: PushTargetEnv, now: number): Pr
         .bind(now - SEND_PURGE_MARGIN_SECONDS, PURGE_BATCH),
       env.ACCOUNTS.prepare(`DELETE FROM push_target_writes WHERE rowid IN (
         SELECT rowid FROM push_target_writes WHERE window_start<? LIMIT ?)`)
-        .bind(now - 7_200, PURGE_BATCH),
+        .bind(now - 2 * TARGET_WRITE_WINDOW_SECONDS, PURGE_BATCH),
     ]);
   } catch (error) {
     if (!isMissingPushTable(error)) throw error;

@@ -186,6 +186,7 @@
 		1C763567CD9CCE8F93EA60F8 /* HostSignInMatrixUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37C85FB08FD771ED53292DB4 /* HostSignInMatrixUITests.swift */; };
 		1CAD3F56F34703C56D4795E1 /* DirectHermesProjectClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2F8FB47038C2E9A1EE89696 /* DirectHermesProjectClientTests.swift */; };
 		1CBBCA37E4825CA82FAB683F /* SimpleBotProfileExtras.swift in Sources */ = {isa = PBXBuildFile; fileRef = D51BF68C15E152807C58243B /* SimpleBotProfileExtras.swift */; };
+		1CC3AE6034187BEBA8FD6610 /* BuzzKit in Frameworks */ = {isa = PBXBuildFile; productRef = 9A8FD2C384E308443336FDA7 /* BuzzKit */; };
 		1D0ED381C419538DC3C37394 /* LocalModelsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4171E9FAAD22E3C63A32E6A /* LocalModelsStore.swift */; };
 		1D434F8E937522A7FA6C6414 /* UserIdentityStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EFD49EAD36B9F2F7F171108 /* UserIdentityStore.swift */; };
 		1D6F5FCFEA0A5D754E85F559 /* NativeSessionSpawnTreeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9892508D8BCEB167B645D6ED /* NativeSessionSpawnTreeView.swift */; };
@@ -3563,6 +3564,14 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		32CEFF58052E3563B1CABEA1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1CC3AE6034187BEBA8FD6610 /* BuzzKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		39367AB11F2CD5DC2B7D134A /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -6228,6 +6237,7 @@
 			buildConfigurationList = 8766450E08B77EB9F4C4AF72 /* Build configuration list for PBXNativeTarget "BighelpNotificationService" */;
 			buildPhases = (
 				22FCAA93EDA10EBA55E9B7C5 /* Sources */,
+				32CEFF58052E3563B1CABEA1 /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -6235,6 +6245,7 @@
 			);
 			name = BighelpNotificationService;
 			packageProductDependencies = (
+				9A8FD2C384E308443336FDA7 /* BuzzKit */,
 			);
 			productName = BighelpNotificationService;
 			productReference = 2DA9A35B9B3C917C29643F1E /* BighelpNotificationService.appex */;
@@ -9125,6 +9136,10 @@
 			productName = WebRTC;
 		};
 		64CBDFFEB41F346EC79DB61A /* BuzzKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = BuzzKit;
+		};
+		9A8FD2C384E308443336FDA7 /* BuzzKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = BuzzKit;
 		};

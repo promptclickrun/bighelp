@@ -15,6 +15,17 @@ final class BighelpNotificationDelivery: @unchecked Sendable {
         lock.withLock { pending = (handler, content) }
     }
 
+    /// Keeps the handler and swaps the content to show, so there is no moment between stages when
+    /// nothing is held. False when the notification was already shown, and the work should stop.
+    @discardableResult
+    func replace(content: UNNotificationContent) -> Bool {
+        lock.withLock {
+            guard let held = pending else { return false }
+            pending = (held.handler, content)
+            return true
+        }
+    }
+
     /// Takes the hold, so nobody shows it again. Nil once it has been shown or taken.
     func take() -> (handler: Handler, content: UNNotificationContent)? {
         lock.withLock {

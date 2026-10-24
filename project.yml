@@ -141,6 +141,11 @@ targets:
     # The Mac app opens sealed alerts too.
     platform: auto
     supportedDestinations: [iOS, macCatalyst]
+    dependencies:
+      # Only for BuzzKit's delivered receipt on pushes BuzzKit sent (BuzzKitExtensionSupport). The
+      # display work is bighelp's own.
+      - package: BuzzKit
+        product: BuzzKit
     sources:
       - path: BighelpNotificationService
       - path: Bighelp/NotificationShared

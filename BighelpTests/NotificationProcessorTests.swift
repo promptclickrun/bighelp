@@ -61,7 +61,12 @@ import UserNotifications
         var shownLive = false
         var avatarWait = Duration.milliseconds(400)
         let categories = PushDisplayTests.Categories()
+        /// When set, reading the categories waits for this gate: a point inside the display stage.
+        var categoriesGate: Gate?
+        var receiptGate: Gate?
         private let lock = NSLock()
+        private var receipts: [String] = []
+        var receiptsSent: [String] { lock.withLock { receipts } }
         private var cleared: [String] = []
         private var downloads: [URL] = []
         var clearedEvents: [String] { lock.withLock { cleared } }
@@ -75,7 +80,11 @@ import UserNotifications
                   },
                   alreadyShown: { [self] _ in shownLive },
                   clearOlder: { [self] _, _, eventID, _ in lock.withLock { cleared.append(eventID) } },
-                  categories: categories,
+                  receipt: { [self] id in
+                      lock.withLock { receipts.append(id) }
+                      await receiptGate?.wait()
+                  },
+                  categories: categoriesGate.map { GatedCategories(gate: $0) } ?? categories,
                   download: { [self] url in
                       lock.withLock { downloads.append(url) }
                       await downloadGate?.wait()
@@ -85,6 +94,16 @@ import UserNotifications
                   },
                   avatarWait: avatarWait)
         }
+    }
+
+    final class GatedCategories: BighelpNotificationCategoryStore, @unchecked Sendable {
+        let gate: Gate
+        init(gate: Gate) { self.gate = gate }
+        func categories() async -> Set<UNNotificationCategory> {
+            await gate.wait()
+            return []
+        }
+        func setCategories(_ categories: Set<UNNotificationCategory>) {}
     }
 
     // MARK: Payloads
@@ -234,6 +253,75 @@ import UserNotifications
         processor.timeWillExpire()
         processor.timeWillExpire()
         #expect(delivered.all.count == 1)
+    }
+
+    @Test func theSystemRunningOutOfTimeBetweenOpeningAndTheDisplayStageStillShowsOnce() async throws {
+        let (info, plaintext) = try Self.sealedPush()
+        let fakes = Fakes()
+        fakes.opened = plaintext
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".png")
+        try Self.png.write(to: file)
+        fakes.avatarFile = file
+        let gate = Gate()
+        fakes.categoriesGate = gate // the display stage starts, and waits here
+        let (processor, delivered) = run(fakes, Self.request(info))
+        try? await Task.sleep(for: .milliseconds(100))
+        #expect(delivered.all.isEmpty)
+        processor.timeWillExpire()
+        #expect(delivered.all.count == 1, "The hold was never let go between the stages")
+        #expect(delivered.all.first?.title == plaintext.title)
+        #expect(delivered.all.first?.attachments.map(\.identifier) == ["bk.image"])
+        gate.open()
+        #expect(await delivered.settled().count == 1)
+    }
+
+    // MARK: BuzzKit's delivered receipt
+
+    @Test func aPushBuzzKitDeliveredGetsItsReceiptAndADirectOneDoesNot() async {
+        for (path, expected) in [(PushDisplayTests.Path.buzzkit, ["msg_1"]), (.direct, [])] {
+            let fakes = Fakes()
+            let (_, delivered) = run(fakes, Self.request(Self.alert(path), title: "Nova", body: "Done"))
+            #expect(await delivered.settled().count == 1)
+            #expect(fakes.receiptsSent == expected, "\(path)")
+        }
+    }
+
+    @Test func aSealedAlertBuzzKitDeliveredGetsItsReceiptToo() async throws {
+        var (info, plaintext) = try Self.sealedPush()
+        var bk = info["bk"] as? [String: Any] ?? [:]
+        bk["messageId"] = "msg_sealed"
+        info["bk"] = bk
+        let fakes = Fakes()
+        fakes.opened = plaintext
+        let (_, delivered) = run(fakes, Self.request(info))
+        #expect(await delivered.settled().count == 1)
+        #expect(fakes.receiptsSent == ["msg_sealed"])
+        // And one that can't be opened still counts as delivered.
+        let unreadable = Fakes()
+        let (_, second) = run(unreadable, Self.request(info))
+        #expect(await second.settled().count == 1)
+        #expect(unreadable.receiptsSent == ["msg_sealed"])
+    }
+
+    @Test func aTopLevelMessageIDCountsLikeBuzzKitsOwnParser() async {
+        let fakes = Fakes()
+        let (_, delivered) = run(fakes, Self.request(["messageId": "msg_9", "aps": ["alert": "Hi"]]))
+        #expect(await delivered.settled().count == 1)
+        #expect(fakes.receiptsSent == ["msg_9"])
+        let none = Fakes()
+        let (_, other) = run(none, Self.request(["aps": ["alert": "Hi"]]))
+        #expect(await other.settled().count == 1)
+        #expect(none.receiptsSent.isEmpty)
+    }
+
+    @Test func aReceiptThatNeverAnswersDoesNotHoldTheAlertBack() async {
+        let fakes = Fakes()
+        let gate = Gate()
+        fakes.receiptGate = gate
+        let (_, delivered) = run(fakes, Self.request(Self.alert(.buzzkit), title: "Nova", body: "Done"))
+        #expect(await delivered.settled().count == 1, "Shown while the receipt is still going")
+        #expect(fakes.receiptsSent == ["msg_1"])
+        gate.open()
     }
 
     // MARK: Other pushes

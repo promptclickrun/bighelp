@@ -621,7 +621,8 @@ Helpful, never a pile to clear (`BighelpNotificationGrouping`):
   notification installation and permission gives the notification service its Apple push address at launch, with
   nothing shown, in addition to BuzzKit (which stays). A 404 means the Worker doesn't have the route yet: no error, ask
   again in a day. Other failures get NS-123 to NS-126 in the log only. The notification service extension shows every
-  alert itself (`BighelpPushDisplay`), for BuzzKit pushes and direct ones alike, and sends no BuzzKit receipts.
+  alert itself (`BighelpPushDisplay`), for BuzzKit pushes and direct ones alike. This release it still sends BuzzKit's
+  delivered receipt for a push that has a `bk.messageId`; a direct push gets none.
 - Every setup failure gets its own code where it happens (`BighelpNotificationErrorCode`, never reused or renumbered);
   the FAQ is [docs/NOTIFICATION_ERROR_CODES.md](docs/NOTIFICATION_ERROR_CODES.md).
 

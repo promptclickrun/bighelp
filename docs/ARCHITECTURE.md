@@ -720,10 +720,14 @@ The notification service extension no longer builds on BuzzKit's extension produ
 is a thin shell around `BighelpNotificationProcessor`, which opens sealed alerts, stacks them, and hands the
 system exactly one notification before time runs out (tests run it with fakes). It shows every
 alert itself (`BighelpPushDisplay`): it registers the push's `bk.category` and `bk.actions` as a
-category, attaches `bk.image` (HTTPS, status 200, at most 10 MB; a picture that says it is bigger is refused before its body is read) and finishes before the system's
+category, attaches `bk.image` (HTTPS, status 200, at most 10 MB, written to a file in pieces; a picture that says it is bigger is refused before its body is read, and one that turns out bigger is cut off) and finishes before the system's
 time limit. Pushes through BuzzKit and pushes sent straight to Apple carry the same `bk` object and
-look the same. The one difference is that bighelp sends no BuzzKit delivered receipts; a direct
-push has no `bk.messageId` for them anyway. Taps are handled by the app's own notification
+look the same. For this release the extension still sends BuzzKit's delivered receipt
+(`BuzzKitExtensionSupport.trackDelivered`, app group `group.app.loopdy.mobile.buzzkit`) for a push that
+carries `bk.messageId`, beside the display work and without holding it back. That is why the extension
+still links the BuzzKit library. A push sent straight to Apple has no message ID and gets no receipt.
+The receipt starts when the push arrives; BuzzKit keeps a failed one for later, but one the system cuts
+off mid-request can be lost, which the old extension avoided by making the alert wait for it. Taps are handled by the app's own notification
 delegate from the `loopdy` object, so they work without a message ID.
 
 ### Live Activities

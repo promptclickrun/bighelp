@@ -17,12 +17,15 @@ final class BighelpNotificationProcessor: @unchecked Sendable {
         var alreadyShown: @Sendable (String) -> Bool
         /// Removes the chat's earlier replies. Takes the content, event type, event ID and this request's ID.
         var clearOlder: @Sendable (UNNotificationContent, String, String, String) async -> Void
+        /// Tells BuzzKit a push it sent has been delivered. Only called for pushes that carry its message ID.
+        var receipt: @Sendable (String) async -> Void
         var categories: any BighelpNotificationCategoryStore
         var download: BighelpPushDisplay.Download
         /// How long a first avatar download may hold the alert back.
         var avatarWait: Duration
 
-        static var live: Self {
+        /// `receipt` is BuzzKit's delivered receipt; the app doesn't send one.
+        static func live(receipt: @escaping @Sendable (String) async -> Void = { _ in }) -> Self {
             Self(open: { try? $0.open() },
                  avatar: { await $0.avatarFile(for: $1) },
                  alreadyShown: { BighelpRecentAlerts.shared.contains($0) },
@@ -30,6 +33,7 @@ final class BighelpNotificationProcessor: @unchecked Sendable {
                      await BighelpSealedAlertPresentation.clearOlder(for: content, eventType: eventType,
                                                                      eventID: eventID, keeping: identifier)
                  },
+                 receipt: receipt,
                  categories: UNUserNotificationCenter.current(),
                  download: BighelpPushDisplay.download,
                  avatarWait: .milliseconds(1500))
@@ -39,11 +43,22 @@ final class BighelpNotificationProcessor: @unchecked Sendable {
     private let services: Services
     private let delivery = BighelpNotificationDelivery()
 
-    init(services: Services = .live) { self.services = services }
+    init(services: Services = .live()) { self.services = services }
+
+    /// The message ID BuzzKit gave a push it delivered. A push sent straight to Apple has none.
+    static func messageID(in userInfo: [AnyHashable: Any]) -> String? {
+        let bk = userInfo["bk"] as? [String: Any] ?? [:]
+        return bk["messageId"] as? String ?? userInfo["messageId"] as? String
+    }
 
     /// Shows `request` through `contentHandler`, once.
     func didReceive(_ request: UNNotificationRequest,
                     withContentHandler contentHandler: @escaping (UNNotificationContent) -> Void) {
+        // BuzzKit's receipt for a push it delivered goes out beside the work and never holds it back.
+        if let messageID = Self.messageID(in: request.content.userInfo) {
+            let receipt = services.receipt
+            Task { await receipt(messageID) }
+        }
         // Anything that isn't a sealed alert, or can't be opened, shows as sent,
         // in its agent's stack (unsealed alerts are titled with the agent's name).
         guard let sealed = BighelpSealedNotification(userInfo: request.content.userInfo),
@@ -79,9 +94,10 @@ final class BighelpNotificationProcessor: @unchecked Sendable {
                let attachment = try? UNNotificationAttachment(identifier: BighelpPushDisplay.imageIdentifier, url: file) {
                 box.value.content.attachments = [attachment]
             }
-            guard let handler = self.delivery.take()?.handler else { return }
-            self.display(UNNotificationRequest(identifier: box.value.request.identifier,
-                                               content: box.value.content, trigger: nil), handler)
+            // The same hold carries on into the display stage, so there is no moment when time running
+            // out could find nothing to show.
+            guard self.delivery.replace(content: box.value.content) else { return }
+            await self.addButtonsAndPicture(box.value.content)
         }
     }
 
@@ -107,23 +123,22 @@ final class BighelpNotificationProcessor: @unchecked Sendable {
         return UNNotificationRequest(identifier: request.identifier, content: content, trigger: nil)
     }
 
-    /// Adds the push's action buttons and picture, then shows it.
+    /// Holds `request`'s content, adds the push's action buttons and picture, then shows it.
     private func display(_ request: UNNotificationRequest, _ handler: @escaping (UNNotificationContent) -> Void) {
         guard let content = request.content.mutableCopy() as? UNMutableNotificationContent else {
             handler(request.content)
             return
         }
         delivery.hold(handler, content)
-        guard let display = BighelpPushDisplay(userInfo: request.content.userInfo) else {
-            delivery.finish()
-            return
-        }
         let box = UncheckedBox(content)
-        let services = self.services
-        Task {
-            await display.apply(to: box.value, categories: services.categories, download: services.download)
-            self.delivery.finish()
+        Task { await self.addButtonsAndPicture(box.value) }
+    }
+
+    private func addButtonsAndPicture(_ content: UNMutableNotificationContent) async {
+        if let display = BighelpPushDisplay(userInfo: content.userInfo) {
+            await display.apply(to: content, categories: services.categories, download: services.download)
         }
+        delivery.finish()
     }
 
     /// The task's value, or nil once `limit` passes (the task keeps running).

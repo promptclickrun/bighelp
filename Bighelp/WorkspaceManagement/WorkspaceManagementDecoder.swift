@@ -88,6 +88,32 @@ enum WorkspaceManagementDecoder {
         )
     }
 
+    /// A project's or chat's folder on the host, written the host's own way: POSIX (`/srv/app`) or
+    /// Windows (`D:\Projects\app`, `D:/Projects/app`, `\\server\share\app`), as Hermes on Windows
+    /// names them (#563). Drive-relative (`D:app`) and device (`\\?\`, `\\.\`) paths, `.` and `..`,
+    /// and empty segments are refused. The file browser keeps to `path`, its POSIX confinement.
+    static func hostFolder(_ value: BighelpJSONValue?) throws -> String {
+        let folder = try text(value, maximum: 4_096)
+        if folder.hasPrefix("/") { return try path(.string(folder)) }
+        let separator: (Character) -> Bool = { $0 == "/" || $0 == "\\" }
+        let segments: [Substring]
+        if folder.range(of: #"^[A-Za-z]:[\\/]"#, options: .regularExpression) != nil {
+            // `D:\` is the drive itself; every folder below it has a name.
+            let below = folder.dropFirst(3)
+            segments = below.isEmpty ? [] : below.split(omittingEmptySubsequences: false, whereSeparator: separator)
+        } else if folder.hasPrefix(#"\\"#) {
+            // A share: `\\server\share`, then its folders.
+            segments = folder.dropFirst(2).split(omittingEmptySubsequences: false, whereSeparator: separator)
+            guard segments.count >= 2 else { throw WorkspaceManagementError.invalidResponse }
+        } else {
+            throw WorkspaceManagementError.invalidResponse
+        }
+        guard !folder.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains),
+              !segments.contains(where: { $0.isEmpty || $0 == "." || $0 == ".." || $0 == "?" })
+        else { throw WorkspaceManagementError.invalidResponse }
+        return folder
+    }
+
     static func path(_ value: BighelpJSONValue?) throws -> String {
         let path = try text(value, maximum: 4_096)
         guard path.hasPrefix("/"), !path.contains("\\"),

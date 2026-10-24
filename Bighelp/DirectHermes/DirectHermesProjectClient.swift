@@ -31,7 +31,7 @@ final class DirectHermesProjectClient: HermesWorkspaceCatalogClient {
             guard resolveSession(sessionID) == coordinate else { throw WorkspaceClientError.ownerChanged }
             return try catalog(payload)
         }
-        _ = try WorkspaceManagementDecoder.path(.string(cwd))
+        _ = try WorkspaceManagementDecoder.hostFolder(.string(cwd))
         let association = try await scope.perform(.projectsForCwd, ["profile": .string(profile), "cwd": .string(cwd)])
         guard association["cwd"]?.string == cwd, resolveSession(sessionID) == coordinate else {
             throw WorkspaceClientError.conflict
@@ -61,7 +61,7 @@ final class DirectHermesProjectClient: HermesWorkspaceCatalogClient {
             ])
             guard let movedCWD = moved["cwd"]?.string,
                   movedCWD == path,
-                  (try? WorkspaceManagementDecoder.path(.string(movedCWD))) != nil,
+                  (try? WorkspaceManagementDecoder.hostFolder(.string(movedCWD))) != nil,
                   resolveSession(sessionID) == coordinate else {
                 throw WorkspaceClientError.outcomeUnknown
             }
@@ -100,14 +100,15 @@ final class DirectHermesProjectClient: HermesWorkspaceCatalogClient {
         // Archiving does not clear the stock host's active-project pointer.
         // A read racing with archival supplies no explicit cwd override.
         guard !project.isArchived else { return nil }
-        return try primaryPath(project)
+        do { return try primaryPath(project) }
+        catch is WorkspaceManagementError { throw DirectHermesSessionError.projectFolderUnusable }
     }
 
     func create(name: String, folderPath: String, agentID: String) async throws -> HermesWorkspaceCatalog {
         let profile = try DirectHermesCoreRequestScope.profile(agentID)
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         _ = try WorkspaceManagementDecoder.text(.string(name), maximum: 160)
-        let path = try WorkspaceManagementDecoder.path(.string(folderPath))
+        let path = try WorkspaceManagementDecoder.hostFolder(.string(folderPath))
         try scope.require(.projectsEdit, profile: profile)
         let result = try await scope.perform(.projectsCreate, [
             "profile": .string(profile), "name": .string(name),
@@ -247,7 +248,7 @@ final class DirectHermesProjectClient: HermesWorkspaceCatalogClient {
         guard primary.count == 1 else {
             throw WorkspaceClientError.unavailable(.unsupportedOperation)
         }
-        return try WorkspaceManagementDecoder.path(.string(primary[0].path))
+        return try WorkspaceManagementDecoder.hostFolder(.string(primary[0].path))
     }
 
     private func catalog(_ payload: [String: BighelpJSONValue], sessionProjectID: String? = nil) throws -> HermesWorkspaceCatalog {

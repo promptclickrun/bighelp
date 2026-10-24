@@ -81,7 +81,9 @@ extension ChatView {
                            controller: timelineController, entryCount: model.transcriptEntries.count,
                            contentInsets: UIEdgeInsets(
                             top: headerHeight, left: 0,
-                            bottom: composerHeight + ChatCanvasLayout.composerInsetSpacing, right: 0)) { row in
+                            bottom: composerHeight + ChatCanvasLayout.composerInsetSpacing, right: 0),
+                           rowContext: ChatCanvasRowContext(groupedIDs: groupedIDs, continuedIDs: continuedIDs,
+                                                            density: chatDensity)) { row in
             canvasRowContent(row)
                 .frame(maxWidth: horizontalSizeClass == .regular ? ChatCanvasLayout.regularLaneMaximumWidth : .infinity,
                        alignment: .leading)

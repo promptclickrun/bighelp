@@ -329,7 +329,19 @@ change in both repos.
   autopilot and probe (`ChatPerformanceAutopilot`, `-test-chat-performance-probe`). `-test-long-chat-heavy`
   (`BIGHELP_SPEED_HEAVY`) makes every turn as big as a chat near half a million tokens. Work done for each
   message as it's drawn must not grow with its text beyond the drawing itself: `MarkdownDocument`'s plain
-  text is worked out only when read.
+  text is worked out only when read. The probe's `main_busy_ms` counts main run loop turns over 8.3 ms, a
+  dropped frame at 120 Hz; the simulator's frame gaps can't show that.
+- **Kept chat rows:** a message row costs more than a 120 Hz frame to build, so the timeline keeps the 40 built
+  rows nearest the screen by ID (`ChatTimelineBuiltRows`), never recycles a cell for another row, and builds the
+  24 rows above while the chat is still. Cells host SwiftUI as a plain subview (`ChatTimelineCell`), not as their
+  `contentConfiguration`: UIKit tells configured content it's hidden for reuse whenever a row goes by, and SwiftUI
+  then made the row's text views again when it came back. A row built ahead is built in the table itself, out
+  of sight, before it waits in `parking`: first built anywhere else, its views were made again when it showed.
+  A kept row is drawn again only when its row value or
+  its part of `ChatCanvasRowContext` (grouping, density) changes, so anything else a row takes from `ChatView`
+  belongs in that context. Rows off screen hold their loaders still (`bighelpLoaderMotionOverride`). SwiftUI
+  updates a hosted row on its own renderer thread while the row animates, so a closure it calls there (an
+  environment transform) must not be made on the main actor: it traps (`hostedEnvironment(from:)`).
 - **Type-checker timeouts:** very large `body`s (`RootShellView`, `BighelpApp`) time out the type checker. Pull
   pieces out into functions or named `ViewModifier`s.
 - **Text styling:** styled text in the composer must pass attributes and theme colors. Plain `String` replacements

@@ -400,6 +400,35 @@ enum ChatCanvasRowIDs {
     }
 }
 
+/// Whether a kept row is on screen. False while it waits off screen: its loaders hold still.
+@MainActor @Observable
+final class ChatRowPresence {
+    var isOnScreen = true
+}
+
+/// UIKit no longer pauses a kept row that has gone by (`ChatTimelineCell`), so it holds its
+/// loaders still itself. Only this modifier reads `isOnScreen`: the row isn't drawn again
+/// each time it comes and goes.
+struct ChatRowMotion: ViewModifier {
+    let presence: ChatRowPresence
+    @Environment(\.bighelpLoaderMotionOverride) private var override
+
+    func body(content: Content) -> some View {
+        var motion = override
+        if !presence.isOnScreen { motion.sceneInactive = true }
+        return content.environment(\.bighelpLoaderMotionOverride, motion)
+    }
+}
+
+/// What rows take from the chat screen besides their own value. A row whose part of it
+/// changes is drawn again; built rows otherwise stay as they are.
+struct ChatCanvasRowContext: Equatable {
+    /// Messages followed by another of their group, and messages that continue one.
+    var groupedIDs: Set<String> = []
+    var continuedIDs: Set<String> = []
+    var density: ChatDensity = .comfortable
+}
+
 struct NativeChatTimeline<Content: View>: UIViewRepresentable {
     let conversationID: String
     let ownerID: ObjectIdentifier
@@ -407,6 +436,7 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
     let controller: ChatTimelineController
     let entryCount: Int
     var contentInsets: UIEdgeInsets = .zero
+    var rowContext = ChatCanvasRowContext()
     @ViewBuilder let rowContent: (ChatCanvasRow) -> Content
     /// Rows get a copy of the scene phase. Reading it here makes SwiftUI call
     /// updateUIView when it changes, so rows don't stay "inactive" from launch
@@ -425,8 +455,11 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
         table.estimatedRowHeight = 120
         // A streaming tail continuously inserts rich, tall rows. Preparing
         // speculative neighboring hosting views amplifies each insertion.
+        // The coordinator builds the rows above while the chat is still instead.
         table.isPrefetchingEnabled = false
-        table.selfSizingInvalidation = .enabled
+        // Rows host their SwiftUI content as a subview (`ChatTimelineCell`), so a row that
+        // grows reaches its cell through Auto Layout.
+        table.selfSizingInvalidation = .enabledIncludingConstraints
         table.sectionHeaderTopPadding = 0
         table.allowsSelection = false
         #if !os(visionOS)
@@ -435,7 +468,6 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
         table.contentInsetAdjustmentBehavior = .automatic
         table.alwaysBounceVertical = true
         table.accessibilityIdentifier = "chat.timeline"
-        table.register(UITableViewCell.self, forCellReuseIdentifier: "message")
         table.delegate = context.coordinator
         context.coordinator.install(on: table)
         return table
@@ -451,6 +483,7 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
         table.onLayout = nil
         table.delegate = nil
         coordinator.cancelPendingUpdate()
+        coordinator.releaseBuiltRows()
         if coordinator.controller?.table === table { coordinator.controller?.table = nil }
     }
 
@@ -459,6 +492,7 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
         var row: ChatCanvasRow
         var render: (ChatCanvasRow) -> Content
         let generation: Int
+        let presence = ChatRowPresence()
 
         init(row: ChatCanvasRow, render: @escaping (ChatCanvasRow) -> Content, generation: Int) {
             self.row = row
@@ -479,7 +513,7 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             // keeps pending state, mode changes and sender stores live even
             // when the transcript item's value itself has not changed.
             let _ = ChatPerformanceProbe.count("row.body")
-            state.render(state.row).id(state.row.id)
+            state.render(state.row).id(state.row.id).modifier(ChatRowMotion(presence: state.presence))
         }
     }
 
@@ -490,6 +524,8 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
         private var rows: [ChatCanvasRow] = []
         private var rowsByID: [String: ChatCanvasRow] = [:]
         private var orderedIDs: [String] = []
+        /// Where each row is in `orderedIDs`, for keeping the built rows nearest the screen.
+        private var indexByID: [String: Int] = [:]
         private var conversationID: String?
         private var ownerID: ObjectIdentifier?
         private var rowContent: ((ChatCanvasRow) -> Content)?
@@ -550,16 +586,33 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
         private var estimates: [String: (width: CGFloat, height: CGFloat)] = [:]
         private var publicationPending = false
         private var presentationGeneration = 0
+        private var rowContext = ChatCanvasRowContext()
+        /// About 2 MB each on a 3x screen, mostly the drawn text. A built row shows as it was
+        /// when it scrolls back in, unless it changed, so scrolling alone redraws nothing.
+        private let built = ChatTimelineBuiltRows<HostedRowState>(limit: 40)
+        /// Rows above the screen built while the chat is still, so the next scroll up finds
+        /// them ready, measured at the table's width.
+        static var prewarmedRowsAbove: Int { 24 }
+        private var prewarm: DispatchWorkItem?
+        private var memoryWarning: NSObjectProtocol?
+        private var lastScrolledAt: CFTimeInterval = 0
         private var pendingUpdate: (parent: NativeChatTimeline, environment: EnvironmentValues)?
         private var updateScheduled = false
-        private let hostedRows = NSMapTable<UITableViewCell, HostedRowState>(
-            keyOptions: .weakMemory, valueOptions: .strongMemory)
 
         func install(on table: ChatTimelineTableView) {
-            dataSource = UITableViewDiffableDataSource(tableView: table) { [weak self] table, index, id in
-                let cell = table.dequeueReusableCell(withIdentifier: "message", for: index)
-                self?.configure(cell, id: id)
-                return cell
+            dataSource = UITableViewDiffableDataSource(tableView: table) { [weak self] table, indexPath, id in
+                guard let self else { return UITableViewCell() }
+                let isNew = self.built[id] == nil
+                let row = self.built.row(for: id)
+                self.configure(row, id: id)
+                if isNew { self.trimBuiltRows(around: indexPath.row, in: table) }
+                return row.cell
+            }
+            table.addSubview(built.parking)
+            memoryWarning = NotificationCenter.default.addObserver(
+                forName: UIApplication.didReceiveMemoryWarningNotification, object: nil, queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated { self?.built.removeAll(keepingOnScreen: true) }
             }
             table.onLayout = { [weak self, weak table] in
                 guard let self, let table else { return }
@@ -589,22 +642,94 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
 
         func cancelPendingUpdate() {
             pendingUpdate = nil
+            prewarm?.cancel()
         }
 
-        private func configure(_ cell: UITableViewCell, id: String) {
+        func releaseBuiltRows() {
+            prewarm?.cancel()
+            memoryWarning.map(NotificationCenter.default.removeObserver)
+            memoryWarning = nil
+            built.removeAll()
+        }
+
+        /// Keeps the built rows nearest the screen and `row`.
+        private func trimBuiltRows(around row: Int, in table: UITableView) {
+            let visible = (table.indexPathsForVisibleRows ?? []).map(\.row)
+            built.trim(around: min(visible.min() ?? row, row)...max(visible.max() ?? row, row)) { self.indexByID[$0] }
+        }
+
+        /// Builds the rows above the screen, one per turn of the main queue, once the chat
+        /// has been still for a moment: no scrolling, no new rows. Any touch, scroll or
+        /// update stops it until the chat is still again.
+        private func schedulePrewarm(_ table: ChatTimelineTableView) {
+            prewarm?.cancel()
+            let work = DispatchWorkItem { [weak self, weak table] in
+                guard let self, let table else { return }
+                self.prewarmNextRow(in: table)
+            }
+            prewarm = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: work)
+        }
+
+        private func prewarmNextRow(in table: ChatTimelineTableView) {
+            // Programmatic scrolls (Return to latest) move the table without a drag.
+            if CACurrentMediaTime() - lastScrolledAt < 0.35 { return schedulePrewarm(table) }
+            guard table.window != nil, !table.isUserInteracting, !table.isAnimatingReturn, !updateScheduled,
+                  table.bounds.width > 0, let first = table.indexPathsForVisibleRows?.first?.row,
+                  first < orderedIDs.count else { return }
+            let range = max(0, first - Self.prewarmedRowsAbove)..<first
+            guard let index = range.reversed().first(where: { built[orderedIDs[$0]] == nil }) else { return }
+            let id = orderedIDs[index]
+            let row = built.row(for: id)
+            trimBuiltRows(around: first, in: table)
+            // Full of rows nearer the screen than this one.
+            guard built[id] != nil else { return }
+            let cell = row.cell
+            let width = table.bounds.width
+            // Built in the table itself, out of sight: a row first built anywhere else (in
+            // `parking`) made its views again the first time it showed.
+            table.addSubview(cell)
+            cell.frame = CGRect(x: 0, y: -100_000, width: width, height: heights[id]?.height ?? 120)
+            configure(row, id: id)
+            row.state?.presence.isOnScreen = false
+            let size = ChatPerformanceProbe.measure("row.prewarm") {
+                let size = cell.systemLayoutSizeFitting(
+                    CGSize(width: width, height: UIView.layoutFittingCompressedSize.height),
+                    withHorizontalFittingPriority: .required, verticalFittingPriority: .fittingSizeLevel)
+                // Laid out at the size it will show at, so its text views are made now, not when it shows.
+                cell.frame.size.height = size.height
+                cell.layoutIfNeeded()
+                return size
+            }
+            built.parking.addSubview(cell)
+            if size.height > 0 { heights[id] = (width, size.height) }
+            let work = DispatchWorkItem { [weak self, weak table] in
+                guard let self, let table else { return }
+                self.prewarmNextRow(in: table)
+            }
+            prewarm = work
+            DispatchQueue.main.async(execute: work)
+        }
+
+        private func configure(_ built: ChatTimelineBuiltRows<HostedRowState>.Row, id: String) {
             ChatPerformanceProbe.count("row.configure")
             guard let row = rowsByID[id], let rowContent else { return }
-            if let state = hostedRows.object(forKey: cell), state.row.id == id,
-               state.generation == presentationGeneration {
+            if let state = built.state, state.generation == presentationGeneration {
                 // Streaming changes the content inside the existing hosting
                 // view. Reassigning its configuration makes UIKit remeasure
                 // the hosting root in addition to the changed message.
-                state.render = rowContent
-                state.row = row
+                // A built row scrolling back in is left alone unless it changed.
+                if state.row != row || built.isStale {
+                    state.render = rowContent
+                    state.row = row
+                    built.isStale = false
+                }
                 return
             }
             let state = HostedRowState(row: row, render: rowContent, generation: presentationGeneration)
-            hostedRows.setObject(state, forKey: cell)
+            built.state = state
+            built.isStale = false
+            let cell = built.cell
             let environment = environment
             cell.backgroundColor = .clear
             cell.isOpaque = false
@@ -612,7 +737,7 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             cell.selectionStyle = .none
             let configuration = UIHostingConfiguration {
                 HostedRow(state: state)
-                    .transformEnvironment(\.self) { Self.applyHostedEnvironment(from: environment, to: &$0) }
+                    .transformEnvironment(\.self, transform: Self.hostedEnvironment(from: environment))
                     .buttonStyle(.plain)
             }.margins(.all, 0)
             // The bottom spacer, and activity lines (which set their own touch
@@ -621,8 +746,8 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             switch row {
             case .bottom, .workTrailEnd, .workTrailHeader, .activityDetail, .transcript(.completed),
                  .transcript(.entry(.activity)), .agentTalk:
-                cell.contentConfiguration = configuration.minSize(height: 0)
-            default: cell.contentConfiguration = configuration
+                cell.host(configuration.minSize(height: 0))
+            default: cell.host(configuration)
             }
         }
 
@@ -647,8 +772,11 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             }
             controller = parent.controller
             rowContent = parent.rowContent
+            defer { schedulePrewarm(table) }
             let nextStyle = Style(environment)
-            let styleChanged = style != nextStyle
+            let previousContext = rowContext
+            rowContext = parent.rowContext
+            let styleChanged = style != nextStyle || previousContext.density != rowContext.density
             style = nextStyle
             self.environment = environment
             let reset = conversationID != parent.conversationID || ownerID != parent.ownerID
@@ -659,7 +787,7 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
                 table.isAnimatingReturn = false
                 heights.removeAll()
                 estimates.removeAll()
-                hostedRows.removeAllObjects()
+                built.removeAll()
             }
             // A long chat changes at its tail (a growing answer, a new tool). Only the rows
             // between the unchanged ends are looked at: hashing and comparing every row of
@@ -678,7 +806,11 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             rows = next
             let removed = previous[start..<(previous.count - end)]
             let inserted = next[start..<(next.count - end)]
-            guard reset || styleChanged || !removed.isEmpty || !inserted.isEmpty else {
+            // A message that gains a follower in its group loses its tail and some space below.
+            let regrouped = reset || styleChanged ? [] : previousContext.groupedIDs
+                .symmetricDifference(rowContext.groupedIDs)
+                .union(previousContext.continuedIDs.symmetricDifference(rowContext.continuedIDs))
+            guard reset || styleChanged || !removed.isEmpty || !inserted.isEmpty || !regrouped.isEmpty else {
                 table.setNeedsLayout()
                 return
             }
@@ -697,6 +829,8 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             let previousFirstID = orderedIDs.first
             if reset || styleChanged || previousFirstID != ids.first {
                 presentationGeneration &+= 1
+                // Rows off screen are built again when they show, in the new look.
+                if !reset { built.removeAll(keepingOnScreen: true) }
             }
             var changed = styleChanged ? ids : insertedIDs.filter { previousRows[$0] != rowsByID[$0] }
             if !styleChanged, previousFirstID != ids.first {
@@ -706,13 +840,17 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
                     changed.append(id)
                 }
             }
+            for id in regrouped where rowsByID[id] != nil && !changed.contains(id) { changed.append(id) }
+            built.markStale(changed)
             for id in changed {
                 heights[id] = nil
                 estimates[id] = nil
             }
             if reordered {
                 orderedIDs = ids
+                indexByID = Dictionary(ids.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
                 heights = heights.filter { rowsByID[$0.key] != nil }
+                if !removed.isEmpty { built.remove(notIn: Set(rowsByID.keys)) }
                 var snapshot = NSDiffableDataSourceSnapshot<Int, String>()
                 snapshot.appendSections([0])
                 snapshot.appendItems(ids)
@@ -740,15 +878,21 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
                 let changed = Set(changed)
                 for index in table.indexPathsForVisibleRows ?? [] {
                     let id = ids[index.row]
-                    if changed.contains(id), let cell = table.cellForRow(at: index) {
-                        configure(cell, id: id)
+                    if changed.contains(id), let row = built[id], row.cell === table.cellForRow(at: index) {
+                        configure(row, id: id)
                     }
                 }
             }
             table.setNeedsLayout()
         }
 
-        private static func applyHostedEnvironment(from source: EnvironmentValues, to values: inout EnvironmentValues) {
+        /// SwiftUI can apply this off the main thread, while a row animates on its own renderer: made on the main
+        /// actor, the closure trapped there (Swift 6 isolation check). Rows hosted as a subview render that way.
+        nonisolated private static func hostedEnvironment(from source: EnvironmentValues) -> (inout EnvironmentValues) -> Void {
+            { applyHostedEnvironment(from: source, to: &$0) }
+        }
+
+        nonisolated private static func applyHostedEnvironment(from source: EnvironmentValues, to values: inout EnvironmentValues) {
             // Each hosting configuration owns its own layout/accessibility
             // bridge. Copy public presentation values and app dependencies,
             // never the parent hosting graph's private environment storage.
@@ -815,23 +959,29 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
         func tableView(_ tableView: UITableView, didEndDisplaying cell: UITableViewCell, forRowAt indexPath: IndexPath) {
             // Height is keyed to the item still represented by this cell, not
             // a possibly shifted index following history insertion.
-            guard let id = cell.accessibilityIdentifier, cell.bounds.height > 0 else { return }
-            heights[id] = (tableView.bounds.width, cell.bounds.height)
+            guard let id = cell.accessibilityIdentifier else { return }
+            if cell.bounds.height > 0 { heights[id] = (tableView.bounds.width, cell.bounds.height) }
+            if let presence = built[id]?.state?.presence, presence.isOnScreen { presence.isOnScreen = false }
+            DispatchQueue.main.async { [weak self] in self?.built.park(id) }
         }
 
         func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath) {
             guard orderedIDs.indices.contains(indexPath.row) else { return }
-            cell.accessibilityIdentifier = orderedIDs[indexPath.row]
+            let id = orderedIDs[indexPath.row]
+            cell.accessibilityIdentifier = id
+            if let presence = built[id]?.state?.presence, !presence.isOnScreen { presence.isOnScreen = true }
         }
 
         func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
             guard let table = scrollView as? ChatTimelineTableView else { return }
+            prewarm?.cancel()
             table.followsTail = false
             table.isAnimatingReturn = false
         }
 
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
             guard let table = scrollView as? ChatTimelineTableView else { return }
+            lastScrolledAt = CACurrentMediaTime()
             publishPosition(of: table)
         }
 
@@ -846,12 +996,14 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             table.followsTail = table.distanceFromBottom <= ChatTimelineFollowState.nearBottomThreshold
             table.setNeedsLayout()
             publishPosition(of: table)
+            schedulePrewarm(table)
         }
 
         func scrollViewDidEndScrollingAnimation(_ scrollView: UIScrollView) {
             guard let table = scrollView as? ChatTimelineTableView else { return }
             table.isAnimatingReturn = false
             table.setNeedsLayout()
+            schedulePrewarm(table)
         }
 
         private func publishPosition(of table: ChatTimelineTableView) {

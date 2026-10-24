@@ -24,14 +24,12 @@ jobs:
         working-directory: services/telemetry
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          package_json_file: services/telemetry/package.json
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
-          cache-dependency-path: services/telemetry/pnpm-lock.yaml
+      # Only GitHub's own actions are allowed here, so pnpm comes from Node's corepack
+      # at the version package.json pins.
+      - run: corepack enable
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
       - run: pnpm typecheck

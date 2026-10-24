@@ -633,6 +633,14 @@ Helpful, never a pile to clear (`BighelpNotificationGrouping`):
   The finished card leaves about 30 seconds after all work ends, and opening the app clears it.
 - The Live Activity uses the app's palette and real host phases, never a guessed percentage. Titles stay in the
   phone's App Group; only opaque row IDs and bounded status reach the push service. Stale rows say Paused.
+- Direct push (`BighelpPushRegistrar`, docs/ARCHITECTURE.md › Direct push registration): a phone that already has a
+  notification installation and permission gives the notification service its Apple push address at launch, with
+  nothing shown, in addition to BuzzKit (which stays). A 404 means the Worker doesn't have the route yet: no error, ask
+  again in a day. Other failures get NS-123 to NS-126 in the log only. The notification service extension shows every
+  alert itself (`BighelpPushDisplay`), for BuzzKit pushes and direct ones alike. This release it still sends BuzzKit's
+  delivered receipt for a push that has a `bk.messageId`; a direct push gets none. The shared Live Activity's token is
+  registered directly under its group ID (the `groupId` of the version 3 registration), never a per-turn or per-chat
+  alias, and removed when the physical card ends.
 - Every setup failure gets its own code where it happens (`BighelpNotificationErrorCode`, never reused or renumbered);
   the FAQ is [docs/NOTIFICATION_ERROR_CODES.md](docs/NOTIFICATION_ERROR_CODES.md).
 

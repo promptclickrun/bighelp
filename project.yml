@@ -142,8 +142,10 @@ targets:
     platform: auto
     supportedDestinations: [iOS, macCatalyst]
     dependencies:
+      # Only for BuzzKit's delivered receipt on pushes BuzzKit sent (BuzzKitExtensionSupport). The
+      # display work is bighelp's own.
       - package: BuzzKit
-        product: BuzzKitNotificationServiceExtension
+        product: BuzzKit
     sources:
       - path: BighelpNotificationService
       - path: Bighelp/NotificationShared

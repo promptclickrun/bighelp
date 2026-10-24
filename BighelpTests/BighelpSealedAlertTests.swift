@@ -108,6 +108,30 @@ struct BighelpSealedAlertTests {
         #expect(BighelpSealedNotification(userInfo: ["loopdy": ["version": 2, "eventId": eventID]]) == nil)
     }
 
+    /// Pushes sent straight to Apple carry the same alert plus `bk` and `bighelp_meta` (CONTRACTS §2);
+    /// the phone opens them like any other.
+    @Test func aDirectPushOpensLikeABuzzKitOne() throws {
+        let keys = BighelpNotificationRecipientKeyStore(accessGroup: nil, account: "test." + UUID().uuidString)
+        let senders = BighelpSealedAlertSenderStore(accessGroup: nil, service: "app.loopdy.test.sealed." + UUID().uuidString)
+        defer { try? keys.remove(); try? senders.removeAll() }
+        try keys.save(recipient.rawRepresentation)
+        let grantID = try #require(envelope["grantId"] as? String)
+        let eventID = try #require(envelope["eventId"] as? String)
+        let senderKeyID = try #require(envelope["senderKeyId"] as? String)
+        try senders.upsert(BighelpSealedAlertSender(grantID: grantID, hostKeyID: senderKeyID,
+                                                    hostPublicKey: vector.senderPublicKey, expiresAt: 1_800_000_100),
+                           now: 1_790_000_000)
+        let direct: [AnyHashable: Any] = [
+            "aps": ["alert": ["title": "bighelp", "body": "placeholder"], "mutable-content": 1, "category": "BIGHELP_UPDATE"],
+            "loopdy": ["version": 2, "eventId": eventID, "eventType": "session.completed", "grantId": grantID,
+                       "sealed": envelope, "avatar": ["url": "https://example.com/avatar"]],
+            "bk": ["deepLink": "loopdy:///dashboard?eventId=\(eventID)", "category": "BIGHELP_UPDATE", "actions": []],
+            "bighelp_meta": ["v": 1, "path": "direct", "sentAt": 1_800_000_000_000],
+        ]
+        let notification = try #require(BighelpSealedNotification(userInfo: direct))
+        #expect(try notification.open(recipientKeys: keys, senders: senders) == vector.plaintext)
+    }
+
     private static func bytes(_ value: String) throws -> Data {
         guard let data = BighelpNotificationBase64URL.decodeCanonical(value) else { throw BighelpSealedAlert.Failure.invalidPayload }
         return data

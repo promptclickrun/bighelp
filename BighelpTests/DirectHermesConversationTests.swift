@@ -2147,8 +2147,8 @@ struct DirectHermesConversationTests {
         #expect(!answer.metadata.isInterimReply)
     }
 
-    /// One chat fed Hermes' events in their real order, read the way the chat shows it: normal,
-    /// and Bots mode with Show reasoning off and on.
+    /// One chat fed Hermes' events in their real order, read the way the chat shows it in each
+    /// `ChatWorkStyle`.
     @MainActor
     private final class LandedAnswerReplay {
         let model: ChatModel
@@ -2175,17 +2175,12 @@ struct DirectHermesConversationTests {
 
         /// The agent messages each way of showing the chat puts on screen, with their look.
         func shown() -> [(mode: String, texts: [String], interim: [String])] {
-            let modes: [(String, ChatTranscriptCanvasCache.SimpleBotsReasoning?)] = [
-                ("normal", nil),
-                ("simple bot, reasoning off", .init(agentName: "Avery", showsReasoning: false)),
-                ("simple bot, reasoning on", .init(agentName: "Avery", showsReasoning: true)),
-            ]
+            let modes: [(String, ChatWorkStyle)] = [("full", .full), ("card", .card), ("minimal", .minimal)]
             return zip(modes, caches).map { mode, cache in
                 let context = ChatTranscriptCanvasCache.DisplayContext(
                     ledgerRevision: model.activityLedgerRevision, isSending: model.isSending, isBotMode: false,
-                    foldsCompletedTurns: true,
-                    interimReplies: mode.1 == nil ? .following(model.activityVisibility) : .inline,
-                    simpleBotsReasoning: mode.1)
+                    foldsCompletedTurns: true, interimReplies: .following(model.activityVisibility),
+                    workStyle: mode.1)
                 let rows = cache.buildCanvas(from: model.transcriptEntries,
                                              activityEvents: { self.model.activityLedger.allEvents },
                                              context: context, disclosures: model.activityDisclosures,

@@ -389,8 +389,9 @@ struct ChatActivityVisibility: Codable, Equatable, Sendable {
     var showReasoning: Bool
     var showToolCalls: Bool
 
+    /// A thought is one quiet line with its heading, so reasoning shows unless someone hides it.
     static let `default` = ChatActivityVisibility(
-        showReasoning: false,
+        showReasoning: true,
         showToolCalls: true
     )
 }

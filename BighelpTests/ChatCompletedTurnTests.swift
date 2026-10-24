@@ -119,7 +119,7 @@ struct ChatCompletedTurnTests {
             switch row {
             case .entry(let entry): [entry.id]
             case .completed(let turn): turn.entries.map(\.id)
-            case .reasoning(let group): group.entries.map(\.id)
+            case .liveWork(let work): work.entries.map(\.id)
             }
         }
         #expect(expanded == entries.map(\.id))
@@ -377,7 +377,7 @@ struct ChatCompletedTurnTests {
         ]
         let rows = ChatCompletedTurnProjection.rows(from: entries, isSending: false, enabled: true)
         let store = ChatActivityDisclosureStore()
-        store.setCompletedTurnExpanded(true, id: "completed-turn:activity:r1")
+        store.setWorkExpanded(true, id: "completed-turn:activity:r1")
         let canvas = ChatCanvasTranscriptProjection.rows(from: rows, disclosures: store)
         // As they were in the turn: the message outside the fold had split them.
         #expect(canvas.filter { $0.id.contains("card:") }.count == 2)
@@ -466,7 +466,7 @@ struct ChatCompletedTurnTests {
             switch row {
             case .entry(let entry): [entry.id]
             case .completed(let turn): turn.entries.map(\.id)
-            case .reasoning(let group): group.entries.map(\.id)
+            case .liveWork(let work): work.entries.map(\.id)
             }
         }
     }

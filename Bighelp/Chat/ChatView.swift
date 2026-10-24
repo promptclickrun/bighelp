@@ -117,6 +117,8 @@ struct ChatView: View {
     let sessionAppearance: SessionAppearanceSnapshot
     let onForceRefresh: (@MainActor () async throws -> Void)?
     let foldCompletedTurns: Bool
+    /// Settings › Chat › Agent's work. A group chat keeps its own folders (`workStyleInUse`).
+    let workStyle: ChatWorkStyle
     let showsHeader: Bool
     let sessionControlAccessory: ChatSessionControlAccessory?
     let agentName: String
@@ -202,10 +204,6 @@ struct ChatView: View {
     @AppStorage(ChatLayoutPreferences.densityKey) var chatDensity: ChatDensity = .comfortable
     @AppStorage(ChatLayoutPreferences.showsSessionTitleKey)
     private var showsSessionTitle = ChatLayoutPreferences.showsSessionTitleByDefault
-    @AppStorage(ChatActiveTurnDisclosurePreferences.expandReasoningKey)
-    var expandReasoningByDefault = false
-    @AppStorage(ChatActiveTurnDisclosurePreferences.expandToolCallsKey)
-    var expandToolCallsByDefault = false
     @State var composerHeight: CGFloat = 0
 
     init(
@@ -242,6 +240,7 @@ struct ChatView: View {
         referenceSkills: SkillsAndToolsStore? = nil,
         onReferenceSend: ((ReferenceFrozenDraft, MidSessionChatBehavior?) async -> Void)? = nil,
         foldCompletedTurns: Bool = true,
+        workStyle: ChatWorkStyle = .card,
         showsHeader: Bool = true,
         sessionControlAccessory: ChatSessionControlAccessory? = nil,
         sessionAppearance: SessionAppearanceSnapshot = .inherited,
@@ -251,6 +250,9 @@ struct ChatView: View {
         self.sessionAppearance = sessionAppearance
         self.onForceRefresh = onForceRefresh
         self.foldCompletedTurns = foldCompletedTurns
+        self.workStyle = workStyle
+        // Before the first frame, so a chat opens with its folders as the style has them.
+        model.activityDisclosures.configure(style: model.isBotMode ? nil : workStyle)
         self.showsHeader = showsHeader
         self.sessionControlAccessory = sessionControlAccessory
         self.agentName = agentName
@@ -288,40 +290,8 @@ struct ChatView: View {
 
     @Environment(\.nerdModeEnabled) private var nerdModeEnabled
 
-    private var activeActivityTurnID: String? {
-        guard model.isSending else { return nil }
-        if let nativeTurnID = model.nativeTurnID?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !nativeTurnID.isEmpty {
-            return nativeTurnID
-        }
-        // A Send with no adopted native turn yet: the activity after the latest human
-        // message, read from the end so a long chat stays cheap. Never borrow an older turn.
-        var turnID: String?
-        for entry in model.transcriptEntries.reversed() {
-            switch entry {
-            case .message(let item) where item.role == .human:
-                return turnID
-            case .activity(let turn):
-                if let id = turn.events.last?.turnID.trimmingCharacters(in: .whitespacesAndNewlines),
-                   !id.isEmpty {
-                    turnID = id
-                }
-            default:
-                break
-            }
-        }
-        return nil
-    }
-
-    private func configureActiveTurnDisclosures() {
-        model.activityDisclosures.configureActiveTurn(
-            isSending: model.isSending,
-            turnID: activeActivityTurnID,
-            expandReasoning: expandReasoningByDefault,
-            expandToolCalls: expandToolCallsByDefault,
-            showReasoning: model.activityVisibility.showReasoning,
-            showToolCalls: model.activityVisibility.showToolCalls
-        )
+    var workStyleInUse: ChatWorkStyle? {
+        model.isBotMode ? nil : workStyle
     }
 
     var body: some View {
@@ -358,22 +328,9 @@ struct ChatView: View {
             BighelpVisibleChats.shared.appeared(model, screen: screenID)
             ChatPDFPagesDraftRegistry.mount(model)
             model.nativeSessionResumeProgress.mount()
-            configureActiveTurnDisclosures()
         }
-        .onChange(of: model.isSending, initial: true) { _, _ in
-            configureActiveTurnDisclosures()
-        }
-        .onChange(of: activeActivityTurnID, initial: true) { _, _ in
-            configureActiveTurnDisclosures()
-        }
-        .onChange(of: expandReasoningByDefault) { _, _ in
-            configureActiveTurnDisclosures()
-        }
-        .onChange(of: expandToolCallsByDefault) { _, _ in
-            configureActiveTurnDisclosures()
-        }
-        .onChange(of: model.activityVisibility, initial: true) { _, _ in
-            configureActiveTurnDisclosures()
+        .onChange(of: workStyleInUse) { _, style in
+            model.activityDisclosures.configure(style: style)
         }
         // The message box's model chip: every model is on the one Model & reasoning screen.
         .onChange(of: allModelsRequest) { _, request in

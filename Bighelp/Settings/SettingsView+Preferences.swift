@@ -242,6 +242,15 @@ extension SettingsView {
             }
             .accessibilityIdentifier("settings.chat.bot-chat-experience")
 
+            Picker(selection: $settings.chatWorkStyle) {
+                ForEach(ChatWorkStyle.allCases) { style in
+                    Text(style.title).tag(style)
+                }
+            } label: {
+                settingLabel(String(localized: "Agent's work"), detail: settings.chatWorkStyle.detail)
+            }
+            .accessibilityIdentifier("settings.chat.work-style")
+
             #if !targetEnvironment(macCatalyst) // A Mac has no haptics.
             Toggle(isOn: $settings.responseHapticsEnabled) {
                 settingLabel(
@@ -333,16 +342,6 @@ extension SettingsView {
             }
             .accessibilityIdentifier("settings.chat.show-reasoning")
 
-            if settings.showReasoningByDefault {
-                Toggle(isOn: $settings.expandReasoningByDefault) {
-                    settingLabel(
-                        String(localized: "Expand reasoning"),
-                        detail: String(localized: "Keep reasoning folders open while a turn runs.")
-                    )
-                }
-                .accessibilityIdentifier("settings.chat.expand-reasoning")
-            }
-
             Toggle(isOn: $settings.showToolCallsByDefault) {
                 settingLabel(
                     String(localized: "Show tool calls"),
@@ -350,16 +349,6 @@ extension SettingsView {
                 )
             }
             .accessibilityIdentifier("settings.chat.show-tool-calls")
-
-            if settings.showToolCallsByDefault {
-                Toggle(isOn: $settings.expandToolCallsByDefault) {
-                    settingLabel(
-                        String(localized: "Expand tool calls"),
-                        detail: String(localized: "Keep tool folder summaries open while a turn runs.")
-                    )
-                }
-                .accessibilityIdentifier("settings.chat.expand-tool-calls")
-            }
         } header: {
             Text("Chat details")
         } footer: {

@@ -116,7 +116,7 @@ struct SessionReopenReplayTests {
                             }
                         }
                         for row in display {
-                            if case .completed(let turn) = row { disclosures.setCompletedTurnExpanded(expanded, id: turn.id) }
+                            if case .completed(let turn) = row { disclosures.setWorkExpanded(expanded, id: turn.id) }
                         }
                         let canvas = ChatCanvasTranscriptProjection.rows(from: display, disclosures: disclosures)
                         let duplicates = Dictionary(grouping: canvas.map(\.id), by: { $0 }).filter { $0.value.count > 1 }.keys.sorted()

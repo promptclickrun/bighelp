@@ -268,6 +268,46 @@ enum BotChatExperience: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// How a one-to-one chat shows its agent's work (Settings › Chat › Agent's work). Show reasoning and
+/// Show tool calls decide what's in it; Fold finished turns, whether a finished turn's work starts closed.
+/// Group chats keep their own folders.
+enum ChatWorkStyle: String, CaseIterable, Identifiable, Sendable {
+    /// One line while the agent works, its newest note under it; a receipt under the answer when it's done.
+    case minimal
+    /// One card with the newest steps while the agent works; "Worked for…" when it's done.
+    case card
+    /// Every step in order, open, while the agent works; folded under "Worked for…" when it's done.
+    case full
+
+    var id: Self { self }
+
+    /// The running turn's work is one block (`ChatLiveWork`) instead of rows in the chat.
+    var gathersLiveWork: Bool { self != .full }
+
+    var title: String {
+        switch self {
+        case .minimal: String(localized: "Minimal")
+        case .card: String(localized: "Card")
+        case .full: String(localized: "Full")
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .minimal: String(localized: "One line while your agent works. Its steps wait under the answer.")
+        case .card: String(localized: "A card shows the newest steps while your agent works.")
+        case .full: String(localized: "Every step, message and thought, open as it happens.")
+        }
+    }
+
+    /// Before this choice there were two switches that kept folders open; either one asked to see everything.
+    static func migrated(from defaults: UserDefaults) -> Self {
+        let expandedBefore = ["loopdy.chat.expandReasoningByDefault", "loopdy.chat.expandToolCallsByDefault"]
+            .contains { defaults.bool(forKey: $0) }
+        return expandedBefore ? .full : .card
+    }
+}
+
 /// Which home bighelp shows: the everyday agent chat, or Code mode's coding
 /// sessions (Settings › Code mode; ☰ switches between them).
 enum BighelpExperience: String, CaseIterable, Identifiable, Sendable {

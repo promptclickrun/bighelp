@@ -30,8 +30,7 @@ final class ChatToolFoldersUITests: BighelpUITestCase {
             // The folder before the note is finished: it says what it did.
             let finished = trail(in: app, labelPrefix: "Checked your calendars")
             XCTAssertTrue(finished.exists)
-            XCTAssertEqual(finished.value as? String, "Expanded",
-                           "Expand tool calls keeps parent folders open through their active turn")
+            XCTAssertEqual(finished.value as? String, "Expanded", "Full keeps every folder open")
             XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Done")).firstMatch.exists)
             save("tool-folders-live-\(appearance)", app)
 
@@ -73,48 +72,12 @@ final class ChatToolFoldersUITests: BighelpUITestCase {
         }
     }
 
-    /// Settings › Chat: each Expand switch shows only while its Show switch is on.
-    @MainActor
-    func testExpandSwitchesFollowTheirShowSwitches() throws {
-        for appearance in ["light", "dark"] {
-            let app = makeApp()
-            app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
-                                   "-loopdy.chat.showReasoningByDefault", "YES",
-                                   "-loopdy.chat.showToolCallsByDefault", "NO",
-                                   "-loopdy.chat.expandReasoningByDefault", "NO",
-                                   "-loopdy.chat.expandToolCallsByDefault", "NO",
-                                   "-loopdy.demo.appearance", appearance]
-            app.launch()
-            openRootTab("tab.profile", in: app)
-            settingsRow("settings.menu.chat", in: app).tap()
-
-            let showReasoning = app.switches["settings.chat.show-reasoning"].firstMatch
-            let expandReasoning = app.switches["settings.chat.expand-reasoning"].firstMatch
-            let showToolCalls = app.switches["settings.chat.show-tool-calls"].firstMatch
-            let expandToolCalls = app.switches["settings.chat.expand-tool-calls"].firstMatch
-            for _ in 0..<8 where !(showToolCalls.exists && showToolCalls.isHittable) { app.swipeUp() }
-            XCTAssertTrue(showToolCalls.isHittable)
-            XCTAssertTrue(expandReasoning.exists, "Expand reasoning shows under Show reasoning")
-            XCTAssertEqual(expandReasoning.value as? String, "0", "Off until the person turns it on")
-            XCTAssertFalse(expandToolCalls.exists, "Hidden while Show tool calls is off")
-            save("expand-switches-reasoning-\(appearance)", app)
-
-            showReasoning.switches.firstMatch.tap()
-            XCTAssertTrue(expandReasoning.waitForNonExistence(timeout: 5), "Hidden once Show reasoning is off")
-            showToolCalls.switches.firstMatch.tap()
-            XCTAssertTrue(expandToolCalls.waitForExistence(timeout: 5), "Shows once Show tool calls is on")
-            XCTAssertEqual(expandToolCalls.value as? String, "0")
-            save("expand-switches-tool-calls-\(appearance)", app)
-            app.terminate()
-        }
-    }
-
     @MainActor
     private func launch(appearance: String) -> XCUIApplication {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-start-chat", "-preview-ui-v3",
                                "-test-tool-folders", "-loopdy.chat.foldCompletedTurns", "YES",
-                               "-loopdy.chat.expandToolCallsByDefault", "YES",
+                               "-bighelp.chat.work-style", "full",
                                "-loopdy.demo.appearance", appearance]
         app.launch()
         return app

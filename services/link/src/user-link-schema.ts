@@ -95,6 +95,29 @@ export function initializeUserLinkStorage(storage: DurableObjectStorage): void {
     );
     CREATE INDEX IF NOT EXISTS managed_notification_activities_grant_idx
       ON managed_notification_activities (grant_id, status, lease_expires);
+    CREATE TABLE IF NOT EXISTS managed_activity_rows (
+      activity_id TEXT PRIMARY KEY,
+      group_id TEXT NOT NULL,
+      row_id TEXT NOT NULL,
+      row_revision INTEGER NOT NULL,
+      credential_id TEXT NOT NULL,
+      state_json TEXT NOT NULL,
+      last_state_timestamp INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS managed_activity_rows_group_idx ON managed_activity_rows(group_id, credential_id);
+    CREATE TABLE IF NOT EXISTS managed_activity_row_generations (
+      group_id TEXT NOT NULL,
+      row_id TEXT NOT NULL,
+      row_revision INTEGER NOT NULL,
+      activity_id TEXT NOT NULL,
+      PRIMARY KEY (group_id,row_id)
+    );
+    CREATE TABLE IF NOT EXISTS managed_activity_groups (
+      group_id TEXT PRIMARY KEY,
+      credential_id TEXT NOT NULL,
+      last_timestamp INTEGER NOT NULL DEFAULT 0,
+      ended INTEGER NOT NULL DEFAULT 0
+    );
     CREATE TABLE IF NOT EXISTS managed_notification_credentials (
       credential_id TEXT PRIMARY KEY,
       authorization_epoch INTEGER NOT NULL CHECK (authorization_epoch > 0),

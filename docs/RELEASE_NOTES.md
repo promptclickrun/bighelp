@@ -3,6 +3,24 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.18
+
+### CarPlay
+
+- **Connects without your iPhone:** in CarPlay, bighelp now connects to your computer when you do not open the app
+  on your iPhone. Voice works when your iPhone is locked.
+- **Clear problems:** if your computer does not answer, CarPlay tells you which step failed. It does not show
+  **Connecting** without end.
+- **Choose the agent:** to choose the computer and the agent for CarPlay, go to **Settings** › **CarPlay**.
+- **Your agent's face and steps:** CarPlay shows the face of your agent. While your agent works, CarPlay shows each
+  step in one line, the same as voice mode in the app.
+- **Fixed:** the app no longer stops when you tap **Agents** on the voice screen in CarPlay.
+
+### Cards
+
+- **Album artwork:** music cards in your chats now show the artwork of the song, album or playlist.
+- **Contact photos:** if bighelp can use your contacts, contact cards show the saved photo of the person.
+
 ## 2.6.17
 
 ### Links

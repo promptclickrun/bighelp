@@ -222,18 +222,50 @@ final class ChatPerformanceAutopilot: NSObject {
         case Self.sendNotification: send(recorder)
         case Self.openNotification:
             // The way a widget or Shortcut opens a chat; reads once it has had time to settle.
-            // Each open takes the next long chat (`-test-long-chat-count`), then starts over.
+            // Each open takes the next long chat (`-test-long-chat-count`), then starts over, or
+            // `BIGHELP_PERF_OPEN_URL` (a real host's chat, `loopdy://agent/chat?agent=…`).
             recorder.reset()
-            opened = opened % LongChatPerformanceFixture.count(in: ProcessInfo.processInfo.arguments) + 1
-            BighelpIncomingLinkCenter.shared.open(BighelpShortcutLinks.chat(LongChatPerformanceFixture.sessionID(opened)))
-            Task { @MainActor in
-                try? await Task.sleep(for: .seconds(5))
-                recorder.read()
+            if let link = ProcessInfo.processInfo.environment["BIGHELP_PERF_OPEN_URL"].flatMap(URL.init(string:)) {
+                BighelpIncomingLinkCenter.shared.open(link)
+            } else {
+                opened = opened % LongChatPerformanceFixture.count(in: ProcessInfo.processInfo.arguments) + 1
+                BighelpIncomingLinkCenter.shared.open(BighelpShortcutLinks.chat(LongChatPerformanceFixture.sessionID(opened)))
             }
+            timeOpen(recorder)
         case Self.listNotification:
             // Back to the chat list, the way a link to it goes.
             BighelpIncomingLinkCenter.shared.open(URL(string: "loopdy://sessions")!)
         default: break
+        }
+    }
+
+    /// Records how long the opened chat takes to show (`open.shown`), to show its messages with no
+    /// loader (`open.loaded`) and to take a message (`open.ready`), then reads. Gives up after 30 s.
+    private func timeOpen(_ recorder: ChatPerformanceRecorder) {
+        let start = CACurrentMediaTime()
+        var marked: Set<String> = []
+        func mark(_ name: StaticString) {
+            guard marked.insert("\(name)").inserted else { return }
+            recorder.record(name, milliseconds: (CACurrentMediaTime() - start) * 1_000)
+        }
+        animate { _ in
+            if let model = BighelpVisibleChats.shared.models.first {
+                mark("open.shown")
+                if !model.isHydratingHistory, !model.transcriptEntries.isEmpty { mark("open.loaded") }
+                if model.composerTransportIsReady { mark("open.ready") }
+            }
+            guard marked.count < 3, CACurrentMediaTime() - start < 30 else {
+                if let model = BighelpVisibleChats.shared.models.first, !model.composerTransportIsReady {
+                    let native = model.nativeConversationClient
+                    NSLog("CHAT_PERFORMANCE open: Send not ready: native=%d connected=%d hydrating=%d recovery=%d reattach=%d sending=%d status=%@",
+                          native == nil ? 0 : 1, native?.connected == true ? 1 : 0, native?.isHydratingForReason == true ? 1 : 0,
+                          native?.needsRecoveryForReason == true ? 1 : 0, native?.requiresDurableReattachmentForReason == true ? 1 : 0,
+                          model.isSending ? 1 : 0, native?.status ?? "-")
+                }
+                recorder.read()
+                return false
+            }
+            return true
         }
     }
 

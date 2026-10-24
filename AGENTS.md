@@ -185,6 +185,10 @@ change in both repos.
 - **A turn stays pending while it streams:** after `prompt.submit` returns `streaming`, the chat isn't "ready for a
   new turn" until the turn ends. A mid-turn Send must go through the steer/queue path (`sendMidSession`). Steer is
   the default.
+- **Live voice multitasks:** requests from the voice model never wait for each other. One runs as a turn in
+  the chat when it's free; one made while the chat works runs at once as a Hermes background task for it
+  (`ChatModel.runNativeVoiceRequest`, `prompt.background`) and answers the call on its own. Background tasks
+  can't reach the phone's tools.
 - **Hermes reaps and prunes app sessions:** 20 s after an app's socket goes, Hermes reclaims the session's
   runtime and, for any source but `desktop`, ends its row (`ws_orphan_reap`); `sessions.auto_prune` then
   deletes ended chats idle past `retention_days`. Plugin 3.18.0 (`durable_sessions.py`) gives `bighelp`
@@ -195,13 +199,16 @@ change in both repos.
   profiles differ. Go by what `groups.capabilities` and each pending action say, never the version
   (docs/HERMES_BOT_MODE.md, vectors in `BighelpTests/Fixtures/HermesGroups`).
 - **Bot Chats are hidden in Hermes:** `GET /api/sessions` never returns them; the catalog list adds each
-  agent's (`canonical_session`, `canonicalBotChat`) so a refresh can't drop it.
+  agent's (`canonical_session`, `canonicalBotChat`) so a refresh can't drop it. Hermes names it only when
+  `profiles.list` asks for the agents' sessions (`include_sessions`, its default), so the catalog asks; without
+  them every refresh dropped the saved Bot Chat, and the first tap on a bot waited on a full lookup.
 - **Archived:** the catalog lists `archived=include` and keeps rows Hermes' idle sweep archived
   (`auto_archived`); deliberately archived chats live in Archived Chats (`archivedChats`, Restore).
 - **Rereads keep Send on:** while agents work together, an open chat rereads what Hermes saved every few seconds,
   and each reread recovers the chat's connection. Send stays on through it (`acceptsSubmissionAfterCatchUp`); a
   message sent then waits in the box until the recovery ends (`isAwaitingCatchUp`). As a turn, the recovery's idle
-  readback would take it for a stale one and drop it.
+  readback would take it for a stale one and drop it. Opening keeps Send on too: while a chat opens from its saved
+  copy (`isOpening`, a navigation open), a message waits the same way and goes out once the chat is connected.
 - **Who's working:** Bots mode's home and the Agents screen show each agent's Bot Chat working or needing
   you from the plugin's `agents/activity` (`native-agents-activity-v1`): Hermes' turn leases in any process
   (the app, `message_agent`, `chat -q`) and the dashboard's open prompts, for up to 64 agents in one read.

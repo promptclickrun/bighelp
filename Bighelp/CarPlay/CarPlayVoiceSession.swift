@@ -32,7 +32,8 @@ final class CarPlayVoiceSession {
         case problem(String)
     }
 
-    private(set) var phase: Phase = .connecting
+    /// Nothing runs until `start`.
+    private(set) var phase: Phase = .paused
     private(set) var agentName = "your agent"
     /// The agent being talked to, and its picture, for the car's screen.
     private(set) var agent: CarPlayAgent?

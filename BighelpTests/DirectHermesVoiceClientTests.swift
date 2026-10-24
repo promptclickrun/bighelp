@@ -298,6 +298,52 @@ struct DirectHermesVoiceClientTests {
         #expect(reply.items.last?.content == .message("Three events tomorrow."))
     }
 
+    @Test func voiceRequestWhileTheChatWorksRunsBesideItAsABackgroundTask() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let rpc = DirectHermesVoiceRPCFixture()
+        rpc.handler = { method, _ in
+            if method == "prompt.background" { return .object(["task_id": .string("bg_voice")]) }
+            return .object(["status": .string("streaming")])
+        }
+        let conversation = try DirectHermesConversationClient(
+            rpc: rpc, hostIdentity: "voice-host", profile: "finance", runtimeID: "voice-runtime",
+            storedID: "voice-stored", title: "Voice", epoch: "voice-epoch", drafts: DirectHermesDraftStore(root: root))
+        let chat = ChatModel(conversationID: conversation.conversationID, client: conversation, initialItems: [])
+        // The chat's turn is still working on an earlier request.
+        conversation.receive(.init(type: "message.start", sessionID: "voice-runtime", payload: [:], sequence: 1))
+
+        let answer = Task { try await chat.runNativeVoiceRequest("What's the weather tomorrow?") }
+        let background = { rpc.requests.filter { $0.method == "prompt.background" } }
+        for _ in 0..<100 where background().isEmpty { await Task.yield() }
+        #expect(background().map { $0.params["text"] } == [.string("What's the weather tomorrow?")])
+        #expect(!rpc.requests.contains { $0.method == "prompt.submit" }, "no second turn in the busy chat")
+
+        // Another task's answer is not this one's.
+        conversation.receive(.init(type: "background.complete", sessionID: "voice-runtime",
+                                   payload: ["task_id": .string("bg_other"), "text": .string("Other answer")], sequence: 2))
+        conversation.receive(.init(type: "background.complete", sessionID: "voice-runtime",
+                                   payload: ["task_id": .string("bg_voice"), "text": .string("Sunny tomorrow.")], sequence: 3))
+        #expect(try await answer.value == "Sunny tomorrow.")
+        #expect(conversation.sessionActionsAreRunning, "the chat's own turn goes on")
+    }
+
+    @Test func aBackgroundTaskWaitingForItsAnswerEndsWhenTheChatDisconnects() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let rpc = DirectHermesVoiceRPCFixture()
+        rpc.handler = { _, _ in .object(["task_id": .string("bg_voice")]) }
+        let conversation = try DirectHermesConversationClient(
+            rpc: rpc, hostIdentity: "voice-host", profile: "finance", runtimeID: "voice-runtime",
+            storedID: "voice-stored", title: "Voice", epoch: "voice-epoch", drafts: DirectHermesDraftStore(root: root))
+
+        let answer = Task { try await conversation.runBackgroundTask("Check my inbox") }
+        for _ in 0..<100 where conversation.backgroundTaskWaiters.isEmpty { await Task.yield() }
+        #expect(!conversation.backgroundTaskWaiters.isEmpty, "the task was accepted and its answer awaited")
+        conversation.suspend()
+        await #expect(throws: DirectHermesError.notConnected) { try await answer.value }
+    }
+
     @Test func queuedVoiceSubmissionRetainsItsWaiterUntilItsTurnCompletes() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }

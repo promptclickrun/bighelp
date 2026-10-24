@@ -326,7 +326,9 @@ extension NativeWorkspaceSessionBridge {
             descriptor = try await client.createFirstCanonicalChat(profileID: profileID)
             wasCreated = true
         }
-        var hydrated = try await client.hydrate(descriptor.record)
+        // The newest page, as opening any chat reads: a long Bot Chat's whole history took seconds,
+        // and the open that follows reads the newest page again anyway.
+        var hydrated = try await client.hydratePage(descriptor.record, offset: nil, turnLimit: 8).record
         // The registry doesn't report the chat's source, but a stream retained
         // across a reconnect does. Without it, prepare() reads the gap as another
         // chat and retires the stream, so the first tap after a reconnect failed.

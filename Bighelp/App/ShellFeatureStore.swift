@@ -655,6 +655,7 @@ final class ShellFeatureStore {
             handle: handle, model: model, source: source,
             accountGeneration: accountGeneration, owner: owner, ownsHydrationFlag: ownsFlag
         )
+        model.beginOpening(handle.id) { _ = try? await handle.value() }
         let flightID = handle.id
         let catalog = catalog
         navigationHydrations[id]?.task = Task { @MainActor [weak self] in
@@ -719,6 +720,7 @@ final class ShellFeatureStore {
         if flight.ownsHydrationFlag, chatModels[id] === flight.model {
             flight.model.finishHistoryHydration(hasPreviousHistory: catalog.hasPreviousHistory(id: id))
         }
+        flight.model.endOpening(flight.handle.id)
         flight.handle.finish(.failure(CancellationError()))
         scheduleNativeRetention()
     }
@@ -765,6 +767,7 @@ final class ShellFeatureStore {
         if flight.ownsHydrationFlag {
             flight.model.finishHistoryHydration(hasPreviousHistory: catalog.hasPreviousHistory(id: id))
         }
+        flight.model.endOpening(flight.handle.id)
         flight.handle.finish(completion)
         scheduleNativeRetention()
     }

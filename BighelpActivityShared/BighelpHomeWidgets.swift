@@ -64,10 +64,13 @@ private struct WidgetHeader: View {
     let title: String
     let symbol: String
     var count: Int? = nil
+    var showsSymbol = true
     @Environment(\.bighelpWidgetColors) private var colors
     var body: some View {
         HStack(spacing: 5) {
-            Image(systemName: symbol).font(.caption.weight(.semibold)).foregroundStyle(colors.accent).widgetAccentable()
+            if showsSymbol {
+                Image(systemName: symbol).font(.caption.weight(.semibold)).foregroundStyle(colors.accent).widgetAccentable()
+            }
             Text(title).font(.caption.weight(.semibold)).lineLimit(1)
             Spacer(minLength: 0)
             if let count {
@@ -86,41 +89,50 @@ private struct WidgetHeader: View {
 /// One chat: what the agent is doing while it runs, else its last reply.
 private struct WidgetSessionRow: View {
     let session: BighelpWidgetSnapshot.Session
-    var avatar: CGFloat = 0
+    var avatar: CGFloat = 26
+    var titleLines = 1
     var detailLines = 1
+    var showsAgent = false
+    var isStale = false
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.bighelpWidgetColors) private var colors
 
     var body: some View {
-        HStack(alignment: avatar > 0 ? .top : .center, spacing: 8) {
-            if avatar > 0 {
+        let paused = isStale && session.isRunning
+        HStack(alignment: .center, spacing: 9) {
+            if !dynamicTypeSize.isAccessibilitySize {
                 BighelpWidgetAvatar(agentID: session.agentID, name: session.agentName, diameter: avatar,
-                                   pose: session.isRunning ? pose : nil)
-            } else if session.isRunning {
-                Image(systemName: pose.symbolName)
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(colors.accentForeground)
-                    .frame(width: 20, height: 20)
-                    .background(Circle().fill(colors.accent))
-                    .widgetAccentable()
+                                   pose: session.isRunning && !paused ? pose : nil)
+                    .accessibilityHidden(true)
             }
-            VStack(alignment: .leading, spacing: 1) {
-                HStack(spacing: 5) {
-                    Text(session.title).font(.caption.weight(.semibold)).foregroundStyle(colors.primary).lineLimit(1)
-                    if avatar > 0 {
-                        Spacer(minLength: 4)
-                        if session.isRunning {
-                            RunningDot(running: true)
-                        } else {
-                            Text(session.updatedAt, format: .relative(presentation: .named, unitsStyle: .abbreviated))
-                                .font(.caption2).foregroundStyle(colors.secondary).lineLimit(1).fixedSize()
-                        }
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline, spacing: 5) {
+                    Text(session.title).font(.caption.weight(.semibold)).foregroundStyle(colors.primary).lineLimit(titleLines)
+                    Spacer(minLength: 2)
+                    if session.isRunning {
+                        Image(systemName: paused ? "pause.circle" : pose.symbolName)
+                            .font(.caption2.weight(.semibold)).foregroundStyle(paused ? colors.secondary : colors.accent)
+                            .accessibilityHidden(true)
                     }
                 }
-                Text(session.isRunning ? session.status : (session.preview ?? session.status))
+                Text(detail)
                     .font(.caption2).foregroundStyle(colors.secondary).lineLimit(detailLines)
+                if showsAgent && dynamicTypeSize < .xxLarge {
+                    Text(session.agentName).font(.caption2.weight(.medium)).foregroundStyle(colors.secondary).lineLimit(1)
+                }
             }
-            if avatar == 0 { Spacer(minLength: 0) }
         }
+        .padding(.vertical, dynamicTypeSize.isAccessibilitySize ? 1 : 3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(.rect)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(session.title), \(session.agentName), \(detail)")
+        .accessibilityHint(isStale ? "Opens this conversation to refresh" : "Opens this conversation")
+    }
+
+    private var detail: String {
+        isStale && session.isRunning ? "Updates paused"
+            : session.isRunning ? session.status : (session.preview ?? session.status)
     }
 
     private var pose: BighelpActivityPose {
@@ -128,14 +140,45 @@ private struct WidgetSessionRow: View {
     }
 }
 
-// MARK: - Active sessions (small / accessory)
+private struct WidgetChatEmptyState: View {
+    let symbol: String
+    let text: String
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.bighelpWidgetColors) private var colors
+
+    var body: some View {
+        VStack(spacing: 6) {
+            if !dynamicTypeSize.isAccessibilitySize {
+                Image(systemName: symbol).font(.title3).foregroundStyle(colors.accent).widgetAccentable()
+                    .accessibilityHidden(true)
+            }
+            Text(text).font(.caption).foregroundStyle(colors.secondary)
+                .lineLimit(2).multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// MARK: - Active sessions
 
 struct BighelpActiveSessionsView: View {
-    @Environment(\.widgetFamily) private var family
+    @Environment(\.widgetFamily) private var environmentFamily
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let snapshot: BighelpWidgetSnapshot
+    /// Set by render tests; WidgetKit supplies the family otherwise.
+    var familyOverride: WidgetFamily? = nil
+    var asOf: Date = .now
+
+    private var family: WidgetFamily { familyOverride ?? environmentFamily }
+    private var rowLimit: Int {
+        if family == .systemSmall { return 1 }
+        if family == .systemLarge || family == .systemExtraLarge { return dynamicTypeSize >= .xxLarge ? 2 : 5 }
+        return dynamicTypeSize >= .xxLarge ? 1 : 2
+    }
 
     var body: some View {
         let running = snapshot.runningSessions
+        let stale = snapshot.chatsAreStale(at: asOf)
         switch family {
         #if os(iOS)
         case .accessoryCircular:
@@ -143,39 +186,54 @@ struct BighelpActiveSessionsView: View {
                 AccessoryWidgetBackground()
                 VStack(spacing: 0) {
                     Text("\(running.count)").font(.title2.weight(.semibold).monospacedDigit())
-                    Image(systemName: "bubble.left.and.bubble.right.fill").font(.caption2)
+                    Image(systemName: stale && !running.isEmpty ? "pause.circle" : "bubble.left.and.bubble.right.fill")
+                        .font(.caption2)
                 }
             }
-            .accessibilityLabel("\(running.count) active bighelp chats")
+            .accessibilityLabel(stale && !running.isEmpty
+                ? "\(running.count) bighelp chats, updates paused" : "\(running.count) active bighelp chats")
             .widgetURL(snapshot.sessionsURL)
         case .accessoryRectangular:
             VStack(alignment: .leading, spacing: 2) {
-                Text(running.isEmpty ? "No active chats" : "\(running.count) active")
+                Text(running.isEmpty ? "No active chats" : stale ? "\(running.count) chats" : "\(running.count) active")
                     .font(.headline).widgetAccentable()
                 if let first = running.first {
                     Text(first.title).font(.caption).lineLimit(1)
-                    Text(first.status).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                    Text(stale ? "Updates paused" : first.status).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .widgetURL(running.first.map { snapshot.chatURL($0.id) } ?? snapshot.sessionsURL)
         #endif
         default:
-            VStack(alignment: .leading, spacing: 8) {
-                WidgetHeader(title: "Working on", symbol: "bolt.fill", count: running.count)
+            VStack(alignment: .leading, spacing: dynamicTypeSize.isAccessibilitySize ? 4 : 8) {
+                WidgetHeader(title: dynamicTypeSize.isAccessibilitySize && family == .systemSmall ? "Active" : "Active chats",
+                             symbol: stale && !running.isEmpty ? "pause.circle" : "bubble.left.and.bubble.right.fill",
+                             count: running.count, showsSymbol: !dynamicTypeSize.isAccessibilitySize)
                 if running.isEmpty {
-                    EmptyState(symbol: "checkmark.circle", text: "All caught up")
+                    WidgetChatEmptyState(symbol: "checkmark.circle", text: "All caught up")
                 } else {
-                    ForEach(running.prefix(family == .systemMedium ? 3 : 2)) { session in
-                        Link(destination: snapshot.chatURL(session.id)) {
-                            WidgetSessionRow(session: session)
+                    ForEach(running.prefix(rowLimit)) { session in
+                        if family == .systemSmall {
+                            chatRow(session, stale: stale)
+                        } else {
+                            Link(destination: snapshot.chatURL(session.id)) { chatRow(session, stale: stale) }
                         }
                     }
                     Spacer(minLength: 0)
                 }
             }
-            .widgetURL(snapshot.sessionsURL)
+            .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+            // One visible chat keeps the small widget's fallback tap unambiguous.
+            .widgetURL(family == .systemSmall
+                ? running.first.map { snapshot.chatURL($0.id) } ?? snapshot.sessionsURL : snapshot.sessionsURL)
         }
+    }
+
+    private func chatRow(_ session: BighelpWidgetSnapshot.Session, stale: Bool) -> some View {
+        WidgetSessionRow(session: session,
+                         titleLines: family == .systemSmall ? 2 : 1,
+                         showsAgent: family == .systemLarge || family == .systemSmall, isStale: stale)
     }
 }
 
@@ -185,7 +243,7 @@ struct BighelpActiveSessionsWidget: Widget {
         AppIntentConfiguration(kind: "LoopdyActiveSessionsWidget", intent: GatewayWidgetIntent.self,
                                provider: GatewayWidgetProvider()) { entry in
             BighelpWidgetScaffold(snapshot: entry.snapshot) {
-                BighelpActiveSessionsView(snapshot: entry.snapshot)
+                BighelpActiveSessionsView(snapshot: entry.snapshot, asOf: entry.date)
             }
         }
         .configurationDisplayName("Active Chats")
@@ -196,9 +254,9 @@ struct BighelpActiveSessionsWidget: Widget {
 
     private static var families: [WidgetFamily] {
         #if os(visionOS)
-        [.systemSmall, .systemMedium]
+        [.systemSmall, .systemMedium, .systemLarge]
         #else
-        [.systemSmall, .systemMedium, .accessoryCircular, .accessoryRectangular]
+        [.systemSmall, .systemMedium, .systemLarge, .accessoryCircular, .accessoryRectangular]
         #endif
     }
 }
@@ -361,39 +419,62 @@ struct BighelpNewChatWidget: Widget {
 struct BighelpActivityFeedView: View {
     @Environment(\.widgetFamily) private var environmentFamily
     @Environment(\.bighelpWidgetColors) private var colors
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let snapshot: BighelpWidgetSnapshot
     /// Set by render tests; WidgetKit supplies the family otherwise.
     var familyOverride: WidgetFamily? = nil
+    var asOf: Date = .now
 
     private var family: WidgetFamily { familyOverride ?? environmentFamily }
+    private var large: Bool { family == .systemLarge || family == .systemExtraLarge }
+    private var rowLimit: Int {
+        if family == .systemSmall { return 1 }
+        if dynamicTypeSize >= .xxLarge { return large ? 2 : 1 }
+        return family == .systemExtraLarge ? 6 : large ? 4 : 2
+    }
 
     var body: some View {
         let sessions = snapshot.feedSessions
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: dynamicTypeSize.isAccessibilitySize ? 4 : 8) {
             HStack(spacing: 8) {
-                WidgetHeader(title: "Recent chats", symbol: "bubble.left.and.bubble.right.fill",
-                             count: snapshot.runningSessions.count)
-                Link(destination: snapshot.newChatURL(agentID: snapshot.defaultAgentID)) {
-                    Image(systemName: "square.and.pencil")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(colors.accentForeground)
-                        .frame(width: 26, height: 26)
-                        .background(Circle().fill(colors.accent))
-                        .widgetAccentable()
+                WidgetHeader(title: dynamicTypeSize.isAccessibilitySize && family == .systemSmall ? "Recent" : "Recent chats",
+                             symbol: "bubble.left.and.bubble.right.fill",
+                             count: snapshot.runningSessions.count, showsSymbol: !dynamicTypeSize.isAccessibilitySize)
+                if family != .systemSmall {
+                    Link(destination: snapshot.newChatURL(agentID: snapshot.defaultAgentID)) {
+                        Image(systemName: "square.and.pencil")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(colors.accentForeground)
+                            .frame(width: 26, height: 26)
+                            .background(Circle().fill(colors.accent))
+                            .widgetAccentable()
+                    }
+                    .accessibilityLabel("New chat")
                 }
             }
             if sessions.isEmpty {
-                EmptyState(symbol: "bubble.left.and.bubble.right", text: "No recent chats")
+                WidgetChatEmptyState(symbol: "bubble.left.and.bubble.right", text: "No recent chats")
             } else {
-                let large = family == .systemLarge || family == .systemExtraLarge
-                ForEach(sessions.prefix(family == .systemExtraLarge ? 8 : large ? 5 : 2)) { session in
-                    Link(destination: snapshot.chatURL(session.id)) {
-                        WidgetSessionRow(session: session, avatar: 30, detailLines: large ? 2 : 1)
+                ForEach(sessions.prefix(rowLimit)) { session in
+                    if family == .systemSmall {
+                        chatRow(session)
+                    } else {
+                        Link(destination: snapshot.chatURL(session.id)) { chatRow(session) }
                     }
                 }
                 Spacer(minLength: 0)
             }
         }
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+        .widgetURL(family == .systemSmall
+            ? sessions.first.map { snapshot.chatURL($0.id) } ?? snapshot.sessionsURL : snapshot.sessionsURL)
+    }
+
+    private func chatRow(_ session: BighelpWidgetSnapshot.Session) -> some View {
+        WidgetSessionRow(session: session, avatar: 30,
+                         titleLines: family == .systemSmall ? 2 : 1,
+                         detailLines: large && !dynamicTypeSize.isAccessibilitySize ? 2 : 1,
+                         showsAgent: large || family == .systemSmall, isStale: snapshot.chatsAreStale(at: asOf))
     }
 }
 
@@ -402,21 +483,20 @@ struct BighelpActivityFeedWidget: Widget {
         AppIntentConfiguration(kind: "LoopdyActivityFeedWidget", intent: GatewayWidgetIntent.self,
                                provider: GatewayWidgetProvider()) { entry in
             BighelpWidgetScaffold(snapshot: entry.snapshot) {
-                BighelpActivityFeedView(snapshot: entry.snapshot)
-                    .widgetURL(entry.snapshot.sessionsURL)
+                BighelpActivityFeedView(snapshot: entry.snapshot, asOf: entry.date)
             }
         }
         .configurationDisplayName("Recent Chats")
-        .description("Your latest chats, newest first, with what each agent is doing.")
+        .description("Working chats first, then recent replies. Tap a chat to pick it up.")
         .supportedFamilies(Self.families)
         .bighelpWidgetPlacement()
     }
 
     private static var families: [WidgetFamily] {
         #if os(visionOS)
-        [.systemMedium, .systemLarge, .systemExtraLarge]
+        [.systemSmall, .systemMedium, .systemLarge, .systemExtraLarge]
         #else
-        [.systemMedium, .systemLarge]
+        [.systemSmall, .systemMedium, .systemLarge]
         #endif
     }
 }

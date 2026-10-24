@@ -19,7 +19,9 @@ export function errorResponse(error: unknown): Response {
       linkErrorStatus(error.code),
     );
   }
-  console.error("Loopdy Link request failed", error);
+  // Only the error's class: its message can carry paths, keys or tokens.
+  const kind = error instanceof Error ? error.name.replace(/[^A-Za-z0-9_]/g, "_").slice(0, 64) : "unknown";
+  console.error(`[loopdy-link] request_failed: ${kind}`);
   return json({ version: 1, error: "internal_error", message: "Loopdy Link request failed" }, 500);
 }
 

@@ -229,6 +229,60 @@ struct DirectHermesProjectClientTests {
         #expect(!workspace.calls.contains { $0.operation == .projectsSetActive || $0.operation == .projectsGet })
     }
 
+    /// A Windows host keeps projects in drive-letter or share folders. Refusing them failed every
+    /// New Chat (and first Bot Chat) for an agent with a project, before anything reached the host (#563).
+    @Test(arguments: [#"D:\Projects\notes"#, "D:/Projects/notes", #"\\nas\share\notes"#])
+    func windowsProjectFolderStartsNewChatsInIt(folder: String) async throws {
+        let workspace = try SessionWorkspaceStub()
+        let windowsProject = project(folder: folder)
+        // Hermes answers with the folder as Windows writes it (`os.path.abspath`).
+        let started = folder.replacingOccurrences(of: "/", with: "\\")
+        workspace.handler = { operation, payload in
+            switch operation {
+            case .profilesList: return DirectHermesSessionCatalogClientTests.profiles()
+            case .projectsList: return ["projects": .array([.object(windowsProject)]), "active_id": .string("p_notes")]
+            case .projectsGet: return ["project": .object(windowsProject)]
+            case .sessionCreate:
+                #expect(payload["cwd"] == .string(folder))
+                return DirectHermesSessionCatalogClientTests.created(stored: "windows-chat", cwd: started)
+            default: throw WorkspaceClientError.invalidRequest
+            }
+        }
+        let projects = DirectHermesProjectClient(workspace: workspace, owner: workspace.owner!,
+            currentOwner: { workspace.owner }, resolveSession: { _ in nil })
+        let sessions = DirectHermesSessionCatalogClientTests.client(workspace,
+            folder: { try await projects.selectedFolderPath(agentID: $0) }, sink: { _ in })
+
+        let created = try await sessions.createOrdinarySession(profileID: "alpha")
+
+        #expect(created.coordinate.storedSessionID == "windows-chat")
+        #expect(workspace.calls.filter { $0.operation == .sessionCreate }.count == 1,
+                "The chat starts in its project, not a second time without it")
+    }
+
+    /// A folder bighelp refuses says so in plain words, and no chat starts somewhere else.
+    @Test func unusableProjectFolderSaysSoAndStartsNothing() async throws {
+        let workspace = try SessionWorkspaceStub()
+        let escaping = project(folder: #"D:\Projects\..\keys"#)
+        workspace.handler = { operation, _ in
+            switch operation {
+            case .profilesList: return DirectHermesSessionCatalogClientTests.profiles()
+            case .projectsList: return ["projects": .array([.object(escaping)]), "active_id": .string("p_notes")]
+            case .projectsGet: return ["project": .object(escaping)]
+            default: throw WorkspaceClientError.invalidRequest
+            }
+        }
+        let projects = DirectHermesProjectClient(workspace: workspace, owner: workspace.owner!,
+            currentOwner: { workspace.owner }, resolveSession: { _ in nil })
+        let sessions = DirectHermesSessionCatalogClientTests.client(workspace,
+            folder: { try await projects.selectedFolderPath(agentID: $0) }, sink: { _ in })
+
+        await #expect(throws: DirectHermesSessionError.projectFolderUnusable) {
+            _ = try await sessions.createOrdinarySession(profileID: "alpha")
+        }
+        #expect(!workspace.calls.contains { $0.operation == .sessionCreate })
+    }
+
     @Test func selectionArchivedBetweenListAndGetDoesNotChooseAnotherProject() async throws {
         let transport = try ProjectPerformer()
         transport.responses[.projectsList] = [catalog()]
@@ -289,10 +343,11 @@ struct DirectHermesProjectClientTests {
         })
     }
 
-    private func project(id: String = "p_notes", archived: Bool = false) -> [String: BighelpJSONValue] {
+    private func project(id: String = "p_notes", archived: Bool = false,
+                         folder: String = "/workspace/notes") -> [String: BighelpJSONValue] {
         ["id": .string(id), "name": .string("Notes"), "description": .string("Synthetic notes"),
          "archived": .boolean(archived), "folders": .array([
-            .object(["path": .string("/workspace/notes"), "label": .null, "is_primary": .boolean(true)])
+            .object(["path": .string(folder), "label": .null, "is_primary": .boolean(true)])
          ])]
     }
 

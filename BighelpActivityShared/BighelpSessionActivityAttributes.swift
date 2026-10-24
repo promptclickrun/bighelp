@@ -7,7 +7,7 @@ import UIKit
 
 /// Keeps its original "Loopdy" name: push-started Live Activities name this type,
 /// and BuzzKit sends the type name to the push service.
-struct LoopdySessionActivityAttributes: Hashable {
+struct LoopdySessionActivityAttributes: Codable, Hashable, Sendable {
     struct ContentState: Codable, Hashable, Sendable {
         enum Phase: String, Codable, Hashable, Sendable {
             case thinking
@@ -30,6 +30,9 @@ struct LoopdySessionActivityAttributes: Hashable {
         let activeSubagentCount: Int
         let latestTool: String?
         let timestamp: Int
+        var sessions: [BighelpActivitySession]? = nil
+        var activeCount: Int? = nil
+        var activeRows: [String]? = nil
 
         static func initial(agentName: String, timestamp: Int) -> ContentState {
             let name = BighelpActivityText.personName(agentName) ?? "Your agent"
@@ -268,9 +271,20 @@ struct BighelpLiveActivityCard: View {
     }
 
     var body: some View {
+        if state.sessions != nil {
+            BighelpActivityRowsView(state: state, isStale: isStale, snapshot: snapshot)
+                .foregroundStyle(BighelpActivityColors(snapshot: snapshot, scheme: scheme).primary)
+                .padding(12)
+                .background(BighelpActivityColors(snapshot: snapshot, scheme: scheme).canvas)
+        } else {
+            legacyCard
+        }
+    }
+
+    private var legacyCard: some View {
         let colors = BighelpActivityColors(snapshot: snapshot, scheme: scheme)
         let stateColor = colors.stateColor(state.phase, isStale: isStale)
-        HStack(alignment: .center, spacing: 14) {
+        return HStack(alignment: .center, spacing: 14) {
             if !dynamicTypeSize.isAccessibilitySize {
                 avatar(colors: colors, stateColor: stateColor)
             }

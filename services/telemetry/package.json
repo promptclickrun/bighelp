@@ -1,0 +1,28 @@
+{
+  "name": "@bighelp/telemetry",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "version": "0.1.0",
+  "description": "Allowlisted telemetry ingestion for bighelp. Validates batches at the edge and forwards them to Azure Application Insights.",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "generate": "wrangler types",
+    "types": "wrangler types",
+    "check": "node ../../Scripts/check-relay.mjs",
+    "typecheck": "node ../../Scripts/check-relay.mjs",
+    "deploy:dry-run": "wrangler deploy --dry-run"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.22.0",
+    "typescript": "^5.9.2",
+    "vitest": "4.1.11",
+    "wrangler": "4.127.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "sharp": "0.35.4",
+      "undici": "7.29.1"
+    }
+  }
+}

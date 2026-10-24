@@ -7,10 +7,22 @@
   "workers_dev": false,
   "preview_urls": false,
   "routes": [{ "pattern": "link.loopdy.app", "custom_domain": true }],
-  "observability": { "enabled": false },
+  // Workers Logs on, sampled. The Worker logs fixed codes only: no tokens, IDs
+  // that name a person, message text or exception text. Invocation logs are off,
+  // because they store each request's URL, and a URL here carries a grant ID.
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 0.2,
+    "logs": { "invocation_logs": false }
+  },
   "send_metrics": false,
   "dependencies_instrumentation": { "enabled": false },
   "limits": { "cpu_ms": 1000 },
+  // Direct APNs delivery (docs/DIRECT_APNS_RELAY.md). These stay out of source and
+  // are set with `wrangler secret put`: APNS_KEY_P8 (the .p8 key), APNS_KEY_ID,
+  // APNS_TEAM_ID and PUSH_TOKEN_KEY (base64 of 32 random bytes). While any is
+  // missing, or DIRECT_APNS is "off", every push goes through BuzzKit as before.
+  //
   // BuzzKit secrets stay out of source. Before this Worker can serve or revoke
   // provider identities, rotate the tenant identity secret, update
   // BUZZKIT_IDENTITY_SECRET, then set the secret binding
@@ -21,7 +33,17 @@
     "LINK_RETAINED_BYTE_LIMIT": "536870912",
     "APPLE_APP_ID": "ZWDGY4GYX9.app.loopdy.mobile",
     "PASSKEY_RP_ID": "link.loopdy.app",
-    "PASSKEY_ORIGIN": "https://link.loopdy.app"
+    "PASSKEY_ORIGIN": "https://link.loopdy.app",
+    "APNS_TOPIC": "app.loopdy.mobile",
+    // Which APNs environments get direct sends: "production", "sandbox" or both, comma-separated.
+    // A key made for production only answers sandbox with BadEnvironmentKeyInToken, so the
+    // default is production. Sandbox targets (Xcode builds) go through BuzzKit.
+    "APNS_ENVIRONMENTS": "production",
+    // "off" (BuzzKit only), "shadow" (direct for DIRECT_APNS_CANARY, the rest
+    // through BuzzKit) or "on" (direct for every installation with a push target).
+    "DIRECT_APNS": "off",
+    // Comma-separated installation IDs.
+    "DIRECT_APNS_CANARY": ""
   },
   "d1_databases": [
     {
@@ -37,6 +59,28 @@
       "migrations_dir": "./marketplace-migrations"
     }
   ],
+
+  // Pushes APNs could not take at once wait here. Create both queues before deploying:
+  //   wrangler queues create loopdy-link-apns-retry-dlq
+  //   wrangler queues create loopdy-link-apns-retry
+  "queues": {
+    "producers": [{ "binding": "APNS_RETRY", "queue": "loopdy-link-apns-retry" }],
+    "consumers": [{
+      "queue": "loopdy-link-apns-retry",
+      "max_batch_size": 10,
+      "max_batch_timeout": 2,
+      "max_retries": 5,
+      "dead_letter_queue": "loopdy-link-apns-retry-dlq"
+    }]
+  },
+
+  // The telemetry Worker (services/telemetry) takes relay events over RPC.
+  // Deploy it first. Without this binding the relay still works and sends none.
+  "services": [{
+    "binding": "TELEMETRY",
+    "service": "bighelp-telemetry",
+    "entrypoint": "TelemetryIngest"
+  }],
 
   "durable_objects": {
     "bindings": [

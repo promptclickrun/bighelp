@@ -4,6 +4,27 @@ import Testing
 
 @MainActor
 struct DirectHermesConversationTests {
+    @Test func textOnlyTurnStartsActivityWithoutInventingTranscriptActivity() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let client = try DirectHermesConversationClient(rpc: DirectTestRPC(), hostIdentity: "host", profile: "default",
+            runtimeID: "runtime", storedID: "saved", title: "Chat", epoch: "epoch", drafts: .init(root: root))
+        defer { client.suspend() }
+        let model = ChatModel(conversationID: client.conversationID, client: client, initialItems: [])
+        client.model = model
+        var admitted: [ChatActivityEvent] = []
+        client.onAdmittedActivity = { change, _, _ in admitted += change.activities }
+        client.receive(.init(type: "message.start", sessionID: "runtime", payload: [:], sequence: 1))
+        #expect(admitted.count == 1)
+        #expect(admitted.first?.turnID == client.projection.turnID)
+        #expect(admitted.first?.lifecycle == .running)
+        #expect(model.activityLedger.allEvents.isEmpty)
+        client.receive(.init(type: "message.delta", sessionID: "runtime", payload: ["text": .string("Hello")], sequence: 2))
+        #expect(admitted.count == 1)
+        client.receive(.init(type: "message.start", sessionID: "runtime", payload: [:], sequence: 1))
+        #expect(admitted.count == 1)
+    }
+
     @Test func unavailableQuickActionPreservesDraftAndTimeline() async {
         let model = ChatModel(conversationID: "unprepared", client: NativeWorkspaceUnavailableClient(), initialItems: [])
         model.draft = "Keep this draft"

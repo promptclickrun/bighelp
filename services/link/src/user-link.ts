@@ -1,3 +1,4 @@
+import { requireNotificationGroupGrantEgressActive } from "./notification-grants.js";
 import { UserLinkAccount } from "./user-link-account.js";
 import { ACTIVITY_RECORD_GRACE_SECONDS, UserLinkNotificationStore } from "./user-link-notifications.js";
 import { initializeUserLinkStorage } from "./user-link-schema.js";
@@ -17,7 +18,8 @@ import {
   type SaveAccountProfile,
 } from "./contracts.js";
 import { lookupDeviceAccountCoordinate, verifyDeviceRequest } from "./device-auth.js";
-import { sendBuzzKitLinkWake } from "./buzzkit.js";
+import { sendBuzzKitLiveActivity, sendBuzzKitLinkWake } from "./buzzkit.js";
+import { deliverLiveActivity, type DeliveryEnv } from "./push-delivery.js";
 import { acceptedFrame, backpressureFrame, type EncryptedLinkFrame, parseEncryptedFrame } from "./frame.js";
 import {
   ACTIVE_DEVICE_LIMIT, DELIVERY_BYTE_WINDOW, DELIVERY_WINDOW, PendingDeliveryStore,
@@ -228,6 +230,67 @@ export class UserLink extends DurableObject<LinkEnv> {
 
   notificationAsset(input: Parameters<UserLinkNotificationStore["notificationAsset"]>[0]) {
     return this.notificationState.notificationAsset(input);
+  }
+
+  private activityDeliveryTail: Promise<void> = Promise.resolve();
+
+  async sendNotificationActivityGroup(input: {
+    ownerCoordinate: string; activityId: string; state: import("./activity-group.js").ActivityGroupRow;
+    authority: import("./notification-grants.js").NotificationEgressSnapshot; externalId: string;
+  }) {
+    this.notificationState.authorizeNotificationEgress(input.authority);
+    this.notificationState.updateActivityGroup(input.activityId, input.state, input.authority.credentialId);
+    const before = this.activityDeliveryTail;
+    let release!: () => void;
+    this.activityDeliveryTail = new Promise<void>((resolve) => { release = resolve; });
+    try {
+      await before;
+      // APNs timestamps are whole seconds. Serialize sends and read the newest
+      // aggregate after waiting so reordered rows cannot overwrite newer work.
+      const delay = (this.notificationState.activityDeliveryTimestamp(input.activityId) + 1) * 1_000 - Date.now();
+      if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
+      this.notificationState.authorizeNotificationEgress(input.authority);
+      const now = Math.max(Math.floor(Date.now() / 1_000),
+        this.notificationState.activityDeliveryTimestamp(input.activityId) + 1);
+      const content = this.notificationState.activityGroup(input.activityId, now, input.authority);
+      const terminal = content.activeCount === 0;
+      const authorize = async () => {
+        const grants = this.notificationState.activityGroupGrants(input.activityId);
+        await requireNotificationGroupGrantEgressActive(this.env, input.ownerCoordinate, input.authority, grants);
+        const freshGrants = this.notificationState.activityGroupGrants(input.activityId);
+        const fresh = this.notificationState.activityGroup(input.activityId, now, input.authority);
+        // No asynchronous work separates rebuilding the aggregate from reserving
+        // the physical send. A newly registered row must also prevent an end.
+        if (JSON.stringify(fresh) !== JSON.stringify(content) || JSON.stringify(freshGrants) !== JSON.stringify(grants)) {
+          throw new LoopdyLinkError("notification_activity_conflict", "Activity group changed before delivery");
+        }
+        this.notificationState.reserveActivityDelivery(input.activityId, now, terminal);
+      };
+      const event = terminal ? "end" : "update";
+      // The physical card is addressed by its group ID, so that is the ID whose push token the
+      // phone registers for direct delivery too. The aggregate is rebuilt for every send, so a
+      // failed direct push is never queued for later: it goes through BuzzKit at once.
+      const receipt = await deliverLiveActivity({
+        env: this.env as unknown as DeliveryEnv, ctx: this.ctx,
+        owner: {
+          kind: input.authority.ownerKind, coordinate: input.ownerCoordinate,
+          credentialId: input.authority.credentialId,
+        },
+        grantId: input.authority.grant?.grantId ?? "", updateId: String(now), queueable: false,
+        live: {
+          event, activityId: content.groupId, contentState: content, timestamp: now, staleDate: now + 120,
+          ...(terminal ? { dismissalDate: now + 30 } : {}),
+        },
+        authorize,
+        sendViaBuzzKit: () => sendBuzzKitLiveActivity(this.env, {
+          externalId: input.externalId, activityId: content.groupId,
+          event, contentState: content, timestamp: now,
+          staleDate: new Date((now + 120) * 1_000).toISOString(),
+          ...(terminal ? { dismissalDate: new Date((now + 30) * 1_000).toISOString() } : {}),
+        }, authorize),
+      });
+      return receipt;
+    } finally { release(); }
   }
 
   registerNotificationActivity(input: Parameters<UserLinkNotificationStore["registerNotificationActivity"]>[0]) {

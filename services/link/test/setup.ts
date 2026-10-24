@@ -9,6 +9,7 @@ import notificationIdentityMigrationSql from "../migrations/0006_notification_id
 import notificationRetirementMigrationSql from "../migrations/0007_retire_account_notifications.sql?raw";
 import notificationRevocationFenceMigrationSql from "../migrations/0008_notification_revocation_fences.sql?raw";
 import notificationAccountInstallationsMigrationSql from "../migrations/0009_notification_account_installations.sql?raw";
+import pushTargetsMigrationSql from "../migrations/0010_push_targets.sql?raw";
 import marketplaceRetirementMigrationSql from "../marketplace-migrations/0005_retire_marketplace.sql?raw";
 
 beforeAll(async () => {
@@ -27,6 +28,7 @@ beforeAll(async () => {
     "notification_account_installations",
     notificationAccountInstallationsMigrationSql,
   );
+  await applyMigrationIfMissing("push_targets", pushTargetsMigrationSql);
   await applyMigrationIfMissing(
     "marketplace_retirement",
     marketplaceRetirementMigrationSql,

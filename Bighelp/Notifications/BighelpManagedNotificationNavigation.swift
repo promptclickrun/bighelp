@@ -12,32 +12,19 @@ extension EnvironmentValues {
 }
 
 extension BighelpManagedNotificationService {
-    /// Activity links identify a local scoped mapping, not a host supplied by URL.
+    /// Activity links identify a local scoped mapping, not a host supplied by URL. The tap hands
+    /// the shell its computer, agent and exact chat; the shell opens it from its saved chats.
+    /// Asking `session.list` first failed every Bot Chat (Hermes leaves them out) and so every
+    /// tap in Bots mode (#571).
     @MainActor
-    func openActivity(opaqueSessionID: String) async throws {
+    func openActivity(opaqueSessionID: String, opens: BighelpExternalSessionOpenCenter = .shared) throws {
         guard let owner = activityRuntime?.destination(opaqueSessionID: opaqueSessionID),
               let host = registry.hosts.first(where: { $0.hostConnectionID == owner.hostConnectionID && $0.notificationScope == owner.accountScope }) else {
             throw DirectHermesError.invalidResponse
         }
-        let credentials = try self.credentials(for: host)
+        _ = try credentials(for: host)
         registry.select(host.id)
-        let generation = registry.generation
-        let workspace = registry.workspace(for: host)
-        await workspace.reconnect()
-        try requireCurrent(host, credentials: credentials)
-        guard registry.generation == generation, registry.selectedHostID == host.id else { throw DirectHermesError.secureStorageChanged }
-        try await workspace.visiting(profile: owner.profile) {
-            await workspace.loadSessions()
-            try requireCurrent(host, credentials: credentials)
-            guard registry.generation == generation, let session = workspace.sessions.first(where: {
-                $0.storedID == owner.storedSessionID && $0.profile == owner.profile && $0.supportsNativeResume
-            }) else { throw DirectHermesError.invalidResponse }
-            await workspace.openSession(session)
-            try requireCurrent(host, credentials: credentials)
-            guard registry.generation == generation, workspace.selectedChat?.client.storedID == owner.storedSessionID else {
-                throw DirectHermesError.secureStorageChanged
-            }
-        }
-        BighelpExternalSessionOpenCenter.shared.request(profileID: owner.profile, storedSessionID: owner.storedSessionID)
+        guard registry.selectedHostID == host.id else { throw DirectHermesError.secureStorageChanged }
+        opens.request(hostID: host.id, profileID: owner.profile, storedSessionID: owner.storedSessionID)
     }
 }

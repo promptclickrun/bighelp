@@ -131,6 +131,15 @@ deliberately reduced, generic progress projection suitable for a Lock Screen
 surface. They must not contain prompts, tool inputs, unrestricted model output,
 credentials, or private attachments.
 
+### Direct APNs delivery from the Link Worker
+
+The Link Worker (`loopdy-link`) can also send a push straight to APNs for installations whose app registered a push
+token with it. The token is stored encrypted in the `loopdy-link-accounts` database. Transient APNs failures wait in a
+retry queue with a dead-letter queue, and a message that cannot be sent directly falls back to BuzzKit. The Worker has
+Workers Logs on (sampled), an optional service binding to the telemetry Worker, and these secrets: `APNS_KEY_P8`,
+`APNS_KEY_ID`, `APNS_TEAM_ID` and `PUSH_TOKEN_KEY`. `DIRECT_APNS` (`off`, `shadow` or `on`) turns it on and `off` is the
+way back. See [Direct APNs relay](DIRECT_APNS_RELAY.md) for the routes, payloads and rollout.
+
 ## 5. What Cloudflare can and cannot see
 
 ### Cloudflare can process
@@ -222,6 +231,23 @@ repository containing:
 Do not publish production account identifiers, resource identifiers, API
 tokens, APNs credentials, signing keys, production hostnames not already meant
 to be public, or live operational thresholds.
+
+## Telemetry Worker
+
+The `bighelp-telemetry` Worker (`services/telemetry`) is a separate Worker at `telemetry.bighelp.app`. It accepts
+batches from the app, the notification extension and the Hermes plugin. The Link relay reaches it over a service
+binding that calls the `TelemetryIngest` entrypoint.
+
+- **It holds no storage.** There is no D1, KV, R2, queue or Durable Object. It checks each batch against an
+  allowlist (`contracts/telemetry-v1.json`), applies two Workers Rate Limiting bindings (per ID, and per network by a
+  keyed hash of the client address), and forwards accepted events to Azure Application Insights in the background.
+- **Secrets:** `APPINSIGHTS_CONNECTION_STRING` and `IP_HASH_KEY`. Only this Worker holds the Azure key.
+- **Privacy:** the client address is never stored, logged or forwarded. Logs hold fixed codes only, with sampling.
+  The Worker adds no CORS headers, because only native clients call it.
+- **Failure:** if Azure is down or the connection string is missing, the Worker still answers `202` and drops the
+  events. A telemetry outage never affects pushes.
+
+See [Telemetry](TELEMETRY.md) for what is collected and how to turn it off.
 
 ## Wiki folder setup transport
 

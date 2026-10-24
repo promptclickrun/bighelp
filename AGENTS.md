@@ -314,9 +314,11 @@ change in both repos.
 - **Glass button taps:** glass buttons need `.contentShape` before `bighelpNavigationGlass`, or taps miss.
 - **Overlays that swallow taps:** full-screen `UIView` helpers in overlays need `isUserInteractionEnabled = false`,
   or they swallow every tap.
-- **Chat row environment:** chat rows (`NativeChatTimeline`) copy selected environment values into each row. If a row
-  acts stale (for example, animations frozen because it still thinks the app is inactive), check what the timeline
-  copies and whether the representable reads it.
+- **Chat row environment:** chat rows (`NativeChatTimeline`) copy selected environment values into each row as it's
+  built, and a change to them builds every row again. Values that change without changing a row's look (the scene
+  phase, card actions) reach rows live instead (`ChatRowLiveValues`): copied, each return to the app built every row
+  again and the first scroll up dropped frames. If a row acts stale (for example, animations frozen because it still
+  thinks the app is inactive), check what the timeline copies or hands live and whether the representable reads it.
 - **Chat redraw cost:** `ChatView` redraws for the keyboard, the message box, the header and each streaming
   delta. Its transcript rows live in `ChatTranscriptCanvasCache`: built again only when something in its key
   changes, and then only for the turns that changed (`ChatTranscriptTurn`; a tool event redoes just the turns
@@ -586,6 +588,9 @@ sections can crash only on devices ("Thread stack size exceeded").
   more. Every other intent is still an ordinary Shortcuts action. Tiles per agent, scheduled task and group chat
   refresh through `BighelpShortcutParameters` when those names change, never on every load.
 - Returning to a chat reloads it from the host. Treat the host's saved history as the truth after a turn ends.
+  Coming back to the app reads an open chat's newest page again and keeps the earlier pages it holds
+  (`refreshHeldHistory`); the next connection's history client takes what the last one read, for the same sign-in
+  (`adoptHistory`). A full history read there laid out a long chat's every message on the main thread as you scrolled.
 - Every reconnect is a new `WorkspaceOwner` (its `connectionGeneration` changes), and the owner is nil while
   disconnected. To decide whether to close open sheets or screens, compare `owner.signIn`, never the whole
   owner, or coming back after a minute away closes whatever was open (`WorkspacePresentationContinuity`).
@@ -613,11 +618,12 @@ Helpful, never a pile to clear (`BighelpNotificationGrouping`):
   again (`formerStoredIDs`, the saved row). Compaction gives a chat a new stored ID and Hermes' alert for that turn
   can name it first, so a chat compacted in the last two minutes answers for its agent's unknown references
   (`lastCompactionAt`).
-- One Live Activity at a time: a new chat's card replaces the older one (`BighelpManagedNativeActivityRuntime`).
-  Finished cards leave the Lock Screen about 30 seconds after the end (the Link service sends a dismissal date),
-  and opening the app clears any still there.
-- The Live Activity uses the app's palette from the widget snapshot, like the Home widgets. Its four steps come from
-  the phase Hermes reports, never a guessed percentage.
+- One Live Activity holds the active chats as independently linked rows (`BighelpActivityGroupDriver`).
+  Attention comes first; the payload holds five rows and a total count. A chat finishing cannot end another chat's card.
+  The service aggregates scoped per-turn updates before sending to the shared native token (docs/LIVE_ACTIVITY_GROUPS.md).
+  The finished card leaves about 30 seconds after all work ends, and opening the app clears it.
+- The Live Activity uses the app's palette and real host phases, never a guessed percentage. Titles stay in the
+  phone's App Group; only opaque row IDs and bounded status reach the push service. Stale rows say Paused.
 - Every setup failure gets its own code where it happens (`BighelpNotificationErrorCode`, never reused or renumbered);
   the FAQ is [docs/NOTIFICATION_ERROR_CODES.md](docs/NOTIFICATION_ERROR_CODES.md).
 

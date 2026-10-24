@@ -12,6 +12,7 @@ enum SettingsMenuSection: String, CaseIterable, Identifiable, Equatable, Sendabl
     case companion
     case help
     case watch
+    case carPlay
 
     var id: Self { self }
 
@@ -28,6 +29,7 @@ enum SettingsMenuSection: String, CaseIterable, Identifiable, Equatable, Sendabl
         case .companion: String(localized: "Companion pet")
         case .help: String(localized: "Help & feedback")
         case .watch: String(localized: "Apple Watch")
+        case .carPlay: "CarPlay"
         }
     }
 
@@ -44,6 +46,7 @@ enum SettingsMenuSection: String, CaseIterable, Identifiable, Equatable, Sendabl
         case .companion: String(localized: "Character, motion and agent")
         case .help: String(localized: "Report a problem, guides and version")
         case .watch: String(localized: "Pairing and connection")
+        case .carPlay: String(localized: "The agent and computer it talks to")
         }
     }
 
@@ -68,6 +71,7 @@ enum SettingsMenuSection: String, CaseIterable, Identifiable, Equatable, Sendabl
         case .companion: "pawprint.fill"
         case .help: "questionmark.circle.fill"
         case .watch: "applewatch"
+        case .carPlay: "car.fill"
         }
     }
 
@@ -81,6 +85,7 @@ enum SettingsMenuSection: String, CaseIterable, Identifiable, Equatable, Sendabl
         case .connectivityAndNotifications: "5B6B7F"
         case .permissions: "3478F6"
         case .watch: "6E6E73"
+        case .carPlay: "2E9C5A"
         case .companion: "F28B32"
         case .help: "2E9CA6"
         default: nil

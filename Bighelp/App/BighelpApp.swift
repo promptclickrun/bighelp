@@ -273,7 +273,7 @@ struct BighelpApp: App {
         self.watchRelay = watchRelay
         #endif
         #if os(iOS)
-        Self.configureCarPlay(composition, arguments: arguments)
+        Self.configureCarPlay(composition, hostRegistry: hostRegistry, arguments: arguments)
         #endif
         _newChatCoordinator = State(initialValue: composition.newChatCoordinator)
         shortcutService = composition.shortcutService
@@ -369,10 +369,14 @@ struct BighelpApp: App {
     #if os(iOS)
     /// CarPlay's voice chat talks through the same live host as Shortcuts;
     /// demo runs use the local fixtures.
-    private static func configureCarPlay(_ composition: BighelpAppComposition, arguments: [String]) {
+    private static func configureCarPlay(_ composition: BighelpAppComposition, hostRegistry: BighelpHostRegistry,
+                                         arguments: [String]) {
         BighelpCarPlayServices.settings = composition.settings
+        BighelpCarPlayServices.companion = composition.companion
+        BighelpCarPlayServices.companionScope = { CompanionSurfaceScope.computer(hostRegistry.activeHostConnectionID) }
         #if DEBUG
         if arguments.contains("-use-demo-fixtures") {
+            BighelpCarPlayServices.companionScope = { "fixture-account:fixture-host" }
             let demo = BighelpShortcutWorkspace(
                 appState: composition.appState, agents: composition.agentDirectory,
                 runtimeDefaults: composition.agentRuntimeDefaults, catalog: composition.sessionCatalog,
@@ -383,6 +387,9 @@ struct BighelpApp: App {
         #endif
         let shortcuts = composition.shortcutService
         BighelpCarPlayServices.workspace = { try await shortcuts.connectedWorkspace() }
+        BighelpCarPlayServices.useGateway = { try shortcuts.useGateway($0) }
+        BighelpCarPlayServices.gateways = { shortcuts.availableGateways() }
+        BighelpCarPlayServices.agents = { try await shortcuts.availableAgents(on: $0) }
         DeviceToolServices.workspace = { try await shortcuts.connectedWorkspace() }
     }
     #endif

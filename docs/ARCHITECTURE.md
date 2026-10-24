@@ -127,17 +127,24 @@ that opens it; the Watch also offers the same link through Handoff.
 
 ### CarPlay voice
 
-Opening bighelp in CarPlay starts a new chat with the agent last picked in the
-car (`CarPlayAgentChoice`, else the default agent) and runs
+Opening bighelp in CarPlay starts a new chat with the agent from Settings ›
+CarPlay (`CarPlayAgentPreference`: a computer and an agent), else the one last
+picked in the car (`CarPlayAgentChoice`), else the default agent, and runs
 `CarPlayVoiceSession` without a screen (the iPhone is usually locked, and the
 phone's voice screen only listens while it's active). It builds the same
 `VoicePresentation` the chat uses, keeps it listening between turns, and holds
 the host connection (`BighelpShortcutService.holdHostConnection()`) while the
-car is connected. The CarPlay scene is declared in the iOS Info.plist; visionOS
-generates its own scene manifest, which wins there. Voice stays the root, as Apple asks of voice
-apps. Each voice state's second button, Agents, stops listening and pushes a list
-of up to 12 agents; a pick starts talking to it. Talk after a pause continues
-the same car chat; another agent or a new car connection starts a new one.
+car is connected (`audio` in `UIBackgroundModes` lets WebRTC run with the phone
+locked). Each wait (computer, chat, voice) is bounded: after 20 s the car says
+which step failed (`CarPlayConnectStep`). The CarPlay scene is declared in the
+iOS Info.plist; visionOS generates its own scene manifest, which wins there.
+The root is a list of up to 12 agents under a header with the agent's face, its
+live step and its last three steps; the voice screen shows over it while you
+talk (an overlay on iOS 27, presented before). Each voice state's second
+button, Agents, ends the talk and shows that list; a pick starts talking to it.
+Talk after a pause continues the same car chat; another agent or a new car
+connection starts a new one. CarPlay calls handlers off the main thread, so
+they come from `CarPlayCallbacks`.
 
 ## 3. Composition and state ownership
 

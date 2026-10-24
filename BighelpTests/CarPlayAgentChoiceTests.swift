@@ -128,3 +128,51 @@ struct CarPlayAgentChoiceTests {
         #expect(CarPlayChatContinuity().reusableSessionID(for: "omar") == nil)
     }
 }
+
+/// The car's home and its live steps, and the computer Settings › CarPlay picks.
+@MainActor
+struct CarPlayHomeTests {
+    @Test func theHeaderSaysWhatTheConversationIsDoing() {
+        #expect(CarPlayHeaderContent.status(phase: .connecting, step: nil) == "Connecting…")
+        #expect(CarPlayHeaderContent.status(phase: .listening, step: nil) == "Listening")
+        // Working shows the agent's step, as voice mode does.
+        #expect(CarPlayHeaderContent.status(phase: .working, step: "Checking your calendars…") == "Checking your calendars…")
+        #expect(CarPlayHeaderContent.status(phase: .working, step: nil) == "Working…")
+        #expect(CarPlayHeaderContent.status(phase: .paused, step: nil) == "Tap Talk to start")
+        #expect(CarPlayHeaderContent.isTalking(.speaking))
+        #expect(!CarPlayHeaderContent.isTalking(.paused))
+        #expect(!CarPlayHeaderContent.isTalking(.problem("x")))
+    }
+
+    @Test func eachNewStepPushesTheLastOneDownAndTheTurnsEndClearsThem() {
+        var step: String?
+        var earlier: [String] = []
+        for next in ["Searching the web…", "Searching the web…", "Reading the page…", "Writing it up…", "Checking the map…"] {
+            (step, earlier) = CarPlayVoiceSession.steps(after: step, earlier: earlier, next: next, isWorking: true)
+        }
+        #expect(step == "Checking the map…")
+        #expect(earlier == ["Writing it up…", "Reading the page…", "Searching the web…"], "Newest first, one line each")
+        (step, earlier) = CarPlayVoiceSession.steps(after: step, earlier: earlier, next: nil, isWorking: false)
+        #expect(step == nil)
+        #expect(earlier.isEmpty)
+    }
+
+    @Test func theComputerPickedForCarPlayIsKeptOnThisDevice() throws {
+        let name = "carplay-host-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        let preference = CarPlayAgentPreference(defaults: defaults)
+        #expect(preference.hostID == nil, "The one bighelp is using, until one is picked")
+        let host = UUID()
+        preference.hostID = host
+        #expect(CarPlayAgentPreference(defaults: defaults).hostID == host)
+        preference.hostID = nil
+        #expect(CarPlayAgentPreference(defaults: defaults).hostID == nil)
+    }
+
+    @Test func aStallSaysWhichStepItWas() {
+        #expect(CarPlayConnectStep.computer.problem.contains("couldn't reach your computer"))
+        #expect(CarPlayConnectStep.chat.problem.contains("chat didn't start"))
+        #expect(CarPlayConnectStep.voice.problem.contains("voice didn't start"))
+    }
+}

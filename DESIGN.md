@@ -153,8 +153,11 @@ with each item's full text. Change agent sits at the bottom. **Open on iPhone** 
 open, or taps through from a notification; Handoff offers it too. Anything too big for the Watch says to answer on
 the iPhone.
 
-**CarPlay** is voice only: opening bighelp in the car starts a new chat with the default agent and listens. The
-car screen says Connecting, Listening, Thinking or Speaking, with End and Mute; Talk starts again.
+**CarPlay** is voice first: opening bighelp in the car starts a new chat with the agent from Settings › CarPlay
+(else the last one picked in the car, else the default) and listens. The home shows that agent's face, what it's
+doing in one line and its last steps, with Talk or End, and the other agents under it. While you talk, the voice
+screen shows the face in a ring that moves with Connecting, Listening, Working and Speaking, with End, Agents and
+Mute. If the computer doesn't answer, it says which step failed instead of connecting forever.
 
 Shortcuts run with bighelp closed, in the background or open. The app closes its host connection in the
 background, so a Shortcut first proves the host answers (the agent list) and reconnects once if not.

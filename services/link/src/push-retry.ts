@@ -16,7 +16,7 @@ import {
   type NotificationActivity,
 } from "./notification-grants.js";
 import {
-  apnsBreakerOpen,
+  directBlockedReason,
   directAttempt,
   fallbackReason,
   isSealedMessage,
@@ -218,7 +218,6 @@ async function processOne(message: Message<unknown>, env: LinkEnv, events: Relay
   const direct = async (): Promise<string | null> => {
     // A repeat from the host already gave this message to BuzzKit.
     if (sendState === "buzzkit") return "already_with_buzzkit";
-    if (apnsBreakerOpen()) return "apns_breaker_open";
 
     const config = apnsConfig(env);
     if (!config) return "apns_unconfigured";
@@ -228,6 +227,8 @@ async function processOne(message: Message<unknown>, env: LinkEnv, events: Relay
     );
     if (lookup.status !== "found") return lookup.status === "unreadable" ? "target_unreadable" : "no_target";
     const target = lookup.target;
+    const blocked = directBlockedReason(deliveryEnv, target.environment);
+    if (blocked) return blocked;
     if (target.kind === "alert" && target.mutedTopics === null) return "target_incomplete";
     // The person may have muted this topic while the message waited. BuzzKit holds the real
     // settings, so it decides while it is there.

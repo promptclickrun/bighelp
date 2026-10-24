@@ -35,6 +35,10 @@
     "PASSKEY_RP_ID": "link.loopdy.app",
     "PASSKEY_ORIGIN": "https://link.loopdy.app",
     "APNS_TOPIC": "app.loopdy.mobile",
+    // Which APNs environments get direct sends: "production", "sandbox" or both, comma-separated.
+    // A key made for production only answers sandbox with BadEnvironmentKeyInToken, so the
+    // default is production. Sandbox targets (Xcode builds) go through BuzzKit.
+    "APNS_ENVIRONMENTS": "production",
     // "off" (BuzzKit only), "shadow" (direct for DIRECT_APNS_CANARY, the rest
     // through BuzzKit) or "on" (direct for every installation with a push target).
     "DIRECT_APNS": "off",

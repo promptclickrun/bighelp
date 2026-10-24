@@ -2,9 +2,11 @@ import {
   APNS_PAYLOAD_BYTES,
   apnsCollapseIdFor,
   apnsConfig,
+  apnsEnvironments,
   apnsIdFor,
   sendApns,
   type ApnsConfig,
+  type ApnsEnvironment,
   type ApnsPushType,
   type ApnsResult,
   type ApnsSecrets,
@@ -115,24 +117,34 @@ const SETUP_REASONS = new Set([
   "bad_topic", "topic_disallowed", "missing_topic", "forbidden", "bad_certificate",
   "bad_certificate_environment", "provider_key_invalid",
 ]);
-let breaker = { failureClass: "", count: 0, openUntil: 0 };
+type BreakerState = { failureClass: string; count: number; openUntil: number };
+const closedBreaker = (): BreakerState => ({ failureClass: "", count: 0, openUntil: 0 });
+/** One breaker per environment: a sandbox target (an Xcode build) can never pause production. */
+let breakers: Record<ApnsEnvironment, BreakerState> = { sandbox: closedBreaker(), production: closedBreaker() };
+/** When an environment last answered that the key can't serve it. */
+let unsupportedUntil: Record<ApnsEnvironment, number> = { sandbox: 0, production: 0 };
+const UNSUPPORTED_MEMORY_MS = 10 * 60_000;
 
-/** Closes the breaker. For tests. */
+/** Closes the breakers and forgets unsupported environments. For tests. */
 export function resetApnsBreaker(): void {
-  breaker = { failureClass: "", count: 0, openUntil: 0 };
-}
-
-function breakerIsOpen(): boolean {
-  return Date.now() < breaker.openUntil;
+  breakers = { sandbox: closedBreaker(), production: closedBreaker() };
+  unsupportedUntil = { sandbox: 0, production: 0 };
 }
 
 /**
- * After three setup failures in a row of the same kind, direct sends pause for a
- * minute in this isolate. Otherwise a bad key would add round trips to every send.
+ * After three setup failures in a row of the same kind in one environment, direct sends to
+ * that environment pause for a minute in this isolate. Otherwise a bad key would add round
+ * trips to every send. A refusal that only says the key doesn't serve the environment is
+ * remembered for that environment and never counted here.
  */
-function recordBreaker(result: ApnsResult): void {
+function recordBreaker(result: ApnsResult, environment: ApnsEnvironment): void {
+  if (result.outcome === "environment_unsupported") {
+    unsupportedUntil[environment] = Date.now() + UNSUPPORTED_MEMORY_MS;
+    return;
+  }
+  const breaker = breakers[environment];
   if (result.outcome === "sent") {
-    breaker = { failureClass: "", count: 0, openUntil: 0 };
+    breakers[environment] = closedBreaker();
     return;
   }
   const failureClass = result.outcome === "provider_token" ? "provider_token"
@@ -146,9 +158,24 @@ function recordBreaker(result: ApnsResult): void {
   }
 }
 
-/** True while direct sends are paused. */
-export function apnsBreakerOpen(): boolean {
-  return breakerIsOpen();
+/** True while direct sends to this environment are paused. */
+export function apnsBreakerOpen(environment: ApnsEnvironment): boolean {
+  return Date.now() < breakers[environment].openUntil;
+}
+
+/**
+ * Why a send to this target must not go direct right now, or null. The environment must be one
+ * the Worker was told to use (`APNS_ENVIRONMENTS`), the key must not have refused it recently,
+ * and its breaker must be closed.
+ */
+export function directBlockedReason(
+  env: { APNS_ENVIRONMENTS?: string },
+  environment: ApnsEnvironment,
+): string | null {
+  if (!apnsEnvironments(env).has(environment)) return "environment_disabled";
+  if (Date.now() < unsupportedUntil[environment]) return "environment_unsupported";
+  if (apnsBreakerOpen(environment)) return "apns_breaker_open";
+  return null;
 }
 
 export function deliveryMode(env: { DIRECT_APNS?: string }): DeliveryMode {
@@ -289,12 +316,6 @@ async function chooseRoute(
     return { via: "buzzkit" };
   }
   const canary = canaryInstallations(env).has(owner.credentialId.toLowerCase());
-  if (mode === "on" || canary) {
-    if (breakerIsOpen()) {
-      fallbackEvent(env, ctx, "apns_breaker_open");
-      return { via: "buzzkit" };
-    }
-  }
   const nowSeconds = Math.floor(Date.now() / 1_000);
   let lookup: PushTargetLookup;
   try {
@@ -310,12 +331,19 @@ async function chooseRoute(
   if (mode === "shadow" && !canary) {
     // Say what would have happened, and send as before.
     if (lookup.status === "found") {
-      emitRelayEvents(env, ctx, [relayEvent("push.shadow", { eventType, wouldUseDirect: true })]);
+      emitRelayEvents(env, ctx, [relayEvent("push.shadow", {
+        eventType, wouldUseDirect: !directBlockedReason(env, lookup.target.environment),
+      })]);
     }
     return { via: "buzzkit" };
   }
   if (lookup.status !== "found") {
     fallbackEvent(env, ctx, lookup.status === "unreadable" ? "target_unreadable" : "no_target");
+    return { via: "buzzkit" };
+  }
+  const blocked = directBlockedReason(env, lookup.target.environment);
+  if (blocked) {
+    fallbackEvent(env, ctx, blocked);
     return { via: "buzzkit" };
   }
   // Without the person's muted topics the Worker can't honour them, as BuzzKit does.
@@ -367,7 +395,7 @@ export async function directAttempt(input: DirectAttemptInput, events: RelayEven
     ...(input.deadlineAt !== undefined ? { deadlineAt: input.deadlineAt } : {}),
     authorize: input.authorize,
   });
-  recordBreaker(result);
+  recordBreaker(result, target.environment);
   events.push(relayEvent("push.sent", {
     eventType: spec.eventType,
     path: "direct",
@@ -396,6 +424,7 @@ export function fallbackReason(result: ApnsResult): string {
   switch (result.outcome) {
     case "token_invalid": return "token_invalid";
     case "provider_token": return "provider_token";
+    case "environment_unsupported": return "environment_unsupported";
     case "retryable": return "no_queue";
     default: return `apns_${result.reason}`;
   }
@@ -647,6 +676,8 @@ export interface DeliverLiveActivityInput {
   grantId: string;
   updateId: string;
   live: LiveActivityMessage;
+  /** False when a failed push must not wait: the shared card's content is rebuilt for every send. */
+  queueable?: boolean;
   authorize: () => Promise<void>;
   sendViaBuzzKit: () => Promise<{ status: "accepted"; deliveryId: string }>;
 }
@@ -670,12 +701,12 @@ export async function deliverLiveActivity(
   const apnsId = await apnsIdFor(dedupeKey);
   const outcome = await runDirect({
     env, ctx, owner, route, spec, dedupeKey, apnsId, authorize: input.authorize, deadlineAt,
-    noQueueReason: "no_queue",
-    retry: {
-      v: 1, kind: "liveactivity", grantId: input.grantId, eventType: "liveactivity", dedupeKey,
+    noQueueReason: input.queueable === false ? "group_not_queued" : "no_queue",
+    ...(input.queueable === false ? {} : { retry: {
+      v: 1 as const, kind: "liveactivity" as const, grantId: input.grantId, eventType: "liveactivity", dedupeKey,
       live: { ...live, updateId: input.updateId },
       enqueuedAt: Date.now(),
-    },
+    } }),
   });
   if (!outcome.done) return viaBuzzKit(env, ctx, info, input.sendViaBuzzKit, (value) => value.status);
   return { status: outcome.status, deliveryId: apnsId };

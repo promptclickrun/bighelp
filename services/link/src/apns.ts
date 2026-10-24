@@ -3,13 +3,18 @@ import { readByteStream } from "./http-primitives.js";
 
 export type ApnsPushType = "alert" | "background" | "liveactivity";
 export type ApnsEnvironment = "sandbox" | "production";
-export type ApnsOutcomeKind = "sent" | "token_invalid" | "provider_token" | "retryable" | "rejected";
+export type ApnsOutcomeKind =
+  | "sent" | "token_invalid" | "provider_token" | "retryable" | "rejected"
+  /** The key can't be used for this environment (a production-only key and a sandbox token). */
+  | "environment_unsupported";
 
 export interface ApnsSecrets {
   APNS_KEY_P8?: string;
   APNS_KEY_ID?: string;
   APNS_TEAM_ID?: string;
   APNS_TOPIC?: string;
+  /** Comma-separated: `production`, `sandbox` or both. The default is production only. */
+  APNS_ENVIRONMENTS?: string;
 }
 
 export interface ApnsConfig {
@@ -72,7 +77,7 @@ export const APNS_PAYLOAD_BYTES = 4_000;
 
 /** The reasons APNs documents. Anything else is reported as `other`. */
 const KNOWN_REASONS = new Set([
-  "BadCertificate", "BadCertificateEnvironment", "BadCollapseId", "BadDeviceToken",
+  "BadCertificate", "BadCertificateEnvironment", "BadCollapseId", "BadDeviceToken", "BadEnvironmentKeyInToken",
   "BadExpirationDate", "BadMessageId", "BadPath", "BadPriority", "BadTopic",
   "DeviceTokenNotForTopic", "DuplicateHeaders", "ExpiredProviderToken", "ExpiredToken",
   "Forbidden", "IdleTimeout", "InternalServerError", "InvalidProviderToken", "InvalidPushType",
@@ -100,6 +105,13 @@ export function apnsConfig(env: ApnsSecrets): ApnsConfig | null {
     return null;
   }
   return { keyId, teamId, privateKeyPem, topic };
+}
+
+/** The environments direct sends are attempted for. Production only unless `APNS_ENVIRONMENTS` says more. */
+export function apnsEnvironments(env: { APNS_ENVIRONMENTS?: string }): Set<ApnsEnvironment> {
+  const listed = (env.APNS_ENVIRONMENTS ?? "").split(/[\s,]+/).map((value) => value.trim().toLowerCase())
+    .filter((value): value is ApnsEnvironment => value === "sandbox" || value === "production");
+  return new Set(listed.length > 0 ? listed : ["production"]);
 }
 
 export function apnsTopicFor(config: ApnsConfig, pushType: ApnsPushType): string {
@@ -170,6 +182,9 @@ export function classifyApnsResponse(status: number, reason: string | undefined)
   if (status === 400 && (reason === "BadDeviceToken" || reason === "DeviceTokenNotForTopic")) {
     return "token_invalid";
   }
+  // A key made for one environment answers the other with BadEnvironmentKeyInToken. A new
+  // provider token would not change that, so it is not a provider token problem.
+  if (status === 403 && reason?.startsWith("BadEnvironmentKey")) return "environment_unsupported";
   if (status === 403 && (reason === "ExpiredProviderToken" || reason === "InvalidProviderToken"
       || reason === "MissingProviderToken")) {
     return "provider_token";
@@ -181,7 +196,7 @@ export function classifyApnsResponse(status: number, reason: string | undefined)
 /** A fixed lowercase code for an APNs reason, such as `bad_device_token`. */
 export function apnsReasonCode(reason: string | undefined): string {
   if (!reason) return "none";
-  if (!KNOWN_REASONS.has(reason)) return "other";
+  if (!KNOWN_REASONS.has(reason)) return reason.startsWith("BadEnvironmentKey") ? "bad_environment_key" : "other";
   return reason.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
 }
 

@@ -15,17 +15,20 @@ import {
   type NotificationActivity,
 } from "./notification-grants.js";
 import {
+  apnsBreakerOpen,
   directAttempt,
   fallbackReason,
+  isSealedMessage,
   liveActivitySpec,
   MAX_QUEUE_RETRIES,
   messageSpec,
   RETRY_DELAYS_SECONDS,
+  retryStillUseful,
   type ApnsRetryMessage,
   type DeliveryEnv,
   type DirectSpec,
 } from "./push-delivery.js";
-import { finishPushSend, pushSendState, releasePushSend } from "./push-sends.js";
+import { finishPushSend, handPushSendToBuzzKit, pushSendState, releasePushSend } from "./push-sends.js";
 import { findPushTarget, purgeExpiredPushState } from "./push-targets.js";
 import { emitRelayEvents, logPush, relayEvent, safeCode, type RelayEvent } from "./push-telemetry.js";
 import type { LinkEnv } from "./user-link.js";
@@ -57,6 +60,8 @@ export function parseRetryMessage(value: unknown): ApnsRetryMessage | null {
   if (!message || typeof message !== "object" || !message.body || typeof message.body !== "object"
       || typeof message.idempotencyKey !== "string" || message.idempotencyKey.length > 300
       || (message.occurredAtMs !== undefined && !Number.isSafeInteger(message.occurredAtMs))) return null;
+  // Only a sealed alert may wait on a queue: a rich alert's text is plain.
+  if (body.kind === "alert" && !isSealedMessage(message.body as Record<string, unknown>)) return null;
   return body as unknown as ApnsRetryMessage;
 }
 
@@ -124,7 +129,8 @@ async function processOne(message: Message<unknown>, env: LinkEnv, events: Relay
     return drop("owner_invalid");
   }
   const owner = { kind: row.owner_kind, coordinate: row.owner_coordinate, credentialId: row.credential_id };
-  if ((await pushSendState(deliveryEnv, dedupeKey).catch(() => null)) === "sent") {
+  const sendState = await pushSendState(deliveryEnv, dedupeKey).catch(() => null);
+  if (sendState === "sent") {
     message.ack();
     return;
   }
@@ -152,11 +158,14 @@ async function processOne(message: Message<unknown>, env: LinkEnv, events: Relay
     spec = null;
   }
   if (!spec) return drop("payload_invalid");
-  if (startedAt + spec.ttlSeconds <= nowSeconds) return drop("expired");
+  const expiry = startedAt + spec.ttlSeconds;
+  if (expiry <= nowSeconds) return drop("expired");
 
   const fallBack = async (reason: string): Promise<void> => {
     events.push(relayEvent("push.fallback_buzzkit", { reason: safeCode(reason) }));
     logPush("fallback_buzzkit", reason);
+    // A repeat of this message goes to BuzzKit too, which deduplicates by the same key.
+    await handPushSendToBuzzKit(deliveryEnv, dedupeKey).catch(() => undefined);
     try {
       let status: string;
       if (retry.kind === "liveactivity" && retry.live) {
@@ -192,18 +201,35 @@ async function processOne(message: Message<unknown>, env: LinkEnv, events: Relay
         logPush("dlq", code);
         await releasePushSend(deliveryEnv, dedupeKey).catch(() => undefined);
         message.retry();
+      } else if (nowSeconds + backoff(message.attempts) >= expiry) {
+        // The push would be stale by the next try.
+        return drop("expired");
       } else {
         message.retry({ delaySeconds: backoff(message.attempts) });
       }
     }
   };
 
+  // A repeat from the host already gave this message to BuzzKit.
+  if (sendState === "buzzkit") return fallBack("already_with_buzzkit");
+  if (apnsBreakerOpen()) return fallBack("apns_breaker_open");
+
   const config = apnsConfig(env);
-  const target = config ? await findPushTarget(
+  if (!config) return fallBack("apns_unconfigured");
+  const lookup = await findPushTarget(
     env, { installationId: owner.credentialId, ownerCoordinate: owner.coordinate }, spec.kind === "liveactivity"
       ? "liveactivity" : "alert", retry.live?.activityId ?? "", nowSeconds,
-  ) : null;
-  if (!config || !target) return fallBack(config ? "no_target" : "apns_unconfigured");
+  );
+  if (lookup.status !== "found") return fallBack(lookup.status === "unreadable" ? "target_unreadable" : "no_target");
+  const target = lookup.target;
+  if (target.kind === "alert" && target.mutedTopics === null) return fallBack("target_incomplete");
+  // The person may have muted this topic while the message waited.
+  const topic = retry.message?.body.topic;
+  if (retry.kind === "alert" && typeof topic === "string" && target.mutedTopics?.includes(topic)) {
+    await finishPushSend(deliveryEnv, dedupeKey, "sent").catch(() => undefined);
+    message.ack();
+    return;
+  }
 
   let result;
   try {
@@ -220,11 +246,17 @@ async function processOne(message: Message<unknown>, env: LinkEnv, events: Relay
     message.ack();
     return;
   }
-  if (result.outcome === "retryable" && !finalAttempt) {
-    events.push(relayEvent("push.retry", { attempt: message.attempts + 1, reason: safeCode(result.reason) }));
-    logPush("retry", result.reason);
-    message.retry({ delaySeconds: backoff(message.attempts) });
-    return;
+  if (result.outcome === "retryable") {
+    // The first try was inline, so this was the second failure or later. One more wait is only
+    // worth it if the push would still be fresh, and the rule keeps it to two tries in all.
+    const delay = backoff(message.attempts);
+    if (retryStillUseful(message.attempts + 1, nowSeconds, expiry, delay)) {
+      events.push(relayEvent("push.retry", { attempt: message.attempts + 1, reason: safeCode(result.reason) }));
+      logPush("retry", result.reason);
+      message.retry({ delaySeconds: delay });
+      return;
+    }
+    return fallBack("retries_exhausted");
   }
-  return fallBack(result.outcome === "retryable" ? "retries_exhausted" : fallbackReason(result));
+  return fallBack(fallbackReason(result));
 }

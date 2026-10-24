@@ -41,6 +41,11 @@ export interface SendApnsInput {
   collapseId?: string;
   payload: object;
   /**
+   * Unix milliseconds after which no new request starts and a running one is
+   * cut short, so the whole direct path stays inside the host's own timeout.
+   */
+  deadlineAt?: number;
+  /**
    * The last awaited step before the request leaves. Egress authority is
    * decided here, so nothing awaited may sit between it and `fetch`.
    */
@@ -51,6 +56,8 @@ export const DEFAULT_APNS_TOPIC = "app.loopdy.mobile";
 /** APNs rejects a new token under 20 minutes old and one over 60 minutes old. */
 export const APNS_TOKEN_MAX_AGE_MS = 40 * 60 * 1_000;
 export const APNS_TIMEOUT_MS = 5_000;
+/** A request is not started with less time than this left. */
+export const APNS_MIN_ATTEMPT_MS = 500;
 export const APNS_RESPONSE_BYTES = 4_096;
 /** APNs allows 4 KiB; this keeps a margin. */
 export const APNS_PAYLOAD_BYTES = 4_000;
@@ -195,6 +202,9 @@ export async function sendApns(input: SendApnsInput): Promise<ApnsResult> {
   const body = JSON.stringify(input.payload);
   let refused: string | undefined;
   for (let attempt = 0; attempt < 2; attempt += 1) {
+    if (input.deadlineAt !== undefined && Date.now() >= input.deadlineAt - APNS_MIN_ATTEMPT_MS) {
+      return { outcome: "rejected", status: 0, reason: "deadline", providerMs: 0 };
+    }
     let jwt: string;
     try {
       jwt = await apnsProviderToken(input.config, refused);
@@ -215,13 +225,15 @@ export async function sendApns(input: SendApnsInput): Promise<ApnsResult> {
     // Egress authority is the final decision. Keep it the last await before the request.
     await input.authorize();
     const startedAt = Date.now();
+    const timeoutMs = input.deadlineAt === undefined
+      ? APNS_TIMEOUT_MS : Math.max(1, Math.min(APNS_TIMEOUT_MS, input.deadlineAt - startedAt));
     let response: Response;
     try {
       response = await fetch(`https://${host}/3/device/${input.tokenHex}`, {
         method: "POST",
         headers,
         body,
-        signal: AbortSignal.timeout(APNS_TIMEOUT_MS),
+        signal: AbortSignal.timeout(timeoutMs),
         redirect: "manual",
       });
     } catch (error) {

@@ -11,10 +11,11 @@ import {
 } from "./apns.js";
 import {
   attachDeliveryMeta,
+  BuzzKitBackendError,
   type BuzzKitMessageReceipt,
   type ManagedMessage,
 } from "./buzzkit.js";
-import { claimPushSend, finishPushSend, releasePushSend } from "./push-sends.js";
+import { claimPushSend, finishPushSend, handPushSendToBuzzKit, releasePushSend } from "./push-sends.js";
 import {
   findPushTarget,
   markPushTargetInvalid,
@@ -22,6 +23,7 @@ import {
   pushTokenKeyConfigured,
   type PushTarget,
   type PushTargetEnv,
+  type PushTargetLookup,
   type PushTargetKind,
 } from "./push-targets.js";
 import { emitRelayEvents, logPush, relayEvent, safeCode, type RelayEvent } from "./push-telemetry.js";
@@ -87,6 +89,66 @@ export const MAX_QUEUE_RETRIES = 5;
 
 const ALERT_PRIORITY = 10;
 
+/** The direct path (database, provider token, both APNs tries) gives up after this. The host waits 12 s. */
+export const DIRECT_DEADLINE_MS = 8_000;
+/** After this many failed direct tries a message goes through BuzzKit. */
+export const MAX_DIRECT_TRIES = 2;
+
+/**
+ * Whether waiting for another direct try is still worth it: it has failed fewer
+ * than twice, and the next try would still land before the push expires.
+ */
+export function retryStillUseful(
+  failedTries: number, nowSeconds: number, expirySeconds: number, nextDelaySeconds: number,
+): boolean {
+  return failedTries < MAX_DIRECT_TRIES && nowSeconds + nextDelaySeconds < expirySeconds;
+}
+
+// MARK: Circuit breaker
+
+const BREAKER_THRESHOLD = 3;
+const BREAKER_COOLDOWN_MS = 60_000;
+/** Refusals that say something is wrong with this Worker's APNs setup, not with one token or message. */
+const SETUP_REASONS = new Set([
+  "bad_topic", "topic_disallowed", "missing_topic", "forbidden", "bad_certificate",
+  "bad_certificate_environment", "provider_key_invalid",
+]);
+let breaker = { failureClass: "", count: 0, openUntil: 0 };
+
+/** Closes the breaker. For tests. */
+export function resetApnsBreaker(): void {
+  breaker = { failureClass: "", count: 0, openUntil: 0 };
+}
+
+function breakerIsOpen(): boolean {
+  return Date.now() < breaker.openUntil;
+}
+
+/**
+ * After three setup failures in a row of the same kind, direct sends pause for a
+ * minute in this isolate. Otherwise a bad key would add round trips to every send.
+ */
+function recordBreaker(result: ApnsResult): void {
+  if (result.outcome === "sent") {
+    breaker = { failureClass: "", count: 0, openUntil: 0 };
+    return;
+  }
+  const failureClass = result.outcome === "provider_token" ? "provider_token"
+    : result.outcome === "rejected" && SETUP_REASONS.has(result.reason) ? result.reason : null;
+  if (!failureClass) return;
+  breaker.count = breaker.failureClass === failureClass ? breaker.count + 1 : 1;
+  breaker.failureClass = failureClass;
+  if (breaker.count >= BREAKER_THRESHOLD) {
+    breaker.openUntil = Date.now() + BREAKER_COOLDOWN_MS;
+    breaker.count = 0;
+  }
+}
+
+/** True while direct sends are paused. */
+export function apnsBreakerOpen(): boolean {
+  return breakerIsOpen();
+}
+
 export function deliveryMode(env: { DIRECT_APNS?: string }): DeliveryMode {
   const value = env.DIRECT_APNS?.trim().toLowerCase();
   return value === "on" || value === "shadow" ? value : "off";
@@ -109,6 +171,12 @@ function targetKindFor(kind: PushKind): PushTargetKind {
 export function hostToWorkerMs(occurredAtMs: number | undefined, nowMs = Date.now()): number | undefined {
   if (occurredAtMs === undefined) return undefined;
   return Math.min(86_400_000, Math.max(0, Math.round(nowMs - occurredAtMs)));
+}
+
+/** True for a sealed alert: only the phone can read its text. */
+export function isSealedMessage(body: Record<string, unknown>): boolean {
+  const loopdy = (body.data as { loopdy?: { sealed?: unknown } } | undefined)?.loopdy;
+  return Boolean(loopdy && typeof loopdy.sealed === "object" && loopdy.sealed !== null);
 }
 
 // MARK: Payloads
@@ -218,10 +286,17 @@ async function chooseRoute(
     fallbackEvent(env, ctx, "apns_unconfigured");
     return { via: "buzzkit" };
   }
+  const canary = canaryInstallations(env).has(owner.credentialId.toLowerCase());
+  if (mode === "on" || canary) {
+    if (breakerIsOpen()) {
+      fallbackEvent(env, ctx, "apns_breaker_open");
+      return { via: "buzzkit" };
+    }
+  }
   const nowSeconds = Math.floor(Date.now() / 1_000);
-  let target: PushTarget | null;
+  let lookup: PushTargetLookup;
   try {
-    target = await findPushTarget(
+    lookup = await findPushTarget(
       env, { installationId: owner.credentialId, ownerCoordinate: owner.coordinate },
       targetKindFor(kind), activityId, nowSeconds,
     );
@@ -230,17 +305,23 @@ async function chooseRoute(
     fallbackEvent(env, ctx, "target_lookup_failed");
     return { via: "buzzkit" };
   }
-  const canary = canaryInstallations(env).has(owner.credentialId.toLowerCase());
   if (mode === "shadow" && !canary) {
     // Say what would have happened, and send as before.
-    if (target) emitRelayEvents(env, ctx, [relayEvent("push.shadow", { eventType, wouldUseDirect: true })]);
+    if (lookup.status === "found") {
+      emitRelayEvents(env, ctx, [relayEvent("push.shadow", { eventType, wouldUseDirect: true })]);
+    }
     return { via: "buzzkit" };
   }
-  if (!target) {
-    fallbackEvent(env, ctx, "no_target");
+  if (lookup.status !== "found") {
+    fallbackEvent(env, ctx, lookup.status === "unreadable" ? "target_unreadable" : "no_target");
     return { via: "buzzkit" };
   }
-  return { via: "direct", config, target };
+  // Without the person's muted topics the Worker can't honour them, as BuzzKit does.
+  if (lookup.target.kind === "alert" && lookup.target.mutedTopics === null) {
+    fallbackEvent(env, ctx, "target_incomplete");
+    return { via: "buzzkit" };
+  }
+  return { via: "direct", config, target: lookup.target };
 }
 
 function fallbackEvent(env: DeliveryEnv, ctx: ExecCtx | undefined, reason: string): void {
@@ -261,6 +342,7 @@ export interface DirectAttemptInput {
   startedAt: number;
   attempt: number;
   hostToWorkerMs?: number;
+  deadlineAt?: number;
   authorize: () => Promise<void>;
 }
 
@@ -280,8 +362,10 @@ export async function directAttempt(input: DirectAttemptInput, events: RelayEven
     apnsId: input.apnsId,
     ...(spec.collapseId ? { collapseId: spec.collapseId } : {}),
     payload: spec.payload,
+    ...(input.deadlineAt !== undefined ? { deadlineAt: input.deadlineAt } : {}),
     authorize: input.authorize,
   });
+  recordBreaker(result);
   events.push(relayEvent("push.sent", {
     eventType: spec.eventType,
     path: "direct",
@@ -325,8 +409,12 @@ interface DirectRun {
   apnsId: string;
   authorize: () => Promise<void>;
   hostToWorkerMs?: number;
+  /** Unix milliseconds the whole direct path must end by. */
+  deadlineAt: number;
   /** Set when a transient failure may wait in the retry queue. */
   retry?: ApnsRetryMessage;
+  /** Why a transient failure goes to BuzzKit instead of the queue. */
+  noQueueReason: string;
 }
 
 type DirectOutcome =
@@ -346,45 +434,57 @@ async function runDirect(run: DirectRun): Promise<DirectOutcome> {
   if (claim.status === "duplicate") {
     return { done: true, status: "duplicate", providerStatus: claim.state === "sent" ? "sent" : "queued" };
   }
-  if (Math.random() < 1 / 32) {
+  // Another request is sending this message right now. Nothing has been sent that this
+  // answer could stand for, so say "try again": the host retries a 503 and never drops
+  // its grant for it.
+  if (claim.status === "in_flight") throw new BuzzKitBackendError(503, "push_in_flight");
+  // An earlier attempt gave this message to BuzzKit, which deduplicates by the same key.
+  if (claim.status === "buzzkit") return { done: false };
+  if (Math.random() < 1 / 16) {
     const purge = purgeExpiredPushState(env, nowSeconds).catch(() => undefined);
     try { run.ctx?.waitUntil(purge); } catch { /* nothing to wait for */ }
   }
   const events: RelayEvent[] = [];
   let outcome: DirectOutcome = { done: false };
-  let keepClaim = false;
+  // Release the claim unless the message was sent, queued or handed to BuzzKit.
+  let release = true;
   try {
     const result = await directAttempt({
       env, owner: run.owner, config: run.route.config, target: run.route.target, spec,
-      apnsId: run.apnsId, startedAt: nowSeconds, attempt: 1,
+      apnsId: run.apnsId, startedAt: nowSeconds, attempt: 1, deadlineAt: run.deadlineAt,
       ...(run.hostToWorkerMs !== undefined ? { hostToWorkerMs: run.hostToWorkerMs } : {}),
       authorize: run.authorize,
     }, events);
+    let fallback: string | null = null;
     if (result.outcome === "sent") {
       await finishPushSend(env, dedupeKey, "sent").catch(() => undefined);
-      keepClaim = true;
+      release = false;
       outcome = { done: true, status: "accepted", providerStatus: "sent" };
     } else if (result.outcome === "retryable" && run.retry) {
-      const queued = await enqueueRetry(env, run.retry, RETRY_DELAYS_SECONDS[0]);
-      if (queued) {
+      if (retryStillUseful(1, nowSeconds, nowSeconds + spec.ttlSeconds, RETRY_DELAYS_SECONDS[0])
+          && await enqueueRetry(env, run.retry, RETRY_DELAYS_SECONDS[0])) {
         await finishPushSend(env, dedupeKey, "queued").catch(() => undefined);
-        keepClaim = true;
+        release = false;
         events.push(relayEvent("push.retry", { attempt: 1, reason: safeCode(result.reason) }));
         logPush("retry", result.reason);
         outcome = { done: true, status: "accepted", providerStatus: "queued" };
       } else {
-        events.push(relayEvent("push.fallback_buzzkit", { reason: "queue_unavailable" }));
-        logPush("fallback_buzzkit", "queue_unavailable");
+        fallback = "queue_unavailable";
       }
+    } else if (result.outcome === "retryable") {
+      fallback = run.noQueueReason;
     } else {
-      const reason = fallbackReason(result);
-      events.push(relayEvent("push.fallback_buzzkit", { reason: safeCode(reason) }));
-      logPush("fallback_buzzkit", reason);
+      fallback = fallbackReason(result);
+    }
+    if (fallback) {
+      events.push(relayEvent("push.fallback_buzzkit", { reason: safeCode(fallback) }));
+      logPush("fallback_buzzkit", fallback);
+      // A repeat of this message goes to BuzzKit too, so the phone can't get it twice.
+      if (await handPushSendToBuzzKit(env, dedupeKey).then(() => true, () => false)) release = false;
     }
     return outcome;
   } finally {
-    // A message that went another way, or failed, must not block the host's retry.
-    if (!keepClaim) await releasePushSend(env, dedupeKey).catch(() => undefined);
+    if (release) await releasePushSend(env, dedupeKey).catch(() => undefined);
     emitRelayEvents(env, run.ctx, events);
   }
 }
@@ -453,6 +553,7 @@ export interface DeliverMessageInput {
 /** Delivers a sealed or rich alert, or the sign-in wake, by the best route. */
 export async function deliverMessage(input: DeliverMessageInput): Promise<BuzzKitMessageReceipt> {
   const { env, ctx, owner, kind, eventType, message } = input;
+  const deadlineAt = Date.now() + DIRECT_DEADLINE_MS;
   const priority = kind === "wake" ? 5 : ALERT_PRIORITY;
   const hostMs = hostToWorkerMs(message.occurredAtMs);
   const info = { eventType, priority, ...(hostMs !== undefined ? { hostToWorkerMs: hostMs } : {}) } as const;
@@ -466,17 +567,28 @@ export async function deliverMessage(input: DeliverMessageInput): Promise<BuzzKi
   }
   const dedupeKey = sendKey(owner.credentialId, kind, message.idempotencyKey);
   const apnsId = await apnsIdFor(dedupeKey);
+  // A topic this person turned off is not sent. BuzzKit accepts such a message and
+  // delivers it to nobody, and the host is told the same. Wakes ignore topics.
+  const topic = message.body.topic;
+  if (kind === "alert" && typeof topic === "string" && route.target.mutedTopics?.includes(topic)) {
+    return {
+      status: "accepted", deliveryId: apnsId, providerStatus: "suppressed", counts: { total: 0, sent: 0 },
+    };
+  }
+  // A rich alert's text is plain. It is never put on a queue.
+  const sealed = kind === "wake" || isSealedMessage(message.body);
   const outcome = await runDirect({
-    env, ctx, owner, route, spec, dedupeKey, apnsId, authorize: input.authorize,
+    env, ctx, owner, route, spec, dedupeKey, apnsId, authorize: input.authorize, deadlineAt,
     ...(hostMs !== undefined ? { hostToWorkerMs: hostMs } : {}),
-    retry: {
-      v: 1, kind, grantId: input.grantId, eventType, dedupeKey,
+    noQueueReason: "plaintext_not_queued",
+    ...(sealed ? { retry: {
+      v: 1 as const, kind, grantId: input.grantId, eventType, dedupeKey,
       message: {
         body: message.body, idempotencyKey: message.idempotencyKey,
         ...(message.occurredAtMs !== undefined ? { occurredAtMs: message.occurredAtMs } : {}),
       },
       enqueuedAt: Date.now(),
-    },
+    } } : {}),
   });
   if (!outcome.done) return viaBuzzKit(env, ctx, info, input.sendViaBuzzKit, (value) => value.status);
   return {
@@ -502,6 +614,7 @@ export async function deliverTest(
   input: DeliverTestInput,
 ): Promise<{ id: string; state: "accepted" | "failed"; providerStatus: string }> {
   const { env, ctx, owner } = input;
+  const deadlineAt = Date.now() + DIRECT_DEADLINE_MS;
   const info = { eventType: "test", priority: ALERT_PRIORITY } as const;
   const route = await chooseRoute(env, ctx, owner, "test", "test", "");
   if (route.via === "buzzkit") return viaBuzzKit(env, ctx, info, input.sendViaBuzzKit, (value) => value.state);
@@ -513,7 +626,8 @@ export async function deliverTest(
   const dedupeKey = sendKey(owner.credentialId, "test", input.requestId);
   const apnsId = await apnsIdFor(dedupeKey);
   const outcome = await runDirect({
-    env, ctx, owner, route, spec, dedupeKey, apnsId, authorize: input.authorize,
+    env, ctx, owner, route, spec, dedupeKey, apnsId, authorize: input.authorize, deadlineAt,
+    noQueueReason: "not_queued",
   });
   if (!outcome.done) return viaBuzzKit(env, ctx, info, input.sendViaBuzzKit, (value) => value.state);
   return { id: apnsId, state: "accepted", providerStatus: outcome.providerStatus };
@@ -535,6 +649,7 @@ export async function deliverLiveActivity(
   input: DeliverLiveActivityInput,
 ): Promise<{ status: "accepted" | "duplicate"; deliveryId: string }> {
   const { env, ctx, owner, live } = input;
+  const deadlineAt = Date.now() + DIRECT_DEADLINE_MS;
   const info = { eventType: "liveactivity", priority: ALERT_PRIORITY } as const;
   const route = await chooseRoute(env, ctx, owner, "liveactivity", "liveactivity", live.activityId);
   if (route.via === "buzzkit") return viaBuzzKit(env, ctx, info, input.sendViaBuzzKit, (value) => value.status);
@@ -547,7 +662,8 @@ export async function deliverLiveActivity(
   const dedupeKey = sendKey(owner.credentialId, "liveactivity", `${live.activityId}|${input.updateId}`);
   const apnsId = await apnsIdFor(dedupeKey);
   const outcome = await runDirect({
-    env, ctx, owner, route, spec, dedupeKey, apnsId, authorize: input.authorize,
+    env, ctx, owner, route, spec, dedupeKey, apnsId, authorize: input.authorize, deadlineAt,
+    noQueueReason: "no_queue",
     retry: {
       v: 1, kind: "liveactivity", grantId: input.grantId, eventType: "liveactivity", dedupeKey,
       live: { ...live, updateId: input.updateId },

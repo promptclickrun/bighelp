@@ -1,5 +1,6 @@
 import { decodeBase64URL, encodeBase64URL } from "./encoding.js";
 import type { ApnsEnvironment } from "./apns.js";
+import { LOOPDY_BUZZKIT_TOPICS } from "./buzzkit.js";
 
 export type PushTargetKind = "alert" | "liveactivity" | "pts";
 
@@ -16,6 +17,8 @@ export interface PushTargetInput {
   token: string;
   environment: ApnsEnvironment;
   appVersion: string;
+  /** The topic slugs this person turned off. Required for an alert target. */
+  mutedTopics?: string[];
 }
 
 /** A stored target with its token opened. Never log or return one. */
@@ -25,6 +28,8 @@ export interface PushTarget {
   environment: ApnsEnvironment;
   token: string;
   appVersion: string;
+  /** The topics this person turned off, or null when the app never said. */
+  mutedTopics: string[] | null;
   /** The stored ciphertext, to tell whether the row changed since it was read. */
   ciphertext: string;
 }
@@ -34,18 +39,31 @@ export const LONG_TARGET_SECONDS = 60 * 86_400;
 /** A Live Activity token is useful for 12 hours at most. */
 export const LIVE_ACTIVITY_TARGET_SECONDS = 12 * 3_600;
 export const MAX_LIVE_ACTIVITY_TARGETS = 8;
-const PURGE_BATCH = 50;
+const PURGE_BATCH = 100;
+/** Send records are kept this long past their expiry before they are purged. */
+const SEND_PURGE_MARGIN_SECONDS = 3_600;
+export const TARGET_WRITES_PER_HOUR = 30;
 const CIPHERTEXT_VERSION = "v1.";
 
 export const TOKEN_PATTERN = /^(?:[0-9a-f]{2}){32,100}$/;
 export const ACTIVITY_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+/** The topic slugs the app can turn off. */
+export const KNOWN_TOPICS: readonly string[] = LOOPDY_BUZZKIT_TOPICS.map((topic) => topic.slug);
+
+/** A unique list of known slugs, or null. */
+export function parseMutedTopics(value: unknown): string[] | null {
+  if (!Array.isArray(value) || value.length > KNOWN_TOPICS.length) return null;
+  if (value.some((topic) => typeof topic !== "string" || !KNOWN_TOPICS.includes(topic))) return null;
+  return new Set(value).size === value.length ? [...value].sort() as string[] : null;
+}
+
 export const APP_VERSION_PATTERN = /^[0-9]{1,4}(\.[0-9]{1,4}){0,3}\([0-9]{1,7}\)$/;
 
 const keys = new Map<string, Promise<CryptoKey>>();
 
 /** True when this error is only a table that migration 0010 has not created yet. */
 export function isMissingPushTable(error: unknown): boolean {
-  return error instanceof Error && /no such table: push_(targets|sends)/i.test(error.message);
+  return error instanceof Error && /no such table: push_/i.test(error.message);
 }
 
 function keyBytes(value: string | undefined): Uint8Array | null {
@@ -131,18 +149,18 @@ export async function putPushTarget(
   const ciphertext = await sealPushToken(env, principal.installationId, input.kind, input.activityId, input.token);
   const expiresAt = now + (input.kind === "liveactivity" ? LIVE_ACTIVITY_TARGET_SECONDS : LONG_TARGET_SECONDS);
   const result = await env.ACCOUNTS.prepare(`INSERT INTO push_targets(
-      installation_id,kind,activity_id,environment,token_ciphertext,app_version,
+      installation_id,kind,activity_id,environment,token_ciphertext,muted_topics,app_version,
       authorization_epoch,updated_at,invalid_at,expires_at)
-    SELECT ?,?,?,?,?,?,?,?,NULL,?
+    SELECT ?,?,?,?,?,?,?,?,?,NULL,?
     WHERE EXISTS(SELECT 1 FROM notification_installations
       WHERE installation_id=? AND notification_coordinate=? AND state='active' AND authorization_epoch=?)
     ON CONFLICT(installation_id,kind,activity_id) DO UPDATE SET
       environment=excluded.environment,token_ciphertext=excluded.token_ciphertext,
-      app_version=excluded.app_version,authorization_epoch=excluded.authorization_epoch,
+      muted_topics=excluded.muted_topics,app_version=excluded.app_version,authorization_epoch=excluded.authorization_epoch,
       updated_at=excluded.updated_at,invalid_at=NULL,expires_at=excluded.expires_at`)
     .bind(
       principal.installationId, input.kind, input.activityId, input.environment, ciphertext,
-      input.appVersion, principal.authorizationEpoch, now, expiresAt,
+      input.kind === "alert" && input.mutedTopics ? JSON.stringify([...input.mutedTopics].sort()) : null, input.appVersion, principal.authorizationEpoch, now, expiresAt,
       principal.installationId, principal.ownerCoordinate, principal.authorizationEpoch,
     ).run();
   if (result.meta.changes !== 1) return null;
@@ -170,13 +188,20 @@ interface TargetRow {
   environment: ApnsEnvironment;
   token_ciphertext: string;
   app_version: string;
+  muted_topics: string | null;
 }
 
+export type PushTargetLookup =
+  | { status: "found"; target: PushTarget }
+  | { status: "none" }
+  /** A row exists but its token won't open (the key changed, or the row is damaged). */
+  | { status: "unreadable" };
+
 /**
- * The installation's live target of this kind, opened. Null when there is none,
- * it is expired or marked invalid, the installation is no longer active, the
- * key is missing or the row can't be opened. A table that isn't there yet
- * counts as no target, so a Worker deployed before the migration keeps working.
+ * The installation's live target of this kind, opened. "None" when there is no
+ * row, it is expired or marked invalid, or the installation is no longer active.
+ * A table that isn't there yet counts as none, so a Worker deployed before the
+ * migration keeps working.
  */
 export async function findPushTarget(
   env: PushTargetEnv,
@@ -184,10 +209,11 @@ export async function findPushTarget(
   kind: PushTargetKind,
   activityId: string,
   now: number,
-): Promise<PushTarget | null> {
+): Promise<PushTargetLookup> {
   let row: TargetRow | null;
   try {
-    row = await env.ACCOUNTS.prepare(`SELECT target.environment,target.token_ciphertext,target.app_version
+    row = await env.ACCOUNTS.prepare(`SELECT target.environment,target.token_ciphertext,
+        target.app_version,target.muted_topics
       FROM push_targets target
       JOIN notification_installations installation
         ON installation.installation_id=target.installation_id
@@ -201,16 +227,35 @@ export async function findPushTarget(
       .bind(installation.installationId, kind, activityId, now, installation.ownerCoordinate)
       .first<TargetRow>();
   } catch (error) {
-    if (isMissingPushTable(error)) return null;
+    if (isMissingPushTable(error)) return { status: "none" };
     throw error;
   }
-  if (!row) return null;
+  if (!row) return { status: "none" };
   const token = await openPushToken(env, installation.installationId, kind, activityId, row.token_ciphertext);
-  if (!token) return null;
+  if (!token) return { status: "unreadable" };
+  let mutedTopics: string[] | null = null;
+  if (row.muted_topics !== null) {
+    try { mutedTopics = parseMutedTopics(JSON.parse(row.muted_topics)); } catch { mutedTopics = null; }
+  }
   return {
-    kind, activityId, environment: row.environment, token, appVersion: row.app_version,
-    ciphertext: row.token_ciphertext,
+    status: "found",
+    target: {
+      kind, activityId, environment: row.environment, token, appVersion: row.app_version,
+      mutedTopics, ciphertext: row.token_ciphertext,
+    },
   };
+}
+
+/**
+ * Counts one write to a target route. False once the installation has made too
+ * many in this hour.
+ */
+export async function allowTargetWrite(env: PushTargetEnv, installationId: string, now: number): Promise<boolean> {
+  const window = Math.floor(now / 3_600) * 3_600;
+  const result = await env.ACCOUNTS.prepare(`INSERT INTO push_target_writes(installation_id,window_start,writes)
+    VALUES(?,?,1) ON CONFLICT(installation_id,window_start) DO UPDATE SET writes=writes+1
+    WHERE writes<?`).bind(installationId, window, TARGET_WRITES_PER_HOUR).run();
+  return result.meta.changes === 1;
 }
 
 /** Marks the exact token APNs refused. A newer token for the same slot is left alone. */
@@ -231,6 +276,7 @@ export async function deleteInstallationPushState(env: PushTargetEnv, installati
     await env.ACCOUNTS.batch([
       env.ACCOUNTS.prepare("DELETE FROM push_targets WHERE installation_id=?").bind(installationId),
       env.ACCOUNTS.prepare("DELETE FROM push_sends WHERE installation_id=?").bind(installationId),
+      env.ACCOUNTS.prepare("DELETE FROM push_target_writes WHERE installation_id=?").bind(installationId),
     ]);
   } catch (error) {
     // Before migration 0010 there is nothing to delete.
@@ -245,7 +291,11 @@ export async function purgeExpiredPushState(env: PushTargetEnv, now: number): Pr
       env.ACCOUNTS.prepare(`DELETE FROM push_targets WHERE rowid IN (
         SELECT rowid FROM push_targets WHERE expires_at<=? LIMIT ?)`).bind(now, PURGE_BATCH),
       env.ACCOUNTS.prepare(`DELETE FROM push_sends WHERE rowid IN (
-        SELECT rowid FROM push_sends WHERE expires_at<=? LIMIT ?)`).bind(now, PURGE_BATCH),
+        SELECT rowid FROM push_sends WHERE expires_at<=? LIMIT ?)`)
+        .bind(now - SEND_PURGE_MARGIN_SECONDS, PURGE_BATCH),
+      env.ACCOUNTS.prepare(`DELETE FROM push_target_writes WHERE rowid IN (
+        SELECT rowid FROM push_target_writes WHERE window_start<? LIMIT ?)`)
+        .bind(now - 7_200, PURGE_BATCH),
     ]);
   } catch (error) {
     if (!isMissingPushTable(error)) throw error;

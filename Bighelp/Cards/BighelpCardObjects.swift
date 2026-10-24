@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 /// The object components (plugin feature `native-card-objects-v1`): one real
@@ -270,14 +271,178 @@ struct BighelpCardMusic: Equatable, Sendable {
         return search?.url
     }
 
-    /// "Song · Sample Artist".
-    var detail: String {
-        let kindName: String = switch kind {
+    /// "Song", "Album", "Playlist" or "Artist".
+    var kindName: String {
+        switch kind {
         case .song: String(localized: "Song")
         case .album: String(localized: "Album")
         case .playlist: String(localized: "Playlist")
         case .artist: String(localized: "Artist")
         }
-        return [kindName, artist].compactMap { $0 }.joined(separator: " · ")
+    }
+
+    /// "Song · Sample Artist".
+    var detail: String {
+        [kindName, artist].compactMap { $0 }.joined(separator: " · ")
+    }
+
+    /// What VoiceOver calls the card's picture.
+    var artworkLabel: String {
+        switch kind {
+        case .song, .album: String(localized: "Album artwork for \(title)")
+        case .playlist: String(localized: "Playlist artwork for \(title)")
+        case .artist: String(localized: "Picture of \(title)")
+        }
+    }
+}
+
+// MARK: - Music artwork lookup
+
+/// Where a music card's picture comes from without signing in: Apple's public
+/// lookup by store id, else its search by title and artist. Only the picture
+/// Apple lists for that item is ever shown; a search answer that names another
+/// song or artist is no answer.
+enum BighelpCardMusicLookup {
+    static let timeout: TimeInterval = 6
+    static let maximumResponseBytes = 256 * 1024
+    static let maximumImageBytes = 4 * 1024 * 1024
+    /// Sharp at 3x for the card's largest picture.
+    static let artworkPixels = 600
+
+    struct StoreID: Equatable, Sendable {
+        let id: String
+        /// The two-letter store in the link (`us`), so the lookup asks the right country.
+        let storefront: String?
+    }
+
+    /// Library ids (`i.…`, `l.…`, `p.…`) live only on the person's devices.
+    static func isLibraryID(_ id: String) -> Bool {
+        let parts = id.split(separator: ".", maxSplits: 1)
+        return parts.count == 2 && parts[0].count == 1 && parts[0].allSatisfy { $0.isASCII && $0.isLetter }
+    }
+
+    static func isStoreNumber(_ text: some StringProtocol) -> Bool {
+        !text.isEmpty && text.count <= 20 && text.unicodeScalars.allSatisfy { (0x30...0x39).contains($0.value) }
+    }
+
+    /// The card's link first (it names the item and the store), then a numeric catalog `music_id`.
+    static func storeID(for music: BighelpCardMusic) -> StoreID? {
+        if let url = music.url, let id = storeID(from: url, kind: music.kind) { return id }
+        if let id = music.musicID, music.source != .library, !isLibraryID(id), isStoreNumber(id) {
+            return StoreID(id: id, storefront: nil)
+        }
+        return nil
+    }
+
+    /// `…/us/album/name/123?i=456` is song 456 on album 123: a song card takes
+    /// 456, anything else 123. Old links spell the id `id123`.
+    static func storeID(from url: URL, kind: BighelpCardMusic.Kind) -> StoreID? {
+        guard url.host == "music.apple.com",
+              let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
+        let path = components.path.split(separator: "/").map(String.init)
+        let storefront = path.first.flatMap { first -> String? in
+            first.count == 2 && first.allSatisfy({ $0.isASCII && $0.isLowercase }) ? first : nil
+        }
+        if kind == .song, let song = components.queryItems?.first(where: { $0.name == "i" })?.value,
+           isStoreNumber(song) {
+            return StoreID(id: song, storefront: storefront)
+        }
+        for part in path.reversed() {
+            let digits = part.hasPrefix("id") ? String(part.dropFirst(2)) : part
+            if isStoreNumber(digits) { return StoreID(id: digits, storefront: storefront) }
+        }
+        return nil
+    }
+
+    static func lookupURL(_ id: StoreID) -> URL? {
+        var components = URLComponents(string: "https://itunes.apple.com/lookup")
+        var items = [URLQueryItem(name: "id", value: id.id)]
+        if let storefront = id.storefront { items.append(URLQueryItem(name: "country", value: storefront)) }
+        components?.queryItems = items
+        return components?.url
+    }
+
+    /// Apple's search lists no pictures for artists or playlists, so those never search.
+    static func searchURL(for music: BighelpCardMusic) -> URL? {
+        let entity: String
+        switch music.kind {
+        case .song: entity = "song"
+        case .album: entity = "album"
+        case .playlist, .artist: return nil
+        }
+        var components = URLComponents(string: "https://itunes.apple.com/search")
+        components?.queryItems = [
+            URLQueryItem(name: "term", value: [music.title, music.artist].compactMap { $0 }.joined(separator: " ")),
+            URLQueryItem(name: "media", value: "music"),
+            URLQueryItem(name: "entity", value: entity),
+            URLQueryItem(name: "limit", value: "5"),
+        ]
+        return components?.url
+    }
+
+    /// `…/100x100bb.jpg` → `…/600x600bb.jpg`, on Apple's picture servers only.
+    static func largeArtworkURL(_ text: String) -> URL? {
+        let large = text.replacingOccurrences(of: "100x100", with: "\(artworkPixels)x\(artworkPixels)")
+        guard let url = URL(string: large), let host = url.host?.lowercased(),
+              host == "mzstatic.com" || host.hasSuffix(".mzstatic.com"),
+              (try? BighelpCardNetworkPolicy.validate(url)) != nil else { return nil }
+        return url
+    }
+
+    private struct Response: Decodable {
+        let results: [Item]
+    }
+
+    private struct Item: Decodable {
+        let artworkUrl100: String?
+        let trackName: String?
+        let collectionName: String?
+        let artistName: String?
+    }
+
+    /// The picture's address in a lookup or search answer. A lookup asked for
+    /// one id, so its first picture is that item's; a search answer must name
+    /// the card's title (and artist, when the card has one).
+    static func artworkURL(in data: Data, for music: BighelpCardMusic, matchingNames: Bool) -> URL? {
+        guard data.count <= maximumResponseBytes,
+              let response = try? JSONDecoder().decode(Response.self, from: data) else { return nil }
+        for item in response.results {
+            guard let artwork = item.artworkUrl100, let url = largeArtworkURL(artwork) else { continue }
+            if !matchingNames { return url }
+            let name = music.kind == .album ? item.collectionName : item.trackName
+            guard let name, sameName(name, music.title) else { continue }
+            if let artist = music.artist {
+                guard let found = item.artistName, sameName(found, artist) else { continue }
+            }
+            return url
+        }
+        return nil
+    }
+
+    /// Letters and digits only, case and accents folded; one may run on past
+    /// the other ("Sample Song (Remastered)", "The Placeholders & Friends").
+    static func sameName(_ found: String, _ wanted: String) -> Bool {
+        let a = folded(found), b = folded(wanted)
+        guard !a.isEmpty, !b.isEmpty else { return false }
+        return a == b || a.hasPrefix(b) || b.hasPrefix(a)
+    }
+
+    private static func folded(_ text: String) -> String {
+        let plain = text.folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: nil)
+        var result = String.UnicodeScalarView()
+        // Scalar properties, not `CharacterSet`, which has rejected plain text on some iPhones.
+        for scalar in plain.unicodeScalars
+        where scalar.properties.isAlphabetic || scalar.properties.numericType != nil {
+            result.append(scalar)
+        }
+        return String(result)
+    }
+
+    /// One name per card's item, the same on every launch: what the cache files are called.
+    static func cacheKey(for music: BighelpCardMusic) -> String {
+        let parts = ["v1", music.kind.rawValue, music.source?.rawValue ?? "", music.musicID ?? "",
+                     music.url?.absoluteString ?? "", music.title, music.artist ?? ""]
+        let digest = SHA256.hash(data: Data(parts.joined(separator: "\u{1F}").utf8))
+        return digest.map { String(format: "%02x", $0) }.joined()
     }
 }

@@ -12,6 +12,7 @@ final class NotificationService: BuzzKitNotificationService, @unchecked Sendable
 
     override func didReceive(_ request: UNNotificationRequest,
                              withContentHandler contentHandler: @escaping (UNNotificationContent) -> Void) {
+        BighelpDeliveryReceipts.record(userInfo: request.content.userInfo, receivedAt: Date())
         // Anything that isn't a sealed alert, or can't be opened, shows as sent,
         // in its agent's stack (unsealed alerts are titled with the agent's name).
         guard let sealed = BighelpSealedNotification(userInfo: request.content.userInfo),

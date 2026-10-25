@@ -324,7 +324,7 @@ installation IDs and message text. Don't add a log line that does.
 | Kind | Name |
 |---|---|
 | Secrets | `APNS_KEY_P8` (the `.p8` file's text), `APNS_KEY_ID`, `APNS_TEAM_ID`, `PUSH_TOKEN_KEY` (base64 of 32 random bytes) |
-| Vars | `APNS_TOPIC` (`app.loopdy.mobile`), `DIRECT_APNS` (`off`), `DIRECT_APNS_CANARY` (empty) |
+| Vars | `APNS_TOPIC` (`app.loopdy.mobile`), `DIRECT_APNS` (`on` in `wrangler.jsonc` since the 2.6.20 rollout; `off` when unset), `DIRECT_APNS_CANARY` (empty) |
 | Queue | Producer `APNS_RETRY`, consumer for `loopdy-link-apns-retry` |
 | Service | Optional `TELEMETRY` to `bighelp-telemetry`, entrypoint `TelemetryIngest` |
 

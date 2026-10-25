@@ -196,13 +196,13 @@ PDF (the last pick is kept), see exactly what goes out, then Copy or Share…. M
 with Unicode letters for apps that show no Markdown, with a note that some apps and screen readers can't read them;
 the PDF is named for the agent ("Message from Avery Park.pdf"). The converter is `ChatMessageExport`.
 
-Holding a message lifts the whole bubble and floats a reaction bar over it, like Messages' tapback: the six common
-reactions in a solid pill (the raised surface; nothing under it shows through), then + for any emoji
-(`ChatReactionBarProjection`, `ChatMessageMenuDriver`). The menu below has no React item. A tap reacts and closes the
-menu; the person's reaction shows chosen and a second tap takes it away. The pill lifts with the bubble, so the system
-fits both on screen and everything else stays under the menu's blur; the emoji sit in the bar's own pass-through
-window over that pill (`ChatReactionBarOverlay`). The Mac, Vision Pro and VoiceOver get the
-same reactions as the menu's first row of icons instead.
+Holding a message lifts the whole bubble and offers the six common reactions, then a + More reactions row for any emoji
+(`ChatReactionBarProjection`, `ChatMessageMenuDriver`). Reactions are the native menu's first row of icons on every
+platform, so UIKit fits them and the actions together even beside a screen-height message. A tap reacts and closes
+the menu; the person's reaction shows chosen and a second tap takes it away. A chosen custom emoji gets its own row,
+so UIKit never clips a seventh palette item. + waits for the menu to close, then
+opens Apple's emoji keyboard; choosing one emoji reacts immediately. There is no custom emoji grid. Mac and
+Vision Pro use their system text input for that same choice.
 
 Reactions use Hermes' own: the app saves them with `message.react`, and with Settings › Chat › "Agents see your
 reactions" on (the host's `display.message_reactions`), Hermes tells the agent at its next turn. The app sends no

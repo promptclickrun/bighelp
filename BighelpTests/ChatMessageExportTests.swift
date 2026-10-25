@@ -109,7 +109,7 @@ struct ChatMessageExportTests {
         driver.actions = ChatMessageMenuActions(
             copyActionLabel: "Copy to clipboard", onCopy: {}, onSelect: {}, onFork: nil, onReply: nil,
             reactions: nil, onShare: {})
-        let titles = (driver.menu(floatsReactions: true)?.children ?? []).compactMap { ($0 as? UIAction)?.title }
+        let titles = (driver.menu()?.children ?? []).compactMap { ($0 as? UIAction)?.title }
         let copy = titles.firstIndex(of: "Copy to clipboard")
         #expect(copy != nil)
         #expect(titles.firstIndex(of: "Share…") == copy.map { $0 + 1 })

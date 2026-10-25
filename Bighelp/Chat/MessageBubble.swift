@@ -273,7 +273,6 @@ struct MessageBubble: View {
             #else
             .bighelpSheet(isPresented: $isReactionPickerPresented) {
                 reactionPicker
-                    .presentationDetents([.medium])
                     .presentationDragIndicator(.visible)
             }
             #endif

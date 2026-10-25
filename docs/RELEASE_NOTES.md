@@ -3,6 +3,17 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.21
+
+### Fixed
+
+- **Cloudflare Access:** bighelp connects when you open it after a long time in the background. Before, it could show "Cloudflare Access didn't let bighelp through" until you closed bighelp and opened it again. The same fix applies to a proxy password and to custom headers.
+
+### Chat
+
+- **Tapbacks:** when you hold a message, one menu holds the tapbacks and the actions. On a long message, the tapbacks no longer cover **Reply**, **Copy** or **Share**.
+- **More reactions:** this opens the Apple emoji keyboard. Select an emoji to add it as a tapback.
+
 ## 2.6.20
 
 ### Highlights

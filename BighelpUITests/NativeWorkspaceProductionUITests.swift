@@ -222,8 +222,8 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         // Reactions need the reply's saved row; give the host a moment to confirm it.
         sleep(3)
         finished.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 12, dy: 10)).press(forDuration: 1.0)
-        // The reaction bar floats over the held message.
-        let heart = app.buttons["chat.reaction-bar.heart"]
+        // Reactions share the native menu with its actions.
+        let heart = app.buttons["React with heart"]
         if heart.waitForExistence(timeout: 5) {
             heart.tap()
             let noted = Date().addingTimeInterval(20)
@@ -1589,11 +1589,11 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         longPressTarget.coordinate(withNormalizedOffset: .zero)
             .withOffset(CGVector(dx: 12, dy: 10)).press(forDuration: 1)
 
-        // The bar over the held message: its common reactions, and + for any emoji.
-        let barNames = ["❤️": "heart", "👍": "thumbs-up", "👎": "thumbs-down",
+        // The native menu keeps quick reactions beside its actions, with + for any emoji.
+        let barNames = ["❤️": "heart", "👍": "thumbs up", "👎": "thumbs down",
                         "😂": "laughing", "🎉": "party", "🤔": "thinking"]
         if usingAnyEmojiField {
-            let more = app.buttons["chat.reaction-bar.more"]
+            let more = app.buttons["More reactions"]
             XCTAssertTrue(more.waitForExistence(timeout: 5))
             more.tap()
             let picker = app.descendants(matching: .any)["chat.reaction-picker"]
@@ -1602,16 +1602,10 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
             XCTAssertTrue(field.waitForExistence(timeout: 5))
             field.tap()
             field.typeText(emoji)
-            let add = app.buttons["Add reaction"]
-            let enabled = XCTNSPredicateExpectation(
-                predicate: NSPredicate(format: "enabled == true"),
-                object: add
-            )
-            XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 5), .completed)
-            add.tap()
+            XCTAssertTrue(picker.waitForNonExistence(timeout: 5), "Choosing an emoji reacts immediately")
         } else {
             let name = try XCTUnwrap(barNames[emoji], "\(emoji) is not on the reaction bar")
-            let choice = app.buttons["chat.reaction-bar.\(name)"]
+            let choice = app.buttons["React with \(name)"]
             XCTAssertTrue(choice.waitForExistence(timeout: 5))
             choice.tap()
         }

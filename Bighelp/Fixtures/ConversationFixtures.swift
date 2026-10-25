@@ -142,6 +142,9 @@ enum ConversationFixtures {
     #if DEBUG
     static var nativeReactionPreview: SessionRecord {
         let agent = TimelineSender.agent(id: "finance", snapshot: .init(name: "Avery Park"))
+        let extra = ProcessInfo.processInfo.arguments.contains("-test-long-reaction-message")
+            ? String(repeating: "\n\nA long message keeps its complete text while the conversation scrolls. Hold any visible part to reply, copy, share, select text, or react.", count: 24)
+            : ""
         let items = [
             TimelineItem(id: "native-reaction-fixture:row:101", role: .human,
                          sender: .user(snapshot: .init(name: "You")),
@@ -149,7 +152,7 @@ enum ConversationFixtures {
                          metadata: .init(source: "UI preview", sourceOrder: 1)),
             TimelineItem(id: "native-reaction-fixture:row:102", role: .assistant,
                          sender: agent,
-                         content: .message("**Room for the conversation.**\n\nYour model, rich drafts, files, and voice stay close."),
+                         content: .message("**Room for the conversation.**\n\nYour model, rich drafts, files, and voice stay close." + extra),
                          metadata: .init(source: "UI preview", sourceOrder: 2)),
         ]
         return SessionRecord(

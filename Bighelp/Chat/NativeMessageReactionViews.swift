@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 enum NativeMessageReactionLayoutMetrics {
     static let visualHeight: CGFloat = 26
@@ -106,43 +107,16 @@ struct NativeMessageReactionPicker: View {
     let currentReaction: String?
     let onSelection: (String?) -> Void
 
-    @State private var draft = ""
-    @FocusState private var isFocused: Bool
     @Environment(\.dismiss) private var dismiss
-    @BighelpThemeReader private var theme
+    @ScaledMetric(relativeTo: .largeTitle) private var inputHeight: CGFloat = 60
 
     var body: some View {
         NavigationStack {
             VStack(spacing: BighelpTokens.space16) {
                 Text("Choose a reaction")
                     .bighelpFont(.sectionTitle, weight: .semibold)
-                LazyVGrid(
-                    columns: [GridItem(.adaptive(minimum: BighelpTokens.hitTarget), spacing: BighelpTokens.space8)],
-                    spacing: BighelpTokens.space8
-                ) {
-                    ForEach(ChatReactionBarProjection(selectedEmoji: currentReaction).choices) { choice in
-                        Button(choice.emoji) { select(choice.emoji) }
-                            .font(.bighelp(.title2))
-                            .frame(minWidth: BighelpTokens.hitTarget,
-                                   minHeight: BighelpTokens.hitTarget)
-                            .buttonStyle(.bordered)
-                            .tint(choice.isSelected ? theme.action : nil)
-                            .accessibilityLabel(choice.accessibilityLabel)
-                            .accessibilityAddTraits(choice.isSelected ? .isSelected : [])
-                    }
-                }
-                TextField("Any emoji", text: $draft)
-                    .font(.bighelp(.largeTitle))
-                    .multilineTextAlignment(.center)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .focused($isFocused)
-                    .submitLabel(.done)
-                    .onSubmit { submitDraft() }
-                    .accessibilityIdentifier("chat.reaction-picker.any-emoji")
-                Button("Add reaction") { submitDraft() }
-                    .bighelpProminentButtonStyle()
-                    .disabled(NativeMessageReactionEmoji.normalized(draft) == nil)
+                NativeReactionEmojiInput(onSelection: { select($0) })
+                    .frame(height: inputHeight)
                 if currentReaction != nil {
                     Button("Remove reaction", role: .destructive) { select(nil) }
                 }
@@ -154,18 +128,77 @@ struct NativeMessageReactionPicker: View {
                     Button("Cancel") { dismiss() }
                 }
             }
-            .onAppear { isFocused = true }
         }
         .accessibilityIdentifier("chat.reaction-picker")
-    }
-
-    private func submitDraft() {
-        guard let emoji = NativeMessageReactionEmoji.normalized(draft) else { return }
-        select(emoji)
+        .presentationDetents([.height(inputHeight + (currentReaction == nil ? 150 : 190))])
     }
 
     private func select(_ emoji: String?) {
         onSelection(emoji)
         dismiss()
+    }
+}
+
+/// Public text-input APIs give the reaction picker Apple's searchable emoji
+/// keyboard, including the person's recent emoji and skin-tone choices.
+struct NativeReactionEmojiInput: UIViewRepresentable {
+    let onSelection: (String) -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(onSelection: onSelection) }
+
+    func makeUIView(context: Context) -> UITextField {
+        let field = EmojiTextField()
+        field.delegate = context.coordinator
+        field.placeholder = "Choose an emoji"
+        field.font = .bighelp(.largeTitle)
+        field.adjustsFontForContentSizeCategory = true
+        field.textAlignment = .center
+        field.borderStyle = .roundedRect
+        field.autocorrectionType = .no
+        field.accessibilityLabel = "Choose an emoji"
+        field.accessibilityIdentifier = "chat.reaction-picker.any-emoji"
+        return field
+    }
+
+    func updateUIView(_ uiView: UITextField, context: Context) {
+        context.coordinator.onSelection = onSelection
+    }
+
+    final class Coordinator: NSObject, UITextFieldDelegate {
+        var onSelection: (String) -> Void
+        private var didSelect = false
+
+        init(onSelection: @escaping (String) -> Void) { self.onSelection = onSelection }
+
+        func textField(_ textField: UITextField, shouldChangeCharactersIn range: NSRange,
+                       replacementString string: String) -> Bool {
+            guard !didSelect else { return false }
+            let candidate = ((textField.text ?? "") as NSString).replacingCharacters(in: range, with: string)
+            if let emoji = NativeMessageReactionEmoji.normalized(candidate) {
+                didSelect = true
+                onSelection(emoji)
+            }
+            return false
+        }
+    }
+
+    final class EmojiTextField: UITextField {
+        override var textInputMode: UITextInputMode? {
+            #if os(iOS) && !targetEnvironment(macCatalyst)
+            UITextInputMode.activeInputModes.first { $0.primaryLanguage == "emoji" } ?? super.textInputMode
+            #else
+            super.textInputMode
+            #endif
+        }
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            guard window != nil else { return }
+            Task { @MainActor [weak self] in
+                await Task.yield()
+                guard let self, self.window != nil, !self.isFirstResponder else { return }
+                self.becomeFirstResponder()
+            }
+        }
     }
 }

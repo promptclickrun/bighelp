@@ -1,10 +1,57 @@
 import CoreGraphics
 import Testing
 import UIKit
+import SwiftUI
 @testable import Bighelp
 
 @MainActor
 struct ChatReactionBarTests {
+    @Test func moreReactionsStaysVisibleBeyondTheSixQuickChoices() throws {
+        let driver = ChatMessageMenuDriver()
+        driver.actions = ChatMessageMenuActions(
+            copyActionLabel: "Copy to clipboard", onCopy: {}, onSelect: {}, onFork: {}, onReply: {},
+            reactions: ChatMessageReactionActions(selectedEmoji: "🦊", onSelect: { _ in }, onMore: {}))
+        let menu = try #require(driver.menu())
+        let rows = menu.children.compactMap { $0 as? UIAction }
+        #expect(rows.contains { $0.title == "More reactions" }, "A seventh palette item is clipped by UIKit")
+        #expect(rows.contains { $0.title == "React with 🦊" && $0.state == .on })
+    }
+
+    @Test func moreReactionsStartsWithTheSystemEmojiKeyboard() async throws {
+        var selected: [String?] = []
+        let host = UIHostingController(rootView: NativeMessageReactionPicker(currentReaction: nil, onSelection: { selected.append($0) }))
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 393, height: 852))
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; window.rootViewController = nil }
+        host.view.layoutIfNeeded()
+        try await Task.sleep(for: .milliseconds(200))
+        func textField(in view: UIView) -> UITextField? {
+            if let field = view as? UITextField { return field }
+            return view.subviews.lazy.compactMap { textField(in: $0) }.first
+        }
+        let field = try #require(textField(in: host.view))
+        #expect(field.textInputMode?.primaryLanguage == "emoji")
+        let range = NSRange(location: 0, length: 0)
+        #expect(field.delegate?.textField?(field, shouldChangeCharactersIn: range, replacementString: "hello") == false)
+        #expect(selected.isEmpty)
+        #expect(field.delegate?.textField?(field, shouldChangeCharactersIn: range, replacementString: "👩🏽‍💻") == false)
+        #expect(selected == ["👩🏽‍💻"], "A single emoji selection reacts immediately, including joined skin-tone emoji")
+        _ = field.delegate?.textField?(field, shouldChangeCharactersIn: range, replacementString: "😀")
+        #expect(selected.count == 1, "A second tap while the picker closes cannot send twice")
+    }
+
+    @Test func reactionsAndActionsShareTheSystemMenuLayout() {
+        let driver = ChatMessageMenuDriver()
+        driver.actions = ChatMessageMenuActions(
+            copyActionLabel: "Copy to clipboard", onCopy: {}, onSelect: {}, onFork: {}, onReply: {},
+            reactions: ChatMessageReactionActions(selectedEmoji: nil, onSelect: { _ in }, onMore: {}))
+        let menu = driver.menu()
+        let palette = menu?.children.first as? UIMenu
+        #expect(palette?.options.contains(.displayAsPalette) == true,
+                "UIKit must reserve space for reactions alongside its actions, including for screen-height messages")
+    }
+
     @Test func barOffersTheSixCommonReactionsWithNoneChosen() {
         let bar = ChatReactionBarProjection(selectedEmoji: nil)
         #expect(bar.choices.map(\.emoji) == ["❤️", "👍", "👎", "😂", "🎉", "🤔"])
@@ -61,64 +108,6 @@ struct ChatReactionBarTests {
         #expect(ChatReactionBarProjection(selectedEmoji: nil).selection(afterTapping: "👍") == "👍")
     }
 
-    @Test func barSitsOverTheMessageOnItsSideAndStaysOnScreen() {
-        let bounds = CGRect(x: 0, y: 59, width: 393, height: 759)
-        let size = CGSize(width: 316, height: 52)
-        let reply = CGRect(x: 16, y: 400, width: 120, height: 60)
-        let left = ChatReactionBarMetrics.frame(barSize: size, over: reply, alignsTrailing: false, within: bounds)
-        #expect(left.minX == 16)
-        #expect(left.maxY == reply.minY - ChatReactionBarMetrics.gap)
-
-        let sent = CGRect(x: 300, y: 400, width: 77, height: 44)
-        let right = ChatReactionBarMetrics.frame(barSize: size, over: sent, alignsTrailing: true, within: bounds)
-        #expect(right.maxX == 377)
-
-        let wide = CGRect(x: 0, y: 400, width: 393, height: 44)
-        let clamped = ChatReactionBarMetrics.frame(barSize: size, over: wide, alignsTrailing: true, within: bounds)
-        #expect(clamped.maxX == bounds.maxX - ChatReactionBarMetrics.edgeMargin)
-
-        let high = CGRect(x: 16, y: 70, width: 120, height: 60)
-        let top = ChatReactionBarMetrics.frame(barSize: size, over: high, alignsTrailing: false, within: bounds)
-        #expect(top.minY == bounds.minY)
-    }
-
-    @Test func liftedPillStaysOverTheMessageForTheSystemToFitOnScreen() {
-        let size = ChatReactionBarMetrics.barSize(choiceCount: 6, slot: 44)
-        #expect(size == CGSize(width: 7 * 44 + 2 * ChatReactionBarMetrics.inset, height: 44 + 2 * ChatReactionBarMetrics.inset))
-        let high = CGRect(x: 16, y: 20, width: 120, height: 60)
-        let lifted = ChatReactionBarMetrics.liftedFrame(barSize: size, over: high, alignsTrailing: false, minX: 0, maxX: 393)
-        #expect(lifted.maxY == high.minY - ChatReactionBarMetrics.gap, "Never pushed down onto the message")
-        #expect(lifted.minX == 16)
-    }
-
-    @Test func slotsShrinkToFitANarrowScreenButKeepATouchableSize() {
-        #expect(ChatReactionBarMetrics.slot(choiceCount: 6, availableWidth: 393) == 44)
-        let narrow = ChatReactionBarMetrics.slot(choiceCount: 7, availableWidth: 320)
-        #expect(narrow < 44 && narrow >= ChatReactionBarMetrics.minimumSlot)
-        #expect(8 * narrow + 2 * ChatReactionBarMetrics.inset <= 320 - 2 * ChatReactionBarMetrics.edgeMargin)
-        #expect(ChatReactionBarMetrics.slot(choiceCount: 7, availableWidth: 200) == ChatReactionBarMetrics.minimumSlot)
-    }
-
-    /// A Mac menu takes every click until it closes, so the iPad app on a Mac puts
-    /// the reactions in the menu, as the Mac app does, instead of floating them.
-    @Test func onAMacTheReactionsAreInTheMenuNotFloatingBesideIt() {
-        #expect(ChatMessageMenuStyle.showsMacMenus(isiOSAppOnMac: true))
-        #expect(!ChatMessageMenuStyle.showsMacMenus(isiOSAppOnMac: false))
-        #expect(!ChatMessageMenuStyle.floatsReactions(showsMacMenus: true, isVoiceOverRunning: false))
-        #expect(!ChatMessageMenuStyle.floatsReactions(showsMacMenus: false, isVoiceOverRunning: true))
-        #expect(ChatMessageMenuStyle.floatsReactions(showsMacMenus: false, isVoiceOverRunning: false))
-
-        let driver = ChatMessageMenuDriver()
-        driver.actions = ChatMessageMenuActions(
-            copyActionLabel: "Copy to clipboard", onCopy: {}, onSelect: {}, onFork: {}, onReply: {},
-            reactions: ChatMessageReactionActions(selectedEmoji: nil, onSelect: { _ in }, onMore: {}))
-        let row = driver.menu(floatsReactions: false)?.children.first as? UIMenu
-        #expect(row?.options.contains(.displayAsPalette) == true)
-        let floating = driver.menu(floatsReactions: true)?.children ?? []
-        #expect(!floating.contains { ($0 as? UIMenu)?.options.contains(.displayAsPalette) == true })
-        #expect((floating.first as? UIAction)?.title == "Reply")
-    }
-
     @Test func menuRowOffersEachReactionByNameWithTheChosenOneOn() {
         let palette = ChatMessageMenuDriver.reactionPalette(ChatMessageReactionActions(
             selectedEmoji: "👍", onSelect: { _ in }, onMore: {}))
@@ -126,7 +115,7 @@ struct ChatReactionBarTests {
         let actions = palette.children.compactMap { $0 as? UIAction }
         #expect(actions.map(\.title) == [
             "React with heart", "React with thumbs up", "React with thumbs down",
-            "React with laughing", "React with party", "React with thinking", "More reactions",
+            "React with laughing", "React with party", "React with thinking",
         ])
         #expect(actions.filter { $0.state == .on }.map(\.title) == ["React with thumbs up"])
     }

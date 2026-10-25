@@ -15,8 +15,35 @@ struct BighelpExternalSessionOpen: Equatable, Sendable {
         /// alert can name its job's chat or the job instead (`BighelpScheduledAlertLinks`).
         case reference(profileID: String, sessionReference: String, isScheduledRun: Bool)
     }
+    /// The tap changed the computer in use to reach this chat. `from` is the one it left, nil when
+    /// none was selected.
+    struct HostSwitch: Equatable, Sendable {
+        let from: UUID?
+    }
     let id = UUID()
     let target: Target
+    var switchedHost: HostSwitch? = nil
+}
+
+/// A tap that switched computers has to wait for the new one before it opens anything. Opened
+/// while that computer was still connecting, the chat could fail to prepare and "This session
+/// could not be prepared" showed over the chat that then opened anyway.
+enum ExternalOpenHostWait {
+    enum Step: Equatable {
+        case openNow
+        case keepWaiting
+        case giveUp
+    }
+
+    static func step(_ open: BighelpExternalSessionOpen, hostIsReady: Bool, timedOut: Bool) -> Step {
+        guard open.switchedHost != nil, !hostIsReady else { return .openNow }
+        return timedOut ? .giveUp : .keepWaiting
+    }
+
+    static func message(unreachable: String, stillOn: String?) -> String {
+        guard let stillOn else { return "Couldn't reach \(unreachable). Check that it's on, then try again." }
+        return FleetSwitchFallback.message(unreachable: unreachable, stillOn: stillOn)
+    }
 }
 
 @MainActor
@@ -26,14 +53,18 @@ final class BighelpExternalSessionOpenCenter {
     init() {}
     private(set) var pending: BighelpExternalSessionOpen?
 
-    func request(hostID: UUID? = nil, profileID: String, storedSessionID: String) {
+    func request(hostID: UUID? = nil, profileID: String, storedSessionID: String,
+                 switchedHost: BighelpExternalSessionOpen.HostSwitch? = nil) {
         pending = BighelpExternalSessionOpen(target: .stored(hostID: hostID, profileID: profileID,
-                                                            storedSessionID: storedSessionID))
+                                                            storedSessionID: storedSessionID),
+                                             switchedHost: switchedHost)
     }
 
-    func request(profileID: String, sessionReference: String, isScheduledRun: Bool = false) {
+    func request(profileID: String, sessionReference: String, isScheduledRun: Bool = false,
+                 switchedHost: BighelpExternalSessionOpen.HostSwitch? = nil) {
         pending = BighelpExternalSessionOpen(target: .reference(profileID: profileID, sessionReference: sessionReference,
-                                                               isScheduledRun: isScheduledRun))
+                                                               isScheduledRun: isScheduledRun),
+                                             switchedHost: switchedHost)
     }
 
     func request(catalogSessionID: String) {

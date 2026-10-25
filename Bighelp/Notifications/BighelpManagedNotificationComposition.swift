@@ -373,11 +373,13 @@ final class BighelpManagedNotificationComposition: HostNotificationSetupServing 
         // the app reconnected meanwhile.
         if let reference = open.sessionReference, let profile = open.agentID,
            let host = integration.service.host(forEvent: open.eventID, eventType: type), let registry {
-            if registry.selectedHostID != host.id { registry.select(host.id) }
+            let previous = registry.selectedHostID
+            if previous != host.id { registry.select(host.id) }
             if registry.selectedHostID == host.id {
                 BighelpExternalSessionOpenCenter.shared.request(
                     profileID: profile, sessionReference: reference,
-                    isScheduledRun: BighelpScheduledAlertLinks.isScheduledRun(type))
+                    isScheduledRun: BighelpScheduledAlertLinks.isScheduledRun(type),
+                    switchedHost: previous == host.id ? nil : BighelpExternalSessionOpen.HostSwitch(from: previous))
                 return
             }
         }

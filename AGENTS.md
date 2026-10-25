@@ -595,6 +595,10 @@ sections can crash only on devices ("Thread stack size exceeded").
 - A Shortcut on a gateway that isn't in use switches bighelp to it, and the app starts connecting at once.
   `reconnect()` returns at once while another connection is under way, so the Shortcut waits for that one
   (`BighelpShortcutConnectionWait`). `ShortcutGatewaySwitchHostUITests` checks it on two real hosts.
+- A Live Activity or alert tap on another gateway's chat selects that gateway, and the shell opens the chat only
+  once it is ready (`ExternalOpenHostWait`, `BighelpExternalSessionOpen.switchedHost`). Opened sooner, the chat
+  could fail to prepare and "Unable to open" showed over the chat that then loaded. A gateway that
+  doesn't answer in `FleetSwitchFallback.timeout` gives the selection back with the usual message.
 - An incoming widget or link tap during startup is queued until the host runtime is ready. Shortcuts that open a
   screen post their link to `BighelpIncomingLinkCenter`, which takes the same path.
 - An app may have at most 10 App Shortcuts (`BighelpAppShortcuts`); Xcode's App Intents metadata step refuses

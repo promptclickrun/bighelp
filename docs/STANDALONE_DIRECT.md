@@ -1,5 +1,7 @@
 # Standalone Direct Hermes
 
+> Current transport contract: [NATIVE_TRANSPORT.md](NATIVE_TRANSPORT.md). Its account setup, Link comparison and missing-feature list describe an older implementation. Where transport details differ, use the versioned native contract and its source links.
+
 Connect your bighelp account to a reachable `hermes serve` backend without bighelp Link chat pairing. Account sign-in, host authentication and optional notification enrollment have separate authority. Existing Link chats remain separate.
 
 ## Connect

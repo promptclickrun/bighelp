@@ -1,5 +1,7 @@
 # Direct Hermes sessions
 
+> Current transport contract: [NATIVE_TRANSPORT.md](NATIVE_TRANSPORT.md). Session creation, fork support and recovery have evolved since this narrative. Where transport details differ, use the versioned native contract and its source links.
+
 `DirectHermesSessionCatalogClient` is a feature adapter over the shared,
 owner-bound `WorkspaceOperationPerforming`. It owns no connection, credential,
 agent loop, session database, ChatModel or canvas. The physical Direct adapter

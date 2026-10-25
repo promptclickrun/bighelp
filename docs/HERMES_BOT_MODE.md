@@ -1,5 +1,7 @@
 # Hermes Bot Mode
 
+> Current transport contract: [NATIVE_TRANSPORT.md](NATIVE_TRANSPORT.md). Its legacy Link transport discussion is historical; the current native groups path uses core JSON-RPC. Where transport details differ, use the versioned native contract and its source links.
+
 ## Product boundary
 
 bighelp supports Hermes and is building its own bighelp Native harness. Neither

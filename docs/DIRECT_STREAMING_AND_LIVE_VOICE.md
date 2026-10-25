@@ -1,5 +1,7 @@
 # Direct streaming and live voice
 
+> Current transport contract: [NATIVE_TRANSPORT.md](NATIVE_TRANSPORT.md). Its Link fallback and account-backed admission discussion describes an older transport. Where transport details differ, use the versioned native contract and its source links.
+
 bighelp keeps Hermes as the execution and canonical-history owner. The native app uses bounded session pages and a separate disposable live overlay. Full tool content is retrieved only when you open its complete-content reader.
 
 ## Routes

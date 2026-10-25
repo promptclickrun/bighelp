@@ -765,6 +765,7 @@
 		6E58E9FB4DCCE110FA2FE5DB /* ChatPDFPagesDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1941C3C4A19C2BFA1B4A9BC3 /* ChatPDFPagesDraft.swift */; };
 		6E9AB565D825E6F32B1BD5DD /* HermesFolderPath.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADCC3B055B82A96326367C2B /* HermesFolderPath.swift */; };
 		6EC4E7B382C1AB062749AB96 /* bighelp-hello.json in Resources */ = {isa = PBXBuildFile; fileRef = D29BFFB555278BF1B0A7BE96 /* bighelp-hello.json */; };
+		6ED9BCB95EB0B402D5B794F9 /* BighelpCardMusicLookupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91FA48259F8B0728A50C6880 /* BighelpCardMusicLookupTests.swift */; };
 		6F0449977A43CAC6843BDE24 /* HostRuntimeSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90F37C5331CA364A0C713127 /* HostRuntimeSection.swift */; };
 		6F5D59B13C7D425800CEE120 /* BighelpHomeWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16B85BE01827FCFD38480171 /* BighelpHomeWidgets.swift */; };
 		6F631722BA04755EA6D70BEA /* ChatActivityTurnView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEF757D732EAA92F9B09196B /* ChatActivityTurnView.swift */; };
@@ -1267,6 +1268,7 @@
 		B5920AF611C069B79333A4CA /* ChatEdgeBlurTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 255997EE9AA60BD554229F3F /* ChatEdgeBlurTests.swift */; };
 		B5A0FE18D947ED73D8570A5A /* ChatMessageShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22571E8F505DF1823F34C87 /* ChatMessageShareSheet.swift */; };
 		B5BE8DDC030CB15AA8BF5C12 /* DashboardModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F0570C055720F3A90D8259 /* DashboardModel.swift */; };
+		B5CBFC1423E2BC12D19268A8 /* MusicCardStreamUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 083AF8AA7347F8449338B451 /* MusicCardStreamUITests.swift */; };
 		B5D0B9968B1329FDF404D3C0 /* DirectHermesBrowserAuthenticationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9757B6D56D92DEDE5D9464A8 /* DirectHermesBrowserAuthenticationTests.swift */; };
 		B5EE619FBC0D254A43D812A5 /* DirectHermesManagedFilesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E0EE8E006424BDE9D97E690 /* DirectHermesManagedFilesTests.swift */; };
 		B60BC5275069EA540FB0545E /* SettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67F0B31843F2BBB8FE261D76 /* SettingsStore.swift */; };
@@ -1955,6 +1957,7 @@
 		07F23D0718DD2CF18502AF95 /* BighelpLiveAlertTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpLiveAlertTests.swift; sourceTree = "<group>"; };
 		07F4CF3C8735C83544AAD84F /* SettingsStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStoreTests.swift; sourceTree = "<group>"; };
 		0833D7454B06F1305F80A2ED /* IMessageThemeContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IMessageThemeContractTests.swift; sourceTree = "<group>"; };
+		083AF8AA7347F8449338B451 /* MusicCardStreamUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicCardStreamUITests.swift; sourceTree = "<group>"; };
 		08A61B0F03132E152859EE95 /* RootUsage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootUsage.swift; sourceTree = "<group>"; };
 		08CA3E8CE8BF9FF6920DE209 /* DemoWorkflowsClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoWorkflowsClient.swift; sourceTree = "<group>"; };
 		08E42C46A7A7B2810717690E /* UsageWidgetPublisher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageWidgetPublisher.swift; sourceTree = "<group>"; };
@@ -2936,6 +2939,7 @@
 		91CB0EFA808DC2BC808C7B83 /* BighelpNotificationHostTrust.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpNotificationHostTrust.swift; sourceTree = "<group>"; };
 		91D2DA6892F98C5DD30FDD10 /* DirectHermesAgentDirectoryClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectHermesAgentDirectoryClient.swift; sourceTree = "<group>"; };
 		91D4F8D182EE30C5C7CDB870 /* ChatToolPhrase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatToolPhrase.swift; sourceTree = "<group>"; };
+		91FA48259F8B0728A50C6880 /* BighelpCardMusicLookupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpCardMusicLookupTests.swift; sourceTree = "<group>"; };
 		9253CD8246850380A92EC86A /* RFBFramebuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RFBFramebuffer.swift; sourceTree = "<group>"; };
 		9271648D36B89271BB6F58AF /* BighelpAgentWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpAgentWidget.swift; sourceTree = "<group>"; };
 		92AA17396288ECCAE341BC9F /* SessionFastModeMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionFastModeMenu.swift; sourceTree = "<group>"; };
@@ -4740,6 +4744,7 @@
 				FCD72AB088AD85CF46830B9D /* BighelpCardCatalogClientTests.swift */,
 				5433B16421F5A33E4E92E569 /* BighelpCardDataClientTests.swift */,
 				1B3CDA4226DAC5A7A0F3B78E /* BighelpCardEnvelopeTests.swift */,
+				91FA48259F8B0728A50C6880 /* BighelpCardMusicLookupTests.swift */,
 				FFBEE9CFB9B0B589E8587043 /* BighelpCardNetworkPolicyTests.swift */,
 				09472D14EDEDAF8E2EC2DEDF /* BighelpCardNovelUseCaseTests.swift */,
 				02163AD49A36843D1EBFAD91 /* BighelpCardObjectsTests.swift */,
@@ -5284,6 +5289,7 @@
 				187B51036858D39AAFA54E5F /* MarkdownAttachmentUITests.swift */,
 				76BE9B99675DDD1D98B385EA /* MenuButtonPlacementUITests.swift */,
 				F0F5EA641F106E35BD8FE868 /* ModelConfirmationUITests.swift */,
+				083AF8AA7347F8449338B451 /* MusicCardStreamUITests.swift */,
 				9ADF27E2CDA198F28038830E /* NativeSubagentProductionUITests.swift */,
 				890274CE80C4CC5D8A048163 /* NativeWorkspaceProductionUITests.swift */,
 				FC90F1E6006570C9305AFBF4 /* NewBotChatHostUITests.swift */,
@@ -7931,6 +7937,7 @@
 				3B80F6C4CC3034E0A30EE01F /* BighelpCardCatalogClientTests.swift in Sources */,
 				8FD03A42A10014510162F2A3 /* BighelpCardDataClientTests.swift in Sources */,
 				7C570BC437FE16E082ED006F /* BighelpCardEnvelopeTests.swift in Sources */,
+				6ED9BCB95EB0B402D5B794F9 /* BighelpCardMusicLookupTests.swift in Sources */,
 				9DDDFAFE94260719AF919ABF /* BighelpCardNetworkPolicyTests.swift in Sources */,
 				4AB6403BD9CD0499AB34FFA1 /* BighelpCardNovelUseCaseTests.swift in Sources */,
 				D1C15D231E02A672803E9025 /* BighelpCardObjectsTests.swift in Sources */,
@@ -8378,6 +8385,7 @@
 				431A69D90CC86137EB213D47 /* MarkdownAttachmentUITests.swift in Sources */,
 				84DEFE134DBBD476F1EF4026 /* MenuButtonPlacementUITests.swift in Sources */,
 				B3347B167D7830ADCFFE0D76 /* ModelConfirmationUITests.swift in Sources */,
+				B5CBFC1423E2BC12D19268A8 /* MusicCardStreamUITests.swift in Sources */,
 				E0FC4D0756B791358EA0DA7F /* NativeSubagentProductionUITests.swift in Sources */,
 				EDE0D703B5A96188D6357DAD /* NativeWorkspaceProductionUITests.swift in Sources */,
 				7BDCC2A37F808393A7DD8AE7 /* NewBotChatHostUITests.swift in Sources */,

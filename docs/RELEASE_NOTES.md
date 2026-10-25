@@ -26,8 +26,7 @@ short sentences, one instruction in each step, and the active voice.
 - bighelp ties each item to a random ID. It never sends your messages, files or names.
 - When you turn the switch off, bighelp stops at once. It deletes the items that it did not send yet, and it deletes
   the random ID. If you turn the switch on again, bighelp makes a new random ID.
-- A computer with a newer bighelp plugin also stops its own sharing when you turn the switch off. That plugin is not
-  released yet.
+- A computer with bighelp plugin 3.31.0 or later also stops its own sharing when you turn the switch off.
 
 ### Live Activities and widgets
 
@@ -71,12 +70,19 @@ short sentences, one instruction in each step, and the active voice.
 
 ### Photos
 
-- **Photo drafts:** send your agent a photo of a business card or an event poster. Your agent makes a draft contact or a draft event. You check the draft, then you save it. Your agent cannot save it without you. This needs a newer bighelp plugin on your computer.
+- **Photo drafts:** send your agent a photo of a business card or an event poster. Your agent makes a draft contact or a draft event. You check the draft, then you save it. Your agent cannot save it without you. This needs bighelp plugin 3.31.0 or later on your computer.
 
 ### Fixed in build 161
 
 - **Live Activities:** the Live Activity shows again and follows your chats. Before, after an error on the notification service, the Live Activity could stop updating or not show at all. The phone now recovers on its own.
 - **Apple Music cards:** an Apple Music card no longer freezes bighelp when Apple Music cannot answer. The card shows without its picture, and **Open in Music** still works.
+
+### Fixed in build 162
+
+- **GPT Live:** the thinking music no longer plays during a GPT Live call. Before, it played over the voice. Live voice also keeps answering after its first request. Before, it could stop answering until you started the call again.
+- **Taps on another computer's chats:** a tap on a Live Activity or an alert for a chat on a different computer opens that chat. Before, bighelp showed "Unable to open" for a moment.
+- **Tapbacks:** tapbacks show on their messages when you open a chat again. Before, they did not show until you added a tapback.
+- **With bighelp plugin 3.32.0:** GPT Live says a short line before it starts work, for example "On it, checking now". A GitHub Copilot sign-in in **Provider Keys** shows as signed in at once.
 
 ## 2.6.19
 

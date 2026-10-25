@@ -154,6 +154,10 @@ code.
   by item (`BighelpCardMusicLookup.cacheKey`); until one comes, and when none
   does, the object shows the kind's symbol. Play plays it through the Music app
   when Music is on, else opens it in Music; Open in Music opens `url` or the id.
+  Lookups run off the main thread, three at a time, and give up after eight
+  seconds. When MusicKit's service doesn't answer (no developer token, no
+  network), cards use the public lookup for five minutes, and Play on a catalog
+  item opens Music instead of waiting.
 - Object props are plain JSON values, never `{ "literal": … }` or other
   bindings, and objects take no children. A phone's or email's `label` may be
   left out; an `address` with every part empty reads as no address.

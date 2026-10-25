@@ -1062,7 +1062,8 @@ struct DirectHermesProjection {
                 sourceOrder: item.metadata.sourceOrder,
                 platformMessageID: item.metadata.platformMessageID,
                 turnDurationMilliseconds: turnDurationMilliseconds ?? item.metadata.turnDurationMilliseconds,
-                contentReference: item.metadata.contentReference, endsTurn: item.metadata.endsTurn),
+                contentReference: item.metadata.contentReference, endsTurn: item.metadata.endsTurn,
+                reactions: item.metadata.reactions),
             attachments: item.attachments)
     }
 

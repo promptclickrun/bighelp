@@ -189,6 +189,23 @@ code.
 - `-use-demo-fixtures -test-object-cards` opens a chat with one card holding a
   made-up person, place and song (`BighelpCardDemoFixtures.objects`).
 
+## Draft objects
+
+Plugin feature `native-image-drafts-v1` adds `contact_draft` and `event_draft`:
+a contact or event the agent read from a photo the person sent, for the person
+to review. The plugin's draft tools make them (agents never write the props of
+these by hand); the full contract is [Image drafts](IMAGE_DRAFTS.md).
+
+- A card with a draft holds that one draft and no other object.
+- The app draws the draft as its own card (`ImageDraftCardView`): the photo,
+  the name or title, what to check, and Review. The review sheet shows the photo
+  beside every field and Save or Discard. The card never writes and never asks
+  for a permission.
+- The app adds the two names to `renders` only when `/native/context` lists
+  `native-image-drafts-v1`. In any other chat the plugin refuses the draft tools.
+- `-use-demo-fixtures -test-image-drafts` opens a chat with a made-up business
+  card and event poster and a draft for each.
+
 ## Weather backgrounds
 
 A `card` element may carry an animated weather background beside its `props`:

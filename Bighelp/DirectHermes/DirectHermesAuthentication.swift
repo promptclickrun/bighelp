@@ -210,6 +210,8 @@ final class DirectHermesHTTP {
     /// preview was refused before it was sent.
     static let nativeFileResponseLimits: [String: Int] = [
         "/api/plugins/loopdy/native/attachments/fetch": 4 * 1_024 * 1_024 + 65_536,
+        // A photo draft's picture, in the same ~3 MB pieces as attachments/fetch.
+        "/api/plugins/loopdy/native/image-drafts/source": 4 * 1_024 * 1_024 + 65_536,
         "/api/plugins/loopdy/native/board/media": 12 * 1_024 * 1_024,
         "/api/plugins/loopdy/native/workspace-files/read": maximumMediaResponseBytes,
     ]

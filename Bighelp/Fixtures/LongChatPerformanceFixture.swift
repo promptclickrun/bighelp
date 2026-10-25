@@ -10,11 +10,14 @@ import UIKit
 /// `-test-long-chat-count <n>` adds more such chats (for opening several in a
 /// row). `-test-long-chat-heavy` makes each turn as big as a chat near half a
 /// million tokens: tool results of 20 to 200 KB, long thinking, pasted logs and
-/// long answers with big code blocks. Made-up vendors, amounts and files.
+/// long answers with big code blocks. `-test-long-chat-drafts` ends every tenth answer with a photo
+/// draft card (a contact or an event), for measuring what drafts cost a long chat. Made-up vendors,
+/// amounts and files.
 enum LongChatPerformanceFixture {
     static let turnsArgument = "-test-long-chat"
     static let countArgument = "-test-long-chat-count"
     static let heavyArgument = "-test-long-chat-heavy"
+    static let draftsArgument = "-test-long-chat-drafts"
     static let startArgument = "-start-long-chat"
 
     static func sessionID(_ index: Int) -> String { "demo-long-chat-\(index)" }
@@ -30,7 +33,10 @@ enum LongChatPerformanceFixture {
         guard let turns = turns(in: arguments) else { return [] }
         let photo = photoAttachment()
         let heavy = arguments.contains(heavyArgument)
-        return (1...count(in: arguments)).map { record(index: $0, turns: turns, heavy: heavy, photo: photo) }
+        let drafts = arguments.contains(draftsArgument)
+        return (1...count(in: arguments)).map {
+            record(index: $0, turns: turns, heavy: heavy, drafts: drafts, photo: photo)
+        }
     }
 
     static func count(in arguments: [String]) -> Int {
@@ -42,7 +48,7 @@ enum LongChatPerformanceFixture {
     /// The newest answer's last line, for tests waiting on the bottom of the chat.
     static func sentinel(turns: Int) -> String { "Long chat sentinel \(turns)" }
 
-    private static func record(index: Int, turns: Int, heavy: Bool, photo: [ChatAttachment]) -> SessionRecord {
+    private static func record(index: Int, turns: Int, heavy: Bool, drafts: Bool, photo: [ChatAttachment]) -> SessionRecord {
         let sessionID = sessionID(index)
         let agent = TimelineSender.agent(id: "finance", snapshot: .init(name: "Avery Park"))
         let start = Date(timeIntervalSince1970: 1_790_000_000)
@@ -76,7 +82,8 @@ enum LongChatPerformanceFixture {
                     durationMilliseconds: 600 + step * 450, toolCallID: "\(turnID)-call-\(step)",
                     toolName: tool.name, arguments: tool.arguments, result: tool.result, sourceOrder: next()))
             }
-            let body = heavy ? heavyAnswer(turn) : self.answer(turn)
+            var body = heavy ? heavyAnswer(turn) : self.answer(turn)
+            if drafts, turn.isMultiple(of: 10) { body += "\n\n" + draft(turn: turn, index: index) }
             let answer = turn == turns ? body + "\n\n" + sentinel(turns: turns) : body
             items.append(TimelineItem(
                 id: "\(sessionID)-answer-\(turn)", role: .assistant, sender: agent, content: .message(answer),
@@ -86,6 +93,16 @@ enum LongChatPerformanceFixture {
         return SessionRecord(id: sessionID, kind: .direct, agentIDs: ["finance"],
                              title: index == 1 ? "Vendor invoices" : "Vendor invoices \(index)",
                              items: items, activityEvents: activity, hasAcceptedMessage: true)
+    }
+
+    /// A contact or event draft with its own id, as the plugin delivers one.
+    private static func draft(turn: Int, index: Int) -> String {
+        let suffix = String(format: "%08x%024x", index, turn)
+        let base = turn.isMultiple(of: 20) ? ImageDraftsFixture.eventDraft : ImageDraftsFixture.contactDraft
+        let draft = ImageDraft(draftID: "d_" + suffix, preset: base.preset, source: base.source,
+                               configRevision: base.configRevision, messages: base.messages, marks: base.marks,
+                               fields: base.fields)
+        return ImageDraftsFixture.fenced(draft, title: base.fields.displayName ?? "Draft")
     }
 
     private static let vendors = ["Northwind Supplies", "Blue Harbor Print", "Cedar & Pine Catering",

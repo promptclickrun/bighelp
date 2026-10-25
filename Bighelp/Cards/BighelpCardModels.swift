@@ -10,6 +10,9 @@ enum BighelpCardImportance: Int, Codable, Comparable, Sendable {
 
 struct BighelpCardDocument: Codable, Equatable, Sendable, Identifiable {
     let document: [String: BighelpJSONValue]
+    /// For a card holding a photo draft: whether its content still has the hash the plugin made it
+    /// with. Worked out here, once per decoded card. Other cards don't need it.
+    let isDraftContentIntact: Bool
 
     init(document: [String: BighelpJSONValue]) throws {
         guard document["schema"]?.string == "loopdy.card",
@@ -24,6 +27,7 @@ struct BighelpCardDocument: Codable, Equatable, Sendable, Identifiable {
               document["origin"]?.string == "live",
               document["created_at"]?.string != nil else { throw BighelpCardDocumentError.invalid }
         self.document = document
+        isDraftContentIntact = ImageDraftCard.holdsDraft(document) ? ImageDraftCardHash.isIntact(document: document) : true
     }
 
     init(from decoder: any Decoder) throws {

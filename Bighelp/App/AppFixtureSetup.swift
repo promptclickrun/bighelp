@@ -88,6 +88,13 @@ enum AppFixtureSetup {
            let index = initialSessions.firstIndex(where: { $0.id == "demo-finance" }) {
             initialSessions[index] = ConversationFixtures.objectCardsPreview
         }
+        if usesFixtures, arguments.contains("-test-image-drafts"),
+           let index = initialSessions.firstIndex(where: { $0.id == "demo-finance" }) {
+            initialSessions[index] = ConversationFixtures.imageDraftsPreview
+            ImageDraftsFixture.registerImages()
+            // Each run starts from the agent's drafts as sent, not from an earlier run's edits.
+            ImageDraftStore.shared.eraseLocalData()
+        }
         if usesFixtures, arguments.contains("-test-completed-turn-context"),
            let index = initialSessions.firstIndex(where: { $0.id == "demo-finance" }) {
             initialSessions[index] = ConversationFixtures.completedTurnContextPreview

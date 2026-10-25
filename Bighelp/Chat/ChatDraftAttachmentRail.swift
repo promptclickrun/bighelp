@@ -393,8 +393,9 @@ struct DraftAttachmentsSheet: View {
 }
 
 #if DEBUG && (targetEnvironment(simulator) || targetEnvironment(macCatalyst))
-/// "-test-draft-attachments photo|file|mixed|adding|failed": puts the tag in one state
-/// for screenshots and UI tests, with made-up pictures and a made-up lease.
+/// "-test-draft-attachments photo|file|mixed|adding|failed|business-card|poster": puts the tag in
+/// one state for screenshots and UI tests, with made-up pictures and a made-up lease. The business
+/// card and poster are the photo drafts' made-up pictures, for sending to a real test host.
 enum DraftAttachmentRailFixture {
     @MainActor
     static func seed(_ model: ChatModel, arguments: [String] = ProcessInfo.processInfo.arguments) async {
@@ -406,6 +407,13 @@ enum DraftAttachmentRailFixture {
         func add(_ attachments: [ChatAttachment]) { for item in attachments { try? model.addDraftAttachment(item) } }
         switch arguments[index + 1] {
         case "photo": add([photos[0]])
+        case "business-card", "poster":
+            let card = arguments[index + 1] == "business-card"
+            if let picture = try? ChatAttachment(id: card ? "attachment_fixture_business_card" : "attachment_fixture_event_poster",
+                                                 fileName: card ? "business-card.png" : "poster.png", mimeType: "image/png",
+                                                 data: card ? ImageDraftsFixture.businessCard : ImageDraftsFixture.poster) {
+                add([picture])
+            }
         case "file": add([lease])
         case "mixed": add(photos + [lease])
         case "adding":

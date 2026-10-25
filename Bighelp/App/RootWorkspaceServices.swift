@@ -142,6 +142,12 @@ extension RootShellView {
             return
         }
         let revision = permissions.revision
+        // An agent's own contacts.create and calendar.create wait for a reviewed draft in a chat with
+        // the person's picture (docs/IMAGE_DRAFTS.md › Image fence); the chat is read per such call.
+        let features = featureStore
+        let guarded = ImageDraftWriteFence.guarding(handler, holdsPicture: {
+            features.preparedChatModel(id: conversationID).map { ImageDraftWriteFence.holdsPersonPicture($0.items) } ?? false
+        })
         var session: NativeDeviceToolSession?
         permissionCenter.nativeDeviceToolStatus = nil
         do {
@@ -153,7 +159,7 @@ extension RootShellView {
                         permissions.scope == scope && permissions.revision == revision
                             && Self.deviceToolsOpenNow && UIApplication.shared.isProtectedDataAvailable
                             && appState.activeConversationID == conversationID
-                    }, isPaused: { !Self.deviceToolsOpenNow }, handle: handler)
+                    }, isPaused: { !Self.deviceToolsOpenNow }, handle: guarded)
                 session = next
                 return next
             }, onConnected: { connected in

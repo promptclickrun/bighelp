@@ -13,8 +13,9 @@ protocol ChatSpeakerNoting: AnyObject, Sendable {
 ///
 /// When the plugin's `/native/context` lists `native-card-objects-v1`, the note
 /// also says which object cards this app draws (`renders`), so the plugin lets
-/// the agent send them in this chat. Without that feature the note is exactly
-/// what older plugins accept: they refuse fields they don't know.
+/// the agent send them in this chat; with `native-image-drafts-v1` too, the list
+/// adds the photo drafts. Without that feature the note is exactly what older
+/// plugins accept: they refuse fields they don't know.
 @MainActor
 final class DirectHermesChatSpeakerNote: ChatSpeakerNoting {
     private let currentWorkspace: @MainActor () -> (any WorkspaceOperationPerforming)?
@@ -53,7 +54,9 @@ final class DirectHermesChatSpeakerNote: ChatSpeakerNoting {
             "personId": .string(personID), "name": .string(UserIdentity.savedName(name)),
         ]
         if pluginFeatures.contains(BighelpCardObjects.feature) {
-            payload["renders"] = .array(BighelpCardObjects.renders.map(BighelpJSONValue.string))
+            // Drafts only with the plugin that knows them: older ones refuse names they don't know.
+            let drafts = pluginFeatures.contains(ImageDraftWire.feature) ? ImageDraftWire.renders : []
+            payload["renders"] = .array((BighelpCardObjects.renders + drafts).map(BighelpJSONValue.string))
         }
         return payload
     }

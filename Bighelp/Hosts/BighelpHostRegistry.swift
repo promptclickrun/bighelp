@@ -409,6 +409,8 @@ final class BighelpHostRegistry {
         // Saved files are named by a one-way key, so a removed host's can't be
         // picked out; clear them all and let other hosts' download again.
         Task { await AgentAttachmentCache.shared.removeAll() }
+        // Photo drafts' edits and pending Saves hold a person's details; same one-way names, same rule.
+        ImageDraftStore.shared.eraseLocalData()
         vault.invalidate(); draftStores[host.id]?.invalidate()
         hosts = remaining; selectedHostID = selection
         selectedWorkspace = selectedHost.map { workspace(for: $0) }

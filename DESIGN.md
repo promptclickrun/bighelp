@@ -62,6 +62,14 @@ are historical (`docs/ui-v3-design.md`).
   Artwork comes from MusicKit when Music is allowed, else Apple's public lookup and search with a name match
   (`BighelpCardMusicLookup`), kept in memory and Caches; until then, and when there is none, a quiet tile with
   the kind's symbol. Showing a card never asks for a permission.
+- Photo drafts: ask an agent to save a business card or event poster you sent, and it answers with a draft card
+  (the photo, the name or title, what to check, Review). The review is a sheet with the photo on top, every field
+  editable, an app-owned box of what to check (Missing, Check, Guess, You changed beside each field), where it goes
+  (iOS's own pop-up menu of accounts or calendars, or the default one until bighelp may list them), anything already
+  saved that looks like it (read only), and Discard and Save in the bar. The agent's review note sits at the top as
+  its quote. After a decision the same card says what happened. Each agent's Photo actions page (beside its
+  Instructions) sets the offer, how to read each kind, the question for unclear pictures and the review messages,
+  with Preview and Reset to defaults ([Image drafts](docs/IMAGE_DRAFTS.md)).
 - Attachments in a draft are one small glass tag above the message box, lined up with the field
   (`DraftAttachmentRail`): the count first, then the kinds ("4 attached · 3 photos, 1 PDF"), with photos leading a
   stack of up to three thumbnails. One photo says "1 photo"; one file shows its name and size. While photos or files

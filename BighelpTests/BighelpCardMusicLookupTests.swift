@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import UIKit
 @testable import Bighelp
 
 /// A music card's picture lookup when MusicKit's service doesn't answer: a chat full of cards
@@ -33,13 +34,14 @@ struct BighelpCardMusicLookupTests {
 
     private func store(
         timeout: TimeInterval = 5, publicLookups: Calls = Calls(),
+        settle: BighelpCardMusicArtworkStore.Settle? = nil,
         musicKit: @escaping BighelpCardMusicArtworkStore.MusicKitLookup
     ) -> BighelpCardMusicArtworkStore {
         BighelpCardMusicArtworkStore(musicKit: musicKit, publicLookup: { _, _ in
             publicLookups.begin()
             publicLookups.end()
             return nil
-        }, musicKitTimeout: timeout)
+        }, settle: settle ?? { found, _, _ in found }, musicKitTimeout: timeout)
     }
 
     private func ask(_ store: BighelpCardMusicArtworkStore, _ music: BighelpCardMusic) async
@@ -145,6 +147,28 @@ struct BighelpCardMusicLookupTests {
         #expect(calls.count == 1)
     }
 
+    private func picture() throws -> BighelpCardMusicArtworkStore.Found {
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 4, height: 4)).image { context in
+            UIColor.red.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 4, height: 4))
+        }
+        return .picture(try #require(BighelpCardArtworkFiles.picture(from: image)))
+    }
+
+    /// MusicKit answered; only the picture server is slow. That is no reason to pause MusicKit.
+    @Test func aSlowPictureDownloadIsNotAMusicKitFailure() async throws {
+        let found = try picture()
+        let store = store(timeout: 0.1, settle: { found, _, _ in
+            try? await Task.sleep(for: .milliseconds(600))
+            return found
+        }, musicKit: { _ in found })
+        let started = Date()
+        let result = try await ask(store, card(1))
+        #expect(result != nil, "The picture still arrives")
+        #expect(Date().timeIntervalSince(started) >= 0.5, "The download wasn't cut short by MusicKit's timeout")
+        #expect(!store.musicKitIsPaused)
+    }
+
     @Test func aCardWithNoPictureIsNotAskedAgainRightAway() async throws {
         let calls = Calls()
         let store = store { _ in calls.begin(); calls.end(); return nil }
@@ -168,6 +192,19 @@ struct BighelpCardMusicLookupTests {
         await release.open()
         for task in tasks { _ = await task.value }
         #expect(calls.count == 1)
+    }
+
+    // MARK: Play
+
+    @Test func playOrOpenMusicNeverBoth() {
+        // The wait ran out first: Music opens, and a late lookup is told not to play.
+        let late = BighelpCardMusicPlayHandoff()
+        #expect(late.abandon())
+        #expect(throws: CancellationError.self) { try late.commit() }
+        // Playing began first: the wait running out opens nothing.
+        let started = BighelpCardMusicPlayHandoff()
+        #expect(throws: Never.self) { try started.commit() }
+        #expect(!started.abandon())
     }
 
     @Test func theRaceReturnsWhatFinishesFirstEvenIfWorkIgnoresCancellation() async throws {

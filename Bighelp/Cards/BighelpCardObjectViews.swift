@@ -639,14 +639,23 @@ struct BighelpCardMusicView: View {
             isStarting = true
             Task {
                 defer { isStarting = false }
-                // MusicKit answers in seconds or not at all; a tap never waits longer than this.
-                let started: Void? = try? await BighelpCardRace.run(timeout: Self.playTimeout) { @MainActor in
-                    try await LiveDeviceMusicProvider().play(id: id, kind: kind, source: source, shuffle: nil) {
-                        // Music turned off while the item was looked up: play nothing.
-                        guard BighelpCardObjectAccess.musicEnabled() else { throw DeviceMusicProviderError.notAuthorized }
+                let handoff = BighelpCardMusicPlayHandoff()
+                do {
+                    // MusicKit answers in seconds or not at all; a tap never waits longer than this.
+                    try await BighelpCardRace.run(timeout: Self.playTimeout) { @MainActor in
+                        try await LiveDeviceMusicProvider().play(id: id, kind: kind, source: source, shuffle: nil) {
+                            // Music turned off while the item was looked up: play nothing.
+                            guard BighelpCardObjectAccess.musicEnabled() else { throw DeviceMusicProviderError.notAuthorized }
+                            // Right before the queue is set: once Music was opened instead, play nothing.
+                            try handoff.commit()
+                        }
                     }
+                } catch is BighelpCardRace.TimedOut {
+                    // Unless playing already began, Music opens and the late lookup plays nothing.
+                    if handoff.abandon() { openInMusic() }
+                } catch {
+                    openInMusic()
                 }
-                if started == nil { openInMusic() }
             }
             return
         }
@@ -712,6 +721,9 @@ final class BighelpCardMusicArtworkStore {
     typealias MusicKitLookup = @Sendable (BighelpCardMusic) async throws -> Found?
     /// Apple's public lookup, and the search by name.
     typealias PublicLookup = @Sendable (BighelpCardMusic, String) async -> Found?
+    /// Turns what MusicKit found into the picture to keep (downloads MusicKit's artwork address).
+    /// Not part of the MusicKit request: a slow picture server is not a MusicKit failure.
+    typealias Settle = @Sendable (Found, BighelpCardMusic, String) async -> Found
 
     static let shared = BighelpCardMusicArtworkStore()
     static let limit = 60
@@ -722,12 +734,14 @@ final class BighelpCardMusicArtworkStore {
 
     private let musicKit: MusicKitLookup
     private let publicLookup: PublicLookup
+    private let settle: Settle
     private let musicKitTimeout: TimeInterval
 
-    init(musicKit: MusicKitLookup? = nil, publicLookup: PublicLookup? = nil,
+    init(musicKit: MusicKitLookup? = nil, publicLookup: PublicLookup? = nil, settle: Settle? = nil,
          musicKitTimeout: TimeInterval = BighelpCardMusicFinder.musicKitTimeout) {
         self.musicKit = musicKit ?? BighelpCardMusicFinder.liveMusicKit
         self.publicLookup = publicLookup ?? BighelpCardMusicFinder.livePublic
+        self.settle = settle ?? BighelpCardMusicFinder.liveSettle
         self.musicKitTimeout = musicKitTimeout
     }
 
@@ -771,7 +785,7 @@ final class BighelpCardMusicArtworkStore {
         let asksMusicKit = usesMusicKit && !musicKitIsPaused
         let outcome = await BighelpCardMusicFinder.find(
             music, key: key, musicKit: asksMusicKit ? musicKit : nil, musicKitTimeout: musicKitTimeout,
-            publicLookup: publicLookup)
+            settle: settle, publicLookup: publicLookup)
         release()
         if outcome.musicKitUnavailable { musicKitPausedUntil = Date().addingTimeInterval(Self.retryAfter) }
         return outcome.found
@@ -823,17 +837,20 @@ enum BighelpCardMusicFinder {
     @concurrent
     static func find(_ music: BighelpCardMusic, key: String,
                      musicKit: BighelpCardMusicArtworkStore.MusicKitLookup?, musicKitTimeout: TimeInterval,
+                     settle: BighelpCardMusicArtworkStore.Settle,
                      publicLookup: BighelpCardMusicArtworkStore.PublicLookup) async -> Outcome {
         if isDemo { return Outcome(found: await BighelpCardArtworkFiles.demoCover(for: music).map(Found.picture)) }
         if let file = await BighelpCardArtworkFiles.read(key) { return Outcome(found: .picture(file)) }
         var unavailable = false
         if let musicKit {
+            // Only the MusicKit request is timed; what it found is settled after, outside the race.
+            var asked: Found?
             do {
-                let found = try await BighelpCardRace.run(timeout: musicKitTimeout, { try await musicKit(music) })
-                if let found { return Outcome(found: found) }
+                asked = try await BighelpCardRace.run(timeout: musicKitTimeout, { try await musicKit(music) })
             } catch {
                 unavailable = isServiceFailure(error)
             }
+            if let asked { return Outcome(found: await settle(asked, music, key)) }
         }
         return Outcome(found: await publicLookup(music, key), musicKitUnavailable: unavailable)
     }
@@ -860,12 +877,19 @@ enum BighelpCardMusicFinder {
         guard let id = music.musicID ?? BighelpCardMusicLookup.storeID(for: music)?.id else { return nil }
         let source = music.source ?? (BighelpCardMusicLookup.isLibraryID(id) ? .library : .catalog)
         guard let artwork = try await fetch(MusicItemID(id), kind: music.kind, source: source) else { return nil }
+        return .musicKit(artwork)
+    }
+
+    /// MusicKit's artwork as a kept picture when it has an address; the download has its own timeout
+    /// (`BighelpCardArtworkFiles`), and when it fails `ArtworkImage` draws the artwork itself.
+    @Sendable static func liveSettle(_ found: Found, _ music: BighelpCardMusic, key: String) async -> Found {
+        guard case .musicKit(let artwork) = found else { return found }
         let pixels = BighelpCardMusicLookup.artworkPixels
         if let url = artwork.url(width: pixels, height: pixels), url.scheme == "https",
-           let picture = await BighelpCardArtworkFiles.download(url, key: BighelpCardMusicLookup.cacheKey(for: music)) {
+           let picture = await BighelpCardArtworkFiles.download(url, key: key) {
             return .picture(picture)
         }
-        return .musicKit(artwork)
+        return found
     }
 
     private static func fetch(_ id: MusicItemID, kind: BighelpCardMusic.Kind,
@@ -911,7 +935,29 @@ enum BighelpCardMusicFinder {
     }
     #else
     @Sendable static func liveMusicKit(_ music: BighelpCardMusic) async throws -> Found? { nil }
+    @Sendable static func liveSettle(_ found: Found, _ music: BighelpCardMusic, key: String) async -> Found { found }
     #endif
+}
+
+/// Which of the two things a Play tap can do happens: MusicKit's player starts, or Music opens instead
+/// (the lookup took too long). The lookup can't be stopped, so it asks this right before it would play.
+@MainActor
+final class BighelpCardMusicPlayHandoff {
+    private enum State { case waiting, playing, abandoned }
+    private var state = State.waiting
+
+    /// Called right before the player starts; throws once Music was opened instead.
+    func commit() throws {
+        guard state != .abandoned else { throw CancellationError() }
+        state = .playing
+    }
+
+    /// Called when the wait ran out. True when Music should open: nothing has started playing, and nothing will.
+    func abandon() -> Bool {
+        guard state != .playing else { return false }
+        state = .abandoned
+        return true
+    }
 }
 
 /// Runs `work` and gives up on it after `timeout` seconds, even when it ignores cancellation

@@ -22,6 +22,18 @@ Registration must establish credential/grant authority before another row can fi
 
 The payload carries five visible rows, the total active count, and opaque membership suffixes for up to 64 active rows. Hidden rows are recovered only when that membership confirms them; local dismissal tombstones survive restoration. Physical token registration is serialized across all row owners and drains token rotations before releasing the queue. If a remote completion ends the physical card before a new row registers, still-running work gets a new physical card during an eligible live opportunity. All-finished cards dismiss after 30 seconds, or on the next app opening. Upgrade cleanup dismisses old per-chat native cards only after a shared start succeeds.
 
+## When the service refuses a card
+
+The service answers a phone's row DELETE for a card it never stored with 404 `notification_activity_unknown`, and a revision it doesn't expect with 409 `notification_activity_conflict` (both `{version, error: {code, message}}`). The host routes keep their own answers. The app treats the 404 as "already gone": it clears the saved revocation and does the same local cleanup a confirmed revoke does. A 409, a 5xx or any other answer stays pending and is retried at the next foreground.
+
+One stuck revoke never costs the other cards their recovery. `BighelpManagedNativeActivityRuntime.recover` runs every owner, and the foreground and wake hooks always run `flushPendingOperations()` (registration retries and card repair) before they report a failure.
+
+A registration the service refuses for good (a 4xx other than 408, 425 and 429) gives the card back to the phone: `remoteOwned` goes off, so the card keeps following the chat and ends when the turn does. An outage or a lost reply keeps it with the service, because the service may have taken the request.
+
+## Diagnosing a card that disappeared
+
+`BighelpLiveActivityLog` writes fixed codes to the `app.loopdy.mobile` subsystem, category `LiveActivity`, never IDs, titles or text. Filter Console on that category. `card-started`, `card-request-disabled` and `card-request-failed` (with the system error's `domain` and `code`) cover the ActivityKit request. `card-ending`, `card-ended`, `card-dismissed`, `card-invalidated`, `finished-cards-dismissed`, `driver-retired`, `entry-repaired` and `entry-pruned` say why a card went. `registration-confirmed`, `registration-failed` (with `reason=http-<status>` or the error kind), `registration-refused-local-control`, `revocation-*` and `recovery-owner-failed` cover the service.
+
 ## Chat widgets
 
 Active Chats and Recent Chats retain working sessions before the twelve-session snapshot limit. The row link includes the correct gateway as well as the stored chat ID. Widget session freshness is independent of unrelated snapshot changes: a cached read does not become fresh merely because the app reopened or a board changed. The native runtime marks sessions live only after an authoritative read on the current connection. A live publisher can refresh the timestamp once a minute; background suspension stops that heartbeat. The timeline includes the stale boundary, subject to WidgetKit's scheduling, and preserves the chats while showing Updates paused.

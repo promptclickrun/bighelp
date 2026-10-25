@@ -86,6 +86,14 @@ final class BighelpManagedLiveActivityRegistrar: BighelpLiveActivityRegistering 
             } catch BighelpLinkAPIError.requestFailed(_, let code) where code == "notification_activity_group_ended" {
                 await service.activityRuntime?.invalidatePhysicalActivity(for: owner)
                 throw RegistrationError.ownerChanged
+            } catch let error as BighelpLinkAPIError where Self.refusesForGood(error) {
+                // The service said no, so it holds nothing for this card and can never push to it. Give the
+                // card back to this phone, or it stays frozen and never ends. The saved request stays, so the
+                // next foreground replays the same bytes. A lost reply or an outage is NOT this: those keep
+                // the card with the service, because it may have taken the request.
+                owner.remoteOwned = false; try? service.ledger.save(owner)
+                BighelpLiveActivityLog.note(.registrationRefused)
+                throw error
             }
             try check()
             guard service.ledger.activity(owner.relayActivityID)?.retired == false else { throw RegistrationError.ownerChanged }
@@ -148,10 +156,24 @@ final class BighelpManagedLiveActivityRegistrar: BighelpLiveActivityRegistering 
         guard let body = intent.pendingRevocationBody,
               let values = try JSONDecoder().decode(BighelpJSONValue.self, from: body).object,
               let revision = values["revision"]?.integer else { throw RegistrationError.ownerChanged }
-        let response = try await service.accountAPI().managedNotificationRequest(path: path(owner), method: "DELETE",
-            body: body, credentials: credentials)
+        let response: BighelpJSONValue?
+        do {
+            response = try await service.accountAPI().managedNotificationRequest(path: path(owner), method: "DELETE",
+                body: body, credentials: credentials)
+        } catch BighelpLinkAPIError.requestFailed(let status, let code)
+                    where status == 404 && code == "notification_activity_unknown" {
+            // The service never stored this card, usually because it refused the registration. There is
+            // nothing to revoke, and asking again can only fail again. 409 and every other answer still
+            // keep the revocation pending.
+            response = nil
+        }
         try check()
-        try validateActivity(response, owner: owner, revision: revision, lease: nil, status: "revoked")
+        if let response {
+            try validateActivity(response, owner: owner, revision: revision, lease: nil, status: "revoked")
+            BighelpLiveActivityLog.note(.revocationConfirmed)
+        } else {
+            BighelpLiveActivityLog.note(.revocationGone)
+        }
         if BighelpActivityGroupDriver.physicalID(owner.nativeActivityID) == nil {
             try await BuzzKit.activities.end(id: owner.relayActivityID)
             // The shared card's address goes when the physical card ends (`onPhysicalEnded`), not with a row.
@@ -192,6 +214,11 @@ final class BighelpManagedLiveActivityRegistrar: BighelpLiveActivityRegistering 
             coordinatorReference: registration.sessionReference, pushToken: registration.pushToken,
             revision: registration.revision, timestamp: registration.timestamp, leaseExpires: registration.leaseExpires,
             pendingRevocationBody: nil, registrationConfirmed: false)
+    }
+    /// The service looked at the request and refused it. Timeouts, rate limits and 5xx are outages: retry.
+    private static func refusesForGood(_ error: BighelpLinkAPIError) -> Bool {
+        guard case .requestFailed(let status, _) = error else { return false }
+        return (400..<500).contains(status) && ![408, 425, 429].contains(status)
     }
     private func check() throws {
         try service.requireCurrent(host, credentials: credentials)
@@ -325,12 +352,28 @@ final class BighelpManagedActivityDriver: BighelpLiveActivityDriving {
         return nativeID
     }
     func update(id: String, state: LoopdySessionActivityAttributes.ContentState) async {
-        guard !isRetired, canonicalTurnID == nil, let owner = owner(id), !owner.remoteOwned else { return }
+        guard !isRetired, let owner = owner(id), writesLocally(owner) else { return }
         await underlying.update(id: id, state: state)
     }
     func end(id: String, state: LoopdySessionActivityAttributes.ContentState) async {
-        guard !isRetired, canonicalTurnID == nil, let owner = owner(id), !owner.remoteOwned else { return }
+        guard !isRetired, let owner = owner(id), writesLocally(owner) else { return }
         await underlying.end(id: id, state: state)
+    }
+    /// A local-only card is this phone's to write. A card the service may hold is not, and neither is one
+    /// that waits for its first registration. The exception is a card whose registration the service
+    /// refused: nothing else can ever update or end it, so it goes back to this phone.
+    private func writesLocally(_ owner: BighelpManagedActivityOwner) -> Bool {
+        !owner.remoteOwned && (canonicalTurnID == nil || registrationRefused)
+    }
+    /// True from the service's refusal until a registration is confirmed. The saved request that was sent
+    /// is still unconfirmed, and no request may have been accepted (`remoteOwned` is off).
+    var registrationRefused: Bool {
+        guard canonicalTurnID != nil, !isRetired else { return false }
+        return ledger.activities.contains { owner in
+            guard matches(owner), !owner.retired, !owner.remoteOwned,
+                  let request = (try? activityKeys.load(owner.relayActivityID)) ?? nil else { return false }
+            return !request.registrationConfirmed && request.pendingRevocationBody == nil
+        }
     }
     func dismiss(id: String, state: LoopdySessionActivityAttributes.ContentState) async {
         guard owner(id, includeRetired: true) != nil else { return }
@@ -362,6 +405,7 @@ final class BighelpManagedActivityDriver: BighelpLiveActivityDriving {
         isRetired = true
         for continuation in tokenContinuations.values { continuation.finish() }
         tokenContinuations.removeAll()
+        BighelpLiveActivityLog.note(.driverRetired, count: snapshots.count)
         for snapshot in snapshots { Task { await underlying.dismiss(id: snapshot.nativeActivityID, state: snapshot.state) } }
     }
     var remoteOwned: Bool { ledger.activities.contains { matches($0) && $0.remoteOwned && !$0.retired } }

@@ -132,14 +132,20 @@ struct BighelpManagedNotificationIntegration {
             }
             try await service.reconcilePendingRevocations()
             guard isCurrent() else { throw DirectHermesError.secureStorageChanged }
+            // A failed recovery is reported, but never before the flush: the flush retries card
+            // registrations and repairs cards, and one stuck revoke must not hold those back.
+            var firstFailure: (any Error)?
             for host in service.registry.hosts {
                 try Task.checkCancellation()
                 guard isCurrent() else { throw DirectHermesError.secureStorageChanged }
-                try await activityRuntime.recover(host: host)
+                do { try await activityRuntime.recover(host: host) }
+                catch is CancellationError { throw CancellationError() }
+                catch { firstFailure = firstFailure ?? error }
                 guard isCurrent() else { throw DirectHermesError.secureStorageChanged }
             }
             await activityRuntime.flushPendingOperations()
             guard isCurrent() else { throw DirectHermesError.secureStorageChanged }
+            if let firstFailure { throw firstFailure }
         }
         hooks = Hooks(
             prepareChat: { host, chat in

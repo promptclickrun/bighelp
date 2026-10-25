@@ -190,6 +190,16 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     case myTemplatesList = "my-templates.list"
     case myTemplatesSave = "my-templates.save"
     case myTemplatesDelete = "my-templates.delete"
+    /// Photo actions: an agent's settings, and drafts read from pictures that the person reviews
+    /// before anything is written (plugin `native-image-drafts-v1`, docs/IMAGE_DRAFTS.md).
+    case imageActionsGet = "image-actions.get"
+    case imageActionsSave = "image-actions.save"
+    case imageDraftsStates = "image-drafts.states"
+    case imageDraftsSource = "image-drafts.source"
+    case imageDraftsClaim = "image-drafts.claim"
+    case imageDraftsFinish = "image-drafts.finish"
+    case imageDraftsDiscard = "image-drafts.discard"
+    case imageDraftsReopen = "image-drafts.reopen"
     /// Composio Connect in Hermes, for Settings › Apps › Composio Apps (plugin `native-composio-v1`).
     case composioStatus = "composio.status"
     case composioInstall = "composio.install"

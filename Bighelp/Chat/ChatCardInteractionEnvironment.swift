@@ -213,6 +213,9 @@ struct ChatCardInteractionHandler {
     let sendReply: @MainActor (_ text: String) -> Bool
     let scheduledTasks: ChatCardScheduledTaskBackend?
     let currentScope: @MainActor () -> ChatCardInteractionScope?
+    /// The chat's stored session on the computer, which its photo drafts belong to. Nil until the
+    /// chat has one.
+    let storedSessionID: @MainActor () -> String?
 
     init(
         scope: ChatCardInteractionScope,
@@ -221,7 +224,8 @@ struct ChatCardInteractionHandler {
         stageComposer: @escaping @MainActor (_ text: String, _ strategy: ChatCardComposerMergeStrategy) -> Void,
         sendReply: @escaping @MainActor (_ text: String) -> Bool = { _ in false },
         scheduledTasks: ChatCardScheduledTaskBackend? = nil,
-        currentScope: @escaping @MainActor () -> ChatCardInteractionScope?
+        currentScope: @escaping @MainActor () -> ChatCardInteractionScope?,
+        storedSessionID: @escaping @MainActor () -> String? = { nil }
     ) {
         self.scope = scope
         self.store = store
@@ -230,6 +234,7 @@ struct ChatCardInteractionHandler {
         self.sendReply = sendReply
         self.scheduledTasks = scheduledTasks
         self.currentScope = currentScope
+        self.storedSessionID = storedSessionID
     }
 
     /// Sends a card's answer straight to the agent and remembers it, so the

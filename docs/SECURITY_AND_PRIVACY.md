@@ -347,10 +347,21 @@ The app sends only the acknowledged `ref_text` references with the user's
 caption. Confirmed references and uncertain attempts remain in the protected
 submission journal; cancellation after the last upload does not authorize a
 prompt, retry, or remote file deletion. Removing a local attachment does not
-claim to remove an uploaded host file. Native image uploads are unavailable,
-including images disguised as ordinary files, until official Hermes provides
-a message-bound upload contract. Unsupported conversation clients cannot
-advertise attachment support or silently send only the caption.
+claim to remove an uploaded host file. Photos go through Hermes' own
+`image.attach_bytes` (at most 8 MB each, 10 per message), which stages each one
+on the exact live session before the prompt; the host keeps the picture in the
+agent's images folder and the chat's history names it. Unsupported conversation
+clients cannot advertise attachment support or silently send only the caption.
+
+Photo actions ([Image drafts](IMAGE_DRAFTS.md)) never write on an upload. A
+contact or event read from a picture is a draft until the person saves it in the
+review; the host records only the draft's state and a hash of the approved
+fields, never a second copy of them. Text inside a picture is data, never
+instructions or consent. In a chat that holds a picture the person sent, or a
+library photo the agent read there, the host and the phone both refuse the
+agent's own `contacts.create` and `calendar.create` (`review_required`), so
+standing Device access can't turn a picture into a new contact or event without
+the person's review. Other phone tools keep their own switches and rules.
 
 Signing out attempts a signed request to revoke this device and its push/Live
 Activity authorization, then deletes bighelp Link runtime credentials,

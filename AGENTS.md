@@ -260,6 +260,12 @@ change in both repos.
   `native-device-tools-agents-v1`; after the grace it closes as `paused` so the host waits for the phone.
   Two reach past the open chat: Arriving and leaving sends its message from the background (`DeviceGeofenceMonitor`),
   and a Shortcuts run keeps the call alive while Shortcuts is in front (`DeviceToolHandoff`).
+- **Photo actions** ([docs/IMAGE_DRAFTS.md](docs/IMAGE_DRAFTS.md), plugin `native-image-drafts-v1`): a contact or
+  event read from a picture is a `contact_draft` or `event_draft` card, never a write. Only the review's Save writes
+  (`ImageDraftStore`): it claims the draft on the host, journals the write (`DeviceToolFileJournal`) and reads it back,
+  so a second tap or a relaunch never writes twice; without access it opens Apple's own editor, whose Done is the
+  Save. In a chat that holds the person's picture the phone answers `contacts.create` and `calendar.create` with
+  `review_required`. Each agent's Photo actions page sits beside its Instructions.
 - **Hermes versions never gate connections or features.** Older, newer, custom and absent version strings are
   metadata, not an allowlist. Check actual host capabilities and route responses instead.
   - Hosts differ, so parse leniently: ignore unknown keys and treat most parts as optional.

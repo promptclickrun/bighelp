@@ -27,6 +27,11 @@ HOME and HERMES_HOME, then runs the matching HostSignInMatrixUITests:
             Scripts/HostProbePlugin: a generated image stays in the chat after
             the turn ends, and Hermes' vault code and save-login prompts open
             bighelp's secure pop-up. Needs a Hermes with the vault (canary)
+  drafts    no sign-in, with the bighelp plugin (--plugin) and a scripted model:
+            a made-up business card sent from the app becomes a contact draft,
+            the review's Save writes once and the agent hears it at its next
+            turn; a photo alone gets the offer, and the host refuses the agent's
+            own contact create in that chat (ImageDraftsHostUITests)
 
 HERMES_DISABLE_LAZY_INSTALLS=1 keeps Hermes from "finishing a source update"
 into its checkout on first launch. Use a separate Hermes checkout anyway: never
@@ -76,6 +81,8 @@ TESTS = {
               "AllHostsHostUITests/testUsageOpensFromTheMenuWithAllHosts",
               "AllHostsHostUITests/testSecureInputAndQuestionsWorkInAChatOnTheOtherHost",
               "ShortcutGatewaySwitchHostUITests/testAskAnAgentSwitchesToItsGatewayAndGetsTheAnswer"],
+    "drafts": ["ImageDraftsHostUITests/testAContactDraftFromAPhotoSavesOnceAndTheAgentHearsIt",
+               "ImageDraftsHostUITests/testAPhotoAloneGetsTheOfferAndTheAgentCantAddTheContactItself"],
     "media": ["testGeneratedImageStaysAfterTheTurnEnds", "testVaultCodePopUpEntersTheCode",
               "testSaveLoginPopUpSavesTheLogin", "testVaultSavesAndImportsLoginsOnTheHost",
               "testACardStreamsBehindALoader"],
@@ -182,6 +189,97 @@ class ToolTurnModel(BaseHTTPRequestHandler):
                 "usage": {"prompt_tokens": 10, "completion_tokens": 10, "total_tokens": 20}}).encode())
             return
         delta = ({"role": "assistant", "tool_calls": [{**call, "index": 0}]} if call
+                 else {"role": "assistant", "content": message["content"]})
+        for part in (delta, {}):
+            chunk = {"id": "fixture", "object": "chat.completion.chunk", "created": 1, "model": "fixture-model",
+                     "choices": [{"index": 0, "delta": part, "finish_reason": None if part else finish}]}
+            self.wfile.write(("data: " + json.dumps(chunk) + "\n\n").encode())
+            self.wfile.flush()
+        self.wfile.write(b"data: [DONE]\n\n")
+        self.wfile.flush()
+
+
+class PhotoDraftModel(BaseHTTPRequestHandler):
+    """A scripted model for photo drafts, so a real Hermes and the real plugin run every step
+    but the reading. "contact draft test" (or tapping the offer's Make a contact) drafts the
+    made-up business card with bighelp_draft_contact; a picture with no words gets the offer
+    (bighelp_offer_photo_action); "direct contact test" calls iphone_contacts create itself,
+    which the host must refuse in a chat with a picture; "outcome test" says which draft note
+    the plugin added to its turn."""
+
+    CONTACT = {"fields": {"given_name": "Riley", "organization": "Sample Studio", "job_title": "Designer",
+                          "phones": [{"label": "work", "value": "+1 555 0142"}],
+                          "emails": [{"label": "work", "value": "riley@example.com"}]},
+               "marks": [{"field": "phones.0", "reason": "unclear"},
+                         {"field": "family_name", "reason": "not_in_image"}]}
+
+    def log_message(self, *args):
+        pass
+
+    @staticmethod
+    def text_of(message: dict) -> str:
+        content = message.get("content")
+        if isinstance(content, list):
+            return "\n".join(str(part.get("text", "")) for part in content if isinstance(part, dict))
+        return str(content or "")
+
+    @staticmethod
+    def has_picture(message: dict, text: str) -> bool:
+        content = message.get("content")
+        if isinstance(content, list) and any(isinstance(p, dict) and p.get("type") in ("image_url", "input_image")
+                                             for p in content):
+            return True
+        return "@image:" in text or "[Image attached" in text or "attached an image" in text
+
+    def do_POST(self):
+        request = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
+        messages = request.get("messages", [])
+        offered = {t.get("function", {}).get("name", "") for t in request.get("tools", [])}
+        users = [i for i, m in enumerate(messages) if m.get("role") == "user"]
+        start = users[-1] if users else -1
+        asked = self.text_of(messages[start]) if start >= 0 else ""
+        results = [self.text_of(m) for m in messages[start + 1:] if m.get("role") == "tool"]
+        words = re.sub(r"(?m)^\s*(@image:.*|\[Image attached[^\]]*\]|\[The user attached.*\]|\[Examine it.*\])\s*$", "",
+                       asked.split("[bighelp]")[0]).strip()
+        call = None
+        if not results:
+            if "contact draft test" in asked or "Make a contact from this card" in asked:
+                call = ("bighelp_draft_contact", self.CONTACT)
+            elif "direct contact test" in asked:
+                call = ("iphone_contacts", {"operation": "create", "givenName": "Riley", "organization": "Sample Studio"})
+            elif start >= 0 and self.has_picture(messages[start], asked) and not words:
+                call = ("bighelp_offer_photo_action", {"preset": "business_card",
+                                                       "question": "This looks like a business card. Want a contact from it?"})
+        if call and call[0] not in offered and "tool_call" in offered:
+            call = ("tool_call", {"name": call[0], "arguments": call[1]})
+        if call:
+            message = {"role": "assistant", "content": None, "tool_calls": [
+                {"id": "call_photo_draft_fixture", "type": "function",
+                 "function": {"name": call[0], "arguments": json.dumps(call[1])}}]}
+        else:
+            outcome = json.loads(results[-1]) if results and results[-1].startswith("{") else {}
+            if "outcome test" in asked:
+                note = asked.lower()
+                text = "Outcome note: " + ("saved" if "saved the contact draft" in note else
+                                           "discarded" if "discarded the contact draft" in note else "none") + "."
+            elif "display_markdown" in outcome:
+                text = "Here it is. Check it before you save.\n\n" + outcome["display_markdown"]
+            elif results:
+                text = "Tool said: " + str(outcome.get("error") or outcome.get("code") or results[-1][:200])
+            else:
+                text = "A made-up business card for Riley at Sample Studio."
+            message = {"role": "assistant", "content": text}
+        finish = "tool_calls" if call else "stop"
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream" if request.get("stream") else "application/json")
+        self.end_headers()
+        if not request.get("stream"):
+            self.wfile.write(json.dumps({"id": "fixture", "object": "chat.completion", "model": "fixture-model",
+                "created": 1, "choices": [{"index": 0, "message": message, "finish_reason": finish}],
+                "usage": {"prompt_tokens": 10, "completion_tokens": 10, "total_tokens": 20}}).encode())
+            return
+        first = message["tool_calls"][0] if call else None
+        delta = ({"role": "assistant", "tool_calls": [{**first, "index": 0}]} if call
                  else {"role": "assistant", "content": message["content"]})
         for part in (delta, {}):
             chunk = {"id": "fixture", "object": "chat.completion.chunk", "created": 1, "model": "fixture-model",
@@ -544,7 +642,8 @@ def run_mode(mode: str, args, repo: Path) -> int:
         home, project = temp / "home", temp / "project"
         home.mkdir()
         project.mkdir()
-        model = ThreadingHTTPServer(("127.0.0.1", 0), ToolTurnModel if mode in ("tools", "media") else SyntheticModel)
+        model = ThreadingHTTPServer(("127.0.0.1", 0), PhotoDraftModel if mode == "drafts"
+                                    else ToolTurnModel if mode in ("tools", "media") else SyntheticModel)
         threading.Thread(target=model.serve_forever, daemon=True).start()
         port = free_port()
         origin = f"http://127.0.0.1:{port}"
@@ -555,14 +654,14 @@ def run_mode(mode: str, args, repo: Path) -> int:
         # still resolves to this Mac, so gated hosts use it; single sign-on needs the
         # app on that same name, since the sign-in cookie belongs to it.
         public = f"http://127.0.0.1:{proxy.port}" if proxy \
-            else origin if mode in ("open", "tools", "widgets", "features", "update", "media") \
+            else origin if mode in ("open", "tools", "widgets", "features", "update", "media", "drafts") \
             else f"http://hermes.localhost:{port}"
         config = {"dashboard": {"public_url": public},
                   "model": {"default": "fixture-model", "provider": "custom",
                             "base_url": f"http://127.0.0.1:{model.server_port}/v1", "api_key": "local-synthetic-no-auth"},
                   "agent": {"max_turns": 3}, "terminal": {"backend": "local", "cwd": str(project)},
                   "memory": {"memory_enabled": False, "user_profile_enabled": False}}
-        if mode in ("tools", "features", "media"):
+        if mode in ("tools", "features", "media", "drafts"):
             if not args.plugin:
                 raise SystemExit(f"{mode} mode needs --plugin <bighelp plugin folder>")
             shutil.copytree(args.plugin, home / "plugins" / "loopdy",

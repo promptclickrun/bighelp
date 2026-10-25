@@ -4,7 +4,6 @@
 import CryptoKit
 import BuzzKit
 import Foundation
-import OSLog
 
 struct BighelpLiveActivityRegistration: Equatable, Sendable {
     let activityID: String
@@ -266,6 +265,7 @@ final class BighelpLiveActivityCoordinator {
                 defer { finishRegistrationAttempt(session, generation: generation) }
                 do {
                     try await registrar.register(registration)
+                    BighelpLiveActivityLog.note(.registrationConfirmed)
                     guard generation == lifecycleGeneration else { return }
                     guard active[session.attributes.sessionID] === session, !session.closeInFlight else {
                         await revokeLateRegistration(registration, generation: generation)
@@ -280,6 +280,7 @@ final class BighelpLiveActivityCoordinator {
                     }
                 } catch {
                     // Keep the exact request for a later event/lifecycle retry.
+                    BighelpLiveActivityLog.failed(.registrationFailed, error)
                 }
 
             case let .revocation(revocation):
@@ -293,6 +294,7 @@ final class BighelpLiveActivityCoordinator {
                     }
                 } catch {
                     // Keep the exact request for a later event/lifecycle retry.
+                    BighelpLiveActivityLog.failed(.revocationFailed, error)
                 }
             }
         }
@@ -395,8 +397,7 @@ final class BighelpLiveActivityCoordinator {
             let nativeID: String
             do { nativeID = try driver.start(attributes: attributes, state: initial) }
             catch {
-                Logger(subsystem: "app.loopdy.mobile", category: "LiveActivity")
-                    .error("Could not start Live Activity: \(String(describing: error), privacy: .private)")
+                BighelpLiveActivityLog.failed(.cardStartFailed, error)
                 return
             }
             session = ActiveSession(
@@ -589,6 +590,7 @@ final class BighelpLiveActivityCoordinator {
             do {
                 try await registrar.revoke(revocation)
             } catch {
+                BighelpLiveActivityLog.failed(.revocationFailed, error)
                 if generation == lifecycleGeneration {
                     pending[PendingOperation.revocation(revocation).key] = .revocation(revocation)
                 }
@@ -661,6 +663,7 @@ final class BighelpLiveActivityCoordinator {
         defer { finishRegistrationAttempt(session, generation: generation) }
         do {
             try await registrar.register(registration)
+            BighelpLiveActivityLog.note(.registrationConfirmed)
             guard generation == lifecycleGeneration else { return }
             guard active[session.attributes.sessionID] === session, !session.closeInFlight else {
                 await revokeLateRegistration(registration, generation: generation)
@@ -669,6 +672,7 @@ final class BighelpLiveActivityCoordinator {
             session.pushToken = token
             session.revision = nextRevision
         } catch {
+            BighelpLiveActivityLog.failed(.registrationFailed, error)
             guard
                 generation == lifecycleGeneration,
                 active[session.attributes.sessionID] === session,
@@ -699,6 +703,7 @@ final class BighelpLiveActivityCoordinator {
         do {
             try await registrar.revoke(revocation)
         } catch {
+            BighelpLiveActivityLog.failed(.revocationFailed, error)
             guard generation == lifecycleGeneration, !resettingAccount else { return }
             pending[PendingOperation.revocation(revocation).key] = .revocation(revocation)
         }
@@ -753,16 +758,24 @@ final class BighelpActivityKitDriver: BighelpLiveActivityDriving {
         state: LoopdySessionActivityAttributes.ContentState
     ) throws -> String {
         guard ActivityAuthorizationInfo().areActivitiesEnabled else {
+            BighelpLiveActivityLog.note(.cardRequestDisabled)
             throw ActivityError.disabled
         }
-        let activity = try Activity.request(
-            attributes: attributes,
-            content: ActivityContent(
-                state: state,
-                staleDate: Date(timeIntervalSince1970: TimeInterval(state.timestamp + 120))
-            ),
-            pushType: .token
-        )
+        let activity: Activity<LoopdySessionActivityAttributes>
+        do {
+            activity = try Activity.request(
+                attributes: attributes,
+                content: ActivityContent(
+                    state: state,
+                    staleDate: Date(timeIntervalSince1970: TimeInterval(state.timestamp + 120))
+                ),
+                pushType: .token
+            )
+        } catch {
+            BighelpLiveActivityLog.requestFailed(error)
+            throw error
+        }
+        BighelpLiveActivityLog.note(.cardStarted)
         known[activity.id] = activity
         if state.sessions != nil {
             let old = Activity<LoopdySessionActivityAttributes>.activities.filter {
@@ -800,6 +813,7 @@ final class BighelpActivityKitDriver: BighelpLiveActivityDriving {
             ),
             dismissalPolicy: .after(Date().addingTimeInterval(30))
         )
+        BighelpLiveActivityLog.note(.cardEnded)
         known.removeValue(forKey: id)
     }
 
@@ -811,15 +825,19 @@ final class BighelpActivityKitDriver: BighelpLiveActivityDriving {
     /// Lock Screen for hours; its reply is already a notification. Opening the
     /// app clears the finished ones.
     static func dismissFinishedActivities() async {
+        var dismissed = 0
         for activity in Activity<LoopdySessionActivityAttributes>.activities
         where activity.activityState == .ended || activity.content.state.phase.isTerminal {
             await activity.end(nil, dismissalPolicy: .immediate)
+            dismissed += 1
         }
+        if dismissed > 0 { BighelpLiveActivityLog.note(.finishedCardsDismissed, count: dismissed) }
     }
 
     func dismiss(id: String, state: LoopdySessionActivityAttributes.ContentState) async {
         guard let activity = activity(id: id) else { return }
         await activity.end(ActivityContent(state: state, staleDate: nil), dismissalPolicy: .immediate)
+        BighelpLiveActivityLog.note(.cardDismissed)
         known.removeValue(forKey: id)
         tokens.removeValue(forKey: id)
     }

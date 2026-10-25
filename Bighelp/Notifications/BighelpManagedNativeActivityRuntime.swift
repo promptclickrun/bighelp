@@ -91,6 +91,12 @@ final class BighelpManagedNativeActivityRuntime {
             // fails. A message segment is not a new canonical host turn.
             existing.nativeTurns.insert(event.turnID)
             existing.lastEvent = event; existing.client = chat.client
+            // The service refused this card's registration, so no host update will ever reach it. The
+            // phone keeps it current instead of leaving it frozen.
+            if existing.driver.registrationRefused {
+                await existing.coordinator.receive(event.routed(to: existing.opaqueID), sessionTitle: "Active session",
+                    agentID: profile, agentName: existing.agentName)
+            }
             return
         }
         if let canonicalHostTurnID {
@@ -107,7 +113,7 @@ final class BighelpManagedNativeActivityRuntime {
                 if workSnapshot?.work?.outcome == .cancelled {
                     try await cancel(host: host, profile: profile, storedSessionID: session,
                         originalLocalTurnID: selected.localTurn)
-                } else if selected.coordinator.activeSessionIDs.isEmpty {
+                } else if selected.coordinator.activeSessionIDs.isEmpty || selected.driver.registrationRefused {
                     await selected.coordinator.receive(event.routed(to: selected.opaqueID), sessionTitle: "Active session",
                         agentID: profile, agentName: "Your agent")
                 } else {
@@ -208,6 +214,7 @@ final class BighelpManagedNativeActivityRuntime {
                 && $0.accountScope == host.notificationScope && $0.profile == entry.profile
                 && $0.storedSessionID == entry.session && $0.localTurnID == entry.localTurn && !$0.retired }
             guard !owners.isEmpty, owners.allSatisfy({ !active.contains($0.nativeActivityID) }) else { continue }
+            BighelpLiveActivityLog.note(.entryRepaired)
             try retireOwner(entry)
             entry.driver.retire()
             let replacement = try makeEntry(host: host, grant: grant, session: entry.session,
@@ -233,6 +240,7 @@ final class BighelpManagedNativeActivityRuntime {
                 && $0.accountScope == entry.host.notificationScope && $0.profile == entry.profile
                 && $0.storedSessionID == entry.session && $0.localTurnID == entry.localTurn && !$0.retired }
             if !owners.isEmpty && owners.allSatisfy({ !active.contains($0.nativeActivityID) }) {
+                BighelpLiveActivityLog.note(.entryPruned)
                 entry.driver.retire(); entries[key] = nil
                 if retired.count < 512 { retired.insert(key) }
             }
@@ -273,7 +281,9 @@ final class BighelpManagedNativeActivityRuntime {
         entries[key]?.nativeParentFinished = true
         // A local frame final is not proof about selected authoritative work,
         // including the interval BEFORE its APNs token has registered.
-        guard let entry = entries[key], entry.canonicalTurn == nil, !entry.driver.remoteOwned else { return }
+        // Except a card whose registration the service refused: no host terminal will ever come for it.
+        guard let entry = entries[key], entry.canonicalTurn == nil || entry.driver.registrationRefused,
+              !entry.driver.remoteOwned else { return }
         if case .cancelled = outcome {
             try await cancel(host: host, profile: profile, storedSessionID: storedSessionID, originalLocalTurnID: originalLocalTurnID)
             return
@@ -307,35 +317,49 @@ final class BighelpManagedNativeActivityRuntime {
 
     /// Restore only exact persisted native owners, not every app activity per host.
     /// Token/revision recovery replays the original request; never guesses revision 1.
+    /// One owner failing (a revoke the service keeps refusing) must not cost the other owners their
+    /// recovery, so every owner runs and the first failure is thrown at the end.
     func recover(host: BighelpConfiguredHost) async throws {
         guard let service else { return }
         _ = try service.credentials(for: host)
         try reapExpiredOwners(host: host)
+        var firstFailure: (any Error)?
         for owner in service.ledger.activities where owner.accountScope == host.notificationScope
-            && owner.hostConnectionID == host.hostConnectionID && !owner.retired {
-            guard let enrollment = service.ledger.record(host: host, profile: owner.profile), enrollment.enabled,
-                  !enrollment.revokePending, let grant = enrollment.grant, grant.grantId == owner.grantID,
-                  grant.expiresAt > Int(now().timeIntervalSince1970), entries.count < 64 else { continue }
-            let key = Self.key(host: host, profile: owner.profile, session: owner.storedSessionID, turn: owner.localTurnID)
-            if retired.contains(key) { continue }
-            let entry: Entry
-            if let retained = entries[key] { entry = retained }
-            else {
-                entry = try makeEntry(host: host, grant: grant, session: owner.storedSessionID,
-                    localTurn: owner.localTurnID, canonicalTurn: owner.canonicalTurnID, firstObservedAt: owner.firstObservedAt)
+        && owner.hostConnectionID == host.hostConnectionID && !owner.retired {
+            do { try await recover(owner: owner, host: host, service: service) }
+            catch is CancellationError { throw CancellationError() }
+            catch {
+                BighelpLiveActivityLog.failed(.recoveryOwnerFailed, error)
+                firstFailure = firstFailure ?? error
             }
-            if try await entry.registrar.resumePendingRevocation(owner) {
-                entry.driver.retire(); entries[key] = nil
-                if retired.count < 512 { retired.insert(key) }
-                continue
-            }
-            guard entry.coordinator.activeSessionIDs.contains(owner.opaqueSessionID) else { continue }
-            entries[key] = entry
-            if let registration = try entry.registrar.restoreRegistration(owner) {
-                await entry.coordinator.reconcileRestoredRegistration(registration)
-            }
-            _ = try service.credentials(for: host)
         }
+        if let firstFailure { throw firstFailure }
+    }
+
+    private func recover(owner: BighelpManagedActivityOwner, host: BighelpConfiguredHost,
+                         service: BighelpManagedNotificationService) async throws {
+        guard let enrollment = service.ledger.record(host: host, profile: owner.profile), enrollment.enabled,
+              !enrollment.revokePending, let grant = enrollment.grant, grant.grantId == owner.grantID,
+              grant.expiresAt > Int(now().timeIntervalSince1970), entries.count < 64 else { return }
+        let key = Self.key(host: host, profile: owner.profile, session: owner.storedSessionID, turn: owner.localTurnID)
+        if retired.contains(key) { return }
+        let entry: Entry
+        if let retained = entries[key] { entry = retained }
+        else {
+            entry = try makeEntry(host: host, grant: grant, session: owner.storedSessionID,
+                localTurn: owner.localTurnID, canonicalTurn: owner.canonicalTurnID, firstObservedAt: owner.firstObservedAt)
+        }
+        if try await entry.registrar.resumePendingRevocation(owner) {
+            entry.driver.retire(); entries[key] = nil
+            if retired.count < 512 { retired.insert(key) }
+            return
+        }
+        guard entry.coordinator.activeSessionIDs.contains(owner.opaqueSessionID) else { return }
+        entries[key] = entry
+        if let registration = try entry.registrar.restoreRegistration(owner) {
+            await entry.coordinator.reconcileRestoredRegistration(registration)
+        }
+        _ = try service.credentials(for: host)
     }
     /// Garbage-collect only absent system records whose original registration
     /// lease has expired. Unknown/live registrations and pending revokes remain.
@@ -349,6 +373,7 @@ final class BighelpManagedNativeActivityRuntime {
             let request = try service.activityKeys.load(owner.relayActivityID)
             guard request?.pendingRevocationBody == nil,
                   (request?.leaseExpires ?? (owner.firstObservedAt + 86_400)) < timestamp else { continue }
+            BighelpLiveActivityLog.note(.ownerReaped)
             owner.retired = true; try service.ledger.save(owner)
             try service.activityKeys.remove(owner.relayActivityID)
             try service.ledger.forgetRetiredActivity(owner.relayActivityID)

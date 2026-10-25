@@ -37,6 +37,7 @@ struct SimpleBotProfileView: View {
     @State private var saveTask: Task<Void, Never>?
     @State private var saveState: String?
     @State private var isInstructionsPresented = false
+    @State private var isPhotoActionsPresented = false
     @State private var newRoutine = false
     @State private var screen: BotScreenTabModel?
     @State private var templateNotice: String?
@@ -94,6 +95,12 @@ struct SimpleBotProfileView: View {
         .bighelpSheet(isPresented: $isInstructionsPresented) {
             if let profile {
                 SimpleBotInstructionsEditor(profile: profile, agents: context.agents)
+                    .bighelpSheetSize(.large)
+            }
+        }
+        .bighelpSheet(isPresented: $isPhotoActionsPresented) {
+            if let profile {
+                SimpleBotPhotoActionsSheet(agentID: profile.id, agentName: profile.name)
                     .bighelpSheetSize(.large)
             }
         }
@@ -335,6 +342,13 @@ struct SimpleBotProfileView: View {
                 .buttonStyle(.plain)
                 .disabled(!context.canEdit)
                 .accessibilityIdentifier("simple-bots.profile.instructions")
+                SimpleBotsDivider()
+                Button { isPhotoActionsPresented = true } label: {
+                    SimpleBotsRow(title: String(localized: "Photo actions"), leading: Image(systemName: "photo.badge.checkmark"))
+                }
+                .buttonStyle(.plain)
+                .disabled(!context.canEdit)
+                .accessibilityIdentifier("simple-bots.profile.photo-actions")
                 if let modelDefaults {
                     SimpleBotsDivider()
                     Button { isModelPresented = true } label: {
@@ -466,6 +480,26 @@ struct SimpleBotProfileView: View {
         return modelID.isEmpty ? String(localized: "Automatic") : ModelNameCatalog.empty.displayName(for: modelID)
     }
 
+}
+
+/// A bot's Photo actions, in a sheet of their own like its instructions.
+@MainActor
+private struct SimpleBotPhotoActionsSheet: View {
+    let agentID: String
+    let agentName: String
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            PhotoActionsSettingsView(agentID: agentID, agentName: agentName)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Done") { dismiss() }
+                            .accessibilityIdentifier("simple-bots.photo-actions.done")
+                    }
+                }
+        }
+    }
 }
 
 /// A bot's instructions (its SOUL), edited and saved straight to the host.

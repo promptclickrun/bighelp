@@ -617,6 +617,77 @@ struct ChatTimelineRenderPartitionTests {
         #expect(abs(table.distanceFromBottom) <= 1, "Growing content must keep the native table following its tail.")
     }
 
+    /// A streamed answer and its table, for the checks below.
+    private func streamingAnswer(_ text: String, owner: NSObject, timeline: ChatTimelineController) -> some View {
+        let item = TimelineItem(id: "answer", role: .assistant,
+            sender: .agent(id: "default", snapshot: .init(name: "Juno")),
+            content: .message(text), metadata: .init(delivery: "Streaming"))
+        return NativeChatTimeline(conversationID: "streaming-answer", ownerID: ObjectIdentifier(owner),
+            rows: [.transcript(.entry(.message(item))), .bottom], controller: timeline, entryCount: 1) { row in
+            if case .transcript(.entry(.message(let message))) = row {
+                TimelineItemView(item: message, onApprovalTap: { _ in })
+            } else { Color.clear.frame(height: 1) }
+        }
+        .environment(\.bighelpUIV3Enabled, true)
+    }
+
+    private func descendants<T: UIView>(_ root: UIView, of type: T.Type) -> [T] {
+        (root as? T).map { [$0] } ?? root.subviews.flatMap { descendants($0, of: type) }
+    }
+
+    /// UIKit animates a self-sizing row's new height; a streamed answer resized many times a second,
+    /// and the stacked animations bounced the answer and the rows under it.
+    @Test func growingAnswerResizesWithoutAnimation() async throws {
+        let owner = NSObject()
+        let timeline = ChatTimelineController()
+        var source = "The first **formatted** line.\n"
+        let host = UIHostingController(rootView: streamingAnswer(source, owner: owner, timeline: timeline))
+        let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        window.frame = CGRect(x: 0, y: 0, width: 402, height: 874)
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+        try await Task.sleep(for: .milliseconds(300))
+        let table = try #require(descendants(host.view, of: ChatTimelineTableView.self).first)
+        for index in 0..<6 {
+            source += "Appended paragraph \(index) with **formatted** content that wraps onto another line.\n"
+            host.rootView = streamingAnswer(source, owner: owner, timeline: timeline)
+            try await Task.sleep(for: .milliseconds(120))
+            table.layoutIfNeeded()
+            let animated = table.visibleCells.flatMap { $0.layer.animationKeys() ?? [] }
+            #expect(animated.isEmpty, "Row \(index) resized with \(animated)")
+        }
+    }
+
+    /// Reader interaction owns the chat: each layout of a growing answer took the main thread from
+    /// the drag, so the rows wait until the finger lifts and the scroll settles.
+    @Test func aDragHoldsTheGrowingAnswerUntilTheScrollSettles() async throws {
+        let owner = NSObject()
+        let timeline = ChatTimelineController()
+        var source = "The first **formatted** line.\n"
+        let host = UIHostingController(rootView: streamingAnswer(source, owner: owner, timeline: timeline))
+        let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        window.frame = CGRect(x: 0, y: 0, width: 402, height: 874)
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+        try await Task.sleep(for: .milliseconds(300))
+        let table = try #require(descendants(host.view, of: ChatTimelineTableView.self).first)
+        let textView = try #require(descendants(table, of: UITextView.self).first)
+
+        table.interactionStateOverride = true
+        source += "Written while the reader drags.\n"
+        host.rootView = streamingAnswer(source, owner: owner, timeline: timeline)
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(!textView.text.contains("Written while the reader drags."))
+
+        table.interactionStateOverride = nil
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(textView.text.contains("Written while the reader drags."), "The newest rows show once the scroll settles.")
+    }
+
     @Test func nativeContentInsetsPreserveReviewAndTailAnchors() async throws {
         let owner = NSObject()
         let timeline = ChatTimelineController()

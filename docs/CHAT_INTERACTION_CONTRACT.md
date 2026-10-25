@@ -16,7 +16,7 @@ plans do not authorize reverting to their earlier scroll implementations.
 | Situation | Required behavior |
 | --- | --- |
 | A response grows while the reader is following it | Follow the actual laid-out tail continuously. Do not replay scroll animations, jump over the same tool repeatedly, or move earlier messages between containers. |
-| The reader drags through history or opens work details | Reader interaction takes ownership immediately. Streaming continues without pulling the reader away; drag and deceleration remain native. |
+| The reader drags through history or opens work details | Reader interaction takes ownership immediately. Streaming continues without pulling the reader away; drag and deceleration remain native. While the reader drags or the chat decelerates, the rows wait and the newest rows show once it settles. |
 | The reader reaches the bottom, taps Return to Latest, or sends a message | Resume following. Sending from older history must expose the new live answer, including reference and mid-session send paths. Respect Reduce Motion for explicit navigation. |
 | Previous history is inserted or a tool is expanded | Preserve the reading context and semantic row identity. Never make a disclosure toggle an implicit jump to the bottom. |
 | A short first response arrives | Start naturally below the header; do not force a short conversation to the bottom of an otherwise empty canvas. |
@@ -57,6 +57,11 @@ eager live-tail and lazy-history containers.
 
 Keep native self-sizing and measured heights associated with semantic rows and
 width. Invalidate relevant measurements when content or presentation changes.
+A self-sizing row takes its new height at once, except inside a keyboard or
+rotation animation: UIKit's 0.3 s resize animation piled up on a streamed answer,
+which resizes many times a second, and bounced it. Each row update waits 50 ms
+after the previous one is laid out, which leaves the main thread room for touches
+while an answer streams.
 Speculative row prefetching is disabled for this canvas because growing, rich
 rows multiplied hosting/layout work. Re-enabling it or replacing the container
 requires comparative evidence for expanded tools, growing text, and user drag.
@@ -82,6 +87,7 @@ cover these boundaries:
 | --- | --- |
 | View identity and selection | `appendingTextPreservesThePreviousNativeMessageAndItsSelection` |
 | Bounded cells and reading position | `nativeRowsRecycleAndPrependingHistoryKeepsTheVisibleMessageInPlace`, `oneExpandedWorkTrailRecyclesIndividualToolRows` |
+| Streaming under the reader's drag | `growingAnswerResizesWithoutAnimation`, `aDragHoldsTheGrowingAnswerUntilTheScrollSettles` |
 | Correct reuse, observation, and owner replacement | `recycledRowsStartWithTheirOwnLocalState`, `livePresentationChangesUpdateAnOtherwiseUnchangedRow`, `replacingTheModelWithMatchingRowIDsRetiresItsVisibleActions` |
 | Exact incremental text | `incrementalNativeTextPreservesExactCharactersAndFormatting`, `streamingTextEditsOnlyTheChangedSuffix` |
 | Native input continuity | `typingDuringLongHistoryStreamingKeepsTheNativeComposerAndCaret` |

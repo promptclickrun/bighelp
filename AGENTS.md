@@ -347,6 +347,13 @@ change in both repos.
   message as it's drawn must not grow with its text beyond the drawing itself: `MarkdownDocument`'s plain
   text is worked out only when read. The probe's `main_busy_ms` counts main run loop turns over 8.3 ms, a
   dropped frame at 120 Hz; the simulator's frame gaps can't show that.
+- **Streaming under a drag:** Hermes sends an answer a few words at a time, and each piece lays the whole answer
+  out again, so each timeline update waits 50 ms after the last one's layout, and while the reader drags or the chat
+  decelerates (`NativeChatTimeline` `applyPendingUpdate`, `isScrolling`); otherwise a drag got a few touch
+  updates a second. Rows resize without UIKit's 0.3 s self-sizing animation, which piled up and bounced a
+  streaming answer. To reproduce by hand, run demo mode with `-test-tool-stream -test-tool-stream-fast-tail`
+  and drag while the answer streams at a model's pace; the other fixtures are slower and pause during
+  gestures, so they never showed this.
 - **Kept chat rows:** a message row costs more than a 120 Hz frame to build, so the timeline keeps the 40 built
   rows nearest the screen by ID (`ChatTimelineBuiltRows`), never recycles a cell for another row, and builds the
   24 rows above while the chat is still. Cells host SwiftUI as a plain subview (`ChatTimelineCell`), not as their

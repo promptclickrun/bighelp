@@ -179,9 +179,14 @@ final class CanvasStreamingFixtureClient: ConversationFixtureClient, StreamingCo
         var tail = "LIVE TOOL STREAM TAIL\n"
         monitor.beginAnswerUpdates()
         let tailID = "\(prefix)-tail"
-        for index in 0..<(twoTurns ? 10 : 40) {
-            try await Task.sleep(for: .milliseconds(80))
-            tail += "Tail update \(index): **stable streaming** with accumulated work.\n"
+        // `-test-tool-stream-fast-tail`: the answer arrives the way a model sends it, a few words every
+        // 25 ms with no pauses, to drag and read while it grows (AGENTS.md, Streaming under a drag).
+        let fastTail = args.contains("-test-tool-stream-fast-tail")
+        for index in 0..<(fastTail ? 1_200 : twoTurns ? 10 : 40) {
+            try await Task.sleep(for: .milliseconds(fastTail ? 25 : 80))
+            tail += fastTail
+                ? (index.isMultiple(of: 6) ? "\nAnswer part \(index): " : "") + "the **answer** keeps growing "
+                : "Tail update \(index): **stable streaming** with accumulated work.\n"
             onDraft(TimelineItem(id: tailID, role: .assistant,
                 sender: .agent(id: senderID, snapshot: .init(name: "Canvas fixture")),
                 content: .message(tail), metadata: .init(source: "UI fixture", delivery: "Streaming")))

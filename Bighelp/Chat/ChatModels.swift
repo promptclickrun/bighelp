@@ -5,12 +5,12 @@ enum TimelineRole: String, Codable, Equatable, Sendable {
     case assistant
 }
 
-enum NativeMessageReactionAuthor: String, Equatable, Sendable {
+enum NativeMessageReactionAuthor: String, Codable, Equatable, Sendable {
     case user
     case agent
 }
 
-struct NativeMessageReaction: Equatable, Sendable {
+struct NativeMessageReaction: Codable, Equatable, Sendable {
     let emoji: String
     let author: NativeMessageReactionAuthor
     let occurredAt: Double?
@@ -140,10 +140,14 @@ struct TimelineMetadata: Codable, Equatable, Sendable {
     /// (`message.complete`), so it never becomes an interim note, whatever
     /// lands after it. Saved history ends each turn with its answer anyway.
     var endsTurn = false
+    /// The tapbacks Hermes had saved on this message when its history was read
+    /// (`display_metadata.reactions`). Nil: none, or a copy from before they were
+    /// kept. A live change for the message (`nativeMessageReactionSnapshots`) wins.
+    var reactions: [NativeMessageReaction]?
 
     private enum CodingKeys: String, CodingKey {
         case source, freshness, delivery, timestamp, turnDurationMilliseconds, sourceOrder,
-             platformMessageID, contentReference
+             platformMessageID, contentReference, reactions
     }
 
     init(
@@ -155,9 +159,11 @@ struct TimelineMetadata: Codable, Equatable, Sendable {
         platformMessageID: String? = nil,
         turnDurationMilliseconds: Int? = nil,
         contentReference: CanonicalContentReference? = nil,
-        endsTurn: Bool = false
+        endsTurn: Bool = false,
+        reactions: [NativeMessageReaction]? = nil
     ) {
         self.endsTurn = endsTurn
+        self.reactions = reactions?.isEmpty == false ? reactions : nil
         self.contentReference = contentReference
         self.turnDurationMilliseconds = turnDurationMilliseconds
         self.platformMessageID = platformMessageID

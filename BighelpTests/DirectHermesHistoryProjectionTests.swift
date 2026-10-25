@@ -278,6 +278,82 @@ struct DirectHermesHistoryProjectionTests {
         }
     }
 
+    /// Reopening a chat whose messages already carry tapbacks showed none of them until a
+    /// reaction changed on that message: history rows were read without their reactions.
+    @Test func savedReactionsRideOnTheirMessagesWhenHistoryLoads() throws {
+        let rows = try [
+            Self.row(id: 11, role: "user", content: .string("Shipped it!"), displayMetadata: .object([
+                "reactions": .array([Self.savedReaction("👍", by: "agent", seen: true)])])),
+            Self.row(id: 12, role: "assistant", content: .string("Nice work."), displayMetadata: .object([
+                "delivery": .string("sent"),
+                "reactions": .array([Self.savedReaction("❤️", by: "user"), Self.savedReaction("🎉", by: "agent")])])),
+            Self.row(id: 13, role: "user", content: .string("Thanks"), displayMetadata: .null),
+            Self.row(id: 14, role: "assistant", content: .string("Anytime.")),
+            Self.row(id: 15, role: "assistant", content: .string("Bad data"), displayMetadata: .object([
+                "reactions": .array([.object(["author": .string("agent")])])])),
+        ].map { try DirectHermesHistoryRow($0, sessionID: "tip") }
+        let projection = try DirectHermesHistoryProjection(rows: rows, appID: "app", profileID: "alpha",
+                                                          source: "bighelp", sourceOrderBase: 0)
+        let saved = Dictionary(uniqueKeysWithValues: projection.messages.map { ($0.id, $0.metadata.reactions ?? []) })
+        #expect(saved["app:row:11"] == [.init(emoji: "👍", author: .agent, occurredAt: 1_792_000_000.25, isSeen: true)])
+        #expect(saved["app:row:12"]?.map(\.emoji) == ["❤️", "🎉"])
+        #expect(saved["app:row:12"]?.map(\.author) == [.user, .agent])
+        // Rows without reactions, with null metadata or with malformed reactions show none, and none breaks the load.
+        for id in [13, 14, 15] { #expect(saved["app:row:\(id)"] == []) }
+        #expect(projection.messages.count == 5)
+    }
+
+    @Test func aHistoryPageHandsItsReactionsToTheChatRecord() async throws {
+        let workspace = try SessionWorkspaceStub()
+        workspace.handler = { operation, _ in
+            switch operation {
+            case .profilesList: return DirectHermesSessionCatalogClientTests.profiles()
+            case .sessionsList:
+                return ["sessions": .array([DirectHermesSessionCatalogClientTests.session(id: "tip")]),
+                        "total": .integer(1), "offset": .integer(0), "limit": .integer(100)]
+            case .sessionHistory:
+                let rows = [
+                    Self.row(id: 21, role: "user", content: .string("Look at this"), displayMetadata: .object([
+                        "reactions": .array([Self.savedReaction("👀", by: "agent")])])),
+                    Self.row(id: 22, role: "assistant", content: .string("Looking."), displayMetadata: .object([
+                        "reactions": .array([Self.savedReaction("👍", by: "user")])])),
+                ]
+                return Self.page(rows, offset: 0, limit: 40, order: "latest")
+            default: throw WorkspaceClientError.invalidRequest
+            }
+        }
+        let client = DirectHermesSessionCatalogClientTests.client(workspace)
+        let record = try #require(try await client.list().first)
+        let page = try await client.hydratePage(record, offset: nil, turnLimit: 1)
+        let reactions = Dictionary(uniqueKeysWithValues: page.record.items.map { ($0.id, $0.metadata.reactions?.map(\.emoji)) })
+        #expect(reactions["\(record.id):row:21"] == ["👀"])
+        #expect(reactions["\(record.id):row:22"] == ["👍"])
+    }
+
+    /// The phone keeps a chat's messages between launches. A reopen from that copy shows the
+    /// reactions it held; a copy saved before this field existed still opens, just without them.
+    @Test func theSavedCopyOnThePhoneKeepsReactionsAndOldCopiesStillOpen() throws {
+        let reacted = TimelineItem(
+            id: "chat:row:31", role: .assistant, sender: .agent(id: "alpha", snapshot: .init(name: "alpha")),
+            content: .message("Done."),
+            metadata: .init(source: "Hermes", delivery: "Saved", sourceOrder: 1, reactions: [
+                .init(emoji: "🎉", author: .agent, occurredAt: 1_792_000_000.25, isSeen: nil),
+                .init(emoji: "❤️", author: .user, occurredAt: nil, isSeen: true),
+            ]))
+        let plain = TimelineItem(
+            id: "chat:row:30", role: .human, sender: .user(snapshot: .init(name: "You")),
+            content: .message("Hi"), metadata: .init(source: "Hermes", delivery: "Saved", sourceOrder: 0))
+        let record = SessionRecord(id: "chat", kind: .direct, agentIDs: ["alpha"], title: "Saved", items: [plain, reacted])
+        let restored = try JSONDecoder().decode(SessionRecord.self, from: JSONEncoder().encode(record))
+        #expect(restored.items.last?.metadata.reactions == reacted.metadata.reactions)
+        #expect(restored.items.first?.metadata.reactions == nil)
+
+        // A copy written by an older build has no reactions key at all.
+        let legacy = try JSONEncoder().encode(plain)
+        #expect(!String(decoding: legacy, as: UTF8.self).contains("reactions"))
+        #expect(try JSONDecoder().decode(TimelineItem.self, from: legacy).metadata.reactions == nil)
+    }
+
     @Test func fullHydrationUsesOverlapAnchorsAndAdoptsOnlyResolvedNativeCoordinates() async throws {
         let workspace = try SessionWorkspaceStub()
         let firstIDs = [300] + Array(1...199)
@@ -408,7 +484,8 @@ struct DirectHermesHistoryProjectionTests {
     }
 
     static func row(id: Int, role: String, content: BighelpJSONValue, timestamp: Double = 1,
-                    displayKind: String? = nil, turnDurationMilliseconds: Int? = nil) -> BighelpJSONValue {
+                    displayKind: String? = nil, turnDurationMilliseconds: Int? = nil,
+                    displayMetadata: BighelpJSONValue? = nil) -> BighelpJSONValue {
         var value: [String: BighelpJSONValue] = [
             "id": .integer(id), "session_id": .string("tip"), "role": .string(role),
             "content": content, "timestamp": .number(timestamp),
@@ -416,6 +493,15 @@ struct DirectHermesHistoryProjectionTests {
         ]
         if let displayKind { value["display_kind"] = .string(displayKind) }
         if let turnDurationMilliseconds { value["turn_duration_ms"] = .integer(turnDurationMilliseconds) }
+        if let displayMetadata { value["display_metadata"] = displayMetadata }
+        return .object(value)
+    }
+
+    /// A reaction as Hermes stores it in a row's `display_metadata.reactions`.
+    static func savedReaction(_ emoji: String, by author: String, at: Double = 1_792_000_000.25,
+                              seen: Bool? = nil) -> BighelpJSONValue {
+        var value: [String: BighelpJSONValue] = ["emoji": .string(emoji), "author": .string(author), "at": .number(at)]
+        if let seen { value["seen"] = .boolean(seen) }
         return .object(value)
     }
 

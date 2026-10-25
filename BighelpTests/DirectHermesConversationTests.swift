@@ -1136,6 +1136,59 @@ struct DirectHermesConversationTests {
         #expect(client.projection.lastSequence == 0)
     }
 
+    /// Reopening a chat whose messages already have tapbacks showed none of them; they appeared
+    /// only after a reaction changed on that message, together with the one already there. The
+    /// reactions saved on the opened history show at once, and a live change replaces them.
+    @Test func savedReactionsShowOnReopenAndALiveChangeAddsToThemOnce() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let client = try DirectHermesConversationClient(rpc: DirectTestRPC(), hostIdentity: "host", profile: "default",
+            runtimeID: "runtime", storedID: "stored", title: "Native", epoch: "epoch", drafts: .init(root: root))
+        defer { client.suspend() }
+        func saved(_ row: Int, _ role: TimelineRole, _ text: String, _ reactions: [NativeMessageReaction]?) -> TimelineItem {
+            TimelineItem(id: "\(client.conversationID):row:\(row)", role: role,
+                         sender: role == .human ? .user(snapshot: .init(name: "You"))
+                            : .agent(id: "default", snapshot: .init(name: "default")),
+                         content: .message(text),
+                         metadata: .init(source: "Hermes", delivery: "Saved", sourceOrder: row, reactions: reactions))
+        }
+        let kept = [
+            saved(8_931, .human, "It shipped!", [.init(emoji: "👍", author: .agent, occurredAt: 1_792_000_000, isSeen: true)]),
+            saved(8_932, .assistant, "Great news.", [.init(emoji: "❤️", author: .user, occurredAt: 1_792_000_001, isSeen: nil),
+                                                    .init(emoji: "🎉", author: .agent, occurredAt: 1_792_000_002, isSeen: nil)]),
+            saved(8_933, .human, "Thanks", nil),
+        ]
+        // The reopen: the phone's copy goes through its saved form, then the chat is built from it.
+        let reopened = try JSONDecoder().decode([TimelineItem].self, from: JSONEncoder().encode(kept))
+        let model = ChatModel(conversationID: client.conversationID, client: client, initialItems: reopened)
+        client.model = model
+        func shown(_ row: Int) -> [String] {
+            let item = reopened.first { $0.id.hasSuffix(":row:\(row)") }!
+            return model.nativeMessageReactionPresentation(for: item).reactions.map { "\($0.emoji) \($0.author)" }
+        }
+        #expect(shown(8_931) == ["👍 agent"])
+        #expect(shown(8_932) == ["❤️ user", "🎉 agent"])
+        #expect(shown(8_933).isEmpty)
+
+        // The person taps ❤️ on the first message: Hermes answers with the whole list.
+        client.receive(.init(type: "message.reaction", sessionID: "stored", payload: [
+            "row_id": .integer(8_931), "role": .string("user"),
+            "reactions": .array([
+                .object(["emoji": .string("👍"), "author": .string("agent"), "at": .number(1_792_000_000), "seen": .boolean(true)]),
+                .object(["emoji": .string("❤️"), "author": .string("user"), "at": .number(1_792_000_100)]),
+            ]),
+        ], sequence: 7))
+        #expect(shown(8_931) == ["👍 agent", "❤️ user"])
+        #expect(shown(8_932) == ["❤️ user", "🎉 agent"])
+
+        // Clearing the last reaction on a message leaves it bare, not back on the saved copy.
+        client.receive(.init(type: "message.reaction", sessionID: "stored", payload: [
+            "row_id": .integer(8_932), "role": .string("assistant"), "reactions": .array([]),
+        ], sequence: 8))
+        #expect(shown(8_932).isEmpty)
+        #expect(shown(8_931) == ["👍 agent", "❤️ user"])
+    }
+
     /// A turn Hermes runs on its own (a background process finished, another agent wrote in) streams
     /// only its answer: the message that started it never reaches this socket, and an agent's answer
     /// can be written by another Hermes process entirely. Once it ends, the chat reads what Hermes saved.

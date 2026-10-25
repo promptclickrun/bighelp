@@ -296,6 +296,9 @@ final class ChatTimelineController {
 final class ChatTimelineTableView: UITableView {
     var followsTail = true
     var isAnimatingReturn = false
+    /// Set by an update; its first layout, which resizes the changed rows, records `updateLaidOutAt`.
+    var awaitsUpdateLayout = false
+    private(set) var updateLaidOutAt: CFTimeInterval = 0
     var onLayout: (() -> Void)?
     #if DEBUG
     // Deterministic gesture tests avoid private UIScrollView state.
@@ -307,6 +310,13 @@ final class ChatTimelineTableView: UITableView {
         if let interactionStateOverride { return interactionStateOverride }
         #endif
         return isTracking || isDragging || isDecelerating
+    }
+    /// The reader drags or the chat decelerates, on screen. A finger resting on the chat doesn't count.
+    var isScrolling: Bool {
+        #if DEBUG
+        if let interactionStateOverride { return interactionStateOverride }
+        #endif
+        return window != nil && (isDragging || isDecelerating)
     }
     var bottomOffset: CGFloat { max(-adjustedContentInset.top, contentSize.height + adjustedContentInset.bottom - bounds.height) }
     var distanceFromBottom: CGFloat { bottomOffset - contentOffset.y }
@@ -352,7 +362,18 @@ final class ChatTimelineTableView: UITableView {
     }
 
     override func layoutSubviews() {
-        super.layoutSubviews()
+        // UIKit animates a self-sizing row's new height over 0.3 s. A streamed answer resizes many
+        // times a second, so those animations piled up and the answer and the rows under it bounced.
+        // Inside a real animation (rotation, the keyboard), rows still move with it.
+        if UIView.inheritedAnimationDuration > 0 {
+            super.layoutSubviews()
+        } else {
+            UIView.performWithoutAnimation { super.layoutSubviews() }
+        }
+        if awaitsUpdateLayout {
+            awaitsUpdateLayout = false
+            updateLaidOutAt = CACurrentMediaTime()
+        }
         if followsTail, !isUserInteracting, !isAnimatingReturn, bounds.height > 0,
            abs(distanceFromBottom) > 0.5 {
             setContentOffset(CGPoint(x: contentOffset.x, y: bottomOffset), animated: false)
@@ -631,6 +652,10 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
         private var lastScrolledAt: CFTimeInterval = 0
         private var pendingUpdate: (parent: NativeChatTimeline, environment: EnvironmentValues)?
         private var updateScheduled = false
+        /// A streamed answer can arrive far faster than it can be laid out again, and each layout of a
+        /// long answer kept the main thread from the reader's drag. After an update is laid out, the
+        /// next waits this long.
+        static var updateInterval: CFTimeInterval { 0.05 }
 
         func install(on table: ChatTimelineTableView) {
             dataSource = UITableViewDiffableDataSource(tableView: table) { [weak self] table, indexPath, id in
@@ -660,17 +685,34 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             // Diffable self-sizing measures hosting views synchronously. Do
             // that outside the enclosing SwiftUI layout transaction, and use
             // the newest complete rows if several updates arrive together.
-            DispatchQueue.main.async { [weak self, weak table] in
-                guard let self else { return }
-                self.updateScheduled = false
-                guard let table, let update = self.pendingUpdate else { return }
-                self.pendingUpdate = nil
-                ChatPerformanceProbe.measure("timeline.update") {
-                    self.update(update.parent, environment: update.environment, table: table)
-                }
-                table.applyCustomContentInsets(update.parent.contentInsets)
-                table.accessibilityValue = "\(update.parent.entryCount) conversation entries"
+            DispatchQueue.main.async { [weak self, weak table] in self?.applyPendingUpdate(to: table) }
+        }
+
+        /// Reader interaction owns the chat: while the reader drags or the chat decelerates, the rows
+        /// wait (the chrome insets don't) and the newest rows are shown once it settles.
+        private func applyPendingUpdate(to table: ChatTimelineTableView?) {
+            guard let table, let update = pendingUpdate else {
+                updateScheduled = false
+                return
             }
+            let sameChat = update.parent.conversationID == conversationID && update.parent.ownerID == ownerID
+            let wait = table.updateLaidOutAt + Self.updateInterval - CACurrentMediaTime()
+            if sameChat, wait > 0 || table.isScrolling {
+                table.applyCustomContentInsets(update.parent.contentInsets)
+                let delay = table.isScrolling ? Self.updateInterval / 2 : max(wait, 0.005)
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self, weak table] in
+                    self?.applyPendingUpdate(to: table)
+                }
+                return
+            }
+            updateScheduled = false
+            pendingUpdate = nil
+            ChatPerformanceProbe.measure("timeline.update") {
+                self.update(update.parent, environment: update.environment, table: table)
+            }
+            table.applyCustomContentInsets(update.parent.contentInsets)
+            table.accessibilityValue = "\(update.parent.entryCount) conversation entries"
+            table.awaitsUpdateLayout = true
         }
 
         func cancelPendingUpdate() {

@@ -95,7 +95,7 @@ struct DirectHermesAccessCredentialsTests {
 
     /// Like the sign-in, saved items are readable after the phone's first unlock. Items from older builds
     /// (readable only while unlocked) move over when they're next read.
-    @Test func savedTokensAndHeadersCanBeReadWhileThePhoneIsLocked() throws {
+    @Test func savedTokensAndHeadersAreReadableAfterFirstUnlock() throws {
         let service = "app.loopdy.mobile.tests.cloudflare-access-\(UUID().uuidString)"
         let headerService = service + ".custom-headers"
         let store = DirectHermesAccessCredentialStore(service: service)

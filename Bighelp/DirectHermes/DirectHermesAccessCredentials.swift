@@ -325,9 +325,11 @@ final class DirectHermesAccessCredentialStore: @unchecked Sendable {
         request[kSecMatchLimit as String] = kSecMatchLimitOne
         request[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIFail
         var result: CFTypeRef?
-        var status = SecItemCopyMatching(request as CFDictionary, &result)
         #if DEBUG
-        if keychainLockedForTesting { status = errSecInteractionNotAllowed }
+        let status = keychainLockedForTesting
+            ? errSecInteractionNotAllowed : SecItemCopyMatching(request as CFDictionary, &result)
+        #else
+        let status = SecItemCopyMatching(request as CFDictionary, &result)
         #endif
         if status == errSecItemNotFound { return .none }
         guard status == errSecSuccess, let item = result as? [String: Any] else { return .refused }

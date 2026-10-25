@@ -41,7 +41,7 @@
     "APNS_ENVIRONMENTS": "production",
     // "off" (BuzzKit only), "shadow" (direct for DIRECT_APNS_CANARY, the rest
     // through BuzzKit) or "on" (direct for every installation with a push target).
-    "DIRECT_APNS": "off",
+    "DIRECT_APNS": "on",
     // Comma-separated installation IDs.
     "DIRECT_APNS_CANARY": ""
   },

@@ -13,6 +13,7 @@ final class CanvasStreamingFixtureClient: ConversationFixtureClient, StreamingCo
     private let silentReply = ProcessInfo.processInfo.arguments.contains("-test-silent-reply")
     private let tableReply = ProcessInfo.processInfo.arguments.contains("-test-table-reply")
     private let voiceSteps = ProcessInfo.processInfo.arguments.contains("-test-voice-steps")
+    private let musicCardReply = ProcessInfo.processInfo.arguments.contains("-test-music-card-reply")
 
     /// A turn with a few slow steps, the way Hermes reports them: the agent's own
     /// tools, and a helper whose own tool must stay inside its folder.
@@ -60,6 +61,27 @@ final class CanvasStreamingFixtureClient: ConversationFixtureClient, StreamingCo
         for count in stride(from: 3, through: words.count, by: 3) {
             try await Task.sleep(for: .milliseconds(150))
             onDraft(reply(words.prefix(count).joined(separator: " "), delivery: "Streaming"))
+        }
+        return ConversationResponse(items: [reply(text, delivery: "Delivered")])
+    }
+
+    /// A reply with a music card, streamed a few characters at a time the way tokens arrive: the card's
+    /// fence is open (a pending card) until its last piece, then the real card draws once.
+    private func runMusicCardReply(onDraft: @escaping (TimelineItem) -> Void) async throws -> ConversationResponse {
+        let id = "music-card-reply-\(UUID().uuidString)"
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        let card = String(decoding: try encoder.encode(BighelpCardEnvelope.card(BighelpCardDemoFixtures.objects)),
+                          as: UTF8.self)
+        let text = "Here's a song for the drive:\n\n```loopdy-card\n\(card)\n```\n\nEnjoy it."
+        func reply(_ text: String, delivery: String) -> TimelineItem {
+            TimelineItem(id: id, role: .assistant, sender: .agent(id: senderID, snapshot: .init(name: "Canvas fixture")),
+                         content: .message(text), metadata: .init(source: "UI fixture", delivery: delivery))
+        }
+        let characters = Array(text)
+        for count in stride(from: 6, to: characters.count, by: 6) {
+            try await Task.sleep(for: .milliseconds(15))
+            onDraft(reply(String(characters.prefix(count)), delivery: "Streaming"))
         }
         return ConversationResponse(items: [reply(text, delivery: "Delivered")])
     }
@@ -238,6 +260,7 @@ final class CanvasStreamingFixtureClient: ConversationFixtureClient, StreamingCo
         if toolStress { return try await runToolStream(onDraft: onDraft) }
         if silentReply { return try await runSilentReply(onDraft: onDraft) }
         if tableReply { return try await runTableReply(onDraft: onDraft) }
+        if musicCardReply { return try await runMusicCardReply(onDraft: onDraft) }
         if voiceSteps { return try await runVoiceSteps(onDraft: onDraft) }
         var text = "CANVAS STREAM START\n"
         var item = TimelineItem(id: "canvas-stream-\(UUID().uuidString)", role: .assistant,

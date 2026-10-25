@@ -1,4 +1,5 @@
 import MapKit
+import os
 import SwiftUI
 import UIKit
 @preconcurrency import Contacts
@@ -449,6 +450,7 @@ struct BighelpCardMusicView: View {
 
     private static let artworkSize: CGFloat = 96
     private static let stackedArtworkSize: CGFloat = 168
+    private static let playTimeout: TimeInterval = 10
 
     init(music: BighelpCardMusic, elementID: String) {
         self.music = music
@@ -487,7 +489,9 @@ struct BighelpCardMusicView: View {
         .modifier(BighelpCardObjectMacMenu(actions: actions))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("card.object.\(elementID)")
-        .task(id: music) { await load() }
+        // The item's own key, not the whole card: nothing about a card that doesn't change its
+        // picture starts another lookup.
+        .task(id: artworkKey) { await load() }
     }
 
     private var wash: some View {
@@ -627,14 +631,28 @@ struct BighelpCardMusicView: View {
         if playsHere, !isStarting, let id = music.musicID,
            let kind = DeviceMusicKind(rawValue: music.kind.rawValue),
            let source = DeviceMusicSource(rawValue: (music.source ?? .catalog).rawValue) {
+            // A catalog item needs MusicKit's service; when it isn't answering, Music opens instead.
+            if source == .catalog, BighelpCardMusicArtworkStore.shared.musicKitIsPaused {
+                openInMusic()
+                return
+            }
             isStarting = true
             Task {
                 defer { isStarting = false }
+                let handoff = BighelpCardMusicPlayHandoff()
                 do {
-                    try await LiveDeviceMusicProvider().play(id: id, kind: kind, source: source, shuffle: nil) {
-                        // Music turned off while the item was looked up: play nothing.
-                        guard BighelpCardObjectAccess.musicEnabled() else { throw DeviceMusicProviderError.notAuthorized }
+                    // MusicKit answers in seconds or not at all; a tap never waits longer than this.
+                    try await BighelpCardRace.run(timeout: Self.playTimeout) { @MainActor in
+                        try await LiveDeviceMusicProvider().play(id: id, kind: kind, source: source, shuffle: nil) {
+                            // Music turned off while the item was looked up: play nothing.
+                            guard BighelpCardObjectAccess.musicEnabled() else { throw DeviceMusicProviderError.notAuthorized }
+                            // Right before the queue is set: once Music was opened instead, play nothing.
+                            try handoff.commit()
+                        }
                     }
+                } catch is BighelpCardRace.TimedOut {
+                    // Unless playing already began, Music opens and the late lookup plays nothing.
+                    if handoff.abandon() { openInMusic() }
                 } catch {
                     openInMusic()
                 }
@@ -669,6 +687,11 @@ struct BighelpCardArtworkPicture: @unchecked Sendable {
 /// the library item for library ids); else Apple's public lookup by the
 /// link's or `music_id`'s store number, else its search by title and artist.
 /// Nothing found shows the card's placeholder; it's asked again after five minutes.
+///
+/// Every lookup runs off the main actor, a few at a time, and gives up after a
+/// few seconds. When MusicKit's service can't be reached (no developer token,
+/// no network), no card asks it again for five minutes: the chat's cards use
+/// the public lookup instead of each waiting on a service that isn't there.
 @MainActor
 final class BighelpCardMusicArtworkStore {
     enum Found: @unchecked Sendable {
@@ -688,18 +711,55 @@ final class BighelpCardMusicArtworkStore {
         }
     }
 
+    /// What one lookup came to, and whether MusicKit's service couldn't be reached for it.
+    struct Outcome: @unchecked Sendable {
+        var found: Found?
+        var musicKitUnavailable = false
+    }
+
+    /// Asks MusicKit for a card's picture. Throws what MusicKit threw; nil when it has none.
+    typealias MusicKitLookup = @Sendable (BighelpCardMusic) async throws -> Found?
+    /// Apple's public lookup, and the search by name.
+    typealias PublicLookup = @Sendable (BighelpCardMusic, String) async -> Found?
+    /// Turns what MusicKit found into the picture to keep (downloads MusicKit's artwork address).
+    /// Not part of the MusicKit request: a slow picture server is not a MusicKit failure.
+    typealias Settle = @Sendable (Found, BighelpCardMusic, String) async -> Found
+
     static let shared = BighelpCardMusicArtworkStore()
-    private static let limit = 60
-    private static let retryAfter: TimeInterval = 300
-    /// Demo mode draws a made-up cover and never goes online.
-    private static let isDemo = ProcessInfo.processInfo.arguments.contains("-use-demo-fixtures")
+    static let limit = 60
+    static let retryAfter: TimeInterval = 300
+    /// Cards with no picture remembered, so a long chat of them can't grow this without end.
+    static let missingLimit = 200
+    static let maximumLookups = 3
+
+    private let musicKit: MusicKitLookup
+    private let publicLookup: PublicLookup
+    private let settle: Settle
+    private let musicKitTimeout: TimeInterval
+
+    init(musicKit: MusicKitLookup? = nil, publicLookup: PublicLookup? = nil, settle: Settle? = nil,
+         musicKitTimeout: TimeInterval = BighelpCardMusicFinder.musicKitTimeout) {
+        self.musicKit = musicKit ?? BighelpCardMusicFinder.liveMusicKit
+        self.publicLookup = publicLookup ?? BighelpCardMusicFinder.livePublic
+        self.settle = settle ?? BighelpCardMusicFinder.liveSettle
+        self.musicKitTimeout = musicKitTimeout
+    }
 
     private var kept: [String: Found] = [:]
     private var order: [String] = []
     private var missing: [String: Date] = [:]
     private var inFlight: [String: Task<Found?, Never>] = [:]
+    private var running = 0
+    private var waiting: [CheckedContinuation<Void, Never>] = []
+    private var musicKitPausedUntil: Date?
 
     func cached(_ key: String) -> Found? { kept[key] }
+
+    /// True while MusicKit's service has just failed to answer; cards use the public lookup, and Play opens Music.
+    var musicKitIsPaused: Bool {
+        guard let until = musicKitPausedUntil else { return false }
+        return until > Date()
+    }
 
     /// The artwork for `music`, found once; cards waiting on the same item share it.
     func artwork(for music: BighelpCardMusic, key: String, usesMusicKit: Bool) async -> Found? {
@@ -707,7 +767,7 @@ final class BighelpCardMusicArtworkStore {
         if let missed = missing[key], Date().timeIntervalSince(missed) < Self.retryAfter { return nil }
         if let running = inFlight[key] { return await running.value }
         // Not tied to the row: a card scrolled away still finishes and keeps it.
-        let task = Task { @MainActor in await Self.find(music, key: key, usesMusicKit: usesMusicKit) }
+        let task = Task { @MainActor in await self.lookup(music, key: key, usesMusicKit: usesMusicKit) }
         inFlight[key] = task
         let found = await task.value
         inFlight[key] = nil
@@ -715,9 +775,37 @@ final class BighelpCardMusicArtworkStore {
             keep(found, key)
             missing[key] = nil
         } else {
-            missing[key] = Date()
+            remember(missing: key)
         }
         return found
+    }
+
+    private func lookup(_ music: BighelpCardMusic, key: String, usesMusicKit: Bool) async -> Found? {
+        await acquire()
+        let asksMusicKit = usesMusicKit && !musicKitIsPaused
+        let outcome = await BighelpCardMusicFinder.find(
+            music, key: key, musicKit: asksMusicKit ? musicKit : nil, musicKitTimeout: musicKitTimeout,
+            settle: settle, publicLookup: publicLookup)
+        release()
+        if outcome.musicKitUnavailable { musicKitPausedUntil = Date().addingTimeInterval(Self.retryAfter) }
+        return outcome.found
+    }
+
+    /// At most `maximumLookups` run at once; the rest wait their turn.
+    private func acquire() async {
+        if running < Self.maximumLookups {
+            running += 1
+            return
+        }
+        await withCheckedContinuation { waiting.append($0) }
+    }
+
+    private func release() {
+        if waiting.isEmpty {
+            running -= 1
+        } else {
+            waiting.removeFirst().resume()
+        }
     }
 
     private func keep(_ found: Found, _ key: String) {
@@ -726,19 +814,57 @@ final class BighelpCardMusicArtworkStore {
         while order.count > Self.limit { kept[order.removeFirst()] = nil }
     }
 
-    private static func find(_ music: BighelpCardMusic, key: String, usesMusicKit: Bool) async -> Found? {
-        if isDemo { return await BighelpCardArtworkFiles.demoCover(for: music).map(Found.picture) }
-        if let file = await BighelpCardArtworkFiles.read(key) { return .picture(file) }
-        #if canImport(MusicKit)
-        if usesMusicKit, let artwork = await musicKitArtwork(music) {
-            let pixels = BighelpCardMusicLookup.artworkPixels
-            if let url = artwork.url(width: pixels, height: pixels), url.scheme == "https",
-               let picture = await BighelpCardArtworkFiles.download(url, key: key) {
-                return .picture(picture)
+    private func remember(missing key: String) {
+        missing[key] = Date()
+        guard missing.count > Self.missingLimit else { return }
+        let cutoff = Date().addingTimeInterval(-Self.retryAfter)
+        missing = missing.filter { $0.value > cutoff }
+        if missing.count > Self.missingLimit { missing.removeAll() }
+    }
+}
+
+/// The off-main-actor part of a music card's artwork lookup.
+enum BighelpCardMusicFinder {
+    typealias Outcome = BighelpCardMusicArtworkStore.Outcome
+    typealias Found = BighelpCardMusicArtworkStore.Found
+
+    /// MusicKit answers in a few seconds or not at all (no developer token, no network).
+    static let musicKitTimeout: TimeInterval = 8
+    /// Demo mode draws a made-up cover and never goes online.
+    private static let isDemo = ProcessInfo.processInfo.arguments.contains("-use-demo-fixtures")
+
+    /// Off the main actor whatever isolation the callers have, so a slow disk, decode or service never holds a frame.
+    @concurrent
+    static func find(_ music: BighelpCardMusic, key: String,
+                     musicKit: BighelpCardMusicArtworkStore.MusicKitLookup?, musicKitTimeout: TimeInterval,
+                     settle: BighelpCardMusicArtworkStore.Settle,
+                     publicLookup: BighelpCardMusicArtworkStore.PublicLookup) async -> Outcome {
+        if isDemo { return Outcome(found: await BighelpCardArtworkFiles.demoCover(for: music).map(Found.picture)) }
+        if let file = await BighelpCardArtworkFiles.read(key) { return Outcome(found: .picture(file)) }
+        var unavailable = false
+        if let musicKit {
+            // Only the MusicKit request is timed; what it found is settled after, outside the race.
+            var asked: Found?
+            do {
+                asked = try await BighelpCardRace.run(timeout: musicKitTimeout, { try await musicKit(music) })
+            } catch {
+                unavailable = isServiceFailure(error)
             }
-            return .musicKit(artwork)
+            if let asked { return Outcome(found: await settle(asked, music, key)) }
         }
+        return Outcome(found: await publicLookup(music, key), musicKitUnavailable: unavailable)
+    }
+
+    static func isServiceFailure(_ error: any Error) -> Bool {
+        if error is BighelpCardRace.TimedOut { return true }
+        #if canImport(MusicKit)
+        return (LiveDeviceMusicProvider.translate(error) as? DeviceMusicProviderError) == .serviceUnavailable
+        #else
+        return false
         #endif
+    }
+
+    @Sendable static func livePublic(_ music: BighelpCardMusic, key: String) async -> Found? {
         guard let address = await BighelpCardArtworkFiles.publicArtworkURL(for: music),
               let picture = await BighelpCardArtworkFiles.download(address, key: key) else { return nil }
         return .picture(picture)
@@ -747,10 +873,23 @@ final class BighelpCardMusicArtworkStore {
     #if canImport(MusicKit)
     /// A card without `source` reads library ids (`i.…`) from the library and
     /// anything else from the catalog, including the store number in its link.
-    private static func musicKitArtwork(_ music: BighelpCardMusic) async -> Artwork? {
+    @Sendable static func liveMusicKit(_ music: BighelpCardMusic) async throws -> Found? {
         guard let id = music.musicID ?? BighelpCardMusicLookup.storeID(for: music)?.id else { return nil }
         let source = music.source ?? (BighelpCardMusicLookup.isLibraryID(id) ? .library : .catalog)
-        return try? await fetch(MusicItemID(id), kind: music.kind, source: source)
+        guard let artwork = try await fetch(MusicItemID(id), kind: music.kind, source: source) else { return nil }
+        return .musicKit(artwork)
+    }
+
+    /// MusicKit's artwork as a kept picture when it has an address; the download has its own timeout
+    /// (`BighelpCardArtworkFiles`), and when it fails `ArtworkImage` draws the artwork itself.
+    @Sendable static func liveSettle(_ found: Found, _ music: BighelpCardMusic, key: String) async -> Found {
+        guard case .musicKit(let artwork) = found else { return found }
+        let pixels = BighelpCardMusicLookup.artworkPixels
+        if let url = artwork.url(width: pixels, height: pixels), url.scheme == "https",
+           let picture = await BighelpCardArtworkFiles.download(url, key: key) {
+            return .picture(picture)
+        }
+        return found
     }
 
     private static func fetch(_ id: MusicItemID, kind: BighelpCardMusic.Kind,
@@ -794,7 +933,61 @@ final class BighelpCardMusicArtworkStore {
             return try await request.response().items.first?.artwork
         }
     }
+    #else
+    @Sendable static func liveMusicKit(_ music: BighelpCardMusic) async throws -> Found? { nil }
+    @Sendable static func liveSettle(_ found: Found, _ music: BighelpCardMusic, key: String) async -> Found { found }
     #endif
+}
+
+/// Which of the two things a Play tap can do happens: MusicKit's player starts, or Music opens instead
+/// (the lookup took too long). The lookup can't be stopped, so it asks this right before it would play.
+@MainActor
+final class BighelpCardMusicPlayHandoff {
+    private enum State { case waiting, playing, abandoned }
+    private var state = State.waiting
+
+    /// Called right before the player starts; throws once Music was opened instead.
+    func commit() throws {
+        guard state != .abandoned else { throw CancellationError() }
+        state = .playing
+    }
+
+    /// Called when the wait ran out. True when Music should open: nothing has started playing, and nothing will.
+    func abandon() -> Bool {
+        guard state != .playing else { return false }
+        state = .abandoned
+        return true
+    }
+}
+
+/// Runs `work` and gives up on it after `timeout` seconds, even when it ignores cancellation
+/// (a MusicKit request waiting on a service that never answers). The abandoned work is
+/// cancelled and left to end on its own.
+enum BighelpCardRace {
+    struct TimedOut: Error, Equatable {}
+
+    static func run<T: Sendable>(timeout: TimeInterval,
+                                 _ work: @escaping @Sendable () async throws -> T) async throws -> T {
+        try await withCheckedThrowingContinuation { continuation in
+            let finished = OSAllocatedUnfairLock(initialState: false)
+            let finish: @Sendable (Result<T, any Error>) -> Void = { result in
+                let first = finished.withLock { done -> Bool in
+                    if done { return false }
+                    done = true
+                    return true
+                }
+                if first { continuation.resume(with: result) }
+            }
+            let worker = Task {
+                do { finish(.success(try await work())) } catch { finish(.failure(error)) }
+            }
+            Task {
+                try? await Task.sleep(for: .seconds(timeout))
+                worker.cancel()
+                finish(.failure(TimedOut()))
+            }
+        }
+    }
 }
 
 /// The network and file side of music artwork, off the main thread: bounded

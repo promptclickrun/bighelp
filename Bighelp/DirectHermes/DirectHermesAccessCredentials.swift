@@ -163,12 +163,16 @@ struct DirectHermesCustomHeader: Codable, Equatable, Hashable, Sendable {
 /// being set up its credentials are staged in memory (used for requests) and
 /// only saved once a connection succeeds. The Keychain service name predates
 /// basic auth and stays, so saved tokens keep working.
+///
+/// iOS wakes bighelp while the phone is locked (widget refresh, a sign-in renewal
+/// push), so items are readable after the first unlock, like the sign-in, and a
+/// read the Keychain refuses is never kept: the next read tries again.
 final class DirectHermesAccessCredentialStore: @unchecked Sendable {
     static let shared = DirectHermesAccessCredentialStore()
 
     private let service: String
     private let lock = NSLock()
-    /// Keychain reads by address; `.some(nil)` records "none saved".
+    /// Keychain reads by address; `.some(nil)` records "none saved". Refused reads aren't kept.
     private var cache: [String: DirectHermesAccessCredentials?] = [:]
     private var staged: [String: DirectHermesAccessCredentials] = [:]
     /// Custom headers, kept apart from the gate credentials above (their own Keychain items).
@@ -182,6 +186,8 @@ final class DirectHermesAccessCredentialStore: @unchecked Sendable {
 
     #if DEBUG
     var serviceForTesting: String { service }
+    /// Reads fail the way they do on a locked phone.
+    var keychainLockedForTesting = false
     #endif
 
     /// Only for the exact address, and never over the open internet in plain HTTP.
@@ -196,7 +202,8 @@ final class DirectHermesAccessCredentialStore: @unchecked Sendable {
         if let known {
             value = known
         } else {
-            value = load(key)
+            guard let read = load(key) else { return nil }
+            value = read
             lock.withLock { cache[key] = .some(value) }
         }
         guard let value, value.canSend(to: endpoint) else { return nil }
@@ -216,13 +223,13 @@ final class DirectHermesAccessCredentialStore: @unchecked Sendable {
         guard Self.mayCarrySecrets(endpoint) else { return [] }
         let key = endpoint.identity
         if let value = lock.withLock({ stagedHeaders[key] ?? headerCache[key] }) { return value }
-        let value = loadHeaders(key)
+        guard let value = loadHeaders(key) else { return [] }
         lock.withLock { headerCache[key] = value }
         return value
     }
 
     func savedCustomHeaders(for endpoint: DirectHermesEndpoint) -> [DirectHermesCustomHeader] {
-        Self.mayCarrySecrets(endpoint) ? loadHeaders(endpoint.identity) : []
+        Self.mayCarrySecrets(endpoint) ? loadHeaders(endpoint.identity) ?? [] : []
     }
 
     func stageCustomHeaders(_ headers: [DirectHermesCustomHeader]?, for endpoint: DirectHermesEndpoint) {
@@ -253,7 +260,7 @@ final class DirectHermesAccessCredentialStore: @unchecked Sendable {
     }
 
     func savedCredentials(for endpoint: DirectHermesEndpoint) -> DirectHermesAccessCredentials? {
-        guard let value = load(endpoint.identity), value.canSend(to: endpoint) else { return nil }
+        guard let value = load(endpoint.identity) ?? nil, value.canSend(to: endpoint) else { return nil }
         return value
     }
 
@@ -301,27 +308,56 @@ final class DirectHermesAccessCredentialStore: @unchecked Sendable {
          kSecAttrSynchronizable as String: false]
     }
 
-    private func load(_ account: String) -> DirectHermesAccessCredentials? {
-        var request = query(account)
-        request[kSecReturnData as String] = true
-        request[kSecMatchLimit as String] = kSecMatchLimitOne
-        request[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIFail
-        var result: CFTypeRef?
-        guard SecItemCopyMatching(request as CFDictionary, &result) == errSecSuccess,
-              let data = result as? Data, data.count <= 4_096 else { return nil }
-        return try? JSONDecoder().decode(DirectHermesAccessCredentials.self, from: data)
+    /// Readable after the phone's first unlock, never synced or restored to another device.
+    private static let accessibility = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly as String
+
+    private enum KeychainRead {
+        case saved(Data)
+        case none
+        /// The Keychain refused the read, as it does on a locked phone for an item saved readable only while unlocked.
+        case refused
     }
 
-    private func loadHeaders(_ account: String) -> [DirectHermesCustomHeader] {
-        var request = query(account, service: headerService)
+    private func read(_ account: String, service: String, maximumBytes: Int) -> KeychainRead {
+        var request = query(account, service: service)
         request[kSecReturnData as String] = true
+        request[kSecReturnAttributes as String] = true
         request[kSecMatchLimit as String] = kSecMatchLimitOne
         request[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIFail
         var result: CFTypeRef?
-        guard SecItemCopyMatching(request as CFDictionary, &result) == errSecSuccess,
-              let data = result as? Data, data.count <= 131_072,
-              let pairs = try? JSONDecoder().decode([[String]].self, from: data) else { return [] }
-        return (try? DirectHermesCustomHeader.list(pairs.compactMap { $0.count == 2 ? ($0[0], $0[1]) : nil })) ?? []
+        var status = SecItemCopyMatching(request as CFDictionary, &result)
+        #if DEBUG
+        if keychainLockedForTesting { status = errSecInteractionNotAllowed }
+        #endif
+        if status == errSecItemNotFound { return .none }
+        guard status == errSecSuccess, let item = result as? [String: Any] else { return .refused }
+        guard let data = item[kSecValueData as String] as? Data, data.count <= maximumBytes else { return .none }
+        if item[kSecAttrAccessible as String] as? String != Self.accessibility {
+            // Older builds saved items readable only while unlocked. Best effort: it's read again next time.
+            _ = SecItemUpdate(query(account, service: service) as CFDictionary,
+                              [kSecAttrAccessible as String: Self.accessibility] as CFDictionary)
+        }
+        return .saved(data)
+    }
+
+    /// `nil` when the Keychain refused the read; `.some(nil)` when nothing usable is saved.
+    private func load(_ account: String) -> DirectHermesAccessCredentials?? {
+        switch read(account, service: service, maximumBytes: 4_096) {
+        case .refused: nil
+        case .none: .some(nil)
+        case .saved(let data): .some(try? JSONDecoder().decode(DirectHermesAccessCredentials.self, from: data))
+        }
+    }
+
+    /// `nil` when the Keychain refused the read.
+    private func loadHeaders(_ account: String) -> [DirectHermesCustomHeader]? {
+        switch read(account, service: headerService, maximumBytes: 131_072) {
+        case .refused: return nil
+        case .none: return []
+        case .saved(let data):
+            guard let pairs = try? JSONDecoder().decode([[String]].self, from: data) else { return [] }
+            return (try? DirectHermesCustomHeader.list(pairs.compactMap { $0.count == 2 ? ($0[0], $0[1]) : nil })) ?? []
+        }
     }
 
     private func saveHeaders(_ headers: [DirectHermesCustomHeader], _ account: String) throws {
@@ -343,7 +379,7 @@ final class DirectHermesAccessCredentialStore: @unchecked Sendable {
     private func write(_ data: Data, query: [String: Any]) throws {
         let attributes: [String: Any] = [
             kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+            kSecAttrAccessible as String: Self.accessibility,
         ]
         var status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
         if status == errSecItemNotFound {

@@ -75,6 +75,64 @@ struct DirectHermesAccessCredentialsTests {
         #expect(store.credentials(for: endpoint) == nil)
     }
 
+    /// iOS wakes bighelp while the phone is locked (widget refresh, a sign-in renewal push). A read that
+    /// fails then must not count as "none saved" for the rest of the run, or every request after unlocking
+    /// goes without the token and Access turns it away.
+    @Test func aTokenUnreadableWhileLockedIsReadAgainOnceUnlocked() throws {
+        let store = DirectHermesAccessCredentialStore(service: "app.loopdy.mobile.tests.cloudflare-access-\(UUID().uuidString)")
+        let endpoint = try DirectHermesEndpoint(address: "https://hermes-\(UUID().uuidString.prefix(8).lowercased()).example.com")
+        defer { store.remove(for: endpoint) }
+        try store.replace(access: DirectHermesAccessCredentials(clientID: id, clientSecret: secret),
+                          customHeaders: DirectHermesCustomHeader.list([("X-Access-Id", "id-1")]), for: endpoint)
+
+        let woken = DirectHermesAccessCredentialStore(service: store.serviceForTesting)
+        woken.keychainLockedForTesting = true
+        #expect(woken.headers(for: endpoint).isEmpty)
+        woken.keychainLockedForTesting = false
+        #expect(woken.headers(for: endpoint)
+            == ["X-Access-Id": "id-1", "CF-Access-Client-Id": id, "CF-Access-Client-Secret": secret])
+    }
+
+    /// Like the sign-in, saved items are readable after the phone's first unlock. Items from older builds
+    /// (readable only while unlocked) move over when they're next read.
+    @Test func savedTokensAndHeadersCanBeReadWhileThePhoneIsLocked() throws {
+        let service = "app.loopdy.mobile.tests.cloudflare-access-\(UUID().uuidString)"
+        let headerService = service + ".custom-headers"
+        let store = DirectHermesAccessCredentialStore(service: service)
+        let older = try DirectHermesEndpoint(address: "https://hermes-\(UUID().uuidString.prefix(8).lowercased()).example.com")
+        let newer = try DirectHermesEndpoint(address: "https://hermes-\(UUID().uuidString.prefix(8).lowercased()).example.com")
+        defer { store.remove(for: older); store.remove(for: newer) }
+        let token = try DirectHermesAccessCredentials(clientID: id, clientSecret: secret)
+        func item(_ service: String, _ endpoint: DirectHermesEndpoint) -> [String: Any] {
+            [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service,
+             kSecAttrAccount as String: endpoint.identity, kSecAttrSynchronizable as String: false]
+        }
+        func accessibility(_ service: String, _ endpoint: DirectHermesEndpoint) -> String? {
+            var query = item(service, endpoint)
+            query[kSecReturnAttributes as String] = true
+            var result: CFTypeRef?
+            guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess else { return nil }
+            return (result as? [String: Any])?[kSecAttrAccessible as String] as? String
+        }
+        let afterFirstUnlock = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly as String
+        for (service, data) in [(service, try JSONEncoder().encode(token)),
+                                (headerService, try JSONEncoder().encode([["X-Access-Id", "id-1"]]))] {
+            var saved = item(service, older)
+            saved[kSecValueData as String] = data
+            saved[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+            #expect(SecItemAdd(saved as CFDictionary, nil) == errSecSuccess)
+        }
+
+        #expect(store.headers(for: older)["CF-Access-Client-Id"] == id)
+        #expect(store.headers(for: older)["X-Access-Id"] == "id-1")
+        #expect(accessibility(service, older) == afterFirstUnlock)
+        #expect(accessibility(headerService, older) == afterFirstUnlock)
+
+        try store.replace(access: token, customHeaders: DirectHermesCustomHeader.list([("X-Access-Id", "id-2")]), for: newer)
+        #expect(accessibility(service, newer) == afterFirstUnlock)
+        #expect(accessibility(headerService, newer) == afterFirstUnlock)
+    }
+
     @Test func tokensNeverGoOverPlainHTTP() throws {
         let store = DirectHermesAccessCredentialStore(service: "app.loopdy.mobile.tests.cloudflare-access-\(UUID().uuidString)")
         let endpoint = try DirectHermesEndpoint(address: "http://10.8.0.5:9119", allowPrivateHTTP: true)

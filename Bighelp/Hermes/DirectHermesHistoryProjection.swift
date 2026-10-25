@@ -40,6 +40,16 @@ struct DirectHermesHistoryRow: Equatable, Sendable {
         } ?? false
     }
 
+    /// The tapbacks saved on this message (`display_metadata.reactions`), from the person and
+    /// the agent. Unreadable ones are left out: they never hold up the history.
+    var savedReactions: [NativeMessageReaction] {
+        guard let list = raw["display_metadata"]?.object?["reactions"]?.array, !list.isEmpty else { return [] }
+        let event = DirectHermesEvent(type: "message.reaction", sessionID: nil, payload: [
+            "row_id": .integer(id), "role": .string(role), "reactions": .array(list),
+        ], sequence: nil)
+        return (try? DirectHermesMessageReaction(event: event))?.reactions.compactMap { NativeMessageReaction($0) } ?? []
+    }
+
     init(_ value: BighelpJSONValue, sessionID: String) throws {
         guard let row = value.object, let id = row["id"]?.integer,
               id > 0, id <= 9_007_199_254_740_991 else { throw WorkspaceClientError.invalidResponse }
@@ -277,7 +287,8 @@ struct DirectHermesHistoryProjection: Equatable, Sendable {
                         freshness: row.hasUnsupportedContent ? "Contains native non-text content" : nil,
                         delivery: "Saved", timestamp: row.timestamp, sourceOrder: order.partialValue,
                         platformMessageID: row.platformMessageID,
-                        turnDurationMilliseconds: row.turnDurationMilliseconds
+                        turnDurationMilliseconds: row.turnDurationMilliseconds,
+                        reactions: isModelSwitch ? nil : row.savedReactions
                     )
                 ))
             }

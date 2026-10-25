@@ -48,6 +48,21 @@ enum NativeMessageReactionRowIdentity {
     }
 }
 
+extension NativeMessageReaction {
+    /// Nil for an author the app doesn't draw (only the person and the agent react).
+    init?(_ value: DirectHermesMessageReaction.Reaction) {
+        let author: NativeMessageReactionAuthor
+        if value.author.utf8.elementsEqual("user".utf8) {
+            author = .user
+        } else if value.author.utf8.elementsEqual("agent".utf8) {
+            author = .agent
+        } else {
+            return nil
+        }
+        self.init(emoji: value.emoji, author: author, occurredAt: value.at, isSeen: value.seen)
+    }
+}
+
 enum NativeAffectionReactionPresentation {
     /// Stock Hermes currently publishes only `vibe`. It is decorative attention,
     /// not task success, and never supplies enough identity to decorate a row.

@@ -22,8 +22,14 @@ extension ChatModel {
             )
         }
 
-        let snapshot = nativeMessageReactionSnapshots[rowID]
-        let reactions = snapshot?.role == item.role ? (snapshot?.reactions ?? []) : []
+        // A live change for the row is the whole list and wins; until one arrives, the
+        // message shows what Hermes had saved on it when its history was read.
+        let reactions: [NativeMessageReaction]
+        if let snapshot = nativeMessageReactionSnapshots[rowID] {
+            reactions = snapshot.role == item.role ? snapshot.reactions : []
+        } else {
+            reactions = items[retainedIndex].metadata.reactions ?? []
+        }
         let availability: NativeMessageReactionAvailability
         if uncertainNativeMessageReactionRows.contains(rowID) {
             availability = .outcomeUnknown
@@ -313,22 +319,7 @@ extension ChatModel {
     private static func nativeMessageReactions(
         _ values: [DirectHermesMessageReaction.Reaction]
     ) -> [NativeMessageReaction] {
-        values.compactMap { value in
-            let author: NativeMessageReactionAuthor
-            if value.author.utf8.elementsEqual("user".utf8) {
-                author = .user
-            } else if value.author.utf8.elementsEqual("agent".utf8) {
-                author = .agent
-            } else {
-                return nil
-            }
-            return NativeMessageReaction(
-                emoji: value.emoji,
-                author: author,
-                occurredAt: value.at,
-                isSeen: value.seen
-            )
-        }
+        values.compactMap { NativeMessageReaction($0) }
     }
 
     private static func nativeMessageReactionErrorMessage(_ error: Error) -> String {

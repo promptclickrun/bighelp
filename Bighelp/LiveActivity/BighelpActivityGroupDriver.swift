@@ -164,6 +164,7 @@ final class BighelpActivityGroupDriver: BighelpLiveActivityDriving {
                 // Detach before awaiting ActivityKit. A new turn must never reuse
                 // the card whose irreversible end is already in flight.
                 self.endingIDs.insert(id); self.clear()
+                BighelpLiveActivityLog.note(.cardEnding)
                 self.onPhysicalEnded?(id)
                 if dismiss { await self.underlying.dismiss(id: id, state: state) }
                 else { await self.underlying.end(id: id, state: state) }
@@ -177,6 +178,7 @@ final class BighelpActivityGroupDriver: BighelpLiveActivityDriving {
         let state = lastSystemState ?? BighelpActivitySession.aggregate([], timestamp: 1)
         let pending = writeTail
         revision += 1; writeTail = nil; endingIDs.insert(id); clear()
+        BighelpLiveActivityLog.note(.cardInvalidated)
         onPhysicalEnded?(id)
         await pending?.value
         await underlying.dismiss(id: id, state: state)

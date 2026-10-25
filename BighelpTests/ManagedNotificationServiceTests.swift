@@ -604,6 +604,281 @@ import UserNotifications
         await runtime.resetForAccountBoundary()
     }
 
+    // MARK: Live Activity recovery
+
+    /// A pending revoke for a card the service never stored (it refused the registration) is the
+    /// service's 404, not a failure to keep retrying.
+    @Test func aRevokeTheServiceNeverStoredClearsWithoutBlockingRecovery() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+        let runtime = makeLiveActivityRuntime(fixture, system: TokenSystemDriver())
+        let owner = try fixture.saveActivityOwner(storedSessionID: "chat-a", nativeID: Fixture.rowID())
+        try fixture.savePendingRevocation(for: owner)
+
+        try await runtime.recover(host: fixture.host)
+
+        #expect(fixture.account.rowDeletes == [owner.relayActivityID])
+        #expect(fixture.ledger.activity(owner.relayActivityID)?.retired == true)
+        #expect(try fixture.service.activityKeys.load(owner.relayActivityID) == nil)
+        // Nothing is left to retry at the next foreground.
+        try await runtime.recover(host: fixture.host)
+        #expect(fixture.account.rowDeletes.count == 1)
+    }
+
+    @Test(arguments: [(409, "notification_activity_conflict"), (500, "internal_error"), (404, "notification_grant_unknown")])
+    func anyOtherAnswerKeepsTheRevocationPending(status: Int, code: String) async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+        let runtime = makeLiveActivityRuntime(fixture, system: TokenSystemDriver())
+        let owner = try fixture.saveActivityOwner(storedSessionID: "chat-a", nativeID: Fixture.rowID())
+        try fixture.savePendingRevocation(for: owner)
+        fixture.account.rowDeleteAnswers = [(status, code)]
+
+        await #expect(throws: BighelpLinkAPIError.requestFailed(status: status, code: code)) {
+            try await runtime.recover(host: fixture.host)
+        }
+
+        #expect(fixture.ledger.activity(owner.relayActivityID)?.retired == false)
+        #expect(try fixture.service.activityKeys.load(owner.relayActivityID)?.pendingRevocationBody != nil)
+    }
+
+    /// The first revoke the service refuses with a 500 used to end recovery for every owner after it.
+    @Test func oneOwnersFailedRevokeDoesNotStopTheOthers() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+        let runtime = makeLiveActivityRuntime(fixture, system: TokenSystemDriver())
+        var owners: [BighelpManagedActivityOwner] = []
+        for chat in ["chat-a", "chat-b", "chat-c"] {
+            let owner = try fixture.saveActivityOwner(storedSessionID: chat, nativeID: Fixture.rowID())
+            try fixture.savePendingRevocation(for: owner)
+            owners.append(owner)
+        }
+        // Whichever owner recovery meets first gets the 500; the others are answered 404 like the service does.
+        fixture.account.rowDeleteAnswers = [(500, "internal_error")]
+
+        await #expect(throws: BighelpLinkAPIError.requestFailed(status: 500, code: "internal_error")) {
+            try await runtime.recover(host: fixture.host)
+        }
+
+        #expect(fixture.account.rowDeletes.count == 3)
+        #expect(owners.filter { fixture.ledger.activity($0.relayActivityID)?.retired == true }.count == 2)
+        let stuck = owners.filter { fixture.ledger.activity($0.relayActivityID)?.retired == false }
+        #expect(stuck.count == 1)
+        #expect(try fixture.service.activityKeys.load(#require(stuck.first).relayActivityID)?.pendingRevocationBody != nil)
+    }
+
+    /// Registration retries and card repair live in the flush that comes after recovery. A stuck revoke
+    /// is still reported, but not before the flush has run.
+    @Test func registrationRetriesRunAfterRecoveryEvenWhenARevokeKeepsFailing() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+        let system = TokenSystemDriver()
+        let runtime = makeLiveActivityRuntime(fixture, system: system)
+        fixture.service.activityRuntime = runtime
+        fixture.account.rowRegistrationRefusal = (400, "notification_request_invalid")
+        let card = try await startPromotedCard(fixture, runtime)
+        let putsBefore = fixture.account.rowPuts
+        #expect(putsBefore >= 1)
+        let stuck = try fixture.saveActivityOwner(storedSessionID: "chat-stuck", nativeID: Fixture.rowID())
+        try fixture.savePendingRevocation(for: stuck)
+        fixture.account.rowDeleteAnswers = [(500, "internal_error")]
+
+        let integration = BighelpManagedNotificationIntegration(service: fixture.service)
+        await #expect(throws: BighelpLinkAPIError.requestFailed(status: 500, code: "internal_error")) {
+            try await integration.hooks.recoverWake { true }
+        }
+
+        #expect(fixture.account.rowPuts > putsBefore, "the flush retried the card's registration")
+        #expect(fixture.ledger.activity(stuck.relayActivityID)?.retired == false)
+        withExtendedLifetime(card) {}
+        await runtime.resetForAccountBoundary()
+    }
+
+    /// The service refused the registration (the old rowId mismatch answered 400): it holds nothing for
+    /// the card and can never update it, so the phone keeps it current and ends it.
+    @Test func aRefusedRegistrationDoesNotFreezeTheLocalCard() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+        let system = TokenSystemDriver()
+        let runtime = makeLiveActivityRuntime(fixture, system: system)
+        fixture.account.rowRegistrationRefusal = (400, "notification_request_invalid")
+        let card = try await startPromotedCard(fixture, runtime)
+
+        let owner = try #require(fixture.ledger.activities.first)
+        #expect(fixture.account.rowPuts >= 1)
+        #expect(owner.remoteOwned == false)
+        #expect(try fixture.service.activityKeys.load(owner.relayActivityID)?.registrationConfirmed == false)
+
+        let updatesBefore = system.updates
+        try await runtime.receive(host: fixture.host, chat: card.chat, event: card.event(.reasoning, .running),
+            canonicalHostTurnID: nil)
+        #expect(system.updates > updatesBefore, "the card still follows the chat")
+        #expect(system.ends == 0)
+
+        try await runtime.finish(host: fixture.host, profile: "default", storedSessionID: "saved",
+            originalLocalTurnID: card.turn, outcome: .succeeded)
+        #expect(system.ends == 1, "the card ends normally instead of staying on the Lock Screen")
+        await runtime.resetForAccountBoundary()
+    }
+
+    /// The first registration is the only one whose refusal means "the service holds nothing". A later
+    /// revision (a token rotation) refused leaves the service holding the earlier one, still pushing to
+    /// the card, so the phone must not write it too. 401 and 403 say the session or grant is gone, not
+    /// that the card is unwanted.
+    @Test(arguments: [(true, 409), (true, 400), (true, 403), (false, 401), (false, 403)])
+    func onlyAFirstRegistrationRefusedForGoodGivesTheCardBack(confirmedFirst: Bool, status: Int) async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+        let grant = try #require(fixture.ledger.record(host: fixture.host, profile: "default")?.grant)
+        let owner = try fixture.saveActivityOwner(storedSessionID: "chat-a", nativeID: Fixture.rowID(),
+            canonicalTurnID: "canonical-turn")
+        let reference = BighelpLinkBase64URL.encode(Data(SHA256.hash(data: Data(owner.opaqueSessionID.utf8))))
+        if confirmedFirst {
+            // Revision 1 was accepted and confirmed; the token then rotated.
+            try fixture.service.activityKeys.save(BighelpManagedActivityRequest(owner: owner,
+                registrationBody: Data("{}".utf8), coordinatorReference: reference, pushToken: "abcd", revision: 1,
+                timestamp: 1_800_000_000, leaseExpires: 1_800_000_900, pendingRevocationBody: nil,
+                registrationConfirmed: true))
+        }
+        let registrar = try BighelpManagedLiveActivityRegistrar(service: fixture.service, host: fixture.host,
+            grant: grant, environment: .sandbox, topic: "app.loopdy.mobile")
+        fixture.account.rowRegistrationRefusal = (status, "refused")
+
+        await #expect(throws: BighelpLinkAPIError.requestFailed(status: status, code: "refused")) {
+            try await registrar.register(.init(activityID: owner.relayActivityID, sessionReference: reference,
+                pushToken: "abcd", revision: confirmedFirst ? 2 : 1, timestamp: 1_800_000_050, leaseExpires: 1_800_000_950))
+        }
+
+        #expect(fixture.account.rowPuts == 1)
+        #expect(fixture.ledger.activity(owner.relayActivityID)?.remoteOwned == true)
+        let system = TokenSystemDriver()
+        let driver = BighelpManagedActivityDriver(underlying: system, ledger: fixture.ledger,
+            activityKeys: fixture.service.activityKeys, host: fixture.host, grantID: grant.grantId, profile: "default",
+            sessionID: "chat-a", localTurnID: "turn", canonicalTurnID: "canonical-turn", firstObservedAt: 1_800_000_100)
+        #expect(driver.registrationRefused == false)
+        await driver.update(id: owner.nativeActivityID, state: .initial(agentName: "Agent", timestamp: 1_800_000_100))
+        await driver.end(id: owner.nativeActivityID, state: .initial(agentName: "Agent", timestamp: 1_800_000_100))
+        #expect(system.updates == 0 && system.ends == 0, "the service still owns the card")
+    }
+
+    /// An outage or a lost reply may mean the service took the registration: that card stays the
+    /// service's, as before.
+    @Test(arguments: [(503, "internal_error"), (429, "notification_rate_limited"), (408, "request_timeout")])
+    func anOutageKeepsTheCardWithTheService(status: Int, code: String) async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+        let system = TokenSystemDriver()
+        let runtime = makeLiveActivityRuntime(fixture, system: system)
+        fixture.account.rowRegistrationRefusal = (status, code)
+        let card = try await startPromotedCard(fixture, runtime)
+
+        let owner = try #require(fixture.ledger.activities.first)
+        #expect(owner.remoteOwned == true)
+        let updatesBefore = system.updates
+        try await runtime.receive(host: fixture.host, chat: card.chat, event: card.event(.reasoning, .running),
+            canonicalHostTurnID: nil)
+        try await runtime.finish(host: fixture.host, profile: "default", storedSessionID: "saved",
+            originalLocalTurnID: card.turn, outcome: .succeeded)
+        #expect(system.updates == updatesBefore)
+        #expect(system.ends == 0)
+        await runtime.resetForAccountBoundary()
+    }
+
+    /// The service's 404 for a card it never stored, as the phone's request code reads it off the wire.
+    @Test func theServicesUnknownActivityAnswerReadsAsA404WithItsCode() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+        let credentials = try fixture.service.credentials(for: fixture.host)
+        let transport = UnknownActivityTransport()
+        let broker = BighelpNotificationBrokerClient(transport: transport)
+        let grant = try #require(fixture.ledger.record(host: fixture.host, profile: "default")?.grant)
+        let path = BighelpManagedNotificationService.root + "/\(grant.grantId)/live-activities/activity_unknown"
+
+        await #expect(throws: BighelpLinkAPIError.requestFailed(status: 404, code: "notification_activity_unknown")) {
+            _ = try await broker.managedNotificationRequest(path: path, method: "DELETE",
+                body: Data(#"{"version":2,"revision":2,"timestamp":1800000100}"#.utf8), credentials: credentials)
+        }
+        #expect(transport.methods == ["DELETE"])
+    }
+
+    @MainActor private final class UnknownActivityTransport: BighelpLinkHTTPTransport {
+        private(set) var methods: [String] = []
+        func data(for request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+            methods.append(request.httpMethod ?? "")
+            let url = try #require(request.url)
+            // The service's JSON error shape: {version, error: {code, message}}.
+            let body = Data(#"{"version":1,"error":{"code":"notification_activity_unknown","message":"notification_activity_unknown"}}"#.utf8)
+            return (body, try #require(HTTPURLResponse(url: url, statusCode: 404, httpVersion: nil, headerFields: nil)))
+        }
+    }
+
+    /// A chat whose running turn started a shared card and was promoted to the host's turn, so the card
+    /// asks the service to register it.
+    @MainActor private struct PromotedCard {
+        let chat: DirectHermesChat
+        let client: DirectHermesConversationClient
+        let turn: String
+        func event(_ kind: ChatActivityKind, _ lifecycle: ChatActivityLifecycle) -> ChatActivityEvent {
+            .init(eventID: "event-\(UUID().uuidString)", sessionID: client.conversationID, turnID: turn,
+                kind: kind, lifecycle: lifecycle, title: "Working", summary: nil, detail: nil, occurredAt: 1_800_000_100)
+        }
+    }
+
+    private func makeLiveActivityRuntime(_ fixture: Fixture, system: TokenSystemDriver) -> BighelpManagedNativeActivityRuntime {
+        var infos: [String: BighelpActivitySessionInfo] = [:]
+        let group = BighelpActivityGroupDriver(underlying: system, loadInfos: { infos }, saveInfos: { infos = $0 })
+        return BighelpManagedNativeActivityRuntime(service: fixture.service, driver: group,
+            environment: .sandbox, topic: "app.loopdy.mobile", now: { Date(timeIntervalSince1970: 1_800_000_100) })
+    }
+
+    private func startPromotedCard(_ fixture: Fixture, _ runtime: BighelpManagedNativeActivityRuntime) async throws -> PromotedCard {
+        let client = try DirectHermesConversationClient(rpc: UnenrolledChatRPC(), hostIdentity: fixture.host.principalIdentity,
+            profile: "default", runtimeID: "runtime", storedID: "saved", title: "Chat", epoch: "epoch",
+            drafts: .init(root: fixture.root.appending(path: "drafts")))
+        let model = ChatModel(conversationID: client.conversationID, client: client, initialItems: [])
+        client.model = model
+        let chat = DirectHermesChat(id: "saved", client: client, model: model)
+        client.receive(.init(type: "message.start", sessionID: "runtime", payload: [:], sequence: 1))
+        let card = PromotedCard(chat: chat, client: client, turn: client.projection.turnID)
+        try await runtime.receive(host: fixture.host, chat: chat, event: card.event(.reasoning, .running), canonicalHostTurnID: nil)
+        let grant = try #require(fixture.ledger.record(host: fixture.host, profile: "default")?.grant)
+        let promoted = try await runtime.promote(host: fixture.host, chat: chat, localTurn: card.turn,
+            snapshot: .init(version: 1, grantId: grant.grantId, work: .init(profile: "default", sessionId: "saved",
+                turnId: "canonical-turn", phase: .thinking, activeSubagentCount: 0, terminal: false,
+                outcome: nil, observedAt: 1_800_000_100)))
+        #expect(promoted)
+        return card
+    }
+
+    /// A phone with push tokens, so a started card registers the way a real one does.
+    @MainActor private final class TokenSystemDriver: BighelpLiveActivityDriving {
+        var starts = 0, updates = 0, ends = 0
+        var snapshots: [String: BighelpLiveActivitySnapshot] = [:]
+        func existingActivities() -> [BighelpLiveActivitySnapshot] { Array(snapshots.values) }
+        func start(attributes: LoopdySessionActivityAttributes, state: LoopdySessionActivityAttributes.ContentState) throws -> String {
+            starts += 1
+            let id = UUID().uuidString
+            snapshots[id] = .init(nativeActivityID: id, attributes: attributes, state: state, pushToken: Data([0xab, 0xcd]))
+            return id
+        }
+        func update(id: String, state: LoopdySessionActivityAttributes.ContentState) async {
+            guard let old = snapshots[id] else { return }
+            updates += 1
+            snapshots[id] = .init(nativeActivityID: id, attributes: old.attributes, state: state, pushToken: old.pushToken)
+        }
+        func end(id: String, state: LoopdySessionActivityAttributes.ContentState) async { ends += 1; snapshots[id] = nil }
+        func currentPushToken(id: String) -> Data? { snapshots[id]?.pushToken }
+        func pushTokenUpdates(id: String) -> AsyncStream<Data> { AsyncStream { $0.finish() } }
+    }
+
     @MainActor private final class NativeActivityDriver: BighelpLiveActivityDriving {
         var starts = 0
         var refuseStart = false
@@ -1065,8 +1340,50 @@ import UserNotifications
         var loseFirstCreate = false
         let template: BighelpManagedGrant
         init(_ template: BighelpManagedGrant) { self.template = template }
+        /// The notification service's phone routes for Live Activity rows, as the Worker answers them.
+        var rowRegistrationRefusal: (status: Int, code: String)?
+        /// Answers for the next DELETEs, first in first out, before the service looks at what it holds.
+        var rowDeleteAnswers: [(status: Int, code: String)] = []
+        private(set) var rowPuts = 0
+        private(set) var rowDeletes: [String] = []
+        private var heldRows: [String: (revision: Int, sessionReference: String)] = [:]
+        private func rowRoute(path: String, method: String, body: Data?) throws -> BighelpJSONValue {
+            let parts = path.split(separator: "/").map(String.init)
+            let id = try #require(parts.last), grant = parts[parts.count - 3]
+            let fields = try body.map { try JSONDecoder().decode(BighelpJSONValue.self, from: $0) }?.object ?? [:]
+            func activity(revision: Int, reference: String, status: String) -> BighelpJSONValue {
+                .object(["version": .integer(1), "activity": .object(["grantId": .string(grant), "activityId": .string(id),
+                    "sessionReference": .string(reference), "revision": .integer(revision), "status": .string(status),
+                    "leaseExpires": fields["leaseExpires"] ?? .integer(1_800_010_000)])])
+            }
+            if method == "PUT" {
+                rowPuts += 1
+                if let refusal = rowRegistrationRefusal {
+                    throw BighelpLinkAPIError.requestFailed(status: refusal.status, code: refusal.code)
+                }
+                let revision = try #require(fields["revision"]?.integer), reference = try #require(fields["sessionReference"]?.string)
+                heldRows[id] = (revision, reference)
+                return activity(revision: revision, reference: reference, status: "active")
+            }
+            rowDeletes.append(id)
+            if !rowDeleteAnswers.isEmpty {
+                let answer = rowDeleteAnswers.removeFirst()
+                throw BighelpLinkAPIError.requestFailed(status: answer.status, code: answer.code)
+            }
+            // A card the service never stored: 404 {version, error: {code, message}}.
+            guard let held = heldRows[id] else {
+                throw BighelpLinkAPIError.requestFailed(status: 404, code: "notification_activity_unknown")
+            }
+            let revision = try #require(fields["revision"]?.integer)
+            guard revision == held.revision + 1 else {
+                throw BighelpLinkAPIError.requestFailed(status: 409, code: "notification_activity_conflict")
+            }
+            heldRows[id] = (revision, held.sessionReference)
+            return activity(revision: revision, reference: held.sessionReference, status: "revoked")
+        }
         func managedNotificationRequest(path: String, method: String, body: Data?, credentials: BighelpManagedNotificationCredentials) async throws -> BighelpJSONValue {
             requests.append(path)
+            if path.contains("/live-activities/") { return try rowRoute(path: path, method: method, body: body) }
             if path == BighelpManagedNotificationService.root + "/buzzkit/identity" {
                 return .object(["version": .integer(2), "identity": .object([
                     "externalId": .string("notify_" + String(repeating: "a", count: 43)),
@@ -1432,20 +1749,31 @@ import UserNotifications
         /// A Live Activity's owner as the registrar saves it when the activity starts.
         @discardableResult
         func saveActivityOwner(storedSessionID: String, hostConnectionID: String? = nil,
-                               retired: Bool = false) throws -> BighelpManagedActivityOwner {
+                               retired: Bool = false, nativeID: String? = nil,
+                               canonicalTurnID: String? = nil) throws -> BighelpManagedActivityOwner {
             let grant = try #require(ledger.record(host: host, profile: "default")?.grant)
             let hostConnection = hostConnectionID ?? host.hostConnectionID
-            let nativeID = UUID().uuidString
+            let nativeID = nativeID ?? UUID().uuidString
             let owner = BighelpManagedActivityOwner(accountScope: host.notificationScope,
                 accountID: try host.notificationAccountID(), hostConnectionID: hostConnection,
                 grantID: grant.grantId, profile: "default", storedSessionID: storedSessionID,
                 opaqueSessionID: "native-" + ManagedNotificationValidation.digest(
                     [host.notificationScope, hostConnection, "default", storedSessionID].joined(separator: "\0")),
                 nativeActivityID: nativeID, relayActivityID: BighelpManagedActivityDriver.relayID(nativeID),
-                canonicalTurnID: nil, localTurnID: "turn", firstObservedAt: 1_800_000_100,
+                canonicalTurnID: canonicalTurnID, localTurnID: "turn", firstObservedAt: 1_800_000_100,
                 remoteOwned: false, retired: retired)
             try ledger.save(owner)
             return owner
+        }
+        /// A row of the shared card, as the group driver names it.
+        static func rowID() -> String { "\(UUID().uuidString)|row|\(Int(Date().timeIntervalSince1970 * 1_000_000))-\(UUID().uuidString.lowercased())" }
+        /// What the registrar saves once a card's end could not reach the service.
+        func savePendingRevocation(for owner: BighelpManagedActivityOwner) throws {
+            let revoke = try ManagedNotificationValidation.data(BighelpJSONValue.object([
+                "version": .integer(2), "revision": .integer(2), "timestamp": .integer(1_800_000_100)]))
+            try service.activityKeys.save(BighelpManagedActivityRequest(owner: owner, registrationBody: Data("{}".utf8),
+                coordinatorReference: "reference", pushToken: "abcd", revision: 1, timestamp: 1_800_000_000,
+                leaseExpires: 1_800_000_900, pendingRevocationBody: revoke, registrationConfirmed: true))
         }
         func cleanup(){ defaults.removePersistentDomain(forName: defaultsSuite); try? trust.removeAll(); try? sealedKeys.remove(); try? sealedSenders.removeAll(); registry.bind(deviceID:nil,authorizationEpoch:nil); try? FileManager.default.removeItem(at:root) }
     }

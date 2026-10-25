@@ -52,6 +52,7 @@ final class ShellFeatureStore {
     private let generatedMediaResolver: (any GeneratedMediaResolving)?
     private let voiceClientFactory: ((SessionRecord, AgentProfile?) -> any VoiceSessionClient)?
     private let voiceInputLevelSource: () -> any VoiceInputLevelSource
+    private let voiceHoldMusic: @MainActor () -> (any VoiceHoldMusicPlaying)?
     private let approvalRequestLoader: (any ApprovalRequestLoading)?
     private let approvalClient: (any ApprovalClient)?
     private let approvalPublisher: @MainActor (LoadedApprovalRequest) -> Void
@@ -283,6 +284,10 @@ final class ShellFeatureStore {
         voiceInputLevelSource: @escaping () -> any VoiceInputLevelSource = {
             AVAudioEngineVoiceInputLevelSource()
         },
+        voiceHoldMusic: @escaping @MainActor () -> (any VoiceHoldMusicPlaying)? = {
+            ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil
+                ? AVAudioPlayerHoldMusic() : nil
+        },
         sessionControlMessaging: (any BighelpLinkSessionControlMessaging)? = nil,
         slashCommandCatalogClient: (any SlashCommandCatalogClient)? = nil,
         generatedMediaResolver: (any GeneratedMediaResolving)? = nil,
@@ -307,6 +312,7 @@ final class ShellFeatureStore {
         self.navigationHydrationTimeout = navigationHydrationTimeout
         voiceClientFactory = voiceClient
         self.voiceInputLevelSource = voiceInputLevelSource
+        self.voiceHoldMusic = voiceHoldMusic
         self.sessionControlMessaging = sessionControlMessaging
         self.slashCommandCatalogClient = slashCommandCatalogClient
         self.generatedMediaResolver = generatedMediaResolver
@@ -1631,8 +1637,10 @@ final class ShellFeatureStore {
                     self?.chatModels[conversationID]?
                         .finishExternallyOwnedTurnWithoutReply()
                 },
-                holdMusic: ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil
-                    ? AVAudioPlayerHoldMusic() : nil
+                // GPT Live answers on its own call and hands requests to Hermes; music over it
+                // would talk over the voice. Turn-based voice (also after "Use TTS voice mode",
+                // which makes a new presentation) keeps its music.
+                holdMusic: conversationMode == .codexLive ? nil : voiceHoldMusic()
             ),
             conversationMode: conversationMode,
             liveModel: liveModel

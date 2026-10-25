@@ -77,9 +77,18 @@ final class SystemVoiceAudioSession: VoiceAudioSessionControlling, @unchecked Se
     }
 }
 
+enum VoiceAudioSessionError: Error, Equatable, Sendable {
+    /// A live voice call runs its own audio and owns the session until it ends.
+    case heldByLiveCall
+}
+
 /// Microphone capture and agent playback share one `AVAudioSession`. Each takes
 /// an independent claim; the session is deactivated only once the last claim is
 /// released, so stopping the mic can never cut off audio that is still playing.
+///
+/// A live voice call (WebRTC) sets up and deactivates the session through its own audio
+/// session, which this coordinator can't see. While it holds the session (`holdForLiveCall`),
+/// every claim is refused, so nothing here configures it or deactivates it under the call.
 ///
 /// Deliberately not actor-isolated: `release` must be reachable from the
 /// nonisolated `deinit` teardown paths that own these claims.
@@ -89,21 +98,28 @@ final class VoiceAudioSessionCoordinator: @unchecked Sendable {
     private let session: any VoiceAudioSessionControlling
     private let lock = NSLock()
     private var activeClaims: [UUID: VoiceAudioUse] = [:]
+    private var liveCallLease: UUID?
 
     init(session: any VoiceAudioSessionControlling = SystemVoiceAudioSession()) {
         self.session = session
-    }
-
-    var isSessionActive: Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return !activeClaims.isEmpty
     }
 
     var claimCount: Int {
         lock.lock()
         defer { lock.unlock() }
         return activeClaims.count
+    }
+
+    /// Reserves the session for a live call, which runs its own audio. Refused while any
+    /// claim is held or another call holds it. It never touches the session itself.
+    func holdForLiveCall() throws -> VoiceAudioSessionLiveCallLease {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard activeClaims.isEmpty, liveCallLease == nil else { throw VoiceAudioSessionError.heldByLiveCall }
+        let id = UUID()
+        liveCallLease = id
+        return VoiceAudioSessionLiveCallLease(id: id, coordinator: self)
     }
 
     /// Activates the shared session if it is not already owned. The claim is
@@ -113,6 +129,7 @@ final class VoiceAudioSessionCoordinator: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
 
+        guard liveCallLease == nil else { throw VoiceAudioSessionError.heldByLiveCall }
         if activeClaims.isEmpty {
             try session.configure(for: use)
             try session.setActive(true)
@@ -132,6 +149,28 @@ final class VoiceAudioSessionCoordinator: @unchecked Sendable {
         guard activeClaims.removeValue(forKey: id) != nil else { return }
         guard activeClaims.isEmpty else { return }
         try? session.setActive(false)
+    }
+
+    fileprivate func releaseLiveCall(_ id: UUID) {
+        lock.lock()
+        defer { lock.unlock() }
+
+        if liveCallLease == id { liveCallLease = nil }
+    }
+}
+
+/// Idempotent like a claim. Letting go only lifts the refusal: the call deactivates its own audio.
+final class VoiceAudioSessionLiveCallLease: @unchecked Sendable {
+    private let id: UUID
+    private let coordinator: VoiceAudioSessionCoordinator
+
+    fileprivate init(id: UUID, coordinator: VoiceAudioSessionCoordinator) {
+        self.id = id
+        self.coordinator = coordinator
+    }
+
+    func release() {
+        coordinator.releaseLiveCall(id)
     }
 }
 

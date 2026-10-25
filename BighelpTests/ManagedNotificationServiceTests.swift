@@ -485,6 +485,26 @@ import UserNotifications
         #expect(opens.pending?.target == .stored(hostID: fixture.host.id, profileID: "default", storedSessionID: "bot-chat"))
     }
 
+    /// The tap on a card of another computer selects it, and tells the shell it did, so the shell
+    /// waits for that computer before it prepares the chat. On the computer in use there is
+    /// nothing to wait for.
+    @Test(arguments: [false, true])
+    func liveActivityTapSaysWhetherItSwitchedComputers(switches: Bool) async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+        fixture.service.activityRuntime = BighelpManagedNativeActivityRuntime(service: fixture.service,
+            driver: NativeActivityDriver(), environment: .sandbox, topic: "app.loopdy.mobile",
+            now: { Date(timeIntervalSince1970: 1_800_000_100) })
+        let owner = try fixture.saveActivityOwner(storedSessionID: "bot-chat")
+        if switches { fixture.registry.select(nil) }
+        let opens = BighelpExternalSessionOpenCenter()
+        try fixture.service.openActivity(opaqueSessionID: owner.opaqueSessionID, opens: opens)
+        #expect(fixture.registry.selectedHostID == fixture.host.id)
+        let expected: BighelpExternalSessionOpen.HostSwitch? = switches ? BighelpExternalSessionOpen.HostSwitch(from: nil) : nil
+        #expect(opens.pending?.switchedHost == expected)
+    }
+
     /// A link alone never picks a computer or a chat: a card this phone no longer owns, or one
     /// whose computer isn't in bighelp, opens nothing.
     @Test(arguments: [false, true])

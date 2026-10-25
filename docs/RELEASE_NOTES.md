@@ -69,6 +69,15 @@ short sentences, one instruction in each step, and the active voice.
 - Alerts arrive the same way as before. bighelp now gives its notification service the push address of your iPhone,
   for faster alerts in a later release. You see no change now.
 
+### Photos
+
+- **Photo drafts:** send your agent a photo of a business card or an event poster. Your agent makes a draft contact or a draft event. You check the draft, then you save it. Your agent cannot save it without you. This needs a newer bighelp plugin on your computer.
+
+### Fixed in build 161
+
+- **Live Activities:** the Live Activity shows again and follows your chats. Before, after an error on the notification service, the Live Activity could stop updating or not show at all. The phone now recovers on its own.
+- **Apple Music cards:** an Apple Music card no longer freezes bighelp when Apple Music cannot answer. The card shows without its picture, and **Open in Music** still works.
+
 ## 2.6.19
 
 ### Highlights

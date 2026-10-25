@@ -3,6 +3,12 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.22
+
+### Chat
+
+- **Scrolling while an answer arrives:** you can scroll up while your agent writes its answer. The chat no longer moves up and down while you read an earlier part.
+
 ## 2.6.21
 
 ### Fixed

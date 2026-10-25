@@ -2111,12 +2111,89 @@ struct ShellFeatureStoreTests {
         #expect(catalog.session(id: session.id)?.isActive == false)
     }
 
-    private func makeStore(records: [SessionRecord]) -> (store: ShellFeatureStore, catalog: SessionCatalogStore) {
+    /// GPT Live's realtime voice answers the person itself and hands requests to Hermes. The turn-based
+    /// model beside it only follows the chat, so the hold music must never start for it.
+    @Test func liveVoiceNeverPlaysHoldMusicWhileTheAgentWorks() async {
+        let session = record(id: "live-hold")
+        let music = HoldMusicSpy()
+        let (store, catalog) = makeStore(records: [session], holdMusic: music)
+        let live = liveVoice(for: session)
+        store.configureLiveVoiceFactory { _, _, _ in live }
+
+        let presentation = store.makeVoicePresentation(for: session.id, conversationMode: .codexLive)
+        #expect(presentation.liveModel === live)
+        presentation.model.reconcileAgentRun(isActive: true)
+        await settle()
+        #expect(presentation.model.status == .working)
+        #expect(music.starts == 0, "A delegated request started the hold music over the live voice")
+
+        presentation.model.reconcileAgentRun(isActive: false)
+        await settle()
+        #expect(music.starts == 0 && music.isPlaying == false)
+
+        // A call opened while the chat is already working.
+        catalog.markActiveForLocalTurn(id: session.id)
+        let busy = store.makeVoicePresentation(for: session.id, conversationMode: .codexLive)
+        await settle()
+        #expect(busy.model.status == .working)
+        #expect(music.starts == 0, "Opening live voice on a working chat started the hold music")
+    }
+
+    @Test func turnBasedVoiceStillPlaysHoldMusicWhileTheAgentWorks() async {
+        let session = record(id: "turn-hold")
+        let music = HoldMusicSpy()
+        let (store, _) = makeStore(records: [session], holdMusic: music)
+
+        let presentation = store.makeVoicePresentation(for: session.id, conversationMode: .turnBased)
+        presentation.model.reconcileAgentRun(isActive: true)
+        await settle()
+        #expect(music.isPlaying && music.starts == 1)
+
+        presentation.model.reconcileAgentRun(isActive: false)
+        await settle()
+        #expect(!music.isPlaying && music.stops == 1)
+    }
+
+    /// "Use TTS voice mode" opens a new turn-based presentation over the failed live one.
+    @Test func switchingFromLiveToTurnBasedVoiceBringsTheHoldMusicBack() async {
+        let session = record(id: "switch-hold")
+        let music = HoldMusicSpy()
+        let (store, _) = makeStore(records: [session], holdMusic: music)
+        let live = liveVoice(for: session)
+        store.configureLiveVoiceFactory { _, _, _ in live }
+
+        let first = store.makeVoicePresentation(for: session.id, conversationMode: .codexLive)
+        first.model.reconcileAgentRun(isActive: true)
+        await settle()
+        #expect(music.starts == 0)
+
+        let second = store.makeVoicePresentation(for: session.id, conversationMode: .turnBased)
+        #expect(second.model !== first.model)
+        second.model.reconcileAgentRun(isActive: true)
+        await settle()
+        #expect(music.isPlaying && music.starts == 1)
+    }
+
+    private func makeStore(
+        records: [SessionRecord],
+        holdMusic: (any VoiceHoldMusicPlaying)? = nil
+    ) -> (store: ShellFeatureStore, catalog: SessionCatalogStore) {
         let catalog = SessionCatalogStore(
             client: SessionCatalogFixtureClient(),
             records: records
         )
-        return (ShellFeatureStore(timing: .immediate, catalog: catalog), catalog)
+        let store = ShellFeatureStore(timing: .immediate, catalog: catalog, voiceHoldMusic: { holdMusic })
+        return (store, catalog)
+    }
+
+    private func liveVoice(for session: SessionRecord) -> LiveVoiceModel {
+        let owner = LiveVoiceOwner(hostID: "host", authorizationID: "owner", agentID: "default", sessionID: session.id)
+        let client = LiveVoiceControlClient(owner: owner, operation: { _, _ in [:] }, isOwnerCurrent: { _ in true })
+        return LiveVoiceModel(agentName: "Fixture", client: client)
+    }
+
+    private func settle() async {
+        for _ in 0..<20 { await Task.yield() }
     }
 
     private func record(id: String) -> SessionRecord {
@@ -2148,6 +2225,15 @@ struct ShellFeatureStoreTests {
             "draftId": draftID as Any,
         ])
     }
+}
+
+@MainActor
+private final class HoldMusicSpy: VoiceHoldMusicPlaying {
+    private(set) var isPlaying = false
+    private(set) var starts = 0
+    private(set) var stops = 0
+    func start() { isPlaying = true; starts += 1 }
+    func stop() { isPlaying = false; stops += 1 }
 }
 
 @MainActor

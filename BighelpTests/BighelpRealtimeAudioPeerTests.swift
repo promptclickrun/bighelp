@@ -2,6 +2,8 @@ import Foundation
 import Testing
 @testable import Bighelp
 
+// The peers share one process-wide audio owner, so tests that start one run in turn.
+@Suite(.serialized)
 @MainActor
 struct BighelpRealtimeAudioPeerTests {
     @Test func routeRecoveryRestoresCaptureOnlyWithValidInputAndPreservesMute() {
@@ -123,4 +125,65 @@ struct BighelpRealtimeAudioPeerTests {
             _ = try await URLSession.shared.data(for: close)
         }
     }
+
+    /// The call's WebRTC audio session is not the coordinator's, so anything the coordinator
+    /// configured or deactivated meanwhile would land on the live call.
+    @Test func whileTheCallOwnsAudioNothingElseCanTakeTheSharedSession() async throws {
+        let session = CountingAudioSession()
+        let coordinator = VoiceAudioSessionCoordinator(session: session)
+        let peer = BighelpRealtimeAudioPeer(captureEnabled: false, sessionCoordinator: coordinator)
+        defer { peer.close() }
+        _ = try await peer.makeOffer()
+
+        #expect(throws: (any Error).self) { _ = try coordinator.acquire(for: .conversation) }
+        #expect(throws: (any Error).self) { _ = try coordinator.acquire(for: .playback) }
+        #expect(coordinator.claimCount == 0)
+        #expect(session.calls.isEmpty, "The shared session was touched under the live call: \(session.calls)")
+
+        peer.close()
+        let after = try coordinator.acquire(for: .conversation)
+        #expect(session.calls == ["configure", "activate"], "Others work again once the call has ended")
+        after.release()
+    }
+
+    /// The hold music takes a claim and lets go of it on every wait. Letting go with no other claim
+    /// used to deactivate the session, under the call.
+    @Test func holdMusicReleasingDuringTheCallNeverDeactivatesTheSession() async throws {
+        let session = CountingAudioSession()
+        let coordinator = VoiceAudioSessionCoordinator(session: session)
+        let peer = BighelpRealtimeAudioPeer(captureEnabled: false, sessionCoordinator: coordinator)
+        defer { peer.close() }
+        _ = try await peer.makeOffer()
+
+        let music = AVAudioPlayerHoldMusic(sessionCoordinator: coordinator)
+        music.start()
+        #expect(!music.isPlaying, "Hold music must stay silent when it can't have the audio")
+        music.stop()
+        try await Task.sleep(for: .milliseconds(200))
+
+        #expect(coordinator.claimCount == 0, "No claim is left pinned")
+        #expect(session.calls.isEmpty, "The session saw \(session.calls)")
+    }
+
+    /// A call can't start over someone else's claim; it never tears that one down.
+    @Test func theCallRefusesToStartWhileAClaimHoldsTheSession() async throws {
+        let session = CountingAudioSession()
+        let coordinator = VoiceAudioSessionCoordinator(session: session)
+        let claim = try coordinator.acquire(for: .conversation)
+        let peer = BighelpRealtimeAudioPeer(captureEnabled: false, sessionCoordinator: coordinator)
+        defer { peer.close() }
+
+        await #expect(throws: BighelpRealtimeAudioPeer.Failure.self) { _ = try await peer.makeOffer() }
+        #expect(session.calls == ["configure", "activate"])
+        claim.release()
+        #expect(session.calls == ["configure", "activate", "deactivate"])
+    }
+}
+
+private final class CountingAudioSession: VoiceAudioSessionControlling, @unchecked Sendable {
+    private let lock = NSLock()
+    private var recorded: [String] = []
+    var calls: [String] { lock.withLock { recorded } }
+    func configure(for use: VoiceAudioUse) throws { lock.withLock { recorded.append("configure") } }
+    func setActive(_ active: Bool) throws { lock.withLock { recorded.append(active ? "activate" : "deactivate") } }
 }

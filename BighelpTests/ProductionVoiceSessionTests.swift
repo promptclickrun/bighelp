@@ -542,6 +542,69 @@ struct ProductionVoiceSessionTests {
         #expect(session.isActive == false)
     }
 
+    @Test func aLiveCallRefusesClaimsAndNeverTouchesTheSession() throws {
+        let session = VoiceAudioSessionFixture()
+        let coordinator = VoiceAudioSessionCoordinator(session: session)
+
+        let call = try coordinator.holdForLiveCall()
+        #expect(throws: VoiceAudioSessionError.heldByLiveCall) { _ = try coordinator.acquire(for: .conversation) }
+        #expect(throws: VoiceAudioSessionError.heldByLiveCall) { _ = try coordinator.acquire(for: .playback) }
+        #expect(throws: VoiceAudioSessionError.heldByLiveCall) { _ = try coordinator.holdForLiveCall() }
+        #expect(coordinator.claimCount == 0)
+
+        call.release()
+        call.release()
+        #expect(session.configurations.isEmpty && session.activations == 0 && session.deactivations == 0)
+
+        let claim = try coordinator.acquire(for: .conversation)
+        #expect(session.activations == 1)
+        claim.release()
+    }
+
+    @Test func aLiveCallCannotTakeTheSessionFromAClaim() throws {
+        let session = VoiceAudioSessionFixture()
+        let coordinator = VoiceAudioSessionCoordinator(session: session)
+
+        let claim = try coordinator.acquire(for: .conversation)
+        #expect(throws: VoiceAudioSessionError.heldByLiveCall) { _ = try coordinator.holdForLiveCall() }
+        #expect(session.isActive)
+        claim.release()
+        #expect(session.deactivations == 1)
+        _ = try coordinator.holdForLiveCall()
+    }
+
+    @Test func aStaleCallLeaseCannotLiftANewerCallsHold() throws {
+        let coordinator = VoiceAudioSessionCoordinator(session: VoiceAudioSessionFixture())
+
+        let first = try coordinator.holdForLiveCall()
+        first.release()
+        let second = try coordinator.holdForLiveCall()
+        first.release()
+        #expect(throws: VoiceAudioSessionError.heldByLiveCall) { _ = try coordinator.acquire(for: .playback) }
+        second.release()
+        _ = try coordinator.acquire(for: .playback)
+    }
+
+    @Test func replyPlaybackDuringALiveCallFailsQuietlyAndLeavesNoClaim() async throws {
+        let session = VoiceAudioSessionFixture()
+        let coordinator = VoiceAudioSessionCoordinator(session: session)
+        let playback = AVAudioPlayerVoicePlayback(sessionCoordinator: coordinator)
+        let call = try coordinator.holdForLiveCall()
+        var events: [VoicePlaybackEvent] = []
+
+        do {
+            try await playback.play(Self.silentWAV(), mimeType: "audio/wav") { events.append($0) }
+            Issue.record("Playback started over a live call")
+        } catch {
+            #expect(error as? VoiceAudioSessionError == .heldByLiveCall)
+        }
+
+        #expect(events == [.failed])
+        #expect(coordinator.claimCount == 0)
+        #expect(session.activations == 0 && session.deactivations == 0)
+        call.release()
+    }
+
     @Test func staleClaimReleaseCannotDeactivateASessionANewerOwnerHolds() throws {
         let session = VoiceAudioSessionFixture()
         let coordinator = VoiceAudioSessionCoordinator(session: session)

@@ -149,6 +149,7 @@ final class BighelpRealtimeAudioPeer: NSObject {
     private(set) var audioDeviceRunning = false
 
     private let captureEnabled: Bool
+    private let sessionCoordinator: VoiceAudioSessionCoordinator
     private static let initializedSSL = RTCInitializeSSL()
     private let resources = LiveVoicePeerResources()
     private var started = false
@@ -159,8 +160,9 @@ final class BighelpRealtimeAudioPeer: NSObject {
 
     /// Inert: no permission prompt, audio unit, factory or network on construction.
     /// `false` builds a receive-only audio offer without microphone access.
-    init(captureEnabled: Bool = true) {
+    init(captureEnabled: Bool = true, sessionCoordinator: VoiceAudioSessionCoordinator = .shared) {
         self.captureEnabled = captureEnabled
+        self.sessionCoordinator = sessionCoordinator
         super.init()
     }
 
@@ -177,7 +179,7 @@ final class BighelpRealtimeAudioPeer: NSObject {
                 guard !closed else { throw Failure.closed }
                 guard permitted else { throw Failure.microphoneDenied }
             }
-            try resources.acquireAudio(captureEnabled: captureEnabled)
+            try resources.acquireAudio(captureEnabled: captureEnabled, coordinator: sessionCoordinator)
             let audioSession = RTCAudioSession.sharedInstance()
             audioSession.add(self)
             resources.audioDelegate = self
@@ -624,14 +626,16 @@ private final class LiveVoicePeerResources: @unchecked Sendable {
     var track: RTCAudioTrack?
     weak var audioDelegate: (any RTCAudioSessionDelegate)?
     private(set) var hasAudioLease = false
+    private var sessionLease: VoiceAudioSessionLiveCallLease?
     private var activated = false
     private var previousManual = false
     private var previousEnabled = false
 
-    func acquireAudio(captureEnabled: Bool) throws {
+    func acquireAudio(captureEnabled: Bool, coordinator: VoiceAudioSessionCoordinator) throws {
         Self.ownership.lock.lock()
         defer { Self.ownership.lock.unlock() }
-        guard Self.ownership.owner == nil, !VoiceAudioSessionCoordinator.shared.isSessionActive else {
+        guard Self.ownership.owner == nil,
+              let lease = try? coordinator.holdForLiveCall() else {
             throw BighelpRealtimeAudioPeer.Failure.busy
         }
         let audio = RTCAudioSession.sharedInstance()
@@ -653,9 +657,13 @@ private final class LiveVoicePeerResources: @unchecked Sendable {
         } catch {
             audio.isAudioEnabled = previousEnabled
             audio.useManualAudio = previousManual
+            lease.release()
             throw BighelpRealtimeAudioPeer.Failure.audioUnavailable
         }
         Self.ownership.owner = id
+        // Until the call ends, the app's other audio (hold music, samples) is refused rather than
+        // configuring or deactivating the session under it.
+        sessionLease = lease
         hasAudioLease = true
         audio.isAudioEnabled = captureEnabled
     }
@@ -682,6 +690,8 @@ private final class LiveVoicePeerResources: @unchecked Sendable {
         activated = false
         audio.isAudioEnabled = previousEnabled
         audio.useManualAudio = previousManual
+        sessionLease?.release()
+        sessionLease = nil
         Self.ownership.owner = nil
     }
 

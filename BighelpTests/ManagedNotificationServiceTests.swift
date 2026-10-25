@@ -726,6 +726,47 @@ import UserNotifications
         await runtime.resetForAccountBoundary()
     }
 
+    /// The first registration is the only one whose refusal means "the service holds nothing". A later
+    /// revision (a token rotation) refused leaves the service holding the earlier one, still pushing to
+    /// the card, so the phone must not write it too. 401 and 403 say the session or grant is gone, not
+    /// that the card is unwanted.
+    @Test(arguments: [(true, 409), (true, 400), (true, 403), (false, 401), (false, 403)])
+    func onlyAFirstRegistrationRefusedForGoodGivesTheCardBack(confirmedFirst: Bool, status: Int) async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+        let grant = try #require(fixture.ledger.record(host: fixture.host, profile: "default")?.grant)
+        let owner = try fixture.saveActivityOwner(storedSessionID: "chat-a", nativeID: Fixture.rowID(),
+            canonicalTurnID: "canonical-turn")
+        let reference = BighelpLinkBase64URL.encode(Data(SHA256.hash(data: Data(owner.opaqueSessionID.utf8))))
+        if confirmedFirst {
+            // Revision 1 was accepted and confirmed; the token then rotated.
+            try fixture.service.activityKeys.save(BighelpManagedActivityRequest(owner: owner,
+                registrationBody: Data("{}".utf8), coordinatorReference: reference, pushToken: "abcd", revision: 1,
+                timestamp: 1_800_000_000, leaseExpires: 1_800_000_900, pendingRevocationBody: nil,
+                registrationConfirmed: true))
+        }
+        let registrar = try BighelpManagedLiveActivityRegistrar(service: fixture.service, host: fixture.host,
+            grant: grant, environment: .sandbox, topic: "app.loopdy.mobile")
+        fixture.account.rowRegistrationRefusal = (status, "refused")
+
+        await #expect(throws: BighelpLinkAPIError.requestFailed(status: status, code: "refused")) {
+            try await registrar.register(.init(activityID: owner.relayActivityID, sessionReference: reference,
+                pushToken: "abcd", revision: confirmedFirst ? 2 : 1, timestamp: 1_800_000_050, leaseExpires: 1_800_000_950))
+        }
+
+        #expect(fixture.account.rowPuts == 1)
+        #expect(fixture.ledger.activity(owner.relayActivityID)?.remoteOwned == true)
+        let system = TokenSystemDriver()
+        let driver = BighelpManagedActivityDriver(underlying: system, ledger: fixture.ledger,
+            activityKeys: fixture.service.activityKeys, host: fixture.host, grantID: grant.grantId, profile: "default",
+            sessionID: "chat-a", localTurnID: "turn", canonicalTurnID: "canonical-turn", firstObservedAt: 1_800_000_100)
+        #expect(driver.registrationRefused == false)
+        await driver.update(id: owner.nativeActivityID, state: .initial(agentName: "Agent", timestamp: 1_800_000_100))
+        await driver.end(id: owner.nativeActivityID, state: .initial(agentName: "Agent", timestamp: 1_800_000_100))
+        #expect(system.updates == 0 && system.ends == 0, "the service still owns the card")
+    }
+
     /// An outage or a lost reply may mean the service took the registration: that card stays the
     /// service's, as before.
     @Test(arguments: [(503, "internal_error"), (429, "notification_rate_limited"), (408, "request_timeout")])
@@ -1708,7 +1749,8 @@ import UserNotifications
         /// A Live Activity's owner as the registrar saves it when the activity starts.
         @discardableResult
         func saveActivityOwner(storedSessionID: String, hostConnectionID: String? = nil,
-                               retired: Bool = false, nativeID: String? = nil) throws -> BighelpManagedActivityOwner {
+                               retired: Bool = false, nativeID: String? = nil,
+                               canonicalTurnID: String? = nil) throws -> BighelpManagedActivityOwner {
             let grant = try #require(ledger.record(host: host, profile: "default")?.grant)
             let hostConnection = hostConnectionID ?? host.hostConnectionID
             let nativeID = nativeID ?? UUID().uuidString
@@ -1718,7 +1760,7 @@ import UserNotifications
                 opaqueSessionID: "native-" + ManagedNotificationValidation.digest(
                     [host.notificationScope, hostConnection, "default", storedSessionID].joined(separator: "\0")),
                 nativeActivityID: nativeID, relayActivityID: BighelpManagedActivityDriver.relayID(nativeID),
-                canonicalTurnID: nil, localTurnID: "turn", firstObservedAt: 1_800_000_100,
+                canonicalTurnID: canonicalTurnID, localTurnID: "turn", firstObservedAt: 1_800_000_100,
                 remoteOwned: false, retired: retired)
             try ledger.save(owner)
             return owner

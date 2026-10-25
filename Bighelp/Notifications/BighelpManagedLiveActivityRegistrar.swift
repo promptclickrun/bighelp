@@ -59,8 +59,10 @@ final class BighelpManagedLiveActivityRegistrar: BighelpLiveActivityRegistering 
         }
         let body = try ManagedNotificationValidation.data(BighelpJSONValue.object(fields))
         var intent: BighelpManagedActivityRequest
+        var everConfirmed = false
         if let existing = try service.activityKeys.load(registration.activityID) {
             guard matches(existing.owner), existing.pendingRevocationBody == nil else { throw RegistrationError.ownerChanged }
+            everConfirmed = existing.registrationConfirmed
             if existing.revision == registration.revision {
                 guard existing.registrationBody == body else { throw RegistrationError.pendingOriginalRequest }
                 intent = existing
@@ -86,12 +88,16 @@ final class BighelpManagedLiveActivityRegistrar: BighelpLiveActivityRegistering 
             } catch BighelpLinkAPIError.requestFailed(_, let code) where code == "notification_activity_group_ended" {
                 await service.activityRuntime?.invalidatePhysicalActivity(for: owner)
                 throw RegistrationError.ownerChanged
-            } catch let error as BighelpLinkAPIError where Self.refusesForGood(error) {
-                // The service said no, so it holds nothing for this card and can never push to it. Give the
-                // card back to this phone, or it stays frozen and never ends. The saved request stays, so the
-                // next foreground replays the same bytes. A lost reply or an outage is NOT this: those keep
-                // the card with the service, because it may have taken the request.
-                owner.remoteOwned = false; try? service.ledger.save(owner)
+            } catch let error as BighelpLinkAPIError
+                        where registration.revision == 1 && !everConfirmed && Self.refusesForGood(error) {
+                // The service said no to this card's FIRST registration, so it holds nothing for the card and
+                // can never push to it. Give the card back to this phone, or it stays frozen and never ends.
+                // The saved request stays, so the next foreground replays the same bytes. Not this: a later
+                // revision (a token rotation) refused, because the service still holds the earlier one and
+                // keeps pushing; and a lost reply or an outage, because the service may have taken the request.
+                owner.remoteOwned = false
+                do { try service.ledger.save(owner) }
+                catch { BighelpLiveActivityLog.failed(.registrationUnfreezeNotSaved, error) }
                 BighelpLiveActivityLog.note(.registrationRefused)
                 throw error
             }
@@ -216,9 +222,10 @@ final class BighelpManagedLiveActivityRegistrar: BighelpLiveActivityRegistering 
             pendingRevocationBody: nil, registrationConfirmed: false)
     }
     /// The service looked at the request and refused it. Timeouts, rate limits and 5xx are outages: retry.
+    /// 401 and 403 say the session or grant is gone, not that this card is unwanted, so they never count.
     private static func refusesForGood(_ error: BighelpLinkAPIError) -> Bool {
         guard case .requestFailed(let status, _) = error else { return false }
-        return (400..<500).contains(status) && ![408, 425, 429].contains(status)
+        return (400..<500).contains(status) && ![401, 403, 408, 425, 429].contains(status)
     }
     private func check() throws {
         try service.requireCurrent(host, credentials: credentials)

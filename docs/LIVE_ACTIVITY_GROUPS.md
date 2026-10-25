@@ -28,7 +28,7 @@ The service answers a phone's row DELETE for a card it never stored with 404 `no
 
 One stuck revoke never costs the other cards their recovery. `BighelpManagedNativeActivityRuntime.recover` runs every owner, and the foreground and wake hooks always run `flushPendingOperations()` (registration retries and card repair) before they report a failure.
 
-A registration the service refuses for good (a 4xx other than 408, 425 and 429) gives the card back to the phone: `remoteOwned` goes off, so the card keeps following the chat and ends when the turn does. An outage or a lost reply keeps it with the service, because the service may have taken the request.
+The service refusing a card's first registration for good (a 4xx other than 401, 403, 408, 425 and 429) gives the card back to the phone: `remoteOwned` goes off, so the card keeps following the chat and ends when the turn does. An outage, a lost reply, a 401 or 403, or a refused later revision (a token rotation) keeps it with the service, because the service may hold or have taken a registration and keeps pushing to the card.
 
 ## Diagnosing a card that disappeared
 

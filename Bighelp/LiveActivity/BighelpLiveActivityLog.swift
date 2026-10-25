@@ -21,6 +21,7 @@ enum BighelpLiveActivityLog {
         case registrationConfirmed = "registration-confirmed"
         case registrationFailed = "registration-failed"
         case registrationRefused = "registration-refused-local-control"
+        case registrationUnfreezeNotSaved = "registration-unfreeze-not-saved"
         case revocationConfirmed = "revocation-confirmed"
         case revocationGone = "revocation-already-gone"
         case revocationFailed = "revocation-failed"

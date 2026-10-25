@@ -25,10 +25,9 @@ struct BighelpExternalSessionOpen: Equatable, Sendable {
     var switchedHost: HostSwitch? = nil
 }
 
-/// A tap that switched computers has to wait for the new one before it opens anything: the chat
-/// is prepared against whichever computer is in use, and until the new one answers that is not
-/// the chat's own, so preparing it early said "This session could not be prepared" while the
-/// right chat was about to load.
+/// A tap that switched computers has to wait for the new one before it opens anything. Opened
+/// while that computer was still connecting, the chat could fail to prepare and "This session
+/// could not be prepared" showed over the chat that then opened anyway.
 enum ExternalOpenHostWait {
     enum Step: Equatable {
         case openNow
@@ -37,7 +36,8 @@ enum ExternalOpenHostWait {
     }
 
     static func step(_ open: BighelpExternalSessionOpen, hostIsReady: Bool, timedOut: Bool) -> Step {
-        .openNow
+        guard open.switchedHost != nil, !hostIsReady else { return .openNow }
+        return timedOut ? .giveUp : .keepWaiting
     }
 
     static func message(unreachable: String, stillOn: String?) -> String {

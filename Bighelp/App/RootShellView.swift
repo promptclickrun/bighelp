@@ -41,6 +41,8 @@ struct RootShellView: View {
     @Environment(\.bighelpHostRegistry) var hostRegistry
     @Environment(\.managedNotificationService) private var managedNotifications
     @State var actionErrorMessage: String?
+    /// The tap (a Live Activity, an alert) whose new computer is still connecting; its timer runs once.
+    @State private var externalOpenWaitID: UUID?
     /// Feed, Ideas, Goals and Apps fold the bottom menu while scrolled down.
     /// All hosts: the chat you left for Feed, Ideas or Goals, which the Chat tab goes back to.
     @State var fleetLastChatID: String?
@@ -1646,6 +1648,11 @@ struct RootShellView: View {
                                 storedSessionID: String) {
         // bighelp holds only the selected computer's chats: while it switches to the card's
         // computer it has none yet, and a switch that was given back opens nothing.
+        if open.switchedHost != nil, let hostID, hostRegistry?.selectedHostID != hostID {
+            _ = BighelpExternalSessionOpenCenter.shared.consume(open)
+            return
+        }
+        if holdsOpenForSwitchedComputer(open) { return }
         guard nativeRuntime != nil else { return }
         if let hostID, hostRegistry?.selectedHostID != hostID {
             _ = BighelpExternalSessionOpenCenter.shared.consume(open)
@@ -1671,11 +1678,48 @@ struct RootShellView: View {
         }
     }
 
+    /// A tap that switched computers (a Live Activity or an alert of another one) opens nothing until
+    /// that computer is ready. Opened while it was still connecting, the chat could fail to prepare
+    /// and "This session could not be prepared" showed over the chat that then opened anyway. A
+    /// computer that never answers ends the wait with the usual message and the selection goes
+    /// back, as for a tap in the all-hosts view (`returnIfFleetHostDoesNotAnswer`).
+    private func holdsOpenForSwitchedComputer(_ open: BighelpExternalSessionOpen) -> Bool {
+        guard ExternalOpenHostWait.step(open, hostIsReady: isFleetHostReady, timedOut: false) != .openNow else {
+            return false
+        }
+        guard externalOpenWaitID != open.id else { return true }
+        externalOpenWaitID = open.id
+        let waitingFor = hostRegistry?.selectedHostID
+        Task { @MainActor in
+            try? await Task.sleep(for: FleetSwitchFallback.timeout)
+            // Connected by now, it opens like any link would. Otherwise: opened meanwhile or replaced
+            // by a newer tap, nothing is left to give up.
+            guard hostRegistry?.selectedWorkspace?.isConnected != true,
+                  BighelpExternalSessionOpenCenter.shared.consume(open) else { return }
+            externalOpenWaitID = nil
+            // A computer picked since then stands.
+            guard hostRegistry?.selectedHostID == waitingFor else { return }
+            giveUpOnSwitchedComputer(open)
+        }
+        return true
+    }
+
+    private func giveUpOnSwitchedComputer(_ open: BighelpExternalSessionOpen) {
+        let unreachable = hostRegistry?.selectedHost?.name ?? "that computer"
+        let previous = open.switchedHost?.from
+        let stillOn = previous.flatMap { id in hostRegistry?.hosts.first { $0.id == id }?.name }
+        if let previous, stillOn != nil {
+            if let fleet { fleet.select(previous) } else { hostRegistry?.select(previous) }
+        }
+        actionErrorMessage = ExternalOpenHostWait.message(unreachable: unreachable, stillOn: stillOn)
+    }
+
     /// A tapped alert's chat. Saved on the phone, it opens at once from its saved history and
     /// catches up when the host answers; a chat the phone hasn't seen yet waits for the host's list.
     /// A scheduled run's alert can name its job's chat or the job (`BighelpScheduledAlertLinks`).
     private func openNotifiedChat(_ open: BighelpExternalSessionOpen, profileID: String, reference: String,
                                   isScheduledRun: Bool) {
+        if holdsOpenForSwitchedComputer(open) { return }
         guard nativeRuntime != nil || usesDemoFixtures else { return }
         if case .chat(let record)? = BighelpScheduledAlertLinks.place(
             reference: reference, profileID: profileID, records: sessionCatalog.records, tasks: nil,

@@ -23,8 +23,11 @@ extension BighelpManagedNotificationService {
             throw DirectHermesError.invalidResponse
         }
         _ = try credentials(for: host)
+        let previous = registry.selectedHostID
         registry.select(host.id)
         guard registry.selectedHostID == host.id else { throw DirectHermesError.secureStorageChanged }
-        opens.request(hostID: host.id, profileID: owner.profile, storedSessionID: owner.storedSessionID)
+        // Another computer's card: the shell waits for that computer before it prepares the chat.
+        opens.request(hostID: host.id, profileID: owner.profile, storedSessionID: owner.storedSessionID,
+                      switchedHost: previous == host.id ? nil : BighelpExternalSessionOpen.HostSwitch(from: previous))
     }
 }

@@ -397,6 +397,10 @@ extension RootShellView {
 
     /// The host a tap waited for is ready: open what was tapped.
     func openPendingFleetIfReady() {
+        // A Live Activity or alert tap that switched computers waits for the same readiness.
+        if isFleetHostReady, let open = BighelpExternalSessionOpenCenter.shared.pending, open.switchedHost != nil {
+            openExternalSession(open)
+        }
         guard let fleet, let pending = fleet.pendingOpen, pending.hostID == fleet.selectedHostID,
               isFleetHostReady else { return }
         fleet.pendingOpen = nil

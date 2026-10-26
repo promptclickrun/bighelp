@@ -1,216 +1,156 @@
-"""The App Store posters: fresh captures in the live set's frame.
+"""The App Store posters, in bighelp.app's style with the app's Ink look.
 
-  python3 -I Scripts/AppStorePosters.py --reference <live set> --captures <folder> \\
-      --nunito <Nunito variable TTF> --inter <Inter variable TTF> --output <folder>
+  python3 -I Scripts/AppStorePosters.py --captures <folder> --inter <Inter variable font> \\
+      --nunito <Nunito variable font> --output <folder>
 
---reference is the live App Store set (`asc screenshots download`), one folder per
-display type: APP_IPHONE_67, APP_IPHONE_65 and APP_IPAD_PRO_3GEN_129. Its first cream
-poster and its first dark one are the templates. Their logo, device frame, the frame's
-shadow and the circle stay pixel for pixel; the headline, the subtitle and the screen
-are replaced. The type was measured from that set: Nunito Black (900, tracked -0.025 em)
-for the headline and Inter Medium (500) for the subtitle, each line placed by the top of
-its ink, the way the live posters are.
+Each poster is an HTML page that headless Chrome renders at the display's exact size: Paper white
+or Black (the app's Ink pages), the wordmark (the Ember Noodle and "ighelp" in Nunito 900), a
+numbered pill, a headline in Inter 800 tracked -0.035em with its last period in Ember, a line under
+it, and the screen in a plain device frame. The fonts are the site's (bighelp-site/src/fonts, woff2)
+or any variable Inter and Nunito.
 
---captures holds the raw screens: iphone-<shot>.png (1320×2868, iPhone 6.9") and
-ipad-<shot>.png (2064×2752, iPad 13"). The 6.5" posters use the iPhone shots. Writes
-<output>/<display type>/NN-name.png and <output>/contact-sheet.png.
+--captures holds the raw screens from Scripts/AppStoreScreenshots.sh: iphone-<shot>.png
+(1320×2868, iPhone 6.9") and ipad-<shot>.png (2064×2752, iPad 13"). The 6.5" posters use the iPhone
+shots. Writes <output>/<display type>/NN-name.png and <output>/contact-sheet.png.
 """
 
 import argparse
+import base64
+import html
+import subprocess
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-import numpy as np
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image
 
-CREAM, DARK = (255, 249, 245), (18, 17, 16)
-# Headline and subtitle colors on each background.
-INK = {CREAM: ((28, 26, 25), (81, 75, 71)), DARK: ((255, 249, 245), (198, 189, 182))}
+CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+EMBER = "#FF8A7A"
+# The wordmark's b (bighelp-site's noodle-d), drawn as a stroke in Ember.
+NOODLE = ("M28 12 L28 60 C28 73.807 39.193 85 53 85 C66.807 85 78 73.807 78 60 C78 46.193 66.807 35 53 35 "
+          "C39.193 35 28 46.193 28 60 C28 80 22 90 8 94")
+PAPER = dict(page="#FFFFFF", ink="#111111", ink2="rgba(17,17,17,.6)", pill="#F2F2F2", frame="#111111",
+             shadow="0 40px 120px rgba(0,0,0,.16)")
+BLACK = dict(page="#000000", ink="#FFFFFF", ink2="rgba(255,255,255,.62)", pill="#1C1C1E", frame="#2C2C2E",
+             shadow="none")
 
-# The live set's copy, by poster name; the templates' old text is cleared with it.
-LIVE = {
-    "01-one-simple-chat": (("Your agents.", "One simple chat."),
-                           ("Turn a question into a useful answer.", "With the agents you choose.")),
-    "02-ask-and-done": (("Ask once.", "Make it happen."),
-                        ("Set up useful work with a conversation.", "Your agents take it from there.")),
-    "03-made-for-you": (("A feed that", "gets you."),
-                        ("Updates you actually asked for.", "Not another endless scroll.")),
-    "04-clear-plan": (("A clear plan.", "Less juggling."),
-                      ("Checklists, budgets and next steps.", "More than just a wall of text.")),
-    "05-move-forward": (("Small steps.", "Real progress."),
-                        ("Give your goals a place to live.", "Let your agents help you move forward.")),
-    "06-next-good-idea": (("Your next", "good idea."),
-                          ("Useful suggestions, ready when you are.", "You decide what happens next.")),
-    "07-work-in-view": (("Keep the work", "in view."),
-                        ("Plans become tasks you can track.", "From the first idea to done.")),
-}
-
-# name, capture, background, headline and subtitle. Backgrounds alternate.
+# name, capture, pill, headline, the line under it, on Black. Pages alternate, Paper first.
 PANELS = [
-    ("01-one-simple-chat", "01-spending", CREAM, *LIVE["01-one-simple-chat"]),
-    ("02-just-your-bots", "11-bots", DARK, ("Just your bots.", "A text away."),
-     ("A calm home for the agents you talk to most.", "Tap one and chat, like texting a friend.")),
-    ("03-ask-and-done", "05-automation", CREAM, *LIVE["02-ask-and-done"]),
-    ("04-code-anywhere", "12-code", DARK, ("Code anywhere.", "Just describe it."),
+    ("01-chat", "01-spending", "Chat", ("Your bots.", "One simple chat."),
+     ("Text your own AI agents like you'd text a friend.", "Answers come back as clear cards.")),
+    ("02-bots", "11-bots", "Bots mode", ("Just your bots.", "A text away."),
+     ("A calm home for the bots you talk to most.", "Tap one and chat.")),
+    ("03-feed", "03-feed", "Feed", ("A Feed that fills", "when you ask."),
+     ("Your bots post what you asked for.", "Nothing runs until you say so.")),
+    ("04-code", "12-code", "Code mode", ("Code anywhere.", "Just describe it."),
      ("Each message starts its own coding session.", "Check the changes when it's done.")),
-    ("05-made-for-you", "03-feed", CREAM, *LIVE["03-made-for-you"]),
-    ("06-clear-plan", "02-packing", DARK, *LIVE["04-clear-plan"]),
-    ("07-move-forward", "04-goals", CREAM, *LIVE["05-move-forward"]),
-    ("08-next-good-idea", "08-ideas", DARK, *LIVE["06-next-good-idea"]),
-    ("09-work-in-view", "07-kanban", CREAM, *LIVE["07-work-in-view"]),
+    ("05-ideas", "08-ideas", "Ideas", ("Ideas it noticed.", "You decide."),
+     ("Your bot offers to take things off your plate.", "Tap Let's do it, or don't.")),
+    ("06-automation", "05-automation", "Chat", ("Just ask.", "Consider it done."),
+     ("Set up useful work with a conversation.", "Your bots take it from there.")),
+    # Goals have no progress number on the host, so the copy promises none.
+    ("07-goals", "04-goals", "Goals", ("Your goals,", "in one place."),
+     ("Tell your bot what you're working toward.", "It checks in and keeps notes.")),
+    ("08-plan", "02-packing", "Chat", ("A clear plan.", "Less juggling."),
+     ("Checklists, budgets and next steps.", "More than a wall of text.")),
+    ("09-work", "07-kanban", "Kanban", ("Keep the work", "in view."),
+     ("Plans become tasks you can track.", "From the first idea to done.")),
 ]
-
-
-@dataclass(frozen=True)
-class Style:
-    size: float
-    weight: float
-    tracking: float  # em
-    x: float  # pen origin
-    tops: tuple[int, int]  # the ink top of each line
 
 
 @dataclass(frozen=True)
 class Display:
     size: tuple[int, int]
     capture: str
-    headline: Style
-    subtitle: Style
-    frames: dict  # background: the device frame's outer box, inclusive
-    radius: int
-    bezel: int
-    clear: dict  # background: rows that hold only background and text
-    # background: a box under the subtitle's last line that also holds the frame's shadow
-    shadowed: dict
+    # In hundredths of the width: the headline, the line under it, the pill's text, the wordmark,
+    # the device's width, its bezel and its outer corner radius.
+    headline: float
+    lede: float
+    pill: float
+    wordmark: float
+    device: float
+    bezel: float
+    radius: float
 
 
 DISPLAYS = {
-    "APP_IPHONE_67": Display(
-        (1320, 2868), "iphone",
-        Style(147, 900, -0.025, 96.375, (384, 534)), Style(46, 500, 0, 96.4375, (741, 801)),
-        {CREAM: (257, 995, 1061, 2715), DARK: (99, 995, 903, 2715)}, 101, 12,
-        {CREAM: (230, 900), DARK: (230, 970)}, {}),
-    "APP_IPHONE_65": Display(
-        (1284, 2778), "iphone",
-        Style(143, 900, -0.025, 93.875, (372, 518)), Style(45, 500, 0, 93.875, (719, 777)),
-        {CREAM: (252, 964, 1031, 2630), DARK: (96, 964, 875, 2630)}, 98, 12,
-        {CREAM: (225, 875), DARK: (225, 940)}, {}),
-    "APP_IPAD_PRO_3GEN_129": Display(
-        (2064, 2752), "ipad",
-        Style(194, 900, -0.025, 150.8125, (322, 520)), Style(66, 500, 0, 150.75, (773, 852)),
-        {CREAM: (423, 985, 1640, 2598), DARK: (423, 985, 1640, 2598)}, 67, 15,
-        {CREAM: (270, 852), DARK: (270, 950)}, {CREAM: (140, 852, 1290, 950)}),
+    "APP_IPHONE_67": Display((1320, 2868), "iphone", 10.6, 3.45, 3.2, 4.4, 64, 1.45, 10.4),
+    "APP_IPHONE_65": Display((1284, 2778), "iphone", 10.6, 3.45, 3.2, 4.4, 64, 1.45, 10.4),
+    "APP_IPAD_PRO_3GEN_129": Display((2064, 2752), "ipad", 8.0, 2.8, 2.5, 3.6, 57, 1.1, 2.8),
 }
 
 
-class Fonts:
-    def __init__(self, nunito: Path, inter: Path):
-        self.paths = {"headline": nunito, "subtitle": inter}
-        self.cache = {}
-
-    def get(self, role: str, style: Style) -> ImageFont.FreeTypeFont:
-        key = (role, style.size, style.weight)
-        if key not in self.cache:
-            font = ImageFont.truetype(str(self.paths[role]), style.size)
-            font.set_variation_by_axes([style.weight])
-            self.cache[key] = font
-        return self.cache[key]
+def data_url(path: Path) -> str:
+    mime = {".png": "image/png", ".woff2": "font/woff2", ".ttf": "font/ttf"}[path.suffix.lower()]
+    return f"data:{mime};base64," + base64.b64encode(path.read_bytes()).decode()
 
 
-def line_mask(size: tuple[int, int], text: str, font: ImageFont.FreeTypeFont, style: Style, top: int) -> Image.Image:
-    """The line's coverage on a canvas, its pen at style.x and its ink's top at `top`."""
-    def draw(baseline: int) -> Image.Image:
-        mask = Image.new("L", size, 0)
-        canvas = ImageDraw.Draw(mask)
-        for index, character in enumerate(text):
-            # Where the shaped line puts this letter (kerning included), plus the tracking so far.
-            pen = style.x + font.getlength(text[:index + 1]) - font.getlength(character)
-            canvas.text((pen + index * style.tracking * style.size, baseline), character, font=font, fill=255,
-                        anchor="ls")
-        return mask
-    probe = draw(size[1] // 2)
-    box = probe.getbbox()
-    return draw(size[1] // 2 + top - box[1])
+def page(display: Display, number: int, panel, shot: Path, fonts: dict, dark: bool) -> str:
+    _, _, pill, headline, lede = panel
+    c = BLACK if dark else PAPER
+    width, height = display.size
+    u = width / 100
+    pad = 7.3 * u
+    device_w = display.device * u
+    device_h = device_w * Image.open(shot).height / Image.open(shot).width
+    device_top = height - device_h - 4.2 * u
+    lines = [html.escape(line) for line in headline]
+    if lines[-1].endswith("."):
+        lines[-1] = lines[-1][:-1] + '<b class="ember">.</b>'
+    return f"""<!doctype html><html><head><meta charset="utf-8"><style>
+@font-face {{ font-family: Inter; src: url({data_url(fonts['inter'])}); font-weight: 100 900; }}
+@font-face {{ font-family: Nunito; src: url({data_url(fonts['nunito'])}); font-weight: 200 1000; }}
+html, body {{ margin: 0; width: {width}px; height: {height}px; overflow: hidden; background: {c['page']}; }}
+body {{ position: relative; font-family: Inter; color: {c['ink']}; -webkit-font-smoothing: antialiased;
+        font-feature-settings: "ss01", "cv11"; }}
+.copy {{ position: absolute; left: {pad}px; right: {pad}px; top: {pad * 0.85}px; }}
+.wordmark {{ display: flex; align-items: center; gap: {0.15 * u}px; font: 900 {display.wordmark * u}px/1 Nunito;
+             letter-spacing: -.02em; }}
+.wordmark svg {{ height: {display.wordmark * 1.05 * u}px; overflow: visible; }}
+.pill {{ display: flex; width: max-content; align-items: center; gap: {1.1 * u}px; margin-top: {5.2 * u}px;
+         padding: {1.05 * u}px {2.2 * u}px; border-radius: 999px; background: {c['pill']}; color: {c['ink2']};
+         font-weight: 650; font-size: {display.pill * u}px; }}
+.pill i {{ width: {display.pill * 0.375 * u}px; height: {display.pill * 0.375 * u}px; border-radius: 50%;
+           background: {EMBER}; }}
+h1 {{ width: max-content; white-space: nowrap; margin: {2.6 * u}px 0 0; font-weight: 800;
+      font-size: {display.headline * u}px; line-height: 1.02; letter-spacing: -.035em; }}
+.ember {{ color: {EMBER}; font-weight: 800; }}
+p {{ margin: {2.4 * u}px 0 0; font-weight: 450; font-size: {display.lede * u}px; line-height: 1.38; color: {c['ink2']}; }}
+.device {{ position: absolute; left: {(width - device_w) / 2}px; top: {device_top}px; width: {device_w}px;
+           height: {device_h}px; box-sizing: border-box; padding: {display.bezel * u}px;
+           border-radius: {display.radius * u}px; background: {c['frame']}; box-shadow: {c['shadow']}; }}
+.device img {{ display: block; width: 100%; height: 100%; border-radius: {(display.radius - display.bezel) * u}px; }}
+</style></head><body>
+<div class="copy">
+<div class="wordmark"><svg viewBox="0 4 86 98"><path d="{NOODLE}" fill="none" stroke="{EMBER}" stroke-width="16"
+  stroke-linecap="round" stroke-linejoin="round"/></svg>ighelp</div>
+<div class="pill"><i></i>{number:02d} · {html.escape(pill)}</div>
+<h1>{'<br>'.join(lines)}</h1>
+<p>{'<br>'.join(html.escape(line) for line in lede)}</p>
+</div>
+<div class="device"><img src="{data_url(shot)}"></div>
+<script>
+// A long line shrinks the headline until it fits inside the margins.
+document.fonts.ready.then(() => {{
+  const h1 = document.querySelector("h1"), room = document.querySelector(".copy").clientWidth;
+  let size = parseFloat(getComputedStyle(h1).fontSize);
+  while (h1.offsetWidth > room && size > 10) h1.style.fontSize = (size -= 1) + "px";
+}});
+</script>
+</body></html>"""
 
 
-def text_masks(display: Display, fonts: Fonts, headline, subtitle) -> list[tuple[str, Image.Image]]:
-    masks = []
-    for role, style, lines in (("headline", display.headline, headline), ("subtitle", display.subtitle, subtitle)):
-        for line, top in zip(lines, style.tops):
-            masks.append((role, line_mask(display.size, line, fonts.get(role, style), style, top)))
-    return masks
-
-
-def background_of(path: Path) -> tuple:
-    return Image.open(path).convert("RGB").getpixel((5, 5))
-
-
-def template(folder: Path, display: Display, background: tuple, fonts: Fonts) -> Image.Image:
-    """The live poster with this background, without its headline, subtitle or screen."""
-    posters = [path for path in sorted(folder.glob("*.png")) if background_of(path) == background]
-    if not posters:
-        raise SystemExit(f"{folder}: no poster on {background}")
-    base = np.asarray(Image.open(posters[0]).convert("RGB")).copy()
-    top, bottom = display.clear[background]
-    base[top:bottom, :] = background
-    box = display.shadowed.get(background)
-    if box:
-        # Under the last line the frame's shadow starts. Every poster has the same shadow and
-        # different words, so the lightest (or darkest) pixel of all of them is the shadow; where
-        # every poster has a letter, fill in from the clean pixels above and below.
-        left, upper, right, lower = box
-        stack = np.stack([np.asarray(Image.open(path).convert("RGB"))[upper:lower, left:right] for path in posters])
-        clean = (stack.max(axis=0) if background == CREAM else stack.min(axis=0)).astype(float)
-        inked = np.ones(clean.shape[:2], bool)
-        for path in posters:
-            name = next((key for key in LIVE if path.stem.endswith(key)), None)
-            if name is None:
-                raise SystemExit(f"{path.name}: unknown live poster, add its copy to LIVE")
-            covered = np.zeros(clean.shape[:2], bool)
-            for _, mask in text_masks(display, fonts, *LIVE[name]):
-                covered |= np.asarray(mask)[upper:lower, left:right] > 0
-            inked &= covered
-        inked = np.asarray(Image.fromarray(inked.astype(np.uint8) * 255).filter(ImageFilter.MaxFilter(5))) > 0
-        above = base[upper - 1, left:right].astype(float)
-        for column in np.where(inked.any(axis=0))[0]:
-            rows = np.where(inked[:, column])[0]
-            for start, end in runs(rows):
-                first = clean[start - 1, column] if start > 0 else above[column]
-                last = clean[end + 1, column]
-                for row in range(start, end + 1):
-                    share = (row - start + 1) / (end - start + 2)
-                    clean[row, column] = first + (last - first) * share
-        base[upper:lower, left:right] = np.round(clean).astype(np.uint8)
-    return Image.fromarray(base)
-
-
-def runs(rows: np.ndarray):
-    start = previous = rows[0]
-    for row in rows[1:]:
-        if row != previous + 1:
-            yield start, previous
-            start = row
-        previous = row
-    yield start, previous
-
-
-def poster(base: Image.Image, display: Display, background: tuple, capture: Image.Image, fonts: Fonts,
-           headline, subtitle) -> Image.Image:
-    canvas = base.copy()
-    left, top, right, bottom = display.frames[background]
-    screen = (left + display.bezel, top + display.bezel, right - display.bezel, bottom - display.bezel)
-    width, height = screen[2] - screen[0] + 1, screen[3] - screen[1] + 1
-    expected = display.size if display.capture == "ipad" else (1320, 2868)
-    if capture.size != expected:
-        raise SystemExit(f"capture is {capture.size}, expected {expected}")
-    shot = capture.convert("RGB").resize((width, height), Image.Resampling.LANCZOS)
-    mask = Image.new("L", (width, height), 0)
-    ImageDraw.Draw(mask).rounded_rectangle((0, 0, width - 1, height - 1), display.radius - display.bezel, fill=255)
-    canvas.paste(shot, screen[:2], mask)
-    colors = dict(zip(("headline", "subtitle"), INK[background]))
-    for role, mask in text_masks(display, fonts, headline, subtitle):
-        canvas = Image.composite(Image.new("RGB", display.size, colors[role]), canvas, mask)
-    return canvas
+def render(document: str, size: tuple[int, int], output: Path) -> None:
+    with tempfile.TemporaryDirectory() as folder:
+        source = Path(folder) / "poster.html"
+        source.write_text(document)
+        subprocess.run([CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars",
+                        f"--user-data-dir={folder}/profile", "--force-device-scale-factor=1",
+                        f"--window-size={size[0]},{size[1]}", "--virtual-time-budget=2000",
+                        f"--screenshot={output}", source.as_uri()], check=True, capture_output=True, timeout=120)
+    with Image.open(output) as image:
+        if image.size != size:
+            raise SystemExit(f"{output} came out {image.size}, not {size}")
 
 
 def contact_sheet(rows: list[list[Path]], output: Path) -> None:
@@ -231,23 +171,21 @@ def contact_sheet(rows: list[list[Path]], output: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--reference", type=Path, required=True)
     parser.add_argument("--captures", type=Path, required=True)
-    parser.add_argument("--nunito", type=Path, required=True)
     parser.add_argument("--inter", type=Path, required=True)
+    parser.add_argument("--nunito", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
-    fonts = Fonts(args.nunito, args.inter)
+    fonts = {"inter": args.inter, "nunito": args.nunito}
     sheet = []
     for kind, display in DISPLAYS.items():
         folder = args.output / kind
         folder.mkdir(parents=True, exist_ok=True)
-        bases = {background: template(args.reference / kind, display, background, fonts) for background in (CREAM, DARK)}
         row = []
-        for name, shot, background, headline, subtitle in PANELS:
-            capture = Image.open(args.captures / f"{display.capture}-{shot}.png")
-            path = folder / f"{name}.png"
-            poster(bases[background], display, background, capture, fonts, headline, subtitle).save(path, optimize=True)
+        for number, panel in enumerate(PANELS, 1):
+            shot = args.captures / f"{display.capture}-{panel[1]}.png"
+            path = folder / f"{panel[0]}.png"
+            render(page(display, number, panel, shot, fonts, dark=number % 2 == 0), display.size, path)
             row.append(path)
             print(path)
         sheet.append(row)

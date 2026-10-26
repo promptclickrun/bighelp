@@ -298,7 +298,7 @@ enum NewChatButtonCopy {
     }
 }
 
-private extension View {
+extension View {
     /// The Mac has no touch and hold: right-click offers the same choices.
     @ViewBuilder
     func newChatRightClickMenu(startTitle: String?, start: @escaping () -> Void,

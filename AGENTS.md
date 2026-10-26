@@ -591,6 +591,10 @@ sections can crash only on devices ("Thread stack size exceeded").
 ### Connections, widgets and Shortcuts
 
 - The app closes its host connection in the background. A suspended runtime can still report "ready".
+- A wake while the phone is locked (Background App Refresh, a Shortcut, the Watch) connects, but the saved
+  workspace can't open until it's unlocked (its files refuse reads while locked). That's a wait, not an error:
+  unlocking, coming back and Reconnect open it (`NativeWorkspaceSelectionStore.reopenIfClosed`), because the
+  wake's connection stays up and no new owner comes to trigger it (#628).
 - Shortcuts and widgets first check that the host answers, and reconnect once if it doesn't.
 - **Widgets never go empty for what the app doesn't know yet.** A launch before the host answers, a gateway
   switch, or bighelp woken in the background (a Shortcut, the Watch, Background App Refresh) has no agents,

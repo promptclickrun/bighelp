@@ -101,11 +101,13 @@ final class NativeWorkspaceSessionBridge: SessionCatalogClient {
     /// The last connection's catalog client, while the box still holds it, for the history it read.
     private weak var lastCatalogClient: DirectHermesSessionCatalogClient?
 
-    init(connections: WorkspaceConnectionStore, authority: WorkspaceAuthority, directory: URL) throws {
+    init(connections: WorkspaceConnectionStore, authority: WorkspaceAuthority, directory: URL,
+         protectedData: any BighelpProtectedDataAvailabilityProviding = BighelpSystemProtectedDataAvailability()) throws {
         self.connections = connections
         self.authority = authority
         drafts = DirectHermesDraftStore(root: directory.appending(path: "submission-journals", directoryHint: .isDirectory))
-        creationRepository = DemoRepository(directory: directory, name: "native-session-creation", seed: [:])
+        creationRepository = DemoRepository(directory: directory, name: "native-session-creation", seed: [:],
+                                            protectedDataAvailability: protectedData)
         creationStates = try creationRepository.loadExistingPreservingSource() ?? [:]
         guard creationStates.count <= 128,
               creationStates.allSatisfy({ key, state in

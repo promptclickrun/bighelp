@@ -34,6 +34,8 @@ struct RootShellView: View {
     let clearLocalCache: @MainActor () async -> Bool
     var nativeRuntime: NativeWorkspaceRuntime? = nil
     var nativeWorkspaceError: String? = nil
+    /// Opens the workspace if it didn't open, on the connection already up.
+    var reopenNativeWorkspace: (@MainActor () async -> Void)? = nil
     var agentIsland: AgentIslandModel? = nil
     /// Every agent on every host (the all-hosts view), kept across host switches.
     var fleet: FleetStore? = nil
@@ -488,6 +490,9 @@ struct RootShellView: View {
             reconnect: {
                 Task {
                     await nativeWorkspaceStore?.reconnect()
+                    // The socket can still be up with no workspace open (a wake while the phone was
+                    // locked); reconnect() leaves a live socket alone.
+                    await reopenNativeWorkspace?()
                     await nativeRuntime?.refresh()
                 }
             }
@@ -495,11 +500,13 @@ struct RootShellView: View {
     }
 
     /// Opening the workspace counts as connecting until it's open, and so do
-    /// the keeper's quiet retries, as the island says.
+    /// the keeper's quiet retries, as the island says. A connection with no workspace
+    /// yet and no error (a wake while the phone was locked) is still connecting.
     private var nativeWorkspaceStatus: HostConnectionStatus {
         let host = HostConnectionStatus(workspace: nativeWorkspaceStore, keeper: connectionKeeper)
-        let isWorking = nativeRuntime?.isRefreshing == true || host.phase == .connecting || host.phase == .reconnecting
         let failed = nativeWorkspaceError != nil || nativeRuntime?.errorMessage != nil
+        let isWorking = nativeRuntime?.isRefreshing == true || host.phase == .connecting || host.phase == .reconnecting
+            || (nativeRuntime == nil && !failed && host.phase == .connected)
         return HostConnectionStatus(isConnected: !isWorking && !failed && host.phase == .connected,
                                     isConnecting: isWorking, isFirstConnection: !connectionKeeper.hasConnected)
     }

@@ -492,6 +492,7 @@ struct BighelpApp: App {
             clearLocalCache: clearLocalCache,
             nativeRuntime: native,
             nativeWorkspaceError: nativeWorkspaces.errorMessage,
+            reopenNativeWorkspace: { await nativeWorkspaces.reopenIfClosed() },
             agentIsland: agentIsland,
             fleet: fleet
         )
@@ -673,6 +674,7 @@ struct BighelpApp: App {
                 for: UIApplication.protectedDataDidBecomeAvailableNotification
             )) { _ in
                 _ = notificationComposition.retryAfterProtectedDataBecomesAvailable()
+                Task { await nativeWorkspaces.reopenIfClosed() }
             }
             .environment(\.directHermesWorkspace, hostRegistry.selectedWorkspace)
             .environment(\.bighelpUIV2Enabled, settings.uiV2Enabled)

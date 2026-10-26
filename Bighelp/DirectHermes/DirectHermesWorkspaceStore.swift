@@ -138,11 +138,13 @@ final class DirectHermesWorkspaceStore {
 
     /// The host's plugin wakes the phone every few hours with a quiet push, so a rotating
     /// sign-in (the Nous Portal's lasts a day) is renewed even while bighelp stays closed.
-    /// A live connection renews its own, so this only runs while there's none.
-    func renewSignInWhileAway() async -> Bool {
+    /// A live connection renews its own, so this only runs while there's none. With a deadline
+    /// (background renewal), a sign-in whose access token outlasts it is left for a later wake.
+    func renewSignInWhileAway(before deadline: Date? = nil) async -> Bool {
         guard !isConnected, !isConnecting, awayRenewal == nil else { return false }
         let task = Task { @MainActor [vault] () -> Bool in
-            guard let saved = try? vault.load(), case .bearer(_, _?, _) = saved.authentication else { return false }
+            guard let saved = try? vault.load(), case .bearer(_, _?, let expiry) = saved.authentication else { return false }
+            if let deadline, let expiry, expiry > deadline { return false }
             let authenticator = DirectHermesAuthenticator(endpoint: saved.endpoint)
             defer { authenticator.http.invalidate() }
             authenticator.persistRotation = { old, replacement in
@@ -154,6 +156,13 @@ final class DirectHermesWorkspaceStore {
         awayRenewal = task
         defer { awayRenewal = nil }
         return await task.value
+    }
+
+    /// Whether the saved sign-in is a browser sign-in with a refresh token, the kind that ends
+    /// after a day without a renewal.
+    var hasRenewableSignIn: Bool {
+        guard let saved = try? vault.load(), case .bearer(_, _?, _) = saved.authentication else { return false }
+        return true
     }
 
     func reconnect() async {

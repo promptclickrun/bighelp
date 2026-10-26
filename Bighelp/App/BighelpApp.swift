@@ -268,6 +268,7 @@ struct BighelpApp: App {
                 // The feeds write half a second after a change.
                 try? await Task.sleep(for: .seconds(1))
             }
+            BighelpSignInBackgroundRenewal.register(registry: hostRegistry)
         }
         #endif
         let notificationComposition = BighelpManagedNotificationComposition(

@@ -185,6 +185,7 @@
     <key>BGTaskSchedulerPermittedIdentifiers</key>
     <array>
         <string>app.loopdy.mobile.widget-refresh</string>
+        <string>app.loopdy.mobile.sign-in-renewal</string>
     </array>
     <key>UIAppFonts</key>
     <array>

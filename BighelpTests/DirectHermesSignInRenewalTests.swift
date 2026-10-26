@@ -306,6 +306,22 @@ struct DirectHermesSignInRenewalTests {
         #expect(Self.refreshToken(vault.stored) == "refresh-2")
     }
 
+    /// Background renewal looks ahead to the next likely wake: a sign-in that lasts past it waits.
+    @Test func backgroundRenewalLeavesASignInThatOutlastsTheNextWake() async throws {
+        let host = try ScriptedHermes { request in
+            request.path == "/auth/native/refresh" ? Self.renewed("refresh-2") : .json("{}")
+        }
+        let signIn = try saved(port: try await host.start(), refresh: "refresh-1")
+        guard case .bearer(_, _, let tokenEnds?) = signIn.authentication else { Issue.record("Expected an expiry"); return }
+        let vault = MemoryVault(signIn)
+        let store = DirectHermesWorkspaceStore(vault: vault)
+
+        #expect(await !store.renewSignInWhileAway(before: tokenEnds.addingTimeInterval(-60)))
+        #expect(host.paths.isEmpty)
+        #expect(await store.renewSignInWhileAway(before: tokenEnds.addingTimeInterval(60)))
+        #expect(Self.refreshToken(vault.stored) == "refresh-2")
+    }
+
     // MARK: Renewing while bighelp is closed
 
     private func saved(port: UInt16, refresh: String?) throws -> DirectHermesSavedConnection {

@@ -58,11 +58,12 @@ struct DeviceAppearanceToolTests {
         fixture.settings.appearance = .dark
         let payload = try fixture.tool.execute(operation: "appearance.get", arguments: [:], authorize: {})
         #expect(payload["mode"] == .string("dark"))
-        #expect(payload["color"] == .string("lavender"))
+        // Ink is the default, and the first choice.
+        #expect(payload["color"] == .string("ink"))
         #expect(payload["modes"] == .array(["system", "light", "dark"].map(BighelpJSONValue.string)))
         let colors = payload["colors"]?.array?.compactMap(\.string) ?? []
-        #expect(colors.first == "lavender")
-        #expect(colors.contains("ocean") && colors.contains("ink"))
+        #expect(colors.first == "ink")
+        #expect(colors.contains("ocean") && colors.contains("lavender"))
         #expect(colors.count == BighelpBubbleColor.allCases.count)
         fixture.settings.customBubbleHex = "0E7C66"
         let custom = try fixture.tool.execute(operation: "appearance.get", arguments: [:], authorize: {})

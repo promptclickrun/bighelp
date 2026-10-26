@@ -94,6 +94,6 @@ final class DeviceAppearanceTool {
 }
 
 private extension BighelpBubbleColor {
-    /// The name Appearance shows, lowercased ("ink" for the dark gray).
+    /// The name Appearance shows, lowercased ("ink" for `graphite`).
     var agentName: String { name.lowercased() }
 }

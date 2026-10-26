@@ -15,9 +15,10 @@ final class BottomMenuUITests: BighelpUITestCase {
         XCTAssertTrue(composer.waitForExistence(timeout: 15), "Opens on the agent's chat")
         let chat = app.buttons["tab.sessions"]
         XCTAssertTrue(chat.waitForExistence(timeout: 5), "The whole bar, not one button")
-        for name in ["Chat", "Feed", "Ideas", "Goals", "Files"] {
+        for name in ["Chat", "Feed", "Ideas", "Goals"] {
             XCTAssertTrue(app.staticTexts[name].exists, "\(name) is named under its icon")
         }
+        XCTAssertTrue(chatNewChatButton(in: app).exists, "New chat sits in the middle of the bar")
         save("chat", app)
 
         app.buttons["tab.ideas"].tap()

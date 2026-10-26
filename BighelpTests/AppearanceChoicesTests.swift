@@ -52,7 +52,9 @@ struct AppearanceChoicesTests {
             }
         }
         // Ink, the default, is the same with or without the pick.
-        #expect(theme(.light, bubble: .graphite).outgoingMessageBackground == theme(.light).outgoingMessageBackground)
+        let light = UITraitCollection(userInterfaceStyle: .light)
+        let picked = UIColor(theme(.light, bubble: .graphite).outgoingMessageBackground).resolvedColor(with: light)
+        #expect(picked.isEqual(UIColor(theme(.light).outgoingMessageBackground).resolvedColor(with: light)))
     }
 
     @Test func aCustomColorWorksLikeTheBuiltInOnes() {

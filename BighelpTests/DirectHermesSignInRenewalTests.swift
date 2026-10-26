@@ -150,23 +150,6 @@ struct DirectHermesSignInRenewalTests {
         #expect(host.bodies.filter { $0.contains("refresh-1") }.count == 2)
     }
 
-    /// After the window a resend could look like reuse to the Portal, which ends the whole sign-in.
-    @Test func aRenewalCutOffIsNotResentAfterTheWindow() async throws {
-        let host = try ScriptedHermes { request in
-            request.path == "/auth/native/refresh" ? .drop : .json("{}")
-        }
-        let authenticator = try lapsed(port: try await host.start())
-        var clock = Date()
-        authenticator.now = { clock }
-
-        await #expect(throws: (any Error).self) { try await authenticator.authenticatedResponse(context) }
-        clock = clock.addingTimeInterval(31)
-        await #expect(throws: DirectHermesError.authenticationRequired) {
-            try await authenticator.authenticatedResponse(context)
-        }
-        #expect(host.paths.filter { $0 == "/auth/native/refresh" }.count == 1)
-    }
-
     /// Leaving the app closes the connection; a renewal already on its way finishes first
     /// instead of being cut off (which used to leave the sign-in unusable).
     @Test func closingWaitsForARenewalOnItsWay() async throws {
@@ -183,6 +166,144 @@ struct DirectHermesSignInRenewalTests {
         #expect(Self.refreshToken(authenticator.savedConnection) == "refresh-2",
                 "The renewal finished and its new token was kept")
         _ = try? await request.value
+    }
+
+    // MARK: A renewal that fails keeps the refresh token
+
+    /// A lapsed sign-in saved in a vault, as a reconnect or a relaunch finds it.
+    private func lapsedVault(port: UInt16, refresh: String = "refresh-1") throws -> MemoryVault {
+        let endpoint = try DirectHermesEndpoint(address: "http://127.0.0.1:\(port)", allowPrivateHTTP: true)
+        return MemoryVault(DirectHermesSavedConnection(endpoint: endpoint, authentication: .bearer(
+            accessToken: Self.oldToken, refreshToken: refresh, expiresAt: Date().addingTimeInterval(-60)),
+            provider: "basic", userID: "fixture"))
+    }
+
+    /// A new authenticator on whatever the vault holds, saving the way the client does:
+    /// only over the sign-in it started from.
+    private func restored(from vault: MemoryVault) throws -> DirectHermesAuthenticator {
+        let saved = try #require(vault.stored)
+        let authenticator = DirectHermesAuthenticator(endpoint: saved.endpoint)
+        authenticator.adoptForTesting(saved)
+        authenticator.persistRotation = { old, replacement in
+            guard try vault.load() == old else { throw DirectHermesError.secureStorageChanged }
+            try vault.save(replacement)
+        }
+        return authenticator
+    }
+
+    /// The renewal was sent, but its answer never came back. The refresh token stays saved, so the
+    /// next authenticator (a reconnect, or the app opened again) sends it again and stays signed in.
+    @Test func aRenewalCutByTheNetworkKeepsTheRefreshTokenForTheNextConnection() async throws {
+        let calls = Counter()
+        let host = try ScriptedHermes { request in
+            guard request.path == "/auth/native/refresh" else { return .json("{}") }
+            return calls.next() == 1 ? .drop : Self.renewed("refresh-2")
+        }
+        let vault = try lapsedVault(port: try await host.start())
+
+        await #expect(throws: (any Error).self) { try await restored(from: vault).authenticatedResponse(context) }
+        #expect(Self.refreshToken(vault.stored) == "refresh-1", "The cut-off renewal left the token saved")
+
+        let response = try await restored(from: vault).authenticatedResponse(context)
+
+        #expect(response.http.statusCode == 200)
+        #expect(host.bodies.filter { $0.contains("refresh-1") }.count == 2, "The same token went out again")
+        #expect(Self.refreshToken(vault.stored) == "refresh-2")
+    }
+
+    /// A proxy in front of Hermes answering 502 says nothing about the token.
+    @Test func aProxyErrorDuringRenewalKeepsTheRefreshToken() async throws {
+        let calls = Counter()
+        let host = try ScriptedHermes { request in
+            guard request.path == "/auth/native/refresh" else { return .json("{}") }
+            return calls.next() == 1 ? .status(502) : Self.renewed("refresh-2")
+        }
+        let vault = try lapsedVault(port: try await host.start())
+
+        await #expect(throws: (any Error).self) { try await restored(from: vault).authenticatedResponse(context) }
+        #expect(Self.refreshToken(vault.stored) == "refresh-1")
+
+        let response = try await restored(from: vault).authenticatedResponse(context)
+        #expect(response.http.statusCode == 200)
+        #expect(Self.refreshToken(vault.stored) == "refresh-2")
+    }
+
+    /// A 401 from the renewal route means the provider ended the sign-in: the token is dropped and
+    /// the person signs in again. It is not sent a second time.
+    @Test func aRejectedRenewalAsksForANewSignIn() async throws {
+        let host = try ScriptedHermes { request in
+            request.path == "/auth/native/refresh" ? .status(401) : .json("{}")
+        }
+        let vault = try lapsedVault(port: try await host.start())
+
+        await #expect(throws: DirectHermesError.authenticationRequired) {
+            try await restored(from: vault).authenticatedResponse(context)
+        }
+        #expect(Self.refreshToken(vault.stored) == nil)
+        await #expect(throws: DirectHermesError.authenticationRequired) {
+            try await restored(from: vault).authenticatedResponse(context)
+        }
+        #expect(host.paths.filter { $0 == "/auth/native/refresh" }.count == 1)
+    }
+
+    /// An authenticator that started from an older sign-in never writes over a newer one saved since,
+    /// whether its answer was a new sign-in or a 401.
+    @Test func aStaleAuthenticatorDoesNotOverwriteANewerSignIn() async throws {
+        let calls = Counter()
+        let host = try ScriptedHermes { request in
+            guard request.path == "/auth/native/refresh" else { return .json("{}") }
+            return calls.next() == 1 ? Self.renewed("refresh-2") : .status(401)
+        }
+        let port = try await host.start()
+        let vault = try lapsedVault(port: port)
+        let stale = try restored(from: vault)
+        let staleToo = try restored(from: vault)
+        var newer = try #require(vault.stored)
+        newer.authentication = .bearer(accessToken: Self.newToken, refreshToken: "refresh-9",
+                                       expiresAt: Date().addingTimeInterval(3_600))
+        try vault.save(newer)
+
+        await #expect(throws: DirectHermesError.secureStorageChanged) { try await stale.authenticatedResponse(context) }
+        #expect(vault.stored == newer)
+        await #expect(throws: DirectHermesError.secureStorageChanged) { try await staleToo.authenticatedResponse(context) }
+        #expect(vault.stored == newer, "A 401 for the old token does not take away the newer token")
+    }
+
+    /// Leaving the app while a renewal is on its way: the connection is closed at once, but the
+    /// renewal finishes and saves its new sign-in, as the old token is not sent again.
+    @Test func aRenewalFinishingAfterTheConnectionClosesStillSavesTheSignIn() async throws {
+        let host = try ScriptedHermes { request in
+            request.path == "/auth/native/refresh" ? .after(0.6, Self.renewed("refresh-2")) : .json("{}")
+        }
+        let vault = try lapsedVault(port: try await host.start())
+        let client = DirectHermesClient.withoutSocketForTesting(try #require(vault.stored), vault: vault)
+        let request = Task { try await client.request(context) }
+        for _ in 0..<200 where !host.paths.contains("/auth/native/refresh") {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        await client.disconnect()
+
+        #expect(Self.refreshToken(vault.stored) == "refresh-2", "The renewal's new sign-in was saved")
+        _ = try? await request.value
+    }
+
+    /// A wake that finds no connection renews on its own authenticator. When that is cut off, the
+    /// next wake (or the next launch) still has the token.
+    @Test func aWakeCutOffKeepsTheRefreshTokenForTheNextWake() async throws {
+        let calls = Counter()
+        let host = try ScriptedHermes { request in
+            guard request.path == "/auth/native/refresh" else { return .json("{}") }
+            return calls.next() == 1 ? .drop : Self.renewed("refresh-2")
+        }
+        let vault = try lapsedVault(port: try await host.start())
+        let store = DirectHermesWorkspaceStore(vault: vault)
+
+        #expect(await !store.renewSignInWhileAway())
+        #expect(Self.refreshToken(vault.stored) == "refresh-1")
+        #expect(await store.renewSignInWhileAway())
+
+        #expect(Self.refreshToken(vault.stored) == "refresh-2")
     }
 
     // MARK: Renewing while bighelp is closed

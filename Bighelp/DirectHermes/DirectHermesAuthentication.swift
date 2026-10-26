@@ -505,18 +505,10 @@ final class DirectHermesAuthenticator {
     let http: DirectHermesHTTP
     private(set) var savedConnection: DirectHermesSavedConnection?
     /// Invoked synchronously before a rotated session can be used. The owner must
-    /// persist it atomically or throw; stale refresh tokens must never be retried.
+    /// compare the stored sign-in with the first value and save the second atomically,
+    /// or throw, so an older answer never replaces a newer sign-in.
     var persistRotation: ((DirectHermesSavedConnection, DirectHermesSavedConnection) throws -> Void)?
-    private var refreshOutcomeUncertain = false
     private var refreshTask: Task<Void, any Error>?
-    /// A renewal whose answer never arrived (the app left, the network dropped): the
-    /// connection it renewed and when it was first sent. Hermes answers the same renewal
-    /// token with the same new sign-in for 30 seconds (`refresh_singleflight`), so inside
-    /// that window it may be sent again; after it, a resend would look like reuse to a
-    /// rotating provider such as the Nous Portal, which then ends the whole sign-in.
-    private var unansweredRenewal: (connection: DirectHermesSavedConnection, sentAt: Date)?
-    static let renewalResendWindow: TimeInterval = 25
-    var now: () -> Date = Date.init
     private var signInID: UUID?
     private var signInTask: Task<DirectHermesSavedConnection, any Error>?
     private var browserAuthentication: DirectHermesBrowserAuthentication?
@@ -635,7 +627,6 @@ final class DirectHermesAuthenticator {
                 guard signInID == id else { throw DirectHermesError.cancelled(outcomeUnknown: false) }
                 try candidate.validate()
                 savedConnection = candidate
-                refreshOutcomeUncertain = false
             } catch { throw DirectHermesHTTP.safeError(error) }
         } onCancel: {
             task.cancel()
@@ -1073,7 +1064,7 @@ final class DirectHermesAuthenticator {
         switch saved.authentication {
         case .bearer(let token, let refreshToken, _):
             guard token == tokens.bearer else { return true }
-            guard refreshTask != nil || (refreshToken != nil && !refreshOutcomeUncertain) else { return false }
+            guard refreshTask != nil || refreshToken != nil else { return false }
             return (try? await refresh()) != nil
         case .dashboardSession(let token, let automatic):
             guard token == tokens.dashboard else { return true }
@@ -1139,59 +1130,37 @@ final class DirectHermesAuthenticator {
         return try DirectHermesDashboardBootstrap.token(from: response.body)
     }
 
+    /// Sends the saved refresh token and saves the sign-in it returns. The saved sign-in keeps its
+    /// refresh token until a renewal succeeds. Only a 401 from Hermes ends it: the provider says
+    /// the token is dead. Every other failure (no network, a timeout, a cancelled task, a proxy's
+    /// 502, a 429, a 503 while the Portal is down) leaves the token where it is, so the next try
+    /// (this authenticator, a new one after a reconnect, or after a relaunch) sends it again.
+    /// Hermes answers a resent token with the same new sign-in for 30 seconds
+    /// (`refresh_singleflight`), and after a lost answer a resend cannot do worse than the
+    /// sign-out that dropping the token forces. Hermes Desktop keeps its token the same way.
     private func performRefresh() async throws {
-        guard let current = savedConnection else { throw DirectHermesError.authenticationRequired }
-        let old: DirectHermesSavedConnection
-        let refreshToken: String
-        let sentAt: Date
-        if !refreshOutcomeUncertain, case .bearer(_, let token?, _) = current.authentication {
-            (old, refreshToken, sentAt) = (current, token, now())
-        } else if let unanswered = unansweredRenewal,
-                  now().timeIntervalSince(unanswered.sentAt) < Self.renewalResendWindow,
-                  case .bearer(_, let token?, _) = unanswered.connection.authentication {
-            // Still inside Hermes' window: the same token gets the same answer.
-            (old, refreshToken, sentAt) = (unanswered.connection, token, unanswered.sentAt)
-        } else {
-            unansweredRenewal = nil
+        guard let current = savedConnection,
+              case .bearer(let accessToken, let refreshToken?, let expiry) = current.authentication else {
             throw DirectHermesError.authenticationRequired
         }
-        // Rotation is a mutation: loss/cancellation of its reply is not permission
-        // to replay the old refresh token (providers may enforce reuse detection).
-        refreshOutcomeUncertain = true
-        var consumed = old
-        if case .bearer(let accessToken, _, let expiry) = old.authentication {
-            consumed.authentication = .bearer(accessToken: accessToken, refreshToken: nil, expiresAt: expiry)
-        }
-        // Durably retire the old rotating token BEFORE dispatch, so process death or
-        // a lost response cannot replay it on the next app launch.
-        if current != consumed {
-            if let persistRotation { try persistRotation(current, consumed) }
-            savedConnection = consumed
-        }
-        unansweredRenewal = (old, sentAt)
         let response = try await http.send(route: "/auth/native/refresh", method: "POST", body: [
-            "refresh_token": .string(refreshToken), "provider": .string(old.provider ?? "")
+            "refresh_token": .string(refreshToken), "provider": .string(current.provider ?? "")
         ])
         if response.http.statusCode == 401 {
-            unansweredRenewal = nil
+            var spent = current
+            spent.authentication = .bearer(accessToken: accessToken, refreshToken: nil, expiresAt: expiry)
+            if let persistRotation { try persistRotation(current, spent) }
+            savedConnection = spent
             throw DirectHermesError.authenticationRequired
         }
-        if response.http.statusCode == 503 {
-            // The sign-in provider couldn't be reached, so nothing was renewed and the
-            // token still works: keep it for the next try instead of signing out.
-            if let persistRotation { try persistRotation(consumed, old) }
-            savedConnection = old
-            refreshOutcomeUncertain = false
-            unansweredRenewal = nil
-            throw DirectHermesError.serverUnavailable
-        }
+        if response.http.statusCode == 503 { throw DirectHermesError.serverUnavailable }
         try DirectHermesHTTP.requireSuccess(response)
         let refreshed = try session(from: response)
-        try requireIdentity(refreshed.provider ?? "", refreshed.userID ?? "", matches: old)
-        if let persistRotation { try persistRotation(consumed, refreshed) }
+        try requireIdentity(refreshed.provider ?? "", refreshed.userID ?? "", matches: current)
+        // Compare-and-swap against the stored sign-in: a newer one saved by another
+        // authenticator is never overwritten by this older answer.
+        if let persistRotation { try persistRotation(current, refreshed) }
         savedConnection = refreshed
-        refreshOutcomeUncertain = false
-        unansweredRenewal = nil
     }
 
     /// Leaving the app closes the connection and cancels its requests. A renewal already on

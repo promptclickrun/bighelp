@@ -48,6 +48,9 @@ final class DirectHermesClient: DirectHermesRPC, DirectHermesAuthenticatedHTTP,
     private var openingTask: Task<Void, any Error>?
     private var automaticRecoveryTask: Task<Void, Never>?
     private var terminallyClosed = false
+    /// Set when `disconnect()` has given a renewal on its way time to finish. Until then the
+    /// renewal may still save its new sign-in, even though the connection is closed.
+    private var savesClosed = false
     private var readyEvent: DirectHermesEvent?
     private var readyContinuation: CheckedContinuation<Void, any Error>?
     private var readyDeadline: Task<Void, Never>?
@@ -151,13 +154,26 @@ final class DirectHermesClient: DirectHermesRPC, DirectHermesAuthenticatedHTTP,
         }
     }
 
+    #if DEBUG
+    /// A client that counts as connected but has no socket, so tests can send web requests and
+    /// close it without a Hermes WebSocket.
+    static func withoutSocketForTesting(_ saved: DirectHermesSavedConnection,
+                                        vault: any DirectHermesCredentialVault) -> DirectHermesClient {
+        let client = DirectHermesClient(authenticator: DirectHermesAuthenticator(endpoint: saved.endpoint),
+                                        saved: saved, vault: vault)
+        client.authenticator.adoptForTesting(saved)
+        client.isConnected = true
+        return client
+    }
+    #endif
+
     private init(authenticator: DirectHermesAuthenticator, saved: DirectHermesSavedConnection,
                  vault: any DirectHermesCredentialVault) {
         self.authenticator = authenticator
         initialConnection = saved
         self.vault = vault
         authenticator.persistRotation = { [weak self] old, replacement in
-            guard let self, !self.terminallyClosed else { throw DirectHermesError.notConnected }
+            guard let self, !self.savesClosed else { throw DirectHermesError.notConnected }
             // Synchronous on the main actor: concurrent clients cannot interleave
             // load/compare/save. This item is deliberately not extension-shared.
             guard try self.vault.load() == old else { throw DirectHermesError.secureStorageChanged }
@@ -316,8 +332,10 @@ final class DirectHermesClient: DirectHermesRPC, DirectHermesAuthenticatedHTTP,
         openingTask?.cancel()
         openingTask = nil
         closeConnection(.disconnected(outcomeUnknown: false), notify: false)
-        // Cancelling a renewal on its way used to leave the sign-in unusable.
+        // Cancelling a renewal on its way used to leave the sign-in unusable. Its save stays
+        // open until the wait ends; the vault's compare-and-swap keeps a stale save out.
         await authenticator.settlePendingRenewal(within: .seconds(8))
+        savesClosed = true
         authenticator.http.invalidate()
         onEvent = nil
         onDisconnect = nil

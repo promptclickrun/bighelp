@@ -26,7 +26,7 @@ extension SettingsView {
                     settingsDone(AppsHubView(native: connectorApps?() ?? nil, composio: composio))
                 } label: {
                     rowLabel(String(localized: "Apps"), detail: String(localized: "Let agents use your email, notes and more"),
-                             symbol: "app.connected.to.app.below.fill")
+                             symbol: "app.connected.to.app.below.fill", showsChevron: BighelpPlatform.drawsOwnLinkChevron)
                         .bighelpSettingsLinkLabel()
                 }
                 .bighelpSettingsLink()
@@ -36,7 +36,7 @@ extension SettingsView {
                     settingsDone(ConnectorAppsView(model: apps))
                 } label: {
                     rowLabel(String(localized: "Apps"), detail: String(localized: "Let agents use your email, notes and more"),
-                             symbol: "app.connected.to.app.below.fill")
+                             symbol: "app.connected.to.app.below.fill", showsChevron: BighelpPlatform.drawsOwnLinkChevron)
                         .bighelpSettingsLinkLabel()
                 }
                 .bighelpSettingsLink()
@@ -73,7 +73,7 @@ extension SettingsView {
         Section {
             Toggle(isOn: $settings.nerdModeEnabled) {
                 HStack(spacing: BighelpTokens.space12) {
-                    BighelpIconTile(systemName: "wrench.adjustable.fill", tint: .gray)
+                    BighelpIconTile(systemName: "wrench.adjustable.fill")
                     settingLabel(String(localized: "Nerd Mode"), detail: String(localized: "Hermes tools and extra chat settings"))
                 }
                 .padding(.horizontal, BighelpMenuRowLayout.labelInset)

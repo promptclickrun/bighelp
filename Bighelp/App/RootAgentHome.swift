@@ -309,13 +309,19 @@ extension RootShellView {
         if appState.selectedTab == .sessions { openHomeChat(replacing: true) }
     }
 
-    /// New chat in the bar, on every place it holds: a chat with the agent in use. All agents
-    /// has its own New chat, bottom right, so the bar leaves it out there.
+    /// New chat in the bar, on every place it holds: a chat with the agent in use. On Sessions'
+    /// list it opens over the list, so Back goes back to it; anywhere else (Feed, Kanban…) it's
+    /// the Chat tab's new chat, as the boards' header button was. All agents has its own New
+    /// chat, bottom right, so the bar leaves it out there.
     var barNewChat: (() -> Void)? {
         guard !fleetModeOn else { return nil }
         return {
-            appState.chatOpenedFromList = true
-            startNewChat(explicitAgentID: nil)
+            if appState.selectedTab != .sessions, let agent = homeAgent {
+                startHomeChat(with: agent.id)
+            } else {
+                appState.chatOpenedFromList = true
+                startNewChat(explicitAgentID: nil)
+            }
         }
     }
 

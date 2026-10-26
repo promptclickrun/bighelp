@@ -266,7 +266,9 @@ struct DirectHermesSignInRenewalTests {
         await #expect(throws: DirectHermesError.secureStorageChanged) { try await stale.authenticatedResponse(context) }
         #expect(vault.stored == newer)
         await #expect(throws: DirectHermesError.secureStorageChanged) { try await staleToo.authenticatedResponse(context) }
-        #expect(vault.stored == newer, "A 401 for the old token does not take away the newer token")
+        #expect(vault.stored == newer, "The newer token stays")
+        // A rotated token sent again looks like reuse to the Portal, which ends the whole sign-in.
+        #expect(!host.paths.contains("/auth/native/refresh"), "A stale copy never sends its old token")
     }
 
     /// Leaving the app while a renewal is on its way: the connection is closed at once, but the

@@ -1143,6 +1143,10 @@ final class DirectHermesAuthenticator {
               case .bearer(let accessToken, let refreshToken?, let expiry) = current.authentication else {
             throw DirectHermesError.authenticationRequired
         }
+        // Another authenticator on the same Keychain item (the live connection, the alerts client, a
+        // wake) may have renewed already. Sending the token it rotated would look like reuse to the
+        // Portal, which then ends the whole sign-in: check the stored sign-in is still this one first.
+        if let persistRotation { try persistRotation(current, current) }
         let response = try await http.send(route: "/auth/native/refresh", method: "POST", body: [
             "refresh_token": .string(refreshToken), "provider": .string(current.provider ?? "")
         ])

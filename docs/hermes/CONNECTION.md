@@ -288,21 +288,19 @@ Rotation algorithm:
 ```text
 join an existing refresh flight if one exists
 read current credential and exact principal
-durably remove its old refresh token BEFORE network dispatch
-remember old token and first-send time only in this live attempt
-POST /auth/native/refresh
+POST /auth/native/refresh        (the saved credential keeps its refresh token)
 on 2xx: validate minted session and unchanged principal
-        compare-and-replace consumed record with new credential
-on 401: require a new sign-in
-on 503: restore old credential because this response means renewal did not run
-on lost/uncertain answer: keep old token durably consumed
+        compare-and-replace the old record with the new credential
+on 401: compare-and-replace the record with one that has no refresh token; require a new sign-in
+on anything else (503, 429, a proxy 5xx, a network error, a timeout, cancellation):
+        change nothing; the next attempt sends the same refresh token again
 ```
 
-The source/test contract says Hermes coalesces repeat refreshes for 30 seconds. This client permits reusing the exact unanswered renewal only within **25 seconds from its original send**, inside the same in-memory attempt. After that window, or process death, do not replay the consumed token: rotating providers can treat reuse as grounds to revoke the entire sign-in. This 25-second client budget must not be confused with an access-token lifetime or a blanket retry permission for arbitrary servers.
+The refresh token is dropped only when Hermes answers 401. Hermes coalesces repeat refreshes for 30 seconds (the same token gets the same answer), and after a lost answer a resend cannot do worse than the sign-out that dropping the token would force; Hermes Desktop keeps its token the same way. A resend may come from the same authenticator, a new one after a reconnect, or the next launch. A stale authenticator never overwrites a newer record: the compare-and-replace fails first, whatever the host answered.
 
 Authenticated JSON HTTP performs one narrowly defined retry: on HTTP 401 **without** `WWW-Authenticate`, renew the Bearer token, or rebootstrap an automatic dashboard token that changed, and resend once. If another concurrent request already installed a new credential, use that one. This relies on the Hermes contract that auth refusal happens before route execution. A 401 with `WWW-Authenticate` is a proxy challenge, not this retry path. Other HTTP failures are not retried here. Dedicated multipart/binary transfers do not inherit this generic JSON retry loop.
 
-Disconnect gives an already dispatched refresh up to eight seconds to settle before invalidating the network session, so a successful rotating response is less likely to be lost. Optional plugin-driven background renewal described in [Native transport](../NATIVE_TRANSPORT.md) is separate from the transport contract and is not guaranteed by mobile background execution.
+Disconnect gives an already dispatched refresh up to eight seconds to settle before invalidating the network session, and the renewal may still save its new sign-in during that wait. Optional plugin-driven background renewal described in [Native transport](../NATIVE_TRANSPORT.md), and the iPhone app's own Background App Refresh renewal (`BighelpSignInBackgroundRenewal`, every few hours at iOS's pace), are separate from the transport contract and are not guaranteed by mobile background execution.
 
 Sources: [refresh, identity and authenticated HTTP](../../Bighelp/DirectHermes/DirectHermesAuthentication.swift), [credential vault](../../Bighelp/DirectHermes/DirectHermesCredentialVault.swift), [rotation compare-and-save](../../Bighelp/DirectHermes/DirectHermesNetworking.swift). Tests: [renewal, outage, lost reply and background cases](../../BighelpTests/DirectHermesSignInRenewalTests.swift).
 

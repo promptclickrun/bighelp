@@ -191,6 +191,12 @@ change in both repos.
   the chat when it's free; one made while the chat works runs at once as a Hermes background task for it
   (`ChatModel.runNativeVoiceRequest`, `prompt.background`) and answers the call on its own. Background tasks
   can't reach the phone's tools.
+- **Browser sign-ins stay signed in:** a Nous Portal sign-in's access token lasts 15 minutes and its refresh
+  token rotates. The saved sign-in keeps its refresh token until a renewal succeeds; only a 401 from
+  `/auth/native/refresh` ends it (`performRefresh`). Every other failure keeps it for the next try, as Hermes
+  Desktop does: dropping it on a lost answer signed people out every day or so (#629). Before sending, the
+  stored sign-in is checked, so a stale copy never sends a token another authenticator rotated. While the app
+  is away, `BighelpSignInBackgroundRenewal` and the plugin's quiet push renew it.
 - **Hermes reaps and prunes app sessions:** 20 s after an app's socket goes, Hermes reclaims the session's
   runtime and, for any source but `desktop`, ends its row (`ws_orphan_reap`); `sessions.auto_prune` then
   deletes ended chats idle past `retention_days`. Plugin 3.18.0 (`durable_sessions.py`) gives `bighelp`

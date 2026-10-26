@@ -254,6 +254,7 @@
 		24F2DA68D41BA5EEFD0A11F4 /* DirectHermesAgentAdapterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D9949FF5F6338FC334250AF /* DirectHermesAgentAdapterTests.swift */; };
 		250BC7C93473EBD7B9CEC42F /* ChatSessionFilesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3169FAF80070C715B4D2C9F /* ChatSessionFilesView.swift */; };
 		2517EC3B67275424C379852D /* AgentDuplicateModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBCCCAC2ABC048282724A2A4 /* AgentDuplicateModel.swift */; };
+		2540F1559855A6B4B716765C /* BighelpSignInBackgroundRenewal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D5246CBA42C822F4D96D61E /* BighelpSignInBackgroundRenewal.swift */; };
 		25AB79EFE6B5541AD824A9EE /* DirectHermesWikiClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52EFFEF9D100E00D374E903F /* DirectHermesWikiClient.swift */; };
 		25AFF76DBCE649A20FBB638A /* ChatToolDetailText.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6241B3C68880AD101042260 /* ChatToolDetailText.swift */; };
 		25C23B2CFD93B91257724C71 /* TelemetryControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67B1DBC4A63038C4E21F709E /* TelemetryControllerTests.swift */; };
@@ -2476,6 +2477,7 @@
 		4C81BE8C178FF496859CE63B /* NotificationProcessorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationProcessorTests.swift; sourceTree = "<group>"; };
 		4C896FD7962B51A53D75A85D /* CarPlayTemplateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlayTemplateTests.swift; sourceTree = "<group>"; };
 		4CA565F0CEECC8289EB2F045 /* ScratchpadFormattingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScratchpadFormattingTests.swift; sourceTree = "<group>"; };
+		4D5246CBA42C822F4D96D61E /* BighelpSignInBackgroundRenewal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpSignInBackgroundRenewal.swift; sourceTree = "<group>"; };
 		4D5B09FF189F3E04B594D313 /* WorkflowPublishUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowPublishUITests.swift; sourceTree = "<group>"; };
 		4D5BB3FF93B2BFBE1309307F /* sealed-alert-v2-vector.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "sealed-alert-v2-vector.json"; sourceTree = "<group>"; };
 		4D88AAE29CD127FD229FF04B /* HermesLogsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesLogsTests.swift; sourceTree = "<group>"; };
@@ -5968,6 +5970,7 @@
 		EF3FC2DA7AD69893E3301399 /* DirectHermes */ = {
 			isa = PBXGroup;
 			children = (
+				4D5246CBA42C822F4D96D61E /* BighelpSignInBackgroundRenewal.swift */,
 				2253F8B0E65D0B29F44C0E9E /* DirectHermesAccessCredentials.swift */,
 				BC6852D3CBD505DB72BC5F00 /* DirectHermesAdministrationCodec.swift */,
 				91D2DA6892F98C5DD30FDD10 /* DirectHermesAgentDirectoryClient.swift */,
@@ -7058,6 +7061,7 @@
 				EAD919BB4B36727A93F66A81 /* BighelpShortcutService.swift in Sources */,
 				0CD347162E295DD37A351AB8 /* BighelpSideMenu.swift in Sources */,
 				CFC89295FDF6FFE3E9014982 /* BighelpSideStrip.swift in Sources */,
+				2540F1559855A6B4B716765C /* BighelpSignInBackgroundRenewal.swift in Sources */,
 				D32ACAE26E7CC87E58A3F314 /* BighelpSkeleton.swift in Sources */,
 				0FA7A6AFF29411F90A565A9E /* BighelpSpinner.swift in Sources */,
 				B9D35F53CE0BDDB9BDC74DFF /* BighelpSplitColumn.swift in Sources */,

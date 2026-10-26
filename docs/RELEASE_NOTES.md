@@ -3,6 +3,20 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.23
+
+### Highlights
+
+- **A new look:** Chat mode has the clean look of Bots mode. The page is white by day and black at night. Your bubbles and buttons are ink. To use a color, go to **Settings › Appearance** and select one. Your bubbles, **New chat** and the other buttons then use that color.
+- **New chat in the bottom bar:** **New chat** is the round button in the middle of the bottom bar. Tap it to start a chat with your agent. Touch and hold it to select an agent or a group.
+- **Feed, Ideas and Goals:** posts, ideas and goals show as color blocks. New posts show in a green block at the top. The goal that your agent changed last shows in its own block, with **Mark done**. Tap an item to open it. Touch and hold an item to see its actions.
+- **Menu and Settings:** the rows have round icons in your color.
+
+### Changed
+
+- **Files:** Files moved from the bottom bar to the menu. To put it back in the bar, go to **Settings › Appearance › App layout**.
+- **Lavender:** if you selected Lavender before, bighelp now shows Ink. To use Lavender again, go to **Settings › Appearance** and select **Lavender**.
+
 ## 2.6.22
 
 ### Chat

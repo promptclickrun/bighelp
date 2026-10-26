@@ -808,10 +808,11 @@ extension BighelpTheme {
     }
 
     /// Used by live settings samples after selecting an explicit document palette.
-    /// The stored document itself is never rewritten.
+    /// The stored document itself is never rewritten. The defaults are Ember's own pages; the
+    /// app's defaults (Paper and Black) come in through `BighelpAppearanceContext`.
     func resolvedForLivePresentation(
         colorScheme: ColorScheme, contrast: ColorSchemeContrast,
-        lightBackground: BighelpLightBackground = .paper, darkBackground: BighelpDarkBackground = .black,
+        lightBackground: BighelpLightBackground = .cream, darkBackground: BighelpDarkBackground = .graphite,
         bubbleColor: BighelpBubbleColor? = nil, customBubbleHex: String? = nil
     ) -> BighelpTheme {
         let dark = colorScheme == .dark

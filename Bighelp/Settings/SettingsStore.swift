@@ -19,7 +19,7 @@ final class SettingsStore {
     private(set) var sessionSectionPreferencesRevision = 0
 
     var appearanceContext: BighelpAppearanceContext {
-        // Bots mode has one look: a white page by day, black at night, black bubbles.
+        // Bots mode's page is always Paper by day and Black at night; bubbles follow the pick.
         var context = BighelpAppearanceContext(
             appearance: appearance,
             lightBackground: simpleBotsEnabled ? .paper : lightBackground,
@@ -41,7 +41,7 @@ final class SettingsStore {
         didSet { defaults.set(darkBackground.rawValue, forKey: Keys.darkBackground) }
     }
 
-    /// Nil is bighelp's own lavender.
+    /// Nil is Ink, bighelp's default.
     var bubbleColor: BighelpBubbleColor? {
         didSet { defaults.set(bubbleColor?.rawValue, forKey: Keys.bubbleColor) }
     }

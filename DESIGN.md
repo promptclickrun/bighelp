@@ -225,11 +225,19 @@ with chat's renderer (`MarkdownMessageView`): headings, lists, quotes, code and 
 provider by itself. Every item has a long-press menu (and the same VoiceOver actions) with only what fits
 it: thumbs up/down on Feed (a thumbs down may ask "Less like this?" with quick reasons, never required), "Turn
 into a goal" and "Start a chat" on Ideas, done/active on Goals, and read/unread, Copy and Share everywhere. It ends
-with the item's dismiss, which is also a swipe left on the item: **Clear** a Feed post, **Not now** for an idea
-(the plugin remembers it), **Remove** a goal. Each hides with Undo (`BoardDismissAction`). The boards are Lists so
-rows can swipe, and the root's right-edge New chat strip steps aside on them. New items carry a dot, and a dot on
+with the item's dismiss: **Clear** a Feed post, **Not now** for an idea (the plugin remembers it), **Remove** a goal.
+Each hides with Undo (`BoardDismissAction`). An item with a List row of its own also dismisses with a swipe left
+(Feed's Earlier rows, goals, and tiles at accessibility text sizes); tiles two to a row share one, so theirs is in
+the menu only. The root's right-edge New chat strip steps aside on the boards. New items carry a dot, and a dot on
 the Feed, Ideas or Goals tab says something there is unseen. The agent reads the ratings and reasons before it
 posts (plugin 2.19.0).
+The boards are **color blocks** (`BoardBlocks.swift`): the agent's face and name on the page with no backing, then
+items as rounded tiles in a pastel (`BighelpBlockColor`, the same color for the same item or category every time)
+with dark ink on them. **Feed** leads with what's new in a deep green block (only while something is new), the
+newest posts as tiles two to a row, then Earlier as rows in a card. **Ideas** has chips by the agent's sections
+over a tall newest idea with **Let's do it** beside two short ones, then the rest as tiles. A tile opens the item
+on a tap and its menu on a long press (`Menu(primaryAction:)`; a ⋯ on the Mac). Buttons and chips on the blocks
+take the person's color (`theme.action`).
 **Blueprints** (beside the page title, and in the empty state) are the 45 starter prompts from
 bighelp.app/quick-start, bundled (`BoardBlueprints.json`), 15 per page in five topics. A tap opens a new chat
 with that agent and the prompt in the message box to fill in its [brackets]; nothing runs until Send.
@@ -240,7 +248,8 @@ in one list; bighelp only when the catalog has community ones). My Templates com
 `category` with fixed names and order (`TemplateCategory`); one the app doesn't know is Other, never hidden. New
 agent's Templates rail has the same chips over it. A search that finds nothing says so, with Search all when a
 chip narrowed it.
-**Goals** shows Tracking (the active goals by category: Health, Relationships, Finance, Career, Interests,
+**Goals** shows Tracking (the goal the agent touched last in a block of its category's color with **Mark done**,
+then the other active goals by category in a card: Health, Relationships, Finance, Career, Interests,
 Productivity, Other; "Nothing is being tracked yet" when empty), Done, then **Create a goal**: one row per
 category with a +, which starts a chat asking the agent to plan a goal in that category (touch and hold for that
 category's blueprints). Goals carry the category in the plugin (`native-agent-board-goal-categories-v1`); without

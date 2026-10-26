@@ -21,8 +21,8 @@ enum BighelpDarkBackground: String, CaseIterable, Identifiable, Sendable {
     var neutral: BighelpTheme { self == .graphite ? .graphiteDark : .blackDark }
 }
 
-/// Your chat bubble (and button) color. Lavender is bighelp's own, which
-/// shifts lighter after dark; the rest keep their hue and adjust for contrast.
+/// Your chat bubble (and button) color. Ink is the default. Lavender is bighelp's own violet,
+/// which shifts lighter after dark; the rest keep their hue and adjust for contrast.
 enum BighelpBubbleColor: String, CaseIterable, Identifiable, Sendable {
     // Ink (`graphite`, the default) first. The raw names are what's saved, so they never change.
     case graphite, lavender, grape, ocean, sky, teal, mint, lime, sunflower, tangerine, coral, rose

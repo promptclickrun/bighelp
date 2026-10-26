@@ -377,7 +377,7 @@ struct SettingsView: View {
         }
     }
 
-    /// "Lavender bubbles · Cream · Graphite"
+    /// "Ink bubbles · Paper · Black"
     var appearanceSummary: String {
         String(localized: "\(settings.bubbleColorName) bubbles · \(settings.lightBackground.name) · \(settings.darkBackground.name)")
     }

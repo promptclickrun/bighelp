@@ -114,22 +114,25 @@ struct DirectHermesSignInRenewalTests {
     }
 
     /// Hermes answers 503 when the sign-in provider (the Portal) couldn't be reached: nothing
-    /// was renewed, so the renewal token still works and must be kept, not signed out.
+    /// was renewed, so the renewal token still works and must be kept, not signed out. Requests
+    /// right after it don't ask the Portal again; the next connection renews.
     @Test func aPortalOutageDuringRenewalKeepsTheSignIn() async throws {
         let calls = Counter()
         let host = try ScriptedHermes { request in
             guard request.path == "/auth/native/refresh" else { return .json("{}") }
             return calls.next() == 1 ? .status(503) : Self.renewed("refresh-2")
         }
-        var rotated: [DirectHermesSavedConnection] = []
-        let authenticator = try lapsed(port: try await host.start()) { rotated.append($0) }
+        let vault = try lapsedVault(port: try await host.start())
+        let first = try restored(from: vault)
 
-        await #expect(throws: (any Error).self) { try await authenticator.authenticatedResponse(context) }
-        let response = try await authenticator.authenticatedResponse(context)
+        await #expect(throws: DirectHermesError.serverUnavailable) { try await first.authenticatedResponse(context) }
+        await #expect(throws: DirectHermesError.serverUnavailable) { try await first.authenticatedResponse(context) }
+        #expect(Self.refreshToken(vault.stored) == "refresh-1", "The renewal token is kept")
+        let response = try await restored(from: vault).authenticatedResponse(context)
 
         #expect(response.http.statusCode == 200)
-        #expect(host.bodies.filter { $0.contains("refresh-1") }.count == 2, "The same renewal token, kept")
-        #expect(Self.refreshToken(rotated.last) == "refresh-2", "The new renewal token is saved")
+        #expect(host.bodies.filter { $0.contains("refresh-1") }.count == 2, "Sent once per connection, not per request")
+        #expect(Self.refreshToken(vault.stored) == "refresh-2", "The new renewal token is saved")
     }
 
     /// A renewal cut off before its answer arrived may or may not have happened. Hermes answers

@@ -73,6 +73,7 @@ struct SessionAppearanceView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
+    @BighelpThemeReader private var theme
     @State private var choice: SessionAppearanceChoice
     @State private var dimming: Double
     @State private var photoSelection: PhotosPickerItem?
@@ -160,10 +161,10 @@ struct SessionAppearanceView: View {
                         Spacer(minLength: BighelpTokens.space24)
                         Text("Outgoing message")
                             .font(.bighelp(.callout))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(theme.outgoingMessageForeground)
                             .padding(.horizontal, BighelpTokens.space12)
                             .padding(.vertical, BighelpTokens.space8)
-                            .background(Color.accentColor, in: .rect(cornerRadius: 17))
+                            .background(theme.outgoingMessageBackground, in: .rect(cornerRadius: 17))
                     }
                 }
                 .padding(BighelpTokens.space16)
@@ -280,7 +281,7 @@ struct SessionAppearanceView: View {
                     .frame(width: 58, height: 58)
                 Image(systemName: option.systemImage)
                     .font(.bighelp(.title3).weight(.semibold))
-                    .foregroundStyle(option == .inherit ? Color.accentColor : (option == .photo ? Color.primary : .white))
+                    .foregroundStyle(option == .inherit ? theme.action : (option == .photo ? Color.primary : .white))
                 if choice == option {
                     Circle()
                         .stroke(.primary, lineWidth: 2)

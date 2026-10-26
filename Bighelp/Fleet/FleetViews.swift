@@ -890,7 +890,7 @@ struct FleetHostPicker: View {
                                 .onAppear { detent = .large }
                         } label: {
                             HStack(spacing: BighelpTokens.space12) {
-                                BighelpIconTile(systemName: "square.stack.3d.up.fill", tint: Color(hex: "5B6B7F"))
+                                BighelpIconTile(systemName: "square.stack.3d.up.fill")
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text("Fleet settings")
                                         .font(.bighelp(.body).weight(.semibold))

@@ -109,11 +109,41 @@ private struct InkSwitchStyle: ToggleStyle {
     }
 }
 
+/// Switches outside a Form (whose own surface styles them): the color picked in Appearance, and
+/// green under Ink, for the same reason as `InkSwitchStyle`. Keeps the platform's own kind of
+/// toggle.
+struct BighelpSwitchTintStyle: ToggleStyle {
+    @Environment(\.appAppearance) private var appearance
+    @BighelpThemeReader private var theme
+
+    func makeBody(configuration: Configuration) -> some View {
+        Toggle(configuration).toggleStyle(.automatic)
+            .tint(appearance.usesInk ? SimpleBotColor.green.color : theme.action)
+    }
+}
+
 extension View {
+    /// Controls that set no tint of their own take the color picked in Appearance
+    /// (`theme.action`), switches too (`BighelpSwitchTintStyle`). One look whatever the pick, so
+    /// changing it never builds the app's views again.
+    func bighelpAppTint() -> some View {
+        modifier(BighelpAppTintModifier())
+    }
+
     /// The toggles in this view are switches on the Mac too (`BighelpFormSwitchStyle`).
     /// `bighelpFormSurface` already does this; use it on pages built outside a Form.
     func bighelpSwitches() -> some View {
         toggleStyle(BighelpFormSwitchStyle())
+    }
+}
+
+private struct BighelpAppTintModifier: ViewModifier {
+    @BighelpThemeReader private var theme
+
+    func body(content: Content) -> some View {
+        content
+            .toggleStyle(BighelpSwitchTintStyle())
+            .tint(theme.action)
     }
 }
 

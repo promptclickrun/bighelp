@@ -34,6 +34,7 @@ final class NativeWorkspaceSelectionStore {
     private let userIdentity: UserIdentityStore
     private let directory: URL
     private let peerHosts: (any HermesBotModePeerHosts)?
+    private let protectedData: any BighelpProtectedDataAvailabilityProviding
 
     var current: NativeWorkspaceRuntime? {
         guard hostID == connections.hosts.selectedHostID, connections.isDirectSelected else { return nil }
@@ -45,12 +46,14 @@ final class NativeWorkspaceSelectionStore {
     }
 
     init(connections: WorkspaceConnectionStore, settings: SettingsStore,
-         userIdentity: UserIdentityStore, directory: URL, peerHosts: (any HermesBotModePeerHosts)? = nil) {
+         userIdentity: UserIdentityStore, directory: URL, peerHosts: (any HermesBotModePeerHosts)? = nil,
+         protectedData: any BighelpProtectedDataAvailabilityProviding = BighelpSystemProtectedDataAvailability()) {
         self.connections = connections
         self.settings = settings
         self.userIdentity = userIdentity
         self.directory = directory
         self.peerHosts = peerHosts
+        self.protectedData = protectedData
     }
 
     func synchronize() async {
@@ -112,9 +115,16 @@ final class NativeWorkspaceSelectionStore {
             do {
                 runtime = try NativeWorkspaceRuntime(
                     connections: connections, authority: owner.authority,
-                    settings: settings, userIdentity: userIdentity, directory: directory, peerHosts: peerHosts
+                    settings: settings, userIdentity: userIdentity, directory: directory, peerHosts: peerHosts,
+                    protectedData: protectedData
                 )
                 errorMessage = nil
+            } catch BighelpLocalPersistenceError.protectedDataUnavailable {
+                // Woken while the phone is locked (Background App Refresh, a Shortcut, the Watch): the
+                // saved files open once it's unlocked. Unlocking, coming back and Reconnect try again
+                // (`reopenIfClosed`).
+                errorMessage = nil
+                return
             } catch {
                 errorMessage = "Saved native workspace data could not be opened. It has not been replaced or adopted by another account."
                 return
@@ -136,9 +146,18 @@ final class NativeWorkspaceSelectionStore {
         current?.receive(event)
     }
 
+    /// Opens the workspace if it isn't open, for the same connection. Its usual trigger is a new owner,
+    /// but a wake while the phone was locked leaves its connection up: nothing new comes when the
+    /// person unlocks and returns, so foreground entry, unlocking and Reconnect call this (#628).
+    func reopenIfClosed() async {
+        guard current == nil else { return }
+        await synchronize()
+    }
+
     /// Parent BighelpApp calls this on foreground entry even when the selected
     /// host/owner synchronization key did not change while the app was away.
     func refreshCurrentRuntimeForForeground() async {
+        guard current != nil else { return await reopenIfClosed() }
         let key = synchronizationKey
         guard let owner = connections.owner,
               let runtime = current,

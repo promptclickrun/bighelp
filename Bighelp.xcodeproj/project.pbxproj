@@ -43,6 +43,7 @@
 		048F7A61F0CA0760D47A2BF2 /* DirectHermesAttachmentClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81CABC4DD0A03C05A6531348 /* DirectHermesAttachmentClientTests.swift */; };
 		0499789C48A13CFC46D6E128 /* DirectHermesGeneratedMediaClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80938D1DC3C8FD823A41A1E1 /* DirectHermesGeneratedMediaClient.swift */; };
 		050AF19EDB08DD39CFB94B47 /* UnifiedModeToggleUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF768AB5BA4E7E7F91249A1D /* UnifiedModeToggleUITests.swift */; };
+		051146CA8DA17E3FF2A1F883 /* NativeWorkspaceLockedWakeLiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 117DF67A867B04D7F822E7D8 /* NativeWorkspaceLockedWakeLiveTests.swift */; };
 		0537F66F671525DE97D570CE /* VoiceConfigurationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 335213208F41D9012118F4BD /* VoiceConfigurationStore.swift */; };
 		053E66E5A37D5E8F24168EBC /* BighelpRealtimeAudioPeer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 918B96E497E5895E812E63C3 /* BighelpRealtimeAudioPeer.swift */; };
 		053EB5E11B8F26BDA0FCDB09 /* PinnedModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F842CFD9DCD39F9FA5F5C67 /* PinnedModelTests.swift */; };
@@ -2065,6 +2066,7 @@
 		112773F6B2779C39B4332F60 /* pin.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = pin.json; sourceTree = "<group>"; };
 		112D329592AC95EB7826923E /* ScheduledTaskPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduledTaskPresentationTests.swift; sourceTree = "<group>"; };
 		113548A3FB4DC14DE70D90B3 /* UserIdentityStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserIdentityStoreTests.swift; sourceTree = "<group>"; };
+		117DF67A867B04D7F822E7D8 /* NativeWorkspaceLockedWakeLiveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeWorkspaceLockedWakeLiveTests.swift; sourceTree = "<group>"; };
 		11CFFEC0DBBAF848BB1380A6 /* SettingsView+Menu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsView+Menu.swift"; sourceTree = "<group>"; };
 		123219BA513DFDB4145C074A /* bighelp-reveal.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "bighelp-reveal.json"; sourceTree = "<group>"; };
 		126BFED069EB3CAD8D3E2464 /* WorkspaceOwner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceOwner.swift; sourceTree = "<group>"; };
@@ -5075,6 +5077,7 @@
 				EEAAC293921CC8A177EB54B7 /* NativeMessageSelectionTests.swift */,
 				B4941F32A0895F8230986EE1 /* NativeWikiOwnerTests.swift */,
 				89AA752919F2FE40F87539E7 /* NativeWorkspaceCompositionTests.swift */,
+				117DF67A867B04D7F822E7D8 /* NativeWorkspaceLockedWakeLiveTests.swift */,
 				CFD2EB9171DAF6783C60499D /* NativeWorkspaceSessionBridgeTests.swift */,
 				796D456E65153197E2D8FF67 /* NewChatCoordinatorTests.swift */,
 				D7300A82F304603F649DDD43 /* NotificationBundleConfigurationTests.swift */,
@@ -8336,6 +8339,7 @@
 				4269CB56CD599F47FCBD70B5 /* NativeMessageSelectionTests.swift in Sources */,
 				AC48C66078736F6CC3B21B00 /* NativeWikiOwnerTests.swift in Sources */,
 				D916A9524B9403FE89DAECBB /* NativeWorkspaceCompositionTests.swift in Sources */,
+				051146CA8DA17E3FF2A1F883 /* NativeWorkspaceLockedWakeLiveTests.swift in Sources */,
 				E7F94962F9DE60E9D5ED47D0 /* NativeWorkspaceSessionBridgeTests.swift in Sources */,
 				F748D31409E3D5790C8B3F97 /* NewChatCoordinatorTests.swift in Sources */,
 				88ED87F9AC0696EC231467DF /* NotificationBundleConfigurationTests.swift in Sources */,

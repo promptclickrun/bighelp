@@ -91,9 +91,12 @@ final class NativeWorkspaceRuntime {
     @ObservationIgnored private weak var observedPromptStore: DirectHermesPromptStore?
     @ObservationIgnored private let promptObserverID = UUID()
 
+    /// Throws `BighelpLocalPersistenceError.protectedDataUnavailable` while the phone is locked: the
+    /// saved files open only once it's unlocked.
     init(connections: WorkspaceConnectionStore, authority: WorkspaceAuthority,
          settings: SettingsStore, userIdentity: UserIdentityStore, directory: URL,
-         peerHosts: (any HermesBotModePeerHosts)? = nil) throws {
+         peerHosts: (any HermesBotModePeerHosts)? = nil,
+         protectedData: any BighelpProtectedDataAvailabilityProviding = BighelpSystemProtectedDataAvailability()) throws {
         guard authority.kind == .direct else { throw WorkspaceClientError.ownerChanged }
         self.connections = connections
         self.authority = authority
@@ -102,7 +105,8 @@ final class NativeWorkspaceRuntime {
         guard let preferences = UserDefaults(suiteName: "app.loopdy.native-workspace." + scope) else {
             throw DirectHermesError.secureStorageUnavailable
         }
-        let bridge = try NativeWorkspaceSessionBridge(connections: connections, authority: authority, directory: root)
+        let bridge = try NativeWorkspaceSessionBridge(connections: connections, authority: authority, directory: root,
+                                                      protectedData: protectedData)
         self.bridge = bridge
         let resumeProgress = NativeSessionResumeProgressCoordinator()
         self.resumeProgress = resumeProgress
@@ -112,7 +116,8 @@ final class NativeWorkspaceRuntime {
         ) { workspace, owner, current in
             DirectHermesAgentDirectoryClient(workspace: workspace, owner: owner, currentOwner: current, readCache: agentReadCache)
         }
-        agentRepository = DemoRepository(directory: root, name: "native-agents", seed: [])
+        agentRepository = DemoRepository(directory: root, name: "native-agents", seed: [],
+                                         protectedDataAvailability: protectedData)
         let savedAgents = try agentRepository.loadExistingPreservingSource() ?? []
         let agents = AgentDirectoryStore(
             client: WorkspaceAgentDirectoryProxy(box: directoryBox), defaults: preferences, profiles: savedAgents,

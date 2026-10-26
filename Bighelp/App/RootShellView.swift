@@ -34,6 +34,8 @@ struct RootShellView: View {
     let clearLocalCache: @MainActor () async -> Bool
     var nativeRuntime: NativeWorkspaceRuntime? = nil
     var nativeWorkspaceError: String? = nil
+    /// Opens the workspace if it didn't open, on the connection already up.
+    var reopenNativeWorkspace: (@MainActor () async -> Void)? = nil
     var agentIsland: AgentIslandModel? = nil
     /// Every agent on every host (the all-hosts view), kept across host switches.
     var fleet: FleetStore? = nil
@@ -488,6 +490,9 @@ struct RootShellView: View {
             reconnect: {
                 Task {
                     await nativeWorkspaceStore?.reconnect()
+                    // The socket can still be up with no workspace open (a wake while the phone was
+                    // locked); reconnect() leaves a live socket alone.
+                    await reopenNativeWorkspace?()
                     await nativeRuntime?.refresh()
                 }
             }

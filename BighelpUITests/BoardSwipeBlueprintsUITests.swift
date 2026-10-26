@@ -9,20 +9,21 @@ final class BoardSwipeBlueprintsUITests: BighelpUITestCase {
     @MainActor
     func testSwipeLeftDismissesOnEveryBoard() throws {
         let app = launch(appearance: "light")
-        let cases: [(tab: String, row: XCUIElement, action: String, fromEdge: Bool)] = [
-            ("tab.feed", app.descendants(matching: .any)["board.feed.post.feed-3"], "Clear", true),
-            ("tab.ideas", app.buttons["board.idea.idea-3"], "Not now", false),
-            ("tab.goals", app.descendants(matching: .any)["board.goal.goal-4"], "Remove", true),
+        // Ideas sit two to a row in the bento, so a tile's Not now is in its touch-and-hold menu.
+        let cases: [(tab: String, row: XCUIElement, action: String, fromEdge: Bool, holds: Bool)] = [
+            ("tab.feed", app.descendants(matching: .any)["board.feed.post.feed-3"], "Clear", true, false),
+            ("tab.ideas", app.buttons["board.idea.idea-3"], "Not now", false, true),
+            ("tab.goals", app.descendants(matching: .any)["board.goal.goal-4"], "Remove", true, false),
         ]
-        for (tab, row, action, fromEdge) in cases {
+        for (tab, row, action, fromEdge, holds) in cases {
             openRootTab(tab, in: app)
             // Boards are Lists: rows below the fold don't exist until scrolled to.
             _ = app.buttons["board.blueprints"].waitForExistence(timeout: 10)
             scroll(app, until: row)
             XCTAssertTrue(row.waitForExistence(timeout: 10), "\(tab) shows the item")
-            swipeLeft(on: row, in: app, fromEdge: fromEdge)
+            if holds { row.press(forDuration: 1.0) } else { swipeLeft(on: row, in: app, fromEdge: fromEdge) }
             let button = app.buttons[action].firstMatch
-            XCTAssertTrue(button.waitForExistence(timeout: 5), "Swiping left on \(tab) shows \(action)")
+            XCTAssertTrue(button.waitForExistence(timeout: 5), "\(holds ? "Holding" : "Swiping left on") \(tab) shows \(action)")
             XCTAssertFalse(app.textViews["chat.composer.text"].exists, "The swipe didn't open a new chat")
             save("board-swipe-\(tab)", app)
             button.tap()

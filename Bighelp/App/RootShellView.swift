@@ -500,11 +500,13 @@ struct RootShellView: View {
     }
 
     /// Opening the workspace counts as connecting until it's open, and so do
-    /// the keeper's quiet retries, as the island says.
+    /// the keeper's quiet retries, as the island says. A connection with no workspace
+    /// yet and no error (a wake while the phone was locked) is still connecting.
     private var nativeWorkspaceStatus: HostConnectionStatus {
         let host = HostConnectionStatus(workspace: nativeWorkspaceStore, keeper: connectionKeeper)
-        let isWorking = nativeRuntime?.isRefreshing == true || host.phase == .connecting || host.phase == .reconnecting
         let failed = nativeWorkspaceError != nil || nativeRuntime?.errorMessage != nil
+        let isWorking = nativeRuntime?.isRefreshing == true || host.phase == .connecting || host.phase == .reconnecting
+            || (nativeRuntime == nil && !failed && host.phase == .connected)
         return HostConnectionStatus(isConnected: !isWorking && !failed && host.phase == .connected,
                                     isConnecting: isWorking, isFirstConnection: !connectionKeeper.hasConnected)
     }

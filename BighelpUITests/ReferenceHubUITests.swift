@@ -156,7 +156,7 @@ class BighelpUITestCase: XCTestCase {
     func openRootTab(_ identifier: String, in app: XCUIApplication, timeout: TimeInterval = 20,
                      file: StaticString = #filePath, line: UInt = #line) {
         let drawerRows = ["tab.agents": "menu.agents", "tab.scheduled-tasks": "menu.scheduled-tasks",
-                          "tab.profile": "menu.settings"]
+                          "tab.profile": "menu.settings", "tab.apps": "menu.files"]
         let sidebar = ["tab.sessions": "chats", "tab.agents": "agents",
                        "tab.scheduled-tasks": "scheduledTasks", "tab.profile": "settings"]
         let deadline = Date.now.addingTimeInterval(timeout)

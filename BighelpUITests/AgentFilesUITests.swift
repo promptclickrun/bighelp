@@ -8,8 +8,10 @@ final class AgentFilesUITests: BighelpUITestCase {
     func testSwitchingAgentsShowsEachAgentsOwnFiles() throws {
         for appearance in ["light", "dark"] {
             let app = makeApp()
+            // Files lives in ☰ by default; pinned here so the bar holds it.
             app.launchArguments += ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.home.opens-chat", "YES",
-                                    "-bighelp.hosts.all-hosts", "NO", "-loopdy.demo.appearance", appearance]
+                                    "-bighelp.hosts.all-hosts", "NO", "-loopdy.demo.appearance", appearance,
+                                    "-bighelp.app-layout", "{pinned=(feed,ideas,files);menu=();}"]
             app.launch()
             let files = app.buttons["tab.apps"]
             XCTAssertTrue(files.waitForExistence(timeout: 30), "The bottom bar holds Files")
@@ -55,7 +57,7 @@ final class AgentFilesUITests: BighelpUITestCase {
             throw XCTSkip("Set BIGHELP_AGENT_FILES_HOST")
         }
         let app = makeApp()
-        app.launchArguments = ["-loopdy.home.opens-chat", "YES"]
+        app.launchArguments = ["-loopdy.home.opens-chat", "YES", "-bighelp.app-layout", "{pinned=(feed,ideas,files);menu=();}"]
         app.launch()
         try onboardOpenHost(app, address: host)
         let files = app.buttons["tab.apps"]

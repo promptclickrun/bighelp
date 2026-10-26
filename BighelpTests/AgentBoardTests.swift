@@ -376,6 +376,16 @@ struct AgentBoardTests {
         #expect(BoardTimeBucket.title(for: at(24, 14), now: now, calendar: calendar) == "Yesterday afternoon")
     }
 
+    /// A block's color comes from the item's key with FNV-1a, not `hashValue` (which changes on
+    /// every launch), so a goal's category or a post keeps its color.
+    @Test func blockColorsStayTheSameBetweenLaunches() {
+        #expect(BighelpBlockColor.pastel(for: "health") == .peach)
+        #expect(BighelpBlockColor.pastel(for: "finance") == .lilac)
+        #expect(BighelpBlockColor.pastel(for: "feed-2") == .sky)
+        #expect(BighelpBlockColor.pastel(for: "idea-1") == .lime)
+        #expect(BighelpBlockColor.goal(.health) == .peach)
+    }
+
     @Test func islandAndAvatarShareOneActivityVocabulary() {
         for kind in AgentActivityKind.allCases {
             #expect(kind.pose.rawValue == kind.rawValue)

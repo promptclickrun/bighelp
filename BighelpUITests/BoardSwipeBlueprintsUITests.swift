@@ -102,8 +102,10 @@ final class BoardSwipeBlueprintsUITests: BighelpUITestCase {
             let health = app.descendants(matching: .any)["board.goals.category.health"]
             XCTAssertTrue(health.waitForExistence(timeout: 10), "Goals are grouped by category")
             XCTAssertTrue(app.descendants(matching: .any)["board.goals.category.finance"].exists)
-            XCTAssertTrue(app.descendants(matching: .any)["board.goals.category.other"].exists,
-                          "A goal without a category shows under Other")
+            // The latest goal leads in its own block; Other's heading is further down the card.
+            let other = app.descendants(matching: .any)["board.goals.category.other"]
+            scroll(app, until: other)
+            XCTAssertTrue(other.exists, "A goal without a category shows under Other")
             save("board-goals-categories-\(appearance)", app)
             let create = app.buttons["board.goals.create.relationships"]
             scroll(app, until: create)

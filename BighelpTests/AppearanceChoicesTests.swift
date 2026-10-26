@@ -28,11 +28,12 @@ struct AppearanceChoicesTests {
     }
 
     @Test func bubbleColorsDriveTheActionColor() {
-        let ember = theme(.light)
-        #expect(theme(.light, bubble: .lavender).actionHex == ember.actionHex)
-        for bubble in BighelpBubbleColor.allCases where bubble != .lavender {
+        // No pick is Ink, the default, the same as picking it.
+        let ink = theme(.light)
+        #expect(theme(.light, bubble: .graphite).actionHex == ink.actionHex)
+        for bubble in BighelpBubbleColor.allCases where bubble != .graphite {
             let light = theme(.light, bubble: bubble)
-            #expect(light.actionHex != ember.actionHex, "\(bubble) should change the bubble color")
+            #expect(light.actionHex != ink.actionHex, "\(bubble) should change the bubble color")
             #expect(!light.actionForegroundHex.isEmpty)
         }
     }
@@ -41,17 +42,17 @@ struct AppearanceChoicesTests {
     @Test func yourChatBubblesUseThePickedColor() {
         for scheme in [ColorScheme.light, .dark] {
             let traits = UITraitCollection(userInterfaceStyle: scheme == .dark ? .dark : .light)
-            let purple = UIColor(theme(scheme).outgoingMessageBackground).resolvedColor(with: traits)
-            for bubble in [BighelpBubbleColor.ocean, .mint, .rose, .tangerine, .graphite] {
+            let ink = UIColor(theme(scheme).outgoingMessageBackground).resolvedColor(with: traits)
+            for bubble in [BighelpBubbleColor.ocean, .mint, .rose, .tangerine, .lavender] {
                 let mine = UIColor(theme(scheme, bubble: bubble).outgoingMessageBackground).resolvedColor(with: traits)
-                #expect(!mine.isEqual(purple), "\(bubble) bubbles in \(scheme) mode")
-                if bubble != .graphite {
-                    #expect(Self.hueDistance(mine, UIColor(Color(hex: bubble.hex!))) < 0.03, "\(bubble) in \(scheme) mode")
+                #expect(!mine.isEqual(ink), "\(bubble) bubbles in \(scheme) mode")
+                if let hex = bubble.hex {
+                    #expect(Self.hueDistance(mine, UIColor(Color(hex: hex))) < 0.03, "\(bubble) in \(scheme) mode")
                 }
             }
         }
-        // Lavender, the default, keeps bighelp's own purple.
-        #expect(theme(.light, bubble: .lavender).outgoingMessageBackground == theme(.light).outgoingMessageBackground)
+        // Ink, the default, is the same with or without the pick.
+        #expect(theme(.light, bubble: .graphite).outgoingMessageBackground == theme(.light).outgoingMessageBackground)
     }
 
     @Test func aCustomColorWorksLikeTheBuiltInOnes() {

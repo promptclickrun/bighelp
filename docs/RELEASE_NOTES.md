@@ -3,6 +3,13 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.24
+
+### Fixed
+
+- **Signed out every day:** bighelp no longer signs you out of a computer that uses browser sign-in, for example with Nous Portal. Before, a renewal that was cut off (for example, when the phone locked or the network changed) could end the sign-in. bighelp also renews the sign-in in the background.
+- **Workspace after time away:** bighelp opens your computer's workspace when you come back to it. Before, after some time in the background, it could show "Saved native workspace data could not be opened", and Reconnect did nothing.
+
 ## 2.6.23
 
 ### Highlights

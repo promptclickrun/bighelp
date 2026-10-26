@@ -1,126 +1,127 @@
-# Native chat transport
+# Hermes native transport contract
 
-Production chat connects directly to the selected Hermes host. Cloud services are
-used only for explicitly enabled notifications and Live Activities, which BuzzKit delivers.
+This is the entry point for implementing a bighelp-compatible Hermes client in
+any language or UI framework, including Kotlin and Expo/React Native. The wire
+contract is JSON over authenticated HTTP and WebSockets; Swift types, Apple
+frameworks and the app's local `WorkspaceOperation` names are not wire formats.
 
-## Connection and storage
+## Scope and status
 
-- `BighelpAppComposition` selects `NativeWorkspaceRuntime` and the existing
-  authenticated Hermes REST and `/api/ws` clients.
-- Startup always selects the independent host registry. A saved Link preference,
-  cloud login, expired cloud credential, or unavailable cloud service cannot
-  select the chat route. Host authentication and local submission journals are
-  isolated from cloud account erasure.
-- The iOS target no longer contains the disabled Link chat socket, its outbox
-  state machine, the paired Direct experience, or the old HTTPS gateway client.
-  Shared wire value types and narrowly scoped legacy-data erasers remain where
-  native clients, notification delivery or migrations still use them. The plugin
-  does not load a Link chat client or start its paired Direct listener; its
-  explicitly injected protocol fixtures do not enable a production fallback.
-- Existing legacy account-scoped host files and credentials are preserved.
-  They are not adopted by matching an address. Reauthenticate an existing native
-  host explicitly when moving it into the independent registry.
-- Connect to the operator's existing Hermes dashboard address and port. No
-  additional listener, public URL, cloud login or cloud pairing is required.
-  The app discovers and offers the host's own sign-in methods: no sign-in,
-  dashboard session token, access token, username/password and dashboard login.
-  An ungated dashboard bootstraps its existing session token from the exact
-  endpoint's inert HTML, just as the dashboard does; this does not create a
-  provider identity or change server authentication. Provider accounts retain
-  strict provider/user identity. All credentials remain in the iOS Keychain,
-  on this device only, readable after its first unlock.
-- Rotating sign-ins (the Nous Portal's renewal token lasts a day) are renewed
-  while bighelp is closed: the plugin asks the notification service for a quiet
-  push (`bighelp_wake`, `renew-sign-in`) every eight hours, and the app renews
-  each computer that isn't connected (`renewSignInWhileAway`). A live connection
-  renews its own, and reconnecting waits for a renewal on its way. iOS may delay
-  or drop quiet pushes, and never delivers them to a force-quit app.
-- Hermes owns sessions, turns, tools, approvals, model state and recovery. An
-  uncertain native submission remains in its existing local journal; reconnect
-  does not resend it or switch to a cloud queue.
-- A reply to a message (long-press › Reply) has no field in `prompt.submit`, so
-  it travels in the message text the way Hermes hands replies from other
-  platforms to the model: a first line `[Replying to your previous message: "…"]`
-  (or `my previous message`, or a name in group chats), a blank line, then the
-  text (`ChatReplyQuote`). The quote is one line of at most 500 characters with
-  `@` handles disarmed. Because it is the message's own text, Hermes' saved
-  history keeps it, and the app reads it back to draw the reply above the bubble.
-  The draft saves its reply the same way.
+This contract describes the **native transport profile used by bighelp**, audited
+against app revision `09fc79c01aed91734e8006b5355209a31c52feca` (2026-10-25).
+It covers the stock Hermes dashboard/session APIs the app uses and its optional
+plugin integrations. It is not a specification of every unrelated upstream
+Hermes endpoint. No Hermes server changes or client behavior changes accompany
+these documents.
 
-## Optional delivery
+Some companion behavior was also checked against [bighelp-plugin revision
+`7e1f74f`](https://github.com/promptclickrun/bighelp-plugin/tree/7e1f74ff26c1c36dd6bb7d2da3c19d6a44c3fdaf).
+The app and plugin evolve independently: an app route registration is not proof
+that a particular server offers that route. In particular, Wiki client routes
+remain in this app revision but were removed in that companion revision. Gate
+features by the actual connected host's advertisements.
 
-The notification account action opens only account management, with no paired
-chat-device catalog. Explicit notification enrollment records a separate
-`BighelpHostNotificationBinding` (cloud device and authorization epoch). It does
-not change the native host, principal, credentials, selected workspace or
-registry generation.
+The requirements below define interoperability with the current app profile.
+Within the chapters, **wire behavior** describes messages the app sends or
+accepts, **client policy** describes its local safety/size/retry choices, and
+**limitations** identify behavior not established by the audited sources.
+Terms such as “must” describe this profile, not a claim that all historical
+Hermes releases implement a new standard. Source and test links make those
+boundaries inspectable. Example hosts, names, IDs and data are synthetic.
 
-Notification ledgers, grants, trust pins and Live Activity ownership use that
-notification scope. Each operation still verifies the current cloud credential
-and exact native host binding. Changing the notification account retires its old
-delivery enrollment and retains pending revocation metadata. Native chat is
-unaffected. Cloud requests without an explicit enrollment remain unavailable.
+## Read the contract
 
-## Native Live Voice
+| Document | Contents |
+|---|---|
+| [Connection, authentication and framing](hermes/CONNECTION.md) | Endpoint normalization and prefixes, TLS/proxies, all sign-in modes, PKCE/rotation, WebSocket upgrade, JSON-RPC and newline framing, bounds, readiness, ping and reconnect |
+| [Sessions, chat, prompts and recovery](hermes/CHAT.md) | Runtime/durable identities, create/resume, submit/steer/queue/background, commands, event payloads, prompt replies, history, journal and replay |
+| [Stock API reference](hermes/REFERENCE.md) | HTTP and RPC inventory for sessions, profiles, models, providers, cron, projects/git, files, configuration, skills, tools, MCP, gateways and administration |
+| [Optional plugin extensions](hermes/EXTENSIONS.md) | Native context, feature gates, ETags/request correlation, route matrix, attachments, managed media/files, voice, boards, Workflows and other plugin APIs |
+| [Groups and device integration](hermes/GROUPS_AND_DEVICE_TOOLS.md) | Both groups protocol paths, RoomLink, durable room log/actions, optional room activity, device tools, display and native app connections |
+| [Optional delivery](hermes/DELIVERY.md) | Notification enrollment and sealed alerts, foreground feed, quiet hours and Apple delivery boundaries |
+| [Porting guide](hermes/PORTING.md) | Suggested implementation layers, Android/Expo constraints, persistence and reconnect algorithm, phased acceptance criteria |
+| [Conformance and evidence](hermes/CONFORMANCE.md) | Portable framing vectors, stateful test matrix, source/test traceability, known gaps and validation boundaries |
 
-The optional plugin capability `native-voice-v1` exposes bounded POST operations
-under `/api/plugins/loopdy/native/voice/`: `status`, `offer`, `poll`, `result`,
-and `close`. They require the real Hermes interactive session, native context
-ETag and request-ID correlation. All calls bind the native principal, profile,
-stored session and backend runtime; there is no Link account or device catalog.
+Read Connection and Chat before implementing API wrappers. For an initial
+Android client, implement the minimum chat profile in the porting guide; then
+add feature-gated extensions. All API paths in this documentation are relative
+to the selected endpoint's deployment prefix unless explicitly absolute URLs.
 
-The host reuses the existing Codex subscription or explicitly selected API-key
-provider media implementation. Credentials remain on the host. There is no
-automatic provider/billing fallback. The phone owns WebRTC audio, and host events
-arrive over the authenticated bounded native feed.
+## Authority and vocabulary
 
-Provider work requests go through the current `ChatModel` and ordinary Hermes
-`prompt.submit`. They do not create another voice job database, agent loop or
-cloud queue. Repeated IDs are ignored; identical pending requests with different
-provider IDs share one native submission. Distinct requests are bounded and
-serialized. Work and pending approvals remain visible in the same chat.
+| Term | Meaning |
+|---|---|
+| Endpoint | Canonical dashboard scheme, host, port and deployment prefix; never just the hostname |
+| Principal | Verified dashboard/provider identity at that endpoint; separate from a display name or a model-provider account |
+| Sign-in scope | Endpoint plus authentication identity/generation; bounds all credentials, saved state and actions |
+| Workspace connection generation | Workspace owner generation; replaced when the workspace rebuilds its authenticated connection |
+| Logical transport owner | Lifetime of an authenticated client; registered prompt handlers may survive its automatic socket recovery |
+| Socket epoch | One concrete WebSocket lifetime; rotates on socket replacement and fences in-flight requests/replies |
+| Replay epoch | Host-advertised event-stream lifetime; determines whether a saved session-event cursor is reusable |
+| Profile | Hermes agent configuration selected by `profile`; IDs are opaque and are not display names |
+| Runtime session ID | Live `session_id` used for session RPC and events; replaced when resuming |
+| Stored session ID | Durable history coordinate, returned as `session_key`/`stored_session_id`/`resumed`; can change after compaction |
+| Request ID | JSON-RPC correlation ID, server prompt ID, native HTTP UUID, or a domain idempotency key; these are separate namespaces |
+| Sequence/cursor | Coordinate within a specific event stream or page contract; room-log, session-event and disposable-feed cursors are not interchangeable |
+| Receipt | Confirmation for a specific operation; a submit receipt is not a terminal agent answer |
+| Outcome unknown | A mutation may have reached the host but no authoritative receipt was received; it is not a rejection |
 
-Only a verified native terminal answer may be returned to the media provider.
-A queued receipt, failed turn, overlapping admission or uncertain submission
-does not become a claimed answer. Long answers are explicitly labeled excerpts;
-the complete result remains in Hermes history. Native timeline updates are not
-appended a second time to return an answer to voice.
+Opaque identifiers must be compared without Unicode normalization, trimming or
+case folding. Numeric timestamps and counters keep each endpoint's documented
+units. Do not turn missing values into fabricated state, and distinguish absent
+fields from JSON `null` where a decoder does.
 
-An offer ID is consumed before provider allocation and cannot be replayed in the
-same backend runtime. A backend restart changes the native context and rejects
-old-context requests. A result append is also claimed before sending, so a lost
-receipt cannot cause a repeated provider append. Media expires after 60 seconds
-without authenticated polling. Ending media does not cancel accepted Hermes
-work, and an old call's result cannot appear in a replacement call.
+## Architectural invariants
 
-## Verification boundaries
+1. Chat connects directly to the user's existing Hermes dashboard address and
+   port using stock REST and `/api/ws`. Hermes owns sessions, turns, tools,
+   model state, approvals and durable history. There is no cloud queue, second
+   agent execution loop, extra listener or Link fallback.
+2. Native chat needs no bighelp account. Host authentication and submission
+   journals are independent of optional notification enrollment/account erasure.
+   Old Link preference files or credentials cannot select a production chat route.
+3. Register server-request handlers and advertise
+   `client.capabilities {"server_requests":true}` on every socket. A WebSocket
+   upgrade alone is not ready. Do not answer prompts with invented blanks.
+4. Every `session.create` and `session.resume` uses `source:"bighelp"` and the
+   appropriate profile. The source affects Hermes' model instructions; `desktop`
+   describes a different client's tools. Never invent device capabilities for a port.
+5. A `prompt.submit` receipt of `streaming` leaves the turn active. A later Send
+   uses the intended steer/queue path; it does not start an overlapping submit.
+6. After a dispatched mutation loses its receipt, retain the intent and reconcile.
+   Reconnect never blindly resends it, swaps to a cloud transport, takes over
+   another process's session, or asserts the work failed. Domain-specific safe
+   retries require their own demonstrated idempotency contract.
+7. Reject stale asynchronous results after a host, principal or generation
+   change. Preserve same-sign-in presentation state across a transient disconnect;
+   that does not authorize old requests to act on a new socket.
+8. Plugin routes are optional and capability-gated. `/api/plugins/loopdy/native/…`
+   uses the native context ETag and a lowercase UUID request ID, with response
+   correlation. `loopdy` route/header identifiers are intentionally stable.
+9. Durable history is authoritative after a turn and on reopening. Streaming
+   rows and disposable activity observations must not be appended as duplicate
+   history. Preserve unknown read-only data only within each endpoint's bounds.
+10. Optional notifications and Live Activities have separate enrollment, grants,
+    trust keys and lifecycle. Their errors cannot block opening or sending chat.
+    Apple delivery facilities are not Android transport requirements.
 
-`NativeWorkspaceProductionUITests` exercises the production app against a
-disposable real Hermes host with a rejecting cloud endpoint: native sign-in,
-workspace navigation, new chat, ordinary tool execution, streaming, exact stored
-history and cold relaunch. `Scripts/NativeWorkspaceAcceptanceProbe.py` requires
-an explicit full source SHA and records every attempted cloud connection.
+## Compatibility and evidence
 
-Native voice tests additionally cover real native lifecycle reduction, duplicate
-provider requests, owner changes, media close, provider append uncertainty and
-authentication revocation. Simulated provider/media tests do not establish live
-microphone performance or a completed physical-device voice conversation.
+Negotiate actual capabilities, not version strings. The host health response,
+`gateway.ready`, core method advertisements, `groups.capabilities`, and plugin
+`native/context` serve different purposes; none replaces the others. A missing
+optional capability disables that integration rather than selecting a retired
+transport. Retain readable saved state through transient connectivity failures.
 
-Build, plugin activation and TestFlight processing are separate claims and must
-be verified against the exact deployed source and build number.
+The chapters identify exact tests and probes used as documentary evidence.
+The repository's 59 existing JSON fixtures do not collectively define the
+protocol. The additional [wire vectors](hermes/vectors/wire.json) isolate the
+framing boundary, and the [conformance checklist](hermes/CONFORMANCE.md) covers
+the stateful behavior that cannot be established by a single JSON sample.
 
-Missing or invalid optional cloud configuration cannot stop application startup.
-Native chat notification subscription and Live Activity hooks run separately after
-explicit enrollment; their errors cannot block opening or sending chat.
-
-## Workspace presentation and synchronization
-
-Tasks uses Hermes' native cron client for its full lifecycle. Agent row taps
-create a new native chat for that profile. Groups use official groups RPCs and
-keep the selected authority's cached catalog through transient reconnects.
-Agent enumeration omits session scans, compares catalog metadata, and reuses
-unchanged SOUL/avatar details for up to 60 seconds because the current Hermes
-catalog does not provide revisions for those files. Changed metadata fetches
-fresh details immediately; mutation validation always rereads current state.
-Auth/host changes retain their strict scope boundaries. Streaming native rows
-advance the same presentation counter as locally submitted messages.
+Older design narratives under `docs/` retain historical implementation context.
+Where they describe Link fallback, account-required native chat, missing native
+features or non-idempotent create behavior, use this contract and its source
+revision instead. Product interaction requirements remain in
+[CHAT_INTERACTION_CONTRACT.md](CHAT_INTERACTION_CONTRACT.md); broad app architecture
+and delivery background remain in [ARCHITECTURE.md](ARCHITECTURE.md).

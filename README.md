@@ -116,6 +116,10 @@ xcodebuild test -project Bighelp.xcodeproj -scheme Bighelp \
 [DESIGN.md](DESIGN.md) describes the look and feel. [AGENTS.md](AGENTS.md) is the guide for people and AI agents
 that work on the code.
 
+For an Android or other client port, start with the platform-neutral
+[Hermes transport contract](docs/NATIVE_TRANSPORT.md), including API references,
+recovery rules and portable conformance vectors.
+
 ## Contributing
 
 Issues and pull requests are welcome. The maintainer reviews every change before it merges. See

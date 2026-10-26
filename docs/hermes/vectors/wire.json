@@ -1,0 +1,449 @@
+{
+  "schemaVersion": 1,
+  "profile": "bighelp-hermes-native",
+  "sourceRevision": "09fc79c01aed91734e8006b5355209a31c52feca",
+  "description": "Framing vectors, not complete method payloads. expected lists ordered categories; rejected frames publish no messages. Opaque ID cases may differ only in Unicode representation.",
+  "cases": [
+    {
+      "id": "ready",
+      "frame": "{\"jsonrpc\":\"2.0\",\"method\":\"event\",\"params\":{\"type\":\"gateway.ready\",\"payload\":{\"heartbeat\":true}}}",
+      "expected": [
+        "event:gateway.ready"
+      ],
+      "purpose": "Readiness requires the gateway event, not just a successful WebSocket upgrade."
+    },
+    {
+      "id": "empty-result",
+      "frame": "{\"jsonrpc\":\"2.0\",\"id\":\"client-1\",\"result\":{}}",
+      "expected": [
+        "result:client-1"
+      ],
+      "purpose": "A result object may be empty."
+    },
+    {
+      "id": "null-result",
+      "frame": "{\"jsonrpc\":\"2.0\",\"id\":\"client-2\",\"result\":null}",
+      "expected": [
+        "result:client-2"
+      ],
+      "purpose": "Presence of result differs from absence, including JSON null."
+    },
+    {
+      "id": "scalar-result",
+      "frame": "{\"jsonrpc\":\"2.0\",\"id\":\"client-3\",\"result\":true}",
+      "expected": [
+        "result:client-3"
+      ],
+      "purpose": "Wire result accepts any JSON value; method decoder validates its own shape."
+    },
+    {
+      "id": "rpc-refusal",
+      "frame": "{\"jsonrpc\":\"2.0\",\"id\":\"client-4\",\"error\":{\"code\":4090,\"message\":\"Active session limit reached\",\"data\":{\"reason\":\"MAX_CONCURRENT_SESSIONS\"}}}",
+      "expected": [
+        "failure:client-4"
+      ],
+      "purpose": "Preserve code and machine reason; SESSION_NOT_OWNED is a different reason at the same code."
+    },
+    {
+      "id": "event-defaults",
+      "frame": "{\"jsonrpc\":\"2.0\",\"method\":\"event\",\"params\":{\"type\":\"future.feature\"}}",
+      "expected": [
+        "event:future.feature"
+      ],
+      "purpose": "Unknown event names are valid envelopes; absent payload defaults to object and seq is absent."
+    },
+    {
+      "id": "nullable-session",
+      "frame": "{\"jsonrpc\":\"2.0\",\"method\":\"event\",\"params\":{\"type\":\"notice\",\"session_id\":null,\"payload\":{\"message\":\"Synthetic notice\"}}}",
+      "expected": [
+        "event:notice"
+      ],
+      "purpose": "Session coordinate may be null."
+    },
+    {
+      "id": "sequence",
+      "frame": "{\"jsonrpc\":\"2.0\",\"method\":\"event\",\"params\":{\"type\":\"message.delta\",\"session_id\":\"runtime-1\",\"seq\":7,\"payload\":{\"text\":\"Hello\"}}}",
+      "expected": [
+        "event:message.delta"
+      ],
+      "purpose": "Envelope seq is an integer; session reducer performs additional checks."
+    },
+    {
+      "id": "unknown-envelope-key",
+      "frame": "{\"jsonrpc\":\"2.0\",\"method\":\"event\",\"params\":{\"type\":\"notice\",\"payload\":{\"message\":\"Synthetic notice\"}},\"future\":true}",
+      "expected": [
+        "event:notice"
+      ],
+      "purpose": "Extra ordinary envelope fields are not globally forbidden."
+    },
+    {
+      "id": "opaque-id-9",
+      "frame": "{\"jsonrpc\":\"2.0\",\"id\":\"\",\"method\":\"approval\",\"params\":{}}",
+      "expected": [
+        "request:approval"
+      ],
+      "purpose": "Echo the original decoded ID bytes; do not trim or normalize Unicode."
+    },
+    {
+      "id": "opaque-id-10",
+      "frame": "{\"jsonrpc\":\"2.0\",\"id\":\" leading and trailing \",\"method\":\"approval\",\"params\":{}}",
+      "expected": [
+        "request:approval"
+      ],
+      "purpose": "Echo the original decoded ID bytes; do not trim or normalize Unicode."
+    },
+    {
+      "id": "opaque-id-11",
+      "frame": "{\"jsonrpc\":\"2.0\",\"id\":\"request:é\",\"method\":\"approval\",\"params\":{}}",
+      "expected": [
+        "request:approval"
+      ],
+      "purpose": "Echo the original decoded ID bytes; do not trim or normalize Unicode."
+    },
+    {
+      "id": "opaque-id-12",
+      "frame": "{\"jsonrpc\":\"2.0\",\"id\":\"request:é\",\"method\":\"approval\",\"params\":{}}",
+      "expected": [
+        "request:approval"
+      ],
+      "purpose": "Echo the original decoded ID bytes; do not trim or normalize Unicode."
+    },
+    {
+      "id": "missing-request-params",
+      "frame": "{\"jsonrpc\":\"2.0\",\"id\":\"server-1\",\"method\":\"clarify\"}",
+      "expected": [
+        "request:clarify"
+      ],
+      "purpose": "Absent params defaults to an object at framing boundary."
+    },
+    {
+      "id": "null-request-params",
+      "frame": "{\"jsonrpc\":\"2.0\",\"id\":\"server-2\",\"method\":\"secret\",\"params\":null}",
+      "expected": [
+        "request:secret"
+      ],
+      "purpose": "Null params defaults to an object; business validation still applies."
+    },
+    {
+      "id": "unsupported-request",
+      "frame": "{\"jsonrpc\":\"2.0\",\"id\":\"server-3\",\"method\":\"future.method\",\"params\":{}}",
+      "expected": [
+        "request:future.method"
+      ],
+      "purpose": "A well-framed unsupported request should receive -32601 instead of disconnecting."
+    },
+    {
+      "id": "cancel",
+      "frame": "{\"jsonrpc\":\"2.0\",\"method\":\"event\",\"params\":{\"type\":\"request.cancel\",\"payload\":{\"id\":\"server-1\",\"method\":\"clarify\",\"reason\":\"expired\"}}}",
+      "expected": [
+        "event:request.cancel"
+      ],
+      "purpose": "Cancel only the matching ID and method in this socket generation."
+    },
+    {
+      "id": "ndjson",
+      "frame": "{\"jsonrpc\":\"2.0\",\"method\":\"event\",\"params\":{\"type\":\"gateway.ready\",\"payload\":{}}}\n{\"jsonrpc\":\"2.0\",\"id\":\"client-1\",\"result\":{}}",
+      "expected": [
+        "event:gateway.ready",
+        "result:client-1"
+      ],
+      "purpose": "Process multiple line-separated objects in order; not a JSON array batch."
+    },
+    {
+      "id": "blank-lines",
+      "frame": "\n \t\r\n{\"jsonrpc\": \"2.0\", \"id\": \"client-1\", \"result\": {}}\n",
+      "expected": [
+        "result:client-1"
+      ],
+      "purpose": "Ignore empty or space/tab/CR-only lines."
+    },
+    {
+      "id": "escaped-newline",
+      "frame": "{\"jsonrpc\":\"2.0\",\"id\":\"server-4\",\"method\":\"clarify\",\"params\":{\"question\":\"First line\\nSecond line\"}}",
+      "expected": [
+        "request:clarify"
+      ],
+      "purpose": "JSON escaped newlines remain inside one value."
+    },
+    {
+      "id": "empty-frame",
+      "frame": "",
+      "expected": [
+        "reject:invalidResponse"
+      ],
+      "purpose": "Reject the entire frame before publishing any decoded messages."
+    },
+    {
+      "id": "whitespace-frame",
+      "frame": " \r\n\t",
+      "expected": [
+        "reject:invalidResponse"
+      ],
+      "purpose": "Reject the entire frame before publishing any decoded messages."
+    },
+    {
+      "id": "invalid-json",
+      "frame": "{",
+      "expected": [
+        "reject:invalidResponse"
+      ],
+      "purpose": "Reject the entire frame before publishing any decoded messages."
+    },
+    {
+      "id": "array-batch",
+      "frame": "[{\"jsonrpc\":\"2.0\",\"id\":\"a\",\"result\":{}},{\"jsonrpc\":\"2.0\",\"id\":\"b\",\"result\":{}}]",
+      "expected": [
+        "reject:invalidResponse"
+      ],
+      "purpose": "Reject the entire frame before publishing any decoded messages."
+    },
+    {
+      "id": "missing-version",
+      "frame": "{\"id\":\"a\",\"result\":{}}",
+      "expected": [
+        "reject:invalidResponse"
+      ],
+      "purpose": "Reject the entire frame before publishing any decoded messages."
+    },
+    {
+      "id": "wrong-version",
+      "frame": "{\"jsonrpc\":\"1.0\",\"id\":\"a\",\"result\":{}}",
+      "expected": [
+        "reject:invalidResponse"
+      ],
+      "purpose": "Reject the entire frame before publishing any decoded messages."
+    },
+    {
+      "id": "numeric-response-id",
+      "frame": "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{}}",
+      "expected": [
+        "reject:invalidResponse"
+      ],
+      "purpose": "Reject the entire frame before publishing any decoded messages."
+    },
+    {
+      "id": "null-response-id",
+      "frame": "{\"jsonrpc\":\"2.0\",\"id\":null,\"result\":{}}",
+      "expected": [
+        "reject:invalidResponse"
+      ],
+      "purpose": "Reject the entire frame before publishing any decoded messages."
+    },
+    {
+      "id": "response-missing-outcome",
+      "frame": "{\"jsonrpc\":\"2.0\",\"id\":\"a\"}",
+      "expected": [
+        "reject:invalidResponse"
+      ],
+      "purpose": "Reject the entire frame before publishing any decoded messages."
+    },
+    {
+      "id": "response-both-outcomes",
+      "frame": "{\"jsonrpc\":\"2.0\",\"id\":\"a\",\"result\":{},\"error\":{\"code\":1}}",
+      "expected": [
+        "reject:invalidResponse"
+      ],
+      "purpose": "Reject the entire frame before publishing any decoded messages."
+    },
+    {
+      "id": "response-with-params",
+      "frame": "{\"jsonrpc\":\"2.0\",\"id\":\"a\",\"result\":{},\"params\":{}}",
+      "expected": [
+        "reject:invalidResponse"
+      ],
+      "purpose": "Reject the entire frame before publishing any decoded messages."
+    },
+    {
+      "id": "error-code-string",
+      "frame": "{\"jsonrpc\":\"2.0\",\"id\":\"a\",\"error\":{\"code\":\"1\"}}",
+      "expected": [
+        "reject:invalidResponse"
+      ],
+      "purpose": "Reject the entire frame before publishing any decoded messages."
+    },
+    {
+      "id": "request-with-result",
+      "frame": "{\"jsonrpc\":\"2.0\",\"id\":\"a\",\"method\":\"approval\",\"result\":null}",
+      "expected": [
+        "reject:invalidResponse"
+      ],
+      "purpose": "Reject the entire frame before publishing any decoded messages."
+    },
+    {
+      "id": "request-without-id",
+      "frame": "{\"jsonrpc\":\"2.0\",\"method\":\"approval\",\"params\":{}}",
+      "expected": [
+        "reject:invalidResponse"
+      ],
+      "purpose": "Reject the entire frame before publishing any decoded messages."
+    },
+    {
+      "id": "request-numeric-id",
+      "frame": "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"approval\",\"params\":{}}",
+      "expected": [
+        "reject:invalidResponse"
+      ],
+      "purpose": "Reject the entire frame before publishing any decoded messages."
+    },
+    {
+      "id": "request-array-params",
+      "frame": "{\"jsonrpc\":\"2.0\",\"id\":\"a\",\"method\":\"approval\",\"params\":[]}",
+      "expected": [
+        "reject:invalidResponse"
+      ],
+      "purpose": "Reject the entire frame before publishing any decoded messages."
+    },
+    {
+      "id": "method-number",
+      "frame": "{\"jsonrpc\":\"2.0\",\"id\":\"a\",\"method\":1,\"params\":{}}",
+      "expected": [
+        "reject:invalidResponse"
+      ],
+      "purpose": "Reject the entire frame before publishing any decoded messages."
+    },
+    {
+      "id": "method-empty",
+      "frame": "{\"jsonrpc\":\"2.0\",\"id\":\"a\",\"method\":\"\",\"params\":{}}",
+      "expected": [
+        "reject:invalidResponse"
+      ],
+      "purpose": "Reject the entire frame before publishing any decoded messages."
+    },
+    {
+      "id": "method-space",
+      "frame": "{\"jsonrpc\":\"2.0\",\"id\":\"a\",\"method\":\"has space\",\"params\":{}}",
+      "expected": [
+        "reject:invalidResponse"
+      ],
+      "purpose": "Reject the entire frame before publishing any decoded messages."
+    },
+    {
+      "id": "method-unicode",
+      "frame": "{\"jsonrpc\":\"2.0\",\"id\":\"a\",\"method\":\"méthod\",\"params\":{}}",
+      "expected": [
+        "reject:invalidResponse"
+      ],
+      "purpose": "Reject the entire frame before publishing any decoded messages."
+    },
+    {
+      "id": "event-with-id",
+      "frame": "{\"jsonrpc\":\"2.0\",\"id\":\"a\",\"method\":\"event\",\"params\":{\"type\":\"notice\"}}",
+      "expected": [
+        "reject:invalidResponse"
+      ],
+      "purpose": "Reject the entire frame before publishing any decoded messages."
+    },
+    {
+      "id": "event-missing-type",
+      "frame": "{\"jsonrpc\":\"2.0\",\"method\":\"event\",\"params\":{}}",
+      "expected": [
+        "reject:invalidResponse"
+      ],
+      "purpose": "Reject the entire frame before publishing any decoded messages."
+    },
+    {
+      "id": "event-empty-type",
+      "frame": "{\"jsonrpc\":\"2.0\",\"method\":\"event\",\"params\":{\"type\":\"\"}}",
+      "expected": [
+        "reject:invalidResponse"
+      ],
+      "purpose": "Reject the entire frame before publishing any decoded messages."
+    },
+    {
+      "id": "event-array-payload",
+      "frame": "{\"jsonrpc\":\"2.0\",\"method\":\"event\",\"params\":{\"type\":\"notice\",\"payload\":[]}}",
+      "expected": [
+        "reject:invalidResponse"
+      ],
+      "purpose": "Reject the entire frame before publishing any decoded messages."
+    },
+    {
+      "id": "event-null-payload",
+      "frame": "{\"jsonrpc\":\"2.0\",\"method\":\"event\",\"params\":{\"type\":\"notice\",\"payload\":null}}",
+      "expected": [
+        "reject:invalidResponse"
+      ],
+      "purpose": "Reject the entire frame before publishing any decoded messages."
+    },
+    {
+      "id": "event-number-session",
+      "frame": "{\"jsonrpc\":\"2.0\",\"method\":\"event\",\"params\":{\"type\":\"notice\",\"session_id\":1}}",
+      "expected": [
+        "reject:invalidResponse"
+      ],
+      "purpose": "Reject the entire frame before publishing any decoded messages."
+    },
+    {
+      "id": "event-string-seq",
+      "frame": "{\"jsonrpc\":\"2.0\",\"method\":\"event\",\"params\":{\"type\":\"notice\",\"seq\":\"1\"}}",
+      "expected": [
+        "reject:invalidResponse"
+      ],
+      "purpose": "Reject the entire frame before publishing any decoded messages."
+    },
+    {
+      "id": "cancel-missing-reason",
+      "frame": "{\"jsonrpc\":\"2.0\",\"method\":\"event\",\"params\":{\"type\":\"request.cancel\",\"payload\":{\"id\":\"a\",\"method\":\"clarify\"}}}",
+      "expected": [
+        "reject:invalidResponse"
+      ],
+      "purpose": "Reject the entire frame before publishing any decoded messages."
+    },
+    {
+      "id": "cancel-extra-key",
+      "frame": "{\"jsonrpc\":\"2.0\",\"method\":\"event\",\"params\":{\"type\":\"request.cancel\",\"payload\":{\"id\":\"a\",\"method\":\"clarify\",\"reason\":\"expired\",\"extra\":true}}}",
+      "expected": [
+        "reject:invalidResponse"
+      ],
+      "purpose": "Reject the entire frame before publishing any decoded messages."
+    },
+    {
+      "id": "cancel-wrong-id",
+      "frame": "{\"jsonrpc\":\"2.0\",\"method\":\"event\",\"params\":{\"type\":\"request.cancel\",\"payload\":{\"id\":1,\"method\":\"clarify\",\"reason\":\"expired\"}}}",
+      "expected": [
+        "reject:invalidResponse"
+      ],
+      "purpose": "Reject the entire frame before publishing any decoded messages."
+    },
+    {
+      "id": "id-too-long",
+      "frame": "{\"jsonrpc\":\"2.0\",\"id\":\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"result\":{}}",
+      "expected": [
+        "reject:invalidResponse"
+      ],
+      "purpose": "Reject the entire frame before publishing any decoded messages."
+    },
+    {
+      "id": "method-too-long",
+      "frame": "{\"jsonrpc\":\"2.0\",\"id\":\"a\",\"method\":\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"params\":{}}",
+      "expected": [
+        "reject:invalidResponse"
+      ],
+      "purpose": "Reject the entire frame before publishing any decoded messages."
+    },
+    {
+      "id": "cancel-reason-too-long",
+      "frame": "{\"jsonrpc\":\"2.0\",\"method\":\"event\",\"params\":{\"type\":\"request.cancel\",\"payload\":{\"id\":\"a\",\"method\":\"clarify\",\"reason\":\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"}}}",
+      "expected": [
+        "reject:invalidResponse"
+      ],
+      "purpose": "Reject the entire frame before publishing any decoded messages."
+    },
+    {
+      "id": "nesting-too-deep",
+      "frame": "{\"jsonrpc\":\"2.0\",\"id\":\"a\",\"result\":[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[0]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]}",
+      "expected": [
+        "reject:messageTooLarge"
+      ],
+      "purpose": "Bound JSON nesting before deserializing."
+    },
+    {
+      "id": "invalid-trailing-line-atomic",
+      "frame": "{\"jsonrpc\":\"2.0\",\"id\":\"first\",\"result\":{}}\n{\"jsonrpc\":\"2.0\",\"id\":\"second\"}",
+      "expected": [
+        "reject:invalidResponse"
+      ],
+      "purpose": "A valid first object followed by an invalid envelope rejects the whole WebSocket message. No first result may be published."
+    }
+  ]
+}

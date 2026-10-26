@@ -1,5 +1,7 @@
 # iPhone tools for Hermes
 
+> Current transport contract: [NATIVE_TRANSPORT.md](NATIVE_TRANSPORT.md). Its Link delivery discussion is historical; current native tools use the authenticated native device-tools bridge. Where transport details differ, use the versioned native contract and its source links.
+
 Requires bighelp plugin 2.11.0 or later on the Hermes host.
 
 Host plugin 2.11.2 is required for the corrected phone-tool delivery path.

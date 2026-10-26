@@ -777,6 +777,8 @@ New code uses Bighelp names. Don't "finish" the rename on this list.
   Python 3.14 and its `messaging` extra (the API server serves RoomLink).
 - `Scripts/AppStoreScreenshots.sh` takes the App Store screenshots from the real app on an isolated host whose
   agents really run their tools on made-up files. No demo chats in store screenshots.
+  `Scripts/AppStorePosters.py` frames them as posters in bighelp.app's style with the app's Ink look (Paper and
+  Black, Inter 800 headlines, the Ember Noodle).
 - **Never start Hermes with a fresh `HERMES_HOME` against a shared Hermes checkout.** Hermes treats it as an
   unfinished update, rebuilds the checkout and rewrites its launchers to point at your throwaway environment. Instead:
   - Use a separate clone of Hermes.

@@ -75,8 +75,11 @@ enum ConversationRootNavigationPresentation {
 struct RootComposeButton: View {
     static let diameter: CGFloat = 60
     var identifier = ConversationRootNavigationPresentation.composeAccessibilityIdentifier
+    var systemImage = "square.and.pencil"
     /// Bigger where it's the screen's one main action (All agents).
     var size: CGFloat = RootComposeButton.diameter
+    /// Touch and hold (right-click on the Mac): the picker, for another agent or a group.
+    var onLongPress: (() -> Void)?
     let action: () -> Void
 
     @BighelpThemeReader private var theme
@@ -84,23 +87,48 @@ struct RootComposeButton: View {
     @ScaledMetric(relativeTo: .title2) private var glyph: CGFloat = 24
     @State private var taps = 0
 
+    @ViewBuilder
     var body: some View {
-        Button {
-            BighelpKeyboard.dismiss()
-            taps += 1
-            action()
-        } label: {
-            Image(systemName: "square.and.pencil")
-                .font(.system(size: glyph * size / Self.diameter, weight: .semibold))
-                .foregroundStyle(theme.actionForeground)
-                .frame(width: size, height: size)
-                .contentShape(.circle)
-                .modifier(ComposeSurface(tint: theme.action, reduceTransparency: reduceTransparency))
+        if let onLongPress {
+            // A tap and a hold on one control: as gestures, so the hold never also counts as a tap.
+            glyphCircle
+                .onTapGesture(perform: tap)
+                .onLongPressGesture(minimumDuration: 0.4) {
+                    BighelpHaptics.tap()
+                    onLongPress()
+                }
+                .newChatRightClickMenu(startTitle: String(localized: "New chat"), start: tap, pick: onLongPress)
+                .bighelpHover(in: Circle())
+                .sensoryFeedback(.impact(weight: .light), trigger: taps)
+                .accessibilityElement()
+                .accessibilityAddTraits(.isButton)
+                .bighelpIconLabel("New chat", shortcut: "⌘N")
+                .accessibilityHint(NewChatButtonCopy.pickHint)
+                .accessibilityAction { tap() }
+                .accessibilityAction(named: "Pick agents") { onLongPress() }
+                .accessibilityIdentifier(identifier)
+        } else {
+            Button(action: tap) { glyphCircle }
+                .bighelpPointerButtonStyle(BighelpPressFeedbackStyle(), outline: .circle)
+                .sensoryFeedback(.impact(weight: .light), trigger: taps)
+                .bighelpIconLabel("New chat", shortcut: "⌘N")
+                .accessibilityIdentifier(identifier)
         }
-        .bighelpPointerButtonStyle(BighelpPressFeedbackStyle(), outline: .circle)
-        .sensoryFeedback(.impact(weight: .light), trigger: taps)
-        .bighelpIconLabel("New chat", shortcut: "⌘N")
-        .accessibilityIdentifier(identifier)
+    }
+
+    private var glyphCircle: some View {
+        Image(systemName: systemImage)
+            .font(.system(size: glyph * size / Self.diameter, weight: .semibold))
+            .foregroundStyle(theme.actionForeground)
+            .frame(width: size, height: size)
+            .contentShape(.circle)
+            .modifier(ComposeSurface(tint: theme.action, reduceTransparency: reduceTransparency))
+    }
+
+    private func tap() {
+        BighelpKeyboard.dismiss()
+        taps += 1
+        action()
     }
 
     private struct ComposeSurface: ViewModifier {

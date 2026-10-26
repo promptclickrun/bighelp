@@ -23,6 +23,12 @@ struct AgentHomeChrome {
     var barTabs: [AppTab] = AppTab.allCases
     /// The Unified Mode Toggle, on the Chat tab's own chat only (Settings › Experience).
     var modeSwitch: BighelpModeSwitch?
+
+    /// New chat lives in the bar under the message box. A chat without that bar (Code mode, the
+    /// iPhone Duo's side strip, Vision Pro's tab ornament) keeps it in the header.
+    func barHoldsNewChat(screen: BighelpScreenGeometry) -> Bool {
+        showsTabBar && !screen.usesSideBar && !BighelpPlatform.usesTabOrnament
+    }
 }
 
 private struct AgentHomeChromeKey: EnvironmentKey {
@@ -37,7 +43,7 @@ extension EnvironmentValues {
 }
 
 /// Every chat's header: ☰ on the left, the live avatar and name in the
-/// middle, New chat and chat options on the right. ☰ is in the same place as
+/// middle, chat options on the right (New chat too where there's no bar). ☰ is in the same place as
 /// on the other root screens; the edge swipe goes back to where the chat opened from.
 struct AgentHomeChatHeader: View {
     let agentID: String
@@ -55,6 +61,7 @@ struct AgentHomeChatHeader: View {
     var screenHeight: CGFloat = 0
     let beforeAction: () -> Void
     @AppStorage(ChatLayoutPreferences.avatarSizeKey) private var avatarSize: ChatAvatarSize = .automatic
+    @Environment(\.bighelpScreen) private var screen
     @AppStorage(ChatLayoutPreferences.showsAgentNameKey) private var showsAgentName = true
 
     var body: some View {
@@ -101,7 +108,7 @@ struct AgentHomeChatHeader: View {
                     Spacer(minLength: 0)
                 }
                 HStack(spacing: 0) {
-                    newChatButton
+                    if !chrome.barHoldsNewChat(screen: screen) { newChatButton }
                     options
                         .frame(width: HeaderButtonMetrics.glass, height: HeaderButtonMetrics.glass)
                         .bighelpNavigationGlass(in: Circle(), isInteractive: true)
@@ -173,7 +180,8 @@ struct AgentBoardHeaderButtons: View {
             }
             Spacer()
             HStack(spacing: 0) {
-                newChatButton
+                // A board opened with Back has no bar, so it keeps New chat up here.
+                if context.onBack != nil { newChatButton }
                 Menu {
                     Button("Agent profile", systemImage: "person.crop.circle", action: context.onProfile)
                     Divider()
@@ -282,7 +290,7 @@ private struct HeaderButtonsPlacement: ViewModifier {
     }
 }
 
-private enum NewChatButtonCopy {
+enum NewChatButtonCopy {
     static var pickHint: String {
         BighelpPlatform.isMac
             ? "Right-click to pick other agents or start a group."

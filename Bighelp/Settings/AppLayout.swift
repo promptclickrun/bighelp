@@ -82,14 +82,14 @@ enum BighelpPlace: String, CaseIterable, Codable, Identifiable, Sendable {
 /// App layout). ☰ lists every place the bar doesn't, plus Agents and Settings
 /// always, so each stays one tap away.
 struct BighelpAppLayout: Equatable, Sendable {
-    /// Chat comes first; four more fill the bar.
-    static let maximumPinned = 4
+    /// Chat comes first; three more fill the bar, two either side of New chat.
+    static let maximumPinned = 3
 
     private(set) var pinned: [BighelpPlace]
     private(set) var menuOrder: [BighelpPlace]
 
     static let standard = BighelpAppLayout(
-        pinned: [.feed, .ideas, .goals, .files],
+        pinned: [.feed, .ideas, .goals],
         menuOrder: [.agents, .sessions, .projects, .kanban, .workflows, .scheduledTasks, .usage,
                     .feed, .ideas, .goals, .files, .settings])
 

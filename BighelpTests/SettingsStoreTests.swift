@@ -791,7 +791,9 @@ struct SettingsStoreTests {
         restored.pickBubbleColor(.ocean)
         #expect(restored.customBubbleHex == nil && restored.bubbleColor == .ocean)
         restored.pickBubbleColor(.lavender)
-        #expect(restored.bubbleColor == nil)
+        #expect(restored.bubbleColor == .lavender, "Lavender is a choice like any other")
+        restored.pickBubbleColor(.graphite)
+        #expect(restored.bubbleColor == nil, "Ink is the default, saved as no choice")
         #expect(SettingsStore(defaults: defaults).customBubbleHex == nil)
 
         defaults.set("not-a-color", forKey: "loopdy.appearance.customBubbleColor")

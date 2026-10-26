@@ -595,6 +595,8 @@ struct ChatView: View {
                         // Chats keep the bottom bar under the composer.
                         if showsChatBar, !screen.usesSideBar, let selection = homeChrome.tabSelection {
                             FloatingTabBar(selection: selection, tabs: homeChrome.barTabs,
+                                           onNewChat: startNewChatFromBar, onPickAgents: pickAgentsFromBar,
+                                           newChatIdentifier: "chat.home.new-chat",
                                            homeIndicatorSink: FloatingTabBar.homeIndicatorSink(forBottomInset: bottomSafeArea),
                                            unread: homeChrome.unreadTabs, isInChat: true)
                                 .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -688,10 +690,27 @@ struct ChatView: View {
         return model.headerSessionTitle
     }
 
+    /// The agent this chat is with; a group chat has no one agent.
+    private var homeAgentID: String {
+        resolvedIdentityParticipants.first?.stableID ?? model.memberIDs.first ?? agentName
+    }
+
+    /// The bar's New chat: a new chat with this agent. A group chat has no one agent, so it opens the picker.
+    private func startNewChatFromBar() {
+        dismissKeyboard()
+        if model.isBotMode { homeChrome.onNewChat(nil) } else { homeChrome.onStartChat(homeAgentID) }
+    }
+
+    /// Touch and hold New chat: the picker, with this chat's agent already picked.
+    private func pickAgentsFromBar() {
+        dismissKeyboard()
+        homeChrome.onNewChat(model.isBotMode ? nil : homeAgentID)
+    }
+
     private var homeHeader: some View {
         let participant = resolvedIdentityParticipants.first
         return AgentHomeChatHeader(
-            agentID: participant?.stableID ?? model.memberIDs.first ?? agentName,
+            agentID: homeAgentID,
             displayName: agentName,
             imageURL: participant?.imageURL,
             activity: model.liveActivityKind,

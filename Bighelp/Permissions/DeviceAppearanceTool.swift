@@ -56,7 +56,7 @@ final class DeviceAppearanceTool {
     private var look: [String: BighelpJSONValue] {
         [
             "mode": .string(settings.appearance.rawValue),
-            "color": .string(settings.customBubbleHex.map { "#" + $0 } ?? (settings.bubbleColor ?? .lavender).agentName),
+            "color": .string(settings.customBubbleHex.map { "#" + $0 } ?? (settings.bubbleColor ?? .graphite).agentName),
         ]
     }
 

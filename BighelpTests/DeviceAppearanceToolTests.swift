@@ -98,12 +98,12 @@ struct DeviceAppearanceToolTests {
 
     @Test func lavenderAndInkUseTheNamesPeopleSee() throws {
         let fixture = AppearanceFixture()
-        _ = try fixture.tool.execute(operation: "appearance.set", arguments: ["color": .string("ink")], authorize: {})
-        #expect(fixture.settings.bubbleColor == .graphite)
+        _ = try fixture.tool.execute(operation: "appearance.set", arguments: ["color": .string("lavender")], authorize: {})
+        #expect(fixture.settings.bubbleColor == .lavender)
         let payload = try fixture.tool.execute(operation: "appearance.set",
-                                               arguments: ["color": .string("lavender")], authorize: {})
-        #expect(fixture.settings.bubbleColor == nil, "Lavender is the default, saved as no choice")
-        #expect(payload["color"] == .string("lavender"))
+                                               arguments: ["color": .string("ink")], authorize: {})
+        #expect(fixture.settings.bubbleColor == nil, "Ink is the default, saved as no choice")
+        #expect(payload["color"] == .string("ink"))
     }
 
     @Test func refusedRequestsChangeNothing() {

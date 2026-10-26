@@ -309,7 +309,17 @@ extension RootShellView {
         if appState.selectedTab == .sessions { openHomeChat(replacing: true) }
     }
 
-    /// Header New chat: pick one agent for a 1:1 chat or several for a group.
+    /// New chat in the bar, on every place it holds: a chat with the agent in use. All agents
+    /// has its own New chat, bottom right, so the bar leaves it out there.
+    var barNewChat: (() -> Void)? {
+        guard !fleetModeOn else { return nil }
+        return {
+            appState.chatOpenedFromList = true
+            startNewChat(explicitAgentID: nil)
+        }
+    }
+
+    /// New chat's touch and hold: pick one agent for a 1:1 chat or several for a group.
     func presentNewChatPicker(seed: String?) {
         guard let owner = currentWorkspaceOwner else {
             actionErrorMessage = "Connect to your Hermes host to start a chat."

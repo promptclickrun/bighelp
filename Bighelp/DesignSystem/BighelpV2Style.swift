@@ -93,17 +93,17 @@ private struct BighelpFormSurfaceModifier: ViewModifier {
             .scrollContentBackground(.hidden)
             .background(theme.canvas.ignoresSafeArea())
             .tint(theme.action)
-        if appearance.simpleBots {
-            form.toggleStyle(SimpleBotsSwitchStyle())
+        if appearance.usesInk {
+            form.toggleStyle(InkSwitchStyle())
         } else {
             form.toggleStyle(BighelpFormSwitchStyle())
         }
     }
 }
 
-/// Bots mode tints with the page's ink, which is white after dark: a switch would be white on
-/// white. Its switches are green, as on its own Settings page.
-private struct SimpleBotsSwitchStyle: ToggleStyle {
+/// Ink tints with the page's ink, which is white after dark: a switch would be white on white.
+/// Its switches are green, as on Bots mode's own Settings page.
+private struct InkSwitchStyle: ToggleStyle {
     func makeBody(configuration: Configuration) -> some View {
         Toggle(configuration).toggleStyle(BighelpFormSwitchStyle()).tint(SimpleBotColor.green.color)
     }

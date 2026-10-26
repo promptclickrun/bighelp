@@ -57,13 +57,13 @@ final class SettingsStore {
 
     /// "Custom" or the built-in color's name.
     var bubbleColorName: String {
-        customBubbleHex != nil ? String(localized: "Custom") : (bubbleColor ?? .lavender).name
+        customBubbleHex != nil ? String(localized: "Custom") : (bubbleColor ?? .graphite).name
     }
 
     /// One of the built-in colors, replacing a custom one.
     func pickBubbleColor(_ color: BighelpBubbleColor) {
-        // Lavender is the default, so it's stored as no choice.
-        bubbleColor = color == .lavender ? nil : color
+        // Ink is the default, so it's stored as no choice.
+        bubbleColor = color == .graphite ? nil : color
         customBubbleHex = nil
     }
 
@@ -478,8 +478,8 @@ final class SettingsStore {
         ) ?? .botChat
         foldCompletedTurns = defaults.bool(forKey: Keys.foldCompletedTurns, default: true)
         reactionsReachAgent = defaults.bool(forKey: Keys.reactionsReachAgent, default: true)
-        lightBackground = defaults.string(forKey: Keys.lightBackground).flatMap(BighelpLightBackground.init(rawValue:)) ?? .cream
-        darkBackground = defaults.string(forKey: Keys.darkBackground).flatMap(BighelpDarkBackground.init(rawValue:)) ?? .graphite
+        lightBackground = defaults.string(forKey: Keys.lightBackground).flatMap(BighelpLightBackground.init(rawValue:)) ?? .paper
+        darkBackground = defaults.string(forKey: Keys.darkBackground).flatMap(BighelpDarkBackground.init(rawValue:)) ?? .black
         bubbleColor = defaults.string(forKey: Keys.bubbleColor).flatMap(BighelpBubbleColor.init(rawValue:))
         customBubbleHex = BighelpCustomBubbleColor.validated(defaults.string(forKey: Keys.customBubbleColor))
         windowTransparency = defaults.object(forKey: Keys.windowTransparency) == nil

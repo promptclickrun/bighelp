@@ -228,26 +228,143 @@ struct DirectHermesSignInRenewalTests {
         #expect(Self.refreshToken(vault.stored) == "refresh-2")
     }
 
-    /// A 401 from the renewal route means the provider ended the sign-in: the token is dropped and
-    /// the person signs in again. It is not sent a second time.
+    /// Hermes' own 401 on the renewal route (`session_expired`) means the provider ended the sign-in:
+    /// the person signs in again, every time it's tried. The Keychain isn't touched, so a newer
+    /// sign-in another authenticator saves meanwhile is never erased; a new sign-in replaces it.
     @Test func aRejectedRenewalAsksForANewSignIn() async throws {
         let host = try ScriptedHermes { request in
-            request.path == "/auth/native/refresh" ? .status(401) : .json("{}")
+            request.path == "/auth/native/refresh"
+                ? .raw(401, type: "application/json", body: #"{"error":"session_expired"}"#) : .json("{}")
         }
         let vault = try lapsedVault(port: try await host.start())
+        let saved = vault.stored
 
         await #expect(throws: DirectHermesError.authenticationRequired) {
             try await restored(from: vault).authenticatedResponse(context)
         }
-        #expect(Self.refreshToken(vault.stored) == nil)
+        #expect(vault.stored == saved, "Nothing is written on a 401")
         await #expect(throws: DirectHermesError.authenticationRequired) {
             try await restored(from: vault).authenticatedResponse(context)
         }
+    }
+
+    /// Two copies of one sign-in renew at once, and the host turns one away with a 401 before the
+    /// other's renewal comes back. The 401 must leave the Keychain alone, so the other copy can still
+    /// save its new sign-in (writing a token-less copy on the 401 made that save fail).
+    @Test func aRejectedRenewalLeavesTheOtherCopysNewSignIn() async throws {
+        let calls = Counter()
+        let host = try ScriptedHermes { request in
+            guard request.path == "/auth/native/refresh" else { return .json("{}") }
+            return calls.next() == 1
+                ? .after(1.0, Self.renewed("refresh-2"))
+                : .after(0.2, .raw(401, type: "application/json", body: #"{"error":"session_expired"}"#))
+        }
+        let vault = try lapsedVault(port: try await host.start())
+        let winner = try restored(from: vault)
+        let loser = try restored(from: vault)
+        let winning = Task { try await winner.authenticatedResponse(context) }
+        for _ in 0..<200 where !host.paths.contains("/auth/native/refresh") {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        await #expect(throws: DirectHermesError.authenticationRequired) { try await loser.authenticatedResponse(context) }
+        _ = try await winning.value
+        #expect(Self.refreshToken(vault.stored) == "refresh-2", "The other copy's new sign-in is saved")
+    }
+
+    /// A proxy in front of Hermes answering 502 says nothing about the token.
+    @Test func aProxyErrorDuringRenewalKeepsTheRefreshToken() async throws {
+        let calls = Counter()
+        let host = try ScriptedHermes { request in
+            guard request.path == "/auth/native/refresh" else { return .json("{}") }
+            return calls.next() == 1 ? .status(502) : Self.renewed("refresh-2")
+        }
+        let vault = try lapsedVault(port: try await host.start())
+
+        await #expect(throws: (any Error).self) { try await restored(from: vault).authenticatedResponse(context) }
+        #expect(Self.refreshToken(vault.stored) == "refresh-1")
+
+        let response = try await restored(from: vault).authenticatedResponse(context)
+        #expect(response.http.statusCode == 200)
+        #expect(Self.refreshToken(vault.stored) == "refresh-2")
+    }
+
+    /// Hermes' own 401 on the renewal route (`session_expired`) means the provider ended the sign-in:
+    /// the person signs in again, every time it's tried. The Keychain isn't touched, so a newer
+    /// sign-in another authenticator saves meanwhile is never erased; a new sign-in replaces it.
+    @Test func aRejectedRenewalAsksForANewSignIn() async throws {
+        let host = try ScriptedHermes { request in
+            request.path == "/auth/native/refresh"
+                ? .raw(401, type: "application/json", body: #"{"error":"session_expired"}"#) : .json("{}")
+        }
+        let vault = try lapsedVault(port: try await host.start())
+        let saved = vault.stored
+
+        await #expect(throws: DirectHermesError.authenticationRequired) {
+            try await restored(from: vault).authenticatedResponse(context)
+        }
+        #expect(vault.stored == saved, "Nothing is written on a 401")
+        await #expect(throws: DirectHermesError.authenticationRequired) {
+            try await restored(from: vault).authenticatedResponse(context)
+        }
+    }
+
+    /// Two copies of one sign-in renew at once. If the host turns one away with a 401 while the other
+    /// saves its new sign-in, the 401 must not erase it (the old code wrote a token-less copy first).
+    @Test func aRejectedRenewalLeavesANewerSignInSavedMeanwhile() async throws {
+        let host = try ScriptedHermes { request in
+            request.path == "/auth/native/refresh"
+                ? .after(0.5, .raw(401, type: "application/json", body: #"{"error":"session_expired"}"#)) : .json("{}")
+        }
+        let vault = try lapsedVault(port: try await host.start())
+        let loser = try restored(from: vault)
+        let request = Task { try await loser.authenticatedResponse(context) }
+        for _ in 0..<200 where !host.paths.contains("/auth/native/refresh") {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        var newer = try #require(vault.stored)
+        newer.authentication = .bearer(accessToken: Self.newToken, refreshToken: "refresh-2",
+                                       expiresAt: Date().addingTimeInterval(3_600))
+        try vault.save(newer)
+
+        await #expect(throws: DirectHermesError.authenticationRequired) { try await request.value }
+        #expect(vault.stored == newer, "The other copy's new sign-in stays")
+    }
+
+    /// A proxy in front of Hermes (Basic auth, Cloudflare Access) that challenges the renewal is not
+    /// Hermes ending the sign-in: the refresh token stays, and nobody is asked to sign in again.
+    @Test func aProxyChallengeDuringRenewalKeepsTheSignIn() async throws {
+        let host = try ScriptedHermes { request in
+            request.path == "/auth/native/refresh"
+                ? .raw(401, type: "text/html", headers: ["WWW-Authenticate": #"Basic realm="proxy""#], body: "no")
+                : .json("{}")
+        }
+        let vault = try lapsedVault(port: try await host.start())
+
+        await #expect(throws: (any Error).self) { try await restored(from: vault).authenticatedResponse(context) }
+        #expect(Self.refreshToken(vault.stored) == "refresh-1")
+        do {
+            _ = try await restored(from: vault).authenticatedResponse(context)
+        } catch let error as DirectHermesError {
+            #expect(error != .authenticationRequired, "A proxy's challenge doesn't ask for a new sign-in")
+        }
+    }
+
+    /// While the host refuses renewals (a 502 from a proxy, a 429), requests that need a fresh token
+    /// get the same error for a moment instead of each sending another renewal.
+    @Test func aRefusedRenewalIsNotSentAgainForEveryRequest() async throws {
+        let host = try ScriptedHermes { request in
+            request.path == "/auth/native/refresh" ? .status(502) : .json("{}")
+        }
+        let authenticator = try lapsed(port: try await host.start())
+
+        await #expect(throws: DirectHermesError.serverUnavailable) { try await authenticator.authenticatedResponse(context) }
+        await #expect(throws: DirectHermesError.serverUnavailable) { try await authenticator.authenticatedResponse(context) }
         #expect(host.paths.filter { $0 == "/auth/native/refresh" }.count == 1)
     }
 
     /// An authenticator that started from an older sign-in never writes over a newer one saved since,
-    /// whether its answer was a new sign-in or a 401.
+    /// and never sends the token that newer sign-in replaced.
     @Test func aStaleAuthenticatorDoesNotOverwriteANewerSignIn() async throws {
         let calls = Counter()
         let host = try ScriptedHermes { request in

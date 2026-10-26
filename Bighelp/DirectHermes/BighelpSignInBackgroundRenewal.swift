@@ -24,15 +24,36 @@ enum BighelpSignInBackgroundRenewal {
         }
     }
 
-    /// BackgroundTasks calls this on its own queue.
+    /// BackgroundTasks calls this on its own queue. When iOS's time runs out the task is reported done
+    /// at once, not when the renewal on its way times out; a renewal cut off keeps its token anyway.
     nonisolated private static func handle(_ task: BGTask) {
         nonisolated(unsafe) let task = task
+        let completion = Completion(task)
         let work = Task { @MainActor in
             scheduleIfNeeded()
             if let registry { await renew(registry, deadline: Date(timeIntervalSinceNow: interval)) }
-            task.setTaskCompleted(success: !Task.isCancelled)
+            completion.finish(success: !Task.isCancelled)
         }
-        task.expirationHandler = { work.cancel() }
+        task.expirationHandler = {
+            work.cancel()
+            completion.finish(success: false)
+        }
+    }
+
+    /// Reports the task done exactly once, from whichever side finishes first.
+    private final class Completion: @unchecked Sendable {
+        private let task: BGTask
+        private let lock = NSLock()
+        private var finished = false
+        init(_ task: BGTask) { self.task = task }
+
+        func finish(success: Bool) {
+            let first = lock.withLock { () -> Bool in
+                defer { finished = true }
+                return !finished
+            }
+            if first { task.setTaskCompleted(success: success) }
+        }
     }
 
     /// Renews each computer that isn't connected and whose access token ends before `deadline`.

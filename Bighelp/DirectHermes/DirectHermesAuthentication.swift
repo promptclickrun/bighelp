@@ -509,6 +509,11 @@ final class DirectHermesAuthenticator {
     /// or throw, so an older answer never replaces a newer sign-in.
     var persistRotation: ((DirectHermesSavedConnection, DirectHermesSavedConnection) throws -> Void)?
     private var refreshTask: Task<Void, any Error>?
+    /// A renewal the host answered with a refusal that doesn't end the sign-in (a 503 while the
+    /// Portal is down, a 429, a proxy's 502 or its own 401). For a moment the same error comes back
+    /// instead of a new renewal for every request. A request cut off before any answer retries at once.
+    private var refusedRenewal: (at: ContinuousClock.Instant, error: DirectHermesError)?
+    static let refusedRenewalPause: Duration = .seconds(15)
     private var signInID: UUID?
     private var signInTask: Task<DirectHermesSavedConnection, any Error>?
     private var browserAuthentication: DirectHermesBrowserAuthentication?
@@ -1017,6 +1022,7 @@ final class DirectHermesAuthenticator {
 
     private func refresh() async throws {
         if let refreshTask { return try await refreshTask.value }
+        if let refused = refusedRenewal, refused.at.duration(to: .now) < Self.refusedRenewalPause { throw refused.error }
         let task = Task { @MainActor in try await self.performRefresh() }
         refreshTask = task
         defer { refreshTask = nil }
@@ -1140,7 +1146,7 @@ final class DirectHermesAuthenticator {
     /// sign-out that dropping the token forces. Hermes Desktop keeps its token the same way.
     private func performRefresh() async throws {
         guard let current = savedConnection,
-              case .bearer(let accessToken, let refreshToken?, let expiry) = current.authentication else {
+              case .bearer(_, let refreshToken?, _) = current.authentication else {
             throw DirectHermesError.authenticationRequired
         }
         // Another authenticator on the same Keychain item (the live connection, the alerts client, a
@@ -1150,21 +1156,35 @@ final class DirectHermesAuthenticator {
         let response = try await http.send(route: "/auth/native/refresh", method: "POST", body: [
             "refresh_token": .string(refreshToken), "provider": .string(current.provider ?? "")
         ])
-        if response.http.statusCode == 401 {
-            var spent = current
-            spent.authentication = .bearer(accessToken: accessToken, refreshToken: nil, expiresAt: expiry)
-            if let persistRotation { try persistRotation(current, spent) }
-            savedConnection = spent
+        // Hermes' own 401 (`session_expired`, no challenge header) says the token is dead. The Keychain
+        // keeps it: another authenticator may be saving a newer sign-in right now, and erasing this one
+        // could erase that. A new sign-in replaces it anyway.
+        if response.http.statusCode == 401, response.http.value(forHTTPHeaderField: "WWW-Authenticate") == nil {
             throw DirectHermesError.authenticationRequired
         }
-        if response.http.statusCode == 503 { throw DirectHermesError.serverUnavailable }
-        try DirectHermesHTTP.requireSuccess(response)
+        guard (200...299).contains(response.http.statusCode) else {
+            let refusal = Self.refusal(response)
+            refusedRenewal = (.now, refusal)
+            throw refusal
+        }
         let refreshed = try session(from: response)
         try requireIdentity(refreshed.provider ?? "", refreshed.userID ?? "", matches: current)
         // Compare-and-swap against the stored sign-in: a newer one saved by another
         // authenticator is never overwritten by this older answer.
         if let persistRotation { try persistRotation(current, refreshed) }
         savedConnection = refreshed
+        refusedRenewal = nil
+    }
+
+    /// What a refused renewal says to the rest of the app; none of these end the sign-in.
+    private static func refusal(_ response: DirectHermesHTTP.Response) -> DirectHermesError {
+        if response.http.statusCode == 503 { return .serverUnavailable }
+        do {
+            try DirectHermesHTTP.requireSuccess(response)
+            return .invalidResponse
+        } catch {
+            return DirectHermesHTTP.safeError(error)
+        }
     }
 
     /// Leaving the app closes the connection and cancels its requests. A renewal already on

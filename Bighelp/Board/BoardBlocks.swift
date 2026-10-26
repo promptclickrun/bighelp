@@ -318,7 +318,7 @@ struct BoardFilterChip: View {
 // MARK: - Files on a tile
 
 /// A Feed tile's files: up to two picture thumbnails, then a count of the rest. A tap opens
-/// the post. Same label and identifier as the full strip (`BoardFilesStrip`).
+/// the post.
 struct BoardTileFiles: View {
     let item: AgentBoardItem
     let files: [AgentBoardItem.File]

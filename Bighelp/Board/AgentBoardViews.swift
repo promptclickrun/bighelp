@@ -486,19 +486,6 @@ enum BoardTimeBucket {
         }
         return date.formatted(.dateTime.month(.wide).day())
     }
-
-    static func grouped(_ items: [AgentBoardItem], now: Date = .now) -> [(title: String, items: [AgentBoardItem])] {
-        var groups: [(title: String, items: [AgentBoardItem])] = []
-        for item in items.sorted(by: { $0.createdAt > $1.createdAt }) {
-            let title = self.title(for: item.createdAt, now: now)
-            if groups.last?.title == title {
-                groups[groups.count - 1].items.append(item)
-            } else {
-                groups.append((title, [item]))
-            }
-        }
-        return groups
-    }
 }
 
 // MARK: - Feed
@@ -990,6 +977,10 @@ private struct IdeaHeroTile: View {
             }
             .tint(block.ink)
             .accessibilityHint("Opens the idea")
+            // The menu's actions for VoiceOver too, as on every other board item.
+            .accessibilityActions {
+                BoardItemMenu.items(idea, context: context, asksWhy: .constant(false), includesShare: false)
+            }
             .accessibilityIdentifier("board.idea.\(idea.id)")
             Spacer(minLength: 0)
             VStack(alignment: .leading, spacing: BighelpTokens.space4) {
@@ -1086,6 +1077,9 @@ private struct IdeaTile: View {
         }
         .tint(block.ink)
         .accessibilityHint("Opens the idea")
+        .accessibilityActions {
+            BoardItemMenu.items(idea, context: context, asksWhy: .constant(false), includesShare: false)
+        }
         .accessibilityIdentifier("board.idea.\(idea.id)")
         #if targetEnvironment(macCatalyst)
         .overlay(alignment: .bottomTrailing) {

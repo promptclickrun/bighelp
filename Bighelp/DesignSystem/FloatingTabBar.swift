@@ -226,8 +226,6 @@ struct FloatingTabBar: View {
         .contentShape(.rect)
     }
 
-    private var increasedContrast: Bool { colorSchemeContrast == .increased }
-
     @BighelpThemeReader private var theme
 }
 

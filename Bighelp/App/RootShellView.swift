@@ -1974,7 +1974,7 @@ struct RootShellView: View {
         return false
     }
 
-    @BighelpThemeReader private var theme
+    @BighelpThemeReader var theme
 
 }
 

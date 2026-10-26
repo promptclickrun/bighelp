@@ -154,7 +154,8 @@ struct BighelpMenu<Recent: View>: View {
             }
             .padding(.bottom, BighelpTokens.space4)
         }
-        .listRowBackground(theme.surface)
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
     }
 
     @ViewBuilder
@@ -242,8 +243,8 @@ struct BighelpMenu<Recent: View>: View {
         Button { choose(destinations.code?.onNewSession ?? destinations.onNewChat) } label: {
             Image(systemName: "square.and.pencil")
                 .font(.bighelp(.body).weight(.semibold))
-                // Dark Mac palettes use pale lavender and need dark icon ink.
-                .foregroundStyle(BighelpPlatform.isMac ? theme.actionForeground : .white)
+                // The person's color and its own ink: white after dark is the ink look's color.
+                .foregroundStyle(theme.actionForeground)
                 .frame(width: BighelpTokens.scaled(40), height: BighelpTokens.scaled(40))
                 .background(theme.action, in: Circle())
                 .contentShape(Circle())
@@ -353,7 +354,8 @@ struct BighelpMenu<Recent: View>: View {
                     .accessibilityIdentifier("menu.chats")
             }
         }
-        .listRowBackground(theme.surface)
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
     }
 
     // MARK: More
@@ -375,7 +377,8 @@ struct BighelpMenu<Recent: View>: View {
                         action: folder.open)
                 }
             }
-            .listRowBackground(theme.surface)
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
         }
     }
 

@@ -6,17 +6,17 @@ import Testing
 struct AppLayoutTests {
     @Test func theStandardLayoutIsTodaysBarAndMenu() {
         let layout = BighelpAppLayout.standard
-        #expect(layout.barTabs == [.sessions, .feed, .ideas, .goals, .apps])
+        #expect(layout.barTabs == [.sessions, .feed, .ideas, .goals], "Two either side of New chat")
         #expect(layout.menuPlaces == [.agents, .sessions, .projects, .kanban, .workflows, .scheduledTasks, .usage,
-                                      .settings])
+                                      .files, .settings])
     }
 
     @Test func sessionsIsInTheMenuAndCanTakeABottomBarTab() {
         var layout = BighelpAppLayout.standard
         #expect(layout.menuPlaces[1] == .sessions, "Every chat, right under Agents")
-        layout.unpin(.files)
+        layout.unpin(.goals)
         layout.pin(.sessions)
-        #expect(layout.barTabs == [.sessions, .feed, .ideas, .goals, .sessionList],
+        #expect(layout.barTabs == [.sessions, .feed, .ideas, .sessionList],
                 "Its own tab: Chat stays the agent's chat")
         #expect(!layout.menuPlaces.contains(.sessions), "A pinned place isn't listed twice")
         #expect(BighelpPlace(tab: .sessionList) == .sessions)
@@ -34,27 +34,42 @@ struct AppLayoutTests {
         var layout = BighelpAppLayout.standard
         for place in [BighelpPlace.feed, .ideas, .goals] { layout.unpin(place) }
         for place in [BighelpPlace.kanban, .workflows, .scheduledTasks] { layout.pin(place) }
-        #expect(layout.barTabs == [.sessions, .apps, .kanban, .workflows, .scheduledTasks])
-        #expect(layout.menuPlaces == [.agents, .sessions, .projects, .usage, .feed, .ideas, .goals, .settings],
+        #expect(layout.barTabs == [.sessions, .kanban, .workflows, .scheduledTasks])
+        #expect(layout.menuPlaces == [.agents, .sessions, .projects, .usage, .feed, .ideas, .goals, .files, .settings],
                 "Feed, Ideas and Goals stay one tap away in the menu")
         #expect(!layout.menuPlaces.contains(.kanban), "A pinned place isn't listed twice")
     }
 
-    @Test func theBarHoldsChatAndFourMoreAndSettingsStaysInTheMenu() {
+    @Test func theBarHoldsChatAndThreeMoreAndSettingsStaysInTheMenu() {
         var layout = BighelpAppLayout.standard
         #expect(!layout.canPinMore)
         layout.pin(.kanban)
         #expect(!layout.isPinned(.kanban), "Full: remove one first")
-        layout.unpin(.files)
+        layout.unpin(.goals)
         layout.pin(.settings)
         #expect(!layout.isPinned(.settings), "Settings can't leave the menu")
         layout.pin(.kanban)
         #expect(layout.barTabs.last == .kanban)
     }
 
+    @Test func aFourPlaceBarFromAnOlderBuildKeepsThreeAndTheFourthGoesBackToTheMenu() {
+        let layout = BighelpAppLayout(saved: #"{"pinned":["feed","ideas","goals","files"],"menu":[]}"#)
+        #expect(layout.barTabs == [.sessions, .feed, .ideas, .goals])
+        #expect(layout.menuPlaces.contains(.files), "Still one tap away in ☰")
+    }
+
+    @MainActor
+    @Test func newChatSitsInTheMiddleOfTheBar() {
+        #expect(FloatingTabBar.slots(tabs: [.sessions, .feed, .ideas, .goals], hasNewChat: true)
+                == [.tab(.sessions), .tab(.feed), .newChat, .tab(.ideas), .tab(.goals)])
+        #expect(FloatingTabBar.slots(tabs: [.sessions], hasNewChat: true) == [.tab(.sessions), .newChat])
+        #expect(!FloatingTabBar.slots(tabs: [.sessions, .feed], hasNewChat: false).contains(.newChat),
+                "All agents has its own New chat")
+    }
+
     @Test func agentsAndSettingsStayInTheMenuWhenPinned() {
         var layout = BighelpAppLayout.standard
-        layout.unpin(.files)
+        layout.unpin(.goals)
         layout.pin(.agents)
         #expect(layout.barTabs.last == .agents)
         #expect(layout.menuPlaces.first == .agents, "Quick screens hide the bar; ☰ still reaches Agents")
@@ -68,9 +83,9 @@ struct AppLayoutTests {
 
     @Test func barAndMenuOrdersMove() {
         var layout = BighelpAppLayout.standard
-        layout.movePinned(from: [3], to: 0)
-        #expect(layout.barTabs == [.sessions, .apps, .feed, .ideas, .goals], "Chat stays first")
-        layout.moveMenu(from: [7], to: 0)
+        layout.movePinned(from: [2], to: 0)
+        #expect(layout.barTabs == [.sessions, .goals, .feed, .ideas], "Chat stays first")
+        layout.moveMenu(from: [8], to: 0)
         #expect(layout.menuPlaces.first == .settings)
         layout.unpin(.goals)
         #expect(layout.menuPlaces.last == .goals, "Taken out of the bar, it comes back at the end of the menu")
@@ -105,7 +120,7 @@ struct AppLayoutTests {
         #expect(settings.appLayout == .standard)
         settings.appLayout.unpin(.feed)
         settings.appLayout.pin(.kanban)
-        #expect(SettingsStore(defaults: defaults).appLayout.barTabs == [.sessions, .ideas, .goals, .apps, .kanban])
+        #expect(SettingsStore(defaults: defaults).appLayout.barTabs == [.sessions, .ideas, .goals, .kanban])
         settings.appLayout = .standard
         #expect(defaults.string(forKey: "bighelp.app-layout") == nil, "The standard layout saves nothing")
     }

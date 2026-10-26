@@ -81,7 +81,8 @@ final class AppLayoutUITests: BighelpUITestCase {
 
             openAppLayout(in: app)
             let add = app.buttons["app-layout.add.sessions"]
-            app.buttons["app-layout.remove.files"].tap()
+            // The bar is full (Feed, Ideas, Goals): one place makes room.
+            app.buttons["app-layout.remove.goals"].tap()
             XCTAssertTrue(scrollTo(add, in: app), "Sessions can go in the bottom bar")
             add.tap()
             for _ in 0..<4 { app.swipeDown() }

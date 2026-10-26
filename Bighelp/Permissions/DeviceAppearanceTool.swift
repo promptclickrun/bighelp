@@ -56,7 +56,7 @@ final class DeviceAppearanceTool {
     private var look: [String: BighelpJSONValue] {
         [
             "mode": .string(settings.appearance.rawValue),
-            "color": .string(settings.customBubbleHex.map { "#" + $0 } ?? (settings.bubbleColor ?? .lavender).agentName),
+            "color": .string(settings.customBubbleHex.map { "#" + $0 } ?? (settings.bubbleColor ?? .graphite).agentName),
         ]
     }
 
@@ -94,6 +94,6 @@ final class DeviceAppearanceTool {
 }
 
 private extension BighelpBubbleColor {
-    /// The name Appearance shows, lowercased ("ink" for the dark gray).
+    /// The name Appearance shows, lowercased ("ink" for `graphite`).
     var agentName: String { name.lowercased() }
 }

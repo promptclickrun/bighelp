@@ -1017,15 +1017,13 @@ struct BighelpIconTile: View {
     var body: some View {
         let color = tint ?? theme.action
         let solid = colorSchemeContrast == .increased
-        let shape = RoundedRectangle(cornerRadius: side * 0.3, style: .continuous)
+        // Round, as Bots mode draws its rows: a soft wash of the person's color with the icon in it.
+        // Increased Contrast keeps a solid circle with the color's own ink.
         BighelpSymbolImage(systemName: systemName)
-            .frame(width: side * 0.72, height: side * 0.72)
-            // A soft wash of the accent with the icon in the accent itself.
-            // Increased Contrast keeps a solid tile with the accent's own ink.
+            .frame(width: side * 0.62, height: side * 0.62)
             .foregroundStyle(solid ? (tint == nil ? theme.actionForeground : .white) : color)
             .frame(width: side, height: side)
-            .background(color.opacity(solid ? 1 : (theme.isDarkPalette ? 0.26 : 0.13)), in: shape)
-            .overlay { if !solid { shape.strokeBorder(color.opacity(theme.isDarkPalette ? 0.22 : 0.16), lineWidth: 1) } }
+            .background(color.opacity(solid ? 1 : (theme.isDarkPalette ? 0.2 : 0.08)), in: Circle())
             .accessibilityHidden(true)
     }
 

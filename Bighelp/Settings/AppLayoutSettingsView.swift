@@ -97,7 +97,7 @@ struct AppLayoutSettingsView: View {
             Text("Add to the bottom bar")
         } footer: {
             Text(layout.canPinMore
-                 ? "The bottom bar holds Chat and up to \(BighelpAppLayout.maximumPinned) more."
+                 ? "The bottom bar holds Chat and up to \(BighelpAppLayout.maximumPinned) more, around New chat."
                  : "The bottom bar is full. Remove one to add another.")
         }
         .listRowBackground(theme.surface)

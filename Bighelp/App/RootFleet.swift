@@ -637,7 +637,7 @@ extension RootShellView {
                     .renderingMode(.template)
                     .scaledToFit()
                     .frame(width: 22, height: 22)
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(theme.action)
                     .bighelpToolbarIcon()
             }
                 .bighelpIconLabel("Show one host")

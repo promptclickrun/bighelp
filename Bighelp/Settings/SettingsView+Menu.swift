@@ -29,7 +29,8 @@ extension SettingsView {
 
     func settingsMenuRow(_ section: SettingsMenuSection) -> some View {
         HStack(spacing: BighelpTokens.space12) {
-            BighelpIconTile(systemName: section.systemImage, tint: section.tintHex.map { Color(hex: $0) })
+            // In the person's color (Appearance), like every row's icon.
+            BighelpIconTile(systemName: section.systemImage)
             VStack(alignment: .leading, spacing: 2) {
                 Text(section.title)
                     .bighelpFont(.body)

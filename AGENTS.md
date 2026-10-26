@@ -27,7 +27,8 @@ change in both repos.
   - There's one ☰ menu (`BighelpMenu`) and one Settings. Settings is a short list of rows that each open one page;
     Nerd Mode adds its Hermes section (System, Hermes tools) at the bottom.
   - Don't add a second menu, drawer or settings copy for a feature. Add a row where people already look.
-  - People choose the bottom bar (Chat plus up to four) and ☰'s order in Appearance › App layout
+  - People choose the bottom bar (Chat plus up to three, around New chat in the middle) and ☰'s order in
+    Appearance › App layout
     (`BighelpAppLayout`). ☰ lists every place the bar doesn't hold, so nothing is out of reach, and Agents
     and Settings always (`staysInMenu`): quick screens hide the bar. A new place
     in ☰ is a `BighelpPlace` case; a page that can be pinned also needs an `AppTab` and a root in `rootTabs`.

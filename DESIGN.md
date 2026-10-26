@@ -3,7 +3,8 @@
 ## Authority and scope
 
 The current authority is the **Noodle brand kit** (`BighelpBrand`, the Ember palette) and its blended direction:
-1a "Messages, evolved" structure, 1b "Center stage" warm cream as light mode, and 1c "After dark" as dark mode.
+1a "Messages, evolved" structure, in the **Ink** look Bots mode started (#622): white by day, black at night, ink
+controls in the person's own color. Cream ("Center stage") and Graphite ("After dark") stay as page choices.
 The app is a simple messaging experience for personal assistant agents. Earlier bighelp/iOS 27 Builder references
 are historical (`docs/ui-v3-design.md`).
 
@@ -23,12 +24,18 @@ are historical (`docs/ui-v3-design.md`).
   lowercase b and kicks out at the bottom left as a chat-bubble tail. It appears in chrome (root nav bars, icon,
   setup) and as the app's loaders, never as a chat participant and never in an agent color. In the wordmark the mark
   stands in for the b, then "ighelp" in the kit's outlined Nunito: ink by day, cream after dark. See **Noodle** below.
-- Light: cream canvas #FFF9F5, white cards, #F3ECE6 incoming bubbles, ink #1C1A19. Dark: #121110 canvas,
-  #1E1C1B / #292624 surfaces, cream text. Actions are lavender-purple (#7B52E0 light, #C9B6FF dark); outgoing
-  bubbles #7B52E0 with white text. All of this lives in `BighelpTheme` so screens read theme tokens, not system colors.
+- **Ink** is the default look, the one Bots mode always had: a Paper page (#FFFFFF) by day and Black at night,
+  black bubbles by day (dark gray #3A3A3F after dark), and buttons and tinted text in the page's ink. Its switches
+  are green, since an ink switch would be white on white after dark. Every control that acts (New chat, the
+  selected tab, buttons, chips, row icons) takes the color picked in Appearance (`theme.action` and
+  `theme.actionForeground`), never a fixed color, just as the bubbles do. Feed, Ideas and Goals color their content
+  with `BighelpBlockColor` (lime, lilac, sky, peach, and a deep green for what's new today); those are content
+  colors, like an agent's mark, not controls. All of this lives in `BighelpTheme` so screens read theme tokens, not
+  system colors.
 - Settings › **Appearance** (`AppearanceStudioView`) is the one place for the look: a live light/dark preview,
-  12 bubble colors (`BighelpBubbleColor`, Lavender is Ember's own), the light page (Cream #FFF9F5 or Paper #FFFFFF),
-  the dark page (Graphite #1C1C1F or Black #000000), Automatic/Light/Dark and Chat layout. High contrast keeps its
+  12 bubble colors (`BighelpBubbleColor`: Ink, the default and saved as no choice, first; Lavender is Ember's own
+  violet), the light page (Paper #FFFFFF, the default, or Cream #FFF9F5), the dark page (Black #000000, the
+  default, or Graphite #1C1C1F), Automatic/Light/Dark and Chat layout. High contrast keeps its
   own pages. There are no other themes: the old theme list (Nous, Superpilot, custom themes with import, export,
   fonts and logos) was removed because picking a bubble color quietly replaced it. First-run setup offers the same
   bubble colors (`AppearanceBubbleGrid`).
@@ -78,8 +85,11 @@ are historical (`docs/ui-v3-design.md`).
 
 ## Navigation and simplicity
 
-iPhone is an agent home. The bottom bar is **Chat, Feed, Ideas, Goals, Files** (the Apps page), all for the selected agent;
-it is always open and names each tab under its icon. In a chat, Chat is the lit tab and tapping it does nothing.
+iPhone is an agent home. The bottom bar is **Chat, Feed, New chat, Ideas, Goals**, all for the selected agent; Files
+(the Apps page) is in ☰. It is always open and names each tab under its icon; the current one is a pill in the
+picked color. New chat is a round button in the middle, in the picked color, on every place the bar holds: a tap
+starts a chat with the agent in use, touch and hold (right-click on the Mac) picks agents, one for a 1:1 chat or
+several for a group. The bar holds Chat and three places (Appearance › App layout). In a chat, Chat is the lit tab and tapping it does nothing.
 With Sessions in the bar (App layout), every chat's list and a chat picked from it light Sessions instead, and
 Chat there opens the agent's own chat.
 Chat opens that agent's canonical Bot Chat (the same conversation as Hermes Desktop's bot entry) with its live avatar big at the top: tap the avatar for its profile (This chat's
@@ -89,12 +99,11 @@ scrolling: the host as one switcher row on top, then New chat (Group beside it),
 (where the computer's plugin has them or says why it can't run them; with All hosts on it asks which computer),
 Scheduled tasks, Usage and Settings, then Recent chats with See all. The Secure credential vault and Nerd Mode's folder
 sit under More at the bottom.
-Keep it that short: a new destination goes where people already look, not on the first screen. A tap on the
-header's compose button starts a new chat with this agent right away; touch and hold picks agents: one is a 1:1
-chat, two or more a group. On the chat list, New chat floats centered above the bottom bar, which keeps the
-same width as on every other screen. The chat list (and the all-hosts view's All sessions) searches from the system
-glass search bar along the bottom, like All agents; it matches titles and previews, and a scroll puts the keyboard away. Feed, Ideas, Goals and Apps keep the Chat tab's header: ☰, the avatar, New
-chat and ⋯ (the agent's profile, then Files, Memory, Skills & tools and Scheduled tasks). The root's edge-swipe zones
+Keep it that short: a new destination goes where people already look, not on the first screen. Headers keep their
+own New chat only where there's no bar to hold it: Code mode, the iPhone Duo's side strip, Vision Pro's tab
+ornament, and a board opened with Back. The chat list (and the all-hosts view's All sessions) searches from the system
+glass search bar along the bottom, like All agents; it matches titles and previews, and a scroll puts the keyboard away. Feed, Ideas, Goals and Apps keep the Chat tab's header: ☰ and ⋯ (the agent's profile,
+then Files, Memory, Skills & tools and Scheduled tasks). The root's edge-swipe zones
 start below that row, so its corner buttons always get the tap. The avatar reacts to what the agent is doing (thinking, writing code, browsing, making
 images…), driven by the running tool (`AgentActivityKind`, shared with the island as `BighelpActivityPose`). On
 phones with a Dynamic Island, the island names the work. In the app it grows into a stage
@@ -216,11 +225,19 @@ with chat's renderer (`MarkdownMessageView`): headings, lists, quotes, code and 
 provider by itself. Every item has a long-press menu (and the same VoiceOver actions) with only what fits
 it: thumbs up/down on Feed (a thumbs down may ask "Less like this?" with quick reasons, never required), "Turn
 into a goal" and "Start a chat" on Ideas, done/active on Goals, and read/unread, Copy and Share everywhere. It ends
-with the item's dismiss, which is also a swipe left on the item: **Clear** a Feed post, **Not now** for an idea
-(the plugin remembers it), **Remove** a goal. Each hides with Undo (`BoardDismissAction`). The boards are Lists so
-rows can swipe, and the root's right-edge New chat strip steps aside on them. New items carry a dot, and a dot on
+with the item's dismiss: **Clear** a Feed post, **Not now** for an idea (the plugin remembers it), **Remove** a goal.
+Each hides with Undo (`BoardDismissAction`). An item with a List row of its own also dismisses with a swipe left
+(Feed's Earlier rows, goals, and tiles at accessibility text sizes); tiles two to a row share one, so theirs is in
+the menu only. The root's right-edge New chat strip steps aside on the boards. New items carry a dot, and a dot on
 the Feed, Ideas or Goals tab says something there is unseen. The agent reads the ratings and reasons before it
 posts (plugin 2.19.0).
+The boards are **color blocks** (`BoardBlocks.swift`): the agent's face and name on the page with no backing, then
+items as rounded tiles in a pastel (`BighelpBlockColor`, the same color for the same item or category every time)
+with dark ink on them. **Feed** leads with what's new in a deep green block (only while something is new), the
+newest posts as tiles two to a row, then Earlier as rows in a card. **Ideas** has chips by the agent's sections
+over a tall newest idea with **Let's do it** beside two short ones, then the rest as tiles. A tile opens the item
+on a tap and its menu on a long press (`Menu(primaryAction:)`; a ⋯ on the Mac). Buttons and chips on the blocks
+take the person's color (`theme.action`).
 **Blueprints** (beside the page title, and in the empty state) are the 45 starter prompts from
 bighelp.app/quick-start, bundled (`BoardBlueprints.json`), 15 per page in five topics. A tap opens a new chat
 with that agent and the prompt in the message box to fill in its [brackets]; nothing runs until Send.
@@ -231,7 +248,8 @@ in one list; bighelp only when the catalog has community ones). My Templates com
 `category` with fixed names and order (`TemplateCategory`); one the app doesn't know is Other, never hidden. New
 agent's Templates rail has the same chips over it. A search that finds nothing says so, with Search all when a
 chip narrowed it.
-**Goals** shows Tracking (the active goals by category: Health, Relationships, Finance, Career, Interests,
+**Goals** shows Tracking (the goal the agent touched last in a block of its category's color with **Mark done**,
+then the other active goals by category in a card: Health, Relationships, Finance, Career, Interests,
 Productivity, Other; "Nothing is being tracked yet" when empty), Done, then **Create a goal**: one row per
 category with a +, which starts a chat asking the agent to plan a goal in that category (touch and hold for that
 category's blueprints). Goals carry the category in the plugin (`native-agent-board-goal-categories-v1`); without

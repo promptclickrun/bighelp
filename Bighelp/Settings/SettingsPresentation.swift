@@ -75,23 +75,6 @@ enum SettingsMenuSection: String, CaseIterable, Identifiable, Equatable, Sendabl
         }
     }
 
-    /// Tile colors, so rows are easy to tell apart at a glance.
-    var tintHex: String? {
-        switch self {
-        case .appearance: "8E6BD8"
-        case .chat: "3F7FD9"
-        case .voice: "E0533D"
-        case .notifications: "E5484D"
-        case .connectivityAndNotifications: "5B6B7F"
-        case .permissions: "3478F6"
-        case .watch: "6E6E73"
-        case .carPlay: "2E9C5A"
-        case .companion: "F28B32"
-        case .help: "2E9CA6"
-        default: nil
-        }
-    }
-
     /// Existing tests and deep links know these rows by their older names.
     var accessibilityIdentifier: String {
         switch self {

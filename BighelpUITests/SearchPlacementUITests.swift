@@ -6,8 +6,8 @@ import XCTest
 /// showing, on demo data. Set BIGHELP_SEARCH_PLACEMENT_EVIDENCE (TEST_RUNNER_…) to save
 /// screenshots.
 final class SearchPlacementUITests: BighelpUITestCase {
-    /// Agents, Scheduled tasks and Kanban in the bar beside Chat and Feed.
-    private let layout = "{pinned=(agents,feed,scheduledTasks,kanban);menu=();}"
+    /// Agents, Scheduled tasks and Kanban in the bar beside Chat (three places at most).
+    private let layout = "{pinned=(agents,scheduledTasks,kanban);menu=();}"
     private let searchedTabs = ["tab.sessions", "tab.agents", "tab.scheduled-tasks", "tab.kanban"]
     private let origins = ["tab.sessions", "tab.feed", "tab.agents", "tab.scheduled-tasks", "tab.kanban"]
     private let searchIDs = ["tab.sessions": "sessions.search", "tab.agents": "agents.search",

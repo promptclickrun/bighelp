@@ -685,9 +685,8 @@ struct BighelpApp: App {
             // No app-wide tint here: visionOS would fill every toolbar button with it.
             .modifier(BighelpVisionInk())
             #else
-            // Lavender (asset AccentColor, light/dark) for every control that
-            // doesn't set its own tint, including switches that default to green.
-            .tint(Color.accentColor)
+            // The color picked in Appearance for every control that doesn't set its own.
+            .bighelpAppTint()
             .modifier(BighelpMacWindowStyle(sideMenu: sideMenu))
             #endif
             .environment(\.companionStore, companion)

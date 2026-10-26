@@ -17,7 +17,7 @@ extension SettingsView {
                     onOpenWorkspaceDestination(.models)
                 }
                 routeRow(String(localized: "AI providers"), detail: String(localized: "Sign in to model providers or add API keys"),
-                         symbol: "key.fill", tint: Color(hex: "F28B32"), identifier: "settings.providers") {
+                         symbol: "key.fill", identifier: "settings.providers") {
                     onOpenWorkspaceDestination(.keys)
                 }
             }
@@ -26,7 +26,7 @@ extension SettingsView {
                     settingsDone(AppsHubView(native: connectorApps?() ?? nil, composio: composio))
                 } label: {
                     rowLabel(String(localized: "Apps"), detail: String(localized: "Let agents use your email, notes and more"),
-                             symbol: "app.connected.to.app.below.fill", tint: Color(hex: "3A7BD5"))
+                             symbol: "app.connected.to.app.below.fill", showsChevron: BighelpPlatform.drawsOwnLinkChevron)
                         .bighelpSettingsLinkLabel()
                 }
                 .bighelpSettingsLink()
@@ -36,7 +36,7 @@ extension SettingsView {
                     settingsDone(ConnectorAppsView(model: apps))
                 } label: {
                     rowLabel(String(localized: "Apps"), detail: String(localized: "Let agents use your email, notes and more"),
-                             symbol: "app.connected.to.app.below.fill", tint: Color(hex: "3A7BD5"))
+                             symbol: "app.connected.to.app.below.fill", showsChevron: BighelpPlatform.drawsOwnLinkChevron)
                         .bighelpSettingsLinkLabel()
                 }
                 .bighelpSettingsLink()
@@ -44,7 +44,7 @@ extension SettingsView {
             }
             if let teamworkModel {
                 TeamworkToggle(model: teamworkModel) { detail in
-                    rowLabel(String(localized: "Teamwork"), detail: detail, symbol: "person.3.fill", tint: Color(hex: "2E9E6B"),
+                    rowLabel(String(localized: "Teamwork"), detail: detail, symbol: "person.3.fill",
                              showsChevron: false)
                 }
                 .bighelpSettingsRowInsets()
@@ -52,7 +52,7 @@ extension SettingsView {
             Button {
                 isPersonalitiesPresented = true
             } label: {
-                rowLabel(String(localized: "Personalities"), detail: personalityDetail, symbol: "theatermasks.fill", tint: Color(hex: "B7356F"))
+                rowLabel(String(localized: "Personalities"), detail: personalityDetail, symbol: "theatermasks.fill")
             }
             .bighelpSettingsButton()
             .accessibilityIdentifier("profile.personalities")
@@ -73,7 +73,7 @@ extension SettingsView {
         Section {
             Toggle(isOn: $settings.nerdModeEnabled) {
                 HStack(spacing: BighelpTokens.space12) {
-                    BighelpIconTile(systemName: "wrench.adjustable.fill", tint: .gray)
+                    BighelpIconTile(systemName: "wrench.adjustable.fill")
                     settingLabel(String(localized: "Nerd Mode"), detail: String(localized: "Hermes tools and extra chat settings"))
                 }
                 .padding(.horizontal, BighelpMenuRowLayout.labelInset)

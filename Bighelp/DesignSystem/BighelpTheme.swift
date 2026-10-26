@@ -725,9 +725,9 @@ enum BighelpThemeRegistry {
 
 struct BighelpAppearanceContext: Equatable, Sendable {
     let appearance: AppAppearance
-    var lightBackground: BighelpLightBackground = .cream
-    var darkBackground: BighelpDarkBackground = .graphite
-    /// Your bubbles and buttons. Nil is bighelp's own lavender.
+    var lightBackground: BighelpLightBackground = .paper
+    var darkBackground: BighelpDarkBackground = .black
+    /// Your bubbles and buttons. Nil is Ink, bighelp's default.
     var bubbleColor: BighelpBubbleColor?
     /// A color you picked yourself; wins over `bubbleColor`.
     var customBubbleHex: String?
@@ -735,13 +735,16 @@ struct BighelpAppearanceContext: Equatable, Sendable {
     var bubbleHex: String? { customBubbleHex ?? bubbleColor?.hex }
     /// Vision Pro: 0 is a solid window, 1 shows the room through the glass.
     var windowTransparency = BighelpVisionGlass.defaultTransparency
-    /// Bots mode's look: black bubbles by day and ink after dark, unless a bubble color was picked.
+    /// Bots mode is on (Settings › Experience). Its page is always Paper by day and Black at night.
     var simpleBots = false
+    /// The Ink look, bighelp's default: black bubbles and buttons by day, ink after dark. Ink is
+    /// `.graphite`; no saved choice is Ink too.
+    var usesInk: Bool { customBubbleHex == nil && (bubbleColor == nil || bubbleColor == .graphite) }
 
     init(
         appearance: AppAppearance,
-        lightBackground: BighelpLightBackground = .cream,
-        darkBackground: BighelpDarkBackground = .graphite,
+        lightBackground: BighelpLightBackground = .paper,
+        darkBackground: BighelpDarkBackground = .black,
         bubbleColor: BighelpBubbleColor? = nil,
         customBubbleHex: String? = nil,
         windowTransparency: Double = BighelpVisionGlass.defaultTransparency
@@ -770,16 +773,16 @@ extension BighelpTheme {
         case (true, .increased): definition.darkHighContrast
         @unknown default: dark ? definition.dark : definition.light
         }
-        // Bots mode's own look, unless a bubble color was picked in Appearance: black bubbles by day
-        // (they'd vanish on a black page, so ink after dark), and buttons and tinted text in the page's ink
-        // (the gray bubble color read as grayed out).
-        let simpleDefault = context.simpleBots && context.bubbleHex == nil
+        // Ink, unless another bubble color was picked in Appearance: black bubbles by day (they'd
+        // vanish on a black page, so dark gray after dark), and buttons and tinted text in the page's
+        // ink (the gray bubble color read as grayed out).
+        let simpleDefault = context.usesInk
         let simpleBubble = simpleDefault ? (dark ? "3A3A3F" : "111111") : nil
         let simpleInk = simpleDefault ? (dark ? "FFFFFF" : "111111") : nil
         var theme = selected.resolvedForLivePresentation(
             colorScheme: dark ? .dark : .light, contrast: contrast,
             lightBackground: context.lightBackground, darkBackground: context.darkBackground,
-            bubbleColor: context.bubbleColor, customBubbleHex: simpleInk ?? context.customBubbleHex)
+            bubbleColor: simpleDefault ? nil : context.bubbleColor, customBubbleHex: simpleInk ?? context.customBubbleHex)
         theme.chosenBubbleHex = simpleBubble ?? context.bubbleHex
         theme.visionCanvasOpacity = BighelpVisionGlass.canvasOpacity(forTransparency: context.windowTransparency,
                                                                      dark: dark)
@@ -805,7 +808,8 @@ extension BighelpTheme {
     }
 
     /// Used by live settings samples after selecting an explicit document palette.
-    /// The stored document itself is never rewritten.
+    /// The stored document itself is never rewritten. The defaults are Ember's own pages; the
+    /// app's defaults (Paper and Black) come in through `BighelpAppearanceContext`.
     func resolvedForLivePresentation(
         colorScheme: ColorScheme, contrast: ColorSchemeContrast,
         lightBackground: BighelpLightBackground = .cream, darkBackground: BighelpDarkBackground = .graphite,

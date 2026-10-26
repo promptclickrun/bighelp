@@ -59,16 +59,16 @@ final class ProjectsAndBoardHostUITests: BighelpUITestCase {
         let selected = expectation(for: NSPredicate(format: "isSelected == true"), evaluatedWith: thumbsDown)
         wait(for: [selected], timeout: 10)
 
-        // Long press: delete, then undo.
+        // Long press: clear, then undo.
         let news = app.descendants(matching: .any)["board.feed.post.probe-ai-news"]
         XCTAssertTrue(news.waitForExistence(timeout: 5))
         news.press(forDuration: 1.2)
-        let delete = app.buttons["Delete"]
-        XCTAssertTrue(delete.waitForExistence(timeout: 5), "The long-press menu opens")
+        let clear = app.buttons["Clear"]
+        XCTAssertTrue(clear.waitForExistence(timeout: 5), "The long-press menu opens")
         save("features-3-long-press", app)
-        delete.tap()
+        clear.tap()
         let undo = app.buttons["board.undo"]
-        XCTAssertTrue(undo.waitForExistence(timeout: 5), "Delete offers Undo")
+        XCTAssertTrue(undo.waitForExistence(timeout: 5), "Clear offers Undo")
         XCTAssertTrue(news.waitForNonExistence(timeout: 5))
         undo.tap()
         XCTAssertTrue(news.waitForExistence(timeout: 10), "Undo brings the post back")
@@ -150,7 +150,8 @@ final class ProjectsAndBoardHostUITests: BighelpUITestCase {
             throw XCTSkip("This host runs the \(probe["mode"] ?? "?") mode")
         }
         let app = makeApp()
-        app.launchArguments = ["-loopdy.home.opens-chat", "YES"]
+        // Files lives in ☰ by default; pinned here so the bar holds it.
+        app.launchArguments = ["-loopdy.home.opens-chat", "YES", "-bighelp.app-layout", "{pinned=(feed,ideas,files);menu=();}"]
         app.launch()
         try onboardOpenHost(app, address: try XCTUnwrap(probe["address"]))
         XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 30), "The agent's chat opens")

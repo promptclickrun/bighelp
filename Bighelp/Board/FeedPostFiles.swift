@@ -43,63 +43,6 @@ struct BoardFileSummary: Equatable {
     }
 }
 
-/// The post's files in the Feed: picture thumbnails and a file chip. A tap opens the post.
-struct BoardFilesStrip: View {
-    let item: AgentBoardItem
-    let files: [AgentBoardItem.File]
-    let store: AgentBoardStore
-    let onOpen: () -> Void
-
-    var body: some View {
-        let summary = BoardFileSummary(files: files)
-        Button(action: onOpen) {
-            HStack(spacing: BighelpTokens.space8) {
-                ForEach(summary.pictures) { file in
-                    BoardFileThumbnail(item: item, file: file, store: store)
-                        .frame(width: 72, height: 72)
-                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        .overlay {
-                            if file == summary.pictures.last, summary.morePictures > 0 {
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .fill(.black.opacity(0.45))
-                                    .overlay {
-                                        Text("+\(summary.morePictures)")
-                                            .font(.bighelp(.headline))
-                                            .foregroundStyle(.white)
-                                    }
-                            }
-                        }
-                }
-                if let title = summary.chipTitle {
-                    Label {
-                        Text(title)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                    } icon: {
-                        Image(systemName: summary.chipSymbol)
-                            .foregroundStyle(theme.action)
-                    }
-                    .font(.bighelp(.subheadline).weight(.medium))
-                    .foregroundStyle(theme.primaryText)
-                    .padding(.horizontal, BighelpTokens.space12)
-                    .frame(minHeight: BighelpTokens.hitTarget)
-                    .background(Capsule().fill(theme.incomingMessageBackground))
-                    .overlay(Capsule().strokeBorder(theme.border, lineWidth: BighelpTokens.hairline))
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(.rect)
-        }
-        // Only the row takes the tap in a List row.
-        .bighelpPlainButtonStyle()
-        .accessibilityLabel(summary.accessibilityLabel)
-        .accessibilityHint("Opens the post")
-        .accessibilityIdentifier("board.feed.files.\(item.id)")
-    }
-
-    @BighelpThemeReader private var theme
-}
-
 /// A post's picture: its small copy, the loading glow while it comes from the host, or a
 /// plain sign when the host no longer serves it. Never the file's path.
 struct BoardFileThumbnail: View {
@@ -138,38 +81,6 @@ struct BoardFileThumbnail: View {
     @BighelpThemeReader private var theme
 }
 
-/// A tap on a post's icon, title or pictures opens it, when it has files. Its Markdown keeps
-/// its own links, so the text isn't a tap target.
-struct OpensPost: ViewModifier {
-    let isEnabled: Bool
-    let open: () -> Void
-
-    func body(content: Content) -> some View {
-        if isEnabled {
-            content
-                .bighelpPointer()
-                .contentShape(.rect)
-                .onTapGesture(perform: open)
-        } else {
-            content
-        }
-    }
-}
-
-/// The same for VoiceOver, on the whole post.
-struct OpensPostForVoiceOver: ViewModifier {
-    let isEnabled: Bool
-    let open: () -> Void
-
-    func body(content: Content) -> some View {
-        if isEnabled {
-            content.accessibilityAction(named: "Open post", open)
-        } else {
-            content
-        }
-    }
-}
-
 // MARK: - The post
 
 /// Which post is open; a post the person clears closes it.
@@ -177,8 +88,9 @@ struct OpenedFeedPost: Identifiable, Equatable {
     let id: String
 }
 
-/// The whole post, with every file it carries. Tap a file to preview it, then save or
-/// share it; hold it (right-click on the Mac) to share or save without opening.
+/// The whole post, with every file it carries and a preview of its first link. Tap a file to
+/// preview it, then save or share it; hold it (right-click on the Mac) to share or save without
+/// opening.
 struct FeedPostDetailSheet: View {
     let itemID: String
     let context: AgentBoardContext
@@ -186,6 +98,7 @@ struct FeedPostDetailSheet: View {
     @State private var preview: ChatAttachment?
     @State private var exporting: ChatAttachment?
     @State private var notice: BoardFileNotice?
+    @AppStorage(LinkPreviewPreferences.enabledKey) private var showsLinkPreviews = true
 
     var body: some View {
         NavigationStack {
@@ -366,9 +279,15 @@ struct FeedPostDetailSheet: View {
 
     @ViewBuilder
     private func links(_ item: AgentBoardItem) -> some View {
-        if !item.links.isEmpty {
+        let previewed = previewedLink(item)
+        if let previewed {
+            LinkPreviewCard(url: previewed.url, fallbackTitle: previewed.title)
+                .frame(maxWidth: 420, alignment: .leading)
+        }
+        let rest = item.links.filter { $0.url != previewed?.url }
+        if !rest.isEmpty {
             VStack(alignment: .leading, spacing: BighelpTokens.space8) {
-                ForEach(item.links, id: \.url) { link in
+                ForEach(rest, id: \.url) { link in
                     Link(destination: link.url) {
                         Label(link.title.isEmpty ? (link.url.host() ?? "Open link") : link.title, systemImage: "link")
                             .font(.bighelp(.subheadline).weight(.medium))
@@ -389,6 +308,13 @@ struct FeedPostDetailSheet: View {
         }
         .bighelpPlainButtonStyle()
         .accessibilityIdentifier("board.feed.detail.discuss")
+    }
+
+    /// The post's first web link, else the first one in its text, as a preview card.
+    private func previewedLink(_ item: AgentBoardItem) -> AgentBoardItem.Link? {
+        guard showsLinkPreviews else { return nil }
+        if let link = item.links.first(where: { LinkPreviewPolicy.loadableURL($0.url) != nil }) { return link }
+        return LinkPreviewCandidate.firstURL(inMarkdown: item.body).map { .init(url: $0, title: "") }
     }
 
     private func open(_ item: AgentBoardItem, _ file: AgentBoardItem.File) {

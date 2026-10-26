@@ -27,7 +27,7 @@ enum FloatingTabBarBackgroundSurface: Equatable, Sendable {
 struct FloatingTabBar: View {
     static let newChatVisibleLabel = "New chat"
     static let newChatAccessibilityLabel = String(localized: "New chat")
-    static let selectionShape = RoundedRectangle(cornerRadius: 18, style: .continuous)
+    static let selectionShape = Capsule()
 
     static func newChatPresentation(for _: BighelpThemeID) -> FloatingTabBarActionPresentation {
         FloatingTabBarActionPresentation(surface: .neutralGlass, foreground: .themeAccent,
@@ -50,7 +50,12 @@ struct FloatingTabBar: View {
     }
 
     @Binding var selection: AppTab
+    /// New chat, in the middle of the bar. Nil leaves it out (All agents has its own).
     let onNewChat: (() -> Void)?
+    /// Touch and hold New chat: the picker, for another agent or a group.
+    var onPickAgents: (() -> Void)?
+    /// UI tests find the chat's New chat by its old header name.
+    var newChatIdentifier = ConversationRootNavigationPresentation.composeAccessibilityIdentifier
     /// Points the bar drops into the home indicator's area.
     let homeIndicatorSink: CGFloat
     /// Feed, Ideas or Goals with something the person hasn't seen: a small dot.
@@ -68,10 +73,14 @@ struct FloatingTabBar: View {
     @ScaledMetric(relativeTo: .caption2) private var iconSize: CGFloat = 26
 
     init(selection: Binding<AppTab>, tabs: [AppTab] = AppTab.allCases, onNewChat: (() -> Void)? = nil,
+         onPickAgents: (() -> Void)? = nil,
+         newChatIdentifier: String = ConversationRootNavigationPresentation.composeAccessibilityIdentifier,
          homeIndicatorSink: CGFloat = 0, unread: Set<AppTab> = [], isInChat: Bool = false) {
         self.tabs = tabs
         self._selection = selection
         self.onNewChat = onNewChat
+        self.onPickAgents = onPickAgents
+        self.newChatIdentifier = newChatIdentifier
         self.homeIndicatorSink = homeIndicatorSink
         self.unread = unread
         self.isInChat = isInChat
@@ -87,25 +96,31 @@ struct FloatingTabBar: View {
         min(max(0, inset - 14), 20)
     }
 
+    /// What the bar's row holds: the tabs, with New chat in the middle.
+    enum Slot: Hashable {
+        case tab(AppTab)
+        case newChat
+    }
+
+    /// Chat and three places either side of New chat: [Chat, Feed, New chat, Ideas, Goals].
+    static func slots(tabs: [AppTab], hasNewChat: Bool) -> [Slot] {
+        var slots = tabs.map(Slot.tab)
+        if hasNewChat { slots.insert(.newChat, at: (slots.count + 1) / 2) }
+        return slots
+    }
+
     var body: some View {
-        // New chat floats centered above the tabs, so the tab row keeps the
-        // same width on every screen.
-        VStack(spacing: BighelpTokens.space8) {
-            if let onNewChat {
-                RootComposeButton { onNewChat() }
-                    .accessibilityShowsLargeContentViewer {
-                        Label(Self.newChatVisibleLabel, systemImage: "square.and.pencil")
-                    }
-            }
-            // Up to five tabs in one row, each named under its icon.
-            navigationRow(constrainsWidth: true) {
-                ForEach(tabs) { tab in
-                    destination(tab)
+        // Each tab named under its icon, New chat in the middle.
+        navigationRow(constrainsWidth: true) {
+            ForEach(Self.slots(tabs: tabs, hasNewChat: onNewChat != nil), id: \.self) { slot in
+                switch slot {
+                case .tab(let tab): destination(tab)
+                case .newChat: newChatButton
                 }
             }
-            .padding(6)
-            .bighelpNavigationGlass(in: Capsule())
         }
+        .padding(6)
+        .bighelpNavigationGlass(in: Capsule())
         .sensoryFeedback(.selection, trigger: tabChanges)
         .frame(maxWidth: BighelpTokens.scaled(620))
         .accessibilityElement(children: .contain)
@@ -119,6 +134,20 @@ struct FloatingTabBar: View {
     }
 
     private var isVerticallyCompact: Bool { verticalSizeClass == .compact }
+
+    /// In the person's color (Appearance), like their bubbles.
+    @ViewBuilder
+    private var newChatButton: some View {
+        if let onNewChat {
+            RootComposeButton(identifier: newChatIdentifier, systemImage: "plus",
+                              size: BighelpTokens.scaled(isVerticallyCompact ? 44 : 52),
+                              onLongPress: onPickAgents, action: onNewChat)
+                .accessibilityShowsLargeContentViewer {
+                    Label(Self.newChatVisibleLabel, systemImage: "plus")
+                }
+                .frame(maxWidth: .infinity)
+        }
+    }
 
     private func navigationRow<Content: View>(
         constrainsWidth: Bool = false, @ViewBuilder content: () -> Content
@@ -181,23 +210,21 @@ struct FloatingTabBar: View {
                 .accessibilityIdentifier(identifier + ".label")
         }
         // The theme's ink, not `.secondary`: on glass that turns symbols vibrant
-        // but leaves the drawn glyphs a faint grey.
-        .foregroundStyle(selected ? (increasedContrast ? Color.primary : theme.action) : theme.secondaryText)
+        // but leaves the drawn glyphs a faint grey. The current tab is a pill in the person's color.
+        .foregroundStyle(selected ? theme.actionForeground : theme.secondaryText)
         .padding(.horizontal, 4)
         .padding(.vertical, isVerticallyCompact ? 3 : 6)
         .frame(minWidth: BighelpTokens.hitTarget, maxWidth: .infinity, minHeight: BighelpTokens.hitTarget)
         .background {
             if selected {
                 Self.selectionShape
-                    .fill(increasedContrast ? Color.primary.opacity(0.18) : theme.action.opacity(0.14))
+                    .fill(theme.action)
                     .transition(reduceMotion ? .opacity : .scale(scale: 0.86).combined(with: .opacity))
                     .accessibilityHidden(true)
             }
         }
         .contentShape(.rect)
     }
-
-    private var increasedContrast: Bool { colorSchemeContrast == .increased }
 
     @BighelpThemeReader private var theme
 }

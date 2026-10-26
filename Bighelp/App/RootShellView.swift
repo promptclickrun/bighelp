@@ -645,20 +645,14 @@ struct RootShellView: View {
         .ornament(visibility: visionTabsVisible ? .visible : .hidden,
                   attachmentAnchor: .scene(.leading), contentAlignment: .trailing) {
             VisionTabOrnament(selection: tabSelection, tabs: barTabs, unread: boardUnreadTabs,
-                              onNewChat: appState.selectedTab == .sessions && appState.path.isEmpty && !fleetModeOn ? {
-                                  appState.chatOpenedFromList = true
-                                  startNewChat(explicitAgentID: nil)
-                              } : nil)
+                              onNewChat: appState.path.isEmpty ? barNewChat : nil)
         }
         #endif
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if showsBottomNavigation && !BighelpPlatform.usesTabOrnament && !screen.usesSideBar {
-                // All agents has its own New chat, bottom right.
                 FloatingTabBar(selection: tabSelection, tabs: barTabs,
-                               onNewChat: appState.selectedTab == .sessions && !fleetModeOn ? {
-                                   appState.chatOpenedFromList = true
-                                   startNewChat(explicitAgentID: nil)
-                               } : nil,
+                               onNewChat: barNewChat,
+                               onPickAgents: { presentNewChatPicker(seed: homeAgent?.id) },
                                homeIndicatorSink: FloatingTabBar.homeIndicatorSink(forBottomInset: rootBottomSafeArea),
                                unread: boardUnreadTabs)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -669,10 +663,7 @@ struct RootShellView: View {
         .toolbar {
             if showsBottomNavigation && screen.usesSideBar {
                 BighelpStripTabs(selection: tabSelection, tabs: barTabs, unread: boardUnreadTabs,
-                                 onNewChat: appState.selectedTab == .sessions && !fleetModeOn ? {
-                                     appState.chatOpenedFromList = true
-                                     startNewChat(explicitAgentID: nil)
-                                 } : nil,
+                                 onNewChat: barNewChat,
                                  selectedTint: theme.action, tint: theme.secondaryText)
             }
         }
@@ -1983,7 +1974,7 @@ struct RootShellView: View {
         return false
     }
 
-    @BighelpThemeReader private var theme
+    @BighelpThemeReader var theme
 
 }
 

@@ -177,6 +177,7 @@
 		1AE5E08EBD9DA1F3CB9C9B8D /* CardReplyTextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA65EC5BF590AE9736B714EF /* CardReplyTextTests.swift */; };
 		1AF4CAA831455395465D8664 /* WorkspaceExchangeWireModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6216839BCCA6470EC2D9DBDF /* WorkspaceExchangeWireModels.swift */; };
 		1B11A01631489F6E5C3EDD65 /* HermesLogCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58E8AFFA03F01F636DD2D3EA /* HermesLogCodec.swift */; };
+		1B1C611D6D74D75467641733 /* BoardBlocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02BB3BFA464829CA09B84FFD /* BoardBlocks.swift */; };
 		1B2C5F81B5157A90ED3B9D9E /* HostAuthenticationDiscovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8485C55B7079C5C7A1372CFB /* HostAuthenticationDiscovery.swift */; };
 		1B94A32B9D32D30BB823D2F6 /* DirectHermesProjectGitClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AFA6E2F7D42A8AB897FBA47 /* DirectHermesProjectGitClient.swift */; };
 		1BA53E4F4E35D42F490C3529 /* AppearanceStudioView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 853942665777C89A188608DD /* AppearanceStudioView.swift */; };
@@ -562,6 +563,7 @@
 		4F2BD0E4B2B920B3DDF06152 /* KanbanCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2D90A74097F0FF386ACDEF3 /* KanbanCardView.swift */; };
 		4F3B17E2E566E942FEDCD536 /* AsyncOperationTestGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9965BF9A6F80AA4F0C3FEA00 /* AsyncOperationTestGate.swift */; };
 		4F4BFD5D7FE39BBA056987FA /* SimpleBotVoiceBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2D043AD3DE1B95D66A8421C /* SimpleBotVoiceBar.swift */; };
+		4FEEBCF403A455B61F2B5F7F /* BighelpBlockColor.swift in Sources */ = {isa = PBXBuildFile; fileRef = E73C8ED3127FC294AA7B6B5B /* BighelpBlockColor.swift */; };
 		5020A0991D8055D665E140CF /* BighelpPushToStartObserver.swift in Sources */ = {isa = PBXBuildFile; fileRef = A734D25BEF7EFFD9AF1132F9 /* BighelpPushToStartObserver.swift */; };
 		504D0D4DBC028D5E7DCAEF13 /* SpatialAvatarRig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99A41F789761960F1B5EFD87 /* SpatialAvatarRig.swift */; };
 		50780189A3CAD330F23725C5 /* AvatarCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C365F7E695CE29FA628F71A /* AvatarCatalog.swift */; };
@@ -1937,6 +1939,7 @@
 		027157CAB5BF115163393990 /* AvatarCreatorUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarCreatorUITests.swift; sourceTree = "<group>"; };
 		0284978EC9F5AD21700F6E31 /* AvatarKitRenderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarKitRenderTests.swift; sourceTree = "<group>"; };
 		02889C4BAB355C04380A9EEC /* CodeComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeComposer.swift; sourceTree = "<group>"; };
+		02BB3BFA464829CA09B84FFD /* BoardBlocks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardBlocks.swift; sourceTree = "<group>"; };
 		02DC14B5DC48148BBC38D0A9 /* templates-list-code.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "templates-list-code.json"; sourceTree = "<group>"; };
 		02F2DEE243A51982965DE06D /* BighelpLinkProjectGitClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpLinkProjectGitClientTests.swift; sourceTree = "<group>"; };
 		0301ED2BC34B085E0DC13039 /* BighelpGlassGroup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpGlassGroup.swift; sourceTree = "<group>"; };
@@ -3539,6 +3542,7 @@
 		E7173F836ECF6E4D13740E1B /* generation-preview.mp4 */ = {isa = PBXFileReference; path = "generation-preview.mp4"; sourceTree = "<group>"; };
 		E728546967FA8A1B5B5D6E37 /* ReferenceChatComposition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReferenceChatComposition.swift; sourceTree = "<group>"; };
 		E73A5BB3ECDA83D28D23F206 /* DirectHermesHostOperationsClient+Configuration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DirectHermesHostOperationsClient+Configuration.swift"; sourceTree = "<group>"; };
+		E73C8ED3127FC294AA7B6B5B /* BighelpBlockColor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpBlockColor.swift; sourceTree = "<group>"; };
 		E742476E7F84949EADED6784 /* status.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = status.json; sourceTree = "<group>"; };
 		E79E21E199A5499FA817AA0F /* BotModeActivityStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BotModeActivityStore.swift; sourceTree = "<group>"; };
 		E7D61D803AFF04ABB33D6171 /* PluginUpdateStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginUpdateStore.swift; sourceTree = "<group>"; };
@@ -4038,6 +4042,7 @@
 				D7039EBD45CE3DBB7D8555F6 /* AgentMedia.swift */,
 				CDCFBB5C4E5985D8EC6C78FD /* AgentProfileSheet.swift */,
 				7437B65BFB4AFEE0CCB68086 /* BighelpActivityAvatarWriter.swift */,
+				02BB3BFA464829CA09B84FFD /* BoardBlocks.swift */,
 				DA72880EFC6357C4E04ABA5F /* BoardBlueprints.swift */,
 				14791450B5A4D6CE103EC937 /* FeedPostFiles.swift */,
 				D927E9C5B53DDE1797A520AD /* IslandStage.swift */,
@@ -5823,6 +5828,7 @@
 				0B75FFB3DFFDC0B90BE70C2F /* AvatarView.swift */,
 				F4BA91D42B8CD65D9DDB4908 /* BighelpActionRow.swift */,
 				E2C274F8CDDC43A089AC6DB9 /* BighelpAppearanceChoices.swift */,
+				E73C8ED3127FC294AA7B6B5B /* BighelpBlockColor.swift */,
 				717F9482B56B0893621311C6 /* BighelpBrand.swift */,
 				2D4BF0E77894904D0E9F8014 /* BighelpChatSwitcher.swift */,
 				49232E1CBDD8758F2AF9C099 /* BighelpComponents.swift */,
@@ -6913,6 +6919,7 @@
 				B8A729CEE679D296CF63FC59 /* BighelpAppIntents.swift in Sources */,
 				D298D910DEC65761AE8B3AF0 /* BighelpAppearanceChoices.swift in Sources */,
 				49C55CB4934DDF4C731D9900 /* BighelpBackgroundGrace.swift in Sources */,
+				4FEEBCF403A455B61F2B5F7F /* BighelpBlockColor.swift in Sources */,
 				3A4C3BD63F9AD9122450E4A5 /* BighelpBoardWidgets.swift in Sources */,
 				6ADFF4E253966B4555AFBEF5 /* BighelpBotsWidget.swift in Sources */,
 				497184FD88B2582FFA37CDB9 /* BighelpBotsWidgetFeed.swift in Sources */,
@@ -7075,6 +7082,7 @@
 				371BB39D4A8F91DC1BBCCCBF /* BighelpWidgetStyle.swift in Sources */,
 				35DA12A31771CE2BB4548E80 /* BighelpWindowAppearance.swift in Sources */,
 				90F00CF9F27AE0762CF15B34 /* BighelpWorkflowsWidget.swift in Sources */,
+				1B1C611D6D74D75467641733 /* BoardBlocks.swift in Sources */,
 				18220DBE95765EF22BEFF997 /* BoardBlueprints.swift in Sources */,
 				EB185CAA604358DC4478D3C3 /* BotChatActivity.swift in Sources */,
 				5222C95B449746172625A6B2 /* BotModeActivityFixtureClient.swift in Sources */,

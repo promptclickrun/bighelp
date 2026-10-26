@@ -15,7 +15,7 @@ struct AppsHubView: View {
                         ConnectorAppsView(model: native)
                     } label: {
                         row("Native App Connections", detail: "Built into Hermes on this computer",
-                            symbol: "app.connected.to.app.below.fill", tint: Color(hex: "3A7BD5"))
+                            symbol: "app.connected.to.app.below.fill")
                     }
                     .accessibilityIdentifier("apps.native")
                 }
@@ -25,7 +25,7 @@ struct AppsHubView: View {
                     row("Composio Apps", detail: composio.account.isSignedIn
                             ? (composio.account.email.map { "Signed in as \($0)" } ?? "Signed in")
                             : "Sign in to connect hundreds of apps",
-                        symbol: "square.grid.3x3.fill", tint: Color(hex: "7A5AF8"))
+                        symbol: "square.grid.3x3.fill")
                 }
                 .accessibilityIdentifier("apps.composio")
             } footer: {
@@ -39,7 +39,7 @@ struct AppsHubView: View {
         .accessibilityIdentifier("apps.hub")
     }
 
-    private func row(_ title: String, detail: String, symbol: String, tint: Color) -> some View {
+    private func row(_ title: String, detail: String, symbol: String, tint: Color? = nil) -> some View {
         HStack(spacing: BighelpTokens.space12) {
             BighelpIconTile(systemName: symbol, tint: tint)
             VStack(alignment: .leading, spacing: 2) {

@@ -250,10 +250,8 @@ struct BighelpConnectionLine: View {
         .accessibilityIdentifier("connection.line")
     }
 
-    /// Hosts' own tile color from Settings, so a computer looks the same everywhere.
-    static func hostTint(_ theme: BighelpTheme) -> Color {
-        SettingsMenuSection.connectivityAndNotifications.tintHex.map(Color.init(hex:)) ?? theme.secondaryText
-    }
+    /// The computer's color in Settings (the person's own, from Appearance), so it looks the same everywhere.
+    static func hostTint(_ theme: BighelpTheme) -> Color { theme.action }
 }
 
 /// Keyframes of the loader motions, as plain math so tests can check them.

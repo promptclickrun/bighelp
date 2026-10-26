@@ -218,7 +218,7 @@ struct AppearanceBubbleGrid: View {
     @State private var colorPicker = SystemColorPickerAnchor()
 
     private var selectedBubble: BighelpBubbleColor? {
-        settings.customBubbleHex == nil ? settings.bubbleColor ?? .lavender : nil
+        settings.customBubbleHex == nil ? settings.bubbleColor ?? .graphite : nil
     }
 
     var body: some View {
@@ -263,7 +263,7 @@ struct AppearanceBubbleGrid: View {
     private var customTile: some View {
         let custom = settings.customBubbleHex
         return Button {
-            let start = Color(hex: custom ?? (selectedBubble ?? .lavender).swatchHex)
+            let start = Color(hex: custom ?? (selectedBubble ?? .graphite).swatchHex)
             colorPicker.present(title: String(localized: "Custom bubble color"), color: UIColor(start)) { picked in
                 settings.customBubbleHex = BighelpCustomBubbleColor.hex(from: Color(uiColor: picked))
             }

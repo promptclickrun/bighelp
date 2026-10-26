@@ -238,10 +238,11 @@ struct AgentHeroHeader: View {
             if showsName {
                 namePillLabel(line: "Updating…").hidden()
             }
+            // Plain text under the avatar, as Bots mode names its bots; the blur under the header
+            // keeps it readable over the messages.
             Button(action: onNameTap) {
                 namePillLabel(line: statusLine ?? sessionTitle)
                     .contentShape(.capsule)
-                    .bighelpNavigationGlass(in: Capsule(), isInteractive: true)
             }
             .buttonStyle(.plain)
             .accessibilityLabel(displayName)
@@ -264,8 +265,8 @@ struct AgentHeroHeader: View {
         VStack(spacing: 1) {
             if showsName {
                 Text(displayName)
-                    .font(.bighelp(.subheadline).weight(.semibold))
-                    .foregroundStyle(theme.primaryText)
+                    .font(.bighelp(.footnote).weight(.medium))
+                    .foregroundStyle(theme.secondaryText)
                     .lineLimit(1)
             }
             if let line {

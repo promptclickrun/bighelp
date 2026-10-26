@@ -177,6 +177,7 @@
 		1AE5E08EBD9DA1F3CB9C9B8D /* CardReplyTextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA65EC5BF590AE9736B714EF /* CardReplyTextTests.swift */; };
 		1AF4CAA831455395465D8664 /* WorkspaceExchangeWireModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6216839BCCA6470EC2D9DBDF /* WorkspaceExchangeWireModels.swift */; };
 		1B11A01631489F6E5C3EDD65 /* HermesLogCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58E8AFFA03F01F636DD2D3EA /* HermesLogCodec.swift */; };
+		1B1C611D6D74D75467641733 /* BoardBlocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02BB3BFA464829CA09B84FFD /* BoardBlocks.swift */; };
 		1B2C5F81B5157A90ED3B9D9E /* HostAuthenticationDiscovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8485C55B7079C5C7A1372CFB /* HostAuthenticationDiscovery.swift */; };
 		1B94A32B9D32D30BB823D2F6 /* DirectHermesProjectGitClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AFA6E2F7D42A8AB897FBA47 /* DirectHermesProjectGitClient.swift */; };
 		1BA53E4F4E35D42F490C3529 /* AppearanceStudioView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 853942665777C89A188608DD /* AppearanceStudioView.swift */; };
@@ -1938,6 +1939,7 @@
 		027157CAB5BF115163393990 /* AvatarCreatorUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarCreatorUITests.swift; sourceTree = "<group>"; };
 		0284978EC9F5AD21700F6E31 /* AvatarKitRenderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarKitRenderTests.swift; sourceTree = "<group>"; };
 		02889C4BAB355C04380A9EEC /* CodeComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeComposer.swift; sourceTree = "<group>"; };
+		02BB3BFA464829CA09B84FFD /* BoardBlocks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardBlocks.swift; sourceTree = "<group>"; };
 		02DC14B5DC48148BBC38D0A9 /* templates-list-code.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "templates-list-code.json"; sourceTree = "<group>"; };
 		02F2DEE243A51982965DE06D /* BighelpLinkProjectGitClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpLinkProjectGitClientTests.swift; sourceTree = "<group>"; };
 		0301ED2BC34B085E0DC13039 /* BighelpGlassGroup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpGlassGroup.swift; sourceTree = "<group>"; };
@@ -4040,6 +4042,7 @@
 				D7039EBD45CE3DBB7D8555F6 /* AgentMedia.swift */,
 				CDCFBB5C4E5985D8EC6C78FD /* AgentProfileSheet.swift */,
 				7437B65BFB4AFEE0CCB68086 /* BighelpActivityAvatarWriter.swift */,
+				02BB3BFA464829CA09B84FFD /* BoardBlocks.swift */,
 				DA72880EFC6357C4E04ABA5F /* BoardBlueprints.swift */,
 				14791450B5A4D6CE103EC937 /* FeedPostFiles.swift */,
 				D927E9C5B53DDE1797A520AD /* IslandStage.swift */,
@@ -7079,6 +7082,7 @@
 				371BB39D4A8F91DC1BBCCCBF /* BighelpWidgetStyle.swift in Sources */,
 				35DA12A31771CE2BB4548E80 /* BighelpWindowAppearance.swift in Sources */,
 				90F00CF9F27AE0762CF15B34 /* BighelpWorkflowsWidget.swift in Sources */,
+				1B1C611D6D74D75467641733 /* BoardBlocks.swift in Sources */,
 				18220DBE95765EF22BEFF997 /* BoardBlueprints.swift in Sources */,
 				EB185CAA604358DC4478D3C3 /* BotChatActivity.swift in Sources */,
 				5222C95B449746172625A6B2 /* BotModeActivityFixtureClient.swift in Sources */,

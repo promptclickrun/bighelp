@@ -30,10 +30,13 @@ struct AgentBoardContext {
 // MARK: - Shared pieces
 
 /// A board page. A List, not a ScrollView: only List rows get swipe actions, so Feed, Ideas and
-/// Goals items can swipe left to dismiss. Each view `content` lists is its own row.
+/// Goals items can swipe left to dismiss. Each view `content` lists is its own row, and each
+/// sets its own insets (`boardRow()`, `boardCardSegment`) so a card's rows can touch.
 struct BoardScroll<Content: View>: View {
     let context: AgentBoardContext
     let title: String?
+    /// A small line under the title (Feed's date).
+    var subtitle: String? = nil
     let identifier: String
     /// Items on this page; they count as read once it has been open a moment.
     var seen: [AgentBoardItem] = []
@@ -47,24 +50,27 @@ struct BoardScroll<Content: View>: View {
             let side = max(BighelpTokens.space20, (geometry.size.width - 720) / 2 + BighelpTokens.space20)
             List {
                 Group {
+                    // Between ☰ and New chat, as on the chat: the avatar opens the profile, the name
+                    // switches agents.
                     AgentHeroHeader(agentID: context.agentID, displayName: context.agentName,
-                                    imageURL: context.imageURL, activity: context.activity,
+                                    imageURL: context.imageURL, activity: context.activity, avatarSize: 56,
                                     onAvatarTap: context.onProfile, onNameTap: context.onSwitchAgent)
                         .frame(maxWidth: .infinity)
-                        .padding(.top, BighelpTokens.space8)
+                        .padding(.top, BighelpTokens.space4)
+                        .boardRow()
                     if title != nil || onBlueprints != nil {
                         titleRow
+                            .boardRow(top: BighelpTokens.space8, bottom: BighelpTokens.space4)
                     }
                     content()
                 }
-                .listRowInsets(EdgeInsets(top: BighelpTokens.space8, leading: side, bottom: BighelpTokens.space8,
-                                          trailing: side))
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .environment(\.defaultMinListRowHeight, 0)
+            .environment(\.boardRowSide, side)
             .contentMargins(.bottom, 120, for: .scrollContent)
         }
         .scrollIndicators(.hidden)
@@ -88,19 +94,28 @@ struct BoardScroll<Content: View>: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .animation(.snappy, value: context.store.recentlyHidden?.id)
+        .animation(reduceMotion ? nil : .snappy, value: context.store.recentlyHidden?.id)
         .background(BighelpThemeCanvas(theme: theme).ignoresSafeArea())
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(identifier)
     }
 
+    /// The page's big title, left aligned under the header buttons.
     private var titleRow: some View {
         HStack(alignment: .center, spacing: BighelpTokens.space8) {
-            if let title {
-                Text(title)
-                    .font(.bighelp(.largeTitle).weight(.bold))
-                    .foregroundStyle(theme.primaryText)
-                    .accessibilityAddTraits(.isHeader)
+            VStack(alignment: .leading, spacing: 2) {
+                if let title {
+                    Text(title)
+                        .font(.bighelp(.title, weight: .bold))
+                        .tracking(-0.6)
+                        .foregroundStyle(theme.primaryText)
+                        .accessibilityAddTraits(.isHeader)
+                }
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.bighelp(.subheadline, weight: .medium))
+                        .foregroundStyle(theme.secondaryText)
+                }
             }
             Spacer(minLength: BighelpTokens.space8)
             if let onBlueprints {
@@ -110,6 +125,7 @@ struct BoardScroll<Content: View>: View {
     }
 
     @BighelpThemeReader private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 }
 
 /// Why a thumbs down. The agent reads it to post better things; never required.
@@ -119,7 +135,8 @@ enum BoardFeedbackReason {
 
 /// Long press (right-click on the Mac) on a Feed, Ideas or Goals item, and the same actions for
 /// VoiceOver: only the ones that fit the item's kind. The last one is the item's dismiss
-/// (`BoardDismissAction`), the same as swiping left.
+/// (`BoardDismissAction`), the same as swiping left. For an item that has its own List row;
+/// tiles that share a row put `BoardItemMenu` in a `Menu` of their own.
 private struct BoardItemActions: ViewModifier {
     let item: AgentBoardItem
     let context: AgentBoardContext
@@ -127,13 +144,38 @@ private struct BoardItemActions: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .contextMenu { actions(includesShare: true) }
-            .accessibilityActions { actions(includesShare: false) }
+            .contextMenu {
+                BoardItemMenu.info(item, context: context)
+                BoardItemMenu.items(item, context: context, asksWhy: $asksWhy, includesShare: true)
+            }
+            .accessibilityActions {
+                BoardItemMenu.items(item, context: context, asksWhy: $asksWhy, includesShare: false)
+            }
             .modifier(LessLikeThis(isPresented: $asksWhy, item: item, context: context))
+    }
+}
+
+/// What a board item's long-press menu offers. A tile in a grid shares its List row with
+/// others, and a List row shows its first `.contextMenu` for every item in it, so tiles put
+/// these in their own `Menu(primaryAction:)` instead.
+@MainActor
+enum BoardItemMenu {
+    /// Who posted it and when, and why a thumbs down: what a post's info button used to show.
+    @ViewBuilder
+    static func info(_ item: AgentBoardItem, context: AgentBoardContext) -> some View {
+        if item.kind == .feed {
+            Text((item.source.isEmpty ? "Posted by \(context.agentName)" : item.source) + " · "
+                 + item.createdAt.formatted(date: .abbreviated, time: .shortened))
+            if item.rating == .down, !item.reason.isEmpty {
+                Text("You said: \(item.reason)")
+            }
+            Divider()
+        }
     }
 
     @ViewBuilder
-    private func actions(includesShare: Bool) -> some View {
+    static func items(_ item: AgentBoardItem, context: AgentBoardContext, asksWhy: Binding<Bool>,
+                      includesShare: Bool) -> some View {
         let store = context.store
         switch item.kind {
         case .feed:
@@ -148,7 +190,7 @@ private struct BoardItemActions: ViewModifier {
                         Task { await store.rate(item, .none) }
                     } else {
                         Task { await store.rate(item, .down) }
-                        asksWhy = true
+                        asksWhy.wrappedValue = true
                     }
                 }
             }
@@ -185,7 +227,7 @@ private struct BoardItemActions: ViewModifier {
 }
 
 /// After a thumbs down: "Less like this?" with quick reasons. Skipping is fine.
-private struct LessLikeThis: ViewModifier {
+struct LessLikeThis: ViewModifier {
     @Binding var isPresented: Bool
     let item: AgentBoardItem
     let context: AgentBoardContext
@@ -311,11 +353,9 @@ private struct BoardEmptyState: View {
                 .multilineTextAlignment(.center)
             Text("“\(example)”")
                 .font(.bighelp(.subheadline).italic())
-                .foregroundStyle(theme.primaryText)
                 .multilineTextAlignment(.center)
-                .padding(BighelpTokens.space12)
                 .frame(maxWidth: .infinity)
-                .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(theme.incomingMessageBackground))
+                .boardBlock(BighelpBlockColor.pastel(for: identifier), padding: BighelpTokens.space16)
             Button {
                 onAsk(example)
             } label: {
@@ -416,7 +456,8 @@ struct BoardStateBanner: View {
             .tint(theme.action)
         }
         .padding(BighelpTokens.space16)
-        .background(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(theme.border))
+        .background(RoundedRectangle(cornerRadius: BoardBlockMetrics.cardRadius, style: .continuous)
+            .strokeBorder(theme.separator))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("board.plugin-required")
     }
@@ -462,17 +503,35 @@ enum BoardTimeBucket {
 
 // MARK: - Feed
 
+/// Feed: what's new today in a green block, the newest posts as tiles two to a row, then the
+/// rest as rows in a card. Every post opens in full (`FeedPostDetailSheet`).
 struct AgentFeedView: View {
     let context: AgentBoardContext
     @State private var showsBlueprints = false
     @State private var openedPost: OpenedFeedPost?
+    /// Posts that were new while the page was open. They count as read a moment after they
+    /// show (`BoardScroll`), so this keeps the page from rearranging under the person.
+    @State private var newIDs: Set<String> = []
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    /// At most this many tiles; older posts are rows.
+    private static let maximumTiles = 6
 
     var body: some View {
         let store = context.store
-        let isEmpty = store.feed.isEmpty && store.state == .loaded
-        BoardScroll(context: context, title: nil, identifier: "board.feed", seen: store.feed,
+        let posts = store.feed.sorted { $0.createdAt > $1.createdAt }
+        let isEmpty = posts.isEmpty && store.state == .loaded
+        let fresh = posts.filter { newIDs.contains($0.id) }
+        // The new posts, rounded up to fill the last row, and at least the newest two.
+        let tileCount = min(posts.count, Self.maximumTiles, max(2, fresh.count + fresh.count % 2))
+        let tiles = Array(posts.prefix(tileCount))
+        let rows = Array(posts.dropFirst(tileCount))
+        BoardScroll(context: context, title: "Feed",
+                    subtitle: Date.now.formatted(.dateTime.weekday(.wide).month(.wide).day()),
+                    identifier: "board.feed", seen: store.feed,
                     onBlueprints: isEmpty ? nil : { showsBlueprints = true }) {
             BoardStateBanner(state: store.state, context: context)
+                .boardRow()
             if isEmpty {
                 BoardEmptyState(
                     symbol: "newspaper",
@@ -481,22 +540,29 @@ struct AgentFeedView: View {
                     example: "Every evening, post the top three AI stories to my feed.",
                     agentName: context.agentName, onAsk: context.onAsk, identifier: "board.feed.empty",
                     onBlueprints: { showsBlueprints = true })
+                    .boardRow()
             }
-            ForEach(BoardTimeBucket.grouped(store.feed), id: \.title) { group in
-                Text(group.title)
-                    .font(.bighelp(.title2).weight(.bold))
-                    .foregroundStyle(theme.primaryText)
-                    .padding(.top, BighelpTokens.space8)
-                    .accessibilityAddTraits(.isHeader)
-                ForEach(group.items) { item in
-                    VStack(spacing: 0) {
-                        FeedPostView(item: item, context: context) { openedPost = .init(id: item.id) }
-                        Divider().overlay(theme.border)
-                    }
-                    .boardItemSwipe(item, store: store)
+            if !fresh.isEmpty {
+                FeedTodayBlock(posts: fresh, context: context)
+                    .boardRow()
+            }
+            BoardTileRows(items: tiles, columns: dynamicTypeSize.isAccessibilitySize ? 1 : 2, store: store) { item in
+                FeedPostTile(item: item, context: context) { openedPost = .init(id: item.id) }
+            }
+            if !rows.isEmpty {
+                BoardSectionCaption(title: "Earlier")
+                    .boardRow(top: BighelpTokens.space8, bottom: 0)
+                ForEach(rows) { item in
+                    FeedPostRow(item: item, context: context) { openedPost = .init(id: item.id) }
+                        .boardCardSegment(isFirst: item.id == rows.first?.id, isLast: item.id == rows.last?.id)
+                        .boardItemSwipe(item, store: store)
                 }
             }
         }
+        .onChange(of: unreadIDs, initial: true) { _, unread in
+            newIDs.formUnion(unread)
+        }
+        .onChange(of: context.agentID) { newIDs = [] }
         .boardBlueprints(isPresented: $showsBlueprints, kind: .feed, context: context)
         .bighelpSheet(item: $openedPost) { post in
             FeedPostDetailSheet(itemID: post.id, context: context)
@@ -506,103 +572,191 @@ struct AgentFeedView: View {
         }
     }
 
-    @BighelpThemeReader private var theme
+    /// Posts not seen yet. Hosts without read state (plugins before 2.19.0) have none.
+    private var unreadIDs: Set<String> {
+        guard context.store.supportsFeedback else { return [] }
+        return Set(context.store.feed.filter { !$0.read }.map(\.id))
+    }
 }
 
-private struct FeedPostView: View {
-    let item: AgentBoardItem
+/// The deep green block on top of Feed: how many posts are new, from whom.
+private struct FeedTodayBlock: View {
+    let posts: [AgentBoardItem]
     let context: AgentBoardContext
-    /// Opens the post with its files. Only posts with files open: the Feed already shows
-    /// the rest of a post in full.
-    let onOpen: () -> Void
-    @State private var isShowingInfo = false
-    @State private var asksWhy = false
-    @AppStorage(LinkPreviewPreferences.enabledKey) private var showsLinkPreviews = true
 
     var body: some View {
+        let block = BighelpBlockColor.forest
+        let isToday = posts.allSatisfy { Calendar.current.isDateInToday($0.createdAt) }
+        HStack(alignment: .center, spacing: BighelpTokens.space16) {
+            VStack(alignment: .leading, spacing: BighelpTokens.space12) {
+                BoardOutlinePill(title: isToday ? "Today" : "New", ink: block.ink)
+                Text(posts.count == 1 ? "1 new post from \(context.agentName)"
+                                      : "\(posts.count) new posts from \(context.agentName)")
+                    .font(.bighelp(.title2, weight: .bold))
+                    .tracking(-0.4)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            // The agent itself, bare: no circle or glass behind it.
+            AgentLiveAvatar(agentID: context.agentID, displayName: context.agentName, imageURL: context.imageURL,
+                            activity: context.activity, size: 56, showsBadge: false)
+        }
+        .boardBlock(block, padding: 20)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("board.feed.today")
+    }
+}
+
+/// A new post as a pastel tile. It shares a List row with its neighbor, so its long-press menu
+/// is its own `Menu` (a tap opens the post) and it has no swipe.
+private struct FeedPostTile: View {
+    let item: AgentBoardItem
+    let context: AgentBoardContext
+    let onOpen: () -> Void
+    @State private var asksWhy = false
+
+    var body: some View {
+        let block = BighelpBlockColor.feed(item)
         let files = context.store.visibleFiles(of: item)
-        HStack(alignment: .top, spacing: BighelpTokens.space12) {
-            BoardIcon(icon: item.icon, fallback: "newspaper", size: 44)
-                .modifier(OpensPost(isEnabled: !files.isEmpty, open: onOpen))
-            VStack(alignment: .leading, spacing: BighelpTokens.space8) {
-                HStack(alignment: .firstTextBaseline, spacing: BighelpTokens.space8) {
-                    Text(item.title)
-                        .font(.bighelp(.headline))
-                        .foregroundStyle(theme.primaryText)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: 0)
-                    UnreadDot(item: item, store: context.store)
-                }
-                // The title opens the post; the text keeps its own links.
-                .modifier(OpensPost(isEnabled: !files.isEmpty, open: onOpen))
-                if !item.body.isEmpty {
-                    // Agents write posts in Markdown (bighelp_board): headings, lists, quotes, code
-                    // and tables draw as they do in chat.
-                    MarkdownMessageView(document: MarkdownDocument(item.body),
-                                        primaryText: theme.primaryText.opacity(0.9))
-                        .foregroundStyle(theme.primaryText.opacity(0.9))
-                        .tint(theme.action)
-                }
-                if !item.pictures.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: BighelpTokens.space8) {
-                            ForEach(Array(item.pictures.enumerated()), id: \.offset) { _, picture in
-                                BoardPictureView(item: item, picture: picture, store: context.store)
-                                    .frame(width: 220, height: 220)
-                                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                                    .modifier(OpensPost(isEnabled: !files.isEmpty, open: onOpen))
-                            }
-                        }
-                    }
-                    .scrollClipDisabled()
-                }
-                if !files.isEmpty {
-                    BoardFilesStrip(item: item, files: files, store: context.store, onOpen: onOpen)
-                }
-                if let previewed = previewedLink {
-                    LinkPreviewCard(url: previewed.url, fallbackTitle: previewed.title)
-                        .frame(maxWidth: 420, alignment: .leading)
-                }
-                ForEach(item.links.filter { $0.url != previewedLink?.url }, id: \.url) { link in
-                    Link(destination: link.url) {
-                        Label(link.title.isEmpty ? (link.url.host() ?? "Open link") : link.title, systemImage: "link")
-                            .font(.bighelp(.subheadline).weight(.medium))
-                    }
-                    // Only the link takes the tap in a List row.
-                    .buttonStyle(.borderless)
-                    .tint(theme.action)
-                }
-                actions
+        VStack(alignment: .leading, spacing: BighelpTokens.space8) {
+            Menu {
+                BoardItemMenu.info(item, context: context)
+                BoardItemMenu.items(item, context: context, asksWhy: $asksWhy, includesShare: true)
+            } label: {
+                label(ink: block.ink)
+            } primaryAction: {
+                onOpen()
+            }
+            .tint(block.ink)
+            .accessibilityHint("Opens the post")
+            if !files.isEmpty {
+                BoardTileFiles(item: item, files: files, store: context.store, ink: block.ink, onOpen: onOpen)
+            }
+            Spacer(minLength: 0)
+            HStack(spacing: 0) {
+                FeedThumbs(item: item, context: context, asksWhy: $asksWhy, ink: block.ink)
+                #if targetEnvironment(macCatalyst)
+                Spacer(minLength: 0)
+                BoardTileMoreMenu(item: item, context: context, ink: block.ink, asksWhy: $asksWhy)
+                #endif
             }
         }
-        .padding(.vertical, BighelpTokens.space8)
-        .contentShape(.rect)
-        .boardItemActions(item, context: context)
+        .boardBlock(block, padding: 14)
         .modifier(LessLikeThis(isPresented: $asksWhy, item: item, context: context))
         .accessibilityElement(children: .contain)
-        .modifier(OpensPostForVoiceOver(isEnabled: !files.isEmpty, open: onOpen))
+        .accessibilityActions {
+            BoardItemMenu.items(item, context: context, asksWhy: $asksWhy, includesShare: false)
+        }
         .accessibilityIdentifier("board.feed.post.\(item.id)")
     }
 
-    /// The post's first web link, else the first one in its text, as a preview card.
-    private var previewedLink: AgentBoardItem.Link? {
-        guard showsLinkPreviews else { return nil }
-        if let link = item.links.first(where: { LinkPreviewPolicy.loadableURL($0.url) != nil }) { return link }
-        return LinkPreviewCandidate.firstURL(inMarkdown: item.body).map { .init(url: $0, title: "") }
+    private func label(ink: Color) -> some View {
+        VStack(alignment: .leading, spacing: BighelpTokens.space8) {
+            HStack(spacing: 6) {
+                AgentLiveAvatar(agentID: context.agentID, displayName: context.agentName, imageURL: context.imageURL,
+                                size: 22, showsBadge: false)
+                Text(item.source.isEmpty ? context.agentName : item.source)
+                    .font(.bighelp(.caption, weight: .semibold))
+                    .foregroundStyle(ink.opacity(0.75))
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                UnreadDot(item: item, store: context.store)
+            }
+            Text(item.title)
+                .font(.bighelp(.headline, weight: .bold))
+                .foregroundStyle(ink)
+                .multilineTextAlignment(.leading)
+                .lineLimit(4)
+                .fixedSize(horizontal: false, vertical: true)
+            if let picture = item.pictures.first {
+                BoardPictureView(item: item, picture: picture, store: context.store)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 96)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            } else if !preview.isEmpty {
+                Text(preview)
+                    .font(.bighelp(.footnote))
+                    .foregroundStyle(ink.opacity(0.8))
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(2)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(.rect)
     }
 
-    private var actions: some View {
-        HStack(spacing: BighelpTokens.space12) {
+    /// The post's words without Markdown's symbols, like a message preview.
+    private var preview: String {
+        MarkdownDocument(item.body).visiblePlainText
+            .replacingOccurrences(of: "\n", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+/// An older post as a row of the Earlier card. It has its own List row: it swipes, and holds
+/// for the usual menu.
+private struct FeedPostRow: View {
+    let item: AgentBoardItem
+    let context: AgentBoardContext
+    let onOpen: () -> Void
+    @State private var asksWhy = false
+
+    var body: some View {
+        HStack(spacing: BighelpTokens.space8) {
+            Button(action: onOpen) {
+                HStack(spacing: BighelpTokens.space12) {
+                    BoardIconTile(icon: item.icon, fallback: "newspaper", color: BighelpBlockColor.feed(item))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.title)
+                            .font(.bighelp(.subheadline, weight: .semibold))
+                            .foregroundStyle(theme.primaryText)
+                            .multilineTextAlignment(.leading)
+                            .lineLimit(2)
+                        Text((item.source.isEmpty ? context.agentName : item.source) + " · "
+                             + BoardTimeBucket.title(for: item.createdAt))
+                            .font(.bighelp(.caption))
+                            .foregroundStyle(theme.secondaryText)
+                            .lineLimit(1)
+                    }
+                    Spacer(minLength: 0)
+                    UnreadDot(item: item, store: context.store)
+                }
+                .frame(minHeight: BighelpTokens.hitTarget)
+                .contentShape(.rect)
+            }
+            .bighelpPlainButtonStyle()
+            .accessibilityHint("Opens the post")
+            FeedThumbs(item: item, context: context, asksWhy: $asksWhy, ink: theme.primaryText)
+        }
+        .padding(.leading, 14)
+        .padding(.trailing, 6)
+        .padding(.vertical, BighelpTokens.space8)
+        .boardItemActions(item, context: context)
+        .modifier(LessLikeThis(isPresented: $asksWhy, item: item, context: context))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("board.feed.post.\(item.id)")
+    }
+
+    @BighelpThemeReader private var theme
+}
+
+/// Thumbs up and down on a post. They tell the agent what's worth posting; a thumbs down may
+/// ask why (`asksWhy`). The chosen one fills with the color picked in Appearance.
+private struct FeedThumbs: View {
+    let item: AgentBoardItem
+    let context: AgentBoardContext
+    @Binding var asksWhy: Bool
+    /// The glyphs' color on the tile or the page.
+    let ink: Color
+
+    var body: some View {
+        HStack(spacing: 0) {
             Button {
                 Task { await context.store.rate(item, item.rating == .up ? .none : .up) }
             } label: {
-                Image(systemName: item.rating == .up ? "hand.thumbsup.fill" : "hand.thumbsup")
-                    .font(.bighelp(.title3))
-                    .foregroundStyle(item.rating == .up ? theme.action : theme.primaryText)
-                    .contentTransition(.symbolEffect(.replace))
-                    .frame(minWidth: BighelpTokens.hitTarget, minHeight: BighelpTokens.hitTarget)
+                glyph(item.rating == .up ? "hand.thumbsup.fill" : "hand.thumbsup", isSelected: item.rating == .up)
             }
-            .buttonStyle(.plain)
+            .bighelpPlainButtonStyle()
             .accessibilityLabel(item.rating == .up ? "Remove thumbs up" : "Thumbs up")
             .accessibilityAddTraits(item.rating == .up ? .isSelected : [])
             .accessibilityIdentifier("board.feed.thumbs-up")
@@ -615,61 +769,26 @@ private struct FeedPostView: View {
                         asksWhy = true
                     }
                 } label: {
-                    Image(systemName: item.rating == .down ? "hand.thumbsdown.fill" : "hand.thumbsdown")
-                        .font(.bighelp(.title3))
-                        .foregroundStyle(item.rating == .down ? theme.action : theme.primaryText)
-                        .contentTransition(.symbolEffect(.replace))
-                        .frame(minWidth: BighelpTokens.hitTarget, minHeight: BighelpTokens.hitTarget)
+                    glyph(item.rating == .down ? "hand.thumbsdown.fill" : "hand.thumbsdown",
+                          isSelected: item.rating == .down)
                 }
-                .buttonStyle(.plain)
+                .bighelpPlainButtonStyle()
                 .accessibilityLabel(item.rating == .down ? "Remove thumbs down" : "Thumbs down")
                 .accessibilityAddTraits(item.rating == .down ? .isSelected : [])
                 .accessibilityIdentifier("board.feed.thumbs-down")
             }
-            Button {
-                context.onAsk("About “\(item.title)”: ")
-            } label: {
-                Label("Discuss", systemImage: "bubble.left")
-                    .font(.bighelp(.body).weight(.medium))
-                    .foregroundStyle(theme.primaryText)
-                    .frame(minHeight: BighelpTokens.hitTarget)
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("board.feed.discuss")
-            Spacer()
-            Button {
-                isShowingInfo = true
-            } label: {
-                Image(systemName: "info.circle")
-                    .font(.bighelp(.title3))
-                    .foregroundStyle(theme.secondaryText)
-                    .frame(minWidth: BighelpTokens.hitTarget, minHeight: BighelpTokens.hitTarget, alignment: .trailing)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("About this post")
-            .popover(isPresented: $isShowingInfo) {
-                VStack(alignment: .leading, spacing: BighelpTokens.space4) {
-                    Text(item.source.isEmpty ? "Posted by \(context.agentName)" : item.source)
-                        .font(.bighelp(.subheadline).weight(.semibold))
-                    Text(item.createdAt.formatted(date: .abbreviated, time: .shortened))
-                        .font(.bighelp(.caption))
-                        .foregroundStyle(.secondary)
-                    if item.rating == .down, !item.reason.isEmpty {
-                        Label("You said: \(item.reason)", systemImage: "hand.thumbsdown")
-                            .font(.bighelp(.caption))
-                            .foregroundStyle(.secondary)
-                    }
-                    Button("Clear this post") {
-                        isShowingInfo = false
-                        Task { await context.store.dismiss(item) }
-                    }
-                    .padding(.top, BighelpTokens.space4)
-                }
-                .padding()
-                .presentationCompactAdaptation(.popover)
-                .bighelpPopoverDismissal(isPresented: $isShowingInfo)
-            }
         }
+    }
+
+    private func glyph(_ systemImage: String, isSelected: Bool) -> some View {
+        Image(systemName: systemImage)
+            .font(.bighelp(.subheadline, weight: .semibold))
+            .foregroundStyle(isSelected ? theme.actionForeground : ink)
+            .contentTransition(.symbolEffect(.replace))
+            .frame(width: 34, height: 34)
+            .background { if isSelected { Circle().fill(theme.action) } }
+            .frame(minWidth: BighelpTokens.hitTarget, minHeight: BighelpTokens.hitTarget)
+            .contentShape(.rect)
     }
 
     @BighelpThemeReader private var theme
@@ -710,17 +829,29 @@ struct BoardPictureView: View {
 
 // MARK: - Ideas
 
+/// Ideas: chips for its sections, then a bento of pastel tiles. The newest idea is the tall one
+/// with Let's do it; a tap on any idea opens it (`IdeaDetailSheet`).
 struct AgentIdeasView: View {
     let context: AgentBoardContext
     @State private var selected: AgentBoardItem?
     @State private var showsBlueprints = false
+    /// The chosen section chip; nil is All.
+    @State private var section: String?
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         let store = context.store
         let isEmpty = store.ideas.isEmpty && store.state == .loaded
+        let ideas = store.ideas.sorted { $0.createdAt > $1.createdAt }
+        let sections = Self.sections(ideas)
+        // A chip whose ideas are all gone shows All again.
+        let chosen = section.flatMap { sections.contains($0) ? $0 : nil }
+        let shown = chosen.map { name in ideas.filter { Self.key($0) == name } } ?? ideas
+        let columns = dynamicTypeSize.isAccessibilitySize ? 1 : 2
         BoardScroll(context: context, title: "Ideas", identifier: "board.ideas", seen: store.ideas,
                     onBlueprints: isEmpty ? nil : { showsBlueprints = true }) {
             BoardStateBanner(state: store.state, context: context)
+                .boardRow()
             if isEmpty {
                 BoardEmptyState(
                     symbol: "lightbulb",
@@ -729,23 +860,36 @@ struct AgentIdeasView: View {
                     example: "Look through my week and suggest a few things you could take off my plate.",
                     agentName: context.agentName, onAsk: context.onAsk, identifier: "board.ideas.empty",
                     onBlueprints: { showsBlueprints = true })
+                    .boardRow()
             }
-            ForEach(sections(store.ideas), id: \.title) { section in
-                if !section.title.isEmpty {
-                    Text(section.title)
-                        .font(.bighelp(.title2).weight(.bold))
-                        .foregroundStyle(theme.primaryText)
-                        .padding(.top, BighelpTokens.space8)
-                }
-                ForEach(section.items) { idea in
-                    VStack(spacing: 0) {
-                        Button { selected = idea } label: { ideaRow(idea) }
-                            .buttonStyle(.plain)
-                            .boardItemActions(idea, context: context)
-                            .accessibilityIdentifier("board.idea.\(idea.id)")
-                        Divider().overlay(theme.border)
+            if sections.count > 1 || (sections.count == 1 && ideas.contains { Self.key($0).isEmpty }) {
+                chips(sections, chosen: chosen)
+                    .boardRow(top: BighelpTokens.space4, bottom: BighelpTokens.space4)
+            }
+            if let hero = shown.first {
+                let beside = Array(shown.dropFirst().prefix(columns == 1 ? 0 : 2))
+                if beside.isEmpty {
+                    IdeaHeroTile(idea: hero, context: context) { selected = hero }
+                        .boardRow(top: BoardBlockMetrics.tileSpacing / 2, bottom: BoardBlockMetrics.tileSpacing / 2)
+                        .boardItemSwipe(hero, store: store)
+                } else {
+                    // The tall tile beside two short ones, all the same height.
+                    HStack(alignment: .top, spacing: BoardBlockMetrics.tileSpacing) {
+                        IdeaHeroTile(idea: hero, context: context) { selected = hero }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        VStack(spacing: BoardBlockMetrics.tileSpacing) {
+                            ForEach(beside) { idea in
+                                IdeaTile(idea: idea, context: context) { selected = idea }
+                                    .frame(maxHeight: .infinity)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
-                    .boardItemSwipe(idea, store: store)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .boardRow(top: BoardBlockMetrics.tileSpacing / 2, bottom: BoardBlockMetrics.tileSpacing / 2)
+                }
+                BoardTileRows(items: Array(shown.dropFirst(1 + beside.count)), columns: columns, store: store) { idea in
+                    IdeaTile(idea: idea, context: context) { selected = idea }
                 }
             }
         }
@@ -758,42 +902,198 @@ struct AgentIdeasView: View {
         }
     }
 
-    private func sections(_ ideas: [AgentBoardItem]) -> [(title: String, items: [AgentBoardItem])] {
-        var order: [String] = []
-        var groups: [String: [AgentBoardItem]] = [:]
-        for idea in ideas.sorted(by: { $0.createdAt > $1.createdAt }) {
-            let key = idea.section.trimmingCharacters(in: .whitespaces)
-            if groups[key] == nil { order.append(key) }
-            groups[key, default: []].append(idea)
-        }
-        // Unsectioned ideas lead, under the page title.
-        return order.sorted { $0.isEmpty && !$1.isEmpty }.map { ($0, groups[$0] ?? []) }
-    }
-
-    private func ideaRow(_ idea: AgentBoardItem) -> some View {
-        HStack(alignment: .top, spacing: BighelpTokens.space12) {
-            BoardIcon(icon: idea.icon, fallback: "lightbulb", size: 48)
-            VStack(alignment: .leading, spacing: BighelpTokens.space4) {
-                Text(idea.title)
-                    .font(.bighelp(.headline))
-                    .foregroundStyle(theme.primaryText)
-                    .multilineTextAlignment(.leading)
-                // A short preview reads like a message preview: the Markdown's words, no symbols.
-                Text(MarkdownDocument(idea.body).visiblePlainText.replacingOccurrences(of: "\n\n", with: "\n"))
-                    .font(.bighelp(.subheadline))
-                    .foregroundStyle(theme.secondaryText)
-                    .lineLimit(4)
-                    .multilineTextAlignment(.leading)
+    private func chips(_ sections: [String], chosen: String?) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: BighelpTokens.space8) {
+                BoardFilterChip(title: "All", isSelected: chosen == nil) { section = nil }
+                    .accessibilityIdentifier("board.ideas.chip.all")
+                ForEach(sections, id: \.self) { name in
+                    BoardFilterChip(title: name, isSelected: chosen == name) { section = name }
+                        .accessibilityIdentifier("board.ideas.chip.\(name)")
+                }
             }
-            Spacer(minLength: 0)
-            UnreadDot(item: idea, store: context.store)
-                .padding(.top, 6)
         }
-        .padding(.vertical, BighelpTokens.space8)
-        .contentShape(.rect)
+        .scrollClipDisabled()
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("board.ideas.chips")
     }
 
-    @BighelpThemeReader private var theme
+    /// An idea's section (the agent's own words, like "Health"); empty for none.
+    private static func key(_ idea: AgentBoardItem) -> String {
+        idea.section.trimmingCharacters(in: .whitespaces)
+    }
+
+    /// The named sections, newest first.
+    private static func sections(_ ideas: [AgentBoardItem]) -> [String] {
+        var names: [String] = []
+        for idea in ideas {
+            let name = key(idea)
+            if !name.isEmpty, !names.contains(name) { names.append(name) }
+        }
+        return names
+    }
+}
+
+/// An idea's words without Markdown's symbols, like a message preview.
+@MainActor
+private func ideaPreview(_ idea: AgentBoardItem) -> String {
+    MarkdownDocument(idea.body).visiblePlainText
+        .replacingOccurrences(of: "\n", with: " ")
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+}
+
+/// The newest idea: its section and agent, a big title, a few lines, and Let's do it, which
+/// says yes the same way as the idea's own page. It shares a List row with the tiles beside
+/// it, so its long-press menu is its own `Menu` (a tap opens the idea).
+private struct IdeaHeroTile: View {
+    let idea: AgentBoardItem
+    let context: AgentBoardContext
+    let onOpen: () -> Void
+    @State private var isAccepting = false
+    @State private var acceptFailed = false
+
+    var body: some View {
+        let block = BighelpBlockColor.idea(idea)
+        let preview = ideaPreview(idea)
+        VStack(alignment: .leading, spacing: BighelpTokens.space16) {
+            Menu {
+                BoardItemMenu.items(idea, context: context, asksWhy: .constant(false), includesShare: true)
+            } label: {
+                VStack(alignment: .leading, spacing: BighelpTokens.space8) {
+                    HStack(alignment: .firstTextBaseline, spacing: BighelpTokens.space4) {
+                        Text([idea.section.trimmingCharacters(in: .whitespaces), context.agentName]
+                            .filter { !$0.isEmpty }.joined(separator: " · "))
+                            .font(.bighelp(.caption, weight: .semibold))
+                            .foregroundStyle(block.ink.opacity(0.7))
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                        UnreadDot(item: idea, store: context.store)
+                    }
+                    Text(idea.title)
+                        .font(.bighelp(.title2, weight: .bold))
+                        .tracking(-0.4)
+                        .foregroundStyle(block.ink)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if !preview.isEmpty {
+                        Text(preview)
+                            .font(.bighelp(.subheadline))
+                            .foregroundStyle(block.ink.opacity(0.8))
+                            .multilineTextAlignment(.leading)
+                            .lineLimit(4)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(.rect)
+            } primaryAction: {
+                onOpen()
+            }
+            .tint(block.ink)
+            .accessibilityHint("Opens the idea")
+            .accessibilityIdentifier("board.idea.\(idea.id)")
+            Spacer(minLength: 0)
+            VStack(alignment: .leading, spacing: BighelpTokens.space4) {
+                #if targetEnvironment(macCatalyst)
+                HStack(spacing: 0) {
+                    letsDoItButton
+                    Spacer(minLength: 0)
+                    BoardTileMoreMenu(item: idea, context: context, ink: block.ink, asksWhy: .constant(false))
+                }
+                #else
+                letsDoItButton
+                #endif
+                if acceptFailed {
+                    Text("Couldn't tell \(context.agentName) yet.")
+                        .font(.bighelp(.caption))
+                        .foregroundStyle(block.ink.opacity(0.75))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .boardBlock(block)
+        .accessibilityElement(children: .contain)
+    }
+
+    private var letsDoItButton: some View {
+        Button {
+            Task { await letsDoIt() }
+        } label: {
+            BoardActionPillLabel(title: acceptFailed ? "Try again" : "Let's do it", isBusy: isAccepting)
+        }
+        .bighelpPlainButtonStyle()
+        .disabled(isAccepting)
+        .accessibilityLabel(acceptFailed ? "Try again" : "Let's do it")
+        .accessibilityIdentifier("board.idea.lets-do-it.\(idea.id)")
+    }
+
+    /// As on the idea's page: the yes is recorded by the idea's ID, and the chat that opens gets
+    /// only the readable text. Older plugins go straight to the chat.
+    private func letsDoIt() async {
+        isAccepting = true
+        let outcome = await context.store.accept(idea)
+        isAccepting = false
+        guard outcome != .failed else { acceptFailed = true; return }
+        acceptFailed = false
+        context.onAsk(idea.letsDoItMessage)
+    }
+}
+
+/// Any other idea as a pastel tile: its section, title and a line or two. The whole tile is its
+/// `Menu`: a tap opens the idea, touch and hold shows its actions.
+private struct IdeaTile: View {
+    let idea: AgentBoardItem
+    let context: AgentBoardContext
+    let onOpen: () -> Void
+
+    var body: some View {
+        let block = BighelpBlockColor.idea(idea)
+        let preview = ideaPreview(idea)
+        Menu {
+            BoardItemMenu.items(idea, context: context, asksWhy: .constant(false), includesShare: true)
+        } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .center, spacing: BighelpTokens.space4) {
+                    if idea.icon.isEmpty {
+                        Text(idea.section.trimmingCharacters(in: .whitespaces))
+                            .font(.bighelp(.caption, weight: .semibold))
+                            .foregroundStyle(block.ink.opacity(0.7))
+                            .lineLimit(1)
+                    } else {
+                        Text(idea.icon).font(.bighelp(.title3)).accessibilityHidden(true)
+                    }
+                    Spacer(minLength: 0)
+                    UnreadDot(item: idea, store: context.store)
+                }
+                Text(idea.title)
+                    .font(.bighelp(.headline, weight: .bold))
+                    .foregroundStyle(block.ink)
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(4)
+                    .fixedSize(horizontal: false, vertical: true)
+                if !preview.isEmpty {
+                    Text(preview)
+                        .font(.bighelp(.footnote))
+                        .foregroundStyle(block.ink.opacity(0.8))
+                        .multilineTextAlignment(.leading)
+                        .lineLimit(2)
+                }
+                Spacer(minLength: 0)
+            }
+            .boardBlock(block, padding: 16)
+            .contentShape(.rect)
+        } primaryAction: {
+            onOpen()
+        }
+        .tint(block.ink)
+        .accessibilityHint("Opens the idea")
+        .accessibilityIdentifier("board.idea.\(idea.id)")
+        #if targetEnvironment(macCatalyst)
+        .overlay(alignment: .bottomTrailing) {
+            BoardTileMoreMenu(item: idea, context: context, ink: block.ink, asksWhy: .constant(false))
+                .padding(BighelpTokens.space4)
+        }
+        #endif
+    }
 }
 
 private struct IdeaDetailSheet: View {

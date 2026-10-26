@@ -1,8 +1,10 @@
 import SwiftUI
 
-/// The bold blocks of Feed, Ideas and Goals, and New chat in the bottom bar: pastel fills with ink
-/// on them, and a deep green for what's new today. The pastels keep their color after dark, where
-/// they read well on the black page; the green gets a little darker so it stays a block.
+/// The content blocks of Feed, Ideas and Goals: pastel fills with ink on them, and a deep green for
+/// what's new today. They color content, like an agent's mark; controls (New chat, the selected tab,
+/// buttons and chips) take the color picked in Appearance (`theme.action`), never these. The pastels
+/// keep their color after dark, where they read well on the black page; the green gets a little
+/// darker so it stays a block.
 enum BighelpBlockColor: String, CaseIterable, Sendable {
     case lime, lilac, sky, peach, forest
 

@@ -310,6 +310,8 @@ extension RootShellView {
             showsHiddenFiles: settings.nerdModeEnabled,
             dashboard: SimpleBotDashboardHooks(
                 shellBoard: agentBoard,
+                shellBoardKey: { agentBoardClientKey },
+                configureShellBoard: { await configureAgentBoard($0) },
                 onAsk: { id, text in askSimpleBot(id, text, sends: false) },
                 onSend: { id, text in askSimpleBot(id, text, sends: true) })
         )

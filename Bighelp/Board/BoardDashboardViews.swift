@@ -232,6 +232,9 @@ struct BoardDashboardView: View {
     let context: AgentBoardContext
     /// The shell's board, whose connection this one follows.
     let shellBoard: AgentBoardStore
+    /// The connection the shell's board should be on now (`RootShellView.agentBoardClientKey`).
+    let shellBoardKey: @MainActor () -> RootShellView.AgentBoardClientKey
+    let configureShellBoard: @MainActor (RootShellView.AgentBoardClientKey) async -> Void
 
     /// One sheet at a time; what it asked for runs once it has closed (a push under a closing
     /// sheet gets dropped).
@@ -257,6 +260,7 @@ struct BoardDashboardView: View {
     @BighelpThemeReader private var theme
 
     private struct FollowKey: Equatable {
+        let connection: RootShellView.AgentBoardClientKey
         let client: ObjectIdentifier?
         let waiting: Bool
         let disconnected: Bool
@@ -285,8 +289,15 @@ struct BoardDashboardView: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("dashboard")
-        .task(id: FollowKey(client: shellBoard.followableConnection.map { ObjectIdentifier($0.client) },
+        .task(id: FollowKey(connection: shellBoardKey(),
+                            client: shellBoard.followableConnection.map { ObjectIdentifier($0.client) },
                             waiting: shellBoard.isWaitingForConnection, disconnected: shellBoard.isDisconnected)) {
+            // The shell sets its board up in a root task, which waits while this profile (or the
+            // chat it came from) covers the root: bring it to the connection of the moment first.
+            // Its own task, so this one ending for the new connection never cuts it short.
+            let connection = shellBoardKey()
+            await Task { await configureShellBoard(connection) }.value
+            guard !Task.isCancelled else { return }
             await model.follow(shellBoard)
         }
         .task(id: store.state == .loaded && cardCount > 0) {

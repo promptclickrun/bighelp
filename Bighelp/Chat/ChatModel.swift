@@ -62,7 +62,7 @@ final class ChatModel {
                 persistSession()
                 flushPersistence()
             } else {
-                persistSession()
+                persistSession(draftOnly: true)
             }
         }
     }
@@ -289,6 +289,8 @@ final class ChatModel {
     let persistenceCheckpointDelay: Duration
     var persistenceCheckpointTask: Task<Void, Never>?
     var hasDirtyPersistence = false
+    /// Something besides the draft is waiting to be saved, so typing doesn't hold its checkpoint back.
+    var hasDirtyContent = false
     let onTurnStopped: (() -> Void)?
     let onBotModeChange: ((String, [String]) -> Bool)?
     let onBotModeChangeWithHistory: ((String, [String], [TimelineItem]) -> Bool)?

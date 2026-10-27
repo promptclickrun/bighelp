@@ -51,6 +51,7 @@ extension ChatModel {
         persistenceCheckpointTask?.cancel()
         persistenceCheckpointTask = nil
         hasDirtyPersistence = false
+        hasDirtyContent = false
         isReplacingReferenceDraft = true
         draft = ""
         replyDraft = nil
@@ -258,6 +259,7 @@ extension ChatModel {
         try onReferenceStateChange(persistedDraft, referenceState)
         lastReferenceCheckpoint = (Data(persistedDraft.utf8), referenceState)
         hasDirtyPersistence = false
+        hasDirtyContent = false
     }
 
     /// Recovery uses only authenticated existing history/platform_message_id or
@@ -349,9 +351,17 @@ extension ChatModel {
         }
     }
 
-    func persistSession() {
+    /// Saves the chat after `persistenceCheckpointDelay`. A change to the draft alone waits
+    /// for a pause in typing: each save redraws every screen that lists chats, and doing that
+    /// every two seconds while someone types made the keyboard stutter.
+    func persistSession(draftOnly: Bool = false) {
         guard !referenceOwnerRetired, !isReplacingReferenceDraft else { return }
         hasDirtyPersistence = true
+        if !draftOnly { hasDirtyContent = true }
+        if draftOnly, !hasDirtyContent {
+            persistenceCheckpointTask?.cancel()
+            persistenceCheckpointTask = nil
+        }
         guard persistenceCheckpointTask == nil else { return }
         let delay = persistenceCheckpointDelay
         persistenceCheckpointTask = Task { [weak self] in
@@ -371,6 +381,7 @@ extension ChatModel {
         guard !referenceOwnerRetired else { return }
         guard hasDirtyPersistence else { return }
         hasDirtyPersistence = false
+        hasDirtyContent = false
         let acceptedItems = pendingIndependentMessageIDs.isEmpty
             ? items
             : items.filter { !pendingIndependentMessageIDs.contains($0.id) }

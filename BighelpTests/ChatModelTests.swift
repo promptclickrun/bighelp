@@ -3233,6 +3233,25 @@ struct ChatModelTests {
         #expect(persisted.last?.1.last?.content == .message("Final"))
     }
 
+    /// Each save redraws every screen that lists chats, so the draft waits for a pause in typing.
+    @Test func typingSavesTheDraftOnceItPauses() async {
+        var persisted: [String] = []
+        let model = ChatModel(
+            conversationID: "typing-pause",
+            client: ConversationFixtureClient(),
+            initialItems: [],
+            persistenceCheckpointDelay: .milliseconds(60),
+            onSessionChange: { draft, _, _, _ in persisted.append(draft) }
+        )
+        for count in 1...12 {
+            model.draft = String(repeating: "a", count: count)
+            try? await Task.sleep(for: .milliseconds(25))
+        }
+        #expect(persisted.isEmpty, "Nothing is saved while the person keeps typing")
+        try? await Task.sleep(for: .milliseconds(150))
+        #expect(persisted == [String(repeating: "a", count: 12)])
+    }
+
     @Test func backgroundAndNavigationFlushDirtySessionStateImmediately() {
         var persisted: [(String, [TimelineItem])] = []
         let model = ChatModel(

@@ -1,12 +1,20 @@
 package app.bighelp.android.storage
 
 import java.nio.file.Files
+import java.nio.file.Path
+import java.io.File
+import java.io.FileOutputStream
+import java.io.FilterInputStream
+import java.io.IOException
+import java.io.InputStream
+import java.security.ProviderException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import javax.crypto.KeyGenerator
 import org.junit.Assert.*
+import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -80,6 +88,10 @@ class ProtectedRecordStoreTest {
         file.writeBytes(original.copyOf().also { it[it.lastIndex] = (it.last().toInt() xor 1).toByte() })
         refuses(StorageProblem.CorruptRecord) { vault.read(binding) }
         file.writeBytes(original.copyOf(12))
+        refuses(StorageProblem.CorruptRecord) { vault.read(binding) }
+        file.writeBytes(original.copyOf(original.size - 1))
+        refuses(StorageProblem.CorruptRecord) { vault.read(binding) }
+        file.writeBytes(original.copyOf().also { it[8] = (it[8].toInt() xor 1).toByte() })
         refuses(StorageProblem.CorruptRecord) { vault.read(binding) }
     }
 
@@ -155,6 +167,126 @@ class ProtectedRecordStoreTest {
         assertTrue(vault.compareAndSet(second, null, bytes("two")))
         assertArrayEquals(bytes("one"), vault.read(first))
         assertArrayEquals(bytes("two"), vault.read(second))
+    }
+
+    @Test fun aStatFailureIsNeverTreatedAsAnAbsentRecord() {
+        val vault = store()
+        assertTrue(vault.compareAndSet(binding, null, bytes("saved")))
+        val file = temporary.root.listFiles()!!.single { it.extension == "sealed" }.toPath()
+        Files.delete(file)
+        Files.createSymbolicLink(file, file.fileName)
+        refuses(StorageProblem.DiskUnavailable) { vault.read(binding) }
+        refuses(StorageProblem.DiskUnavailable) { vault.compareAndSet(binding, null, bytes("replacement")) }
+        assertTrue(Files.isSymbolicLink(file))
+    }
+
+    @Test fun readingWithAMissingDeviceKeyNeverCreatesAnotherKey() {
+        assertTrue(store().compareAndSet(binding, null, bytes("saved")))
+        var created = false
+        val missing = object : RecordKeyProvider {
+            override fun existing() = null
+            override fun getOrCreate() = key.also { created = true }
+        }
+        val vault = ProtectedRecordStore(temporary.root, RecordCipher(missing))
+        refuses(StorageProblem.KeyMissing) { vault.read(binding) }
+        assertFalse(created)
+        assertArrayEquals(bytes("saved"), store().read(binding))
+    }
+
+    @Test fun providerRuntimeFailuresAreTypedOnEncryptAndDecrypt() {
+        val provider = object : RecordKeyProvider {
+            override fun existing() = key
+            override fun getOrCreate() = key
+        }
+        val broken = RecordCipher(provider) { throw ProviderException("synthetic provider failure") }
+        refuses(StorageProblem.KeyUnavailable) { broken.encrypt(binding, bytes("secret")) }
+        val envelope = RecordCipher { key }.encrypt(binding, bytes("secret"))
+        refuses(StorageProblem.KeyUnavailable) { broken.decrypt(binding, envelope) }
+    }
+
+    @Test fun unreadableRecordsCanBeExplicitlyDiscardedWithoutDeletingValidOnes() {
+        val vault = store()
+        assertFalse(vault.discardUnreadable(binding))
+        assertTrue(vault.compareAndSet(binding, null, bytes("saved")))
+        assertFalse(vault.discardUnreadable(binding))
+        val file = temporary.root.listFiles()!!.single { it.extension == "sealed" }
+        file.writeBytes(byteArrayOf(1, 2, 3))
+        assertTrue(vault.discardUnreadable(binding))
+        assertNull(vault.read(binding))
+        assertTrue(vault.compareAndSet(binding, null, bytes("new-sign-in")))
+    }
+
+    @Test fun aTransientKeyFailureCannotDiscardAnyRecord() {
+        assertTrue(store().compareAndSet(binding, null, bytes("saved")))
+        val broken = ProtectedRecordStore(temporary.root, RecordCipher { throw ProviderException("unavailable") })
+        refuses(StorageProblem.KeyUnavailable) { broken.discardUnreadable(binding) }
+        assertArrayEquals(bytes("saved"), store().read(binding))
+    }
+
+    @Test fun theReadBudgetStopsAnOversizedInputAfterOneExcessByte() {
+        assertTrue(store().compareAndSet(binding, null, bytes("saved")))
+        var consumed = 0
+        val io = object : RecordFileOperations by SystemRecordFileOperations {
+            override fun read(file: File): InputStream = object : FilterInputStream(ByteArray(70_000).inputStream()) {
+                override fun read(bytes: ByteArray, offset: Int, length: Int): Int =
+                    super.read(bytes, offset, length).also { if (it > 0) consumed += it }
+            }
+        }
+        val vault = ProtectedRecordStore(temporary.root, RecordCipher { key }, io)
+        refuses(StorageProblem.RecordTooLarge) { vault.read(binding) }
+        assertEquals(RecordCipher.MAXIMUM_ENVELOPE_BYTES + 1, consumed)
+    }
+
+    @Test fun partialWriteAndMoveFailureLeaveThePreviousRecordReadable() {
+        val original = bytes("saved")
+        assertTrue(store().compareAndSet(binding, null, original))
+        val failures = listOf(
+            object : RecordFileOperations by SystemRecordFileOperations {
+                override fun write(file: File): FileOutputStream = object : FileOutputStream(file) {
+                    override fun write(bytes: ByteArray) {
+                        super.write(bytes, 0, minOf(8, bytes.size))
+                        throw IOException("synthetic interrupted write")
+                    }
+                }
+            },
+            object : RecordFileOperations by SystemRecordFileOperations {
+                override fun move(from: Path, to: Path) { throw IOException("synthetic failed move") }
+            },
+        )
+        for (io in failures) {
+            val vault = ProtectedRecordStore(temporary.root, RecordCipher { key }, io)
+            refuses(StorageProblem.DiskUnavailable) { vault.compareAndSet(binding, original, bytes("replacement")) }
+            assertArrayEquals(original, store().read(binding))
+            assertFalse(temporary.root.listFiles()!!.any { it.extension == "pending" })
+        }
+    }
+
+    @Test fun malformedOpaqueKeysNeverCollapseToAQuestionMark() {
+        val vault = store()
+        assertTrue(vault.compareAndSet("?", null, bytes("valid")))
+        refuses(StorageProblem.InvalidBinding) { vault.read("\ud800") }
+        refuses(StorageProblem.InvalidBinding) { vault.compareAndSet("\udc00", null, bytes("invalid")) }
+        assertArrayEquals(bytes("valid"), vault.read("?"))
+    }
+
+    @Test fun directorySyncFailureCanFollowACommittedReplaceAndNeedsReadback() {
+        assumeTrue(System.getProperty("user.name") != "root")
+        assumeTrue(temporary.root.toPath().fileSystem.supportedFileAttributeViews().contains("posix"))
+        val vault = store()
+        val original = bytes("saved")
+        val next = bytes("rotated")
+        assertTrue(vault.compareAndSet(binding, null, original))
+        val mode = Files.getPosixFilePermissions(temporary.root.toPath())
+        try {
+            Files.setPosixFilePermissions(
+                temporary.root.toPath(),
+                java.nio.file.attribute.PosixFilePermissions.fromString("-wx------"),
+            )
+            refuses(StorageProblem.DiskUnavailable) { vault.compareAndSet(binding, original, next) }
+        } finally {
+            Files.setPosixFilePermissions(temporary.root.toPath(), mode)
+        }
+        assertArrayEquals(next, vault.read(binding))
     }
 
     private fun refuses(problem: StorageProblem, action: () -> Unit) {

@@ -1,5 +1,6 @@
 package app.bighelp.hermes.chat
 
+import kotlinx.coroutines.async
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -75,7 +76,7 @@ class HistoryRepositoryTest : ChatTestBase() {
         // A cache from earlier holds only the first two rows.
         val cached = HistoryWindow.fresh(HistoryPage.parse(historyEnvelope(session.rows.take(2), 0, 40, "latest", session = "s1"), "research", 0, 40, "latest"))
         val scope = ConversationScope(ChatTestData.host, "research", "s1")
-        store.putCache(RecordKey.history(scope), HistoryCacheCodec.encode(cached))
+        store.putCache(RecordKey.history(scope), HistoryCacheCodec.encode(cached, scope))
         val r = rig(host = host, store = store)
         val ref = ConversationRef("research", "s1")
         r.repo.open(ref)
@@ -121,5 +122,34 @@ class HistoryRepositoryTest : ChatTestBase() {
         assertEquals(ChatError.Kind.HistoryChanged, failure.error.kind)
         assertEquals("The tip moved only on first-hand proof, never on a history read", tip, r.state(ref).identity.storedTip)
         assertEquals(4, r.rows(ref).size)
+    }
+
+    @Test fun aHistoryCacheFileOfAnotherConversationIsNeverShownAsThisOnes() = run {
+        val store = MemoryChatStore()
+        val hostA = FakeHermesHost().also { it.addSession("research", "chat-a") { addRow("user", "secret from chat A"); addRow("assistant", "reply A") } }
+        val first = rig(host = hostA, store = store)
+        val refA = ConversationRef("research", "chat-a")
+        first.repo.open(refA)
+        first.awaitState(refA) { it.phase == ConversationPhase.Ready && it.items.size == 2 }
+        val scopeA = ConversationScope(ChatTestData.host, "research", "chat-a")
+        first.eventually(message = "chat A's cache written") { store.read(RecordKey.history(scopeA)) != null }
+        val foreign = store.read(RecordKey.history(scopeA))!!
+        first.close()
+
+        // A mis-addressed file: chat A's rows sit under chat B's key.
+        val hostB = FakeHermesHost().also { it.addSession("research", "chat-b") { addRow("user", "hello B"); addRow("assistant", "reply B") } }
+        val scopeB = ConversationScope(ChatTestData.host, "research", "chat-b")
+        store.putCache(RecordKey.history(scopeB), foreign)
+        val hold = kotlinx.coroutines.CompletableDeferred<Unit>()
+        hostB.holdMessages = hold
+        val second = rig(host = hostB, store = store)
+        val refB = ConversationRef("research", "chat-b")
+        val opening = second.scope.async { second.repo.open(refB) }
+        second.awaitState(refB, "attached while the page read is held") { it.phase == ConversationPhase.Ready }
+        assertTrue("Chat A's text was shown in chat B", second.rows(refB).none { it.text.contains("secret from chat A") })
+        hold.complete(Unit)
+        opening.await()
+        second.awaitState(refB) { it.items.size == 2 }
+        assertEquals(listOf("hello B", "reply B"), second.rows(refB).map { it.text })
     }
 }

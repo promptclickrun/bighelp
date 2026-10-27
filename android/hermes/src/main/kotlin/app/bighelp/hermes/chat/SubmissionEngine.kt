@@ -57,65 +57,105 @@ internal class SubmissionEngine(private val ctx: ChatContext, private val engine
         if (text.isBlank()) return notSent(ChatError.Kind.InvalidInput)
         if (utf8Length(text) > ChatStoreLimits.MAXIMUM_MESSAGE_TEXT_BYTES) return notSent(ChatError.Kind.TooLarge)
         if (attachments.size > ChatStoreLimits.MAXIMUM_ATTACHMENT_REFERENCES) return notSent(ChatError.Kind.TooLarge)
-        val plan = when (val planned = ctx.onState { plan(ref, text, mode, attachments, selection) }) {
-            is Planned.Stop -> return planned.result
-            is Planned.Go -> planned.plan
+        // Planning reserves the admission slot on the serial dispatcher. A caller cancelled just as the plan comes back never sees
+        // it, so the plan is also noted here and its slot is freed in that case.
+        var reserved: Plan? = null
+        val plan = try {
+            when (val planned = ctx.onState { plan(ref, text, mode, attachments, selection).also { if (it is Planned.Go) reserved = it.plan } }) {
+                is Planned.Stop -> return planned.result
+                is Planned.Go -> planned.plan
+            }
+        } catch (e: CancellationException) {
+            reserved?.let { withContext(NonCancellable) { release(it) } }
+            throw e
         }
         val rt = plan.rt
+        // Until the journal entry is durable, nothing exists but the reserved slot: a cancelled caller only gives it back.
         try {
-            ctx.gateway.prepareForAdmission()
-        } catch (e: HermesException) {
-            release(plan)
-            return SendResult.NotSent(SessionBinder.chatError(e))
+            try {
+                ctx.gateway.prepareForAdmission()
+            } catch (e: HermesException) {
+                release(plan)
+                return SendResult.NotSent(SessionBinder.chatError(e))
+            }
+            val stillOwner = ctx.onState {
+                engine.conversations[plan.rt.ref] === rt && rt.binding == plan.binding && rt.binding?.generation == ctx.gateway.state.value.generation &&
+                    !rt.hydrating && !rt.needsRecovery && (plan.pending == null || rt.pending === plan.pending)
+            }
+            if (!stillOwner) {
+                release(plan)
+                return SendResult.NotSent(ChatError(ChatError.Kind.NotConnected))
+            }
+
+            // Journal first. A write failure, also an oversize record, sends nothing.
+            try {
+                val ops = ArrayList<StoreOp>()
+                ops += StoreOp.Put(RecordKey.journal(rt.scope, plan.entry.id), plan.entry.encode())
+                if (plan.clearsDraft) ops += engine.draftOp(rt.scope, "", emptyList())
+                engine.commit(ops)
+            } catch (e: ChatStoreException) {
+                release(plan)
+                return SendResult.NotSent(ChatError(if (e.kind == ChatStoreException.Kind.TooLarge) ChatError.Kind.TooLarge else ChatError.Kind.PersistenceFailed))
+            }
         } catch (e: CancellationException) {
             withContext(NonCancellable) { release(plan) }
             throw e
         }
-        val stillOwner = ctx.onState {
-            engine.conversations[plan.rt.ref] === rt && rt.binding == plan.binding && rt.binding?.generation == ctx.gateway.state.value.generation &&
-                !rt.hydrating && !rt.needsRecovery && (plan.pending == null || rt.pending === plan.pending)
-        }
-        if (!stillOwner) {
-            release(plan)
-            return SendResult.NotSent(ChatError(ChatError.Kind.NotConnected))
-        }
 
-        // Journal first. A write failure, also an oversize record, sends nothing.
-        try {
-            val ops = ArrayList<StoreOp>()
-            ops += StoreOp.Put(RecordKey.journal(rt.scope, plan.entry.id), plan.entry.encode())
-            if (plan.clearsDraft) ops += engine.draftOp(rt.scope, "", emptyList())
-            engine.commit(ops)
-        } catch (e: ChatStoreException) {
-            release(plan)
-            return SendResult.NotSent(ChatError(if (e.kind == ChatStoreException.Kind.TooLarge) ChatError.Kind.TooLarge else ChatError.Kind.PersistenceFailed))
-        } catch (e: CancellationException) {
-            withContext(NonCancellable) { release(plan) }
-            throw e
+        // The entry is durable from here. Whatever happens to the caller, the bookkeeping that follows must complete: a cancelled
+        // send that skipped it would leave the admission slot taken, the entry out of reach of review and a second bubble on screen.
+        var cancelled: CancellationException? = null
+        val shown = uncancellably {
+            ctx.onState {
+                rt.unresolved += plan.entry
+                if (plan.clearsDraft) { rt.draft = ""; rt.draftAttachments = emptyList() }
+                rt.reducer.addLocalUser(plan.entry.id, text)
+                engine.publish(rt)
+            }
         }
-        ctx.onState {
-            rt.unresolved += plan.entry
-            if (plan.clearsDraft) { rt.draft = ""; rt.draftAttachments = emptyList() }
-            rt.reducer.addLocalUser(plan.entry.id, text)
-            engine.publish(rt)
-        }
+        shown.cancellation?.let { cancelled = it }
 
-        val outcome = try {
+        val outcome: Outcome = if (cancelled != null) {
+            // Cancelled before the frame could be written: nothing was dispatched.
+            Outcome.NotSent(ChatError(ChatError.Kind.Cancelled))
+        } else try {
             dispatch(plan, text)
         } catch (e: CancellationException) {
-            val sent = (e as? RequestCancelledException)?.dispatch == DispatchOutcome.MayHaveBeenSent || (e !is RequestCancelledException && plan.dispatched)
-            withContext(NonCancellable) { settle(plan, if (sent) Outcome.Uncertain(ChatError(ChatError.Kind.Cancelled)) else Outcome.NotSent(ChatError(ChatError.Kind.Cancelled))) }
-            throw e
+            cancelled = e
+            // The request itself says how far it got; any other cancellation counts as sent once a frame was begun.
+            val sent = if (e is RequestCancelledException) e.dispatch == DispatchOutcome.MayHaveBeenSent else plan.dispatched
+            if (sent) Outcome.Uncertain(ChatError(ChatError.Kind.Cancelled)) else Outcome.NotSent(ChatError(ChatError.Kind.Cancelled))
         }
-        settle(plan, outcome)
+        val settled = uncancellably {
+            settle(plan, outcome)
+            // One exact-owner recovery so independent new input becomes possible again; the repository's scope runs it, not the caller's.
+            if (outcome is Outcome.Uncertain) ctx.scope.launch { recoverAfterLoss(plan) }
+        }
+        cancelled?.let { throw it }
+        settled.cancellation?.let { throw it }
         return when (outcome) {
             is Outcome.Admitted -> SendResult.Admitted(plan.entry.id, outcome.admission)
             is Outcome.Refused -> SendResult.Refused(plan.entry.id, outcome.code, outcome.reachedLimit, outcome.error)
             is Outcome.Uncertain -> SendResult.Uncertain(plan.entry.id, outcome.error)
             is Outcome.NotSent -> SendResult.NotSent(outcome.error)
-        }.also {
-            if (outcome is Outcome.Uncertain) ctx.scope.launch { recoverAfterLoss(plan) }
         }
+    }
+
+    private class Uncancelled(val cancellation: CancellationException?)
+
+    /**
+     * Runs [block] to the end even when the caller is cancelled. Returning into a cancelled caller rethrows its cancellation
+     * after the block has finished; that is reported in the result, not thrown, so the caller can finish what it owes first.
+     */
+    private suspend fun uncancellably(block: suspend () -> Unit): Uncancelled {
+        var finished = false
+        try {
+            withContext(NonCancellable) { block(); finished = true }
+        } catch (e: CancellationException) {
+            if (!finished) throw e
+            return Uncancelled(e)
+        }
+        return Uncancelled(null)
     }
 
     private fun notSent(kind: ChatError.Kind) = SendResult.NotSent(ChatError(kind))
@@ -135,7 +175,7 @@ internal class SubmissionEngine(private val ctx: ChatContext, private val engine
             // A chosen command is checked against the current text: an edited message never runs a stale selection.
             return Planned.Stop(notSent(ChatError.Kind.InvalidInput))
         }
-        engine.sendBlock(rt)?.let { block ->
+        engine.sendBlock(rt, submission = effective != Effective.Steer)?.let { block ->
             return Planned.Stop(SendResult.NotSent(ChatError(if (block == SendBlock.NoLiveSession || block == SendBlock.NotConnected) ChatError.Kind.NotConnected else ChatError.Kind.Conflict), block))
         }
         val binding = rt.binding ?: return Planned.Stop(notSent(ChatError.Kind.NoLiveSession))
@@ -203,15 +243,14 @@ internal class SubmissionEngine(private val ctx: ChatContext, private val engine
             }
         } catch (e: HermesException) {
             return classify(e)
-        } catch (e: RequestCancelledException) {
-            return if (e.dispatch == DispatchOutcome.MayHaveBeenSent) Outcome.Uncertain(ChatError(ChatError.Kind.Cancelled)) else Outcome.NotSent(ChatError(ChatError.Kind.Cancelled))
         }
+        // A cancelled caller (RequestCancelledException) is not an outcome: it reaches send(), which settles and then rethrows it.
     }
 
     private suspend fun call(plan: Plan, method: String, params: JsonObject): JsonElement {
         plan.dispatched = true
         plan.currentMethod = method
-        return ctx.gateway.request(method, params)
+        return ctx.gateway.request(method, params, generation = plan.binding.generation)
     }
 
     private fun JsonElement.status(): String? = asObject?.get("status").asString
@@ -453,7 +492,7 @@ internal class SubmissionEngine(private val ctx: ChatContext, private val engine
         } ?: return StopResult.Refused(ChatError(ChatError.Kind.NotConnected))
         val (rt, binding) = target
         return try {
-            val result = ctx.gateway.request("session.interrupt", buildJsonObject { put("session_id", binding.runtimeId); put("profile", binding.profile) })
+            val result = ctx.gateway.request("session.interrupt", buildJsonObject { put("session_id", binding.runtimeId); put("profile", binding.profile) }, generation = binding.generation)
             if (result.status() != "interrupted") return StopResult.Uncertain(ChatError(ChatError.Kind.InvalidResponse))
             ctx.onState { if (rt.binding == binding) { rt.stopRequested = true; rt.status = "Stop requested"; engine.publish(rt) } }
             StopResult.Requested

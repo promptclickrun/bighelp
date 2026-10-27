@@ -127,7 +127,14 @@ class HermesChatRepository private constructor(wiring: Wiring) : AutoCloseable {
      */
     suspend fun createChat(profile: String, request: CreateRequest = CreateRequest(), retryIntent: String? = null): CreateOutcome {
         if (!Coordinates.isValid(profile, Coordinates.MAXIMUM_PROFILE_BYTES)) return CreateOutcome.Failed(ChatError(ChatError.Kind.InvalidInput))
-        val outcome = when (val step = binder.createOrdinary(profile, request, retryIntent)) {
+        // A cancelled caller still changed the book (an intent kept or dropped): the list people see follows it.
+        val step = try {
+            binder.createOrdinary(profile, request, retryIntent)
+        } catch (e: kotlin.coroutines.cancellation.CancellationException) {
+            mutablePending.value = creations.pending()
+            throw e
+        }
+        val outcome = when (step) {
             is CreateStep.Failed -> CreateOutcome.Failed(step.error)
             is CreateStep.Unconfirmed -> CreateOutcome.Unconfirmed(step.intentId, step.error)
             is CreateStep.Created -> {
@@ -170,7 +177,12 @@ class HermesChatRepository private constructor(wiring: Wiring) : AutoCloseable {
         }
         val outcome: BotChatStep = when {
             chat != null -> BotChatStep.Registered(chat)
-            createIfMissing -> binder.createFirstBotChat(profile)
+            createIfMissing -> try {
+                binder.createFirstBotChat(profile)
+            } catch (e: kotlin.coroutines.cancellation.CancellationException) {
+                mutablePending.value = creations.pending()
+                throw e
+            }
             else -> return BotChatOutcome.NotCreated
         }
         mutablePending.value = creations.pending()
@@ -314,7 +326,7 @@ class HermesChatRepository private constructor(wiring: Wiring) : AutoCloseable {
                 return
             } catch (e: HermesException) {
                 // The collector fell too far behind: events were lost. Close admission and reattach everything.
-                ctx.onState { engine.onDisconnected() }
+                ctx.onState { engine.onEventsLost() }
                 ctx.scope.launch { reattachWhenConnected(ctx.gateway.state.value.generation) }
             }
         }

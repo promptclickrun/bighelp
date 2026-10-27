@@ -96,6 +96,24 @@ class GatewayQueueTest {
         return calls
     }
 
+    @Test fun aStalledWriterWaitsWithoutSpinningAndStillResumesPromptly() = runBlocking {
+        val (client, socket) = connected()
+        socket.buffered = true // the peer stopped reading
+        val call = request(client, "profiles.list", 200)
+        eventually { client.queueSnapshot().frames == 1 }
+        val baseline = socket.bufferedReads.get()
+        delay(600)
+        val polls = socket.bufferedReads.get() - baseline
+        assertTrue("A stalled writer polled $polls times in 600 ms", polls < 80)
+
+        val before = socket.sent.size
+        socket.buffered = false
+        val resumed = System.nanoTime()
+        eventually(2_000) { socket.sent.size > before }
+        assertTrue("The frame went out ${(System.nanoTime() - resumed) / 1_000_000} ms after the socket drained", System.nanoTime() - resumed < 300_000_000L)
+        call.cancel()
+    }
+
     @Test fun ordinaryRequestsAreHeldToEightMebibytesExactlyAndReleasedInOrder() = runBlocking {
         val (client, socket) = connected()
         val before = socket.sent.size

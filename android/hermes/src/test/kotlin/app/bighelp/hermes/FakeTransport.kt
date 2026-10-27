@@ -22,7 +22,10 @@ internal class FakeTransports : GatewayTransportFactory {
         @Volatile var stallAfterEachSend = false
         @Volatile var closed = false
 
-        override val hasBufferedData: Boolean get() = buffered
+        /** How often the sender asked whether the socket had taken its data (a stalled writer must not spin). */
+        val bufferedReads = java.util.concurrent.atomic.AtomicLong()
+
+        override val hasBufferedData: Boolean get() { bufferedReads.incrementAndGet(); return buffered }
 
         override fun send(text: String): Boolean {
             if (closed) return false

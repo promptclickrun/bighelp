@@ -4,13 +4,22 @@ import app.bighelp.hermes.HermesException
 import app.bighelp.hermes.RequestCancelledException
 import app.bighelp.hermes.DispatchOutcome
 import java.util.UUID
+import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-/** The coordinates a create or resume answer proved, ready to become a [Binding]. */
-internal class Attached(val runtimeId: String, val storedId: String, val running: Boolean?, val info: JsonObject, val model: String?, val cwd: String?)
+/**
+ * The coordinates a create or resume answer proved, ready to become a [Binding]. [generation] is the socket the
+ * request was fenced to: the runtime ID belongs to that socket and to no later one (null: not from a request).
+ */
+internal data class Attached(
+    val runtimeId: String, val storedId: String, val running: Boolean?, val info: JsonObject, val model: String?, val cwd: String?,
+    val generation: Long? = null,
+)
 
 /**
  * The create intents of this computer, one per profile, written before `session.create` leaves and updated as
@@ -46,7 +55,14 @@ internal class CreationBook(private val ctx: ChatContext) {
     }
 
     suspend fun remove(profile: String) {
-        runCatching { ctx.store.commit(listOf(StoreOp.Delete(RecordKey.creation(ctx.host, profile)))) }
+        try {
+            ctx.store.commit(listOf(StoreOp.Delete(RecordKey.creation(ctx.host, profile))))
+        } catch (e: CancellationException) {
+            // The record stays where it is, in memory and on disk alike; a caller that needs it gone finishes this uncancellably.
+            throw e
+        } catch (_: Exception) {
+            // A failed delete leaves a stale intent that the next create reconciles; the in-memory book still lets go.
+        }
         records.remove(profile)
     }
 }
@@ -59,27 +75,31 @@ internal class SessionBinder(private val ctx: ChatContext, val creations: Creati
 
     // ---- resume
 
-    /** `session.resume` of a stored ID (never the runtime ID), with the app's source. A rejected optional field is retried once without it. */
-    suspend fun resume(profile: String, storedId: String): Attached {
+    /**
+     * `session.resume` of a stored ID (never the runtime ID), with the app's source. A rejected optional field is retried once without it.
+     * The call is fenced to [generation] (default: the socket as it is now), so a runtime is never made on a socket the caller did not plan for.
+     */
+    suspend fun resume(profile: String, storedId: String, generation: Long? = null): Attached {
+        val fence = generation ?: ctx.gateway.state.value.generation
         val base = buildJsonObject {
             put("session_id", storedId); put("profile", profile); put("source", SOURCE)
             put("defer_history", true); put("omit_messages", true)
         }
         val withLifetime = JsonObject(base + ("close_on_disconnect" to kotlinx.serialization.json.JsonPrimitive(false)))
         val result = try {
-            ctx.gateway.request("session.resume", withLifetime)
+            ctx.gateway.request("session.resume", withLifetime, generation = fence)
         } catch (e: HermesException) {
             // An older host refuses a field it does not know before doing anything; the plain resume is the same request.
-            if (e.kind == HermesException.Kind.RpcRejected && e.code == 4000L) ctx.gateway.request("session.resume", base) else throw e
+            if (e.kind == HermesException.Kind.RpcRejected && e.code == 4000L) ctx.gateway.request("session.resume", base, generation = fence) else throw e
         }
-        return decodeAttached(result, profile, requireStoredAlias = false)
+        return decodeAttached(result, profile, requireStoredAlias = false).copy(generation = fence)
     }
 
     /** `session.activate` of an already proved runtime: attaches and touches it, never builds or creates one. */
-    suspend fun activate(profile: String, runtimeId: String): JsonObject {
+    suspend fun activate(profile: String, runtimeId: String, generation: Long): JsonObject {
         val result = ctx.gateway.request("session.activate", buildJsonObject {
             put("session_id", runtimeId); put("profile", profile); put("omit_messages", true)
-        })
+        }, generation = generation)
         return result.asObject ?: throw invalidResponse()
     }
 
@@ -112,21 +132,30 @@ internal class SessionBinder(private val ctx: ChatContext, val creations: Creati
 
     /** Sends the create under [record]'s key and proves what came back. */
     private suspend fun dispatchCreate(record: CreationRecord): CreateStep {
+        // The socket this create is planned on: the answer's runtime ID belongs to it and to no later socket.
+        val generation = ctx.gateway.state.value.generation
         var sendExplicitCwd = record.request.cwd != null
         var answer: JsonElement? = null
         while (answer == null) {
             try {
-                answer = ctx.gateway.request("session.create", createParams(record, sendExplicitCwd))
+                answer = ctx.gateway.request("session.create", createParams(record, sendExplicitCwd), generation = generation)
             } catch (e: HermesException) {
                 // Only an explicit rejection of cwd_explicit authorizes a retry without it: a timeout or lost reply does not.
                 if (sendExplicitCwd && e.kind == HermesException.Kind.RpcRejected && e.code == 4000L) { sendExplicitCwd = false; continue }
                 return afterFailedCreate(record, e.outcomeUnknown, chatError(e))
             } catch (e: RequestCancelledException) {
-                return afterFailedCreate(record, e.dispatch == DispatchOutcome.MayHaveBeenSent, ChatError(ChatError.Kind.Cancelled))
+                // The caller is gone, but how far the frame got still decides the intent: kept for a retry when it may have
+                // reached the host, dropped (on disk too) when it did not. That finishes first; then the cancellation goes on.
+                try {
+                    withContext(NonCancellable) { afterFailedCreate(record, e.dispatch == DispatchOutcome.MayHaveBeenSent, ChatError(ChatError.Kind.Cancelled)) }
+                } catch (_: CancellationException) {
+                    // The settlement above ran to completion; the caller's own cancellation is rethrown below.
+                }
+                throw e
             }
         }
         val attached = try {
-            decodeAttached(answer, record.profile, requireStoredAlias = true, requireEmpty = true)
+            decodeAttached(answer, record.profile, requireStoredAlias = true, requireEmpty = true).copy(generation = generation)
         } catch (e: HermesException) {
             // The host answered something unusable: whether it created a chat is unknown. Keep the intent.
             return CreateStep.Unconfirmed(record.intentId, ChatError(ChatError.Kind.InvalidResponse))
@@ -242,7 +271,7 @@ internal class SessionBinder(private val ctx: ChatContext, val creations: Creati
             val titling = record!!.copy(phase = CreationPhase.TitleRequested, storedSessionId = attached!!.storedId, runtimeSessionId = attached.runtimeId)
             try { creations.save(titling) } catch (e: ChatStoreException) { return BotChatStep.Failed(ChatError(ChatError.Kind.PersistenceFailed)) }
             try {
-                val reply = ctx.gateway.request("session.title", buildJsonObject { put("session_id", attached.runtimeId); put("title", "Bot Chat") }).asObject
+                val reply = ctx.gateway.request("session.title", buildJsonObject { put("session_id", attached.runtimeId); put("title", "Bot Chat") }, generation = attached.generation).asObject
                 if (reply?.get("pending").asBool != false || reply?.get("title").asString != "Bot Chat") {
                     return BotChatStep.Unconfirmed(record.intentId, ChatError(ChatError.Kind.CreationUnconfirmed))
                 }

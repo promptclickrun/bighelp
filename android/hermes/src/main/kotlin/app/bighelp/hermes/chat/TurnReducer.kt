@@ -69,14 +69,21 @@ internal class TurnReducer(initialEpoch: String = "") {
     private var sealedSegmentId: String? = null
     private var anonymous = 0L
 
+    /** Counts the cursor restarts. The first numbering keeps the plain `epoch:sequence` key. */
+    private var numbering = 0
+
     val items: List<TranscriptItem> get() = live.values.toList()
 
     fun seedCheckpoint(sequence: Long) { lastSequence = maxOf(lastSequence, sequence) }
 
-    /** A new replay epoch restarts sequence numbers. Rows stay; only the cursor moves. */
+    /**
+     * A new replay epoch, or another runtime, restarts sequence numbers. Rows stay; only the cursor moves. Each restart is a new
+     * numbering, so the IDs made after it never repeat one from before it (the same epoch and sequence on another runtime).
+     */
     fun resetCursor(newEpoch: String, latest: Long) {
         epoch = newEpoch
         lastSequence = latest
+        numbering += 1
     }
 
     fun seedRunning(value: Boolean) { running = value }
@@ -127,7 +134,7 @@ internal class TurnReducer(initialEpoch: String = "") {
         }
         if (event.type.startsWith("message.") || event.type.startsWith("tool.")) hasLiveEvents = true
         val p = event.payload
-        val key = "$epoch:${event.sequence ?: "x${++anonymous}"}"
+        val key = (if (numbering == 0) "$epoch:" else "$epoch~$numbering:") + (event.sequence ?: "x${++anonymous}")
         when (event.type) {
             "message.start" -> {
                 change.started = true

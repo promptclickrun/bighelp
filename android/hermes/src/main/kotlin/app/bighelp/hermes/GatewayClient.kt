@@ -416,6 +416,11 @@ class GatewayClient internal constructor(
      * Failures are [HermesException]s; [HermesException.outcomeUnknown] marks a mutation that may have been
      * accepted. Cancelling the caller throws [RequestCancelledException] (a `CancellationException`) saying
      * whether the frame had been handed to the socket; it never stops the host and is never resent.
+     *
+     * [generation] fences a call that names something only one socket knows (a runtime ID): it is compared with
+     * the current socket's generation in the same serial section that reads the socket, and a mismatch is
+     * [HermesException.Kind.NotConnected] before anything is queued. [requestOn] then enqueues on exactly that
+     * socket object, so the frame can only ever leave on the generation that was named.
      */
     suspend fun request(
         method: String,
@@ -423,8 +428,9 @@ class GatewayClient internal constructor(
         timeoutMillis: Long = timings.requestMillis,
         operation: GatewayOperation? = null,
         maximumFrameBytes: Int = DEFAULT_FRAME_BYTES,
+        generation: Long? = null,
     ): JsonElement {
-        val live = withContext(serial) { link } ?: throw notConnected()
+        val live = withContext(serial) { link?.takeIf { generation == null || it.generation == generation } } ?: throw notConnected()
         return requestOn(live, method, params, timeoutMillis, operation, maximumFrameBytes)
     }
 
@@ -574,14 +580,25 @@ class GatewayClient internal constructor(
         }
     }
 
-    /** Resumes the writer once the socket has taken what it was given. */
+    /**
+     * Resumes the writer once the socket has taken what it was given. The library offers no "written" callback, so the
+     * wait polls, but backs off while the peer stays stalled (a stalled socket may last until the request timeout) and
+     * starts fast again at the next stall.
+     */
     private fun drainLater(owner: Link) {
         if (owner.draining) return
         owner.draining = true
         scope.launch(serial) {
             try {
+                var wait = DRAIN_POLL_MILLIS
                 while (!owner.closed && owner.outbox.isNotEmpty()) {
-                    if (owner.transport?.hasBufferedData == true) delay(DRAIN_POLL_MILLIS) else pump(owner)
+                    if (owner.transport?.hasBufferedData == true) {
+                        delay(wait)
+                        wait = minOf(wait * 2, DRAIN_POLL_MAX_MILLIS)
+                    } else {
+                        pump(owner)
+                        wait = DRAIN_POLL_MILLIS
+                    }
                 }
             } finally {
                 owner.draining = false
@@ -909,6 +926,7 @@ class GatewayClient internal constructor(
         const val MAXIMUM_QUEUED_SERVER_BYTES = 4 * 1_024 * 1_024
         const val EVENT_BUFFER = 8_192
         private const val DRAIN_POLL_MILLIS = 2L
+        private const val DRAIN_POLL_MAX_MILLIS = 50L
         // Few, because one message can be 4 MiB; a full buffer blocks the socket reader, which is TCP backpressure.
         private const val INBOUND_BUFFER = 8
         private val SUBMISSION_METHODS = setOf("prompt.submit", "slash.exec", "command.dispatch")

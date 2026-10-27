@@ -5,7 +5,9 @@ import app.bighelp.hermes.GatewayEvent
 import app.bighelp.hermes.HermesException
 import app.bighelp.hermes.WireMessage
 import app.bighelp.hermes.utf8Length
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -51,7 +53,8 @@ internal class ConversationEngine(
         return ConversationState(
             ref = rt.ref, title = rt.title, identity = rt.identity, phase = rt.phase, items = rt.savedItems + live,
             running = rt.reducer.running, status = rt.status, runtime = rt.runtimeInfo, draft = rt.draft,
-            draftAttachments = rt.draftAttachments, sendBlock = sendBlock(rt),
+            // A running turn is steered by default, and a steer is not a submission.
+            draftAttachments = rt.draftAttachments, sendBlock = sendBlock(rt, submission = !rt.reducer.running),
             unresolved = rt.unresolved.map { UnresolvedSubmission(it.id, it.method, it.composerText, it.attachments, it.createdAtMillis, it.rejectionCode) },
             prompts = prompts.statesFor(rt.ref),
             history = HistoryState(rt.saved?.nextOffset != null, rt.loadingOlder, rt.saved?.rows?.size ?: 0),
@@ -59,8 +62,12 @@ internal class ConversationEngine(
         )
     }
 
-    /** Why a new message cannot be admitted now; null when it can. Steering a running turn stays open while a send is pending. */
-    fun sendBlock(rt: ConversationRuntime): SendBlock? {
+    /**
+     * Why a new message cannot be admitted now; null when it can. Steering a running turn stays open while a send is pending.
+     * [submission] is false for a steer, which is not one of the host's submission methods: only a message that starts, queues
+     * or runs a turn needs the host's `per_session_exclusive_submit` guarantee.
+     */
+    fun sendBlock(rt: ConversationRuntime, submission: Boolean = true): SendBlock? {
         val gateway = ctx.gateway.state.value
         val binding = rt.binding
         return when {
@@ -68,9 +75,11 @@ internal class ConversationEngine(
             gateway.connection != GatewayConnection.Connected -> SendBlock.NotConnected
             binding == null || rt.requiresReattach -> SendBlock.NoLiveSession
             binding.generation != gateway.generation -> SendBlock.NotConnected
+            // Suspended means this chat's transcript may have a hole (events were dropped, or the host reclaimed its runtime).
+            rt.phase == ConversationPhase.Suspended -> SendBlock.NoLiveSession
             rt.hydrating -> SendBlock.CatchingUp
             rt.needsRecovery -> SendBlock.RecoveryRequired
-            gateway.capabilities?.perSessionExclusiveSubmit != true -> SendBlock.HostLacksExclusiveSubmit
+            submission && gateway.capabilities?.perSessionExclusiveSubmit != true -> SendBlock.HostLacksExclusiveSubmit
             rt.pending != null && !rt.reducer.running -> SendBlock.PendingAdmission
             rt.unresolved.size >= ChatStoreLimits.MAXIMUM_UNRESOLVED_ENTRIES -> SendBlock.TooManyUnresolved
             else -> null
@@ -130,8 +139,10 @@ internal class ConversationEngine(
     /** A stored copy of the newest page, shown at once. It never replaces anything once live events advanced the cursor. */
     private suspend fun seedFromCache(rt: ConversationRuntime) {
         val bytes = ctx.store.read(RecordKey.history(rt.scope)) ?: return
-        val cached = runCatching { HistoryCacheCodec.decode(bytes) }.getOrNull() ?: return
+        val cached = runCatching { HistoryCacheCodec.decode(bytes, rt.scope) }.getOrNull() ?: return
         ctx.onState {
+            // Another conversation's rows are never this one's: the window must be of an ID this chat has had.
+            if (!rt.identity.knows(cached.storedId)) return@onState
             if (rt.saved == null && rt.reducer.lastSequence == 0L && !rt.reducer.hasLiveEvents) {
                 setSaved(rt, cached, persist = false)
                 publish(rt)
@@ -139,8 +150,41 @@ internal class ConversationEngine(
         }
     }
 
-    /** Resume by stored ID on the current socket and recover coverage. Failure leaves the transcript and marks the chat suspended. */
+    /**
+     * Resume by stored ID on the current socket and recover coverage. Failure leaves the transcript and marks the chat suspended.
+     * One attach runs per conversation and socket: a caller that arrives while it runs (a second screen, [open], the socket's own
+     * re-attach) joins it instead of resuming and recovering the same chat again. An attach for an older socket is never joined.
+     */
     suspend fun attach(rt: ConversationRuntime) {
+        val flight = ctx.onState {
+            val generation = ctx.gateway.state.value.generation
+            rt.attachFlight?.let { current ->
+                if (current.generation == generation && current.done.isActive && !current.superseded) return@onState current
+                current.superseded = true
+            }
+            val started = AttachFlight(generation)
+            rt.attachFlight = started
+            // The flight is the repository's, not a caller's: a screen going away must not abandon a half-made attach for the others.
+            val job = ctx.scope.launch {
+                try {
+                    attachOnce(rt, started)
+                    finishAttach(rt, started, null)
+                } catch (e: Throwable) {
+                    finishAttach(rt, started, e)
+                }
+            }
+            job.invokeOnCompletion { cause -> if (cause != null) started.done.completeExceptionally(cause) }
+            started
+        }
+        flight.done.await()
+    }
+
+    private suspend fun finishAttach(rt: ConversationRuntime, flight: AttachFlight, failure: Throwable?) {
+        withContext(NonCancellable + ctx.serial) { if (rt.attachFlight === flight) rt.attachFlight = null }
+        if (failure == null) flight.done.complete(Unit) else flight.done.completeExceptionally(failure)
+    }
+
+    private suspend fun attachOnce(rt: ConversationRuntime, flight: AttachFlight) {
         val state = ctx.gateway.state.value
         if (state.connection != GatewayConnection.Connected) {
             ctx.onState { suspendLocal(rt, ConversationPhase.Suspended); publish(rt) }
@@ -153,9 +197,9 @@ internal class ConversationEngine(
         }
         try {
             val tip = ctx.onState { rt.identity.storedTip }
-            val attached = binder.resume(rt.scope.profile, tip)
+            val attached = binder.resume(rt.scope.profile, tip, generation)
             val proceed = ctx.onState {
-                if (conversations[rt.ref] !== rt || ctx.gateway.state.value.generation != generation) return@onState false
+                if (conversations[rt.ref] !== rt || ctx.gateway.state.value.generation != generation || flight.superseded) return@onState false
                 val before = rt.binding
                 if (attached.storedId != rt.identity.storedTip) {
                     if (!IdentityAdoption.accepts(rt.identity, attached.storedId, IdentityAdoption.Evidence.ResumeOfCurrentTip)) throw ChatException(ChatError.Kind.InvalidResponse)
@@ -165,6 +209,8 @@ internal class ConversationEngine(
                 if (before != null && before.runtimeId != attached.runtimeId) rt.reducer.resetCursor("", 0)
                 rt.binding = Binding(attached.runtimeId, attached.storedId, generation, null, rt.scope.profile)
                 rt.requiresReattach = false
+                // Admission stays closed from here until the bracket below has covered the chat, whatever an earlier attach did to the flag.
+                rt.hydrating = true
                 applyInfo(rt, attached.info)
                 true
             }
@@ -172,11 +218,11 @@ internal class ConversationEngine(
             persistIdentity(rt)
             recover(rt, generation)
         } catch (e: ChatException) {
-            fail(rt, e.error)
+            failUnlessSuperseded(rt, e.error, generation, flight)
         } catch (e: HermesException) {
-            fail(rt, SessionBinder.chatError(e).let { if (e.kind == HermesException.Kind.RpcRejected && (e.code == 4007L || e.code == 404L)) ChatError(ChatError.Kind.NotOpen, e.kind, e.code, e.reason) else it })
+            failUnlessSuperseded(rt, SessionBinder.chatError(e).let { if (e.kind == HermesException.Kind.RpcRejected && (e.code == 4007L || e.code == 404L)) ChatError(ChatError.Kind.NotOpen, e.kind, e.code, e.reason) else it }, generation, flight)
         } catch (e: app.bighelp.hermes.RequestCancelledException) {
-            fail(rt, ChatError(ChatError.Kind.Cancelled))
+            failUnlessSuperseded(rt, ChatError(ChatError.Kind.Cancelled), generation, flight)
             return
         }
         // Reading saved history is not part of coverage: a failure here leaves the chat usable, with the error shown.
@@ -198,6 +244,12 @@ internal class ConversationEngine(
             rt.needsRecovery = true
             publish(rt)
         }
+    }
+
+    /** A failure of work done for [generation] says nothing about a newer socket, or a newer attach, which own the chat now. */
+    private suspend fun failUnlessSuperseded(rt: ConversationRuntime, error: ChatError, generation: Long, flight: AttachFlight? = null) {
+        if (ctx.onState { ctx.gateway.state.value.generation != generation || flight?.superseded == true }) return
+        fail(rt, error)
     }
 
     private fun persistIdentityLater(rt: ConversationRuntime) { ctx.scope.launch { persistIdentity(rt) } }
@@ -241,9 +293,28 @@ internal class ConversationEngine(
         publishAll()
     }
 
+    /**
+     * The event stream dropped events (the collector fell too far behind) while the socket itself carried on. Every chat that
+     * is, or may be, bound now has a hole that no later event announces: admission closes, the binding is no longer trusted and
+     * the next [reattachAll] resumes each chat by its stored ID and covers it again.
+     */
+    fun onEventsLost() {
+        for (rt in conversations.values) {
+            // The socket is the same one: the host's open questions are still open on it, so they stay answerable.
+            suspendLocal(rt, ConversationPhase.Suspended, retirePrompts = false)
+            rt.requiresReattach = true
+            rt.needsRecovery = true
+            // An attach already running may have read its replay before the loss: it cannot vouch for the chat, so the next one starts afresh.
+            rt.attachFlight?.superseded = true
+            rt.attachFlight = null
+        }
+        publishAll()
+    }
+
     /** A conversation just created: bound from the create answer itself, then covered like any other. */
     suspend fun adoptCreated(ref: ConversationRef, attached: Attached, title: String): ConversationRuntime {
-        val generation = ctx.gateway.state.value.generation
+        // The runtime ID belongs to the socket the create was fenced to, whichever socket is current by now.
+        val generation = attached.generation ?: ctx.gateway.state.value.generation
         val scope = ctx.conversationScope(ref)
         val rt = ConversationRuntime(scope, ConversationIdentity(ref, attached.storedId), title)
         ctx.onState {
@@ -253,9 +324,15 @@ internal class ConversationEngine(
             applyInfo(rt, attached.info)
             publish(rt)
         }
+        if (ctx.gateway.state.value.generation != generation) {
+            // The socket was replaced before the answer was applied: that runtime is not reachable here. Resume the chat by its stored ID.
+            ctx.onState { suspendLocal(rt, ConversationPhase.Recovering); rt.requiresReattach = true; rt.hydrating = true; publish(rt) }
+            attach(rt)
+            return rt
+        }
         try {
             recover(rt, generation)
-        } catch (e: ChatException) { fail(rt, e.error) } catch (e: HermesException) { fail(rt, SessionBinder.chatError(e)) }
+        } catch (e: ChatException) { failUnlessSuperseded(rt, e.error, generation) } catch (e: HermesException) { failUnlessSuperseded(rt, SessionBinder.chatError(e), generation) }
         return rt
     }
 
@@ -263,7 +340,7 @@ internal class ConversationEngine(
      * Revokes transport authority, not the visible transcript: held events are dropped, prompts retire, and an
      * already confirmed admission keeps its evidence so an exact replay of its terminal can settle it later.
      */
-    fun suspendLocal(rt: ConversationRuntime, phase: ConversationPhase) {
+    fun suspendLocal(rt: ConversationRuntime, phase: ConversationPhase, retirePrompts: Boolean = true) {
         rt.pending?.let { pending ->
             if (pending.admitted && !pending.overlapped) pending.selectedTurn?.let { rt.acceptedEvidence = AcceptedEvidence(pending.entry.id, it, rt.reducer.epoch) }
             rt.needsRecovery = true
@@ -274,7 +351,7 @@ internal class ConversationEngine(
         rt.heldEvents = ArrayList()
         rt.heldOverflow = false
         rt.stopRequested = false
-        prompts.retireFor(rt.ref)
+        if (retirePrompts) prompts.retireFor(rt.ref)
         rt.status = null
     }
 
@@ -382,6 +459,34 @@ internal class ConversationEngine(
      * when every held live event extends the accepted cursor without a gap. Never resumes or resends a prompt.
      */
     suspend fun recover(rt: ConversationRuntime, generation: Long) {
+        // One bracket per runtime and socket: a second caller (a reopen, the recovery after a lost send) joins the one already
+        // running instead of replaying and activating the same chat again from a snapshot that is older than the first's events.
+        var started: RecoveryFlight? = null
+        val running = ctx.onState {
+            val binding = rt.binding ?: throw ChatException(ChatError.Kind.NoLiveSession)
+            if (binding.generation != generation) throw ChatException(ChatError.Kind.NotConnected)
+            rt.recoveryFlight?.takeIf { it.generation == generation && it.runtimeId == binding.runtimeId && it.done.isActive }?.let { return@onState it }
+            started = RecoveryFlight(generation, binding.runtimeId).also { rt.recoveryFlight = it }
+            null
+        }
+        if (running != null) {
+            running.done.await()
+            return
+        }
+        val mine = started!!
+        try {
+            recoverOnce(rt, generation)
+            mine.done.complete(Unit)
+        } catch (e: Throwable) {
+            // A joiner must not mistake the first caller's cancellation for its own.
+            mine.done.completeExceptionally(if (e is kotlin.coroutines.cancellation.CancellationException) ChatException(ChatError.Kind.Cancelled) else e)
+            throw e
+        } finally {
+            withContext(NonCancellable + ctx.serial) { if (rt.recoveryFlight === mine) rt.recoveryFlight = null }
+        }
+    }
+
+    private suspend fun recoverOnce(rt: ConversationRuntime, generation: Long) {
         val profile = rt.scope.profile
         val (runtimeId, hint, checkpoint, knownEpoch) = ctx.onState {
             val binding = rt.binding ?: throw ChatException(ChatError.Kind.NoLiveSession)
@@ -391,11 +496,11 @@ internal class ConversationEngine(
         }
         var succeeded = false
         try {
-            val before = eventsSince(runtimeId, if (hint == knownEpoch) checkpoint else 0)
-            val snapshot = binder.activate(profile, runtimeId)
+            val before = eventsSince(runtimeId, if (hint == knownEpoch) checkpoint else 0, generation)
+            val snapshot = binder.activate(profile, runtimeId, generation)
             ctx.onState { requireCurrent(rt, generation, runtimeId) }
             val attached = validatedActivation(snapshot, runtimeId, profile)
-            val tail = eventsSince(runtimeId, before.latest)
+            val tail = eventsSince(runtimeId, before.latest, generation)
             if (tail.epoch != before.epoch) throw invalidResponse()
             ctx.onState { requireCurrent(rt, generation, runtimeId) }
             val modern = tail.openRequests != null
@@ -463,8 +568,8 @@ internal class ConversationEngine(
 
     private class Replay(val epoch: String, val latest: Long, val truncated: Boolean?, val events: List<WireMessage.Event>, val openRequests: JsonElement?)
 
-    private suspend fun eventsSince(runtimeId: String, lastSeen: Long): Replay {
-        val result = ctx.gateway.request("session.events.since", buildJsonObject { put("session_id", runtimeId); put("last_seen", lastSeen) }).asObject ?: throw invalidResponse()
+    private suspend fun eventsSince(runtimeId: String, lastSeen: Long, generation: Long): Replay {
+        val result = ctx.gateway.request("session.events.since", buildJsonObject { put("session_id", runtimeId); put("last_seen", lastSeen) }, generation = generation).asObject ?: throw invalidResponse()
         val epoch = result["epoch"].asString ?: throw invalidResponse()
         val latest = result["latest_seq"].asLong?.takeIf { it >= 0 } ?: throw invalidResponse()
         val events = (result["events"].asArray ?: JsonArray(emptyList())).mapNotNull { frame ->
@@ -593,7 +698,7 @@ internal class ConversationEngine(
         rt.savedItems = HistoryProjection.project(window.rows).items
         historyCache.put(rt.ref, window)
         if (persist) {
-            val bytes = HistoryCacheCodec.encode(window)
+            val bytes = HistoryCacheCodec.encode(window, rt.scope)
             ctx.scope.launch { ctx.store.putCache(RecordKey.history(rt.scope), bytes) }
         }
     }

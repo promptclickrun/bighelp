@@ -30,9 +30,11 @@ class GatewayRpcTest : GatewayTestSupport() {
 
     @Test fun requestsAreWrittenAsJsonRpcWithUniqueStringIdsAndCorrelatedByExactId() = runBlocking {
         val (client, conn) = connected()
+        // The second request starts only once the first one's frame was seen: awaitMethod discards frames it skips, so two
+        // requests racing to the socket could swap places and lose one. Both are still pending together when answered.
         val first = async(kotlinx.coroutines.Dispatchers.Default) { client.request("profiles.list", params("a" to "1")) }
-        val second = async(kotlinx.coroutines.Dispatchers.Default) { client.request("session.usage", params("b" to "2")) }
         val a = conn.awaitMethod("profiles.list")
+        val second = async(kotlinx.coroutines.Dispatchers.Default) { client.request("session.usage", params("b" to "2")) }
         val b = conn.awaitMethod("session.usage")
         assertEquals("""{"a":"1"}""", a["params"].toString())
         assertEquals(setOf("jsonrpc", "id", "method", "params"), a.keys)
@@ -41,6 +43,30 @@ class GatewayRpcTest : GatewayTestSupport() {
         conn.result(id(a), """{"which":"first"}""")
         assertEquals("first", first.await().jsonObject["which"]!!.jsonPrimitive.content)
         assertEquals("second", second.await().jsonObject["which"]!!.jsonPrimitive.content)
+        client.disconnect()
+    }
+
+    @Test fun aRequestFencedToAnotherSocketGenerationIsRefusedBeforeAnythingIsQueued() = runBlocking {
+        val (client, first) = connected()
+        val firstGeneration = client.state.value.generation
+        val fenced = async(kotlinx.coroutines.Dispatchers.Default) { client.request("session.title", params("a" to "1"), generation = firstGeneration) }
+        first.result(id(first.awaitMethod("session.title")), """{"fine":true}""")
+        assertTrue("On the socket it names, the call goes through", fenced.await().jsonObject["fine"]!!.jsonPrimitive.content.toBoolean())
+
+        val before = first.allFrames.size
+        assertKind(HermesException.Kind.NotConnected) { client.request("session.title", generation = firstGeneration + 1) }
+        assertEquals("A fence naming a socket that is not current writes nothing", before, first.allFrames.size)
+
+        first.drop()
+        val second = gateway.awaitConnection()
+        eventually { client.state.value.connection == GatewayConnection.Connected && client.state.value.generation > firstGeneration }
+        assertKind(HermesException.Kind.NotConnected) { client.request("session.title", params("a" to "stale"), generation = firstGeneration) }
+        assertEquals("The old runtime's call never reaches the replacement socket", 0, second.framesWithMethod("session.title").size)
+
+        val current = client.state.value.generation
+        val ok = async(kotlinx.coroutines.Dispatchers.Default) { client.request("session.title", params("a" to "2"), generation = current) }
+        second.result(id(second.awaitMethod("session.title")), """{"fine":true}""")
+        assertTrue(ok.await().jsonObject["fine"]!!.jsonPrimitive.content.toBoolean())
         client.disconnect()
     }
 

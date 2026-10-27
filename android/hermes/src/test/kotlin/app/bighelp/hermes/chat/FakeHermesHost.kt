@@ -1,6 +1,8 @@
 package app.bighelp.hermes.chat
 
 import app.bighelp.hermes.ConnectionOwner
+import app.bighelp.hermes.DispatchOutcome
+import app.bighelp.hermes.RequestCancelledException
 import app.bighelp.hermes.GatewayCapabilities
 import app.bighelp.hermes.GatewayConnection
 import app.bighelp.hermes.GatewayEvent
@@ -13,6 +15,8 @@ import app.bighelp.hermes.ServerResponse
 import app.bighelp.hermes.WireMessage
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicLong
+import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
@@ -38,7 +42,8 @@ import kotlinx.serialization.json.put
  * a lost receipt still applies the mutation, and a compaction successor shows up only on resume or in history.
  */
 internal class FakeHermesHost : ChatGateway, ChatRest {
-    class Recorded(val method: String, val params: JsonObject, val generation: Long)
+    /** [fence] is the socket generation the caller asked to be fenced to (null: not fenced). */
+    class Recorded(val method: String, val params: JsonObject, val generation: Long, val fence: Long? = null)
     class RestRecorded(val route: String, val query: List<Pair<String, String>>)
 
     inner class Session(val id: String, val profile: String) {
@@ -91,8 +96,18 @@ internal class FakeHermesHost : ChatGateway, ChatRest {
     var heartbeat = true
 
     override val state: MutableStateFlow<GatewayState> = MutableStateFlow(connectedState())
-    private val delivery = Channel<GatewayEvent>(Channel.RENDEZVOUS)
+    @Volatile private var delivery = Channel<GatewayEvent>(Channel.RENDEZVOUS)
     override val events: Flow<GatewayEvent> = flow { for (event in delivery) emit(event) }
+
+    /**
+     * The collector fell too far behind: the stream the client is reading fails with the gateway's own overflow
+     * error (events are lost), and the next subscription starts on a fresh stream, as the real client's does.
+     */
+    fun overflowEvents() {
+        val old = delivery
+        delivery = Channel(Channel.RENDEZVOUS)
+        old.close(HermesException(HermesException.Kind.TooManyRequests))
+    }
 
     private fun owner(gen: Long) = ConnectionOwner("http://fake.test", "dashboard-session", gen)
 
@@ -270,12 +285,28 @@ internal class FakeHermesHost : ChatGateway, ChatRest {
 
     // ---- ChatGateway
 
-    override suspend fun request(method: String, params: JsonObject, timeoutMillis: Long?): JsonElement {
-        val live = state.value
-        if (live.connection != GatewayConnection.Connected) throw HermesException(HermesException.Kind.NotConnected)
-        requests += Recorded(method, params, live.generation)
-        overrides[method]?.removeFirstOrNull()?.let { return it(params) }
-        return defaultHandle(method, params)
+    /** A request held before its frame is written: cancelling the caller then is cancelling an unsent request. */
+    class Hold { val reached = CompletableDeferred<Unit>(); val release = CompletableDeferred<Unit>() }
+    private val writeHolds = HashMap<String, ArrayDeque<Hold>>()
+    fun holdBeforeWrite(method: String): Hold = Hold().also { writeHolds.getOrPut(method) { ArrayDeque() }.addLast(it) }
+
+    override suspend fun request(method: String, params: JsonObject, timeoutMillis: Long?, generation: Long?): JsonElement {
+        // Like the real client, a cancelled caller learns whether its frame had been handed to the socket.
+        var written = false
+        try {
+            writeHolds[method]?.removeFirstOrNull()?.let { it.reached.complete(Unit); it.release.await() }
+            val live = state.value
+            if (live.connection != GatewayConnection.Connected) throw HermesException(HermesException.Kind.NotConnected)
+            // The real client compares the fence with the socket it queues on: a mismatch writes nothing.
+            if (generation != null && live.generation != generation) throw HermesException(HermesException.Kind.NotConnected)
+            requests += Recorded(method, params, live.generation, generation)
+            written = true
+            overrides[method]?.removeFirstOrNull()?.let { return it(params) }
+            return defaultHandle(method, params)
+        } catch (e: CancellationException) {
+            if (e is RequestCancelledException) throw e
+            throw RequestCancelledException(if (written) DispatchOutcome.MayHaveBeenSent else DispatchOutcome.NotSent).also { it.initCause(e) }
+        }
     }
 
     var admissionPreparations = 0

@@ -1,6 +1,8 @@
 package app.bighelp.hermes.chat
 
 import java.io.File
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -266,6 +268,62 @@ class CreateResumeTest : ChatTestBase() {
         val outcome = r.repo.openBotChat("research", createIfMissing = true) as BotChatOutcome.Opened
         assertEquals("winner-1", outcome.ref.anchor)
         assertEquals("The empty chat made for the failed attempt is dropped", 1, r.host.count("session.delete"))
+    }
+
+    /** A store whose commits notice a cancelled caller, as one that does its I/O on another dispatcher does. */
+    private class CancellationAwareStore : MemoryChatStore() {
+        override suspend fun commit(ops: List<StoreOp>) {
+            kotlin.coroutines.coroutineContext.ensureActive()
+            super.commit(ops)
+        }
+    }
+
+    @Test fun aCreateCancelledAfterTheFrameWasWrittenIsNotSwallowedAndKeepsItsIntent() = run {
+        val r = rig(store = CancellationAwareStore())
+        val reached = kotlinx.coroutines.CompletableDeferred<Unit>()
+        r.host.once("session.create") { _ -> reached.complete(Unit); kotlinx.coroutines.CompletableDeferred<Unit>().await(); throw AssertionError("never answered") }
+        var returned: CreateOutcome? = null
+        val creating = r.scope.launch { returned = r.repo.createChat("research") }
+        reached.awaitWithin("session.create to be in flight")
+        creating.cancel()
+        creating.join()
+        assertNull("A cancelled create does not hand back an outcome", returned)
+        assertEquals("The frame may have reached the host, so the intent stays for a retry", 1, r.repo.pendingCreations.value.size)
+        assertNotNull(r.store.read(RecordKey.creation(host, "research")))
+
+        val key = r.host.calls("session.create").single().params["idempotency_key"].asString
+        val retry = r.repo.createChat("research", retryIntent = r.repo.pendingCreations.value.single().intentId)
+        assertTrue("$retry", retry is CreateOutcome.Created)
+        assertEquals("The retry carries the one key", listOf(key, key), r.host.calls("session.create").map { it.params["idempotency_key"].asString })
+    }
+
+    @Test fun aCreateCancelledBeforeTheFrameWasWrittenDropsItsIntentEverywhere() = run {
+        val r = rig(store = CancellationAwareStore())
+        val hold = r.host.holdBeforeWrite("session.create")
+        var returned: CreateOutcome? = null
+        val creating = r.scope.launch { returned = r.repo.createChat("research") }
+        hold.reached.awaitWithin("session.create to be held")
+        creating.cancel()
+        creating.join()
+        assertNull("A cancelled create does not hand back an outcome", returned)
+        assertEquals(0, r.host.count("session.create"))
+        assertTrue(r.repo.pendingCreations.value.isEmpty())
+        assertNull("Nothing was created, so no intent survives on disk to appear after a restart", r.store.read(RecordKey.creation(host, "research")))
+        assertTrue("A new chat can be made", r.repo.createChat("research") is CreateOutcome.Created)
+    }
+
+    @Test fun aChatCreatedOnASocketThatIsReplacedBeforeTheAnswerIsAppliedIsReattachedNotBoundToTheNewSocket() = run {
+        val r = rig()
+        r.host.once("session.create") { params ->
+            val answer = r.host.defaultHandle("session.create", params)
+            r.host.dropConnection()
+            r.host.newSocket()
+            answer
+        }
+        val ref = (r.repo.createChat("research") as CreateOutcome.Created).ref
+        r.awaitState(ref, "attached on the new socket") { it.phase == ConversationPhase.Ready && it.sendBlock == null }
+        assertEquals("The runtime of the old socket was not trusted on the new one: the chat resumed by its stored ID", 1, r.host.count("session.resume"))
+        assertTrue(r.repo.send(ref, "hello").let { it is SendResult.Admitted })
     }
 }
 

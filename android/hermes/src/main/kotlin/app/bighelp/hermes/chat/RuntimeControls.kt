@@ -40,7 +40,7 @@ internal class RuntimeControls(private val ctx: ChatContext, private val engine:
     private suspend fun proof(rt: ConversationRuntime, binding: Binding): Proof {
         val response = ctx.gateway.request("session.activate", buildJsonObject {
             put("session_id", binding.runtimeId); put("profile", binding.profile); put("omit_messages", true)
-        }).asObject ?: throw invalidResponse()
+        }, generation = binding.generation).asObject ?: throw invalidResponse()
         val info = response["info"].asObject
         val stored = response["session_key"].asString
         if (response["session_id"].asString != binding.runtimeId || stored == null || !rt.identity.knows(stored) ||
@@ -62,7 +62,7 @@ internal class RuntimeControls(private val ctx: ChatContext, private val engine:
     suspend fun options(ref: ConversationRef): ModelOptions = mapErrors {
         val (rt, binding) = live(ref)
         val current = proof(rt, binding)
-        val catalog = ctx.gateway.request("model.options", buildJsonObject { put("profile", binding.profile); put("session_id", binding.runtimeId) })
+        val catalog = ctx.gateway.request("model.options", buildJsonObject { put("profile", binding.profile); put("session_id", binding.runtimeId) }, generation = binding.generation)
         ctx.onState { stale(rt, binding) }
         ModelOptions(current.model, current.provider.ifEmpty { null }, current.reasoning, current.tier, current.running, decodeProviders(catalog))
     }
@@ -97,7 +97,7 @@ internal class RuntimeControls(private val ctx: ChatContext, private val engine:
             put("profile", binding.profile); put("session_id", binding.runtimeId)
             put("key", "model"); put("value", "$model --provider $provider --session")
             if (confirmed) put("confirm_expensive_model", true)
-        }).asObject ?: throw invalidResponse()
+        }, generation = binding.generation).asObject ?: throw invalidResponse()
         ctx.onState { stale(rt, binding) }
         val needsConfirmation = response["confirm_required"].asBool
         if (response["key"].asString != "model" || response["scope"].asString != "session" || needsConfirmation == null || response?.get("value").asString == null) throw invalidResponse()
@@ -122,7 +122,7 @@ internal class RuntimeControls(private val ctx: ChatContext, private val engine:
 
     /** A catalog can list a provider under an alias slug while the runtime reports its canonical ID; a fresh read must mark the chosen slug current. */
     private suspend fun catalogMarksCurrent(binding: Binding, provider: String, model: String): Boolean {
-        val response = ctx.gateway.request("model.options", buildJsonObject { put("profile", binding.profile); put("session_id", binding.runtimeId) })
+        val response = ctx.gateway.request("model.options", buildJsonObject { put("profile", binding.profile); put("session_id", binding.runtimeId) }, generation = binding.generation)
         if (response.asObject?.get("model").asString != model) return false
         val current = decodeProviders(response).filter { it.isCurrent }
         return current.size == 1 && current[0].id == provider
@@ -141,10 +141,10 @@ internal class RuntimeControls(private val ctx: ChatContext, private val engine:
     private suspend fun writeReasoning(binding: Binding, level: String, rt: ConversationRuntime) {
         val set = ctx.gateway.request("config.set", buildJsonObject {
             put("profile", binding.profile); put("session_id", binding.runtimeId); put("key", "reasoning"); put("value", level); put("scope", "session")
-        }).asObject
+        }, generation = binding.generation).asObject
         ctx.onState { stale(rt, binding) }
         if (set?.get("key").asString != "reasoning" || set?.get("value").asString != level) throw ChatException(ChatError.Kind.OutcomeUnknown)
-        val read = ctx.gateway.request("config.get", buildJsonObject { put("profile", binding.profile); put("session_id", binding.runtimeId); put("key", "reasoning") }).asObject
+        val read = ctx.gateway.request("config.get", buildJsonObject { put("profile", binding.profile); put("session_id", binding.runtimeId); put("key", "reasoning") }, generation = binding.generation).asObject
         ctx.onState { stale(rt, binding) }
         if (read?.get("value").asString != level) throw ChatException(ChatError.Kind.OutcomeUnknown)
     }
@@ -154,16 +154,16 @@ internal class RuntimeControls(private val ctx: ChatContext, private val engine:
         val (rt, binding) = live(ref)
         val before = proof(rt, binding)
         if (before.running) throw ChatException(ChatError.Kind.Conflict)
-        val catalog = decodeProviders(ctx.gateway.request("model.options", buildJsonObject { put("profile", binding.profile); put("session_id", binding.runtimeId) }))
+        val catalog = decodeProviders(ctx.gateway.request("model.options", buildJsonObject { put("profile", binding.profile); put("session_id", binding.runtimeId) }, generation = binding.generation))
         val supported = catalog.firstOrNull { it.id == before.provider }?.fastModels?.contains(before.model) == true
         if (!supported) throw ChatException(ChatError.Kind.Unsupported)
         ctx.onState { stale(rt, binding) }
         val value = if (on) "fast" else "normal"
         val set = ctx.gateway.request("config.set", buildJsonObject {
             put("profile", binding.profile); put("session_id", binding.runtimeId); put("key", "fast"); put("value", value); put("scope", "session")
-        }).asObject
+        }, generation = binding.generation).asObject
         if (set?.get("key").asString != "fast" || tierIsFast(set?.get("value").asString) != on) throw ChatException(ChatError.Kind.OutcomeUnknown)
-        val read = ctx.gateway.request("config.get", buildJsonObject { put("profile", binding.profile); put("session_id", binding.runtimeId); put("key", "fast") }).asObject
+        val read = ctx.gateway.request("config.get", buildJsonObject { put("profile", binding.profile); put("session_id", binding.runtimeId); put("key", "fast") }, generation = binding.generation).asObject
         ctx.onState { stale(rt, binding) }
         if (tierIsFast(read?.get("value").asString) != on) throw ChatException(ChatError.Kind.OutcomeUnknown)
         ctx.onState { rt.runtimeInfo = rt.runtimeInfo.merged(RuntimeInfo(serviceTier = value)); engine.publish(rt) }
@@ -180,7 +180,7 @@ internal class RuntimeControls(private val ctx: ChatContext, private val engine:
         val (rt, binding) = live(ref)
         val response = ctx.gateway.request("config.set", buildJsonObject {
             put("profile", binding.profile); put("session_id", binding.runtimeId); put("key", "yolo"); put("value", if (on) "on" else "off"); put("scope", "session")
-        }).asObject
+        }, generation = binding.generation).asObject
         ctx.onState { stale(rt, binding) }
         if (response?.get("key").asString != "yolo" || response?.get("value").asString != (if (on) "1" else "0")) throw ChatException(ChatError.Kind.OutcomeUnknown)
     }
@@ -189,7 +189,7 @@ internal class RuntimeControls(private val ctx: ChatContext, private val engine:
 
     suspend fun commands(ref: ConversationRef): List<SlashCommand> = mapErrors {
         val (_, binding) = live(ref)
-        SlashCommandCatalog.decode(ctx.gateway.request("commands.catalog", buildJsonObject { put("session_id", binding.runtimeId); put("profile", binding.profile) }))
+        SlashCommandCatalog.decode(ctx.gateway.request("commands.catalog", buildJsonObject { put("session_id", binding.runtimeId); put("profile", binding.profile) }, generation = binding.generation))
     }
 
     /** The commands a new chat would have, before it exists (Code mode's `/` list). Bound to the profile, and to a folder for project-local skills. */

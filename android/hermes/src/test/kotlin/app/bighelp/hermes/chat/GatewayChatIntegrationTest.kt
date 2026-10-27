@@ -8,6 +8,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -131,6 +132,38 @@ class GatewayChatIntegrationTest : GatewayTestSupport() {
         assertEquals(1, second.framesWithMethod("session.resume").size)
         assertEquals("The new socket advertised again with the handlers re-registered", 1, second.framesWithMethod("client.capabilities").size)
         assertFalse(repo.conversations.value.getValue(ref).unresolved.isEmpty())
+        repo.close()
+        client.disconnect()
+    }
+
+    @Test fun aSocketReplacedDuringTheJournalWriteNeverCarriesTheOldRuntimeIdToTheNewSocket() = runBlocking {
+        wireUpHost()
+        val authenticator = authenticator()
+        val client = GatewayClient(authenticator, chatScope, fast)
+        val store = GatedChatStore()
+        val repo = HermesChatRepository(client, authenticator, chatScope, ChatTestData.host, store)
+        client.connect()
+        val first = gateway.awaitConnection()
+        repo.open(ref)
+        awaitUntil("ready") { repo.conversations.value[ref]?.phase == ConversationPhase.Ready && repo.conversations.value[ref]?.sendBlock == null }
+
+        store.holdNextJournalWrite()
+        val sending = chatScope.async { repo.send(ref, "planned on socket one") }
+        store.reached.awaitWithin("the journal write to be held")
+        first.drop()
+        val second = gateway.awaitConnection()
+        awaitUntil("recovered on the new socket") {
+            second.framesWithMethod("session.activate").isNotEmpty() &&
+                repo.conversations.value[ref]?.phase == ConversationPhase.Ready && repo.conversations.value[ref]?.sendBlock == null
+        }
+        store.open()
+
+        val result = sending.await()
+        delay(300)
+        assertEquals("The old socket never saw the send either", 0, first.framesWithMethod("prompt.submit").size)
+        assertEquals("No frame naming the old runtime reached the new socket", 0, second.framesWithMethod("prompt.submit").size)
+        assertTrue("$result", result is SendResult.NotSent)
+        assertEquals("planned on socket one", repo.conversations.value.getValue(ref).draft)
         repo.close()
         client.disconnect()
     }

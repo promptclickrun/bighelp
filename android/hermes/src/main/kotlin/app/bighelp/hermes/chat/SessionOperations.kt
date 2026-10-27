@@ -50,7 +50,7 @@ internal class SessionOperations(
             if (released?.get("hidden").asBool != false || released?.get("session_key").asString.isNullOrEmpty()) throw ChatException(ChatError.Kind.InvalidResponse)
             binder.canonical.remove(ref.profile)
         }
-        val reply = ctx.gateway.request("session.title", buildJsonObject { put("session_id", binding.runtimeId); put("title", trimmed) }).asObject
+        val reply = ctx.gateway.request("session.title", buildJsonObject { put("session_id", binding.runtimeId); put("title", trimmed) }, generation = binding.generation).asObject
         ctx.onState { if (rt.binding != binding) throw ChatException(ChatError.Kind.NotConnected) }
         if (reply?.get("pending").asBool != false || reply?.get("title").asString != trimmed) throw ChatException(ChatError.Kind.OutcomeUnknown)
         ctx.onState { rt.title = trimmed; engine.publish(rt) }
@@ -138,7 +138,7 @@ internal class SessionOperations(
         if (messages.isEmpty() || messages.last().first != throughRowId || messages.none { it.second == "user" } || messages.size > 50_000) throw ChatException(ChatError.Kind.InvalidInput)
         val parentStored = ctx.onState { rt.identity.storedTip }
         val title = forkTitle(rt.title)
-        val reply = ctx.gateway.request("session.branch", buildJsonObject { put("session_id", binding.runtimeId); put("count", messages.size); put("name", title) }).asObject
+        val reply = ctx.gateway.request("session.branch", buildJsonObject { put("session_id", binding.runtimeId); put("count", messages.size); put("name", title) }, generation = binding.generation).asObject
             ?: throw invalidResponse()
         val childRuntime = reply["session_id"].asString ?: throw invalidResponse()
         val childStored = reply["stored_session_id"].asString?.takeIf { Coordinates.isValid(it) } ?: throw invalidResponse()

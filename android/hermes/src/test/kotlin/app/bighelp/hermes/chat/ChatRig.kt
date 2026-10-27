@@ -15,6 +15,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.rules.Timeout
 
+/** Waits for [this] for a bounded time and fails the test with [message], not with a bare timeout. */
+suspend fun <T> kotlinx.coroutines.Deferred<T>.awaitWithin(message: String, timeoutMillis: Long = 5_000): T = try {
+    withTimeout(timeoutMillis) { await() }
+} catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+    throw AssertionError("Timed out waiting for $message")
+}
+
 /** One repository over a scripted host and a store, with helpers to wait for asynchronous state. */
 internal class ChatRig(
     val host: FakeHermesHost = FakeHermesHost(),

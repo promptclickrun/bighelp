@@ -21,8 +21,12 @@ internal interface ChatGateway {
     val state: StateFlow<GatewayState>
     val events: Flow<GatewayEvent>
 
-    /** One JSON-RPC call; failures are `HermesException`, a cancelled caller gets `RequestCancelledException`. */
-    suspend fun request(method: String, params: JsonObject, timeoutMillis: Long? = null): JsonElement
+    /**
+     * One JSON-RPC call; failures are `HermesException`, a cancelled caller gets `RequestCancelledException`.
+     * [generation] is the socket generation a runtime-addressed call was planned on: on any other socket the call
+     * fails `NotConnected` and nothing is written.
+     */
+    suspend fun request(method: String, params: JsonObject, timeoutMillis: Long? = null, generation: Long? = null): JsonElement
 
     suspend fun prepareForAdmission()
     suspend fun verifyLiveness()
@@ -35,8 +39,9 @@ internal class GatewayClientAdapter(private val client: GatewayClient) : ChatGat
     override val state get() = client.state
     override val events get() = client.events
 
-    override suspend fun request(method: String, params: JsonObject, timeoutMillis: Long?): JsonElement =
-        if (timeoutMillis == null) client.request(method, params) else client.request(method, params, timeoutMillis)
+    override suspend fun request(method: String, params: JsonObject, timeoutMillis: Long?, generation: Long?): JsonElement =
+        if (timeoutMillis == null) client.request(method, params, generation = generation)
+        else client.request(method, params, timeoutMillis, generation = generation)
 
     override suspend fun prepareForAdmission() = client.prepareForAdmission()
     override suspend fun verifyLiveness() = client.verifyLiveness()

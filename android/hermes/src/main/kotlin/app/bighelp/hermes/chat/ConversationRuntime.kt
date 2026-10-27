@@ -1,6 +1,7 @@
 package app.bighelp.hermes.chat
 
 import app.bighelp.hermes.WireMessage
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.withContext
@@ -51,6 +52,22 @@ internal class PendingAdmission(val entry: JournalEntry, val isCommand: Boolean,
 /** A confirmed admission whose local waiter ended with the socket; exact same-epoch terminal replay can settle it. */
 internal class AcceptedEvidence(val entryId: String, val turnId: String, val epoch: String)
 
+/**
+ * The one attach (resume by stored ID, then the recovery bracket, then the newest history page) running for a
+ * conversation on one socket generation. Every other caller for the same generation joins [done].
+ */
+internal class AttachFlight(val generation: Long) {
+    val done = CompletableDeferred<Unit>()
+
+    /** Set when something happened that this attach cannot cover (a newer socket, dropped events): it then leaves the decisions to the next one. */
+    @Volatile var superseded = false
+}
+
+/** The one recovery bracket running for a runtime on a socket; a caller asking for the same one joins [done]. */
+internal class RecoveryFlight(val generation: Long, val runtimeId: String) {
+    val done = CompletableDeferred<Unit>()
+}
+
 /** Mutable state of one conversation. Touched only on the serial dispatcher. */
 internal class ConversationRuntime(val scope: ConversationScope, var identity: ConversationIdentity, var title: String) {
     val ref: ConversationRef get() = scope.ref
@@ -77,7 +94,8 @@ internal class ConversationRuntime(val scope: ConversationScope, var identity: C
     var hydrating = false
     var heldEvents = ArrayList<WireMessage.Event>()
     var heldOverflow = false
-    var recoveryJobActive = false
+    var attachFlight: AttachFlight? = null
+    var recoveryFlight: RecoveryFlight? = null
     var hasRecovered = false
 
     var status: String? = null

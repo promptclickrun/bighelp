@@ -369,4 +369,26 @@ class SendFlowTest : ChatTestBase() {
         assertEquals(0, r.host.count("prompt.submit"))
         assertTrue(r.journalKeys(ref).isEmpty())
     }
+
+    @Test fun steeringAndStoppingStayOpenWhenTheHostLacksTheExclusiveSubmitGuaranteeButNewTurnsDoNot() = run {
+        val r = rig()
+        val ref = r.newChat()
+        r.startRunning(ref)
+        r.host.changeExclusiveSubmit(false)
+
+        val steer = r.repo.send(ref, "steer under false")
+        assertTrue("A correction is not a submission: $steer", steer is SendResult.Admitted)
+        assertEquals(Admission.Steered, (steer as SendResult.Admitted).admission)
+        assertEquals(1, r.host.count("session.steer"))
+
+        val queued = r.repo.send(ref, "queued", mode = SendMode.Queue)
+        assertEquals(SendBlock.HostLacksExclusiveSubmit, (queued as SendResult.NotSent).block)
+        val replaced = r.repo.send(ref, "replace", mode = SendMode.InterruptAndSend)
+        assertEquals("Nothing is interrupted for a message that could not be queued", SendBlock.HostLacksExclusiveSubmit, (replaced as SendResult.NotSent).block)
+        assertEquals(0, r.host.count("session.interrupt"))
+        assertEquals("Only the first send was ever submitted", 1, r.host.count("prompt.submit"))
+
+        assertEquals(StopResult.Requested, r.repo.stop(ref))
+        assertEquals(1, r.host.count("session.interrupt"))
+    }
 }

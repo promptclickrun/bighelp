@@ -240,6 +240,19 @@ class TurnReducerTest {
         assertEquals("kept!", r.messages().single().text)
     }
 
+    @Test fun turnIdsStayUniqueWhenAnotherRuntimeOfTheSameEpochRestartsItsSequence() {
+        val r = reducer()
+        r.feed("message.start", sequence = 1)
+        val first = r.turnId
+        r.feed("message.delta", """{"text":"old answer"}""", sequence = 2)
+        // Reattached to a new runtime of the same host epoch: its sequence numbers start over at one.
+        r.resetCursor("epoch-1", 0)
+        r.feed("message.start", sequence = 1)
+        assertFalse("A turn of another runtime never reuses an older turn's ID", first == r.turnId)
+        r.feed("message.delta", """{"text":"new answer"}""", sequence = 2)
+        assertEquals(listOf("old answer", "new answer"), r.messages().map { it.text })
+    }
+
     @Test fun anErrorEventMarksTheTurnFailedWithoutEndingIt() {
         val r = reducer()
         r.feed("message.start")

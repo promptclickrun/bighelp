@@ -23,6 +23,7 @@ export interface TemplateRow {
   reviewed_by: string | null;
   review_note: string | null;
   sort_key: number;
+  version: number;
 }
 
 /** A template with its payload parsed, as reviewers see it. */
@@ -30,6 +31,7 @@ export function reviewView(row: TemplateRow) {
   const template = toTemplate(row);
   return {
     id: row.id,
+    version: row.version,
     kind: row.kind,
     status: row.status,
     source: row.source,
@@ -84,7 +86,7 @@ export async function approved(db: D1Database): Promise<TemplateRow[]> {
 }
 
 export async function list(
-  db: D1Database, filter: { status?: TemplateStatus; kind?: TemplateKind; limit: number },
+  db: D1Database, filter: { status?: TemplateStatus; kind?: TemplateKind; limit: number; offset?: number },
 ): Promise<TemplateRow[]> {
   const where: string[] = [];
   const binds: unknown[] = [];
@@ -92,9 +94,19 @@ export async function list(
   if (filter.kind) { where.push("kind = ?"); binds.push(filter.kind); }
   const clause = where.length ? `WHERE ${where.join(" AND ")}` : "";
   const { results } = await db.prepare(
-    `SELECT * FROM templates ${clause} ORDER BY created_at DESC LIMIT ?`,
-  ).bind(...binds, filter.limit).all<TemplateRow>();
+    `SELECT * FROM templates ${clause} ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`,
+  ).bind(...binds, filter.limit, filter.offset ?? 0).all<TemplateRow>();
   return results;
+}
+
+export async function countTemplates(db: D1Database, filter: { status?: TemplateStatus; kind?: TemplateKind }): Promise<number> {
+  const where: string[] = [];
+  const binds: string[] = [];
+  if (filter.status) { where.push("status = ?"); binds.push(filter.status); }
+  if (filter.kind) { where.push("kind = ?"); binds.push(filter.kind); }
+  const clause = where.length ? `WHERE ${where.join(" AND ")}` : "";
+  const row = await db.prepare(`SELECT COUNT(*) AS count FROM templates ${clause}`).bind(...binds).first<{count: number}>();
+  return row?.count ?? 0;
 }
 
 export async function find(db: D1Database, id: string): Promise<TemplateRow | null> {
@@ -157,20 +169,22 @@ export async function insert(
     };
     now: string;
     reviewedBy?: string;
+    skipExisting?: boolean;
   },
-): Promise<void> {
+): Promise<boolean> {
   const reviewed = input.status === "pending" ? null : input.now;
-  await db.prepare(
+  const result = await db.prepare(
     `INSERT INTO templates (id, kind, status, source, payload, credit_name, submitter_email, submitter_name,
        submitter_username, status_token_hash, submitter_ip_hash, submitter_github_id, created_at, updated_at,
        reviewed_at, reviewed_by, sort_key)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)${input.skipExisting ? " ON CONFLICT(id) DO NOTHING" : ""}`,
   ).bind(
     input.id, input.template.kind, input.status, input.source, JSON.stringify(input.template.payload),
     input.creditName, input.submitter?.email ?? null, input.submitter?.name ?? null,
     input.submitter?.username ?? null, input.submitter?.statusTokenHash ?? null, input.submitter?.ipHash ?? null,
     input.submitter?.githubId ?? null, input.now, input.now, reviewed, input.reviewedBy ?? null, Date.parse(input.now) / 1000,
   ).run();
+  return result.meta.changes > 0;
 }
 
 export async function review(
@@ -183,16 +197,19 @@ export async function review(
     now: string;
     template?: TemplatePayload;
     creditName?: string | null;
+    expectedVersion: number;
   },
-): Promise<void> {
-  const sets = ["status = ?", "review_note = ?", "reviewed_by = ?", "reviewed_at = ?", "updated_at = ?"];
+): Promise<boolean> {
+  const sets = ["status = ?", "review_note = ?", "reviewed_by = ?", "reviewed_at = ?", "updated_at = ?", "version = version + 1"];
   const binds: unknown[] = [change.status, change.note, change.reviewer, change.now, change.now];
   if (change.template) { sets.push("payload = ?"); binds.push(JSON.stringify(change.template.payload)); }
   if (change.creditName !== undefined) { sets.push("credit_name = ?"); binds.push(change.creditName); }
-  await db.prepare(`UPDATE templates SET ${sets.join(", ")} WHERE id = ?`).bind(...binds, id).run();
+  const result = await db.prepare(`UPDATE templates SET ${sets.join(", ")} WHERE id = ? AND version = ?`)
+    .bind(...binds, id, change.expectedVersion).run();
+  return result.meta.changes > 0;
 }
 
-export async function remove(db: D1Database, id: string): Promise<boolean> {
-  const result = await db.prepare("DELETE FROM templates WHERE id = ?").bind(id).run();
+export async function remove(db: D1Database, id: string, expectedVersion: number): Promise<boolean> {
+  const result = await db.prepare("DELETE FROM templates WHERE id = ? AND version = ?").bind(id, expectedVersion).run();
   return result.meta.changes > 0;
 }

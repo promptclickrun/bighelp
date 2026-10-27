@@ -138,6 +138,44 @@ dropped; the run goes on. The run keeps the stored copy, and logs a short reason
 
 The log never holds the key or what Composio sent back.
 
+## Reviewer webapp
+
+The catalog-first management interface uses the same Worker, D1 database and Access application as the
+existing `/review` API. The Access application must include both `catalog.bighelp.app/review` and the
+private reviewer hostname as destinations, with the existing maintainer-email and service-token policies.
+`workers_dev` and preview URLs remain disabled. Personal hosts and owner IDs stay out of public source.
+
+- Browse every page of the catalog, search/filter it, edit any template (including agent variables),
+  create owner templates, approve/reject submissions with a reason, unpublish, or delete selected entries.
+- Static assets run through the Worker first. The entire reviewer hostname requires a verified Access
+  JWT, including HTML, JavaScript and alternate paths. No reviewer secrets are shipped to the browser.
+- Browser writes require same-origin JSON requests and `X-Catalog-Review: 1`. Existing CLI/service-token
+  calls without an Origin remain supported. Row changes carry `If-Match: "v<version>"`; version checks
+  happen in the D1 mutation, not only before it. A stale operation returns 409 instead of overwriting.
+- `GET /review/session` returns the authenticated reviewer name. Template lists accept `offset` and
+  return `total` and `nextOffset`, in addition to the existing `templates` array.
+- Public web submissions always enter `pending`, including when someone types the owner's name or email.
+  The owner can publish directly from the protected webapp. Authenticated plugin submissions bypass review
+  only when their server-verified numeric GitHub ID equals `OWNER_GITHUB_ID` (the account ID, not its login).
+  When that setting is missing, nobody receives the exception. Existing submission rate limits still apply.
+- Live D1 is the editing authority. Repo catalog publishing is manual so webapp edits and deletions survive
+  ordinary merges. Export the live catalog when you want a fresh source snapshot.
+
+Apply migration `0005_reviewer_versions.sql` before deploying this version. It only adds the version
+column; existing content, IDs, status and credit are preserved. Deploy the checked-in `reviewer/` assets
+with `npm run deploy` from this directory, never the local test configuration.
+
+Copy `wrangler.jsonc` to the gitignored `wrangler.private.jsonc`. Add the reviewer custom domain to its
+`routes` and set `vars.REVIEWER_HOST` to that bare lowercase hostname. Keep the rest of the bindings,
+assets and triggers in sync with the public config. Set `OWNER_GITHUB_ID` through `wrangler secret put`,
+using the verified numeric account ID from GitHub, never a submitted login. `npm run deploy` requires
+that private config so a routine deployment cannot silently drop the protected domain.
+
+Browser regression tests use synthetic API fixtures, not a live Access session or production D1. Run
+`npx playwright install chromium` once, then `npm run test:browser`. They cover complete pagination, mobile
+layout, first-click saves, in-flight draft ownership, conflicts, expired sessions, status transitions and
+typed delete confirmation. Verify the real Access/D1 path separately before claiming a production deploy.
+
 ## Reviewing
 
 `scripts/catalog-review.py` wraps the review API. It reads `CF_ACCESS_CLIENT_ID` and
@@ -158,8 +196,10 @@ Zero Trust › Access › Service Tokens and update the env file.
 
 ## Templates in the repo
 
-The repo's [catalog/](../../catalog/README.md) directory holds every template. Merging a change to it to `main`
-runs `.github/workflows/catalog.yml`, which publishes through the review API with `scripts/catalog-sync.py`.
+The repo's [catalog/](../../catalog/README.md) directory keeps source snapshots. Live D1 is the editing
+authority. `.github/workflows/catalog.yml` validates normal merges but publishes only on an explicit manual
+run with **publish** enabled. This prevents routine merges from overwriting webapp edits or recreating
+webapp deletions. `scripts/catalog-sync.py sync --apply` remains an explicit replacement operation.
 `POST /review/templates` takes an optional `id` (lowercase letters, digits and dashes) so the repo and the catalog
 keep the same ids; a taken id answers 409.
 
@@ -188,14 +228,16 @@ npm install
 npm run typecheck      # wrangler types && tsc
 npm test               # vitest in workerd: Access gating, review flow, public feed, CORS, Composio refresh
 npx wrangler d1 migrations apply bighelp-catalog --remote
-npx wrangler deploy
+npm run deploy          # requires the private production config described above
 ```
 
-The Worker reads four secrets. Set each one once with `npx wrangler secret put <NAME>`:
+The Worker reads these secrets. Set each one once with `npx wrangler secret put <NAME>`:
 
 - `TURNSTILE_SECRET`: the secret key of the "bighelp Template Catalog submit" Turnstile widget.
 - `ACCESS_TEAM_DOMAIN`: the Zero Trust team domain, for example `team.cloudflareaccess.com`.
 - `ACCESS_AUD_REVIEW`: the Application Audience (AUD) tag of the "review" Access app.
+- `OWNER_GITHUB_ID`: optional, the server-verified numeric GitHub account ID exempt from moderation.
+  Without it, all plugin submissions require review; owner submissions can still be made in the webapp.
 - `COMPOSIO_API_KEY`: a developer (project) API key from bighelp's own Composio account. The maintainer
   sets it with `npx wrangler secret put COMPOSIO_API_KEY`. Only catalog metadata uses it.
 

@@ -3,6 +3,7 @@ import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import first from "../migrations/0001_templates.sql?raw";
 import second from "../migrations/0002_submitter_details.sql?raw";
 import third from "../migrations/0003_agent_installs.sql?raw";
+import fifth from "../migrations/0005_reviewer_versions.sql?raw";
 import type { GitHubLookup } from "../src/agents.js";
 import { type Env, type HumanCheck, handle } from "../src/index.js";
 
@@ -23,7 +24,7 @@ const github: GitHubLookup = async (token) => {
 };
 
 beforeAll(async () => {
-  for (const statement of [first, second, third].join(";").replace(/^--.*$/gm, "").split(";").map((value: string) => value.trim()).filter(Boolean)) {
+  for (const statement of [first, second, third, fifth].join(";").replace(/^--.*$/gm, "").split(";").map((value: string) => value.trim()).filter(Boolean)) {
     await testEnv.DB.prepare(statement).run();
   }
   keyPair = await crypto.subtle.generateKey(
@@ -57,11 +58,13 @@ async function token(claims: Record<string, unknown>): Promise<string> {
 
 async function call(
   path: string,
-  init: { method?: string; body?: unknown; jwt?: string; origin?: string; ip?: string; bearer?: string } = {},
+  init: { method?: string; body?: unknown; jwt?: string; origin?: string; ip?: string; bearer?: string; match?: string; reviewHeader?: boolean } = {},
 ): Promise<Response> {
   const headers = new Headers({ "Content-Type": "application/json", "CF-Connecting-IP": init.ip ?? "203.0.113.7" });
   if (init.jwt) headers.set("Cf-Access-Jwt-Assertion", init.jwt);
   if (init.origin) headers.set("Origin", init.origin);
+  if (init.match) headers.set("If-Match", init.match);
+  if (init.reviewHeader) headers.set("X-Catalog-Review", "1");
   if (init.bearer) headers.set("Authorization", `Bearer ${init.bearer}`);
   const request = new Request(`https://catalog.example${path}`, {
     method: init.method ?? "GET",
@@ -70,6 +73,150 @@ async function call(
   });
   return handle(request, testEnv, { keys, human, github });
 }
+
+describe("catalog reviewer webapp", () => {
+  it("returns a conflict when named templates are created concurrently", async () => {
+    const jwt = await reviewer();
+    const responses = await Promise.all([1, 2].map(() => call("/review/templates", {
+      method: "POST", body: { ...blueprint, id: "same-named-template" }, jwt,
+    })));
+    expect(responses.map(response => response.status).sort()).toEqual([201, 409]);
+  });
+
+  it("changes the public revision even when two writes share a timestamp", async () => {
+    const jwt = await reviewer();
+    const fixed = new Date("2026-01-01T12:00:00Z");
+    const frozen = (path: string, method = "GET", body?: unknown) => handle(
+      new Request(`https://catalog.example${path}`, {
+        method, headers: { "Cf-Access-Jwt-Assertion": jwt, "Content-Type": "application/json" },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      }), testEnv, { keys, now: () => fixed },
+    );
+    const made = await (await frozen("/review/templates", "POST", blueprint)).json<{ id: string }>();
+    const before = (await frozen("/v1/catalog.json")).headers.get("ETag");
+    expect((await frozen(`/review/templates/${made.id}`, "PATCH", { text: "A different useful prompt about [my topic]." })).status).toBe(200);
+    expect((await frozen("/v1/catalog.json")).headers.get("ETag")).not.toBe(before);
+  });
+
+  it("returns the authenticated reviewer identity", async () => {
+    const response = await call("/review/session", { jwt: await reviewer() });
+    expect(await response.json()).toEqual({ reviewer: "owner@example.com" });
+  });
+
+  it("prevents stale edits and deletes from overwriting a newer decision", async () => {
+    const jwt = await reviewer();
+    const created = await (await call("/review/templates", { method: "POST", body: blueprint, jwt }))
+      .json<{ id: string; version: number }>();
+    expect(created.version).toBe(1);
+    const path = `/review/templates/${created.id}`;
+    const options = { method: "PATCH", body: { text: "An updated useful prompt for [my topic]." }, jwt,
+      match: '"v1"', origin: "https://catalog.example", reviewHeader: true };
+    const results = await Promise.all([call(path, options), call(path, options)]);
+    expect(results.map(r => r.status).sort()).toEqual([200, 409]);
+    expect((await call(path, { method: "DELETE", jwt, match: '"v1"' })).status).toBe(409);
+    const current = await (await call(path, { jwt })).json<{ version: number; status: string }>();
+    expect(current.version).toBe(2);
+    expect((await call(`${path}/unpublish`, { method: "POST", jwt, body: {}, match: '"v2"' })).status).toBe(200);
+    expect((await call(path, { method: "DELETE", jwt, match: '"v3"' })).status).toBe(200);
+    expect((await call(path, { jwt })).status).toBe(404);
+  });
+
+  it("requires JSON, same-origin UI headers and row preconditions for browser writes", async () => {
+    const jwt = await reviewer();
+    const made = await (await call("/review/templates", { method: "POST", body: blueprint, jwt })).json<{ id: string }>();
+    const path = `/review/templates/${made.id}`;
+    const origin = "https://catalog.example";
+    expect((await call(path, { method: "PATCH", body: {}, jwt, origin, match: '"v1"' })).status).toBe(403);
+    expect((await call(path, { method: "PATCH", body: {}, jwt, origin, reviewHeader: true })).status).toBe(428);
+    const form = new Request(`https://catalog.example${path}/approve`, { method: "POST",
+      headers: { "Cf-Access-Jwt-Assertion": jwt, "Content-Type": "text/plain" }, body: "{}" });
+    expect((await handle(form, testEnv, { keys })).status).toBe(415);
+  });
+
+  it("protects the entire reviewer hostname, including the HTML and assets", async () => {
+    for (const path of ["/", "/app.js", "/style.css", "/v1/catalog.json"]) {
+      const response = await handle(new Request(`https://reviewer.example.test${path}`), { ...testEnv, REVIEWER_HOST: "reviewer.example.test" }, { keys, human });
+      expect(response.status, path).toBe(401);
+      expect(response.headers.get("Cache-Control")).toContain("no-store");
+    }
+  });
+
+  it("serves reviewer assets only after verifying Access, without exposing them on public routes", async () => {
+    const jwt = await reviewer();
+    let reads = 0;
+    const reviewerEnv = { ...testEnv, REVIEWER_HOST: "reviewer.example.test", REVIEWER_ASSETS: {
+      fetch: async (request: Request) => {
+        reads++;
+        if (new URL(request.url).pathname !== "/") return new Response("Not found", { status: 404 });
+        return new Response("fixture asset", { headers: { "Content-Type": "text/html" } });
+      },
+    } as unknown as Fetcher };
+    const request = (host: string, path: string, signed = true) => new Request(`https://${host}${path}`, {
+      headers: signed ? { "Cf-Access-Jwt-Assertion": jwt } : {},
+    });
+    expect((await handle(request("reviewer.example.test", "/", false), reviewerEnv, { keys })).status).toBe(401);
+    expect(reads).toBe(0);
+    const html = await handle(request("reviewer.example.test", "/"), reviewerEnv, { keys });
+    expect(await html.text()).toBe("fixture asset");
+    expect(html.headers.get("Cache-Control")).toContain("no-store");
+    expect(html.headers.get("Content-Security-Policy")).toContain("frame-ancestors 'none'");
+    expect((await handle(request("reviewer.example.test", "/v1/catalog.json"), reviewerEnv, { keys })).status).toBe(404);
+    expect((await handle(request("catalog.example", "/app.js"), reviewerEnv, { keys })).status).toBe(404);
+    expect(reads).toBe(2);
+  });
+
+  it("bounds fractional and non-finite pagination inputs before querying D1", async () => {
+    const jwt = await reviewer();
+    await call("/review/templates", { method: "POST", body: blueprint, jwt });
+    const response = await call("/review/templates?status=all&limit=1.5&offset=Infinity", { jwt });
+    expect(response.status).toBe(200);
+    const page = await response.json<{ templates: unknown[]; total: number; nextOffset: number | null }>();
+    expect(page.templates).toHaveLength(1);
+    expect(page.total).toBe(1);
+    expect(page.nextOffset).toBeNull();
+  });
+
+  it("rejects cross-origin browser mutations even with a valid reviewer identity", async () => {
+    const response = await call("/review/templates", {
+      method: "POST", body: blueprint, jwt: await reviewer(), origin: "https://attacker.example",
+    });
+    expect(response.status).toBe(403);
+    expect((await call("/v1/catalog.json")).status).toBe(200);
+  });
+
+  it("paginates the complete catalog without silently hiding older templates", async () => {
+    const jwt = await reviewer();
+    for (let i = 0; i < 3; i += 1) {
+      await call("/review/templates", { method: "POST", body: { ...blueprint, id: `page-${i}` }, jwt });
+    }
+    const page = await (await call("/review/templates?status=all&limit=2&offset=2", { jwt }))
+      .json<{ templates: { id: string }[]; total: number; nextOffset: number | null }>();
+    expect(page.templates).toHaveLength(1);
+    expect(page.total).toBe(3);
+    expect(page.nextOffset).toBeNull();
+  });
+
+  it("auto-publishes only the configured numeric GitHub owner's authenticated submissions", async () => {
+    const bearer = await register("gh-42");
+    const request = new Request("https://catalog.example/submit/agent/templates", {
+      method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${bearer}` },
+      body: JSON.stringify(agent),
+    });
+    const response = await handle(request, { ...testEnv, OWNER_GITHUB_ID: "42" }, { keys, human, github });
+    expect(response.status).toBe(201);
+    const created = await response.json<{ id: string; status: string }>();
+    expect(created.status).toBe("approved");
+    const catalog = await (await call("/v1/catalog.json")).json<{ agents: { id: string }[] }>();
+    expect(catalog.agents.map(t => t.id)).toContain(created.id);
+    // Unverified web identity and body fields can never grant the owner exception.
+    const forged = await submit({ ...agent, status: "approved", source: "bighelp", submitterGithubId: "42" }, {
+      username: "promptclickrun", email: "colt.coan@gmail.com",
+    });
+    expect(await forged.json()).toMatchObject({ status: "pending" });
+    expect(await (await agentSubmit(await register("gh-43"), { ...agent, owner: true })).json())
+      .toMatchObject({ status: "pending" });
+  });
+});
 
 const sam = { submitterName: "Sam Rivera", username: "@samr", email: "Sam@Example.com", turnstileToken: "human" };
 

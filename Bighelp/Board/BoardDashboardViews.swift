@@ -104,7 +104,8 @@ final class BoardDashboardModel {
             undo = Undo(item: item, message: message, revert: .unmarkDone)
             run(item) { await $0.store.setDone(item, true) }
         case .notToday:
-            snoozes.snooze(goalID: item.id, scope: scope, agentID: agentID)
+            // Kept per computer; before the Dashboard knows which, it only hides the card here.
+            if !scope.isEmpty { snoozes.snooze(goalID: item.id, scope: scope, agentID: agentID) }
             snoozed.insert(item.id)
             undo = Undo(item: item, message: message, revert: .unsnooze)
         case .useTemplate, .skipTemplate:

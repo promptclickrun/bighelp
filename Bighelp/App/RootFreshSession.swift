@@ -22,7 +22,7 @@ extension RootShellView {
         appState.suspendedChat = nil
         let draft = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? (remembered?.text ?? "") : text
         if !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            appState.pendingComposerText = draft
+            appState.leaveComposerText(draft)
         }
         startNewChat(explicitAgentID: agentID ?? remembered?.agentID)
     }

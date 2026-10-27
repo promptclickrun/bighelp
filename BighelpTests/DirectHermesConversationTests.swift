@@ -3044,8 +3044,8 @@ struct NativeMidSessionTests {
         turn.cancel()
     }
 
-    /// Only a chat's first message waits to say who's sending (the plugin names the person
-    /// in the chat's brief then). Later ones go at once: a far host added round trips to each.
+    /// Once this connection has said who's on this device, a chat with messages sends at once:
+    /// waiting for the note again added round trips to every message on a far host.
     @Test func laterMessagesNeverWaitToSayWhoIsSending() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -3073,6 +3073,7 @@ struct NativeMidSessionTests {
         let model = ChatModel(conversationID: client.conversationID, client: client, initialItems: [])
         client.model = model
         try await client.recover(epoch: "epoch")
+        client.speakerNoted = true
         model.draft = "And tomorrow?"
         let started = ContinuousClock.now
         let turn = Task { await model.send() }

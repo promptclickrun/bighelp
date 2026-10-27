@@ -1,3 +1,4 @@
+import Foundation
 import Observation
 
 enum ConversationActivationSource: Sendable {
@@ -144,9 +145,7 @@ final class AppState {
         }
         activeConversationID = nil
         pendingVoiceConversationID = nil
-        pendingComposerText = nil
-        pendingComposerSends = false
-        pendingComposerAgentID = nil
+        clearComposerText()
         chatOpenedFromList = false
     }
 
@@ -155,20 +154,43 @@ final class AppState {
         path.removeAll()
         activeConversationID = nil
         pendingVoiceConversationID = nil
-        pendingComposerText = nil
-        pendingComposerSends = false
-        pendingComposerAgentID = nil
+        clearComposerText()
         chatOpenedFromList = false
     }
 
-    func consumeComposerText() -> String? {
-        defer { pendingComposerText = nil; pendingComposerAgentID = nil }
-        return pendingComposerText
+    /// When `pendingComposerText` was left. A chat that opens much later (its open failed, or the
+    /// person went elsewhere) doesn't take it.
+    private var pendingComposerSince: Date?
+    static let pendingComposerLifetime: TimeInterval = 30
+
+    /// Leaves text for the next chat's message box. Each request replaces the last one whole, so
+    /// an earlier bot or Send never sticks to new text.
+    func leaveComposerText(_ text: String, sends: Bool = false, agentID: String? = nil, now: Date = .now) {
+        pendingComposerText = text
+        pendingComposerSends = sends
+        pendingComposerAgentID = agentID
+        pendingComposerSince = now
     }
 
-    func consumeComposerSend() -> Bool {
-        defer { pendingComposerSends = false }
-        return pendingComposerSends
+    /// The text, if this chat should take it: a new chat on top, or the named bot's own chat on top.
+    func takeComposerText(isNewChat: Bool, isNamedBotChat: Bool,
+                          now: Date = .now) -> (text: String, sends: Bool)? {
+        guard let text = pendingComposerText else { return nil }
+        guard let since = pendingComposerSince, now.timeIntervalSince(since) <= Self.pendingComposerLifetime else {
+            clearComposerText()
+            return nil
+        }
+        guard pendingComposerAgentID == nil ? isNewChat : isNamedBotChat else { return nil }
+        let sends = pendingComposerSends
+        clearComposerText()
+        return (text, sends)
+    }
+
+    private func clearComposerText() {
+        pendingComposerText = nil
+        pendingComposerSends = false
+        pendingComposerAgentID = nil
+        pendingComposerSince = nil
     }
 
     @discardableResult

@@ -202,7 +202,8 @@ struct ReferenceComposerTextView: UIViewRepresentable {
         // SwiftUI asks several times per layout; each answer laid the whole text out again
         // and moved the Expand corner, on every keystroke.
         let key = Coordinator.MeasureKey(text: uiView.text, width: width, pointSize: uiView.font?.pointSize ?? 0,
-                                         reservesCorner: ownsTextView && container.cornerReserve != nil)
+                                         reservesCorner: ownsTextView && container.cornerReserve != nil,
+                                         expanded: expanded)
         let measured: CGSize
         if let known = context.coordinator.measuredSizes[key] {
             measured = known
@@ -266,6 +267,8 @@ struct ReferenceComposerTextView: UIViewRepresentable {
             let width: CGFloat
             let pointSize: CGFloat
             let reservesCorner: Bool
+            /// The expanded editor lays the same text out with its own insets.
+            let expanded: Bool
         }
 
         /// Sizes measured for the current text, by width.

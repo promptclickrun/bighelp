@@ -153,6 +153,8 @@ final class DirectHermesConversationClient: StreamingConversationClient, Stoppab
     @ObservationIgnored let attachmentResolver: (any AgentAttachmentResolving)?
     /// Says who is sending before each new turn (hosts several people share).
     @ObservationIgnored var speakerNote: (any ChatSpeakerNoting)?
+    /// A note from this connection has reached the host, so the plugin knows who's on this device.
+    @ObservationIgnored var speakerNoted = false
     /// Other agents this chat's agent talks to (`ChatAgentTalkRail`).
     @ObservationIgnored var agentTalk: (any AgentTalkReading)?
     /// What the host supports for this chat's profile (helper Stop and Steer).

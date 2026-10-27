@@ -68,14 +68,18 @@ extension DirectHermesConversationClient {
     /// message anyway and the agent just doesn't get the name.
     static let speakerNoteWait: Duration = .milliseconds(1_200)
 
-    /// Says who's sending. Only a chat's first message waits for it: later turns read the
-    /// note when they reach the model, well after the message lands, so they go at once
-    /// (a host far away added two round trips to every message).
+    /// Says who's sending. A chat's first message waits for it (the plugin records the brief's
+    /// person once), and so does the first one from this connection, when the host may still
+    /// have someone else as the speaker. Later turns read the note when they reach the model,
+    /// well after the message lands, so they go at once (a far host added round trips to each).
     func noteSpeaker() async {
         guard let speakerNote else { return }
         let agentID = profile, storedID = storedID
-        let note = Task { @MainActor in await speakerNote.note(agentID: agentID, storedSessionID: storedID) }
-        guard projection.items.isEmpty else { return }
+        let note = Task { @MainActor [weak self] in
+            await speakerNote.note(agentID: agentID, storedSessionID: storedID)
+            self?.speakerNoted = true
+        }
+        guard projection.items.isEmpty || !speakerNoted else { return }
         let wait = Self.speakerNoteWait
         // Whichever ends first lets the message go: the note, or the wait. A note
         // still running after that finishes on its own.

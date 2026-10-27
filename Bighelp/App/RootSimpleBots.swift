@@ -318,9 +318,7 @@ extension RootShellView {
     /// The bot's own chat with the text in its message box (a Dashboard's Ask, Do it or template).
     /// It's the Bot Chat, history and all; only an empty message box takes the text.
     func askSimpleBot(_ agentID: String, _ text: String, sends: Bool) {
-        appState.pendingComposerText = text
-        appState.pendingComposerSends = sends
-        appState.pendingComposerAgentID = agentID
+        appState.leaveComposerText(text, sends: sends, agentID: agentID)
         openSimpleBotChat(agentID)
     }
 

@@ -346,9 +346,15 @@ final class FleetStore {
     }
 
     /// Every scheduled task, the next to run first.
-    func tasks(on hostID: UUID? = nil) -> [FleetTask] {
-        hosts.filter { hostID == nil || $0.id == hostID }
+    func tasks(on hostID: UUID? = nil, query: String = "") -> [FleetTask] {
+        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        return hosts.filter { hostID == nil || $0.id == hostID }
             .flatMap { snapshots[$0.id]?.tasks ?? [] }
+            .filter { task in
+                query.isEmpty || [task.name, task.schedule, hostName(task.hostID),
+                                  agent(hostID: task.hostID, profileID: task.profileID)?.name ?? ""]
+                    .contains { $0.localizedCaseInsensitiveContains(query) }
+            }
             .sorted { lhs, rhs in
                 if (lhs.status == .active) != (rhs.status == .active) { return lhs.status == .active }
                 return (lhs.nextRun ?? .distantFuture) < (rhs.nextRun ?? .distantFuture)

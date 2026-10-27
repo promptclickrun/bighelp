@@ -28,7 +28,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -93,7 +96,7 @@ fun SetupScreen(
                 InkButton("Check computer", onCheck, tag = "setup.check", enabled = setup.address.isNotBlank())
             }
 
-            DiscoveryResultCard(setup.discovery, onCheck = onCheck, onTryDemo = onTryDemo)
+            DiscoveryResultCard(setup.discovery, setup.allowPrivateHttp, onCheck = onCheck, onTryDemo = onTryDemo)
             Spacer(Modifier.height(8.dp))
         }
         }
@@ -139,16 +142,27 @@ private fun PrivateHttpRow(checked: Boolean, enabled: Boolean, onChange: (Boolea
 }
 
 @Composable
-private fun DiscoveryResultCard(discovery: DiscoveryState, onCheck: () -> Unit, onTryDemo: () -> Unit) {
+private fun DiscoveryResultCard(
+    discovery: DiscoveryState,
+    allowPrivateHttp: Boolean,
+    onCheck: () -> Unit,
+    onTryDemo: () -> Unit,
+) {
     when (discovery) {
         DiscoveryState.Idle, DiscoveryState.Checking -> Unit
 
         is DiscoveryState.AddressProblem -> ResultCard(
             title = "That address can't be used",
             body = when (discovery.reason) {
+                // With the switch already on, the address itself is the problem, so don't send them to the switch.
                 HermesEndpointException.Reason.PlaintextNotAllowed ->
-                    "Plain http:// works only inside your own network. Turn on the private network " +
-                        "switch for an address like 192.168.1.20, or use https://."
+                    if (allowPrivateHttp) {
+                        "Plain http:// works only for an address inside your own network, like " +
+                            "192.168.1.20, and this one is not. Use https:// instead."
+                    } else {
+                        "Plain http:// works only inside your own network. Turn on the private network " +
+                            "switch for an address like 192.168.1.20, or use https://."
+                    }
                 HermesEndpointException.Reason.InvalidEndpoint, HermesEndpointException.Reason.InvalidRoute ->
                     "Use a name or number like hermes.example.com or 192.168.1.20:9119, with no spaces, " +
                         "username, password or question mark."
@@ -194,7 +208,8 @@ private fun ResultCard(
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         shape = RoundedCornerShape(16.dp),
-        modifier = Modifier.fillMaxWidth().testTag(tag),
+        // The card appears or changes after a check; polite means a screen reader announces it without interrupting.
+        modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite }.testTag(tag),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)

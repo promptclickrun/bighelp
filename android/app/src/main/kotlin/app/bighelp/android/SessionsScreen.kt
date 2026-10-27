@@ -112,16 +112,19 @@ private fun SessionRow(session: DemoSession, agent: DemoAgent, draft: String?, o
                 overflow = TextOverflow.Ellipsis,
             )
             Text(agent.name, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            // A box holding only spaces or new lines is not a draft worth previewing.
+            val draftText = draft?.trim().orEmpty()
+            val hasDraft = draftText.isNotEmpty()
             val preview = when {
-                draft != null -> "Draft: ${draft.trim().replace('\n', ' ')}"
+                hasDraft -> "Draft: ${draftText.replace('\n', ' ')}"
                 session.messages.isEmpty() -> "No messages yet"
                 else -> session.messages.last().text.replace('\n', ' ')
             }
             Text(
                 preview,
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (draft != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = if (draft != null) FontWeight.Medium else FontWeight.Normal,
+                color = if (hasDraft) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = if (hasDraft) FontWeight.Medium else FontWeight.Normal,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

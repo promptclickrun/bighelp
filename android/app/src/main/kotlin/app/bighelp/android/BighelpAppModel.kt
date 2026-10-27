@@ -216,7 +216,10 @@ class BighelpAppModel(
 
     private fun titleFrom(message: String): String {
         val line = message.lineSequence().first().trim()
-        return if (line.length <= MAXIMUM_TITLE) line else line.take(MAXIMUM_TITLE).trimEnd() + "…"
+        if (line.length <= MAXIMUM_TITLE) return line
+        // Step back one unit when the cut would leave half of an emoji (a surrogate pair) behind.
+        val cut = if (line[MAXIMUM_TITLE - 1].isHighSurrogate()) MAXIMUM_TITLE - 1 else MAXIMUM_TITLE
+        return line.take(cut).trimEnd() + "…"
     }
 
     // -- settings -----------------------------------------------------------------------------

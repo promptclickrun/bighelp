@@ -57,7 +57,8 @@ import kotlinx.coroutines.launch
 
 /**
  * A demo chat. The reader owns the scroll position: nothing moves it while they read history, Send always
- * brings the newest message into view, and a Latest button appears whenever they are away from the end.
+ * brings the newest message into view, and a Latest button appears, in its own row above the message box,
+ * whenever they are away from the end.
  * Rows are keyed by message ID, so a row's identity survives every change to the list.
  */
 @Composable
@@ -101,34 +102,40 @@ fun ChatScreen(
         }
     }
     // Keep the end in view when the keyboard opens or closes, but only for a reader who is at the end.
+    // Never while a scroll runs: a drag or fling is the reader's, and a programmatic scroll would fight it.
     LaunchedEffect(listState) {
         snapshotFlow { listState.layoutInfo.viewportSize.height }.collect {
-            if (followTail && lastIndex >= 0) listState.scrollToLatest(lastIndex, animated = false)
+            if (followTail && !listState.isScrollInProgress && lastIndex >= 0) {
+                listState.scrollToLatest(lastIndex, animated = false)
+            }
         }
     }
-    val awayFromLatest by remember { derivedStateOf { listState.canScrollForward } }
+    // The Latest row takes its own height out of the transcript, so it must never be what moves the reader.
+    // It appears only once a finished scroll has left the end (followTail is already false then, so the
+    // viewport follow above skips the shrink) and goes away when the reader is back at the end.
+    val showLatest by remember { derivedStateOf { !followTail && listState.canScrollForward } }
 
     Column(Modifier.fillMaxSize().safeDrawingPadding().testTag("screen.chat")) {
         ChatHeader(session.title, agent, onBack)
-        Box(Modifier.weight(1f).fillMaxWidth()) {
-            LazyColumn(
-                state = listState,
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxSize().testTag("chat.messages"),
-            ) {
-                if (messages.isEmpty()) {
-                    item(key = "empty") { EmptyChatNote(agent) }
-                }
-                items(messages, key = { it.id }) { message -> MessageRow(message) }
+        LazyColumn(
+            state = listState,
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.weight(1f).fillMaxWidth().testTag("chat.messages"),
+        ) {
+            if (messages.isEmpty()) {
+                item(key = "empty") { EmptyChatNote(agent) }
             }
-            if (awayFromLatest) {
+            items(messages, key = { it.id }) { message -> MessageRow(message) }
+        }
+        if (showLatest) {
+            // Its own row between the transcript and the message box, so the button covers no message.
+            Box(Modifier.fillMaxWidth().padding(vertical = 4.dp), contentAlignment = Alignment.Center) {
                 JumpToLatest(
                     onClick = {
                         followTail = true
                         scope.launch { listState.scrollToLatest(lastIndex, animated = ValueAnimator.areAnimatorsEnabled()) }
                     },
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp),
                 )
             }
         }

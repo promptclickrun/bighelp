@@ -264,6 +264,22 @@ class AppModelTest {
         assertEquals(4, model.demo().session(id)!!.messages.map { it.id }.toSet().size)
     }
 
+    @Test fun aLongFirstMessageTitleNeverCutsAnEmojiInHalf() = runTest {
+        val model = model()
+        model.tryDemo()
+        model.startNewChat()
+        val id = (model.state.value.route as Route.Chat).sessionId
+
+        // The 40-character title limit falls between the two halves of the emoji (a surrogate pair).
+        val message = "a".repeat(39) + "😀 and some more words"
+        model.setDraft(id, message)
+        assertTrue(model.send(id))
+
+        val session = model.demo().session(id)!!
+        assertEquals("a".repeat(39) + "…", session.title)
+        assertEquals(message, session.messages[0].text)
+    }
+
     @Test fun aBlankDraftDoesNotSend() = runTest {
         val model = model()
         model.tryDemo()

@@ -4,7 +4,7 @@
 
 **Goal:** Establish a buildable native Android app and a tested portable Hermes foundation.
 
-**Architecture:** A Kotlin/JVM `hermes` module owns the bounded protocol and connection policy. A Compose `app` module owns consent, secure platform persistence and UI. Demo fixtures exercise screens without a host.
+**Architecture:** A Kotlin/JVM `hermes` module owns the bounded protocol and connection policy. A Compose `app` module owns consent, local preferences and UI. Demo fixtures exercise screens without a host.
 
 **Tech Stack:** Kotlin, Gradle, Jetpack Compose, OkHttp, kotlinx.serialization, coroutines, JUnit.
 
@@ -33,32 +33,32 @@
 
 **Interfaces:** `HermesEndpoint.parse(input, allowPrivateHttp)` produces a canonical endpoint with prefix preserving route construction. `HermesWire.decode(bytes)` returns an ordered list of typed frames or a typed rejection, atomically.
 
-- [ ] Add the Gradle wrapper, pinned build dependencies and JVM test harness.
-- [ ] Write failing vector and endpoint tests; capture the failure.
-- [ ] Implement the decoder and endpoint rules from `CONNECTION.md` and Swift source.
-- [ ] Run all vectors and generated limit tests; independently review trust boundaries.
+- [x] Add the Gradle wrapper, pinned build dependencies and JVM test harness.
+- [x] Write failing vector and endpoint tests; capture the failure.
+- [x] Implement the decoder and endpoint rules from `CONNECTION.md` and Swift source.
+- [x] Run all vectors and generated limit tests; independently review trust boundaries.
 
-### Task 2: App shell and explicitly scoped live connection
+### Task 2: App shell and public host discovery
 
 **Files:** `android/app/`, `android/README.md`.
 
-**Interfaces:** App state owns consent and connection generation; screens observe state and invoke explicit actions. Demo and live repositories implement the same UI model without invented host success.
+**Interfaces:** App state owns consent and discovery generation; screens observe state and invoke explicit actions. `HostChecker` separates discovery from the state model. Demo chat has no live repository or invented host success.
 
-- [ ] Add Compose app, manifest and local consent preferences with backup exclusions; introduce Keystore storage with authenticated sign-in in the next milestone.
-- [ ] Add consent, connection setup, demo sessions/chat, agents and one Settings surface.
-- [ ] Add consent-gated public host discovery through `HostDiscovery.check(endpoint, consentGranted): DiscoveryResult`; do not label discovery as a connection or collect credentials.
-- [ ] Test consent, failed setup, draft preservation and demo control behavior.
+- [x] Add Compose app, manifest and local consent preferences with backup exclusions; introduce Keystore storage with authenticated sign-in in the next milestone.
+- [x] Add consent, connection setup, demo sessions/chat, agents and one Settings surface.
+- [x] Add consent-gated public host discovery through `HostDiscovery.check(endpoint, consentGranted): DiscoveryResult`; do not label discovery as a connection or collect credentials.
+- [x] Test consent, failed setup, draft preservation and demo control behavior.
 
 ### Task 3: Verify, review and record evidence
 
 **Files:** `android/README.md`, Android CI workflow, issue/PR.
 
-- [ ] Run JVM tests, Android unit checks, lint and debug assemble.
-- [ ] Inspect demo screens and use controls in light and dark on a dedicated emulator, when available.
+- [x] Run JVM tests, Android unit checks, lint and debug assemble.
+- [x] Inspect demo screens and use controls in light and dark on a dedicated emulator, when available.
 - [ ] Review the full diff, fix concrete findings and repeat affected verification.
-- [ ] Document remaining acceptance gaps, commit changes and open a draft PR linked to its issue.
+- [ ] Document remaining acceptance gaps, commit changes and open a pull request linked to its issue.
 
 ### Parallel account preparation
 
-- [ ] Use Terra/max for browser work to prepare personal Play Console registration.
-- [ ] Leave identity, verification and any required direct checkout with the maintainer; report the exact remaining steps.
+- [x] Use Terra/max for browser work to prepare personal Play Console registration.
+- [x] Leave identity, verification and any required direct checkout with the maintainer; report the exact remaining steps.

@@ -73,7 +73,7 @@ fun SettingsScreen(
                 SectionLabel("Your data and AI")
                 Text(
                     if (consentGranted) "You agreed to share chat data with your computer and its AI providers."
-                    else "Not asked yet. bighelp asks before it connects to a computer.",
+                    else "Not agreed yet. bighelp asks before it connects to a computer.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp).testTag("settings.consent-status"),

@@ -312,6 +312,7 @@ final class NativeWorkspaceRuntime {
             pluginFeatures: { [weak connections] in connections?.workspace?.nativeContext?.features ?? [] }
         )
         bridge.agentTalk = DirectHermesAgentTalkReader(currentWorkspace: { [weak connections] in connections?.workspace })
+        let replyVoices = ReplyVoiceCache()
         let features = ShellFeatureStore(
             timing: .immediate, catalog: sessions, agents: agents, agentRuntimeDefaults: defaults,
             allowsNewChatAgentDefaults: false,
@@ -348,8 +349,11 @@ final class NativeWorkspaceRuntime {
                           let coordinate = bridge?.currentCoordinate(for: record.id), coordinate.owner == owner else {
                         return nil
                     }
-                    let output = DirectHermesVoiceSpeechOutput(workspace: workspace, owner: owner,
-                        profileID: coordinate.profileID, currentOwner: { [weak connections] in connections?.owner })
+                    let profile = coordinate.profileID
+                    let output = OnDeviceRoutedSpeechOutput(
+                        host: DirectHermesVoiceSpeechOutput(workspace: workspace, owner: owner, profileID: profile,
+                            currentOwner: { [weak connections] in connections?.owner }),
+                        choice: { OnDeviceVoiceChoices.shared.choice(computer: scope, agentID: profile) })
                     let transcriber = connections.hosts.selectedWorkspace?.nativeClient?.makeVoiceTranscriber(
                         profileID: coordinate.profileID, owner: owner,
                         currentOwner: { [weak connections] in connections?.owner })
@@ -357,6 +361,24 @@ final class NativeWorkspaceRuntime {
                                                           speechRate: { settings.voiceSpeed.hermesTTSSpeed },
                                                           transcriber: transcriber)
                 })
+            },
+            voiceHoldMusicEnabled: { settings.voiceHoldMusicEnabled },
+            // Auto TTS: the chat's agent reads its replies aloud, at media volume.
+            replySpeech: { [weak connections, weak bridge] record in
+                guard let connections, let owner = connections.owner, owner.authority == authority,
+                      let workspace = connections.workspace,
+                      let coordinate = bridge?.currentCoordinate(for: record.id), coordinate.owner == owner else {
+                    return nil
+                }
+                let profile = coordinate.profileID
+                return replyVoices.output(chat: record.id, owner: owner, profile: profile) {
+                    OnDeviceRoutedSpeechOutput(
+                        host: DirectHermesVoiceSpeechOutput(workspace: workspace, owner: owner, profileID: profile,
+                            playback: AVAudioPlayerVoicePlayback(use: .playback),
+                            currentOwner: { [weak connections] in connections?.owner }),
+                        use: .playback,
+                        choice: { OnDeviceVoiceChoices.shared.choice(computer: scope, agentID: profile) })
+                }
             },
             sessionControlMessaging: sessionControls,
             slashCommandCatalogClient: WorkspaceSlashCommandCatalogProxy(box: slashCommandsBox),
@@ -943,5 +965,22 @@ enum NativeWorkspaceSessionRecovery {
             try requireCurrent()
         }
         return failed
+    }
+}
+
+/// Auto TTS keeps one voice per chat while its connection lasts, so the computer warms a voice
+/// once, not before every reply. A new connection or agent gets a new one.
+@MainActor
+private final class ReplyVoiceCache {
+    private var voices: [String: (owner: WorkspaceOwner, profile: String, output: any VoiceSpeechOutput)] = [:]
+
+    func output(chat: String, owner: WorkspaceOwner, profile: String,
+                make: () -> any VoiceSpeechOutput) -> any VoiceSpeechOutput {
+        if let kept = voices[chat], kept.owner == owner, kept.profile == profile { return kept.output }
+        // Voices from an earlier connection can't speak any more.
+        voices = voices.filter { $0.value.owner == owner }
+        let output = make()
+        voices[chat] = (owner, profile, output)
+        return output
     }
 }

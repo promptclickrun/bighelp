@@ -65,12 +65,18 @@ final class VoiceSettingsStore {
     private(set) var confirmation: String?
     @ObservationIgnored private let client: any VoiceSettingsClient
     @ObservationIgnored private let isCurrent: @MainActor () -> Bool
+    /// Whether an on-device provider can speak yet (its model downloaded).
+    @ObservationIgnored private let isOnDeviceReady: @MainActor (String) -> Bool
 
     init(agentID: String, client: any VoiceSettingsClient,
-         isCurrent: @escaping @MainActor () -> Bool = { true }) {
+         isCurrent: @escaping @MainActor () -> Bool = { true },
+         isOnDeviceReady: @escaping @MainActor (String) -> Bool = { providerID in
+             OnDeviceVoiceModel.model(providerID: providerID).map(OnDeviceVoiceInstaller.shared.isInstalled) ?? false
+         }) {
         self.agentID = agentID
         self.client = client
         self.isCurrent = isCurrent
+        self.isOnDeviceReady = isOnDeviceReady
     }
 
     @ObservationIgnored private var generation = 0
@@ -86,7 +92,8 @@ final class VoiceSettingsStore {
               Self.validText(normalizedModel, 160),
               normalizedServerURL.isEmpty || Self.validServerURL(normalizedServerURL),
               Self.validText(normalizedKey, 4096),
-              !selectedProvider.needsAPIKey || selectedProvider.apiKeyConfigured || !normalizedKey.isEmpty
+              !selectedProvider.needsAPIKey || selectedProvider.apiKeyConfigured || !normalizedKey.isEmpty,
+              selectedProvider.kind != .onThisDevice || isOnDeviceReady(selectedProvider.id)
         else { return false }
         return providerID != configuration.providerID || changedVoice || changedModel != nil
             || changedServerURL != nil || !normalizedKey.isEmpty
@@ -261,6 +268,8 @@ final class VoiceSettingsStore {
         default: break
         }
         switch selectedProvider?.kind {
+        case .onThisDevice:
+            return "Couldn't play a sample with \(title). Try again."
         case .onYourComputer:
             return "Couldn't play a sample. Make sure \(title) is installed on your computer: run hermes setup tts there."
         case .cloud:

@@ -105,6 +105,17 @@ final class SettingsStore {
         didSet { defaults.set(voiceTranscription.rawValue, forKey: Keys.voiceTranscription) }
     }
 
+    /// TTS voice mode: music while the agent works on a reply.
+    var voiceHoldMusicEnabled: Bool {
+        didSet { defaults.set(voiceHoldMusicEnabled, forKey: Keys.voiceHoldMusic) }
+    }
+
+    /// Auto TTS: every reply in a chat is read aloud in the agent's voice as it lands.
+    /// Settings › Voice and the chat's + menu show the same switch.
+    var autoSpeakRepliesEnabled: Bool {
+        didSet { defaults.set(autoSpeakRepliesEnabled, forKey: Keys.autoSpeakReplies) }
+    }
+
     /// Vision Pro: a quick pinch on the agent in the room talks or types.
     var spatialAvatarPinchAction: SpatialAvatarPinchAction {
         didSet { defaults.set(spatialAvatarPinchAction.rawValue, forKey: Keys.spatialAvatarPinchAction) }
@@ -406,6 +417,8 @@ final class SettingsStore {
         voiceTranscription = VoiceTranscriptionSource(
             rawValue: defaults.string(forKey: Keys.voiceTranscription) ?? ""
         ) ?? .onDevice
+        voiceHoldMusicEnabled = defaults.bool(forKey: Keys.voiceHoldMusic, default: true)
+        autoSpeakRepliesEnabled = defaults.bool(forKey: Keys.autoSpeakReplies, default: false)
         spatialAvatarPinchAction = SpatialAvatarPinchAction(
             rawValue: defaults.string(forKey: Keys.spatialAvatarPinchAction) ?? ""
         ) ?? .talk
@@ -788,6 +801,8 @@ private extension SettingsStore {
         static let voiceMode = "loopdy.voice.mode"
         static let voiceConversationMode = "loopdy.voice.conversation-mode"
         static let voiceTranscription = "bighelp.voice.transcription"
+        static let voiceHoldMusic = "bighelp.voice.hold-music"
+        static let autoSpeakReplies = "bighelp.voice.auto-tts"
         static let spatialAvatarPinchAction = "bighelp.spatial-avatar.pinch-action"
         static let liveVoiceProvider = "loopdy.voice.live.provider"
         static let codexLiveVoice = "loopdy.voice.live.codex-voice"

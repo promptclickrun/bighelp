@@ -274,6 +274,17 @@ bundled artwork. Successful catalog withdrawal removes the remote override on
 the next refresh, but cannot remotely erase copies on offline devices. Daily
 refreshes and failure backoff limit traffic without background polling.
 
+### On-device voices
+
+An agent can speak with Phonon on the iPhone or iPad instead of its computer's
+speech provider (Settings › Voice). The model downloads only when someone picks
+it, from a fixed GitHub Releases address, and is checked against a SHA-256 pinned
+in the app and against each file's SHA-256 in the model's own list before it's
+used. The request carries no account, conversation or agent data; GitHub still
+receives ordinary connection metadata. The model lives in Application Support,
+excluded from backups, until it's removed in Settings. Replies spoken with it
+never leave the device for speech, and which agents use it stays on the device.
+
 ### Important limitation
 
 End-to-end encryption protects content while it passes through bighelp's cloud

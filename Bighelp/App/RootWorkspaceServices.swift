@@ -211,14 +211,21 @@ extension RootShellView {
     var voiceSettingsClient: (any VoiceSettingsClient)? {
         if let owner = currentWorkspaceOwner, owner.authority.kind == .direct,
            let workspace = workspaceConnections?.workspace {
-            return DirectHermesVoiceSettingsClient(workspace: workspace, owner: owner, currentOwner: { currentWorkspaceOwner })
+            return Self.withOnDeviceVoices(
+                DirectHermesVoiceSettingsClient(workspace: workspace, owner: owner, currentOwner: { currentWorkspaceOwner }),
+                computer: owner.authority.cacheScopeID)
         }
         #if DEBUG
         if usesDemoFixtures, ProcessInfo.processInfo.arguments.contains("-voice-settings-fixture") {
-            return voiceSettingsPreview
+            return Self.withOnDeviceVoices(voiceSettingsPreview, computer: "fixture-voice-settings")
         }
         #endif
         return nil
+    }
+
+    /// This iPhone's or iPad's own voices, where it can run them.
+    private static func withOnDeviceVoices(_ client: any VoiceSettingsClient, computer: String) -> any VoiceSettingsClient {
+        OnDeviceSpeechEngine.isSupported ? OnDeviceVoiceSettingsClient(host: client, computer: computer) : client
     }
 
     var pluginUpdateScope: String? {

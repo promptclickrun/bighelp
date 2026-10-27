@@ -1,7 +1,13 @@
 package app.bighelp.android
 
 import app.bighelp.hermes.HermesEndpoint
+import java.io.IOException
+import java.net.InetAddress
+import java.net.ServerSocket
+import java.net.Socket
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.concurrent.thread
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -41,6 +47,7 @@ class HostDiscoveryTest {
         assertEquals("/hermes/api/status", request.path)
         assertEquals("application/json", request.getHeader("Accept"))
         assertEquals("no-store", request.getHeader("Cache-Control"))
+        assertEquals("close", request.getHeader("Connection"))
         assertNull(request.getHeader("Authorization"))
         assertNull(request.getHeader("Cookie"))
         assertNull(request.getHeader("X-Hermes-Session-Token"))
@@ -116,6 +123,75 @@ class HostDiscoveryTest {
         check.cancel()
         withTimeout(5_000) { cancelled.await() }
         check.join()
+    }
+
+    // A host may close a socket after replying: HTTP/1.0, a keep-alive timeout, a proxy. OkHttp's idle pool
+    // cannot see that until it reads, and a GET only gets that limited check, so a later check could pick the
+    // dead socket and fail with no request ever reaching the host. Each check must therefore find a host that
+    // keeps answering, and the host must receive one request per check.
+
+    @Test fun repeatedChecksOfAHostThatClosesAfterEveryReplyAllFindIt() = runBlocking {
+        ClosingServer().use { server ->
+            val discovery = HostDiscovery()
+            val results = List(4) { discovery.check(server.endpoint(), true) }
+            assertEquals(List(4) { DiscoveryResult.Available(false, false) }, results)
+            assertEquals(4, server.requests.get())
+        }
+    }
+
+    @Test fun repeatedChecksOfAKeepAliveHostThatThenClosesAllFindIt() = runTest {
+        repeat(4) { host.enqueue(json("""{"auth_required":false}""").setSocketPolicy(SocketPolicy.DISCONNECT_AT_END)) }
+        val discovery = HostDiscovery()
+        val results = List(4) { discovery.check(endpoint(), true) }
+        assertEquals(List(4) { DiscoveryResult.Available(false, false) }, results)
+        assertEquals(4, host.requestCount)
+    }
+
+    @Test fun eachCheckOpensItsOwnConnectionEvenWhenTheHostKeepsOneOpen() = runTest {
+        repeat(3) { host.enqueue(json("""{"auth_required":false}""")) }
+        val discovery = HostDiscovery()
+        repeat(3) { assertEquals(DiscoveryResult.Available(false, false), discovery.check(endpoint(), true)) }
+        // sequenceNumber counts requests on one connection; 0 each time means no idle socket was reused.
+        assertEquals(listOf(0, 0, 0), List(3) { host.takeRequest().sequenceNumber })
+    }
+
+    /** Answers like Python's BaseHTTPRequestHandler: HTTP/1.0, Content-Length, then closes the socket. */
+    private class ClosingServer : AutoCloseable {
+        private val listener = ServerSocket(0, 50, InetAddress.getLoopbackAddress())
+        val requests = AtomicInteger()
+
+        fun endpoint() = HermesEndpoint.parse("http://127.0.0.1:${listener.localPort}/hermes", allowPrivateHttp = true)
+
+        init {
+            thread(isDaemon = true) {
+                try {
+                    while (true) {
+                        val socket = listener.accept()
+                        thread(isDaemon = true) { serve(socket) }
+                    }
+                } catch (_: IOException) {
+                }
+            }
+        }
+
+        private fun serve(socket: Socket) = socket.use {
+            val input = socket.getInputStream()
+            var tail = 0
+            while (tail != 0x0d0a0d0a) {
+                val next = input.read()
+                if (next < 0) return@use
+                tail = (tail shl 8) or next
+            }
+            requests.incrementAndGet()
+            val body = """{"auth_required":false}""".toByteArray()
+            socket.getOutputStream().apply {
+                write("HTTP/1.0 200 OK\r\nContent-Type: application/json\r\nContent-Length: ${body.size}\r\n\r\n".toByteArray())
+                write(body)
+                flush()
+            }
+        }
+
+        override fun close() = listener.close()
     }
 
     private fun statusPaddedTo(bytes: Int): String {

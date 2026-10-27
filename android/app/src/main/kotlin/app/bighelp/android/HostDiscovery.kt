@@ -37,7 +37,9 @@ fun interface HostChecker {
  * the first milestone, and it takes no credential of any kind.
  *
  * The request carries no cookies, tokens or custom headers and follows no redirects (not even to the same
- * origin), so a proxy or sign-in page can never turn into a "found" host. The decoded body is capped at
+ * origin), so a proxy or sign-in page can never turn into a "found" host. It asks the host to close the
+ * connection afterwards (`Connection: close`), so each check opens its own socket and none is reused; the
+ * client's no-retry policy stays as it is and is never loosened for other requests. The decoded body is capped at
  * [HostStatus.MAXIMUM_BYTES] and is never kept or logged, whatever it holds. Certificates are checked by
  * the platform; HTTPS is the default and plain HTTP exists only on an endpoint that already passed the
  * private-network opt-in in [HermesEndpoint.parse].
@@ -50,6 +52,10 @@ class HostDiscovery(private val client: OkHttpClient = defaultClient) : HostChec
                 .url(endpoint.httpUrl("/api/status").toString())
                 .header("Accept", "application/json")
                 .header("Cache-Control", "no-store")
+                // A check never rides an idle pooled socket. A host (or a proxy, or an HTTP/1.0 server) may
+                // have closed it, and for a GET OkHttp only learns that by failing to read the reply, which
+                // retryOnConnectionFailure(false) turns into "unavailable" with nothing reaching the host.
+                .header("Connection", "close")
                 .build()
         } catch (_: IllegalArgumentException) {
             return DiscoveryResult.Unavailable

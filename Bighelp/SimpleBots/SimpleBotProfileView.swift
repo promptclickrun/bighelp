@@ -322,33 +322,44 @@ struct SimpleBotProfileView: View {
     @ViewBuilder
     private var tabBar: some View {
         if availableTabs.count > 1 {
-            // Scrolls sideways only when large text makes the tabs wider than the screen.
-            ScrollView(.horizontal) {
-                HStack(spacing: BighelpTokens.space24) {
-                    ForEach(availableTabs) { item in
-                        Button { tab = item } label: {
-                            VStack(spacing: BighelpTokens.space8) {
-                                Text(item.title)
-                                    .font(.bighelp(.body))
-                                    .foregroundStyle(shownTab == item ? theme.primaryText : theme.tertiaryText)
-                                Rectangle()
-                                    .fill(shownTab == item ? theme.primaryText : .clear)
-                                    .frame(height: 2)
-                            }
-                            .fixedSize()
-                            .frame(minHeight: BighelpTokens.hitTarget)
-                            .contentShape(.rect)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityAddTraits(shownTab == item ? .isSelected : [])
-                        .accessibilityIdentifier("simple-bots.profile.tab.\(item.rawValue)")
-                    }
-                }
+            // All the tabs on one line, closer together where they must be: with Dashboard there
+            // are five, which didn't fit an iPhone 17 Pro and were cut at the margin. Only larger
+            // text scrolls them, out to the screen's edges so a tab slides off rather than being cut.
+            ViewThatFits(in: .horizontal) {
+                tabRow(spacing: BighelpTokens.space24)
+                tabRow(spacing: BighelpTokens.space16)
+                ScrollView(.horizontal) { tabRow(spacing: BighelpTokens.space16) }
+                    .scrollIndicators(.hidden)
+                    .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+                    .contentMargins(.horizontal, BighelpTokens.space20, for: .scrollContent)
+                    .padding(.horizontal, -BighelpTokens.space20)
             }
-            .scrollIndicators(.hidden)
-            .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .overlay(alignment: .bottom) {
                 Rectangle().fill(theme.separator).frame(height: BighelpTokens.hairline)
+            }
+        }
+    }
+
+    private func tabRow(spacing: CGFloat) -> some View {
+        HStack(spacing: spacing) {
+            ForEach(availableTabs) { item in
+                Button { tab = item } label: {
+                    VStack(spacing: BighelpTokens.space8) {
+                        Text(item.title)
+                            .font(.bighelp(.body))
+                            .foregroundStyle(shownTab == item ? theme.primaryText : theme.tertiaryText)
+                        Rectangle()
+                            .fill(shownTab == item ? theme.primaryText : .clear)
+                            .frame(height: 2)
+                    }
+                    .fixedSize()
+                    .frame(minHeight: BighelpTokens.hitTarget)
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(shownTab == item ? .isSelected : [])
+                .accessibilityIdentifier("simple-bots.profile.tab.\(item.rawValue)")
             }
         }
     }

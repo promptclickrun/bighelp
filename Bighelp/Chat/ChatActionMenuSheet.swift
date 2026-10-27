@@ -16,6 +16,8 @@ struct ChatActionMenuSheet: View {
     let onSelectSlashCommand: (SlashCommandDescriptor) -> Void
     var allowsImages = true
     var allowsFiles = true
+    /// Auto TTS: the same switch as Settings › Voice › Use TTS on every response.
+    var autoSpeakReplies: Binding<Bool>? = nil
     var onNativeSessionControls: (() -> Void)? = nil
 
     @State private var page: ChatActionMenuPage = .main
@@ -190,6 +192,15 @@ struct ChatActionMenuSheet: View {
                     : [ChatActionMenuAction.chooseAgent, .changeModel, .startSession]
                 ) { action in
                     nativeActionRow(action)
+                }
+                if let autoSpeakReplies {
+                    Toggle(isOn: autoSpeakReplies) {
+                        actionLabel(title: String(localized: "Auto TTS"),
+                                    detail: String(localized: "Read every reply aloud"),
+                                    symbol: "speaker.wave.2")
+                    }
+                    .tint(theme.action)
+                    .accessibilityIdentifier("chat.action.auto-tts")
                 }
             }
             .listRowBackground(theme.surface)

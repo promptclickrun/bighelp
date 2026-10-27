@@ -37,8 +37,9 @@ struct VoiceSettingsView: View {
     @State private var agentID: String
     @State private var store: VoiceSettingsStore?
     @State private var confirmAPIBilling = false
-    /// Choosing a provider pushes a page; that isn't leaving Voice settings.
+    /// Choosing a provider or an on-device voice pushes a page; that isn't leaving Voice settings.
     @State private var isChoosingProvider = false
+    @State private var isChoosingOnDeviceVoice = false
     @State private var loadedTaskID: String?
     @FocusState private var focusedField: VoiceSettingsField?
     @Environment(\.scenePhase) private var scenePhase
@@ -61,12 +62,18 @@ struct VoiceSettingsView: View {
         (scope ?? "disconnected") + ":" + agentID
     }
 
+    /// TTS voice mode and Auto TTS speak with each agent's speech provider; GPT Live 1 speaks
+    /// for itself.
+    private var showsSpeechProvider: Bool {
+        settings.voiceConversationMode == .turnBased || settings.autoSpeakRepliesEnabled
+    }
+
     var body: some View {
         Form {
             VoicePreferenceSections(settings: settings, confirmAPIBilling: $confirmAPIBilling)
 
-            if settings.voiceConversationMode == .codexLive {
-                // GPT Live 1 speaks for itself; the speech provider is TTS-only.
+            if !showsSpeechProvider {
+                // GPT Live 1 speaks for itself.
             } else if client != nil, scope != nil, !agents.isEmpty {
                 Section {
                     Picker("Agent", selection: $agentID) {
@@ -76,12 +83,13 @@ struct VoiceSettingsView: View {
                 } header: {
                     Text("Agent")
                 } footer: {
-                    Text("Each agent has its own speech provider and voice, saved on your computer.")
+                    Text("Each agent has its own speech provider and voice, saved on your computer. A voice that runs on this \(OnDeviceVoiceModel.deviceName) is saved here.")
                 }
                 if agents.contains(where: { $0.id == agentID }) {
                     if let store, store.agentID == agentID {
                         VoiceSettingsEditor(store: store, focusedField: $focusedField,
-                                            isChoosingProvider: $isChoosingProvider)
+                                            isChoosingProvider: $isChoosingProvider,
+                                            isChoosingOnDeviceVoice: $isChoosingOnDeviceVoice)
                     }
                 }
             } else {
@@ -110,29 +118,10 @@ struct VoiceSettingsView: View {
             if !ids.contains(agentID) { agentID = agents.first(where: \.isDefault)?.id ?? ids.first ?? "" }
         }
         .toolbar {
-            if settings.voiceConversationMode == .turnBased {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    focusedField = nil
-                    Task { await store?.save() }
-                } label: {
-                    if store?.isSaving == true {
-                        ProgressView()
-                    } else if store?.confirmation != nil, store?.canSave != true {
-                        // Visible wherever the page is scrolled.
-                        HStack(spacing: 4) {
-                            Image(systemName: "checkmark")
-                            Text("Saved")
-                        }
-                        .accessibilityElement(children: .ignore)
-                        .accessibilityLabel("Saved")
-                    } else {
-                        Text("Save")
-                    }
+            if showsSpeechProvider {
+                ToolbarItem(placement: .topBarTrailing) {
+                    VoiceSettingsSaveButton(store: store) { focusedField = nil }
                 }
-                .disabled(store?.canSave != true)
-                .accessibilityIdentifier("voice.settings.save")
-            }
             }
         }
         .navigationDestination(isPresented: $isChoosingProvider) {
@@ -140,6 +129,11 @@ struct VoiceSettingsView: View {
                 VoiceProviderList(providers: configuration.providers, selection: store.providerID) {
                     store.selectProvider($0)
                 }
+            }
+        }
+        .navigationDestination(isPresented: $isChoosingOnDeviceVoice) {
+            if let store, let model = OnDeviceVoiceModel.model(providerID: store.providerID) {
+                OnDeviceVoicePicker(store: store, model: model)
             }
         }
         .task(id: loadTaskID) {
@@ -153,7 +147,7 @@ struct VoiceSettingsView: View {
             store = current
             await current.load()
         }
-        .onDisappear { if !isChoosingProvider { store?.invalidate() } }
+        .onDisappear { if !isChoosingProvider, !isChoosingOnDeviceVoice { store?.invalidate() } }
         .onChange(of: scenePhase) { _, phase in
             if phase != .active { store?.clearAPIKey() }
         }
@@ -200,6 +194,15 @@ private struct VoicePreferenceSections: View {
             Text("Used when you \(BighelpPlatform.isMac ? "click" : "tap") the microphone in a chat.")
         }
 
+        Section {
+            Toggle("Use TTS on every response", isOn: $settings.autoSpeakRepliesEnabled)
+                .accessibilityIdentifier("voice.settings.auto-tts")
+        } header: {
+            Text("In chats")
+        } footer: {
+            Text("Reads each reply aloud in the agent's voice as it arrives. Sending a message or leaving the chat stops it. Also in a chat's + menu as Auto TTS.")
+        }
+
         if settings.voiceConversationMode == .codexLive {
             Section {
                 Picker("Sign in with", selection: provider) {
@@ -240,10 +243,15 @@ private struct VoicePreferenceSections: View {
                         Text(option.title).tag(option)
                     }
                 }
+                Toggle("Hold music", isOn: $settings.voiceHoldMusicEnabled)
+                    .accessibilityIdentifier("voice.settings.hold-music")
             } header: {
                 Text("Listening")
             } footer: {
-                Text(settings.voiceMode.detail + " " + settings.voiceTranscription.detail)
+                Text(settings.voiceMode.detail + " " + settings.voiceTranscription.detail + " "
+                     + (settings.voiceHoldMusicEnabled
+                        ? String(localized: "Hold music plays while your agent works on a reply.")
+                        : String(localized: "The wait for a reply is silent.")))
             }
         }
     }
@@ -254,6 +262,7 @@ private struct VoiceSettingsEditor: View {
     @Bindable var store: VoiceSettingsStore
     @FocusState.Binding var focusedField: VoiceSettingsField?
     @Binding var isChoosingProvider: Bool
+    @Binding var isChoosingOnDeviceVoice: Bool
 
     var body: some View {
         Group {
@@ -309,7 +318,12 @@ private struct VoiceSettingsEditor: View {
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("voice.settings.provider-summary")
             }
-            if selected?.hasVoice == true {
+            if let selected, let model = OnDeviceVoiceModel.model(providerID: selected.id) {
+                OnDeviceVoiceRows(store: store, model: model) {
+                    focusedField = nil
+                    isChoosingOnDeviceVoice = true
+                }
+            } else if selected?.hasVoice == true {
                 field("Voice", placeholder: "Voice name or ID", text: $store.voiceID, focus: .voice,
                       identifier: "voice.settings.voice-id")
             }
@@ -385,6 +399,8 @@ private struct VoiceSettingsEditor: View {
 
     private func summary(for provider: VoiceProviderConfiguration) -> String {
         switch provider.kind {
+        case .onThisDevice:
+            "Runs on this \(OnDeviceVoiceModel.deviceName), even offline. No account or key."
         case .onYourComputer:
             provider.hasVoice ? "Runs on your computer. Your agent's words never leave it."
                 : "Runs on your computer. Its voice is set up there."
@@ -397,6 +413,8 @@ private struct VoiceSettingsEditor: View {
 
     private func footer(for provider: VoiceProviderConfiguration?) -> String {
         switch provider?.kind {
+        case .onThisDevice:
+            "Saved on this \(OnDeviceVoiceModel.deviceName) for this agent. Your computer keeps its own voice for its other apps."
         case .onYourComputer:
             "Install it once by running hermes setup tts on your computer, then play a sample here."
         case .cloud where provider?.supportsServerURL == true:
@@ -471,6 +489,7 @@ private struct VoiceProviderList: View {
 
     private func detail(_ provider: VoiceProviderConfiguration) -> String {
         switch provider.kind {
+        case .onThisDevice: "No account or key, works offline"
         case .onYourComputer, .free: "No account or key"
         case .custom: "A speech command on your computer"
         case .cloud:
@@ -481,6 +500,7 @@ private struct VoiceProviderList: View {
 
     private func footer(_ kind: VoiceProviderSpec.Kind) -> String {
         switch kind {
+        case .onThisDevice: "Speaks on this \(OnDeviceVoiceModel.deviceName), with no voice service. The voice downloads once."
         case .onYourComputer: "Your agent's words never leave your computer. Install one once by running hermes setup tts there."
         case .custom: "Set up in your agent's config.yaml under tts.providers."
         case .free: "Microsoft's free online voices."

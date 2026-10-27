@@ -465,6 +465,7 @@ struct BighelpAppComposition {
             voiceInputLevelSource: usesFixtures
                 ? Self.demoVoiceInputLevelSource(arguments: arguments)
                 : { AVAudioEngineVoiceInputLevelSource() },
+            voiceHoldMusicEnabled: { settings.voiceHoldMusicEnabled },
             sessionControlMessaging: usesFixtures
                 ? DemoSessionControlMessaging(reasoning: arguments.contains("-test-session-reasoning-high")
                     ? ["demo-finance": "high"]

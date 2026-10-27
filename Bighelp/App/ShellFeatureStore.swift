@@ -53,6 +53,10 @@ final class ShellFeatureStore {
     private let voiceClientFactory: ((SessionRecord, AgentProfile?) -> any VoiceSessionClient)?
     private let voiceInputLevelSource: () -> any VoiceInputLevelSource
     private let voiceHoldMusic: @MainActor () -> (any VoiceHoldMusicPlaying)?
+    /// Settings › Voice › Hold music, read as each voice chat opens.
+    private let voiceHoldMusicEnabled: @MainActor () -> Bool
+    /// Auto TTS: the voice a chat's replies are read in, found when a reply lands.
+    private let replySpeechFactory: (@MainActor (SessionRecord) -> (any VoiceSpeechOutput)?)?
     private let approvalRequestLoader: (any ApprovalRequestLoading)?
     private let approvalClient: (any ApprovalClient)?
     private let approvalPublisher: @MainActor (LoadedApprovalRequest) -> Void
@@ -288,6 +292,8 @@ final class ShellFeatureStore {
             ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil
                 ? AVAudioPlayerHoldMusic() : nil
         },
+        voiceHoldMusicEnabled: @escaping @MainActor () -> Bool = { true },
+        replySpeech: (@MainActor (SessionRecord) -> (any VoiceSpeechOutput)?)? = nil,
         sessionControlMessaging: (any BighelpLinkSessionControlMessaging)? = nil,
         slashCommandCatalogClient: (any SlashCommandCatalogClient)? = nil,
         generatedMediaResolver: (any GeneratedMediaResolving)? = nil,
@@ -313,6 +319,8 @@ final class ShellFeatureStore {
         voiceClientFactory = voiceClient
         self.voiceInputLevelSource = voiceInputLevelSource
         self.voiceHoldMusic = voiceHoldMusic
+        self.voiceHoldMusicEnabled = voiceHoldMusicEnabled
+        replySpeechFactory = replySpeech
         self.sessionControlMessaging = sessionControlMessaging
         self.slashCommandCatalogClient = slashCommandCatalogClient
         self.generatedMediaResolver = generatedMediaResolver
@@ -1561,6 +1569,13 @@ final class ShellFeatureStore {
         return model
     }
 
+    /// Auto TTS: what reads this chat's next reply aloud, in its agent's voice. Nil while the
+    /// chat isn't on a computer's connection (demo chats have no voice).
+    func makeReplySpeech(for conversationID: String) -> (any VoiceSpeechOutput)? {
+        guard let session = catalog.session(id: conversationID) else { return nil }
+        return replySpeechFactory?(session)
+    }
+
     func makeVoicePresentation(
         for conversationID: String,
         mode: VoiceMode = .pressToTalk,
@@ -1639,8 +1654,8 @@ final class ShellFeatureStore {
                 },
                 // GPT Live answers on its own call and hands requests to Hermes; music over it
                 // would talk over the voice. Turn-based voice (also after "Use TTS voice mode",
-                // which makes a new presentation) keeps its music.
-                holdMusic: conversationMode == .codexLive ? nil : voiceHoldMusic()
+                // which makes a new presentation) keeps its music unless it's turned off.
+                holdMusic: conversationMode == .codexLive || !voiceHoldMusicEnabled() ? nil : voiceHoldMusic()
             ),
             conversationMode: conversationMode,
             liveModel: liveModel

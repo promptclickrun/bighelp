@@ -16,6 +16,9 @@ packages:
     path: Vendor/BuzzKit
   ThinkingOrbsKit:
     path: Packages/ThinkingOrbsKit
+  # On-device voices (Phonon). Its compiled core has no visionOS or Intel slices.
+  PhononTTS:
+    path: Packages/PhononTTS
   WebRTC:
     url: https://github.com/stasel/WebRTC.git
     exactVersion: 153.0.0
@@ -63,6 +66,9 @@ targets:
           destination: plugins
         destinationFilters: [macCatalyst]
       - package: ThinkingOrbsKit
+      # iPhone and iPad only: the Mac app ships for Intel too, and visionOS has no build.
+      - package: PhononTTS
+        destinationFilters: [iOS]
       - package: WebRTC
         destinationFilters: [iOS, macCatalyst]
       - package: LiveKitWebRTC
@@ -82,6 +88,8 @@ targets:
         XROS_DEPLOYMENT_TARGET: "26.0"
         # The Vision Pro simulator runs only on Apple silicon; LiveKit ships no Intel slice.
         EXCLUDED_ARCHS[sdk=xrsimulator*]: x86_64
+        # Phonon's core has no Intel simulator slice either (Release simulator builds).
+        EXCLUDED_ARCHS[sdk=iphonesimulator*]: x86_64
         # Vision Pro needs its own layered icon (same art: cream back, orb front).
         ASSETCATALOG_COMPILER_APPICON_NAME[sdk=xros*]: AppIconVision
         ASSETCATALOG_COMPILER_APPICON_NAME[sdk=xrsimulator*]: AppIconVision

@@ -108,7 +108,7 @@ change in both repos.
 | `Bighelp/Connectors/` | Settings › Apps (`AppsHubView`): Hermes' connectors as Native App Connections (the inline connect cards in chat, `connection.request`, `ConnectorCardStore`; `ConnectorAppsModel`) and Composio Apps (`Composio/`, [docs/COMPOSIO_APPS.md](docs/COMPOSIO_APPS.md)) |
 | `Bighelp/BotScreen/` | Bot Screen: an agent's Linux screen (Hermes `display.*`) in its profile's Screen tab, a native RFB client (`RFB/`) and the full-screen viewer with take control and hand back |
 | `Bighelp/Usage/` | The Usage page (☰ › Usage): plans and limits (`ProviderUsageStore`), Hermes' own analytics per agent and computer (`UsageStore`, `HostUsageLoader`), charts |
-| `Bighelp/Voice/` | Turn-based and live voice |
+| `Bighelp/Voice/` | Turn-based and live voice; on-device voices (`OnDevice/`, Phonon in `Packages/PhononTTS`) |
 | `Bighelp/Spatial/` | Vision Pro: the agent in the room (`SpatialAvatarModel`, its volume and voice panel, its Settings section) |
 | `BighelpWatch/`, `BighelpWatchShared/`, `Bighelp/Watch/` | The Watch app, the Watch–iPhone wire (`WatchWire`), and the iPhone's `WatchRelay` that answers it |
 | `Bighelp/CarPlay/` | CarPlay's hands-free voice chat (`CarPlayVoiceSession`) and its scene |
@@ -192,6 +192,18 @@ change in both repos.
   the chat when it's free; one made while the chat works runs at once as a Hermes background task for it
   (`ChatModel.runNativeVoiceRequest`, `prompt.background`) and answers the call on its own. Background tasks
   can't reach the phone's tools.
+- **On-device voices** (`Bighelp/Voice/OnDevice/`): Phonon speaks on the iPhone or iPad instead of the
+  computer. It's chosen per agent in Voice settings and kept on the device (`OnDeviceVoiceChoices`, by computer
+  and agent); the agent's `tts.*` on the computer never changes. `OnDeviceVoiceSettingsClient` adds it to the
+  provider list, and `OnDeviceRoutedSpeechOutput` speaks with it in voice chats and Auto TTS once it's
+  downloaded, else with the computer's voice. The model downloads when someone picks it, from a pinned release
+  checked against its SHA-256 and its `bundle.json`; only Phonon 31m (Apache 2.0), never the CC BY-NC 40m
+  models. Phonon needs iOS 18 or later: `Packages/PhononTTS` keeps the app's minimum and marks its API
+  `@available`, so never raise the app's minimum for it. Its core has no visionOS or Intel slices, so only
+  iPhone and iPad link it (the Mac DMG is universal).
+- **Auto TTS** (`ChatReplyReader`): Settings › Voice › Use TTS on every response and the chat's + menu are one
+  switch. A chat reads a reply once its turn ends, never what it held when it opened, and stops on a new
+  message, voice mode or leaving the chat.
 - **Browser sign-ins stay signed in:** a Nous Portal sign-in's access token lasts 15 minutes and its refresh
   token rotates. The saved sign-in keeps its refresh token until a renewal succeeds; only a 401 from
   `/auth/native/refresh` ends it (`performRefresh`). Every other failure keeps it for the next try, as Hermes

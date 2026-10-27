@@ -6,6 +6,9 @@ import Foundation
 /// config instead, as `.custom`.
 struct VoiceProviderSpec: Equatable, Sendable {
     enum Kind: Int, Comparable, CaseIterable, Sendable {
+        /// Runs on this iPhone or iPad (`OnDeviceVoiceModel`): no account, key or internet.
+        /// Chosen per agent on the device; the computer never sees it.
+        case onThisDevice
         /// Runs on the person's own computer: no account, no key.
         case onYourComputer
         /// A custom command set up on the computer (`tts.providers.<name>`).
@@ -15,8 +18,9 @@ struct VoiceProviderSpec: Equatable, Sendable {
         /// A cloud service billed to the person's own API key.
         case cloud
 
-        var title: String {
+        @MainActor var title: String {
             switch self {
+            case .onThisDevice: String(localized: "Runs on this \(OnDeviceVoiceModel.deviceName)")
             case .onYourComputer: "Runs on your computer"
             case .custom: "Custom (set up on your computer)"
             case .free: "Free"

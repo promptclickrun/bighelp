@@ -21,6 +21,7 @@ struct ChatDestinationView: View {
     @State private var requestsNativeControlsAfterMenu = false
     #endif
     @State private var responseHaptics = ResponseHapticsController()
+    @State private var replyReader = ChatReplyReader()
     @State private var isHapticsSurfaceVisible = false
     @State private var projectChanges: ProjectChangesStore
     @State var voicePresentation: VoicePresentation?
@@ -189,6 +190,12 @@ struct ChatDestinationView: View {
                                     permissionCenter: permissionCenter))
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("chat.canvas")
+            .background {
+                ChatReplyReading(model: model, reader: replyReader,
+                                 isOn: settings.autoSpeakRepliesEnabled && voicePresentation == nil && voiceBar == nil,
+                                 rate: settings.voiceSpeed.hermesTTSSpeed,
+                                 makeOutput: { featureStore.makeReplySpeech(for: model.conversationID) })
+            }
         .chatAttention(client: model.nativeConversationClient,
                        agentName: identity?.name ?? model.workingAgentName,
                        isPresented: $isNativeAttentionPresented, canPopUp: canPopUpAttention)
@@ -602,6 +609,7 @@ struct ChatDestinationView: View {
                 onSelectSlashCommand: model.selectSlashCommand,
                 allowsImages: model.supportedAttachmentKinds.contains(.image),
                 allowsFiles: model.supportedAttachmentKinds.contains(.file),
+                autoSpeakReplies: Bindable(settings).autoSpeakRepliesEnabled,
                 onNativeSessionControls: model.nativeConversationClient == nil ? nil : {
                     #if targetEnvironment(macCatalyst)
                     pendingMacPanelRequest = .nativeSessionControls

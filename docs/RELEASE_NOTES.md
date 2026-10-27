@@ -3,6 +3,15 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.29
+
+### Voice
+
+- **Voices on your iPhone:** an agent can speak with Phonon, a voice that runs on your iPhone or iPad. It needs no account, no key and no internet connection. To use it, open **Settings > Voice**, select an agent and select **Provider**. Then select **Phonon** and tap **Download voice**. The download is approximately 137 MB. Phonon needs iOS 18 or later.
+- **Hear the voices:** Phonon has a default voice and 37 other voices. 12 of them are character voices. Tap **Play** next to a voice to hear it before you choose it. Then tap **Save**.
+- **Auto TTS:** turn on **Use TTS on every response** in **Settings > Voice** to hear each reply when it arrives. You can also turn it on or off from **+** in a chat with **Auto TTS**. A new message, voice mode or a different screen stops the speech.
+- **Hold music:** turn off **Hold music** in **Settings > Voice** for a silent wait while your agent works on a reply.
+
 ## 2.6.28
 
 ### Fixed

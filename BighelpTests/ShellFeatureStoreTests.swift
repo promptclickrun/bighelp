@@ -2154,6 +2154,19 @@ struct ShellFeatureStoreTests {
         #expect(!music.isPlaying && music.stops == 1)
     }
 
+    /// Settings › Voice › Hold music off: the wait for a reply is silent.
+    @Test func turnBasedVoiceWaitsInSilenceWhenHoldMusicIsOff() async {
+        let session = record(id: "quiet-hold")
+        let music = HoldMusicSpy()
+        let (store, _) = makeStore(records: [session], holdMusic: music, holdMusicEnabled: false)
+
+        let presentation = store.makeVoicePresentation(for: session.id, conversationMode: .turnBased)
+        presentation.model.reconcileAgentRun(isActive: true)
+        await settle()
+        #expect(presentation.model.status == .working)
+        #expect(music.starts == 0, "Hold music played with Hold music turned off")
+    }
+
     /// "Use TTS voice mode" opens a new turn-based presentation over the failed live one.
     @Test func switchingFromLiveToTurnBasedVoiceBringsTheHoldMusicBack() async {
         let session = record(id: "switch-hold")
@@ -2176,13 +2189,15 @@ struct ShellFeatureStoreTests {
 
     private func makeStore(
         records: [SessionRecord],
-        holdMusic: (any VoiceHoldMusicPlaying)? = nil
+        holdMusic: (any VoiceHoldMusicPlaying)? = nil,
+        holdMusicEnabled: Bool = true
     ) -> (store: ShellFeatureStore, catalog: SessionCatalogStore) {
         let catalog = SessionCatalogStore(
             client: SessionCatalogFixtureClient(),
             records: records
         )
-        let store = ShellFeatureStore(timing: .immediate, catalog: catalog, voiceHoldMusic: { holdMusic })
+        let store = ShellFeatureStore(timing: .immediate, catalog: catalog, voiceHoldMusic: { holdMusic },
+                                      voiceHoldMusicEnabled: { holdMusicEnabled })
         return (store, catalog)
     }
 

@@ -5,9 +5,11 @@ import Testing
 @MainActor
 struct SimpleBotFilesTests {
     @Test func filesAndMediaComeAfterComputer() {
-        #expect(SimpleBotProfileTab.available(showsComputer: true) == [.info, .computer, .files, .media])
-        #expect(SimpleBotProfileTab.available(showsComputer: false) == [.info, .files, .media])
-        #expect(SimpleBotProfileTab.available(showsComputer: true).map(\.title) == ["Info", "Computer", "Files", "Media"])
+        #expect(SimpleBotProfileTab.available(showsComputer: true) == [.dashboard, .info, .computer, .files, .media])
+        #expect(SimpleBotProfileTab.available(showsComputer: false) == [.dashboard, .info, .files, .media])
+        #expect(SimpleBotProfileTab.available(showsComputer: true).map(\.title)
+            == ["Dashboard", "Info", "Computer", "Files", "Media"])
+        #expect(SimpleBotProfileTab.available(showsComputer: false, showsDashboard: false) == [.info, .files, .media])
     }
 
     @Test func aRowOpensByWhatItIs() {

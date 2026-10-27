@@ -19,12 +19,25 @@ struct SimpleBotProfileContext {
     var makeMediaClient: (() -> (any AgentMediaClient)?)? = nil
     /// Nerd Mode shows hidden files (names starting with ".").
     var showsHiddenFiles = false
+    /// Feed, Ideas and Goals as piles (Dashboard); nil hides the tab.
+    var dashboard: SimpleBotDashboardHooks? = nil
 }
 
-/// A bot's profile in Bots mode: its mark, name and role, then Info
-/// (its look, instructions and routines), Computer (its screen, when the
-/// host has one), Files (its folder on the computer) and Media (photos and
-/// videos from its chats).
+/// What a bot's Dashboard needs from the shell.
+@MainActor
+struct SimpleBotDashboardHooks {
+    /// The shell's board store; the Dashboard's own store follows its connection.
+    let shellBoard: AgentBoardStore
+    /// Opens the bot's chat with the text in its message box (bot ID, text); nothing is sent.
+    let onAsk: (String, String) -> Void
+    /// Opens the bot's chat and sends the text: only a blueprint's own Send to agent.
+    let onSend: (String, String) -> Void
+}
+
+/// A bot's profile in Bots mode: its mark, name and role, then Dashboard (its
+/// Feed, Ideas and Goals as piles to swipe; it opens first), Info (its look,
+/// instructions and routines), Computer (its screen, when the host has one),
+/// Files (its folder on the computer) and Media (photos and videos from its chats).
 @MainActor
 struct SimpleBotProfileView: View {
     let agentID: String
@@ -32,7 +45,8 @@ struct SimpleBotProfileView: View {
 
     private typealias Tab = SimpleBotProfileTab
 
-    @State private var tab: Tab = .info
+    @State private var tab: Tab = .dashboard
+    @State private var dashboard: BoardDashboardModel?
     @State private var mark: SimpleBotMark?
     @State private var saveTask: Task<Void, Never>?
     @State private var saveState: String?
@@ -72,10 +86,17 @@ struct SimpleBotProfileView: View {
         }
         .safeAreaInset(edge: .top, spacing: 0) { header }
         .background(theme.canvas.ignoresSafeArea())
+        .modifier(BoardDashboardOverlays(model: dashboard, isActive: shownTab == .dashboard,
+                                         botName: profile?.name ?? ""))
         .toolbar(.hidden, for: .navigationBar)
         .task(id: agentID) {
             modelDefaults = context.canEdit ? context.makeModelDefaults?(agentID) : nil
             await modelDefaults?.loadIfNeeded()
+        }
+        .task(id: agentID) {
+            if context.dashboard != nil, dashboard?.agentID != agentID {
+                dashboard = BoardDashboardModel(agentID: agentID)
+            }
         }
         .task(id: agentID) {
             // Cheap to make; each tab loads only once it's opened.
@@ -197,10 +218,16 @@ struct SimpleBotProfileView: View {
     private func content(_ profile: AgentProfile) -> some View {
         ScrollView {
             VStack(spacing: BighelpTokens.space24) {
-                face(profile)
-                identityCard(profile)
+                if shownTab == .dashboard {
+                    // One row, so the piles fit under it.
+                    compactIdentity(profile)
+                } else {
+                    face(profile)
+                    identityCard(profile)
+                }
                 tabBar
                 switch shownTab {
+                case .dashboard: dashboardTab(profile)
                 case .info: info(profile)
                 case .computer: computer(profile)
                 case .files: filesTab(profile)
@@ -228,6 +255,37 @@ struct SimpleBotProfileView: View {
         .animation(.snappy, value: mark)
     }
 
+    /// The Dashboard's header: the mark, then the name over the role, on one row.
+    private func compactIdentity(_ profile: AgentProfile) -> some View {
+        HStack(spacing: BighelpTokens.space12) {
+            Group {
+                if let mark {
+                    SimpleBotMarkView(mark: mark, size: 52, isPrimary: isPrimary)
+                } else {
+                    SimpleBotFace(agentID: profile.id, name: profile.name,
+                                  imageURL: context.agents.avatarURL(for: profile), size: 52, isPrimary: isPrimary)
+                }
+            }
+            .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(profile.name)
+                    .font(.bighelp(.title3, weight: .bold))
+                    .foregroundStyle(theme.primaryText)
+                    .lineLimit(2)
+                if !profile.role.isEmpty {
+                    Text(profile.role)
+                        .font(.bighelp(.subheadline))
+                        .foregroundStyle(theme.secondaryText)
+                        .lineLimit(2)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.top, BighelpTokens.space4)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+
     private func identityCard(_ profile: AgentProfile) -> some View {
         SimpleBotsCard {
             Text(profile.name)
@@ -250,12 +308,12 @@ struct SimpleBotProfileView: View {
     }
 
     private var availableTabs: [Tab] {
-        Tab.available(showsComputer: screen?.showsTab == true)
+        Tab.available(showsComputer: screen?.showsTab == true, showsDashboard: context.dashboard != nil)
     }
 
-    /// Info when the chosen tab went away (the screen closed).
+    /// The first tab when the chosen one went away (the screen closed).
     private var shownTab: Tab {
-        availableTabs.contains(tab) ? tab : .info
+        availableTabs.contains(tab) ? tab : (availableTabs.first ?? .info)
     }
 
     @ViewBuilder
@@ -417,6 +475,27 @@ struct SimpleBotProfileView: View {
             SimpleBotsMessageCard(systemImage: "wifi.slash", title: String(localized: "Your computer isn't connected"),
                                   detail: String(localized: "\(profile.name)'s files show up here once it's back."))
         }
+    }
+
+    @ViewBuilder
+    private func dashboardTab(_ profile: AgentProfile) -> some View {
+        if let hooks = context.dashboard, let dashboard, dashboard.agentID == profile.id {
+            BoardDashboardView(model: dashboard, context: boardContext(profile, hooks: hooks, store: dashboard.store),
+                               shellBoard: hooks.shellBoard)
+        }
+    }
+
+    /// The bot's board as the Feed, Ideas and Goals pages take it. Bots mode has no menu or agent
+    /// switcher, so those do nothing; the chat is always this bot's own.
+    private func boardContext(_ profile: AgentProfile, hooks: SimpleBotDashboardHooks,
+                              store: AgentBoardStore) -> AgentBoardContext {
+        let id = profile.id
+        return AgentBoardContext(
+            agentID: id, agentName: profile.name, imageURL: context.agents.avatarURL(for: profile),
+            activity: .idle, store: store,
+            onProfile: {}, onSwitchAgent: {},
+            onAsk: { hooks.onAsk(id, $0) }, onSend: { hooks.onSend(id, $0) },
+            onMenu: {}, onNewChat: { context.onOpenChat(id) }, onPickAgents: {}, tools: [])
     }
 
     private func mediaTab(_ profile: AgentProfile) -> some View {

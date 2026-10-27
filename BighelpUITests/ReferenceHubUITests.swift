@@ -15,6 +15,10 @@ final class BighelpTestApplication: XCUIApplication {
         if !launchArguments.contains("-loopdy.home.opens-chat") {
             launchArguments += ["-loopdy.home.opens-chat", "NO"]
         }
+        // A bot profile's one-time swipe tutorial dims the page; tests of it opt back in.
+        if !launchArguments.contains("-bighelp.dashboard.swipe-tutorial-seen") {
+            launchArguments += ["-bighelp.dashboard.swipe-tutorial-seen", "YES"]
+        }
         // For A/B runs: TEST_RUNNER_BIGHELP_UI_EXTRA_ARGS="-loopdy.chat.agentIsland NO".
         if let extra = ProcessInfo.processInfo.environment["BIGHELP_UI_EXTRA_ARGS"], !extra.isEmpty {
             launchArguments += extra.split(separator: " ").map(String.init)

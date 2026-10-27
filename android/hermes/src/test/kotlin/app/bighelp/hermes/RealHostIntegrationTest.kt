@@ -189,6 +189,11 @@ class RealHostIntegrationTest {
             File(project, "approval-only-delete").isDirectory)
     }
 
+    /**
+     * "secure input test 2" makes the scripted fixture ask for `SECURE_INPUT_FIXTURE_2`, a name an earlier answered
+     * run cannot have filled, and a declined value is never saved, so this stays repeatable. A host that does not
+     * ask is a failure here, not a skip: the fixture is known to support it.
+     */
     @Test fun openHostSecureInputRequestReachesTheHandlerAndIsDeclinedWithoutStoringAnything() = runBlocking {
         val authenticator = authenticator("open")
         authenticator.signIn(SignInInput.Dashboard)
@@ -197,13 +202,12 @@ class RealHostIntegrationTest {
         val events = collect(client)
         client.connect()
         val (runtime, _) = client.newSession("default", text(host("open"), "project"))
-        client.runTurn(events, runtime, "default", "secure input test")
-        // Hermes asks only while the fixture variable is unset; an earlier answered run leaves it set.
-        assumeTrue("The host already holds the fixture secret, so it did not ask", "secret" in prompts.methods())
+        client.runTurn(events, runtime, "default", "secure input test 2")
+        assertTrue("The fixture must ask for the secret; it asked for ${prompts.methods()}", "secret" in prompts.methods())
         val request = prompts.seen.first { it.method == "secret" }
-        assertEquals("SECURE_INPUT_FIXTURE", request.params["env_var"]?.jsonPrimitive?.content)
+        assertEquals("SECURE_INPUT_FIXTURE_2", request.params["env_var"]?.jsonPrimitive?.content)
         assertEquals(runtime, request.params["session_id"]?.jsonPrimitive?.content)
-        Unit
+        println("REAL-HOST open secure input: asked=${request.params["env_var"]?.jsonPrimitive?.content} answeredWith=decline")
     }
 
     @Test fun openHostRestFollowsTheDashboardTokenAndTheNativeContextIsGuardedByItsEtag() = runBlocking {
@@ -259,16 +263,19 @@ class RealHostIntegrationTest {
         restoredAuthenticator.restore(expired) // expiry in the past: renews before anything else
         val rotated = store.load(staged.authority)!!
         val rotatedBearer = rotated.auth as StoredAuth.Bearer
-        assertNotEquals("The access token was renewed", bearer.accessToken, rotatedBearer.accessToken)
+        // Value-free assertions: a failure message must never carry a token. The host derives its access token from
+        // the issue second alone, so a renewal in the same second can repeat it; the refresh token is what rotates.
+        assertTrue("The refresh token rotated", rotatedBearer.refreshToken != null && rotatedBearer.refreshToken != bearer.refreshToken)
+        assertTrue("The stored record is the renewed one, not the expired one", rotated != expired)
         assertEquals("Same principal", staged.authority, rotated.authority)
         assertTrue((rotatedBearer.expiresAtEpochSeconds ?: 0) > System.currentTimeMillis() / 1_000)
         assertEquals(rotated, restoredAuthenticator.savedConnection)
-        println("REAL-HOST password rotation: accessChanged=${bearer.accessToken != rotatedBearer.accessToken} refreshChanged=${bearer.refreshToken != rotatedBearer.refreshToken}")
+        println("REAL-HOST password rotation: refreshChanged=${bearer.refreshToken != rotatedBearer.refreshToken}")
 
         // Two tickets, two sockets: a fresh single-use ticket every attempt.
         val first = restoredAuthenticator.socketRequest()
         val second = restoredAuthenticator.socketRequest()
-        assertNotEquals(first.headers["Sec-WebSocket-Protocol"], second.headers["Sec-WebSocket-Protocol"])
+        assertTrue("A fresh single-use ticket per socket", first.headers["Sec-WebSocket-Protocol"] != second.headers["Sec-WebSocket-Protocol"])
         val again = GatewayClient(restoredAuthenticator, scope).also { clients += it }
         assertEquals(GatewayConnection.Connected, again.connect().connection)
         assertTrue(prompts.seen.isEmpty() || prompts.seen.isNotEmpty())

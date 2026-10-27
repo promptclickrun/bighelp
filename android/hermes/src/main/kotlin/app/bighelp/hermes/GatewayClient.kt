@@ -30,12 +30,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import okhttp3.Headers
-import okhttp3.Request
-import okhttp3.Response
-import okhttp3.WebSocket
-import okhttp3.WebSocketListener
-import okio.ByteString
 
 /**
  * The ordered Hermes gateway: one authenticated WebSocket at a time, a single ordered reader and a single
@@ -64,22 +58,30 @@ import okio.ByteString
  * applied; entries are applied and published in wire order. Everything mutable lives on one
  * single-threaded dispatcher, so no result or event of an older socket can publish after a newer one starts.
  *
- * Known limitation: OkHttp 4.12 assembles an inbound WebSocket message before delivering it, so the 4 MiB
- * cap is enforced on arrival rather than while streaming, and a malformed UTF-8 text frame is repaired by
- * the platform before [HermesWire] sees it.
+ * **Inbound bounds.** The socket (see `GatewayWebSocket.kt`) refuses a frame by its declared length before
+ * allocating for it, caps the sum of fragments at 4 MiB, rejects malformed UTF-8 in a TEXT message instead of
+ * repairing it, bounds the upgrade response headers, offers no extensions, and keeps the platform's default
+ * TLS certificate and hostname checks.
+ *
+ * **Outbound bounds.** Frames reach the socket one at a time: the writer stops while the socket still holds
+ * unwritten data, so a stalled peer fills this client's own bounded queues (8 MiB of ordinary requests, one
+ * attachment of up to 12 MiB counted apart, 4 MiB of server replies) and then refuses new requests with
+ * [HermesException.Kind.TooManyRequests] instead of growing without limit.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
-class GatewayClient(
+class GatewayClient internal constructor(
     private val authenticator: HermesAuthenticator,
     private val scope: CoroutineScope,
-    private val timings: GatewayTimings = GatewayTimings(),
+    private val timings: GatewayTimings,
+    private val transports: GatewayTransportFactory,
 ) {
+    constructor(
+        authenticator: HermesAuthenticator,
+        scope: CoroutineScope,
+        timings: GatewayTimings = GatewayTimings(),
+    ) : this(authenticator, scope, timings, GatewayWebSockets)
+
     private val serial: CoroutineDispatcher = Dispatchers.Default.limitedParallelism(1)
-    private val okHttp = HermesOkHttp.baseClient().newBuilder()
-        .callTimeout(0, java.util.concurrent.TimeUnit.MILLISECONDS)
-        .readTimeout(0, java.util.concurrent.TimeUnit.MILLISECONDS)
-        .writeTimeout(0, java.util.concurrent.TimeUnit.MILLISECONDS)
-        .build()
 
     // Everything below is touched only on [serial], except the concurrent collections.
     private var terminal = false
@@ -120,6 +122,13 @@ class GatewayClient(
 
     internal val subscriberCount: Int get() = subscribers.size
 
+    /** The bytes waiting in each bounded queue of the current socket (a test seam). */
+    internal class QueueSnapshot(val ordinary: Int, val attachment: Int, val server: Int, val frames: Int)
+
+    internal suspend fun queueSnapshot(): QueueSnapshot = withContext(serial) {
+        link?.let { QueueSnapshot(it.queuedBytes, it.queuedAttachmentBytes, it.queuedServerBytes, it.outbox.size) } ?: QueueSnapshot(0, 0, 0, 0)
+    }
+
     private class Pending(
         val id: String,
         val method: String,
@@ -131,7 +140,8 @@ class GatewayClient(
         var timeout: Job? = null
     }
 
-    private class Outbound(val id: String, val serverMethod: String?, val text: String, val bytes: Int)
+    /** [kind] decides which of the three bounded queues counts it. */
+    private class Outbound(val id: String, val serverMethod: String?, val text: String, val bytes: Int, val attachment: Boolean = false)
     private class ServerTask(val token: Any, val job: Job)
 
     private sealed interface Inbound {
@@ -142,7 +152,7 @@ class GatewayClient(
 
     private inner class Link(val generation: Long, val owner: ConnectionOwner, val request: SocketRequest) {
         var socket: GatewaySocket = GatewaySocket.opening(owner)
-        var webSocket: WebSocket? = null
+        var transport: GatewayTransport? = null
         val inbound = Channel<Inbound>(INBOUND_BUFFER)
         var reader: Job? = null
         var heartbeat: Job? = null
@@ -151,8 +161,10 @@ class GatewayClient(
         val pending = LinkedHashMap<String, Pending>()
         val outbox = ArrayDeque<Outbound>()
         var queuedBytes = 0
+        var queuedAttachmentBytes = 0
         var queuedServerBytes = 0
         var attachmentId: String? = null
+        var draining = false
         val serverRequests = ServerRequestTable()
         val serverTasks = HashMap<String, ServerTask>()
         var closed = false
@@ -222,10 +234,12 @@ class GatewayClient(
         link = created
         publish()
 
-        val headers = Headers.Builder()
-        request.headers.forEach { (name, value) -> headers.addUnsafeNonAscii(name, value) }
-        val upgrade = Request.Builder().url(request.url).headers(headers.build()).build()
-        created.webSocket = okHttp.newWebSocket(upgrade, listenerFor(created))
+        try {
+            created.transport = transports.open(request, listenerFor(created))
+        } catch (e: HermesException) {
+            closeLink(created, e, notify = false)
+            throw e
+        }
         created.reader = scope.launch(serial) { readLoop(created) }
         created.readyDeadline = scope.launch(serial) {
             delay(timings.readyMillis)
@@ -234,43 +248,17 @@ class GatewayClient(
         return created
     }
 
-    private fun listenerFor(owner: Link) = object : WebSocketListener() {
-        override fun onOpen(webSocket: WebSocket, response: Response) {
-            owner.inbound.trySendBlocking(Inbound.Opened(response.header("Sec-WebSocket-Protocol")))
+    /** Socket callbacks arrive on the socket's reader thread; a full buffer blocks it, which is TCP backpressure. */
+    private fun listenerFor(owner: Link) = object : GatewayTransportListener {
+        override fun opened(negotiatedSubprotocol: String?) {
+            owner.inbound.trySendBlocking(Inbound.Opened(negotiatedSubprotocol))
         }
 
-        override fun onMessage(webSocket: WebSocket, text: String) {
-            // Characters never outnumber bytes: anything over the cap in characters is over it in bytes.
-            val tooLarge = text.length > HermesWire.MAXIMUM_MESSAGE_BYTES
-            owner.inbound.trySendBlocking(
-                if (tooLarge) Inbound.Failed(HermesException(HermesException.Kind.MessageTooLarge))
-                else Inbound.Message(text.toByteArray(Charsets.UTF_8)),
-            )
+        override fun message(bytes: ByteArray) {
+            owner.inbound.trySendBlocking(Inbound.Message(bytes))
         }
 
-        override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
-            owner.inbound.trySendBlocking(
-                if (bytes.size > HermesWire.MAXIMUM_MESSAGE_BYTES) Inbound.Failed(HermesException(HermesException.Kind.MessageTooLarge))
-                else Inbound.Message(bytes.toByteArray()),
-            )
-        }
-
-        override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
-            webSocket.close(1000, null)
-            owner.inbound.trySendBlocking(Inbound.Failed(HermesException(HermesException.Kind.Disconnected)))
-        }
-
-        override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-            owner.inbound.trySendBlocking(Inbound.Failed(HermesException(HermesException.Kind.Disconnected)))
-        }
-
-        override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-            val status = response?.code
-            val error = when {
-                status == 401 || status == 403 -> HermesException(HermesException.Kind.InvalidCredentials)
-                status != null && status in 300..399 -> HermesException(HermesException.Kind.RedirectRefused)
-                else -> OkHttpHermesHttp.map(t)
-            }
+        override fun failed(error: HermesException) {
             owner.inbound.trySendBlocking(Inbound.Failed(error))
         }
     }
@@ -497,9 +485,15 @@ class GatewayClient(
             )
         }
         if (owner.pending.size >= MAXIMUM_PENDING) throw HermesException(HermesException.Kind.TooManyRequests)
-        if (isAttachment && owner.attachmentId != null) throw HermesException(HermesException.Kind.TooManyRequests)
-        val queuedLimit = if (isAttachment) ATTACHMENT_FRAME_BYTES else MAXIMUM_QUEUED_BYTES
-        if (owner.queuedBytes + bytes > queuedLimit) throw HermesException(HermesException.Kind.TooManyRequests)
+        // Three separate queues, so a flood of ordinary requests can never refuse the one attachment frame the
+        // contract allows (up to 12 MiB), nor the other way round, and neither starves a server reply.
+        if (isAttachment) {
+            if (owner.attachmentId != null || owner.queuedAttachmentBytes + bytes > ATTACHMENT_FRAME_BYTES) {
+                throw HermesException(HermesException.Kind.TooManyRequests)
+            }
+        } else if (owner.queuedBytes + bytes > MAXIMUM_QUEUED_BYTES) {
+            throw HermesException(HermesException.Kind.TooManyRequests)
+        }
 
         val pending = Pending(id, method, CompletableDeferred(), DispatchPolicy.isReadOnly(method), isAttachment)
         owner.pending[id] = pending
@@ -508,8 +502,8 @@ class GatewayClient(
             delay(timeoutMillis)
             expire(owner, id)
         }
-        owner.outbox.addLast(Outbound(id, null, text, bytes))
-        owner.queuedBytes += bytes
+        owner.outbox.addLast(Outbound(id, null, text, bytes, isAttachment))
+        if (isAttachment) owner.queuedAttachmentBytes += bytes else owner.queuedBytes += bytes
         pump(owner)
         return pending
     }
@@ -527,7 +521,7 @@ class GatewayClient(
         pending.timeout?.cancel()
         if (owner.attachmentId == id) owner.attachmentId = null
         val index = owner.outbox.indexOfFirst { it.id == id && it.serverMethod == null }
-        if (index >= 0) owner.queuedBytes -= owner.outbox.removeAt(index).bytes
+        if (index >= 0) uncount(owner, owner.outbox.removeAt(index))
         return pending
     }
 
@@ -543,23 +537,54 @@ class GatewayClient(
         if (pending.sendStarted) closeLink(owner, HermesException(HermesException.Kind.TimedOut), notify = true)
     }
 
-    /** The single ordered writer. Nothing leaves before ready; each frame is marked sent before the socket call. */
+    /** Takes [item] out of whichever bounded queue counted it. */
+    private fun uncount(owner: Link, item: Outbound) {
+        when {
+            item.serverMethod != null -> owner.queuedServerBytes -= item.bytes
+            item.attachment -> owner.queuedAttachmentBytes -= item.bytes
+            else -> owner.queuedBytes -= item.bytes
+        }
+    }
+
+    /**
+     * The single ordered writer. Nothing leaves before ready; each frame is marked sent before the socket call.
+     * Frames go out one at a time, only while the socket holds no unwritten data: a peer that stops reading
+     * leaves the rest here, where it is bounded and a queued server reply can still be cancelled.
+     */
     private fun pump(owner: Link) {
         if (owner.closed || owner.socket.phase != SocketPhase.Ready) return
-        val socket = owner.webSocket ?: return
+        val transport = owner.transport ?: return
         while (owner.outbox.isNotEmpty()) {
+            if (transport.hasBufferedData) {
+                drainLater(owner)
+                return
+            }
             val item = owner.outbox.removeFirst()
-            owner.queuedBytes -= item.bytes
+            uncount(owner, item)
             if (item.serverMethod != null) {
-                owner.queuedServerBytes -= item.bytes
                 if (!owner.serverRequests.beginSendingResponse(item.id, item.serverMethod)) continue
             } else {
                 val pending = owner.pending[item.id] ?: continue
                 pending.sendStarted = true
             }
-            if (!socket.send(item.text)) {
+            if (!transport.send(item.text)) {
                 closeLink(owner, HermesException(HermesException.Kind.Disconnected), notify = true)
                 return
+            }
+        }
+    }
+
+    /** Resumes the writer once the socket has taken what it was given. */
+    private fun drainLater(owner: Link) {
+        if (owner.draining) return
+        owner.draining = true
+        scope.launch(serial) {
+            try {
+                while (!owner.closed && owner.outbox.isNotEmpty()) {
+                    if (owner.transport?.hasBufferedData == true) delay(DRAIN_POLL_MILLIS) else pump(owner)
+                }
+            } finally {
+                owner.draining = false
             }
         }
     }
@@ -671,7 +696,6 @@ class GatewayClient(
         }
         if (!owner.serverRequests.stageResponse(id, method)) return
         owner.outbox.addLast(Outbound(id, method, text, bytes))
-        owner.queuedBytes += bytes
         owner.queuedServerBytes += bytes
         pump(owner)
     }
@@ -706,9 +730,7 @@ class GatewayClient(
         owner.serverTasks.remove(cancellation.id)?.job?.cancel()
         val index = owner.outbox.indexOfFirst { it.id == cancellation.id && it.serverMethod == cancellation.method }
         if (index >= 0) {
-            val removed = owner.outbox.removeAt(index)
-            owner.queuedBytes -= removed.bytes
-            owner.queuedServerBytes -= removed.bytes
+            uncount(owner, owner.outbox.removeAt(index))
         }
     }
 
@@ -759,8 +781,6 @@ class GatewayClient(
             subscribers.clear()
         }
         authenticator.settlePendingRenewal()
-        okHttp.dispatcher.executorService.shutdown()
-        okHttp.connectionPool.evictAll()
     }
 
     private fun closeLink(owner: Link, reason: HermesException, notify: Boolean, orderly: Boolean = false) {
@@ -771,12 +791,12 @@ class GatewayClient(
         if (link === owner) link = null
         owner.readyDeadline?.cancel()
         owner.heartbeat?.cancel()
-        owner.webSocket?.let { socket ->
+        owner.transport?.let { transport ->
             if (orderly) {
-                socket.close(1001, null)
-                scope.launch(serial) { delay(1_000); socket.cancel() }
+                transport.close(orderly = true)
+                scope.launch(serial) { delay(1_000); transport.close(orderly = false) }
             } else {
-                socket.cancel()
+                transport.close(orderly = false)
             }
         }
         owner.inbound.close()
@@ -795,6 +815,7 @@ class GatewayClient(
         owner.serverRequests.removeAll()
         owner.outbox.clear()
         owner.queuedBytes = 0
+        owner.queuedAttachmentBytes = 0
         owner.queuedServerBytes = 0
         owner.attachmentId = null
         lastFailure = reason
@@ -887,6 +908,7 @@ class GatewayClient(
         const val MAXIMUM_RESPONSE_BYTES = 2 * 1_024 * 1_024
         const val MAXIMUM_QUEUED_SERVER_BYTES = 4 * 1_024 * 1_024
         const val EVENT_BUFFER = 8_192
+        private const val DRAIN_POLL_MILLIS = 2L
         // Few, because one message can be 4 MiB; a full buffer blocks the socket reader, which is TCP backpressure.
         private const val INBOUND_BUFFER = 8
         private val SUBMISSION_METHODS = setOf("prompt.submit", "slash.exec", "command.dispatch")

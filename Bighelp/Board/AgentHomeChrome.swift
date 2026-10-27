@@ -31,6 +31,20 @@ struct AgentHomeChrome {
     }
 }
 
+/// Equal when what it shows is the same. Its actions are the shell's own, the same every time
+/// (they read live state when tapped), and the tab selection is read live where it's used.
+/// Compared as a whole, every shell update redrew the chat on screen, its header and its
+/// message box, which made Chat mode's chats slower than Bots mode's.
+extension AgentHomeChrome: Equatable {
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.isEnabled == rhs.isEnabled && lhs.isSimpleBots == rhs.isSimpleBots
+            && lhs.showsTabBar == rhs.showsTabBar && (lhs.tabSelection == nil) == (rhs.tabSelection == nil)
+            && lhs.unreadTabs == rhs.unreadTabs && lhs.barTabs == rhs.barTabs
+            && (lhs.modeSwitch == nil) == (rhs.modeSwitch == nil)
+            && lhs.modeSwitch?.modes == rhs.modeSwitch?.modes && lhs.modeSwitch?.current == rhs.modeSwitch?.current
+    }
+}
+
 private struct AgentHomeChromeKey: EnvironmentKey {
     static var defaultValue: AgentHomeChrome { AgentHomeChrome() }
 }

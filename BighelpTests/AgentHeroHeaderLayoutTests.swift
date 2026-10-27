@@ -5,6 +5,19 @@ import UIKit
 
 @MainActor
 struct AgentHeroHeaderLayoutTests {
+    /// The shell makes the chrome again on every update; only what it shows may redraw the chat.
+    @Test func chromeIsTheSameWhenWhatItShowsIsTheSame() {
+        var opened = 0
+        let first = AgentHomeChrome(isEnabled: true, showsTabBar: true, onMenu: { opened += 1 },
+                                    unreadTabs: [.feed], barTabs: [.sessions, .feed])
+        let again = AgentHomeChrome(isEnabled: true, showsTabBar: true, onMenu: { opened += 2 },
+                                    unreadTabs: [.feed], barTabs: [.sessions, .feed])
+        #expect(first == again)
+        var read = again
+        read.unreadTabs = []
+        #expect(first != read, "A dot going away still redraws the bar")
+    }
+
     @Test func chatHomeUsesACompactIdentityPill() {
         let controller = UIHostingController(rootView:
             AgentHomeChatHeader(agentID: "default", displayName: "Atlas", imageURL: nil,

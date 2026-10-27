@@ -3,6 +3,24 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.26
+
+### Highlights
+
+- **Bot dashboard:** in Bots mode, a bot's profile opens on **Dashboard**. It shows the bot's Feed, Ideas and Goals as piles of cards. Swipe a card right to act on it: ask about a post, do an idea or mark a goal done. Swipe a card left to put it away. **Undo** shows after each swipe. Touch and hold a card to see all its actions. The first time, a short tutorial shows how to swipe.
+- **Templates:** on **Dashboard**, select **Templates** to swipe through starter prompts for Feed, Ideas and Goals. Swipe right to put a prompt in the bot's message box. Nothing runs until you tap **Send**.
+
+### Chat
+
+- **Faster answers:** bighelp sends your message to your computer at once. Before, it waited to tell the computer who was sending.
+- **Smoother typing:** the message box does less work for each key that you type.
+- **Smoother chats in Chat mode:** a chat in Chat mode does not draw itself again when other parts of the app change.
+- **New chat transition:** when you start a new chat, the old messages fade away line by line, from the bottom up.
+
+### Fixed
+
+- **Alerts for the chat on screen:** in Chat mode, bighelp no longer shows alerts for the chat that you are reading. Before, this happened after you started a new chat.
+
 ## 2.6.25
 
 ### Chat

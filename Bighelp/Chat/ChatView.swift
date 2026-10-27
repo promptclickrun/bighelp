@@ -161,8 +161,8 @@ struct ChatView: View {
     let onReferenceSend: ((ReferenceFrozenDraft, MidSessionChatBehavior?) async -> Void)?
     @State private var fallbackReferenceHub = ReferenceHubStore(owner: nil, providers: [])
     @State private var isChatVisible = false
-    /// This screen, for `BighelpVisibleChats`: a chat view made again can appear before the old one leaves.
-    @State private var screenID = UUID()
+    /// Tells the app which chat this screen shows (`BighelpVisibleChats`, ...).
+    @State private var screenMount = ChatScreenMount()
 
     @State private var isSessionControlsPresented = false
     @State private var isContextWindowPresented = false
@@ -327,11 +327,13 @@ struct ChatView: View {
         .onAppear {
             isChatVisible = true
             registerChatDissolve()
-            BighelpVisibleChats.shared.appeared(model, screen: screenID)
-            ChatPDFPagesDraftRegistry.mount(model)
-            model.nativeSessionResumeProgress.mount()
+            screenMount.mount(model)
         }
-        .onChange(of: ObjectIdentifier(model)) { _, _ in registerChatDissolve() }
+        // This view can be handed another model while it stays on screen (New chat, a reconnect).
+        .onChange(of: ObjectIdentifier(model)) { _, _ in
+            registerChatDissolve()
+            if isChatVisible { screenMount.mount(model) }
+        }
         .onChange(of: workStyleInUse) { _, style in
             model.activityDisclosures.configure(style: style)
         }
@@ -406,9 +408,7 @@ struct ChatView: View {
             isForceRefreshing = false
             refreshError = nil
             isChatVisible = false
-            BighelpVisibleChats.shared.disappeared(model, screen: screenID)
-            ChatPDFPagesDraftRegistry.unmount(model)
-            model.nativeSessionResumeProgress.unmount()
+            screenMount.unmount()
             companionAffectionTask?.cancel()
             companionAffectionTask = nil
             composerFocusTask?.cancel()

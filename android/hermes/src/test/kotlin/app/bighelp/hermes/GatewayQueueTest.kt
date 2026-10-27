@@ -257,4 +257,12 @@ class GatewayQueueTest {
     }
 
     private fun params(vararg pairs: Pair<String, String>) = buildJsonObject { pairs.forEach { put(it.first, it.second) } }
+
+    @Test fun theHardCloseFallbackStillRunsWhenTheOwnerScopeIsCancelledRightAfterDisconnect() = runBlocking {
+        val (client, fake) = connected()
+        client.disconnect()
+        scope.cancel() // the app cancels the owner scope as soon as disconnect() returns
+        eventually(3_000) { fake.closes.contains(false) }
+        assertEquals(listOf(true, false), fake.closes.toList())
+    }
 }

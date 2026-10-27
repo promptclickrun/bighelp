@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.trySendBlocking
@@ -82,6 +83,9 @@ class GatewayClient internal constructor(
     ) : this(authenticator, scope, timings, GatewayWebSockets)
 
     private val serial: CoroutineDispatcher = Dispatchers.Default.limitedParallelism(1)
+
+    /** Owns only the one-second hard-close timers, so they outlive the caller's scope; each ends by itself. */
+    private val fallbackClose = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     // Everything below is touched only on [serial], except the concurrent collections.
     private var terminal = false
@@ -811,7 +815,8 @@ class GatewayClient internal constructor(
         owner.transport?.let { transport ->
             if (orderly) {
                 transport.close(orderly = true)
-                scope.launch(serial) { delay(1_000); transport.close(orderly = false) }
+                // Not on `scope`: the owner cancels it right after disconnect(), which would drop this fallback.
+                fallbackClose.launch { delay(1_000); transport.close(orderly = false) }
             } else {
                 transport.close(orderly = false)
             }

@@ -42,7 +42,10 @@ internal class FakeTransports : GatewayTransportFactory {
             return true
         }
 
-        override fun close(orderly: Boolean) { closed = true }
+        /** Every close request in order: true = orderly attempt, false = hard close. */
+        val closes = CopyOnWriteArrayList<Boolean>()
+
+        override fun close(orderly: Boolean) { closes += orderly; closed = true }
 
         /** Delivers a line as if the host sent it, from another thread (the reader thread of a real socket). */
         fun deliver(line: String) {

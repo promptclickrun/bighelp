@@ -28,6 +28,9 @@ struct SimpleBotProfileContext {
 struct SimpleBotDashboardHooks {
     /// The shell's board store; the Dashboard's own store follows its connection.
     let shellBoard: AgentBoardStore
+    /// The connection the shell's board should be on now, and setting it up for that one.
+    let shellBoardKey: @MainActor () -> RootShellView.AgentBoardClientKey
+    let configureShellBoard: @MainActor (RootShellView.AgentBoardClientKey) async -> Void
     /// Opens the bot's chat with the text in its message box (bot ID, text); nothing is sent.
     let onAsk: (String, String) -> Void
     /// Opens the bot's chat and sends the text: only a blueprint's own Send to agent.
@@ -481,7 +484,8 @@ struct SimpleBotProfileView: View {
     private func dashboardTab(_ profile: AgentProfile) -> some View {
         if let hooks = context.dashboard, let dashboard, dashboard.agentID == profile.id {
             BoardDashboardView(model: dashboard, context: boardContext(profile, hooks: hooks, store: dashboard.store),
-                               shellBoard: hooks.shellBoard)
+                               shellBoard: hooks.shellBoard, shellBoardKey: hooks.shellBoardKey,
+                               configureShellBoard: hooks.configureShellBoard)
         }
     }
 

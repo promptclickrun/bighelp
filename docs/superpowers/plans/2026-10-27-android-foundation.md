@@ -55,8 +55,10 @@
 
 - [x] Run JVM tests, Android unit checks, lint and debug assemble.
 - [x] Inspect demo screens and use controls in light and dark on a dedicated emulator, when available.
-- [ ] Review the full diff, fix concrete findings and repeat affected verification.
-- [ ] Document remaining acceptance gaps, commit changes and open a pull request linked to its issue.
+- [x] Review the full diff, fix concrete findings and repeat affected verification.
+- [x] Document remaining acceptance gaps, commit changes and open a pull request linked to its issue.
+
+Preview implementation: [PR #647](https://github.com/promptclickrun/bighelp/pull/647), closing [#644](https://github.com/promptclickrun/bighelp/issues/644). Executed verification and remaining acceptance gaps are recorded in [the Android README](../../../android/README.md#verified-preview-snapshot-2026-10-27). Authenticated live chat and Play release are subsequent milestones.
 
 ### Parallel account preparation
 

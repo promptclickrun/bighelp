@@ -468,7 +468,8 @@ struct ChatView: View {
     }
 
     private func registerChatDissolve() {
-        chatDissolve?.register(conversationID: model.conversationID,
+        chatDissolve?.register(conversationID: model.conversationID, tint: UIColor(theme.danger),
+                               backdrop: sessionAppearance.choice == .inherit ? UIColor(theme.canvas) : nil,
                                scrollView: { [weak timelineController] in timelineController?.scrollView })
     }
 

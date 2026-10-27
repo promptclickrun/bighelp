@@ -19,7 +19,8 @@ struct ChatDissolveTransitionTests {
         #expect(overlay.frame == CGRect(x: 0, y: 100, width: 390, height: 580))
         #expect(!overlay.isUserInteractionEnabled)
         #expect(overlay.accessibilityElementsHidden)
-        #expect(overlay.subviews.count <= 32, "Work stays bounded even with a huge scroll extent")
+        #expect(overlay.subviews.count <= ChatDissolveTransition.maximumBands,
+                "Work stays bounded even with a huge scroll extent")
         #expect(scroll.contentOffset == offset)
         #expect(scroll.contentSize == contentSize)
         #expect(content.superview === scroll, "The live transcript was not replaced or split")
@@ -54,7 +55,37 @@ struct ChatDissolveTransitionTests {
         #expect(transition.overlay == nil)
     }
 
-    private func mountedChat() async throws -> (UIWindow, UIScrollView) {
+    @Test func theBottomLineGoesFirst() async throws {
+        let (window, scroll) = try await mountedChat(lines: [500, 900])
+        defer { window.isHidden = true }
+        let transition = ChatDissolveTransition()
+        transition.register(conversationID: "old", scrollView: { scroll })
+        transition.present(nextID: "new", replacing: "old", reduceMotion: false)
+        let overlay = try #require(transition.overlay)
+        defer { transition.cancel() }
+        let strips = overlay.subviews.sorted { $0.frame.minY < $1.frame.minY }
+        #expect(strips.count == 2)
+        let top = try #require(strips.first?.layer.animation(forKey: "dissolve"))
+        let bottom = try #require(strips.last?.layer.animation(forKey: "dissolve"))
+        #expect(bottom.beginTime < top.beginTime)
+    }
+
+    @Test func findsEachLineAndCoversTheWholeViewport() {
+        var rows = Array(repeating: false, count: 200)
+        for y in 10..<26 { rows[y] = true }
+        for y in 30..<46 where y != 38 { rows[y] = true }
+        // A bubble five lines tall.
+        for y in 80..<160 { rows[y] = true }
+        let bands = ChatDissolveBands.lines(rows: rows, limit: 40)
+        #expect(bands.count == 7, "Two lines, one row of antialiasing inside the second, and a bubble cut in five")
+        #expect(bands.first?.lowerBound == 0)
+        #expect(bands.last?.upperBound == 200)
+        #expect(zip(bands, bands.dropFirst()).allSatisfy { $0.upperBound == $1.lowerBound })
+        #expect(ChatDissolveBands.lines(rows: rows, limit: 3).count <= 3)
+        #expect(ChatDissolveBands.lines(rows: Array(repeating: false, count: 50), limit: 40).isEmpty)
+    }
+
+    private func mountedChat(lines: [CGFloat] = [500]) async throws -> (UIWindow, UIScrollView) {
         let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
         let window = UIWindow(windowScene: scene)
         window.frame = CGRect(x: 0, y: 0, width: 390, height: 800)
@@ -67,9 +98,11 @@ struct ChatDissolveTransitionTests {
         scroll.contentInset = UIEdgeInsets(top: 100, left: 0, bottom: 120, right: 0)
         scroll.contentSize = CGSize(width: 390, height: 1_000_000)
         scroll.contentOffset = CGPoint(x: 0, y: 400)
-        let label = UILabel(frame: CGRect(x: 10, y: 500, width: 360, height: 80))
-        label.text = "The complete conversation stays here."
-        scroll.addSubview(label)
+        for y in lines {
+            let label = UILabel(frame: CGRect(x: 10, y: y, width: 360, height: 80))
+            label.text = "The complete conversation stays here."
+            scroll.addSubview(label)
+        }
         controller.view.addSubview(scroll)
         window.layoutIfNeeded()
         try await Task.sleep(for: .milliseconds(50))

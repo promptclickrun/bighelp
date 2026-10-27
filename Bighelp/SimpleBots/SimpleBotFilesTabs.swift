@@ -1,13 +1,15 @@
 import SwiftUI
 
-/// A bot profile's tabs, in order. Computer shows only when the bot has a screen.
+/// A bot profile's tabs, in order; Dashboard (Feed, Ideas and Goals as piles) opens first.
+/// Computer shows only when the bot has a screen.
 enum SimpleBotProfileTab: String, CaseIterable, Identifiable {
-    case info, computer, files, media
+    case dashboard, info, computer, files, media
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
+        case .dashboard: String(localized: "Dashboard")
         case .info: String(localized: "Info")
         case .computer: String(localized: "Computer")
         case .files: String(localized: "Files")
@@ -15,8 +17,8 @@ enum SimpleBotProfileTab: String, CaseIterable, Identifiable {
         }
     }
 
-    static func available(showsComputer: Bool) -> [Self] {
-        allCases.filter { $0 != .computer || showsComputer }
+    static func available(showsComputer: Bool, showsDashboard: Bool = true) -> [Self] {
+        allCases.filter { ($0 != .computer || showsComputer) && ($0 != .dashboard || showsDashboard) }
     }
 }
 

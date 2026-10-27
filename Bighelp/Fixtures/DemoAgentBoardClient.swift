@@ -19,9 +19,15 @@ final class DemoAgentBoardClient: AgentBoardClient {
 
     private func ago(_ minutes: Double) -> Date { now.addingTimeInterval(-minutes * 60) }
 
+    /// The demo's brand-new bots: Jordan Lee (the Home agent) and any bot made in the demo (a
+    /// UUID). Their Feed, Ideas and Goals start empty, as every real bot's do.
+    static func startsEmpty(_ agentID: String) -> Bool {
+        agentID == "home" || UUID(uuidString: agentID) != nil
+    }
+
     func items(agentID: String) async throws -> [AgentBoardItem] {
         if let items = itemsByAgent[agentID] { return items }
-        let items = seed()
+        let items = Self.startsEmpty(agentID) ? [] : seed()
         itemsByAgent[agentID] = items
         return items
     }

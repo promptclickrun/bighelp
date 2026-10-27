@@ -29,6 +29,9 @@ final class AppState {
     var suspendedChat: SuspendedChat?
     /// A blueprint's Send to agent: the next new chat sends `pendingComposerText` once it can.
     var pendingComposerSends = false
+    /// The bot whose own chat may take `pendingComposerText` even though it has history: a bot's
+    /// Dashboard opens that bot's Bot Chat, never a new one. Only an empty message box takes it.
+    var pendingComposerAgentID: String?
     /// A chat picked from the full chat list isn't the Chat tab's own chat
     /// (auto-opened, ☰ › New chat, the switcher, an agent tapped on Agents), so
     /// tapping Chat leaves it. Both have ☰, the tab bar and the big-avatar header.
@@ -143,6 +146,7 @@ final class AppState {
         pendingVoiceConversationID = nil
         pendingComposerText = nil
         pendingComposerSends = false
+        pendingComposerAgentID = nil
         chatOpenedFromList = false
     }
 
@@ -153,11 +157,12 @@ final class AppState {
         pendingVoiceConversationID = nil
         pendingComposerText = nil
         pendingComposerSends = false
+        pendingComposerAgentID = nil
         chatOpenedFromList = false
     }
 
     func consumeComposerText() -> String? {
-        defer { pendingComposerText = nil }
+        defer { pendingComposerText = nil; pendingComposerAgentID = nil }
         return pendingComposerText
     }
 

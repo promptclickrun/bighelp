@@ -1090,7 +1090,8 @@ private struct IdeaTile: View {
     }
 }
 
-private struct IdeaDetailSheet: View {
+/// An idea in full, with Let's do it. Also opened from a bot's Dashboard.
+struct IdeaDetailSheet: View {
     let idea: AgentBoardItem
     let context: AgentBoardContext
     @Environment(\.dismiss) private var dismiss

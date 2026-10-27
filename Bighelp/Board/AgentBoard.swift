@@ -718,6 +718,15 @@ final class AgentBoardStore {
     @ObservationIgnored private var pendingThumbnails: Set<String> = []
 
     var isAvailable: Bool { client != nil }
+    /// The connection in use and its computer, so a second store can follow this one: a bot
+    /// profile's Dashboard reads that bot's board without moving this store off the home agent,
+    /// whose board the widgets publish.
+    var followableConnection: (client: any AgentBoardClient, scope: String)? {
+        guard let client, let scope else { return nil }
+        return (client, scope)
+    }
+    /// Reconnecting, or the plugin's features aren't known yet (`waitForConnection`).
+    var isWaitingForConnection: Bool { isWaiting }
     var supportsFeedback: Bool { client?.supportsFeedback ?? false }
     /// Without it (older plugins) posts have no files and Feed works as before.
     var supportsFiles: Bool { client?.supportsFiles ?? false }

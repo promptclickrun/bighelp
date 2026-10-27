@@ -732,9 +732,13 @@ struct ChatDestinationView: View {
             Task { await importPhotos(selections) }
         }
         .task(id: appState.pendingComposerText) {
-            // Only a fresh chat takes the board's text, never one already in use.
-            guard appState.pendingComposerText != nil, model.transcriptEntries.isEmpty, model.draft.isEmpty,
-                  let text = appState.consumeComposerText() else { return }
+            // Only a fresh chat takes the board's text, never one already in use; a bot's Dashboard
+            // names its bot, whose own chat on top takes it while its message box is empty.
+            let isNamedBotChat = appState.pendingComposerAgentID.map {
+                model.memberIDs == [$0] && appState.path.last == .chat(conversationID: model.conversationID)
+            } ?? false
+            guard appState.pendingComposerText != nil, model.transcriptEntries.isEmpty || isNamedBotChat,
+                  model.draft.isEmpty, let text = appState.consumeComposerText() else { return }
             model.draft = text
             guard appState.consumeComposerSend() else { return }
             // A new chat connects a moment after it opens; send once it can, and leave the

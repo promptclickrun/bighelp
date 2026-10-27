@@ -11,6 +11,32 @@ import Testing
 /// failure showed up as "could not reach its native API" under Device access.
 @MainActor
 struct DirectHermesSignInRenewalTests {
+    @Test func aRejectedRenewalOffersSignInInsteadOfReconnecting() async throws {
+        let host = try ScriptedHermes { request in
+            request.path == "/auth/native/refresh" ? .status(401) : .json("{\"auth_required\":true}")
+        }
+        let vault = try lapsedVault(port: try await host.start())
+        let store = DirectHermesWorkspaceStore(vault: vault)
+        await store.reconnect()
+        #expect(HostConnectionStatus(workspace: store).label == "Sign in again")
+        #expect(!store.isConnected)
+        #expect(Self.refreshToken(vault.stored) == "refresh-1", "Keep credentials until a replacement succeeds")
+        let keeper = WorkspaceConnectionKeeper()
+        keeper.bind { store }
+        defer { keeper.bind { nil } }
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(keeper.state == .disconnected)
+        #expect(host.paths.filter { $0 == "/auth/native/refresh" }.count == 1,
+                "A rejected sign-in waits for the person instead of retrying in the background")
+    }
+
+    @Test func networkAndProxyFailuresDoNotPretendTheHostSignInExpired() {
+        for error in [DirectHermesError.serverUnavailable, .connectionFailed, .tlsRequired,
+                      .cloudflareAccessDenied, .secureStorageUnavailable, .secureStorageChanged] {
+            #expect(!DirectHermesWorkspaceStore.requiresSignIn(error))
+        }
+    }
+
     private nonisolated static let oldToken = String(repeating: "o", count: 43)
     private nonisolated static let newToken = String(repeating: "n", count: 43)
 

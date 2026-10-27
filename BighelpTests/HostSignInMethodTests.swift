@@ -21,6 +21,13 @@ struct HostSignInMethodTests {
         #expect(HostAuthenticationDiscovery.preferredMethod(for: host) == .password)
     }
 
+    @Test func signingInAgainStartsTheBrowserWhenTheHostOffersIt() throws {
+        let host = try discovery(gated: true, providers: [("basic", true)])
+        #expect(HostAuthenticationDiscovery.preferredMethod(for: host, reauthenticating: true) == .browser)
+        let token = try discovery(gated: true, pkce: false)
+        #expect(HostAuthenticationDiscovery.preferredMethod(for: token, reauthenticating: true) == .token)
+    }
+
     @Test func singleSignOnHostsLeadWithTheBrowser() throws {
         let sso = try discovery(gated: true, providers: [("self-hosted", false)])
         #expect(HostAuthenticationDiscovery.preferredMethod(for: sso) == .browser)

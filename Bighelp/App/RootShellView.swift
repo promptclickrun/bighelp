@@ -508,6 +508,7 @@ struct RootShellView: View {
     /// yet and no error (a wake while the phone was locked) is still connecting.
     private var nativeWorkspaceStatus: HostConnectionStatus {
         let host = HostConnectionStatus(workspace: nativeWorkspaceStore, keeper: connectionKeeper)
+        if nativeWorkspaceStore?.requiresAuthentication == true { return host }
         let failed = nativeWorkspaceError != nil || nativeRuntime?.errorMessage != nil
         let isWorking = nativeRuntime?.isRefreshing == true || host.phase == .connecting || host.phase == .reconnecting
             || (nativeRuntime == nil && !failed && host.phase == .connected)
@@ -2058,7 +2059,10 @@ private struct NativeWorkspaceStatusView: View {
             Text(message)
         } actions: {
             BighelpConnectionPill(phase: status.phase, label: status.label)
-            if status.phase != .connecting {
+            if registry?.selectedWorkspace?.requiresAuthentication == true, let host = registry?.selectedHost {
+                Button("Sign in again") { registry?.beginAuthentication(for: host) }
+                    .accessibilityIdentifier("native-workspace.sign-in-again")
+            } else if status.phase != .connecting {
                 Button("Reconnect", action: reconnect)
             }
         }

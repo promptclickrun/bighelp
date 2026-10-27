@@ -1,8 +1,9 @@
 # Template catalog
 
-Every template in the bighelp Template Catalog (`catalog.bighelp.app`) lives here, one file or folder each.
-When a change to this directory is merged to `main`, the [Template Catalog workflow](../.github/workflows/catalog.yml)
-updates the catalog to match. The catalog's Worker is in [services/catalog](../services/catalog/README.md).
+The live catalog is managed in the private reviewer webapp, behind Cloudflare Access. This directory
+keeps source snapshots, one file or folder per template. Normal merges validate these files but **do not
+publish them**: they must not overwrite reviewer edits or recreate deleted live templates.
+The catalog's Worker is in [services/catalog](../services/catalog/README.md).
 
 ```
 catalog/
@@ -23,10 +24,12 @@ The fields, limits and topics are the Worker's (`services/catalog/src/templates.
    Give it an `id` of lowercase letters, digits and dashes. The id is permanent: a changed id is a new template.
 2. Open a pull request. It runs the Worker's own checks on every file in this directory
    (`services/catalog/test/repo-catalog.test.ts`), so a bad template fails the pull request.
-3. Merge it. The workflow creates what is new, updates what changed and approves what is waiting. Nothing else
-   changes, and a template that is only in the catalog is left alone.
+3. Merge it, then explicitly run the Template Catalog workflow with **publish** enabled if you intend to
+   replace live content from these files. Inspect `catalog-sync.py sync` first: publication overwrites
+   matching live edits, recreates missing IDs and approves matching pending templates. Prefer the webapp
+   for ordinary catalog editing.
 
-To remove a template, delete its file and start the workflow by hand with **prune** on. That unpublishes it
+To remove a live template, use the reviewer webapp. For an intentional repo-driven replacement, delete its file and start the workflow by hand with **publish** and **prune** on. That unpublishes it
 (it goes back to pending, so it can be restored). Without prune, a deleted file does nothing.
 
 Community submissions still go through the review queue. When one is approved, run

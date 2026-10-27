@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="referrer" content="same-origin">
+  <title>Catalog Reviewer · bighelp</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="app-head">
+    <div class="wordmark">bighelp<span class="dot">.</span><span class="app-name">Catalog Reviewer</span></div>
+    <div class="head-right">
+      <span class="identity" id="identity">Checking sign-in…</span>
+      <a class="signout" href="/cdn-cgi/access/logout">Sign out</a>
+    </div>
+  </header>
+
+  <nav class="sections" aria-label="Catalog sections">
+    <div class="section-tabs">
+      <a href="#queue" class="section-tab" data-view="queue" id="tab-queue">Review queue <span class="count" id="count-queue" hidden></span></a>
+      <a href="#all" class="section-tab" data-view="all" id="tab-all">All templates <span class="count" id="count-all" hidden></span></a>
+    </div>
+    <a class="external" href="https://bighelp.app/templates#submit" target="_blank" rel="noopener">Public submission form ↗</a>
+  </nav>
+
+  <div id="auth-banner" class="banner banner-auth" role="alert" hidden>
+    <p><strong>Your sign-in has expired.</strong> Nothing on this page was lost. Sign in again in a new tab, then come back and retry.</p>
+    <div class="banner-actions">
+      <a class="button" href="/" target="_blank" rel="noopener">Sign in again</a>
+      <button type="button" id="auth-retry">I’ve signed in, retry</button>
+    </div>
+  </div>
+
+  <main class="main" id="main">
+    <div class="page-heading">
+      <div>
+        <h1 id="page-title">Review queue</h1>
+        <p class="muted" id="page-desc">Community templates stay private until you approve them.</p>
+      </div>
+      <div class="heading-actions">
+        <button type="button" id="refresh">Refresh</button>
+        <button type="button" class="primary" id="new-template" data-mutates>New template</button>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <input type="search" id="search" placeholder="Search by title, content, author or id…" aria-label="Search templates" autocomplete="off">
+      <select id="filter-status" aria-label="Status">
+        <option value="all">All statuses</option>
+        <option value="approved">Published</option>
+        <option value="pending">Needs review</option>
+        <option value="rejected">Rejected</option>
+      </select>
+      <select id="filter-kind" aria-label="Type">
+        <option value="all">All types</option>
+        <option value="agent">Agents</option>
+        <option value="blueprint">Blueprints</option>
+      </select>
+    </div>
+
+    <div id="load-banner" class="banner banner-error" role="alert" hidden></div>
+    <p id="list-status" class="list-status muted" role="status" aria-live="polite"></p>
+
+    <div class="table-card">
+      <div class="table-wrap">
+        <table>
+          <caption class="sr-only" id="table-caption">Templates</caption>
+          <thead>
+            <tr>
+              <th class="col-check"><input type="checkbox" id="select-all" aria-label="Select all shown templates"></th>
+              <th>Template</th>
+              <th>Type</th>
+              <th>Status</th>
+              <th>Category</th>
+              <th>Author</th>
+              <th>Updated</th>
+              <th><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div class="bulk">
+        <span id="selected-count">Select templates to manage them together.</span>
+        <div class="bulk-actions">
+          <button type="button" id="bulk-unpublish" data-mutates disabled>Unpublish</button>
+          <button type="button" class="danger" id="bulk-delete" data-mutates disabled>Delete selected</button>
+        </div>
+      </div>
+    </div>
+    <p class="policy">Deleting is permanent. Unpublishing takes a template out of the public catalog and returns it to the review queue without deleting it. Templates you create here are published straight away.</p>
+  </main>
+
+  <dialog id="editor" class="editor" aria-labelledby="editor-title">
+    <div class="editor-top">
+      <div class="editor-heading">
+        <span id="editor-tag" class="tag"></span>
+        <h2 id="editor-title"></h2>
+        <p id="editor-meta" class="muted"></p>
+        <p id="editor-live" class="live-note" hidden></p>
+      </div>
+      <button type="button" class="close" id="editor-close" aria-label="Close">✕</button>
+    </div>
+    <div class="subtabs" role="tablist" aria-label="Template views">
+      <button type="button" role="tab" id="tab-preview" aria-controls="panel-preview" data-tab="preview">Preview</button>
+      <button type="button" role="tab" id="tab-edit" aria-controls="panel-edit" data-tab="edit">Edit</button>
+      <button type="button" role="tab" id="tab-details" aria-controls="panel-details" data-tab="details">Review details</button>
+    </div>
+    <div class="editor-body">
+      <section id="panel-preview" role="tabpanel" aria-labelledby="tab-preview"></section>
+      <section id="panel-edit" role="tabpanel" aria-labelledby="tab-edit"></section>
+      <section id="panel-details" role="tabpanel" aria-labelledby="tab-details"></section>
+    </div>
+    <div id="editor-error" class="banner banner-error editor-error" role="alert" hidden></div>
+    <div class="editor-foot">
+      <span id="editor-hint" class="muted hint"></span>
+      <div class="foot-actions" id="editor-actions"></div>
+    </div>
+  </dialog>
+
+  <dialog id="prompt" class="prompt-dialog" aria-labelledby="prompt-title">
+    <form method="dialog" id="prompt-form" novalidate>
+      <h2 id="prompt-title"></h2>
+      <div id="prompt-body"></div>
+      <div id="prompt-note-wrap" hidden>
+        <label for="prompt-note" id="prompt-note-label"></label>
+        <textarea id="prompt-note" maxlength="1000"></textarea>
+      </div>
+      <div id="prompt-typed-wrap" hidden>
+        <label for="prompt-typed" id="prompt-typed-label"></label>
+        <input id="prompt-typed" autocomplete="off" autocapitalize="characters" spellcheck="false">
+      </div>
+      <p id="prompt-error" class="field-error" role="alert" hidden></p>
+      <div class="modal-actions">
+        <button type="button" id="prompt-cancel">Cancel</button>
+        <button type="submit" class="primary" id="prompt-confirm">Confirm</button>
+      </div>
+    </form>
+  </dialog>
+
+  <p id="toast" class="toast" role="status" aria-live="polite" hidden></p>
+</body>
+</html>

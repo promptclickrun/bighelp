@@ -14,7 +14,7 @@ import {
 } from "./agents.js";
 import { refreshComposioCatalog, storedComposioCatalog } from "./composio.js";
 import {
-  type TemplateRow, approved, byStatusTokens, find, githubLoad, insert, list, pendingCommunityCount, publicView,
+  type TemplateRow, approved, byStatusTokens, countTemplates, find, githubLoad, insert, list, pendingCommunityCount, publicView,
   remove, review, reviewView, submitterLoad, submitterView, toTemplate,
 } from "./store.js";
 import {
@@ -24,6 +24,11 @@ import {
 
 export interface Env {
   DB: D1Database;
+  /** Static reviewer files; every request goes through Worker authorization first. */
+  REVIEWER_ASSETS?: Fetcher;
+  /** Verified numeric GitHub identity, never a submitted login/email. Missing means no exemption. */
+  OWNER_GITHUB_ID?: string;
+  REVIEWER_HOST?: string;
   ACCESS_TEAM_DOMAIN: string;
   ACCESS_AUD_REVIEW: string;
   /** Turnstile widget secret (a Worker secret). Also keys the network hash used for rate limits. */
@@ -82,11 +87,33 @@ export async function handle(request: Request, env: Env, deps: Dependencies = {}
   // No cookies anywhere, so any page may call the public routes; Turnstile is the gate on submitting.
   const cors = PUBLIC_CORS;
 
-  if (request.method === "OPTIONS") {
-    return path.startsWith("/review") ? new Response(null, { status: 204 }) : new Response(null, { status: 204, headers: cors });
+  const reviewerHost = !!env.REVIEWER_HOST && url.hostname === env.REVIEWER_HOST;
+  const reviewerPath = path === "/review" || path.startsWith("/review/");
+  if (request.method === "OPTIONS" && !reviewerHost && !reviewerPath) {
+    return new Response(null, { status: 204, headers: cors });
   }
 
   try {
+    // Protect HTML, JavaScript and every alternate path on the private hostname as well as the API.
+    if (reviewerHost || reviewerPath) {
+      const principal = await verifyAccess(request, accessConfig(env, env.ACCESS_AUD_REVIEW), keys);
+      if (!principal) return error(401, "Reviewers only.");
+      if (request.method === "OPTIONS") return new Response(null, { status: 204 });
+      if (reviewerPath) {
+        requireSafeReviewMutation(request, url);
+        if (path === "/review/session" && request.method === "GET") return json({ reviewer: reviewerName(principal) });
+        return await reviewRoute(request, env, path, url, reviewerName(principal), now());
+      }
+      if (!env.REVIEWER_ASSETS) return error(503, "Reviewer assets aren't configured.");
+      if (request.method !== "GET" && request.method !== "HEAD") return error(405, "Read only.");
+      const asset = await env.REVIEWER_ASSETS.fetch(request);
+      const response = new Response(asset.body, asset);
+      response.headers.set("Cache-Control", "no-store");
+      response.headers.set("X-Content-Type-Options", "nosniff");
+      response.headers.set("Referrer-Policy", "no-referrer");
+      response.headers.set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
+      return response;
+    }
     // Approved templates are public, so any page may read them (no cookies).
     if (path.startsWith("/v1/")) {
       return withHeaders(await publicRoute(request, env, path), cors);
@@ -99,11 +126,6 @@ export async function handle(request: Request, env: Env, deps: Dependencies = {}
     }
     if (path.startsWith("/agent/")) {
       return withHeaders(await agentRoute(request, env, path, deps.github ?? githubUser, now()), cors, true);
-    }
-    if (path === "/review" || path.startsWith("/review/")) {
-      const principal = await verifyAccess(request, accessConfig(env, env.ACCESS_AUD_REVIEW), keys);
-      if (!principal) return error(401, "Reviewers only.");
-      return await reviewRoute(request, env, path, url, reviewerName(principal), now());
     }
     if (path === "/") return json({ service: "bighelp template catalog", docs: "/v1/catalog.json" });
     return error(404, "Not found.");
@@ -192,7 +214,7 @@ async function composioCatalogRoute(request: Request, env: Env): Promise<Respons
 }
 
 async function revisionOf(rows: TemplateRow[]): Promise<string> {
-  const basis = rows.map((row) => `${row.id}:${row.updated_at}`).join("\n");
+  const basis = rows.map((row) => `${row.id}:${row.updated_at}:${row.version}`).join("\n");
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(basis));
   return [...new Uint8Array(digest)].slice(0, 8).map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
@@ -318,7 +340,8 @@ async function agentSubmitRoute(request: Request, env: Env, now: Date): Promise<
   if (!install) throw new HttpError(401, "This install isn't signed in. Run the catalog sign-in again.");
   const body = await readJson(request);
   const template = parseTemplate(body);
-  await requireQueueRoom(env.DB);
+  const isOwner = !!env.OWNER_GITHUB_ID && install.github_id === env.OWNER_GITHUB_ID;
+  if (!isOwner) await requireQueueRoom(env.DB);
   const load = await githubLoad(env.DB, install.github_id, new Date(now.getTime() - 86_400_000).toISOString());
   if (load.pending >= MAX_PENDING_PER_SUBMITTER) {
     throw new HttpError(429, "You have 10 templates waiting for review. Try again once some are reviewed.");
@@ -329,12 +352,12 @@ async function agentSubmitRoute(request: Request, env: Env, now: Date): Promise<
   const statusToken = randomToken();
   const id = newId(template.kind);
   await insert(env.DB, {
-    id, template, status: "pending", source: "community", creditName: install.github_login,
+    id, template, status: isOwner ? "approved" : "pending", source: isOwner ? "bighelp" : "community", creditName: install.github_login,
     submitter: { username: install.github_login, githubId: install.github_id, statusTokenHash: await sha256(statusToken) },
-    now: now.toISOString(),
+    now: now.toISOString(), reviewedBy: isOwner ? `github:${install.github_id}` : undefined,
   });
   return json({
-    id, status: "pending", statusToken, credit: install.github_login,
+    id, status: isOwner ? "approved" : "pending", statusToken, credit: install.github_login,
     remainingToday: MAX_AGENT_SUBMISSIONS_PER_DAY - load.recent - 1,
   }, 201);
 }
@@ -350,7 +373,7 @@ function bearer(request: Request): string | null {
   return match?.[1] ?? null;
 }
 
-// MARK: - Reviewers (Colt, Alfie and other agents)
+// MARK: - Access-authenticated reviewers
 
 async function reviewRoute(
   request: Request, env: Env, path: string, url: URL, reviewer: string, now: Date,
@@ -365,13 +388,14 @@ async function reviewRoute(
       const status = oneOfOrUndefined(url.searchParams.get("status") ?? "pending",
         ["pending", "approved", "rejected", "all"] as const);
       const kind = oneOfOrUndefined(url.searchParams.get("kind"), ["blueprint", "agent"] as const);
-      const limit = Math.min(Math.max(Number(url.searchParams.get("limit")) || 100, 1), 500);
-      const rows = await list(env.DB, {
-        status: status === "all" ? undefined : status as TemplateStatus | undefined,
-        kind: kind as TemplateKind | undefined,
-        limit,
-      });
-      return json({ templates: rows.map(reviewView) });
+      const rawLimit = Number(url.searchParams.get("limit"));
+      const limit = Math.min(500, Math.max(1, Math.floor(Number.isFinite(rawLimit) && rawLimit ? rawLimit : 100)));
+      const rawOffset = Number(url.searchParams.get("offset"));
+      const offset = Number.isFinite(rawOffset) ? Math.max(0, Math.min(Number.MAX_SAFE_INTEGER, Math.floor(rawOffset))) : 0;
+      const filter = { status: status === "all" ? undefined : status as TemplateStatus | undefined,
+        kind: kind as TemplateKind | undefined };
+      const [rows, total] = await Promise.all([list(env.DB, { ...filter, limit, offset }), countTemplates(env.DB, filter)]);
+      return json({ templates: rows.map(reviewView), total, nextOffset: offset + rows.length < total ? offset + rows.length : null });
     }
     if (request.method === "POST") {
       // Reviewers can publish their own templates directly.
@@ -396,11 +420,16 @@ async function reviewRoute(
 
   const row = await find(env.DB, id);
   if (!row) return error(404, "No template with that id.");
+  const match = request.headers.get("If-Match");
+  if (match && match !== `"v${row.version}"`) return error(409, "This template changed elsewhere. Reload it before trying again.");
+  if (request.headers.get("Origin") && request.method !== "GET" && !match) {
+    return error(428, "Reload the template before changing it.");
+  }
 
   if (!action) {
     if (request.method === "GET") return json(reviewView(row));
     if (request.method === "DELETE") {
-      await remove(env.DB, id);
+      if (!await remove(env.DB, id, row.version)) return error(409, "This template changed elsewhere. Reload it before trying again.");
       return json({ id, deleted: true });
     }
     if (request.method === "PATCH") {
@@ -409,9 +438,10 @@ async function reviewRoute(
       const template = parseTemplate({ ...toTemplate(row).payload, ...(isRecord(body) ? body : {}), kind: row.kind },
         { allowSymbol: true });
       const creditName = isRecord(body) && "creditName" in body ? parseCreditName(body.creditName) : undefined;
-      await review(env.DB, id, {
+      if (!await review(env.DB, id, {
         status: row.status, note: row.review_note, reviewer, now: now.toISOString(), template, creditName,
-      });
+        expectedVersion: row.version,
+      })) return error(409, "This template changed elsewhere. Reload it before trying again.");
       return json(reviewView((await find(env.DB, id))!));
     }
     return error(405, "Use GET, PATCH or DELETE.");
@@ -421,17 +451,17 @@ async function reviewRoute(
   const body = await readJson(request, true);
   const fields = isRecord(body) ? body : {};
   if (action === "approve") {
-    await review(env.DB, id, {
-      status: "approved", note: parseReviewNote(fields.note, false), reviewer, now: now.toISOString(),
-    });
+    if (!await review(env.DB, id, {
+      status: "approved", note: parseReviewNote(fields.note, false), reviewer, now: now.toISOString(), expectedVersion: row.version,
+    })) return error(409, "This template changed elsewhere. Reload it before trying again.");
   } else if (action === "reject") {
-    await review(env.DB, id, {
-      status: "rejected", note: parseReviewNote(fields.note, true), reviewer, now: now.toISOString(),
-    });
+    if (!await review(env.DB, id, {
+      status: "rejected", note: parseReviewNote(fields.note, true), reviewer, now: now.toISOString(), expectedVersion: row.version,
+    })) return error(409, "This template changed elsewhere. Reload it before trying again.");
   } else if (action === "unpublish") {
-    await review(env.DB, id, {
-      status: "pending", note: parseReviewNote(fields.note, false), reviewer, now: now.toISOString(),
-    });
+    if (!await review(env.DB, id, {
+      status: "pending", note: parseReviewNote(fields.note, false), reviewer, now: now.toISOString(), expectedVersion: row.version,
+    })) return error(409, "This template changed elsewhere. Reload it before trying again.");
   } else {
     return error(404, "Actions are approve, reject and unpublish.");
   }
@@ -452,6 +482,19 @@ async function reviewAccountRoute(
   }
   if (action === "unban") return json(await unban(env.DB, githubId));
   return error(404, "Actions are ban and unban.");
+}
+
+/** Cross-origin pages and HTML forms must never be able to mutate a signed-in review session. */
+function requireSafeReviewMutation(request: Request, url: URL): void {
+  if (["GET", "HEAD", "OPTIONS"].includes(request.method)) return;
+  const origin = request.headers.get("Origin");
+  if ((origin && origin !== url.origin) || request.headers.get("Sec-Fetch-Site") === "cross-site") {
+    throw new HttpError(403, "Review changes must come from this site.");
+  }
+  if (request.method !== "DELETE" && request.headers.get("Content-Type")?.split(";")[0]?.trim() !== "application/json") {
+    throw new HttpError(415, "Send review changes as JSON.");
+  }
+  if (origin && request.headers.get("X-Catalog-Review") !== "1") throw new HttpError(403, "Use the reviewer app to make changes.");
 }
 
 function reviewerName(principal: Principal): string {

@@ -122,6 +122,8 @@ struct RootShellView: View {
     /// This shell, for the open Duo's list: a new shell replaces the list the last one showed.
     @State var splitColumnShellID = UUID()
     @State var didAutoOpenHomeChat = false
+    /// The connection the shell's Feed, Ideas and Goals were last set up for (`configureAgentBoard`).
+    @State var agentBoardConfiguredKey: AgentBoardClientKey?
     /// The open Projects screens' chats and project details.
     @State var projectsStore: ProjectsStore?
     /// Code mode's home for the selected computer (`cacheScopeID`), kept through reconnects.

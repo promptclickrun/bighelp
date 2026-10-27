@@ -624,7 +624,13 @@ extension RootShellView {
     /// Feed, Ideas and Goals follow the connection. Coming back to the app reconnects and
     /// relearns the plugin's features; meanwhile the board waits and keeps what it shows,
     /// then reloads. Only a host that answers without the feature asks for a plugin update.
+    ///
+    /// The root's task does this, and so does a bot's Dashboard: a root task doesn't run while a
+    /// screen covers the root, so after a reconnect the Dashboard followed the old connection, and
+    /// every load said the host or connection had changed. Each connection is set up once.
     func configureAgentBoard(_ key: AgentBoardClientKey) async {
+        guard key != agentBoardConfiguredKey else { return }
+        agentBoardConfiguredKey = key
         // Media has its own plugin feature; the route says when it's missing.
         agentMedia.configure(client: key.owner.flatMap { owner in
             key.fixtures ? DemoAgentMediaClient.shared

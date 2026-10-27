@@ -50,8 +50,9 @@ struct HostAuthenticationDiscovery: Equatable {
     /// The method a host most likely wants: none when it isn't gated, the
     /// credential form when every sign-in provider takes a password, the
     /// browser for single sign-on, and a token when it offers nothing else.
-    static func preferredMethod(for discovery: Self) -> Method {
+    static func preferredMethod(for discovery: Self, reauthenticating: Bool = false) -> Method {
         if discovery.supportsDashboard { return .dashboard }
+        if reauthenticating, discovery.nativePKCE { return .browser }
         if discovery.supportsPassword, discovery.providers.allSatisfy(\.supportsPassword) { return .password }
         if discovery.nativePKCE { return .browser }
         return .token

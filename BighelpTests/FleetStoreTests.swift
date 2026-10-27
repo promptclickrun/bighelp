@@ -492,6 +492,25 @@ struct FleetStoreTests {
         #expect(fleet.tasks().map(\.name) == ["soon", "later", "paused"])
     }
 
+    @Test func taskSearchIntersectsTheChosenHostAndClearingRestoresItsTasks() {
+        let folder = directory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let fleet = FleetStore(reader: reader(), directory: folder, saveDelay: .zero)
+        func task(_ host: UUID, _ name: String, _ schedule: String) -> FleetTask {
+            FleetTask(hostID: host, jobID: name, profileID: "default", name: name, schedule: schedule,
+                      nextRun: nil, status: .active)
+        }
+        fleet.recordLive(FleetSnapshot(tasks: [task(home, "Review inbox", "Every morning"),
+                                               task(home, "Weekly plan", "Every Monday")], refreshedAt: .now), hostID: home)
+        fleet.recordLive(FleetSnapshot(tasks: [task(studio, "Review notes", "Every evening")], refreshedAt: .now), hostID: studio)
+        #expect(fleet.tasks(query: "review").count == 2)
+        #expect(fleet.tasks(on: home, query: "REVIEW").map(\.name) == ["Review inbox"])
+        #expect(fleet.tasks(on: home, query: "monday").map(\.name) == ["Weekly plan"])
+        #expect(fleet.tasks(on: home, query: "nothing matches").isEmpty)
+        #expect(fleet.tasks(on: home, query: "  ").count == 2)
+        #expect(fleet.tasks(query: "Studio").map(\.name) == ["Review notes"])
+    }
+
     @Test func choosingAHostSelectsIt() {
         let reader = reader()
         let fleet = FleetStore(reader: reader, directory: directory(), saveDelay: .zero)

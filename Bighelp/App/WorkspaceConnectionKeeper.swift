@@ -120,7 +120,7 @@ final class WorkspaceConnectionKeeper {
         let current = tracking
         let store = withObservationTracking {
             let store = storeProvider()
-            _ = store.map { ($0.isConnected, $0.isConnecting, $0.hasSavedConnection) }
+            _ = store.map { ($0.isConnected, $0.isConnecting, $0.hasSavedConnection, $0.requiresAuthentication) }
             return store
         } onChange: { [weak self] in
             // Only the latest registration re-arms, so observations never pile up.
@@ -135,6 +135,11 @@ final class WorkspaceConnectionKeeper {
         guard let store, store.hasSavedConnection, !store.isConnected else {
             loop?.cancel(); loop = nil; attempt = 0
             publish(.connected)
+            return
+        }
+        guard !store.requiresAuthentication else {
+            loop?.cancel(); loop = nil
+            publish(.disconnected)
             return
         }
         guard isActive, isPathSatisfied else {
@@ -158,7 +163,7 @@ final class WorkspaceConnectionKeeper {
             }
             waitFirst = true
             guard !Task.isCancelled, isActive, isPathSatisfied, storeProvider() === store,
-                  store.hasSavedConnection, !store.isConnected else { break }
+                  store.hasSavedConnection, !store.isConnected, !store.requiresAuthentication else { break }
             if !store.isConnecting { await store.reconnect() }
             if store.isConnected { break }
             publish(attempt < WorkspaceReconnectPolicy.quietAttempts ? .reconnecting : .disconnected)

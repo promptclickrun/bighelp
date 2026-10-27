@@ -443,7 +443,9 @@ struct FleetConnectingView: View {
     @State private var hasTried = false
 
     var body: some View {
-        let status = HostConnectionStatus(fleetSwitchTo: fleet.selectedHostID.map(fleet.hostName) ?? "your host",
+        let requiresAuthentication = registry?.selectedWorkspace?.requiresAuthentication == true
+        let status = requiresAuthentication ? HostConnectionStatus(.disconnected, "Sign in again")
+            : HostConnectionStatus(fleetSwitchTo: fleet.selectedHostID.map(fleet.hostName) ?? "your host",
                                           isConnecting: isConnecting, hasTried: hasTried)
         FleetHomeView(fleet: fleet, onOpen: onOpen, hostFilter: $hostFilter)
             .onChange(of: isConnecting, initial: true) { _, connecting in if connecting { hasTried = true } }
@@ -453,7 +455,11 @@ struct FleetConnectingView: View {
                     BighelpConnectionIndicator(phase: status.phase)
                     Text(status.label)
                         .contentTransition(.opacity)
-                    if status.phase == .disconnected {
+                    if requiresAuthentication, let host = registry?.selectedHost {
+                        Button("Sign in again") { registry?.beginAuthentication(for: host) }
+                            .buttonStyle(.borderless)
+                            .accessibilityIdentifier("fleet.sign-in-again")
+                    } else if status.phase == .disconnected {
                         Button("Try again", action: retry)
                             .buttonStyle(.borderless)
                     }
@@ -803,34 +809,44 @@ struct FleetTasksView: View {
     let fleet: FleetStore
     @Binding var hostFilter: UUID?
     let onOpen: (FleetTask) -> Void
+    @State private var searchQuery = ""
+
+    private var shownTasks: [FleetTask] { fleet.tasks(on: hostFilter, query: searchQuery) }
 
     var body: some View {
         List {
+            BighelpSearchField(text: $searchQuery, prompt: "Search tasks", accessibilityLabel: "Search tasks",
+                               accessibilityIdentifier: "scheduled-tasks.search")
+                .bighelpListSearchRow()
             if fleet.showsHostNames {
                 FleetHostFilter(fleet: fleet, selection: $hostFilter)
                     .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
             }
-            ForEach(fleet.tasks(on: hostFilter)) { task in
+            ForEach(shownTasks) { task in
                 Button { onOpen(task) } label: { row(task) }
                     .buttonStyle(.plain)
                     .listRowBackground(Color.clear)
                     .accessibilityIdentifier("fleet.task.\(task.name)")
             }
             FleetHostNotes(fleet: fleet, hostFilter: hostFilter)
+            if shownTasks.isEmpty {
+                ContentUnavailableView(searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                       ? "No scheduled tasks" : "No matching tasks",
+                                       systemImage: "calendar.badge.clock",
+                                       description: Text(searchQuery.isEmpty
+                                           ? "Ask an agent to check in or remind you, and it shows up here."
+                                           : "Try another search or computer."))
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+            }
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .bighelpRefreshable {
             fleet.refresh(force: true)
             await fleet.waitForReads()
-        }
-        .overlay {
-            if fleet.tasks(on: hostFilter).isEmpty {
-                ContentUnavailableView("No scheduled tasks", systemImage: "calendar.badge.clock",
-                                       description: Text("Ask an agent to check in or remind you, and it shows up here."))
-            }
         }
         .task { fleet.refresh() }
         .accessibilityIdentifier("fleet.tasks")

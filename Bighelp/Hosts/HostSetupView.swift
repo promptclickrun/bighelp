@@ -593,10 +593,11 @@ struct HostSetupView: View {
                 guard requestID == owner, registry.accountScope == account, registry.generation == accountGeneration, !Task.isCancelled else { return }
                 protection = nil
                 discovery = result
-                method = Method(rawValue: HostAuthenticationDiscovery.preferredMethod(for: result).rawValue) ?? .token
+                method = Method(rawValue: HostAuthenticationDiscovery.preferredMethod(
+                    for: result, reauthenticating: hostToAuthenticate != nil).rawValue) ?? .token
                 provider = defaultProvider
                 // A computer that needs no sign-in connects straight away.
-                if method == .dashboard { connect(result) }
+                if method == .dashboard || (hostToAuthenticate != nil && method == .browser) { connect(result) }
             } catch {
                 guard requestID == owner, registry.accountScope == account, registry.generation == accountGeneration else { return }
                 if let next = nextProtection(after: error) {

@@ -3,6 +3,20 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.25
+
+### Chat
+
+- **A compact header:** Chat mode uses the same glass pill for the agent's name and picture as Bots mode. Text also blurs at the top and bottom edges in the same way.
+- **Open saved chats at once:** select a chat that bighelp has saved on your device to open it at once. The loading screen shows only when the chat has no saved copy.
+- **More room to read:** the smaller **Return to latest** button sits on the right side of the chat.
+- **A new chat transition:** the current messages fade away when you select **New chat** or **New bot chat**. If Reduce Motion is on, the messages clear without the effect.
+
+### Fixed
+
+- **Find scheduled tasks:** search scheduled tasks across all your computers. Search stays available when there are no matches. You can also reach Tasks from Kanban when Kanban is in the bottom bar.
+- **Sign in again:** if a computer rejects your saved sign-in, **Sign in again** replaces **Reconnect**. Tap it to start the sign-in for that computer.
+
 ## 2.6.24
 
 ### Fixed

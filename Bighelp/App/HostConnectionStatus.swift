@@ -71,6 +71,10 @@ extension HostConnectionStatus {
     /// host refuses each try at once), it's reconnecting, as the island says.
     @MainActor
     init(workspace store: DirectHermesWorkspaceStore?, keeper: WorkspaceConnectionKeeper? = nil) {
+        if store?.requiresAuthentication == true {
+            self.init(.disconnected, "Sign in again")
+            return
+        }
         let following = keeper?.isFollowing(store) == true
         self.init(isConnected: store?.isConnected == true,
                   isConnecting: store?.isConnecting == true || (following && keeper?.state == .reconnecting),

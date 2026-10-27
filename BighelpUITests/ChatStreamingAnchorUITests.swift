@@ -247,6 +247,10 @@ final class ChatStreamingAnchorUITests: BighelpUITestCase {
                        "A live answer must not pull a reader away from history.")
         let returnButton = app.buttons["Return to latest messages"]
         XCTAssertTrue(returnButton.exists)
+        XCTAssertGreaterThan(returnButton.frame.midX, app.frame.width * 0.8,
+                             "Return to latest leaves the center of the transcript readable")
+        XCTAssertLessThanOrEqual(returnButton.frame.width, 44)
+        XCTAssertGreaterThanOrEqual(returnButton.frame.height, 44, "Keep a full touch target around the smaller circle")
         returnButton.tap()
         resumeStream()
         let finished = app.textViews.matching(NSPredicate(format: "label CONTAINS %@", "Stream line 100:")).firstMatch

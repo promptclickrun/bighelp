@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 enum NewChatOutcome: Equatable, Sendable {
     case opened(sessionID: String, agentID: String)
@@ -35,14 +36,15 @@ final class NewChatCoordinator {
         pendingPresentationDraft = nil
     }
 
-    func start(explicitAgentID: String? = nil) async throws -> NewChatOutcome {
+    func start(explicitAgentID: String? = nil,
+               beforePresentation: @escaping @MainActor (String, String?) -> Void = { _, _ in }) async throws -> NewChatOutcome {
         if let inFlightStart {
             return try await inFlightStart.task.value
         }
 
         let startID = UUID()
         let task = Task { @MainActor [self] in
-            try await performStart(explicitAgentID: explicitAgentID)
+            try await performStart(explicitAgentID: explicitAgentID, beforePresentation: beforePresentation)
         }
         inFlightStart = InFlightStart(id: startID, task: task)
         defer {
@@ -53,7 +55,8 @@ final class NewChatCoordinator {
         return try await task.value
     }
 
-    private func performStart(explicitAgentID: String?) async throws -> NewChatOutcome {
+    private func performStart(explicitAgentID: String?,
+                              beforePresentation: @escaping @MainActor (String, String?) -> Void) async throws -> NewChatOutcome {
         // Link may be reconnecting while the shell is already usable. Resolve
         // an active/default agent from the last known directory immediately so
         // a transient refresh failure cannot block a new chat. The native
@@ -62,7 +65,7 @@ final class NewChatCoordinator {
         // cache remains a hard failure: Hermes must always receive an explicit
         // agent ID for a new session.
         if let cachedAgent = agents.resolvedAgent(explicitID: explicitAgentID) {
-            return try await openSession(for: cachedAgent)
+            return try await openSession(for: cachedAgent, beforePresentation: beforePresentation)
         }
 
         try await agents.load()
@@ -70,10 +73,11 @@ final class NewChatCoordinator {
             return .needsAgentSelection
         }
 
-        return try await openSession(for: agent)
+        return try await openSession(for: agent, beforePresentation: beforePresentation)
     }
 
-    private func openSession(for agent: AgentProfile) async throws -> NewChatOutcome {
+    private func openSession(for agent: AgentProfile,
+                             beforePresentation: @MainActor (String, String?) -> Void) async throws -> NewChatOutcome {
         let presentation = localPresentationDraft(for: agent)
         let presentationRoute = AppRoute.chat(conversationID: presentation.id)
         guard prepare(presentationRoute) else {
@@ -85,7 +89,7 @@ final class NewChatCoordinator {
         }
         // Show a usable local canvas before any Hermes round trip. This ID is
         // never sent to Hermes; the durable session below remains authoritative.
-        appState.activateConversation(id: presentation.id, source: .newChat)
+        present(presentation.id, beforePresentation: beforePresentation)
 
         let session = try await catalog.createDirect(agentID: agent.id)
         let presentationRecord = catalog.session(id: presentation.id)
@@ -127,7 +131,7 @@ final class NewChatCoordinator {
         guard prepare(route) else {
             return .needsAgentSelection
         }
-        appState.activateConversation(id: session.id, source: .newChat)
+        present(session.id, beforePresentation: beforePresentation)
         catalog.discardLocalPresentationDraft(id: presentation.id)
         if pendingPresentationDraft?.id == presentation.id {
             pendingPresentationDraft = nil
@@ -166,6 +170,13 @@ final class NewChatCoordinator {
         }
 
         return .opened(sessionID: session.id, agentID: agent.id)
+    }
+
+    private func present(_ id: String, beforePresentation: @MainActor (String, String?) -> Void) {
+        beforePresentation(id, appState.activeConversationID)
+        var instant = Transaction()
+        instant.disablesAnimations = true
+        withTransaction(instant) { appState.activateConversation(id: id, source: .newChat) }
     }
 
     private func localPresentationDraft(for agent: AgentProfile) -> SessionRecord {

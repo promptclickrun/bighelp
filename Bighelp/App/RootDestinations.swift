@@ -184,6 +184,7 @@ extension RootShellView {
             )
             .environment(\.chatCardInteractions, cardInteractions(for: model))
             .environment(\.agentHomeChrome, homeChrome(forChat: conversationID))
+            .environment(\.chatDissolveTransition, chatDissolve)
             .environment(connectionKeeper)
             .bighelpSideColumn(screen, isShown: switcher != nil) { switcher }
         case (.scheduledTasks, .scheduledTasks(let store)?):

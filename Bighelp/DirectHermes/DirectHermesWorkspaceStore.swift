@@ -12,6 +12,7 @@ final class DirectHermesWorkspaceStore {
     private(set) var address = ""
     private(set) var isConnecting = false
     private(set) var isConnected = false
+    private(set) var requiresAuthentication = false
     private(set) var status = "Connect your Hermes host."
     private(set) var profiles: [DirectHermesProfile] = []
     private(set) var sessions: [DirectHermesSessionSummary] = []
@@ -98,6 +99,7 @@ final class DirectHermesWorkspaceStore {
         let previous = retireConnection()
         let owner = generation
         isConnecting = true
+        requiresAuthentication = false
         status = "Connecting securely to Hermes…"
         defer { if generation == owner { isConnecting = false } }
         await previous?.disconnect()
@@ -125,6 +127,7 @@ final class DirectHermesWorkspaceStore {
             await recoverRetainedChats(connection, owner: owner)
         } catch {
             guard owner == generation else { return }
+            requiresAuthentication = Self.requiresSignIn(error)
             status = DirectHermesConversationClient.safeMessage(error)
         }
     }
@@ -207,6 +210,7 @@ final class DirectHermesWorkspaceStore {
             await recoverRetainedChats(connection, owner: owner)
         } catch {
             guard owner == generation else { return }
+            requiresAuthentication = requiresAuthentication || Self.requiresSignIn(error)
             // A failed restore may still have rotated credentials successfully.
             // Re-read the exact vault target before offering the next attempt.
             do { try reloadSavedConnection() }
@@ -218,6 +222,13 @@ final class DirectHermesWorkspaceStore {
                 for: DirectHermesHTTP.safeError(error), host: saved?.endpoint.baseURL.host() ?? "",
                 vpnActive: NetworkPathSignature.latest?.vpnActive ?? true)
                 ?? DirectHermesConversationClient.safeMessage(error)
+        }
+    }
+
+    static func requiresSignIn(_ error: any Error) -> Bool {
+        switch DirectHermesHTTP.safeError(error) {
+        case .authenticationRequired, .invalidCredentials, .authModeChanged, .identityChanged: true
+        default: false
         }
     }
 
@@ -510,6 +521,7 @@ final class DirectHermesWorkspaceStore {
             try vault.delete()
             saved = nil
             hasSavedConnection = false
+            requiresAuthentication = false
             address = ""
             selectedChat = nil
             chats = [:]
@@ -649,6 +661,7 @@ final class DirectHermesWorkspaceStore {
     private func attach(_ connection: DirectHermesClient, owner: UUID) throws {
         client = connection
         isConnected = true
+        requiresAuthentication = false
         status = "Connected directly to Hermes"
         let promptConnection = DirectHermesPromptConnection(
             owner: owner,
@@ -807,6 +820,7 @@ final class DirectHermesWorkspaceStore {
             self.isLoadingSessions = false
             self.earlyEvents = []
             self.isConnected = false
+            self.requiresAuthentication = Self.requiresSignIn(error)
             for chat in self.chats.values { chat.client.suspend() }
             self.status = DirectHermesConversationClient.safeMessage(error)
         }

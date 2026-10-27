@@ -137,21 +137,25 @@ extension RootShellView {
     /// The tapped agent's Bot Chat; if the host can't give one, its latest chat or a new one.
     /// `startsVoice` opens voice on it. Cancelled only when the person moves on (another
     /// screen, tab or computer).
-    func openCanonicalAgentChat(_ profileID: String, fromList: Bool, startsVoice: Bool = false) {
-        guard let owner = currentWorkspaceOwner else {
-            actionErrorMessage = "Connect to this computer to open the agent’s chat."
-            return
-        }
+    func openCanonicalAgentChat(_ profileID: String, fromList: Bool, startsVoice: Bool = false,
+                                dissolvesOutgoing: Bool = false) {
+        let saved = sessionCatalog.records.first(where: { $0.isBotChat && $0.agentIDs == [profileID] })
         // Bots mode: the opening loader covers the lookup and the chat's first load if they're slow.
         let opening = simpleBotsOn
             ? simpleBotsChatOpening.begin(agentID: profileID, name: agents.profiles.first { $0.id == profileID }?.name,
-                                          originPath: appState.path)
+                                          originPath: appState.path,
+                                          hasCachedContent: saved.map { hasCachedChatContent($0.id) } ?? false)
             : nil
         // A Bot Chat opened before is saved here: open it at once (its chat loads from
         // Hermes as usual) rather than wait a second or two on the lookup.
-        if let saved = sessionCatalog.records.first(where: { $0.isBotChat && $0.agentIDs == [profileID] }) {
-            showAgentChat(saved, fromList: fromList, startsVoice: startsVoice)
+        if let saved {
+            showAgentChat(saved, fromList: fromList, startsVoice: startsVoice, dissolvesOutgoing: dissolvesOutgoing)
             if let opening { simpleBotsChatOpening.endIfNothingOpened(opening) }
+            return
+        }
+        guard let owner = currentWorkspaceOwner else {
+            if let opening { simpleBotsChatOpening.endIfNothingOpened(opening) }
+            actionErrorMessage = "Connect to this computer to open the agent’s chat."
             return
         }
         let originTab = appState.selectedTab
@@ -173,12 +177,12 @@ extension RootShellView {
         }, present: { id in
             guard let record = sessionCatalog.session(id: id), record.kind == .direct,
                   record.agentIDs == [profileID] else {
-                openLatestAgentChat(profileID, fromList: fromList, startsVoice: startsVoice)
+                openLatestAgentChat(profileID, fromList: fromList, startsVoice: startsVoice, dissolvesOutgoing: dissolvesOutgoing)
                 return
             }
-            showAgentChat(record, fromList: fromList, startsVoice: startsVoice)
+            showAgentChat(record, fromList: fromList, startsVoice: startsVoice, dissolvesOutgoing: dissolvesOutgoing)
         }, failed: {
-            openLatestAgentChat(profileID, fromList: fromList, startsVoice: startsVoice)
+            openLatestAgentChat(profileID, fromList: fromList, startsVoice: startsVoice, dissolvesOutgoing: dissolvesOutgoing)
         })
         if let opening {
             Task { @MainActor in
@@ -188,7 +192,8 @@ extension RootShellView {
         }
     }
 
-    private func showAgentChat(_ record: SessionRecord, fromList: Bool, startsVoice: Bool) {
+    private func showAgentChat(_ record: SessionRecord, fromList: Bool, startsVoice: Bool, dissolvesOutgoing: Bool = false) {
+        if dissolvesOutgoing { presentNewChatDissolve(record.id, replacing: appState.activeConversationID) }
         var instant = Transaction()
         instant.disablesAnimations = true
         withTransaction(instant) {
@@ -217,7 +222,8 @@ extension RootShellView {
     /// Some hosts can't give an agent its Bot Chat: one already titled "Bot Chat"
     /// from Hermes' API server is hidden from the app but keeps the title. The
     /// agent still opens, on its latest chat or a new one, never an error.
-    private func openLatestAgentChat(_ profileID: String, fromList: Bool, startsVoice: Bool) {
+    private func openLatestAgentChat(_ profileID: String, fromList: Bool, startsVoice: Bool,
+                                     dissolvesOutgoing: Bool = false) {
         var instant = Transaction()
         instant.disablesAnimations = true
         withTransaction(instant) {
@@ -225,6 +231,7 @@ extension RootShellView {
             appState.chatOpenedFromList = fromList
             if let latest = sessionCatalog.recentSummaries(includeCronSessions: false)
                 .first(where: { $0.kind == .direct && $0.agentIDs == [profileID] }) {
+                if dissolvesOutgoing { presentNewChatDissolve(latest.id, replacing: appState.activeConversationID) }
                 openSession(latest)
                 if startsVoice { appState.requestVoiceMode(for: latest.id) }
             } else {
@@ -346,6 +353,8 @@ extension RootShellView {
     func startNewBotChat(_ record: SessionRecord) {
         guard let agentID = record.agentIDs.first else { return }
         let fromList = appState.chatOpenedFromList
+        let origin = appState.path
+        let signIn = currentWorkspaceOwner?.signIn
         Task { @MainActor in
             do {
                 try await sessionCatalog.renameSession(id: record.id, title: SessionRecord.retiredBotChatTitle(at: .now))
@@ -356,7 +365,8 @@ extension RootShellView {
                     + (HermesRefusalMessage.sentence(in: error) ?? "Check the connection and try again.")
                 return
             }
-            openCanonicalAgentChat(agentID, fromList: fromList)
+            guard appState.path == origin, currentWorkspaceOwner?.signIn == signIn else { return }
+            openCanonicalAgentChat(agentID, fromList: fromList, dissolvesOutgoing: true)
         }
     }
 

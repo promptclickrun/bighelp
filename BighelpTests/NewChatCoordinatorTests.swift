@@ -4,6 +4,32 @@ import Testing
 
 @MainActor
 struct NewChatCoordinatorTests {
+    @Test func presentationHookRunsBeforeEachReplacementWithoutWaitingForAllocation() async throws {
+        let client = DeferredNewChatSessionCatalogClient()
+        let agents = AgentDirectoryStore(client: AgentDirectoryFixtureClient(profiles: [.defaultFixture]),
+                                         profiles: [.defaultFixture])
+        let state = AppState()
+        state.activateConversation(id: "outgoing", source: .sessions)
+        let catalog = SessionCatalogStore(client: client)
+        let coordinator = NewChatCoordinator(appState: state, agents: agents, catalog: catalog, prepare: { _ in true })
+        var replacements: [(next: String, previous: String?)] = []
+        let start = Task {
+            try await coordinator.start(beforePresentation: { next, previous in
+                #expect(state.activeConversationID == previous, "Snapshot capture precedes route replacement")
+                replacements.append((next, previous))
+            })
+        }
+        await client.waitUntilCreateStarts()
+        let local = state.activeConversationID
+        #expect(replacements.count == 1, "The effect starts with the local canvas, before Hermes answers")
+        #expect(replacements.first?.previous == "outgoing")
+        client.finishCreation()
+        _ = try await start.value
+        #expect(replacements.count == 2)
+        #expect(replacements.last?.previous == local)
+        #expect(replacements.last?.next == "session-shared")
+    }
+
     @Test func newChatPresentsLocalCanvasBeforeAuthoritativeAllocationFinishes() async throws {
         let client = DeferredNewChatSessionCatalogClient()
         let agents = AgentDirectoryStore(

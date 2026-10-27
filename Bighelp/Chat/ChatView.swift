@@ -99,6 +99,7 @@ struct ChatView: View {
     @Environment(\.companionStore) private var companionStore
     @Environment(\.companionAgentScope) private var companionAgentScope
     @Environment(\.agentHomeChrome) var homeChrome
+    @Environment(\.chatDissolveTransition) private var chatDissolve
     @Environment(\.teamCallAction) private var teamCallAction
     private enum SessionTitleDialog {
         case rename
@@ -325,10 +326,12 @@ struct ChatView: View {
         .modifier(ChatScheduledRetryLifecycle(model: model))
         .onAppear {
             isChatVisible = true
+            registerChatDissolve()
             BighelpVisibleChats.shared.appeared(model, screen: screenID)
             ChatPDFPagesDraftRegistry.mount(model)
             model.nativeSessionResumeProgress.mount()
         }
+        .onChange(of: ObjectIdentifier(model)) { _, _ in registerChatDissolve() }
         .onChange(of: workStyleInUse) { _, style in
             model.activityDisclosures.configure(style: style)
         }
@@ -462,6 +465,11 @@ struct ChatView: View {
                 Text(sessionTitleErrorMessage)
             }
         }
+    }
+
+    private func registerChatDissolve() {
+        chatDissolve?.register(conversationID: model.conversationID,
+                               scrollView: { [weak timelineController] in timelineController?.scrollView })
     }
 
     private var companionSignal: CompanionChatSignal {
@@ -931,30 +939,8 @@ struct ChatView: View {
             dismissKeyboard()
             homeChrome.onProfile(agentID)
         } label: {
-            HStack(spacing: BighelpTokens.space8) {
-                SimpleBotFace(agentID: agentID, name: agentName, imageURL: participant?.imageURL, size: 28)
-                BighelpHuggingWidth(maxWidth: 220) {
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(agentName)
-                        .font(.bighelp(.title3, weight: .semibold))
-                        .foregroundStyle(theme.primaryText)
-                        .lineLimit(1)
-                    if let title = shownSessionTitle {
-                        Text(title)
-                            .font(.bighelp(.caption2).weight(.medium))
-                            .foregroundStyle(theme.secondaryText)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                            .accessibilityIdentifier("chat.identity.session-title")
-                    }
-                }
-                }
-            }
-            .padding(.leading, BighelpTokens.space12)
-            .padding(.trailing, BighelpTokens.space16)
-            .frame(minHeight: BighelpTokens.hitTarget)
-            .contentShape(Capsule())
-            .bighelpNavigationGlass(in: Capsule(), isInteractive: true)
+            ChatAgentIdentityPill(agentID: agentID, name: agentName, imageURL: participant?.imageURL,
+                                  sessionTitle: shownSessionTitle)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(agentName)
@@ -1173,6 +1159,13 @@ struct ChatView: View {
                     onNewBotChat()
                 }
                 .accessibilityIdentifier("chat.new-bot-chat")
+            }
+            if homeChrome.isEnabled, !model.isBotMode {
+                Button("Switch agent", systemImage: "person.2") {
+                    dismissKeyboard()
+                    homeChrome.onSwitchAgent()
+                }
+                .accessibilityIdentifier("chat.switch-agent")
             }
             if let onChatFilesTap {
                 Button(dynamicTypeSize.isAccessibilitySize ? "Files" : "Chat files", systemImage: "folder") {

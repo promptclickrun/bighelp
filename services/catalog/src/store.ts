@@ -169,20 +169,22 @@ export async function insert(
     };
     now: string;
     reviewedBy?: string;
+    skipExisting?: boolean;
   },
-): Promise<void> {
+): Promise<boolean> {
   const reviewed = input.status === "pending" ? null : input.now;
-  await db.prepare(
+  const result = await db.prepare(
     `INSERT INTO templates (id, kind, status, source, payload, credit_name, submitter_email, submitter_name,
        submitter_username, status_token_hash, submitter_ip_hash, submitter_github_id, created_at, updated_at,
        reviewed_at, reviewed_by, sort_key)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)${input.skipExisting ? " ON CONFLICT(id) DO NOTHING" : ""}`,
   ).bind(
     input.id, input.template.kind, input.status, input.source, JSON.stringify(input.template.payload),
     input.creditName, input.submitter?.email ?? null, input.submitter?.name ?? null,
     input.submitter?.username ?? null, input.submitter?.statusTokenHash ?? null, input.submitter?.ipHash ?? null,
     input.submitter?.githubId ?? null, input.now, input.now, reviewed, input.reviewedBy ?? null, Date.parse(input.now) / 1000,
   ).run();
+  return result.meta.changes > 0;
 }
 
 export async function review(

@@ -75,6 +75,14 @@ async function call(
 }
 
 describe("catalog reviewer webapp", () => {
+  it("returns a conflict when named templates are created concurrently", async () => {
+    const jwt = await reviewer();
+    const responses = await Promise.all([1, 2].map(() => call("/review/templates", {
+      method: "POST", body: { ...blueprint, id: "same-named-template" }, jwt,
+    })));
+    expect(responses.map(response => response.status).sort()).toEqual([201, 409]);
+  });
+
   it("changes the public revision even when two writes share a timestamp", async () => {
     const jwt = await reviewer();
     const fixed = new Date("2026-01-01T12:00:00Z");

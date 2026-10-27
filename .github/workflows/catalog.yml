@@ -44,6 +44,9 @@ jobs:
       - run: npm ci
       # Every file in catalog/ goes through the Worker's own template checks, and the Worker's tests run.
       - run: npm test
+      - run: npm run typecheck
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
       - run: python3 scripts/catalog-sync.py check
 
   # Only runs on main, never on a pull request, so a pull request can't reach the secrets.
@@ -53,7 +56,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # Two merges in a row publish one after the other, each from its own commit.
+    # Explicit publication requests run one after the other, each from its own commit.
     concurrency:
       group: catalog-publish
       cancel-in-progress: false

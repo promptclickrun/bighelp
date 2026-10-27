@@ -407,12 +407,12 @@ async function reviewRoute(
       if (named !== undefined && (typeof named !== "string" || !/^[a-z0-9][a-z0-9-]{2,63}$/.test(named))) {
         throw new ValidationError("id", "Use lowercase letters, digits and dashes, 3 to 64 characters.");
       }
-      if (named !== undefined && await find(env.DB, named as string)) return error(409, "A template with that id exists.");
       const newID = (named as string | undefined) ?? newId(template.kind);
-      await insert(env.DB, {
+      const created = await insert(env.DB, {
         id: newID, template, status: "approved", source: "bighelp", creditName,
-        now: now.toISOString(), reviewedBy: reviewer,
+        now: now.toISOString(), reviewedBy: reviewer, skipExisting: true,
       });
+      if (!created) return error(409, "A template with that id exists.");
       return json(reviewView((await find(env.DB, newID))!), 201);
     }
     return error(405, "Use GET or POST.");

@@ -63,13 +63,19 @@ final class DirectHermesChatSpeakerNote: ChatSpeakerNoting {
 }
 
 extension DirectHermesConversationClient {
-    /// How long a send waits to say who's sending. The note is small; a slow
-    /// host sends the message anyway and the agent just doesn't get the name.
+    /// How long a chat's first message waits to say who's sending. The plugin writes the
+    /// name into the chat's brief once, as the first turn starts; a slow host sends the
+    /// message anyway and the agent just doesn't get the name.
     static let speakerNoteWait: Duration = .milliseconds(1_200)
 
+    /// Says who's sending. Only a chat's first message waits for it: later turns read the
+    /// note when they reach the model, well after the message lands, so they go at once
+    /// (a host far away added two round trips to every message).
     func noteSpeaker() async {
         guard let speakerNote else { return }
         let agentID = profile, storedID = storedID
+        let note = Task { @MainActor in await speakerNote.note(agentID: agentID, storedSessionID: storedID) }
+        guard projection.items.isEmpty else { return }
         let wait = Self.speakerNoteWait
         // Whichever ends first lets the message go: the note, or the wait. A note
         // still running after that finishes on its own.
@@ -81,7 +87,7 @@ extension DirectHermesConversationClient {
                 race.finish()
             }
             Task { @MainActor in
-                await speakerNote.note(agentID: agentID, storedSessionID: storedID)
+                await note.value
                 race.finish()
             }
         }

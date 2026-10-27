@@ -3044,6 +3044,46 @@ struct NativeMidSessionTests {
         turn.cancel()
     }
 
+    /// Only a chat's first message waits to say who's sending (the plugin names the person
+    /// in the chat's brief then). Later ones go at once: a far host added round trips to each.
+    @Test func laterMessagesNeverWaitToSayWhoIsSending() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let rpc = DirectTestRPC()
+        rpc.handler = { method, _ in
+            switch method {
+            case "session.events.since":
+                return .object(["epoch": .string("epoch"), "latest_seq": .integer(0),
+                    "truncated": .boolean(false), "events": .array([]), "count": .integer(0)])
+            case "session.activate":
+                return .object(["session_id": .string("runtime"), "stored_session_id": .string("saved"),
+                    "session_key": .string("saved"), "running": .boolean(false), "messages": .array([
+                        .object(["role": .string("user"), "text": .string("Saved question")]),
+                        .object(["role": .string("assistant"), "text": .string("Saved answer")]),
+                    ])])
+            case "subagent.list": return .object(["subagents": .array([])])
+            default: return .object(["status": .string(method == "prompt.submit" ? "streaming" : "queued")])
+            }
+        }
+        let client = try DirectHermesConversationClient(rpc: rpc, hostIdentity: "host", profile: "default",
+            runtimeID: "runtime", storedID: "saved", title: "Chat", epoch: "epoch", drafts: .init(root: root))
+        defer { client.suspend() }
+        let log = SpeakerLog()
+        client.speakerNote = RecordingSpeakerNote(log: log, delay: .seconds(30))
+        let model = ChatModel(conversationID: client.conversationID, client: client, initialItems: [])
+        client.model = model
+        try await client.recover(epoch: "epoch")
+        model.draft = "And tomorrow?"
+        let started = ContinuousClock.now
+        let turn = Task { await model.send() }
+        for _ in 0..<500 where !rpc.requests.contains(where: { $0.method == "prompt.submit" }) {
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(rpc.requests.contains(where: { $0.method == "prompt.submit" }))
+        #expect(ContinuousClock.now - started < .milliseconds(600), "The message doesn't wait for the note")
+        turn.cancel()
+    }
+
     /// The chat's model sheet read "Reasoning: unknown" while the agent worked:
     /// its own read waits for an idle chat, and the one made when the chat opened
     /// can fail before the chat is attached. Hermes reports the level in every

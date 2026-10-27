@@ -12,7 +12,7 @@ Contract references below name chapters under `docs/hermes/`, with product refer
 | Proxy access | Independent proxy headers, private HTTP consent and prefix-safe paths | CONNECTION.md §§1–2 | In progress: Task 1 | Endpoint tests exist; full proxy pending |
 | Gateway | Ready deadline, ticket subprotocol, ordered RPC/events, heartbeat and reconnect | CONNECTION.md §§7–10 | In progress: Task 1 | Pending |
 | Prompts | Questions, approval, secret/sudo and exact cancellation ownership | CHAT.md §§8–9 | Not started | Pending |
-| Saved computers | Encrypted credentials, add/select/remove, restore exact principal | CONNECTION.md §6 | Not started | Pending |
+| Saved computers | Encrypted credentials, add/select/remove, restore exact principal | CONNECTION.md §6 | In progress: verified Keystore backing; live composition pending | 22 storage JVM cases and 5 API36 instrumentation cases pass |
 | Agents and Bots | Real directory and canonical Bot Chats; edit instructions, model, appearance | REFERENCE.md §Profiles | Not started | Pending |
 | Sessions | Catalog, create/resume, search, rename, archive/restore/delete/fork | CHAT.md §§1–3,11 | Not started | Pending |
 | Live chat | Streaming, tools, segment finals and authoritative turn terminal | CHAT.md §§4,7 | Not started | Pending |

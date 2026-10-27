@@ -26,7 +26,7 @@ class RecordCipher internal constructor(
     private val cipherFactory: () -> Cipher,
 ) {
     constructor(keys: RecordKeyProvider) : this(keys, { Cipher.getInstance("AES/GCM/NoPadding") })
-    constructor(key: () -> SecretKey) : this(object : RecordKeyProvider {
+    internal constructor(key: () -> SecretKey) : this(object : RecordKeyProvider {
         override fun existing() = key()
         override fun getOrCreate() = key()
     })

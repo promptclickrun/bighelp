@@ -177,6 +177,7 @@ class ProtectedRecordStoreTest {
         Files.createSymbolicLink(file, file.fileName)
         refuses(StorageProblem.DiskUnavailable) { vault.read(binding) }
         refuses(StorageProblem.DiskUnavailable) { vault.compareAndSet(binding, null, bytes("replacement")) }
+        refuses(StorageProblem.DiskUnavailable) { vault.discardUnreadable(binding) }
         assertTrue(Files.isSymbolicLink(file))
     }
 

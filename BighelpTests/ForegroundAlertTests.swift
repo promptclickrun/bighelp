@@ -107,6 +107,33 @@ struct ForegroundAlertTests {
         #expect(!visible.isShowing(chat: reference("saved-e"), agent: "default"))
     }
 
+    // A screen that is handed another chat (New chat swaps the local draft for the durable session in place).
+    @Test func aScreenHandedAnotherChatCountsForTheNewChatOnly() throws {
+        let first = try open(profile: "default", stored: "saved-p")
+        let second = try open(profile: "default", stored: "saved-q")
+        defer { first.close(); second.close() }
+        let visible = BighelpVisibleChats.shared
+        visible.disappeared(first.model)
+        visible.disappeared(second.model)
+
+        let mount = ChatScreenMount()
+        mount.mount(first.model)
+        #expect(visible.isShowing(chat: reference("saved-p"), agent: "default"))
+        #expect(first.model.nativeSessionResumeProgress.isMounted)
+
+        mount.mount(second.model)
+        #expect(visible.isShowing(chat: reference("saved-q"), agent: "default"), "The chat now in front of the person")
+        #expect(!visible.isShowing(chat: reference("saved-p"), agent: "default"), "The one it left")
+        #expect(!first.model.nativeSessionResumeProgress.isMounted)
+        #expect(second.model.nativeSessionResumeProgress.isMounted)
+        #expect(ChatPDFPagesDraftRegistry.owns(second.model, sessionID: second.model.conversationID))
+
+        mount.unmount()
+        #expect(!visible.isShowing(chat: reference("saved-q"), agent: "default"))
+        #expect(!second.model.nativeSessionResumeProgress.isMounted)
+        #expect(!ChatPDFPagesDraftRegistry.owns(second.model, sessionID: second.model.conversationID))
+    }
+
     @Test func aChatStillOpeningIsKnownFromItsSavedRow() {
         let record = SessionRecord(id: "app-row-1", kind: .direct, agentIDs: ["default"], title: "Chat",
                                    remoteStoredID: "saved-h")

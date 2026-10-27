@@ -307,8 +307,19 @@ extension RootShellView {
             },
             makeFilesSource: { makeSimpleBotFilesSource() },
             makeMediaClient: { makeSimpleBotMediaClient() },
-            showsHiddenFiles: settings.nerdModeEnabled
+            showsHiddenFiles: settings.nerdModeEnabled,
+            dashboard: SimpleBotDashboardHooks(
+                shellBoard: agentBoard,
+                onAsk: { id, text in askSimpleBot(id, text, sends: false) },
+                onSend: { id, text in askSimpleBot(id, text, sends: true) })
         )
+    }
+
+    /// The bot's own chat with the text in its message box (a Dashboard's Ask, Do it or template).
+    /// It's the Bot Chat, history and all; only an empty message box takes the text.
+    func askSimpleBot(_ agentID: String, _ text: String, sends: Bool) {
+        appState.leaveComposerText(text, sends: sends, agentID: agentID)
+        openSimpleBotChat(agentID)
     }
 
     /// Each bot's own folder on the computer, read through the connection of the moment.

@@ -1,3 +1,4 @@
+import Foundation
 import Observation
 
 enum ConversationActivationSource: Sendable {
@@ -29,6 +30,9 @@ final class AppState {
     var suspendedChat: SuspendedChat?
     /// A blueprint's Send to agent: the next new chat sends `pendingComposerText` once it can.
     var pendingComposerSends = false
+    /// The bot whose own chat may take `pendingComposerText` even though it has history: a bot's
+    /// Dashboard opens that bot's Bot Chat, never a new one. Only an empty message box takes it.
+    var pendingComposerAgentID: String?
     /// A chat picked from the full chat list isn't the Chat tab's own chat
     /// (auto-opened, ☰ › New chat, the switcher, an agent tapped on Agents), so
     /// tapping Chat leaves it. Both have ☰, the tab bar and the big-avatar header.
@@ -141,8 +145,7 @@ final class AppState {
         }
         activeConversationID = nil
         pendingVoiceConversationID = nil
-        pendingComposerText = nil
-        pendingComposerSends = false
+        clearComposerText()
         chatOpenedFromList = false
     }
 
@@ -151,19 +154,43 @@ final class AppState {
         path.removeAll()
         activeConversationID = nil
         pendingVoiceConversationID = nil
-        pendingComposerText = nil
-        pendingComposerSends = false
+        clearComposerText()
         chatOpenedFromList = false
     }
 
-    func consumeComposerText() -> String? {
-        defer { pendingComposerText = nil }
-        return pendingComposerText
+    /// When `pendingComposerText` was left. A chat that opens much later (its open failed, or the
+    /// person went elsewhere) doesn't take it.
+    private var pendingComposerSince: Date?
+    static let pendingComposerLifetime: TimeInterval = 30
+
+    /// Leaves text for the next chat's message box. Each request replaces the last one whole, so
+    /// an earlier bot or Send never sticks to new text.
+    func leaveComposerText(_ text: String, sends: Bool = false, agentID: String? = nil, now: Date = .now) {
+        pendingComposerText = text
+        pendingComposerSends = sends
+        pendingComposerAgentID = agentID
+        pendingComposerSince = now
     }
 
-    func consumeComposerSend() -> Bool {
-        defer { pendingComposerSends = false }
-        return pendingComposerSends
+    /// The text, if this chat should take it: a new chat on top, or the named bot's own chat on top.
+    func takeComposerText(isNewChat: Bool, isNamedBotChat: Bool,
+                          now: Date = .now) -> (text: String, sends: Bool)? {
+        guard let text = pendingComposerText else { return nil }
+        guard let since = pendingComposerSince, now.timeIntervalSince(since) <= Self.pendingComposerLifetime else {
+            clearComposerText()
+            return nil
+        }
+        guard pendingComposerAgentID == nil ? isNewChat : isNamedBotChat else { return nil }
+        let sends = pendingComposerSends
+        clearComposerText()
+        return (text, sends)
+    }
+
+    private func clearComposerText() {
+        pendingComposerText = nil
+        pendingComposerSends = false
+        pendingComposerAgentID = nil
+        pendingComposerSince = nil
     }
 
     @discardableResult

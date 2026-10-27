@@ -199,10 +199,21 @@ struct ReferenceComposerTextView: UIViewRepresentable {
         // Measure with the Expand corner at this width, then put it back for the
         // width the box has, so what's drawn never keeps a measuring pass's corner.
         let ownsTextView = uiView.superview === container
-        if ownsTextView { container.applyCornerReserve(forWidth: width) }
-        let measured = uiView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
-        if ownsTextView, container.bounds.width > 0, abs(container.bounds.width - width) > 0.5 {
-            container.applyCornerReserve(forWidth: container.bounds.width)
+        // SwiftUI asks several times per layout; each answer laid the whole text out again
+        // and moved the Expand corner, on every keystroke.
+        let key = Coordinator.MeasureKey(text: uiView.text, width: width, pointSize: uiView.font?.pointSize ?? 0,
+                                         reservesCorner: ownsTextView && container.cornerReserve != nil,
+                                         expanded: expanded)
+        let measured: CGSize
+        if let known = context.coordinator.measuredSizes[key] {
+            measured = known
+        } else {
+            if ownsTextView { container.applyCornerReserve(forWidth: width) }
+            measured = uiView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
+            if ownsTextView, container.bounds.width > 0, abs(container.bounds.width - width) > 0.5 {
+                container.applyCornerReserve(forWidth: container.bounds.width)
+            }
+            context.coordinator.remember(measured, for: key)
         }
         let lineHeight = uiView.font?.lineHeight ?? UIFont.bighelp(.body).lineHeight
         // Wrapped onto a second line (one line plus the editor's insets stays under two line heights):
@@ -250,6 +261,25 @@ struct ReferenceComposerTextView: UIViewRepresentable {
         private var ownedDraft: UUID
         private var lastOverflow: Bool?
         private var measuredOverflows: [(width: CGFloat, overflowing: Bool)] = []
+
+        struct MeasureKey: Hashable {
+            let text: String
+            let width: CGFloat
+            let pointSize: CGFloat
+            let reservesCorner: Bool
+            /// The expanded editor lays the same text out with its own insets.
+            let expanded: Bool
+        }
+
+        /// Sizes measured for the current text, by width.
+        private(set) var measuredSizes: [MeasureKey: CGSize] = [:]
+
+        func remember(_ size: CGSize, for key: MeasureKey) {
+            if measuredSizes.keys.contains(where: { $0.text != key.text }) || measuredSizes.count >= 8 {
+                measuredSizes.removeAll(keepingCapacity: true)
+            }
+            measuredSizes[key] = size
+        }
         private var overflowCheckScheduled = false
         private var scrollGeneration: UInt64 = 0
         private var transferringSurface = false

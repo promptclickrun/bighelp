@@ -207,8 +207,9 @@ final class ChatPerformanceAutopilot: NSObject {
     nonisolated static let sendNotification = "app.loopdy.fixture.chat-performance.send"
     nonisolated static let openNotification = "app.loopdy.fixture.chat-performance.open"
     nonisolated static let listNotification = "app.loopdy.fixture.chat-performance.list"
+    nonisolated static let newChatNotification = "app.loopdy.fixture.chat-performance.new-chat"
     nonisolated static let notifications = [scrollNotification, typeNotification, sendNotification, openNotification,
-                                            listNotification]
+                                            listNotification, newChatNotification]
 
     private var link: CADisplayLink?
     private var lastFrame: CFTimeInterval?
@@ -235,6 +236,9 @@ final class ChatPerformanceAutopilot: NSObject {
         case Self.listNotification:
             // Back to the chat list, the way a link to it goes.
             BighelpIncomingLinkCenter.shared.open(URL(string: "loopdy://sessions")!)
+        case Self.newChatNotification:
+            // New chat over the open one, the way a widget starts one (the outgoing chat dissolves).
+            BighelpIncomingLinkCenter.shared.open(URL(string: "loopdy://new-chat")!)
         default: break
         }
     }

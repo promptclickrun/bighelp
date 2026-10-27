@@ -78,6 +78,8 @@ final class SimpleBotsUITests: BighelpUITestCase {
             save("simple-chat-\(appearance)", app)
             identity.tap()
             XCTAssertTrue(app.descendants(matching: .any)["simple-bots.profile"].waitForExistence(timeout: 5))
+            XCTAssertTrue(app.descendants(matching: .any)["dashboard"].waitForExistence(timeout: 5), "Dashboard opens first")
+            app.buttons["simple-bots.profile.tab.info"].tap()
             app.buttons["simple-bots.shape.star"].tap()
             app.buttons["simple-bots.color.purple"].tap()
             let status = app.staticTexts["simple-bots.profile.mark-status"]
@@ -100,6 +102,9 @@ final class SimpleBotsUITests: BighelpUITestCase {
         XCTAssertTrue(identity.waitForExistence(timeout: 10))
         identity.tap()
         XCTAssertTrue(app.descendants(matching: .any)["simple-bots.profile"].waitForExistence(timeout: 5))
+        let info = app.buttons["simple-bots.profile.tab.info"]
+        XCTAssertTrue(info.waitForExistence(timeout: 5))
+        info.tap()
         save("simple-profile-rows-dark", app)
 
         let more = app.buttons["simple-bots.profile.more-avatars"]

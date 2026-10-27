@@ -50,17 +50,20 @@ extension DirectHermesConversationClient {
         try Task.checkCancellation()
         try validate(conversationID)
         guard !needsRecovery, waiter == nil else { throw DirectHermesWorkspaceError.reviewRequired }
+        let command = preparedSubmission == nil && message.hasPrefix("/")
+        let dispatch = command && commandSelection.map { $0.command.source != .core } == true
+        let method = command ? (dispatch ? "command.dispatch" : "slash.exec") : "prompt.submit"
+        // Who's sending goes out with the connection check, not after it.
+        async let speaker: Void = method != "slash.exec" ? noteSpeaker() : ()
         if let admission = rpc as? any DirectHermesAdmissionPreparing {
-            try await admission.prepareForAdmission()
+            do { try await admission.prepareForAdmission() } catch { await speaker; throw error }
         }
+        await speaker
         try await awaitHydrationIfNeeded()
         try validate(conversationID)
         guard !needsRecovery, waiter == nil else { throw DirectHermesWorkspaceError.reviewRequired }
         guard !isHydrating, connected else { throw DirectHermesError.notConnected }
         guard !projection.running || preparedSubmission != nil else { throw DirectHermesWorkspaceError.nativeTurnActive }
-        let command = preparedSubmission == nil && message.hasPrefix("/")
-        let dispatch = command && commandSelection.map { $0.command.source != .core } == true
-        let method = command ? (dispatch ? "command.dispatch" : "slash.exec") : "prompt.submit"
         let submission = try preparedSubmission ?? recordSubmission(message, method: method)
         let owner = generation
         returnsVoiceReply = voiceReply
@@ -108,10 +111,6 @@ extension DirectHermesConversationClient {
                         // If another surface wins the idle race, queue rather
                         // than applying the host's default interrupt/redirect.
                         if !command { params["queued"] = .boolean(true) }
-                        if method != "slash.exec" {
-                            await self.noteSpeaker()
-                            guard self.generation == owner, self.pendingID == submission.id else { return }
-                        }
                         let result: BighelpJSONValue
                         do {
                             result = try await self.rpc.request(method, params: params)

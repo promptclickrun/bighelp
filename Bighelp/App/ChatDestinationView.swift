@@ -732,11 +732,20 @@ struct ChatDestinationView: View {
             Task { await importPhotos(selections) }
         }
         .task(id: appState.pendingComposerText) {
-            // Only a fresh chat takes the board's text, never one already in use.
-            guard appState.pendingComposerText != nil, model.transcriptEntries.isEmpty, model.draft.isEmpty,
-                  let text = appState.consumeComposerText() else { return }
+            // Only the chat on top takes the board's text: a new chat, or, from a bot's Dashboard,
+            // that bot's own chat, history and all.
+            let isOnTop = appState.path.last == .chat(conversationID: model.conversationID)
+            let isNamedBotChat = isOnTop && appState.pendingComposerAgentID.map { model.memberIDs == [$0] } == true
+            guard let pending = appState.takeComposerText(isNewChat: isOnTop && model.transcriptEntries.isEmpty,
+                                                          isNamedBotChat: isNamedBotChat) else { return }
+            // Something typed already stays: the text goes below it, and the two are never sent.
+            guard model.draft.isEmpty else {
+                model.draft += "\n\n" + pending.text
+                return
+            }
+            let text = pending.text
             model.draft = text
-            guard appState.consumeComposerSend() else { return }
+            guard pending.sends else { return }
             // A new chat connects a moment after it opens; send once it can, and leave the
             // text in the message box if it never does.
             for _ in 0..<60 where !model.canSend {

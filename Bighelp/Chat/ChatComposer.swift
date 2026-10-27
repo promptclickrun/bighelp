@@ -51,10 +51,8 @@ struct ChatComposer: View {
                     skills: referenceSkills, agentID: referenceHub.owner?.agentID,
                     reservesResultsSpace: true)
                     .padding(.horizontal, BighelpTokens.space4)
-            } else if !model.mentionSuggestions.isEmpty {
-                MentionSuggestionsView(suggestions: model.mentionSuggestions,
-                                       agents: model.agentDirectory, onSelect: selectMention)
-                    .padding(.horizontal, BighelpTokens.space4)
+            } else {
+                ComposerMentionSuggestions(model: model, onSelect: selectMention)
             }
 
             if !referenceHub.selected.isEmpty || referenceHub.message != nil {
@@ -421,21 +419,10 @@ struct ChatComposer: View {
     }
 
     private var primaryAction: some View {
-        AdaptiveComposerActionButton(
-            action: ChatComposerPrimaryAction.resolve(draft: model.draft,
-                                                      isTurnActive: model.isSending || model.otherProcessRun != nil,
-                                                      hasAttachments: model.hasDraftAttachmentActivity),
-            isBusy: model.isStopping || model.hasExclusiveMidSessionSubmission,
-            canSend: model.canSend, canStop: model.canStop || (!model.isSending && model.otherProcessRun?.canStop == true),
-            onVoice: onVoiceTap, onSend: send, onStop: stop,
-            defaultMidSessionBehavior: model.isMidSessionTurnLive ? model.defaultMidSessionBehavior : nil,
-            onMidSessionSend: sendMidSession,
-            allowedMidSessionBehaviors: model.allowedMidSessionBehaviors,
-            unavailableReason: model.sendUnavailableReason,
-            keyboardSendOptionsRequest: keyboardSendOptionsRequest,
-            onKeyboardSendOptionsClosed: { draftFocus.wrappedValue = true }
-        )
-        .disabled(model.isAwaitingAuthoritativeSessionAllocation)
+        ComposerPrimaryAction(model: model, onVoice: onVoiceTap, onSend: send, onStop: stop,
+                              onMidSessionSend: sendMidSession,
+                              keyboardSendOptionsRequest: keyboardSendOptionsRequest,
+                              onKeyboardSendOptionsClosed: { draftFocus.wrappedValue = true })
     }
 
     private var composerInputFocusSurface: some View {
@@ -473,18 +460,14 @@ struct ChatComposer: View {
             cornerReserve: ComposerFieldMetrics.expandReserve
         )
         .overlay(alignment: .topLeading) {
-            if composerText.wrappedValue.isEmpty {
-                Text(homeChrome.isSimpleBots && !model.isBotMode
-                     ? String(localized: "Ask \(placeholderName)")
-                     : String(localized: "Message \(placeholderName)"))
-                    .bighelpFont(.body)
-                    .foregroundStyle(theme.secondaryText)
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
-            }
+            ComposerPlaceholder(model: model, color: theme.secondaryText,
+                                text: homeChrome.isSimpleBots && !model.isBotMode
+                                    ? String(localized: "Ask \(placeholderName)")
+                                    : String(localized: "Message \(placeholderName)"))
         }
+        // The text view says what's typed itself; reading the draft here redrew the whole box
+        // on every keystroke.
         .accessibilityLabel("Message")
-        .accessibilityValue(composerText.wrappedValue.isEmpty ? String(localized: "Empty") : composerText.wrappedValue)
     }
 
     @Environment(\.agentHomeChrome) private var homeChrome
@@ -772,5 +755,68 @@ private struct ComposerGlass<S: InsettableShape>: ViewModifier {
 extension View {
     func composerGlass<S: InsettableShape>(_ shape: S, fill: Color) -> some View {
         modifier(ComposerGlass(shape: shape, fill: fill))
+    }
+}
+
+// Typing changes the draft and the caret on every key. Only these small views read them,
+// so a keystroke redraws them alone, never the whole message box.
+
+/// The @-mention list.
+private struct ComposerMentionSuggestions: View {
+    let model: ChatModel
+    let onSelect: (MentionSuggestion) -> Void
+
+    var body: some View {
+        let suggestions = model.mentionSuggestions
+        if !suggestions.isEmpty {
+            MentionSuggestionsView(suggestions: suggestions, agents: model.agentDirectory, onSelect: onSelect)
+                .padding(.horizontal, BighelpTokens.space4)
+        }
+    }
+}
+
+/// Send, stop or voice: which one shows follows the draft.
+private struct ComposerPrimaryAction: View {
+    let model: ChatModel
+    let onVoice: () -> Void
+    let onSend: () -> Void
+    let onStop: () -> Void
+    let onMidSessionSend: (MidSessionChatBehavior) -> Void
+    let keyboardSendOptionsRequest: Int
+    let onKeyboardSendOptionsClosed: () -> Void
+
+    var body: some View {
+        AdaptiveComposerActionButton(
+            action: ChatComposerPrimaryAction.resolve(draft: model.draft,
+                                                      isTurnActive: model.isSending || model.otherProcessRun != nil,
+                                                      hasAttachments: model.hasDraftAttachmentActivity),
+            isBusy: model.isStopping || model.hasExclusiveMidSessionSubmission,
+            canSend: model.canSend, canStop: model.canStop || (!model.isSending && model.otherProcessRun?.canStop == true),
+            onVoice: onVoice, onSend: onSend, onStop: onStop,
+            defaultMidSessionBehavior: model.isMidSessionTurnLive ? model.defaultMidSessionBehavior : nil,
+            onMidSessionSend: onMidSessionSend,
+            allowedMidSessionBehaviors: model.allowedMidSessionBehaviors,
+            unavailableReason: model.sendUnavailableReason,
+            keyboardSendOptionsRequest: keyboardSendOptionsRequest,
+            onKeyboardSendOptionsClosed: onKeyboardSendOptionsClosed
+        )
+        .disabled(model.isAwaitingAuthoritativeSessionAllocation)
+    }
+}
+
+/// "Message Juno" until something is typed.
+private struct ComposerPlaceholder: View {
+    let model: ChatModel
+    let color: Color
+    let text: String
+
+    var body: some View {
+        if model.draft.isEmpty {
+            Text(text)
+                .bighelpFont(.body)
+                .foregroundStyle(color)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
     }
 }

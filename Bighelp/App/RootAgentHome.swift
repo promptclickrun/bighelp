@@ -289,14 +289,13 @@ extension RootShellView {
 
     /// "Ask" and "Discuss": a new chat with this agent, the text ready to send.
     func askAgent(_ text: String) {
-        appState.pendingComposerText = text
+        appState.leaveComposerText(text)
         startNewChat(explicitAgentID: homeAgent?.id)
     }
 
     /// A filled-in blueprint: a new chat that sends it straight away.
     func sendToAgent(_ text: String) {
-        appState.pendingComposerText = text
-        appState.pendingComposerSends = true
+        appState.leaveComposerText(text, sends: true)
         startNewChat(explicitAgentID: homeAgent?.id)
     }
 

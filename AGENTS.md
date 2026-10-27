@@ -177,8 +177,9 @@ change in both repos.
 - **Who is sending:** before each new turn, `DirectHermesChatSpeakerNote` posts `people/speaking` (plugin
   `native-people-v1`): the chat's stored session ID, a person ID from iCloud Keychain (`BighelpPersonID`, one per
   Apple ID) and the name the person saved. The plugin puts the name in the chat brief and, once a chat has had two
-  people, a note on each message that only the model sees. The wait is capped (1.2 s), so a slow host sends the
-  message without a name. `UserIdentity.name` is empty until someone saves one; "You" is an on-screen placeholder
+  people, a note on each message that only the model sees. It starts alongside the pre-send connection check. A
+  chat's first message waits for it (capped at 1.2 s; the plugin records the brief's person once), and so does the
+  first from each connection; later turns read the note when they reach the model, so they go at once. `UserIdentity.name` is empty until someone saves one; "You" is an on-screen placeholder
   (`displayName`) and must never be sent. Names are at most 40 characters.
 - **A lost create never locks an agent out:** every `session.create` sends the creation record's `intentID` as
   `idempotency_key` (Hermes keeps it 5 minutes and answers a retry with the same session). An unfinished first Bot

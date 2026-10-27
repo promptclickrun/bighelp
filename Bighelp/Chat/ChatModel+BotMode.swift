@@ -333,12 +333,11 @@ extension ChatModel {
             ?? AgentHandle.normalized(agent.name)
     }
 
+    /// The caret matters only while the draft has an @; otherwise it stays as it is, since
+    /// every change to it redrew the message box on each keystroke.
     func setMentionCursor(offset: Int?) {
-        guard let offset else {
-            mentionCursorOffset = nil
-            return
-        }
-        mentionCursorOffset = max(0, min(offset, draft.count))
+        let cursor = offset.flatMap { draft.utf8.contains(UInt8(ascii: "@")) ? max(0, min($0, draft.count)) : nil }
+        if mentionCursorOffset != cursor { mentionCursorOffset = cursor }
     }
 
     var mentionToken: String? {

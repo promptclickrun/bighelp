@@ -178,6 +178,8 @@ final class LocalizationUITests: BighelpUITestCase {
             capture("simple-menu-more", language, appearance)
             profile.tap()
             XCTAssertTrue(app.descendants(matching: .any)["simple-bots.profile"].waitForExistence(timeout: 10))
+            capture("simple-dashboard", language, appearance)
+            app.buttons["simple-bots.profile.tab.info"].tap()
             XCTAssertTrue(app.staticTexts[say("Instructions", "指令")].waitForExistence(timeout: 5))
             XCTAssertTrue(app.staticTexts[say("Default Model", "默认模型")].exists)
             capture("simple-profile", language, appearance)

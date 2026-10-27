@@ -480,16 +480,18 @@ final class BighelpShortcutService: @unchecked Sendable {
     /// drops its host connection in the background, so wait for a host that
     /// answers (reconnecting once) before creating the chat on it.
     @discardableResult
-    func openNewChat(agentID: String?) async throws -> BighelpShortcutVoiceResult {
-        try await openChat(agentID: agentID).1
+    func openNewChat(agentID: String?,
+                     beforePresentation: @escaping @MainActor (String, String?) -> Void = { _, _ in }) async throws -> BighelpShortcutVoiceResult {
+        try await openChat(agentID: agentID, beforePresentation: beforePresentation).1
     }
 
-    func openChat(agentID: String?) async throws -> (BighelpShortcutWorkspace, BighelpShortcutVoiceResult) {
+    func openChat(agentID: String?,
+                  beforePresentation: @escaping @MainActor (String, String?) -> Void = { _, _ in }) async throws -> (BighelpShortcutWorkspace, BighelpShortcutVoiceResult) {
         let workspace = try await liveWorkspace()
         // A widget remembers the agent it last drew; if that agent is gone, use the default.
         let known = agentID.flatMap { id in workspace.agents.profiles.contains { $0.id == id } ? id : nil }
         let agent = try resolveAgent(explicitID: known, in: workspace)
-        let outcome = try await workspace.newChatCoordinator.start(explicitAgentID: agent.id)
+        let outcome = try await workspace.newChatCoordinator.start(explicitAgentID: agent.id, beforePresentation: beforePresentation)
         guard case .opened(let sessionID, _) = outcome else {
             throw BighelpShortcutServiceError.sessionUnavailable
         }

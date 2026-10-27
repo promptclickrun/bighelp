@@ -45,7 +45,11 @@ final class SimpleBotsChatOpening {
     /// A tap that opens a bot's chat. A second call for the same bot before its chat opens (the Bot Chat
     /// lookup falling back to the latest chat, say) keeps the one under way.
     @discardableResult
-    func begin(agentID: String?, name: String?, originPath: [AppRoute]) -> UUID {
+    func begin(agentID: String?, name: String?, originPath: [AppRoute], hasCachedContent: Bool = false) -> UUID {
+        guard !hasCachedContent else {
+            end()
+            return UUID()
+        }
         let atOnce = showsNextAtOnce
         if var opening = current, opening.conversationID == nil, opening.agentID == agentID {
             if let name { opening.name = name }

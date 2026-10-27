@@ -49,7 +49,15 @@ extension RootShellView {
         guard simpleBotsOn else { return nil }
         let agentID = session.kind == .direct && session.agentIDs.count == 1 ? session.agentIDs[0] : nil
         let name = agentID.flatMap { id in agents.profiles.first { $0.id == id }?.name } ?? session.title
-        return simpleBotsChatOpening.begin(agentID: agentID, name: name, originPath: appState.path)
+        return simpleBotsChatOpening.begin(agentID: agentID, name: name, originPath: appState.path,
+                                           hasCachedContent: hasCachedChatContent(session.id))
+    }
+
+    func hasCachedChatContent(_ id: String) -> Bool {
+        if let model = featureStore.preparedChatModel(id: id), !model.transcriptEntries.isEmpty { return true }
+        guard let record = try? sessionCatalog.restoreSessionContent(id: id) else { return false }
+        // A metadata row with accepted messages and no payload is not a cached empty chat.
+        return !record.items.isEmpty || !record.activityEvents.isEmpty || !record.hasAcceptedMessage
     }
 
     /// After `openSession`: the chat is on screen (the loader waits for its messages if they aren't

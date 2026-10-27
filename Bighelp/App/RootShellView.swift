@@ -64,6 +64,7 @@ struct RootShellView: View {
     @State var sessionRestoreTask: Task<Void, Never>?
     @State var canonicalChatCoordinator = CanonicalChatCoordinator()
     @State var simpleBotsChatOpening = SimpleBotsChatOpening()
+    @State var chatDissolve = ChatDissolveTransition()
     @State var managementStore: WorkspaceManagementStore?
     /// Host pages open in the stack, one per destination (`WorkspaceOpenScreens`).
     @State var capabilitiesPresentations = WorkspaceOpenScreens<NativeCapabilitiesPresentation>()
@@ -242,6 +243,8 @@ struct RootShellView: View {
         .modifier(DemoReconnectOnReturn(scenePhase: scenePhase, connection: $workspaceFixtureConnection,
                                         isEnabled: usesWorkspaceFixtures))
         .onChange(of: appState.path) { _, _ in retireClosedWorkspacePresentations() }
+        .modifier(ChatDissolveLifetime(transition: chatDissolve, appState: appState,
+                                      signIn: workspaceSignIn, scenePhase: scenePhase))
         .modifier(CanonicalChatLifetime(coordinator: canonicalChatCoordinator, appState: appState,
                                         owner: currentWorkspaceOwner, agentID: homeAgent?.id))
         .modifier(WorkspacePresentationContinuity(
@@ -273,6 +276,7 @@ struct RootShellView: View {
         // With Settings open (Settings › System › Add Host), Settings presents it: one view shows one sheet.
         .modifier(HostSetupSheet(registry: hostRegistry, isActive: !isUnifiedSettingsPresented))
         .onChange(of: hostRegistry?.selectedHostID) { _, _ in
+            chatDissolve.cancel()
             appState.resetForHostBoundary(keepsAllHostsScreens: fleetModeOn)
         }
         .task(id: hostRegistry?.selectedHostID) {
@@ -1295,7 +1299,8 @@ struct RootShellView: View {
 
     func startNewChat(explicitAgentID: String?, startsVoice: Bool = false) {
         runNewChatStart(retry: { startNewChat(explicitAgentID: explicitAgentID, startsVoice: startsVoice) }) {
-            let outcome = try await newChatCoordinator.start(explicitAgentID: explicitAgentID)
+            let outcome = try await newChatCoordinator.start(explicitAgentID: explicitAgentID,
+                                                             beforePresentation: presentNewChatDissolve)
             if startsVoice, case .opened(let id, _) = outcome { appState.requestVoiceMode(for: id) }
         }
     }
@@ -1306,12 +1311,17 @@ struct RootShellView: View {
     private func startIncomingNewChat(agentID: String?) {
         runNewChatStart(retry: { startIncomingNewChat(agentID: agentID) }) {
             if let shortcutService, nativeRuntime != nil, !usesWorkspaceFixtures {
-                try await shortcutService.openNewChat(agentID: agentID)
+                try await shortcutService.openNewChat(agentID: agentID, beforePresentation: presentNewChatDissolve)
             } else {
                 let known = agentID.flatMap { id in agents.profiles.contains(where: { $0.id == id }) ? id : nil }
-                _ = try await newChatCoordinator.start(explicitAgentID: known)
+                _ = try await newChatCoordinator.start(explicitAgentID: known,
+                                                       beforePresentation: presentNewChatDissolve)
             }
         }
+    }
+
+    func presentNewChatDissolve(_ nextID: String, replacing previousID: String?) {
+        chatDissolve.present(nextID: nextID, replacing: previousID, reduceMotion: reduceMotion)
     }
 
     private func runNewChatStart(retry: @escaping @MainActor () -> Void,
@@ -1329,8 +1339,10 @@ struct RootShellView: View {
             do {
                 try await start()
             } catch is CancellationError {
+                chatDissolve.cancel()
                 // A replaced account or host must not present the old request's error.
             } catch {
+                chatDissolve.cancel()
                 actionErrorShowsHostStatus = agents.errorMessage != nil || AgentDirectoryStore.isHermesCapabilityMissing(error)
                 // The chat keeps any draft typed while it was starting; Try Again reuses it.
                 actionErrorRetry = retry

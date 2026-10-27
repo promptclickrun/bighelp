@@ -6,6 +6,15 @@ import Testing
 /// open never flashes it, stays up until the chat can show its messages, and ends on Cancel or an error.
 @MainActor
 struct SimpleBotsChatOpeningTests {
+    @Test func aCachedChatNeverShowsTheLoaderEvenDuringGatewayHandover() {
+        let opening = opening()
+        opening.showsNextAtOnce = true
+        let id = opening.begin(agentID: "travel", name: "Mina Shah", originPath: [], hasCachedContent: true)
+        opening.show(id)
+        #expect(!opening.isShowing, "A cached transcript, including a saved empty chat, is usable immediately")
+        #expect(opening.current == nil)
+    }
+
     /// The grace never ends by itself here: each test says when it's over (`show`).
     private func opening() -> SimpleBotsChatOpening {
         SimpleBotsChatOpening(grace: .seconds(3_600))

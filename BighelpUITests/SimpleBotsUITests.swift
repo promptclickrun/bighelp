@@ -6,6 +6,24 @@ import XCTest
 /// (TEST_RUNNER_…) to a folder to save the screenshots.
 final class SimpleBotsUITests: BighelpUITestCase {
     @MainActor
+    func testCachedBotChatOpensWithoutTheLookupLoader() {
+        let app = launch(appearance: "dark", extra: ["-test-canonical-agent-chat", "-test-simple-bots-open-delay-ms", "3000"])
+        let primary = app.buttons["simple-bots.primary"]
+        XCTAssertTrue(primary.waitForExistence(timeout: 15))
+        primary.tap()
+        XCTAssertTrue(app.buttons["chat.identity"].waitForExistence(timeout: 2),
+                      "The saved Bot Chat opens before a deliberately slow host lookup")
+        XCTAssertTrue(app.textViews.matching(NSPredicate(format: "label CONTAINS %@", "This is the shared Bot Chat."))
+            .firstMatch.exists, "It shows the cached canonical transcript")
+        XCTAssertFalse(app.descendants(matching: .any)["simple-bots.opening"].firstMatch.exists)
+        app.buttons["chat.back"].tap()
+        XCTAssertTrue(primary.waitForExistence(timeout: 5))
+        primary.tap()
+        XCTAssertTrue(app.buttons["chat.identity"].waitForExistence(timeout: 2))
+        XCTAssertFalse(app.descendants(matching: .any)["simple-bots.opening"].firstMatch.exists)
+    }
+
+    @MainActor
     func testSimpleBotModeHomeChatAndProfile() throws {
         for appearance in ["light", "dark"] {
             let app = launch(appearance: appearance)

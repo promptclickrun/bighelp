@@ -112,10 +112,21 @@ extension ChatView {
     var timelineStatusOverlay: some View {
         VStack(spacing: BighelpTokens.space8) {
             if !timelineController.isAtBottom {
-                BighelpIconButton(systemImage: "arrow.down", accessibilityLabel: "Return to latest messages",
-                                 style: .neutralGlass,
-                                 action: { timelineController.scrollToLatest(animated: !reduceMotion) })
+                Button { timelineController.scrollToLatest(animated: !reduceMotion) } label: {
+                    Image(systemName: "arrow.down")
+                        .font(.bighelp(.caption).weight(.semibold))
+                        .foregroundStyle(theme.primaryText)
+                        .frame(width: 32, height: 32)
+                        .contentShape(.circle)
+                        .bighelpNavigationGlass(in: Circle(), isInteractive: true)
+                        .frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
+                        .contentShape(.rect)
+                }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Return to latest messages")
                     .accessibilityIdentifier("chat.return-to-latest")
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(.trailing, BighelpTokens.space12)
             }
             if let progress = model.nativeSessionResumeProgress.visibleIndicator {
                 Label {

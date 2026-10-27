@@ -60,9 +60,7 @@ struct AgentHomeChatHeader: View {
     /// Full screen height, for the Auto avatar size.
     var screenHeight: CGFloat = 0
     let beforeAction: () -> Void
-    @AppStorage(ChatLayoutPreferences.avatarSizeKey) private var avatarSize: ChatAvatarSize = .automatic
     @Environment(\.bighelpScreen) private var screen
-    @AppStorage(ChatLayoutPreferences.showsAgentNameKey) private var showsAgentName = true
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -70,13 +68,23 @@ struct AgentHomeChatHeader: View {
                 if let groupIdentity {
                     groupIdentity
                 } else {
-                    AgentHeroHeader(agentID: agentID, displayName: displayName, imageURL: imageURL,
-                                    activity: activity,
-                                    avatarSize: avatarSize.points(screenHeight: screenHeight),
-                                    status: status, showsName: showsAgentName, sessionTitle: sessionTitle,
-                                    onAvatarTap: { beforeAction(); chrome.onProfile(agentID) },
-                                    onNameTap: { beforeAction(); chrome.onSwitchAgent() })
-                        // Who the chat is with, like the name chip in the iPad header.
+                    VStack(spacing: 0) {
+                        Button {
+                            beforeAction()
+                            chrome.onProfile(agentID)
+                        } label: {
+                            ChatAgentIdentityPill(agentID: agentID, name: displayName, imageURL: imageURL,
+                                                  sessionTitle: sessionTitle)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(displayName)
+                        .accessibilityValue(status ?? activity.label)
+                        .accessibilityHint("Opens its profile")
+                        .accessibilityIdentifier("chat.identity")
+                    }
+                        .padding(.horizontal, (HeaderButtonMetrics.glass + 2 * HeaderButtonMetrics.slop)
+                                 * (chrome.barHoldsNewChat(screen: screen) ? 1 : 2))
+                        .padding(.top, HeaderButtonMetrics.slop)
                         .accessibilityElement(children: .contain)
                         .accessibilityIdentifier("chat.header-surface")
                 }
@@ -117,6 +125,42 @@ struct AgentHomeChatHeader: View {
                 }
             }
         }
+    }
+}
+
+/// Chat and Bots share the same bounded glass identity surface.
+struct ChatAgentIdentityPill: View {
+    let agentID: String
+    let name: String
+    let imageURL: URL?
+    var sessionTitle: String? = nil
+    @BighelpThemeReader private var theme
+
+    var body: some View {
+        HStack(spacing: BighelpTokens.space8) {
+            SimpleBotFace(agentID: agentID, name: name, imageURL: imageURL, size: 28)
+            BighelpHuggingWidth(maxWidth: 220) {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(name)
+                        .font(.bighelp(.title3, weight: .semibold))
+                        .foregroundStyle(theme.primaryText)
+                        .lineLimit(1)
+                    if let sessionTitle {
+                        Text(sessionTitle)
+                            .font(.bighelp(.caption2).weight(.medium))
+                            .foregroundStyle(theme.secondaryText)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .accessibilityIdentifier("chat.identity.session-title")
+                    }
+                }
+            }
+        }
+        .padding(.leading, BighelpTokens.space12)
+        .padding(.trailing, BighelpTokens.space16)
+        .frame(minHeight: BighelpTokens.hitTarget)
+        .contentShape(Capsule())
+        .bighelpNavigationGlass(in: Capsule(), isInteractive: true)
     }
 }
 

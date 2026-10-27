@@ -5,6 +5,16 @@ import UIKit
 
 @MainActor
 struct AgentHeroHeaderLayoutTests {
+    @Test func chatHomeUsesACompactIdentityPill() {
+        let controller = UIHostingController(rootView:
+            AgentHomeChatHeader(agentID: "default", displayName: "Atlas", imageURL: nil,
+                                activity: .idle, groupIdentity: nil, options: AnyView(Color.clear),
+                                chrome: AgentHomeChrome(), screenHeight: 852, beforeAction: {})
+        )
+        let size = controller.sizeThatFits(in: CGSize(width: 393, height: 852))
+        #expect(size.height <= 54, "Chat mode should use Bots mode's single-row pill")
+    }
+
     /// The chat's top inset is the header's height, so a status line that grew the header
     /// pushed every message down and back each time "Updating…" came and went.
     @Test(arguments: [DynamicTypeSize.large, .accessibility3])

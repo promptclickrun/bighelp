@@ -3,6 +3,37 @@ import UIKit
 
 final class ComposerInteractionUITests: BighelpUITestCase {
     @MainActor
+    func testChatPillAndNewChatKeepChromeInPlace() {
+        for appearance in ["light", "dark"] {
+            let app = makeApp()
+            app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-start-chat",
+                                   "-bighelp.settings.simple-bots", "NO", "-loopdy.demo.appearance", appearance]
+            app.launch()
+            let identity = app.buttons["chat.identity"]
+            let input = app.textViews["chat.composer.text"]
+            let field = app.otherElements["chat.composer.field"]
+            XCTAssertTrue(identity.waitForExistence(timeout: 10))
+            XCTAssertTrue(input.waitForExistence(timeout: 5))
+            let headerFrame = identity.frame
+            let fieldFrame = field.frame
+            XCTAssertLessThanOrEqual(headerFrame.height, 54)
+            XCTAssertLessThan(headerFrame.width, app.frame.width * 0.75)
+            saveComposer("chat-pill-\(appearance)", app)
+
+            chatNewChatButton(in: app).tap()
+            confirmNewChatPicker(in: app)
+            XCTAssertTrue(input.waitForExistence(timeout: 5))
+            XCTAssertEqual(identity.frame.midY, headerFrame.midY, accuracy: 1)
+            XCTAssertEqual(field.frame.midY, fieldFrame.midY, accuracy: 1)
+            input.tap()
+            input.typeText("A draft in the new chat")
+            XCTAssertEqual(input.value as? String, "A draft in the new chat")
+            saveComposer("new-chat-draft-\(appearance)", app)
+            app.terminate()
+        }
+    }
+
+    @MainActor
     func testChatComposerActionCentersWithAnEmptyInput() throws {
         let app = makeApp()
         app.launchArguments = [

@@ -18,9 +18,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
-/** First screen: the demo works with nothing set up; connecting checks a real computer. */
+/** First screen: the demo works with nothing set up; connecting signs in to a real computer. [extra] shows saved computers. */
 @Composable
-fun WelcomeScreen(onTryDemo: () -> Unit, onConnect: () -> Unit) {
+fun WelcomeScreen(onTryDemo: () -> Unit, onConnect: () -> Unit, extra: @Composable () -> Unit = {}) {
     ScrollingPage(Modifier.fillMaxSize().safeDrawingPadding().testTag("screen.welcome")) {
         NoodleMark(height = 96.dp)
         Spacer(Modifier.height(16.dp))
@@ -32,7 +32,8 @@ fun WelcomeScreen(onTryDemo: () -> Unit, onConnect: () -> Unit) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
-        Spacer(Modifier.height(40.dp))
+        Spacer(Modifier.height(32.dp))
+        extra()
         InkButton("Try the demo", onTryDemo, tag = "welcome.demo")
         Spacer(Modifier.height(6.dp))
         Text(
@@ -45,7 +46,7 @@ fun WelcomeScreen(onTryDemo: () -> Unit, onConnect: () -> Unit) {
         InkOutlinedButton("Connect your computer", onConnect, tag = "welcome.connect")
         Spacer(Modifier.height(6.dp))
         Text(
-            "Check that your Hermes computer answers. Chatting with it comes in a later update.",
+            "Sign in to your Hermes computer and chat with your own agents.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -80,7 +81,7 @@ fun ConsentScreen(onAgree: () -> Unit, onNotNow: () -> Unit, onPrivacyPolicy: ()
         )
         Spacer(Modifier.height(12.dp))
         Text(
-            "Right now bighelp only asks whether your computer answers. It sends no password and no chat.",
+            "Nothing is sent until you agree. Your sign-in stays on this phone, sealed.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,

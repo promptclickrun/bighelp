@@ -2,7 +2,9 @@ package app.bighelp.android.live
 
 import app.bighelp.android.storage.ProtectedRecordStore
 import app.bighelp.android.storage.RecordCipher
+import app.bighelp.hermes.AccessCredential
 import app.bighelp.hermes.AuthStatus
+import app.bighelp.hermes.CustomHeader
 import app.bighelp.hermes.CredentialStore
 import app.bighelp.hermes.HermesEndpoint
 import app.bighelp.hermes.SavedConnection
@@ -12,6 +14,7 @@ import java.io.File
 import java.util.UUID
 import javax.crypto.KeyGenerator
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,12 +39,34 @@ class ComputerConnectionModelTest {
     private var consent = true
     private val sessions = mutableListOf<FakeSession>()
     private var prepare: (FakeSession) -> Unit = { }
+    private val localData = FakeLocalData()
+    private val factoryCalls = mutableListOf<Triple<UUID, HermesEndpoint, AccessSetup>>()
     private fun model(scope: CoroutineScope) = ComputerConnectionModel(
-        registry(), ::vault, { consent }, scope,
-    ) { address, credentials, _ -> FakeSession(address, credentials).also { sessions += it; prepare(it) } }
+        registry(), ::vault, { consent }, scope, localData,
+    ) { id, address, access, credentials, ownedScope ->
+        factoryCalls += Triple(id, address, access)
+        FakeSession(address, credentials, localData, id, ownedScope).also { sessions += it; prepare(it) }
+    }
 
-    private class FakeSession(val endpoint: HermesEndpoint, val store: CredentialStore) : ComputerSession {
+    /** Stands in for the access-header store and the chat records, and remembers what happened to them. */
+    private class FakeLocalData : ComputerLocalData {
+        val access = mutableMapOf<UUID, AccessSetup>()
+        val forgotten = mutableListOf<UUID>()
+        override suspend fun loadAccess(id: UUID) = access[id] ?: AccessSetup.None
+        override suspend fun saveAccess(id: UUID, access: AccessSetup) { this.access[id] = access }
+        override suspend fun forget(id: UUID) { forgotten += id; access.remove(id) }
+    }
+
+    private class FakeSession(
+        val endpoint: HermesEndpoint, val store: CredentialStore, val local: FakeLocalData, val id: UUID, val scope: CoroutineScope,
+    ) : ComputerSession {
         override var saved: SavedConnection? = null
+        override val link = kotlinx.coroutines.flow.MutableStateFlow(ComputerLink.Connected)
+        var accessSavedBeforeCommit: Boolean? = null
+        var resumed = 0
+        var reconnects = 0
+        override suspend fun resume() { resumed++ }
+        override suspend fun reconnect() { reconnects++ }
         var closed = false
         var connected = false
         var commits = 0
@@ -58,10 +83,20 @@ class ComputerConnectionModelTest {
         }
         override suspend fun commit(expected: SavedConnection?, stillCurrent: () -> Boolean) {
             check(connected && stillCurrent())
+            accessSavedBeforeCommit = local.access.containsKey(id)
             store.replace(expected, requireNotNull(saved))
             commits++
         }
+        /** A refresh that finishes while the session shuts down: it tries to save its rotated sign-in, as the real one does. */
+        var rotateOnClose = false
+        var closeWrite: Boolean? = null
+        var scopeActiveOnClose: Boolean? = null
         override suspend fun close() {
+            scopeActiveOnClose = scope.isActive
+            if (rotateOnClose) {
+                val rotated = SavedConnection(endpoint, StoredAuth.DashboardSession("rotated-session", true), null, null)
+                closeWrite = try { store.replace(requireNotNull(saved), rotated); true } catch (_: app.bighelp.hermes.StaleCredentialException) { false }
+            }
             closed = true
             if (failClose) throw java.io.IOException("Synthetic close failure")
         }
@@ -278,6 +313,128 @@ class ComputerConnectionModelTest {
         assertTrue(sessions.first().closed)
         assertEquals(0, sessions.first().commits)
         model.close().join()
+    }
+
+    @Test fun theLinkFollowsTheActiveSessionsGatewayAfterSetupAndEndsWithIt() = runTest {
+        val model = model(backgroundScope)
+        runCurrent()
+        assertNull(model.link.value)
+        model.beginSetup(endpoint).join()
+        model.signIn("Garden computer", SignInInput.Dashboard).join()
+        runCurrent()
+        assertEquals(ComputerLink.Connected, model.link.value)
+        val session = sessions.single()
+        for (next in listOf(ComputerLink.Reconnecting, ComputerLink.Offline, ComputerLink.SignInRequired, ComputerLink.Connected)) {
+            session.link.value = next
+            runCurrent()
+            assertEquals(next, model.link.value)
+        }
+        model.disconnect().join()
+        runCurrent()
+        assertNull("A closed computer has no link to report", model.link.value)
+    }
+
+    @Test fun aDuplicateOrAFullListIsRefusedBeforeTheNewSessionMayConnect() = runTest {
+        val model = model(backgroundScope)
+        model.beginSetup(endpoint).join()
+        model.signIn("Garden computer", SignInInput.Dashboard).join()
+        model.beginSetup(endpoint).join()
+        model.signIn("Another name", SignInInput.Dashboard).join()
+        assertEquals(ComputerProblem.AlreadyConfigured, model.state.value.problem)
+        assertFalse("A refused duplicate never opened a socket with its credentials", sessions.last().connected)
+
+        val registry = registry()
+        val rows = (1..32).map { SavedComputer(UUID.randomUUID(), "Computer $it", HermesEndpoint.parse("https://c$it.example.test"), "dashboard-session", true) }
+        registry.replace(registry.load(), rows, null)
+        model.beginSetup(HermesEndpoint.parse("https://thirty-three.example.test")).join()
+        model.signIn("One too many", SignInInput.Dashboard).join()
+        assertEquals(ComputerProblem.ComputerLimit, model.state.value.problem)
+        assertFalse(sessions.last().connected)
+        model.disconnect().join()
+    }
+
+    @Test fun gateCredentialsAreSavedBeforeTheSignInCommitAndComeBackOnTheNextLaunch() = runTest {
+        val gate = AccessSetup(AccessCredential.proxyBasic("gate-user", "gate-password"), CustomHeader.list(listOf("X-Access-Id" to "synthetic")))
+        val model = model(backgroundScope)
+        model.beginSetup(endpoint, gate).join()
+        assertEquals(gate, factoryCalls.single().third)
+        model.signIn("Garden computer", SignInInput.Dashboard).join()
+        val row = registry().load().computers.single()
+        assertEquals("The gate details were durable before the sign-in was", true, sessions.single().accessSavedBeforeCommit)
+        assertEquals(gate, localData.access[row.id])
+        model.disconnect().join()
+
+        val restored = model(backgroundScope)
+        restored.load().join()
+        assertEquals("The saved gate details reach the new session", gate, factoryCalls.last().third)
+        restored.disconnect().join()
+    }
+
+    @Test fun removingAComputerAlsoForgetsItsGateDetailsAndLocalChatRecords() = runTest {
+        val model = model(backgroundScope)
+        model.beginSetup(endpoint, AccessSetup(AccessCredential.proxyBasic("gate-user", "gate-password"), emptyList())).join()
+        model.signIn("Garden computer", SignInInput.Dashboard).join()
+        val row = registry().load().computers.single()
+        model.remove(row.id).join()
+        assertEquals(listOf(row.id), localData.forgotten)
+        assertTrue(localData.access.isEmpty())
+        assertTrue(registry().load().computers.isEmpty())
+    }
+
+    @Test fun reauthenticatingReusesTheSavedGateDetails() = runTest {
+        val gate = AccessSetup(AccessCredential.cloudflareAccess("id-0123", "secret-0123"), emptyList())
+        val model = model(backgroundScope)
+        model.beginSetup(HermesEndpoint.parse("https://gated.example.test"), gate).join()
+        model.signIn("Gated computer", SignInInput.Dashboard).join()
+        val row = registry().load().computers.single()
+        model.reauthenticate(row.id).join()
+        assertEquals(gate, factoryCalls.last().third)
+        model.disconnect().join()
+    }
+
+    private suspend fun kotlinx.coroutines.test.TestScope.connectedComputer(): Pair<ComputerConnectionModel<FakeSession>, SavedComputer> {
+        val model = model(backgroundScope)
+        model.beginSetup(endpoint).join()
+        model.signIn("Garden computer", SignInInput.Dashboard).join()
+        sessions.single().rotateOnClose = true
+        return model to registry().load().computers.single()
+    }
+
+    private suspend fun rotatedToken(row: SavedComputer) =
+        (vault(row.id).load(row.authority)?.auth as? StoredAuth.DashboardSession)?.token
+
+    @Test fun aRefreshFinishingWhileTheComputerIsReplacedStillSavesItsRotatedSignIn() = runTest {
+        val (model, row) = connectedComputer()
+        model.select(row.id).join()
+        val old = sessions.first()
+        assertEquals("The renewal could still save while the session shut down", true, old.closeWrite)
+        assertEquals("The owner's scope outlived the gateway's disconnect", true, old.scopeActiveOnClose)
+        assertEquals("rotated-session", rotatedToken(row))
+        model.disconnect().join()
+    }
+
+    @Test fun aRefreshFinishingWhileTheComputerIsDisconnectedStillSavesItsRotatedSignIn() = runTest {
+        val (model, row) = connectedComputer()
+        model.disconnect().join()
+        assertEquals(true, sessions.single().closeWrite)
+        assertEquals(true, sessions.single().scopeActiveOnClose)
+        assertEquals("rotated-session", rotatedToken(row))
+    }
+
+    @Test fun aRefreshFinishingWhileTheModelIsClosedStillSavesItsRotatedSignIn() = runTest {
+        val (model, row) = connectedComputer()
+        model.close().join()
+        assertEquals(true, sessions.single().closeWrite)
+        assertEquals(true, sessions.single().scopeActiveOnClose)
+        assertEquals("rotated-session", rotatedToken(row))
+    }
+
+    @Test fun removalKeepsTheFastOrderSoALateRefreshCannotRecreateTheDeletedSignIn() = runTest {
+        val (model, row) = connectedComputer()
+        model.remove(row.id).join()
+        assertEquals("A deleted computer's late refresh is refused", false, sessions.single().closeWrite)
+        assertNull(rotatedToken(row))
+        assertTrue(registry().load().computers.isEmpty())
     }
 
 }

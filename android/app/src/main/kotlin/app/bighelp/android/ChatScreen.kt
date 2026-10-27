@@ -44,6 +44,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -56,9 +57,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 
 /**
- * A demo chat. The reader owns the scroll position: nothing moves it while they read history, Send always
- * brings the newest message into view, and a Latest button appears, in its own row above the message box,
- * whenever they are away from the end.
+ * A demo chat: the shared [ChatPage] with sample messages and a box that only keeps a local draft.
  * Rows are keyed by message ID, so a row's identity survives every change to the list.
  */
 @Composable
@@ -78,10 +77,47 @@ fun ChatScreen(
         return
     }
     val agent = demo.agent(session.agentId)
-    val messages = session.messages
+    ChatPage(
+        rows = session.messages,
+        rowKey = { it.id },
+        header = { ChatHeader(session.title, agent, onBack) },
+        empty = { EmptyChatNote(agent) },
+        // Keyed by chat, so a draft is read once when the chat opens and then owned by the box while typing.
+        bottomBar = {
+            Composer(
+                key = session.id,
+                initialDraft = demo.drafts[session.id].orEmpty(),
+                agentName = agent.name,
+                onDraft = onDraft,
+                onSend = onSend,
+            )
+        },
+    ) { message -> MessageRow(message) }
+}
+
+/**
+ * The chat scaffold both the demo and a real chat use. The reader owns the scroll position: nothing moves it
+ * while they read history, a new row (their own send) always brings the newest into view, and a Latest button
+ * appears, in its own row above the message box, whenever they are away from the end. A reader who is at the
+ * end stays there while the last row grows ([tailVersion] changes as a reply streams). Rows are keyed, so
+ * rows added above (older history) never move what the reader is looking at. [onReachTop] fires each time the
+ * reader arrives at the very top, which is when older history is loaded.
+ */
+@Composable
+internal fun <T> ChatPage(
+    rows: List<T>,
+    rowKey: (T) -> String,
+    header: @Composable () -> Unit,
+    bottomBar: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    tailVersion: Any? = null,
+    onReachTop: (() -> Unit)? = null,
+    empty: (@Composable () -> Unit)? = null,
+    rowContent: @Composable (T) -> Unit,
+) {
     val scope = rememberCoroutineScope()
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = messages.lastIndex.coerceAtLeast(0))
-    val lastIndex by rememberUpdatedState(messages.lastIndex)
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = rows.lastIndex.coerceAtLeast(0))
+    val lastIndex by rememberUpdatedState(rows.lastIndex)
 
     // True while the reader is at the end. Only a finished scroll changes it, so a viewport that shrinks
     // (the keyboard opening) never counts as the reader leaving the end. Saved, so rotation keeps it.
@@ -91,14 +127,20 @@ fun ChatScreen(
             if (!scrolling) followTail = !listState.canScrollForward
         }
     }
-    // Sending (the only way this list grows) always shows the new messages, even from older history.
-    val lastId = messages.lastOrNull()?.id
+    // A new last row (sending is the only way a demo list grows) always shows the new messages.
+    val lastId = rows.lastOrNull()?.let(rowKey)
     var shownLastId by rememberSaveable { mutableStateOf(lastId) }
     LaunchedEffect(lastId) {
         if (lastId != shownLastId) {
             shownLastId = lastId
             followTail = true
             listState.scrollToLatest(lastIndex, animated = ValueAnimator.areAnimatorsEnabled())
+        }
+    }
+    // A reply growing in place keeps the end in view, but only for a reader who is already at the end.
+    LaunchedEffect(tailVersion) {
+        if (tailVersion != null && followTail && !listState.isScrollInProgress && lastIndex >= 0) {
+            listState.scrollToLatest(lastIndex, animated = false)
         }
     }
     // Keep the end in view when the keyboard opens or closes, but only for a reader who is at the end.
@@ -110,23 +152,30 @@ fun ChatScreen(
             }
         }
     }
+    // Arriving at the top (a finished scroll or a first layout) is the cue to read older history.
+    val reachTop by rememberUpdatedState(onReachTop)
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0 && !listState.isScrollInProgress }
+            .distinctUntilChanged()
+            .collect { atTop -> if (atTop) reachTop?.invoke() }
+    }
     // The Latest row takes its own height out of the transcript, so it must never be what moves the reader.
     // It appears only once a finished scroll has left the end (followTail is already false then, so the
     // viewport follow above skips the shrink) and goes away when the reader is back at the end.
     val showLatest by remember { derivedStateOf { !followTail && listState.canScrollForward } }
 
-    Column(Modifier.fillMaxSize().safeDrawingPadding().testTag("screen.chat")) {
-        ChatHeader(session.title, agent, onBack)
+    Column(modifier.fillMaxSize().safeDrawingPadding().testTag("screen.chat")) {
+        header()
         LazyColumn(
             state = listState,
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.weight(1f).fillMaxWidth().testTag("chat.messages"),
         ) {
-            if (messages.isEmpty()) {
-                item(key = "empty") { EmptyChatNote(agent) }
+            if (rows.isEmpty() && empty != null) {
+                item(key = "empty") { empty() }
             }
-            items(messages, key = { it.id }) { message -> MessageRow(message) }
+            items(rows, key = rowKey) { row -> rowContent(row) }
         }
         if (showLatest) {
             // Its own row between the transcript and the message box, so the button covers no message.
@@ -139,14 +188,7 @@ fun ChatScreen(
                 )
             }
         }
-        // Keyed by chat, so a draft is read once when the chat opens and then owned by the box while typing.
-        Composer(
-            key = session.id,
-            initialDraft = demo.drafts[session.id].orEmpty(),
-            agentName = agent.name,
-            onDraft = onDraft,
-            onSend = onSend,
-        )
+        bottomBar()
     }
 }
 
@@ -203,18 +245,31 @@ private fun EmptyChatNote(agent: DemoAgent) {
 
 @Composable
 private fun MessageRow(message: DemoMessage) {
-    val fromUser = message.fromUser
-    Row(
-        Modifier.fillMaxWidth().testTag("chat.message.${message.id}"),
-        horizontalArrangement = if (fromUser) Arrangement.End else Arrangement.Start,
+    MessageBubble(
+        fromUser = message.fromUser,
+        caption = if (message.isExample) "Example reply, not from an agent" else null,
+        modifier = Modifier.testTag("chat.message.${message.id}"),
     ) {
+        Text(message.text, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp))
+    }
+}
+
+/** One speech bubble: the person's on the right (black, dark gray after dark), the agent's on the left. Its text can be selected. */
+@Composable
+internal fun MessageBubble(
+    fromUser: Boolean,
+    modifier: Modifier = Modifier,
+    caption: String? = null,
+    content: @Composable () -> Unit,
+) {
+    Row(modifier.fillMaxWidth(), horizontalArrangement = if (fromUser) Arrangement.End else Arrangement.Start) {
         Column(
             Modifier.padding(start = if (fromUser) 48.dp else 0.dp, end = if (fromUser) 0.dp else 48.dp),
             horizontalAlignment = if (fromUser) Alignment.End else Alignment.Start,
         ) {
-            if (message.isExample) {
+            if (caption != null) {
                 Text(
-                    "Example reply, not from an agent",
+                    caption,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 4.dp, bottom = 2.dp),
@@ -230,9 +285,7 @@ private fun MessageRow(message: DemoMessage) {
                 ),
                 modifier = Modifier.widthIn(max = 560.dp),
             ) {
-                SelectionContainer {
-                    Text(message.text, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp))
-                }
+                SelectionContainer { content() }
             }
         }
     }

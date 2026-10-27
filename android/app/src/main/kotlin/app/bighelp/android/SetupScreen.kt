@@ -18,7 +18,16 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -40,8 +49,9 @@ import androidx.compose.ui.unit.dp
 import app.bighelp.hermes.HermesEndpointException
 
 /**
- * Asks a typed address whether a Hermes computer answers. The result says "found", never "connected":
- * this milestone collects no password or token and opens no chat.
+ * Asks a typed address whether a Hermes computer answers, with the gate details the person may have to give
+ * first. A found computer is not a connection: signing in comes next ([onContinue]). Without a live model (the
+ * demo alone) it is only the public status check and offers the demo.
  */
 @Composable
 fun SetupScreen(
@@ -52,6 +62,9 @@ fun SetupScreen(
     onCheck: () -> Unit,
     onCancel: () -> Unit,
     onTryDemo: () -> Unit,
+    live: Boolean = false,
+    onAccess: (AccessInput) -> Unit = {},
+    onContinue: () -> Unit = {},
 ) {
     val checking = setup.discovery == DiscoveryState.Checking
     Column(Modifier.fillMaxSize().safeDrawingPadding().testTag("screen.setup")) {
@@ -88,6 +101,7 @@ fun SetupScreen(
                 modifier = Modifier.fillMaxWidth().testTag("setup.address"),
             )
             PrivateHttpRow(setup.allowPrivateHttp, enabled = !checking, onChange = onAllowPrivateHttp)
+            if (live) ExtraAccessSection(setup.access, enabled = !checking, onChange = onAccess)
 
             if (checking) {
                 InkButton("Checking…", onClick = {}, tag = "setup.check", enabled = false)
@@ -96,7 +110,7 @@ fun SetupScreen(
                 InkButton("Check computer", onCheck, tag = "setup.check", enabled = setup.address.isNotBlank())
             }
 
-            DiscoveryResultCard(setup.discovery, setup.allowPrivateHttp, onCheck = onCheck, onTryDemo = onTryDemo)
+            DiscoveryResultCard(setup.discovery, setup.allowPrivateHttp, live = live, onCheck = onCheck, onTryDemo = onTryDemo, onContinue = onContinue)
             Spacer(Modifier.height(8.dp))
         }
         }
@@ -145,11 +159,21 @@ private fun PrivateHttpRow(checked: Boolean, enabled: Boolean, onChange: (Boolea
 private fun DiscoveryResultCard(
     discovery: DiscoveryState,
     allowPrivateHttp: Boolean,
+    live: Boolean,
     onCheck: () -> Unit,
     onTryDemo: () -> Unit,
+    onContinue: () -> Unit,
 ) {
     when (discovery) {
         DiscoveryState.Idle, DiscoveryState.Checking -> Unit
+
+        is DiscoveryState.Refused -> ResultCard(
+            title = "Couldn't use this computer",
+            body = discovery.message,
+            tag = "setup.result.refused",
+        ) {
+            InkOutlinedButton("Check again", onCheck, tag = "setup.check-again")
+        }
 
         is DiscoveryState.AddressProblem -> ResultCard(
             title = "That address can't be used",
@@ -187,13 +211,14 @@ private fun DiscoveryResultCard(
                 if (discovery.authRequired) {
                     append(if (discovery.browserSignIn) " Browser sign-in is offered." else " Browser sign-in is not offered.")
                 }
-                append("\n\nThis is not a connection. Signing in and chatting come in a later update; ")
-                append("this preview sent no password or chat.")
+                if (live) append("\n\nNext, choose how to sign in. Nothing has been sent but the check.")
+                else append("\n\nThis is not a connection. This build only checked that a computer answers.")
             },
             tag = "setup.result.found",
         ) {
+            if (live) InkButton("Sign in", onContinue, tag = "setup.sign-in")
             InkOutlinedButton("Check again", onCheck, tag = "setup.check-again")
-            InkButton("Try the demo meanwhile", onTryDemo, tag = "setup.demo")
+            if (!live) InkButton("Try the demo meanwhile", onTryDemo, tag = "setup.demo")
         }
     }
 }
@@ -215,6 +240,72 @@ private fun ResultCard(
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Text(body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             actions()
+        }
+    }
+}
+
+/**
+ * What guards the address before Hermes does: a Cloudflare Access token, a proxy login, and any custom headers
+ * a proxy wants. Closed by default; needed only when the check says the access details were refused.
+ */
+@Composable
+private fun ExtraAccessSection(access: AccessInput, enabled: Boolean, onChange: (AccessInput) -> Unit) {
+    var open by rememberSaveable { mutableStateOf(access.kind != AccessKind.None || access.headers.isNotEmpty()) }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        TextButton(onClick = { open = !open }, modifier = Modifier.testTag("setup.access-toggle")) {
+            Text(if (open) "Hide extra access details" else "Extra access details (optional)")
+        }
+        if (!open) return
+        Text(
+            "Only if something in front of your computer asks for it, like a company login or a Cloudflare access token. These are kept on this phone, sealed, and sent only to this address.",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        listOf(AccessKind.None to "None", AccessKind.Cloudflare to "Cloudflare access token", AccessKind.ProxyLogin to "Username and password").forEach { (kind, label) ->
+            Row(
+                Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                    .selectable(selected = access.kind == kind, enabled = enabled, role = Role.RadioButton, onClick = { onChange(access.copy(kind = kind)) })
+                    .testTag("setup.access.${kind.name}"),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RadioButton(selected = access.kind == kind, onClick = null, enabled = enabled, modifier = Modifier.padding(horizontal = 12.dp))
+                Text(label)
+            }
+        }
+        if (access.kind != AccessKind.None) {
+            OutlinedTextField(
+                value = access.id, onValueChange = { onChange(access.copy(id = it)) }, enabled = enabled, singleLine = true,
+                label = { Text(if (access.kind == AccessKind.Cloudflare) "Client ID" else "Username") }, shape = RoundedCornerShape(16.dp),
+                keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, capitalization = KeyboardCapitalization.None),
+                modifier = Modifier.fillMaxWidth().testTag("setup.access.id"),
+            )
+            OutlinedTextField(
+                value = access.secret, onValueChange = { onChange(access.copy(secret = it)) }, enabled = enabled, singleLine = true,
+                label = { Text(if (access.kind == AccessKind.Cloudflare) "Client secret" else "Password") }, shape = RoundedCornerShape(16.dp),
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, keyboardType = KeyboardType.Password),
+                modifier = Modifier.fillMaxWidth().testTag("setup.access.secret"),
+            )
+        }
+        SectionLabel("Custom headers")
+        access.headers.forEachIndexed { index, (name, value) ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = name, onValueChange = { onChange(access.copy(headers = access.headers.toMutableList().also { list -> list[index] = it to value })) },
+                    enabled = enabled, singleLine = true, label = { Text("Name") }, shape = RoundedCornerShape(16.dp),
+                    keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, capitalization = KeyboardCapitalization.None),
+                    modifier = Modifier.weight(1f).testTag("setup.access.header-name.$index"),
+                )
+                OutlinedTextField(
+                    value = value, onValueChange = { onChange(access.copy(headers = access.headers.toMutableList().also { list -> list[index] = name to it })) },
+                    enabled = enabled, singleLine = true, label = { Text("Value") }, shape = RoundedCornerShape(16.dp),
+                    keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, capitalization = KeyboardCapitalization.None),
+                    modifier = Modifier.weight(1f).testTag("setup.access.header-value.$index"),
+                )
+                TextButton(onClick = { onChange(access.copy(headers = access.headers.filterIndexed { i, _ -> i != index })) }, enabled = enabled, modifier = Modifier.testTag("setup.access.header-remove.$index")) { Text("Remove") }
+            }
+        }
+        if (access.headers.size < 16) {
+            TextButton(onClick = { onChange(access.copy(headers = access.headers + ("" to ""))) }, enabled = enabled, modifier = Modifier.testTag("setup.access.header-add")) { Text("Add a header") }
         }
     }
 }

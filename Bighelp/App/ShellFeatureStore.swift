@@ -74,6 +74,10 @@ final class ShellFeatureStore {
     private var nativeWarmSessionRefresh: (@MainActor (SessionRecord, ChatModel) async throws -> Void)?
     private var nativeCanonicalSessionReentry: (@MainActor (SessionRecord, ChatModel) async throws -> Void)?
     private let navigationHydrationTimeout: Duration
+    /// A chat whose open failed shows its saved copy with no connection of its own, so Send stayed
+    /// off until the app was restarted. It opens again after each of these waits while it's on screen.
+    private let failedOpenRetryDelays: [Duration]
+    private var failedOpenRetries: [String: (attempt: Int, task: Task<Void, Never>?)] = [:]
     private var navigationHydrations: [String: NavigationHydrationFlight] = [:]
     private var warmSessionRefreshes: [String: WarmSessionRefreshFlight] = [:]
     private var canonicalSessionReentries: [String: CanonicalSessionReentryFlight] = [:]
@@ -284,6 +288,7 @@ final class ShellFeatureStore {
         navigationWorkspaceOwner: (@MainActor () -> WorkspaceOwner?)? = nil,
         nativeWarmSessionIsCurrent: @escaping @MainActor (SessionRecord, ChatModel) -> Bool = { _, _ in false },
         navigationHydrationTimeout: Duration = .seconds(180),
+        failedOpenRetryDelays: [Duration] = [.seconds(1), .seconds(3), .seconds(10), .seconds(30)],
         voiceClient: ((SessionRecord, AgentProfile?) -> any VoiceSessionClient)? = nil,
         voiceInputLevelSource: @escaping () -> any VoiceInputLevelSource = {
             AVAudioEngineVoiceInputLevelSource()
@@ -316,6 +321,7 @@ final class ShellFeatureStore {
         self.navigationWorkspaceOwner = navigationWorkspaceOwner
         self.nativeWarmSessionIsCurrent = nativeWarmSessionIsCurrent
         self.navigationHydrationTimeout = navigationHydrationTimeout
+        self.failedOpenRetryDelays = failedOpenRetryDelays
         voiceClientFactory = voiceClient
         self.voiceInputLevelSource = voiceInputLevelSource
         self.voiceHoldMusic = voiceHoldMusic
@@ -633,6 +639,26 @@ final class ShellFeatureStore {
         _ = try? startNavigationHydration(id: id)
     }
 
+    /// Coming back to the app on a chat whose open failed: try again now, with a fresh set of retries.
+    func reopenFailedChat(id: String) {
+        failedOpenRetries.removeValue(forKey: id)?.task?.cancel()
+        openDetachedChat(id: id)
+    }
+
+    /// Opens the chat again after the next wait, while it's still on screen and nothing else opened it.
+    private func retryFailedOpen(id: String, model: ChatModel) {
+        let attempt = failedOpenRetries[id]?.attempt ?? 0
+        guard attempt < failedOpenRetryDelays.count else { return }
+        let delay = failedOpenRetryDelays[attempt]
+        let task = Task { @MainActor [weak self] in
+            do { try await Task.sleep(for: delay) } catch { return }
+            guard let self, self.chatModels[id] === model, self.navigationOwnedConversationIDs.contains(id),
+                  self.navigationHydrations[id] == nil else { return }
+            self.openDetachedChat(id: id)
+        }
+        failedOpenRetries[id] = (attempt + 1, task)
+    }
+
     /// Admit synchronously, before creating a view-owned Task. A second open
     /// joins the exact flight, so A -> B -> A cannot replace A's native lease.
     /// Explicit callers may also exercise this seam with a fixture catalog;
@@ -698,6 +724,8 @@ final class ShellFeatureStore {
     /// Ordinary route disappearance deliberately does not call this method.
     func cancelNavigationHydrations() {
         hydratedNavigationModels.removeAll()
+        for retry in failedOpenRetries.values { retry.task?.cancel() }
+        failedOpenRetries.removeAll()
         for id in Array(navigationHydrations.keys) { cancelNavigationHydration(id: id) }
         let warm = warmSessionRefreshes
         warmSessionRefreshes.removeAll()
@@ -709,6 +737,7 @@ final class ShellFeatureStore {
 
     func retireNavigationSession(id: String) {
         cancelNavigationHydration(id: id)
+        failedOpenRetries.removeValue(forKey: id)?.task?.cancel()
         warmSessionRefreshes.removeValue(forKey: id)?.task.cancel()
         canonicalSessionReentries.removeValue(forKey: id)?.task.cancel()
         hydratedNavigationModels[id] = nil
@@ -783,6 +812,11 @@ final class ShellFeatureStore {
         }
         flight.model.endOpening(flight.handle.id)
         flight.handle.finish(completion)
+        switch completion {
+        case .success: failedOpenRetries.removeValue(forKey: id)?.task?.cancel()
+        case .failure(let error) where !(error is CancellationError): retryFailedOpen(id: id, model: flight.model)
+        case .failure: break
+        }
         scheduleNativeRetention()
     }
 

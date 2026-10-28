@@ -116,6 +116,31 @@ struct SessionOpenLatencyTests {
         #expect(client.calls == 1)
     }
 
+    /// "Unable to open": the chat showed its saved copy with no connection of its own, and Send stayed
+    /// off until the app was restarted. It opens again by itself while it's on screen.
+    @Test func aChatWhoseOpenFailedOpensAgainOnItsOwn() async throws {
+        let connection = HeldConnection(id: "failed-open")
+        let client = HeldSessionPageClient()
+        client.failures = 1
+        let catalog = SessionCatalogStore(client: client, records: [client.record])
+        let features = ShellFeatureStore(timing: .immediate, catalog: catalog, navigationWorkspaceOwner: { connection.owner },
+                                         failedOpenRetryDelays: [.milliseconds(10)])
+        let route = AppRoute.chat(conversationID: client.record.id)
+        #expect(try features.prepareCachedForUserNavigation(route))
+        guard case .chat(let model)? = features.preparedModel(for: route) else { Issue.record("No model"); return }
+        let first = try features.startNavigationHydration(id: client.record.id)
+        for _ in 0..<100 where client.calls == 0 { try await Task.sleep(for: .milliseconds(5)) }
+        client.release()
+        await #expect(throws: (any Error).self) { try await first.value() }
+
+        for _ in 0..<200 where client.calls < 2 { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(client.calls == 2, "The failed open wasn't tried again")
+        #expect(model.isOpening, "Send stays on while it opens again")
+        client.release()
+        for _ in 0..<200 where model.isOpening { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(model.items.last?.content == .message("Canonical answer"))
+    }
+
     @Test func aChatTakesAMessageWhileItOpens() async throws {
         let client = HeldSessionPageClient()
         let catalog = SessionCatalogStore(client: client, records: [client.record])
@@ -286,6 +311,8 @@ private final class HeldSessionPageClient: SessionCatalogClient {
     var record = SessionRecord(id: "held-session", kind: .direct, agentIDs: ["default"], title: "Saved")
     var calls = 0
     var cancelled = false
+    /// Reads that fail (once released) before the next one works.
+    var failures = 0
     private var continuation: CheckedContinuation<Void, Never>?
     func list() async throws -> [SessionRecord] { [record] }
     func create(kind: SessionKind, agentIDs: [String]) async throws -> SessionRecord { record }
@@ -294,6 +321,10 @@ private final class HeldSessionPageClient: SessionCatalogClient {
         calls += 1
         await withCheckedContinuation { continuation = $0 }
         cancelled = Task.isCancelled
+        if failures > 0 {
+            failures -= 1
+            throw HeldPageFailure()
+        }
         var page = record
         page.items = [TimelineItem(id: "canonical-answer", role: .assistant,
             sender: .agent(id: "default", snapshot: .init(name: "Hermes")), content: .message("Canonical answer"), metadata: .init(source: "Fixture", delivery: "Saved"))]
@@ -301,3 +332,5 @@ private final class HeldSessionPageClient: SessionCatalogClient {
     }
     func release() { let pending = continuation; continuation = nil; pending?.resume() }
 }
+
+private struct HeldPageFailure: Error {}

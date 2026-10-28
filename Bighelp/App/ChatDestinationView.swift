@@ -272,19 +272,38 @@ struct ChatDestinationView: View {
     /// Coming back to this chat reloads it exactly like Force Refresh, so it is
     /// never left showing what it looked like before the person stepped away.
     private func refreshOnReturn() {
-        guard model.nativeConversationClient != nil, !model.isBotMode else { return }
+        guard !model.isBotMode else { return }
+        // A chat whose open failed has no connection of its own yet: coming back opens it again.
+        guard model.nativeConversationClient != nil else {
+            featureStore.reopenFailedChat(id: model.conversationID)
+            return
+        }
         let id = model.conversationID
         Task { @MainActor in try? await featureStore.forceRefreshSession(id: id) }
     }
 
-    private func makeVoice(_ mode: VoiceConversationMode) -> VoicePresentation {
-        featureStore.makeVoicePresentation(
+    /// The computer this chat is on (`cacheScopeID`), which an agent's own voice choices are kept under.
+    var voiceComputer: String? {
+        (model.nativeConversationClient?.nativeWorkspaceAuthority ?? appearanceAuthority)?.cacheScopeID
+    }
+
+    /// The agent voice speaks for: the chat's own, else its first.
+    var voiceAgentID: String? { model.nativeConversationClient?.profile ?? model.memberIDs.first }
+
+    /// How voice opens here: the agent's own choice from its Default Voice, else Settings › Voice.
+    var agentVoice: AgentVoicePreference {
+        settings.voicePreference(computer: voiceComputer, agentID: voiceAgentID)
+    }
+
+    func makeVoice(_ mode: VoiceConversationMode) -> VoicePresentation {
+        let voice = agentVoice
+        return featureStore.makeVoicePresentation(
             for: model.conversationID,
             mode: settings.voiceMode,
             transcription: settings.voiceTranscription,
             conversationMode: mode,
-            liveProvider: settings.liveVoiceProvider,
-            liveVoice: settings.liveVoice(for: settings.liveVoiceProvider)
+            liveProvider: voice.liveProvider,
+            liveVoice: voice.liveVoice
         )
     }
 
@@ -297,7 +316,8 @@ struct ChatDestinationView: View {
                 presentation: voiceBar, agentID: agentID, agentName: profile?.name ?? "Your bot",
                 imageURL: profile.flatMap { agents.avatarURL(for: $0) }, permissionCenter: permissionCenter,
                 onSwitchMode: { mode in
-                    settings.voiceConversationMode = mode
+                    // The bar is over one bot's chat: the switch is that bot's own choice.
+                    settings.setVoiceConversationMode(mode, computer: voiceComputer, agentID: agentID)
                     self.voiceBar = makeVoice(mode)
                 },
                 onEnded: { withAnimation(.snappy(duration: 0.25)) { self.voiceBar = nil } }
@@ -311,19 +331,12 @@ struct ChatDestinationView: View {
         }
     }
 
-    /// Live voice couldn't start: remember turn-based voice in Settings
-    /// (listens on the phone, answers with the host's text-to-speech) and
-    /// reopen voice with it.
+    /// Live voice couldn't start: remember turn-based voice (listens on the
+    /// phone, answers with the host's text-to-speech) where the agent's voice
+    /// type comes from, its own or Settings', and reopen voice with it.
     private func useTurnBasedVoice() {
-        settings.voiceConversationMode = .turnBased
-        voicePresentation = featureStore.makeVoicePresentation(
-            for: model.conversationID,
-            mode: settings.voiceMode,
-            transcription: settings.voiceTranscription,
-            conversationMode: .turnBased,
-            liveProvider: settings.liveVoiceProvider,
-            liveVoice: settings.liveVoice(for: settings.liveVoiceProvider)
-        )
+        settings.useTurnBasedVoice(computer: voiceComputer, agentID: voiceAgentID)
+        voicePresentation = makeVoice(.turnBased)
     }
 
     private var forceRefreshAction: (@MainActor () async throws -> Void)? {
@@ -363,7 +376,7 @@ struct ChatDestinationView: View {
                 }
             },
             onVoiceTap: {
-                let presentation = makeVoice(settings.voiceConversationMode)
+                let presentation = makeVoice(agentVoice.mode)
                 if homeChrome.isSimpleBots, model.memberIDs.count == 1 {
                     withAnimation(.snappy(duration: 0.25)) { voiceBar = presentation }
                 } else {
@@ -765,14 +778,7 @@ struct ChatDestinationView: View {
         }
         .task(id: appState.pendingVoiceConversationID) {
             guard appState.consumeVoiceRequest(for: model.conversationID) else { return }
-            voicePresentation = featureStore.makeVoicePresentation(
-                for: model.conversationID,
-                mode: settings.voiceMode,
-                transcription: settings.voiceTranscription,
-                conversationMode: settings.voiceConversationMode,
-                liveProvider: settings.liveVoiceProvider,
-                liveVoice: settings.liveVoice(for: settings.liveVoiceProvider)
-            )
+            voicePresentation = makeVoice(agentVoice.mode)
         }
         .onChange(of: isCameraPickerPresented) { wasPresented, isPresented in
             guard wasPresented && !isPresented else { return }

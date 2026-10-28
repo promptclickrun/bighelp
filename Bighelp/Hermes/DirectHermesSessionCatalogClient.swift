@@ -727,6 +727,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
             // #440: the create's reply was lost before any title was asked for, so this attempt can't
             // hold the agent's Bot Chat. Create again under the same key: Hermes hands back the same
             // session while it still has it, else makes a fresh one. Never a permanent refusal.
+            if let made = try await hermesMadeBotChat(pending, profile: profile) { return made }
             state = pending
             binding = try await dispatchCreate(&state, profile: profile)
         } else if let pending = creations[key], pending.purpose == .firstCanonical, pending.phase != .complete,
@@ -748,6 +749,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
             }
         } else {
             state = try await newCreation(profile: profile, purpose: .firstCanonical)
+            if let made = try await hermesMadeBotChat(state, profile: profile) { return made }
             binding = try await dispatchCreate(&state, profile: profile)
         }
         guard let runtime = binding.coordinate.runtimeSessionID else { throw WorkspaceClientError.invalidResponse }
@@ -1504,6 +1506,43 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         guard let value = rows.first else { return nil }
         guard value.object?["title"]?.string == "Bot Chat" else { throw WorkspaceClientError.invalidResponse }
         return try registryValue(value)
+    }
+
+    /// The agent's Bot Chat, made by Hermes itself through the plugin (`native-bot-chat-v1`): Hermes'
+    /// own native chat, the kind its delivery from other agents adopts. A Bot Chat the app makes over
+    /// its socket is one Hermes can't adopt, so the first message another agent sent the agent moved it
+    /// aside, renamed `Bot Chat (bighelp <id>)`, and started a fresh one without its context. The
+    /// creation's intent ID is the retry key, so a lost reply never makes two. Nil when the plugin
+    /// doesn't have the route yet: the socket makes it as before.
+    private func hermesMadeBotChat(_ creation: DirectHermesSessionCreationState,
+                                   profile: Profile) async throws -> DirectHermesResolvedSession? {
+        var state = creation
+        try persistBeforeDispatch(state)
+        let response: [String: BighelpJSONValue]
+        do {
+            response = try await perform(.botChatCreate, [
+                "profile": .string(profile.id), "idempotencyKey": .string(state.intentID.lowercased()),
+            ])
+        } catch WorkspaceClientError.unavailable(.unsupportedOperation) {
+            return nil
+        } catch WorkspaceClientError.unavailable(.pluginRequired) {
+            return nil
+        } catch WorkspaceClientError.rejected(code: "bot_chat_gateway_unavailable", _) {
+            // The agent's own gateway couldn't start, and nothing was made: chatting matters more, so the
+            // socket makes it as before (one Hermes may still replace when another agent writes).
+            return nil
+        }
+        guard response["ok"]?.boolean == true else { throw WorkspaceClientError.invalidResponse }
+        let stored = try DirectHermesSessionValidation.string(response["storedSessionId"])
+        try DirectHermesSessionValidation.coordinate(stored)
+        let registered = Registry(id: stored, resolvedID: nil)
+        canonicalIDs[DirectHermesSessionIdentity.key(profile.id)] = registered
+        let resolved = try await openRegistry(registered, profile: profile)
+        state.storedSessionID = stored
+        state.phase = .canonicalResolved
+        state.canonicalRegistryID = stored
+        try retain(state)
+        return resolved
     }
 
     /// The chat holding the title "Bot Chat" when Hermes refused it to a new one (4022):

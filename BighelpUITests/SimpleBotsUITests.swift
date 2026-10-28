@@ -40,8 +40,8 @@ final class SimpleBotsUITests: BighelpUITestCase {
             app.buttons["simple-bots.settings"].tap()
             XCTAssertTrue(app.descendants(matching: .any)["simple-bots.settings"].waitForExistence(timeout: 5))
             XCTAssertTrue(app.switches["simple-bots.settings.mode"].exists)
-            XCTAssertTrue(app.descendants(matching: .any)["simple-bots.settings.auto-review"].waitForExistence(timeout: 5),
-                          "Auto-review reads the demo host's approvals")
+            XCTAssertTrue(app.buttons["simple-bots.settings.approvals"].waitForExistence(timeout: 5),
+                          "Approvals links to the primary bot's Advanced Options")
             save("simple-settings-\(appearance)", app)
             app.buttons["simple-bots.settings.close"].tap()
 
@@ -187,9 +187,19 @@ final class SimpleBotsUITests: BighelpUITestCase {
             advanced.tap()
             XCTAssertTrue(app.descendants(matching: .any)["advanced.group.safety"]
                 .waitForExistence(timeout: 10), "The safety group loads")
-            XCTAssertTrue(app.descendants(matching: .any)["advanced.option.approvals.mode"].exists,
-                          "Approvals is one control")
+            let approvals = app.buttons["advanced.option.approvals.mode"]
+            XCTAssertTrue(approvals.exists, "Approvals is one menu")
+            XCTAssertEqual(approvals.value as? String, "Smart")
+            XCTAssertTrue(app.buttons["advanced.page.skillsAndTools"].exists, "Nerd Mode's pages are here too")
             save("simple-advanced-options-\(appearance)", app)
+
+            // Off takes the safety net away, so it asks first.
+            approvals.tap()
+            app.buttons["Off"].firstMatch.tap()
+            XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout: 5), "Turning approvals off asks first")
+            save("simple-advanced-approvals-off-\(appearance)", app)
+            app.alerts.firstMatch.buttons["Cancel"].tap()
+            XCTAssertEqual(approvals.value as? String, "Smart", "Cancel keeps approvals on")
 
             let help = app.buttons["advanced.help.approvals.mode"]
             XCTAssertTrue(help.waitForExistence(timeout: 5))
@@ -197,8 +207,36 @@ final class SimpleBotsUITests: BighelpUITestCase {
             XCTAssertTrue(app.descendants(matching: .any)["advanced.help.popover"]
                 .waitForExistence(timeout: 5), "The note says what each choice does")
             save("simple-advanced-help-\(appearance)", app)
+            app.otherElements["PopoverDismissRegion"].firstMatch.tap()
+
+            // For experts, at the bottom: the bot's own config.yaml.
+            let raw = app.buttons["advanced.page.rawConfiguration"]
+            XCTAssertTrue(raw.waitForExistence(timeout: 5))
+            scrolls = 0
+            while !raw.isHittable, scrolls < 8 {
+                app.swipeUp(velocity: .slow)
+                scrolls += 1
+            }
+            save("simple-advanced-experts-\(appearance)", app)
+            raw.tap()
+            XCTAssertTrue(app.textViews["host.raw-config.editor"].waitForExistence(timeout: 10),
+                          "Edit config.yaml opens the editor")
             app.terminate()
         }
+    }
+
+    /// Bots mode's Settings: Approvals opens the primary bot's Advanced Options, the one place approvals are set.
+    @MainActor
+    func testSettingsApprovalsOpensThePrimaryBotsAdvancedOptions() {
+        let app = launch(appearance: "light")
+        XCTAssertTrue(app.descendants(matching: .any)["simple-bots.home"].waitForExistence(timeout: 15))
+        app.buttons["simple-bots.settings"].tap()
+        let approvals = app.buttons["simple-bots.settings.approvals"]
+        XCTAssertTrue(approvals.waitForExistence(timeout: 5))
+        approvals.tap()
+        XCTAssertTrue(app.buttons["advanced.option.approvals.mode"].waitForExistence(timeout: 10))
+        XCTAssertEqual(app.buttons["advanced.option.approvals.mode"].value as? String, "Smart")
+        save("simple-settings-approvals-light", app)
     }
 
     /// A bot's profile: Files and Media after Computer. Files opens a folder in place, Back goes up,

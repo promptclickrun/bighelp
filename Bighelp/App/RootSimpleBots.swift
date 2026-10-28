@@ -305,10 +305,8 @@ extension RootShellView {
                 }) == true else { return nil }
                 return AgentRuntimeDefaultsEditorModel(agentID: id, client: agentRuntimeDefaults)
             },
-            makeVoiceSettings: { id in makeSimpleBotVoiceSettings(for: id, owner: owner) },
-            makeAdvancedOptions: { id in
-                makeSimpleBotHostConfiguration().map { AdvancedOptionsStore(client: $0, profile: id) }
-            },
+            makeVoiceSettings: { id in makeSimpleBotVoiceSettings(for: id) },
+            makeAdvancedOptions: { makeAdvancedOptions(for: $0) },
             makeFilesSource: { makeSimpleBotFilesSource() },
             makeMediaClient: { makeSimpleBotMediaClient() },
             showsHiddenFiles: settings.nerdModeEnabled,
@@ -358,23 +356,41 @@ extension RootShellView {
             }
     }
 
-    /// The bot's voice on its own computer; the demo copy while fixtures are on and no computer is connected.
-    func makeSimpleBotVoiceSettings(for agentID: String, owner: WorkspaceOwner?) -> SimpleBotVoiceSettings? {
-        if let owner, owner.authority.kind == .direct {
-            guard currentWorkspaceCapabilities.supports(.voiceOutput, owner: owner, profileID: agentID),
-                  let client = voiceSettingsClient else { return nil }
-            return SimpleBotVoiceSettings(
-                store: VoiceSettingsStore(agentID: agentID, client: client, isCurrent: voiceSettingsIsCurrent),
-                settings: settings)
-        }
+    /// The bot's voice: its own voice type, kept on this device for its computer, and its speech
+    /// provider on that computer through the connection of the moment, so a reconnect gets a store of
+    /// its own (`SimpleBotVoiceModel`). The demo copy while fixtures are on and no computer is connected.
+    func makeSimpleBotVoiceSettings(for agentID: String) -> SimpleBotVoiceSettings? {
+        guard let computer = currentWorkspaceOwner?.cacheScopeID else { return nil }
+        let connections = workspaceConnections
         #if DEBUG
-        if usesWorkspaceFixtures {
-            return SimpleBotVoiceSettings(
-                store: VoiceSettingsStore(agentID: agentID, client: voiceSettingsPreview, isCurrent: { true }),
-                settings: settings)
+        if usesWorkspaceFixtures, connections?.isDirectSelected != true {
+            let preview = voiceSettingsPreview
+            return SimpleBotVoiceSettings(settings: settings, computer: computer,
+                connection: { "fixture-voice-settings" },
+                makeStore: { VoiceSettingsStore(agentID: agentID, client: preview, isCurrent: { true }) })
         }
         #endif
-        return nil
+        guard let connections else { return nil }
+        return SimpleBotVoiceSettings(settings: settings, computer: computer,
+            connection: { [weak connections] in
+                // The capabilities count too: a store can only be made once they say the computer speaks.
+                guard let connections, let owner = connections.owner, owner.authority.kind == .direct else { return nil }
+                let speaks = connections.capabilities.supports(.voiceOutput, owner: owner, profileID: agentID)
+                return "\(owner.cacheScopeID):\(owner.authenticationGeneration):\(owner.connectionGeneration):\(speaks)"
+            },
+            makeStore: { [weak connections] in
+                guard let connections, let owner = connections.owner, owner.authority.kind == .direct,
+                      connections.capabilities.supports(.voiceOutput, owner: owner, profileID: agentID),
+                      let workspace = connections.workspace else { return nil }
+                let current: @MainActor () -> WorkspaceOwner? = { [weak connections] in connections?.owner }
+                let host = DirectHermesVoiceSettingsClient(workspace: workspace, owner: owner, currentOwner: current)
+                // This iPhone's or iPad's own voices, as in Settings › Voice.
+                let client: any VoiceSettingsClient = OnDeviceSpeechEngine.isSupported
+                    ? OnDeviceVoiceSettingsClient(host: host, computer: owner.cacheScopeID) : host
+                return VoiceSettingsStore(agentID: agentID, client: client,
+                                          options: DirectHermesVoiceOptionsClient.connected(connections),
+                                          isCurrent: { current() == owner })
+            })
     }
 
     /// Bots mode's Settings sheet; All Settings leads to everything else.
@@ -407,7 +423,8 @@ extension RootShellView {
                     appState.chatOpenedFromList = true
                     openSession(summary)
                 }
-            }
+            },
+            makeAdvancedOptions: { makeAdvancedOptions(for: $0) }
         ))
     }
 }

@@ -3,6 +3,24 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.30
+
+### Bots
+
+- **Bot Chats stay put:** your computer now makes each agent's Bot Chat itself. Before, when one agent sent a message to another agent, Hermes could replace the agent's Bot Chat with a new one, without its earlier messages. This needs bighelp's plugin version 3.33.0 or later on the computer.
+- **New Bot Chat:** this still starts a new Bot Chat. The old one stays in the chat list with its date.
+- **Default Voice:** in Bots mode, open a bot's profile and select **Default Voice**, below **Default Model**. Choose TTS or GPT Live for that bot only. Then choose the provider, the model and the voice from lists.
+- **Advanced Options:** below **Default Voice**, select **Advanced Options** to change that bot's settings in plain words. For **Approvals**, choose **Smart**, **Manual** or **Off**. Tap **(i)** to see what each choice does.
+
+### Voice
+
+- **Voices from lists:** in **Settings > Voice**, you choose voices and models from lists. Before, you typed them.
+- **Team calls:** each bot in a team call speaks with its own voice, also with Phonon on your iPhone. Before, the bots could all use one voice.
+
+### Fixed
+
+- **Unable to open:** if a chat cannot open, bighelp tries again while the chat is on screen and each time you return to it. Before, you could not send in that chat until you closed and opened the app again.
+
 ## 2.6.29
 
 ### Voice

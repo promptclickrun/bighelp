@@ -168,6 +168,19 @@ struct OnDeviceVoiceSettingsTests {
         #expect(store.canSave)
     }
 
+    /// Team calls hand each member's piece to a system player as WAV.
+    @Test func teamCallAudioIsMono16BitWAVAtTheModelRate() {
+        let wav = OnDeviceSpeechEngine.wav([0, 1, -1, 0.5], sampleRate: 24_000)
+        #expect(wav.count == 44 + 8)
+        #expect(String(decoding: wav[0..<4], as: UTF8.self) == "RIFF")
+        #expect(String(decoding: wav[8..<16], as: UTF8.self) == "WAVEfmt ")
+        let rate = wav[24..<28].enumerated().reduce(0) { $0 | Int($1.element) << (8 * $1.offset) }
+        #expect(rate == 24_000)
+        #expect(wav[34] == 16 && wav[22] == 1)
+        let loudest = Int16(wav[46]) | Int16(wav[47]) << 8
+        #expect(loudest == Int16.max)
+    }
+
     @Test func speaksWithTheComputerWhileThisDevicesVoiceIsntDownloaded() async throws {
         let host = ReplySpeechSpy()
         let engine = OnDeviceSpeechEngine(installer: OnDeviceVoiceInstaller(root: try temporaryDirectory()))

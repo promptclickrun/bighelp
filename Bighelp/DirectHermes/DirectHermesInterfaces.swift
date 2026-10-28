@@ -415,16 +415,16 @@ enum DirectHermesIdentity {
         }
     }
 
-    /// Hermes rewrites a chat's `source` between the app's own label and `local`
-    /// when it refreshes a Bot Chat's peer, so only those two labels name one chat.
-    /// Every other label, and a missing one, still has to match exactly.
+    /// One chat under the labels it moves between: Hermes makes an agent's Bot Chat as `cli`, stores it as
+    /// `local` once it runs, and the app's resume stamps `bighelp`. Every other label, and a missing one,
+    /// still has to match exactly.
     static func sameSessionSource(_ lhs: String?, _ rhs: String?) -> Bool {
         if matches(lhs, rhs) { return true }
         guard let lhs, let rhs else { return false }
         return Self.interchangeableSources.contains(lhs) && Self.interchangeableSources.contains(rhs)
     }
 
-    private static let interchangeableSources: Set<String> = [DirectHermesReleaseContract.sessionSource, "local"]
+    private static let interchangeableSources: Set<String> = [DirectHermesReleaseContract.sessionSource, "local", "cli"]
 
     static func validate(_ value: String, maximumBytes: Int) throws {
         guard !value.isEmpty, value.utf8.count <= maximumBytes,

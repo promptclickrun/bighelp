@@ -88,7 +88,10 @@ struct SessionContentRepositoryTests {
         #expect(DirectHermesIdentity.sameSessionSource(nil, nil))
         #expect(!DirectHermesIdentity.sameSessionSource(nil, "bighelp"))
         #expect(!DirectHermesIdentity.sameSessionSource("local", nil))
-        #expect(!DirectHermesIdentity.sameSessionSource("cli", "bighelp"))
+        // Hermes makes a Bot Chat as `cli` and stores it as `local` once it runs.
+        #expect(DirectHermesIdentity.sameSessionSource("cli", "bighelp"))
+        #expect(DirectHermesIdentity.sameSessionSource("cli", "local"))
+        #expect(!DirectHermesIdentity.sameSessionSource("tui", "bighelp"))
         #expect(!DirectHermesIdentity.sameSessionSource("desktop", "local"))
         #expect(!DirectHermesIdentity.sameSessionSource("other-source", "cli"))
         #expect(DirectHermesIdentity.sameSessionSource("cli", "cli"))
@@ -130,7 +133,7 @@ struct SessionContentRepositoryTests {
     @Test func aDifferentSourceStillMeansADifferentChat() {
         let local = SessionRecord(id: "chat", kind: .direct, agentIDs: ["default"], title: "Chat",
             remoteStoredID: "stored", remoteSource: "bighelp")
-        for other in ["cli", "tui", "desktop", "other-source"] {
+        for other in ["tui", "desktop", "other-source"] {
             var incoming = local
             incoming.remoteSource = other
             #expect(!SessionCatalogReconciliation.hasSameDurableIdentity(local, incoming))
@@ -141,7 +144,8 @@ struct SessionContentRepositoryTests {
         #expect(NativeWorkspaceSessionBridge.sameOrAdoptingSource("bighelp", "local"))
         #expect(NativeWorkspaceSessionBridge.sameOrAdoptingSource("local", "bighelp"))
         #expect(NativeWorkspaceSessionBridge.sameOrAdoptingSource(nil, "local"))
-        #expect(!NativeWorkspaceSessionBridge.sameOrAdoptingSource("bighelp", "cli"))
+        #expect(NativeWorkspaceSessionBridge.sameOrAdoptingSource("cli", "local"))
+        #expect(!NativeWorkspaceSessionBridge.sameOrAdoptingSource("bighelp", "tui"))
         #expect(!NativeWorkspaceSessionBridge.sameOrAdoptingSource("local", nil))
     }
 

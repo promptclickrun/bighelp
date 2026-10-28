@@ -70,11 +70,12 @@ struct SimpleBotVoiceBar: View {
 
     private var choicesMenu: some View {
         Menu {
-            Picker("Voice", selection: Binding(
+            // The bot's own voice type, as its Default Voice sets it; the same names as there.
+            Picker("Voice type", selection: Binding(
                 get: { presentation.conversationMode },
                 set: { mode in if mode != presentation.conversationMode { onSwitchMode(mode) } })) {
-                Text("Live voice").tag(VoiceConversationMode.codexLive)
-                Text("TTS voice").tag(VoiceConversationMode.turnBased)
+                Text(VoiceConversationMode.codexLive.title).tag(VoiceConversationMode.codexLive)
+                Text(VoiceConversationMode.turnBased.title).tag(VoiceConversationMode.turnBased)
             }
             Button(isAgentMuted ? "Unmute \(agentName)" : "Mute \(agentName)",
                    systemImage: isAgentMuted ? "speaker.wave.2" : "speaker.slash") {

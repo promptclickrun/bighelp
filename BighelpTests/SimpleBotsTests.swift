@@ -260,37 +260,19 @@ struct SimpleBotsTests {
         #expect(SimpleBotsOrderStore(defaults: defaults).order(scope: "studio") == ["bot:a", "bot:b"])
     }
 
-    @Test func autoReviewIsSmartOrManualAndNeverTurnsApprovalsOff() async throws {
+    @Test func theTimeZoneIsSavedForEveryBotAndKeepsTheirApprovals() async throws {
         let host = SimpleBotDemoConfiguration()
+        try await host.write(["approvals": .object(["mode": .string("manual")])], profile: "nova")
         let settings = SimpleBotHostSettings(client: host, profile: "default", allProfiles: { ["default", "nova"] })
         await settings.refresh()
         #expect(settings.load == .loaded)
-        #expect(settings.autoReview)
-
-        await settings.setAutoReview(false)
-        #expect(!settings.autoReview)
-        #expect(try await host.read(profile: "default")["approvals"]?.object?["mode"] == .string("manual"))
-        await settings.setAutoReview(true)
-        #expect(try await host.read(profile: "default")["approvals"]?.object?["mode"] == .string("smart"))
-
-        await settings.setRules("  Ask before deleting files.  ")
-        #expect(settings.rules == "Ask before deleting files.")
-        #expect(try await host.read(profile: "default")["approvals"]?.object?["mode"] == .string("smart"),
-                "Saving rules keeps the mode: Hermes merges a save")
 
         await settings.setTimeZone("America/Chicago")
         #expect(settings.timeZone == "America/Chicago")
         #expect(try await host.read(profile: "nova")["timezone"] == .string("America/Chicago"),
                 "Every bot on the computer follows the time zone")
-    }
-
-    @Test func approvalsOffOnTheHostIsSaidPlainly() async throws {
-        let host = SimpleBotDemoConfiguration()
-        try await host.write(["approvals": .object(["mode": .string("off")])], profile: "default")
-        let settings = SimpleBotHostSettings(client: host, profile: "default", allProfiles: { ["default"] })
-        await settings.refresh()
-        #expect(!settings.autoReview)
-        #expect(settings.approvalsOff)
+        #expect(try await host.read(profile: "nova")["approvals"]?.object?["mode"] == .string("manual"),
+                "Hermes merges a save, so each bot keeps its own approvals")
     }
 }
 

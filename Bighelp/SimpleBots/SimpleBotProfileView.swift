@@ -13,10 +13,11 @@ struct SimpleBotProfileContext {
     let onEditDetails: (AgentProfile) -> Void
     /// The bot's default model and reasoning, where the computer lets the app read and change them.
     var makeModelDefaults: ((String) -> AgentRuntimeDefaultsEditorModel?)? = nil
-    /// The bot's default voice (Default Voice); nil where the computer can't read or change it.
+    /// The bot's default voice (Default Voice): its own voice type here, its speech provider on the
+    /// computer; nil without a computer.
     var makeVoiceSettings: ((String) -> SimpleBotVoiceSettings?)? = nil
-    /// The bot's everyday settings (Advanced Options); nil where the computer can't read or change them.
-    var makeAdvancedOptions: ((String) -> AdvancedOptionsStore?)? = nil
+    /// The bot's Advanced Options: its settings and Nerd Mode pages; nil without a computer to ask.
+    var makeAdvancedOptions: ((String) -> AdvancedOptionsContext?)? = nil
     /// The folder the computer shares (Files); nil without a computer.
     var makeFilesSource: (() -> (any SimpleBotFilesSource)?)? = nil
     /// Photos and videos from the bot's chats (Media); nil while no computer is connected.
@@ -67,9 +68,9 @@ struct SimpleBotProfileView: View {
     @State private var isStudioPresented = false
     @State private var modelDefaults: AgentRuntimeDefaultsEditorModel?
     @State private var isModelPresented = false
-    @State private var voiceSettings: SimpleBotVoiceSettings?
+    @State private var voice: SimpleBotVoiceModel?
     @State private var isVoicePresented = false
-    @State private var advancedOptions: AdvancedOptionsStore?
+    @State private var advancedOptions: AdvancedOptionsContext?
     @State private var isAdvancedPresented = false
     @State private var files: SimpleBotFilesModel?
     @State private var media = AgentMediaStore()
@@ -104,12 +105,18 @@ struct SimpleBotProfileView: View {
             modelDefaults = context.canEdit ? context.makeModelDefaults?(agentID) : nil
             await modelDefaults?.loadIfNeeded()
         }
-        .task(id: agentID) {
-            voiceSettings = context.canEdit ? context.makeVoiceSettings?(agentID) : nil
-            if let store = voiceSettings?.store, store.configuration == nil { await store.load() }
+        .task(id: "\(agentID)|\(context.canEdit)") {
+            // Made once the computer lets the app edit this bot; kept through a reconnect's moment without one.
+            guard context.canEdit, voice?.agentID != agentID else { return }
+            voice = context.makeVoiceSettings?(agentID).map { SimpleBotVoiceModel(agentID: agentID, voice: $0) }
         }
-        .task(id: agentID) {
-            advancedOptions = context.canEdit ? context.makeAdvancedOptions?(agentID) : nil
+        // A new connection (back from the background) gets a store of its own.
+        .task(id: voice.map { "\($0.agentID)|\($0.connection ?? "")" }) { await voice?.follow() }
+        .task(id: "\(agentID)|\(context.canEdit)") {
+            // Made once the computer says the app may edit this bot, which can come after the
+            // profile opens; kept through a reconnect's moment without a connection.
+            guard context.canEdit, advancedOptions?.store.profile != agentID else { return }
+            advancedOptions = context.makeAdvancedOptions?(agentID)
         }
         .task(id: agentID) {
             if context.dashboard != nil, dashboard?.agentID != agentID {
@@ -170,8 +177,8 @@ struct SimpleBotProfileView: View {
             }
         }
         .bighelpSheet(isPresented: $isVoicePresented) {
-            if let profile, let voiceSettings {
-                SimpleBotDefaultVoiceSheet(voice: voiceSettings, botName: profile.name) { isVoicePresented = false }
+            if let profile, let voice {
+                SimpleBotDefaultVoiceSheet(model: voice, botName: profile.name) { isVoicePresented = false }
                     .presentationDetents([.large])
                     .presentationDragIndicator(.visible)
                     .bighelpSheetSize(.standard)
@@ -179,8 +186,7 @@ struct SimpleBotProfileView: View {
         }
         .bighelpSheet(isPresented: $isAdvancedPresented) {
             if let profile, let advancedOptions {
-                AdvancedOptionsView(store: advancedOptions, botName: profile.name,
-                                    onOpenRawConfiguration: nil) { isAdvancedPresented = false }
+                AdvancedOptionsSheet(context: advancedOptions, botName: profile.name) { isAdvancedPresented = false }
                     .presentationDetents([.large])
                     .presentationDragIndicator(.visible)
                     .bighelpSheetSize(.standard)
@@ -462,11 +468,11 @@ struct SimpleBotProfileView: View {
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("simple-bots.profile.default-model")
                 }
-                if let voiceSettings {
+                if let voice {
                     SimpleBotsDivider()
                     Button { isVoicePresented = true } label: {
                         SimpleBotsRow(title: String(localized: "Default Voice"), leading: Image(systemName: "waveform"),
-                                      value: voiceSummary(voiceSettings))
+                                      value: voice.summary)
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("simple-bots.profile.default-voice")
@@ -617,15 +623,6 @@ struct SimpleBotProfileView: View {
                 saveState = String(localized: "The computer didn't take the new avatar. Try again.")
             }
         }
-    }
-
-    private func voiceSummary(_ voice: SimpleBotVoiceSettings) -> String? {
-        let settings = voice.settings
-        return SimpleBotDefaultVoiceSummary.text(
-            mode: settings.voiceConversationMode,
-            liveProvider: settings.liveVoiceProvider,
-            liveVoice: settings.liveVoice(for: settings.liveVoiceProvider),
-            store: voice.store)
     }
 
     private func modelName(_ defaults: AgentRuntimeDefaultsEditorModel) -> String {

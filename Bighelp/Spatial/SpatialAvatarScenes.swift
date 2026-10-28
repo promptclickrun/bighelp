@@ -363,7 +363,7 @@ struct SpatialAvatarVolume: View {
     }
 
     private func useTurnBasedVoice() {
-        settings.voiceConversationMode = .turnBased
+        settings.useTurnBasedVoice(computer: model.voiceComputer, agentID: model.agent?.id)
         model.endVoice()
         Task { _ = await model.startVoice(settings) }
     }

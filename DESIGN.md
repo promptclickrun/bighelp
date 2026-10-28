@@ -479,14 +479,16 @@ text is SF Pro, as everywhere.
   order, and the answer always shows.
 - **Swipes**: from the left edge back to your bots; from the right, this bot's profile (the primary bot's on
   the home). The full app's swipe choices lead to places this mode hides, so they don't apply here.
-- **Profile**: the mark, name and role, then Info (Character, Instructions, Default Model, Routines) and
-  Computer (its screen, when the host has one). More avatars opens the full avatar studio (`AvatarCreatorView`)
-  with the marks as its Bots section; Save applies the pick at once. Default Model is the model and reasoning
-  picker, saved as the bot's default for chats.
-- **Settings**: you and Usage (your tightest plan limit); Connect apps; the primary bot's Auto-review
-  (Hermes' smart approvals on, manual off; never off), its rules, and the time zone every bot works in
-  (or this device's, automatically); Teamwork; Bot Computer; Notifications and Appearance; then the
-  switch back and All Settings.
+- **Profile**: the mark, name and role, then Info (Character, Instructions, Default Model, Default Voice,
+  Advanced Options, Routines) and Computer (its screen, when the host has one). More avatars opens the full
+  avatar studio (`AvatarCreatorView`) with the marks as its Bots section; Save applies the pick at once. Default
+  Model is the model and reasoning picker, saved as the bot's default for chats. Default Voice picks this bot's
+  TTS or GPT Live and its provider, model and voice from lists (saved per bot). Advanced Options is the bot's
+  one simple doorway to its Nerd Mode settings: plain rows with a tip each (Approvals: Smart, Manual or Off),
+  and links to its Nerd Mode pages under For experts, without Nerd Mode turned on.
+- **Settings**: you and Usage (your tightest plan limit); Connect apps; the primary bot's Approvals (opens its
+  Advanced Options, the one place approvals are set) and the time zone every bot works in (or this device's,
+  automatically); Teamwork; Bot Computer; Notifications and Appearance; then the switch back and All Settings.
 
 ## Code mode
 

@@ -1,6 +1,6 @@
 import SwiftUI
 
-enum VoiceSettingsField { case voice, model, server, key }
+enum VoiceSettingsField { case server, key }
 
 enum CodexLiveVoicePluginAvailability: Equatable, Sendable {
     case unknown
@@ -37,12 +37,12 @@ struct VoiceSettingsView: View {
     @State private var agentID: String
     @State private var store: VoiceSettingsStore?
     @State private var confirmAPIBilling = false
-    /// Choosing a provider or an on-device voice pushes a page; that isn't leaving Voice settings.
-    @State private var isChoosingProvider = false
-    @State private var isChoosingOnDeviceVoice = false
+    /// A pushed picker (provider, voice, model); that isn't leaving Voice settings.
+    @State private var page: VoiceSettingsPage?
     @State private var loadedTaskID: String?
     @FocusState private var focusedField: VoiceSettingsField?
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.workspaceConnections) private var workspaceConnections
 
     init(settings: SettingsStore, agents: [AgentProfile], selectedAgentID: String?,
          client: (any VoiceSettingsClient)?, scope: String?,
@@ -63,9 +63,22 @@ struct VoiceSettingsView: View {
     }
 
     /// TTS voice mode and Auto TTS speak with each agent's speech provider; GPT Live 1 speaks
-    /// for itself.
+    /// for itself. A bot that has TTS as its own voice type (Bots mode) still needs its provider.
     private var showsSpeechProvider: Bool {
         settings.voiceConversationMode == .turnBased || settings.autoSpeakRepliesEnabled
+            || agents.contains { ownMode($0.id) == .turnBased }
+    }
+
+    /// An agent's own voice type from its Default Voice, if it has one.
+    private func ownMode(_ agentID: String) -> VoiceConversationMode? {
+        guard let computer = workspaceConnections?.owner?.cacheScopeID else { return nil }
+        return AgentVoiceChoices.shared.mode(computer: computer, agentID: agentID)
+    }
+
+    private var agentFooter: String {
+        let base = String(localized: "Each agent has its own speech provider and voice, saved on your computer. A voice that runs on this \(OnDeviceVoiceModel.deviceName) is saved here.")
+        guard let mode = ownMode(agentID), let name = agents.first(where: { $0.id == agentID })?.name else { return base }
+        return base + " " + String(localized: "\(name) uses \(mode.title) for voice, its own choice in Bots mode.")
     }
 
     var body: some View {
@@ -83,13 +96,11 @@ struct VoiceSettingsView: View {
                 } header: {
                     Text("Agent")
                 } footer: {
-                    Text("Each agent has its own speech provider and voice, saved on your computer. A voice that runs on this \(OnDeviceVoiceModel.deviceName) is saved here.")
+                    Text(agentFooter)
                 }
                 if agents.contains(where: { $0.id == agentID }) {
                     if let store, store.agentID == agentID {
-                        VoiceSettingsEditor(store: store, focusedField: $focusedField,
-                                            isChoosingProvider: $isChoosingProvider,
-                                            isChoosingOnDeviceVoice: $isChoosingOnDeviceVoice)
+                        VoiceSettingsEditor(store: store, focusedField: $focusedField, page: $page)
                     }
                 }
             } else {
@@ -124,30 +135,21 @@ struct VoiceSettingsView: View {
                 }
             }
         }
-        .navigationDestination(isPresented: $isChoosingProvider) {
-            if let store, let configuration = store.configuration {
-                VoiceProviderList(providers: configuration.providers, selection: store.providerID) {
-                    store.selectProvider($0)
-                }
-            }
-        }
-        .navigationDestination(isPresented: $isChoosingOnDeviceVoice) {
-            if let store, let model = OnDeviceVoiceModel.model(providerID: store.providerID) {
-                OnDeviceVoicePicker(store: store, model: model)
-            }
-        }
+        .modifier(VoiceSettingsPages(store: store, page: $page))
         .task(id: loadTaskID) {
-            // Back from the provider list: keep the loaded settings and edits.
+            // Back from a picker: keep the loaded settings and edits.
             if loadedTaskID == loadTaskID, store?.configuration != nil { return }
             loadedTaskID = loadTaskID
             store?.invalidate()
             store = nil
             guard let client, scope != nil, agents.contains(where: { $0.id == agentID }) else { return }
-            let current = VoiceSettingsStore(agentID: agentID, client: client, isCurrent: isCurrent)
+            let current = VoiceSettingsStore(agentID: agentID, client: client,
+                                             options: DirectHermesVoiceOptionsClient.connected(workspaceConnections),
+                                             isCurrent: isCurrent)
             store = current
             await current.load()
         }
-        .onDisappear { if !isChoosingProvider, !isChoosingOnDeviceVoice { store?.invalidate() } }
+        .onDisappear { if page == nil { store?.invalidate() } }
         .onChange(of: scenePhase) { _, phase in
             if phase != .active { store?.clearAPIKey() }
         }
@@ -189,9 +191,9 @@ private struct VoicePreferenceSections: View {
                 .bighelpFont(.metadata)
                 .foregroundStyle(.secondary)
         } header: {
-            Text("Voice mode")
+            Text("Default voice mode")
         } footer: {
-            Text("Used when you \(BighelpPlatform.isMac ? "click" : "tap") the microphone in a chat.")
+            Text("Used when you \(BighelpPlatform.isMac ? "click" : "tap") the microphone in a chat. It's the default for every agent; in Bots mode, a bot's Default Voice can pick its own.")
         }
 
         Section {
@@ -221,7 +223,7 @@ private struct VoicePreferenceSections: View {
             } header: {
                 Text("GPT Live 1")
             } footer: {
-                Text("Sign-ins stay on your computer. An API key may add separate OpenAI charges.")
+                Text("Sign-ins stay on your computer. An API key may add separate OpenAI charges. The voice is the default for every agent.")
             }
             HostPluginFeatureSection(feature: .liveVoice)
         } else {
@@ -257,12 +259,13 @@ private struct VoicePreferenceSections: View {
     }
 }
 
+/// One agent's speech provider, voice and model, with the API key and server address where the
+/// provider has them. Voices and models are picked from lists on pages of their own (`VoiceSettingsPages`).
 @MainActor
 struct VoiceSettingsEditor: View {
     @Bindable var store: VoiceSettingsStore
     @FocusState.Binding var focusedField: VoiceSettingsField?
-    @Binding var isChoosingProvider: Bool
-    @Binding var isChoosingOnDeviceVoice: Bool
+    @Binding var page: VoiceSettingsPage?
 
     var body: some View {
         Group {
@@ -295,22 +298,11 @@ struct VoiceSettingsEditor: View {
     private func providerSection(_ configuration: VoiceSettingsConfiguration) -> some View {
         let selected = store.selectedProvider
         return Section {
-            Button {
-                focusedField = nil
-                isChoosingProvider = true
-            } label: {
-                HStack {
-                    LabeledContent("Provider", value: selected?.title ?? store.providerID)
-                    Image(systemName: "chevron.right")
-                        .font(.bighelp(.footnote).weight(.semibold))
-                        .foregroundStyle(.tertiary)
-                        .accessibilityHidden(true)
-                }
-                .contentShape(.rect)
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("voice.settings.provider")
-            .disabled(store.isSaving || store.isLoading)
+            VoiceSettingsChoiceRow(title: "Provider", value: selected?.title ?? store.providerID) { open(.provider) }
+                .accessibilityIdentifier("voice.settings.provider")
+                .disabled(store.isSaving || store.isLoading)
+                // So the voice row can name a voice the computer lists (ElevenLabs' by name, not its ID).
+                .task(id: store.providerID) { await store.loadHostCatalog() }
 
             if let selected {
                 Text(summary(for: selected))
@@ -319,17 +311,16 @@ struct VoiceSettingsEditor: View {
                     .accessibilityIdentifier("voice.settings.provider-summary")
             }
             if let selected, let model = OnDeviceVoiceModel.model(providerID: selected.id) {
-                OnDeviceVoiceRows(store: store, model: model) {
-                    focusedField = nil
-                    isChoosingOnDeviceVoice = true
-                }
-            } else if selected?.hasVoice == true {
-                field("Voice", placeholder: "Voice name or ID", text: $store.voiceID, focus: .voice,
-                      identifier: "voice.settings.voice-id")
+                OnDeviceVoiceRows(store: store, model: model) { open(.onDeviceVoice) }
+            } else if selected?.takesVoice == true {
+                VoiceSettingsChoiceRow(title: "Voice", value: store.voiceName) { open(.voice) }
+                    .accessibilityIdentifier("voice.settings.voice-id")
+                    .disabled(store.isSaving)
             }
             if selected?.hasModel == true {
-                field("Model", placeholder: "Automatic", text: $store.model, focus: .model,
-                      identifier: "voice.settings.model")
+                VoiceSettingsChoiceRow(title: "Model", value: store.modelName) { open(.model) }
+                    .accessibilityIdentifier("voice.settings.model")
+                    .disabled(store.isSaving)
             }
             if selected?.supportsServerURL == true {
                 field("Server", placeholder: "OpenAI (leave blank)", text: $store.serverURL, focus: .server,
@@ -357,6 +348,11 @@ struct VoiceSettingsEditor: View {
             Text(footer(for: selected))
         }
         .disabled(store.isSaving)
+    }
+
+    private func open(_ destination: VoiceSettingsPage) {
+        focusedField = nil
+        page = destination
     }
 
     private var sampleSection: some View {
@@ -404,7 +400,8 @@ struct VoiceSettingsEditor: View {
         case .onYourComputer:
             provider.hasVoice ? "Runs on your computer. Your agent's words never leave it."
                 : "Runs on your computer. Its voice is set up there."
-        case .custom: "A speech command set up on your computer."
+        case .custom:
+            provider.voiceLocation == .plugin ? "A speech plugin on your computer." : "A speech command set up on your computer."
         case .free: "Free Microsoft voices. No account or key needed."
         case .cloud:
             provider.needsAPIKey ? "Uses your own \(provider.title) account." : "Set up on your computer."
@@ -491,7 +488,7 @@ struct VoiceProviderList: View {
         switch provider.kind {
         case .onThisDevice: "No account or key, works offline"
         case .onYourComputer, .free: "No account or key"
-        case .custom: "A speech command on your computer"
+        case .custom: provider.voiceLocation == .plugin ? "A speech plugin on your computer" : "A speech command on your computer"
         case .cloud:
             !provider.needsAPIKey ? "Set up on your computer"
                 : provider.apiKeyConfigured ? "API key saved" : "Needs an API key"
@@ -506,6 +503,215 @@ struct VoiceProviderList: View {
         case .free: "Microsoft's free online voices."
         case .cloud: "Billed to your own account with that service. OpenAI also works with self-hosted OpenAI-compatible servers."
         }
+    }
+}
+
+/// A row that opens a picker page: its title, what's chosen, and a chevron.
+@MainActor
+struct VoiceSettingsChoiceRow: View {
+    let title: LocalizedStringKey
+    let value: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack {
+                LabeledContent(title, value: value)
+                Image(systemName: "chevron.right")
+                    .font(.bighelp(.footnote).weight(.semibold))
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
+            }
+            .frame(minHeight: BighelpTokens.hitTarget)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// The pages Voice settings pushes from an agent's speech provider.
+enum VoiceSettingsPage: Hashable, Identifiable {
+    case provider, onDeviceVoice, voice, model
+    var id: Self { self }
+}
+
+/// Pushes `page` for `store`; Settings › Voice and a bot's Default Voice share it.
+@MainActor
+struct VoiceSettingsPages: ViewModifier {
+    let store: VoiceSettingsStore?
+    @Binding var page: VoiceSettingsPage?
+
+    func body(content: Content) -> some View {
+        content.navigationDestination(item: $page) { page in
+            if let store {
+                switch page {
+                case .provider:
+                    if let configuration = store.configuration {
+                        VoiceProviderList(providers: configuration.providers, selection: store.providerID) {
+                            store.selectProvider($0)
+                        }
+                    }
+                case .onDeviceVoice:
+                    if let model = OnDeviceVoiceModel.model(providerID: store.providerID) {
+                        OnDeviceVoicePicker(store: store, model: model)
+                    }
+                case .voice:
+                    VoiceOptionPicker(store: store, kind: .voice)
+                case .model:
+                    VoiceOptionPicker(store: store, kind: .model)
+                }
+            }
+        }
+    }
+}
+
+/// A provider's voices or models on one page, grouped where they have groups (a language), with a
+/// checkmark on the one chosen. Other takes a value that isn't listed, only where the provider accepts one.
+@MainActor
+struct VoiceOptionPicker: View {
+    enum Kind { case voice, model }
+
+    @Bindable var store: VoiceSettingsStore
+    let kind: Kind
+    @State private var other = ""
+    @FocusState private var isOtherFocused: Bool
+    @Environment(\.dismiss) private var dismiss
+    @BighelpThemeReader private var theme
+
+    private var list: VoiceOptionList {
+        (kind == .voice ? store.voiceChoices : store.modelChoices) ?? VoiceOptionList(options: [])
+    }
+
+    private var selection: String {
+        (kind == .voice ? store.voiceID : store.model).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var providerTitle: String { store.selectedProvider?.title ?? store.providerID }
+
+    var body: some View {
+        let choices = list
+        List {
+            if kind == .voice, let note { noteSection(note) }
+            ForEach(groups(choices.options), id: \.title) { group in
+                Section {
+                    ForEach(group.options) { row($0) }
+                } header: {
+                    if let title = group.title { Text(title) }
+                }
+                .listRowBackground(theme.surface)
+            }
+            if choices.allowsOther { otherSection }
+        }
+        .bighelpFormSurface()
+        .environment(\.defaultMinListRowHeight, BighelpTokens.hitTarget)
+        .scrollContentBackground(.hidden)
+        .background(theme.canvas.ignoresSafeArea())
+        .foregroundStyle(theme.primaryText)
+        .tint(theme.action)
+        .navigationTitle(kind == .voice ? Text("Voice") : Text("Model"))
+        .navigationBarTitleDisplayMode(.inline)
+        .task { if kind == .voice { await store.loadHostCatalog() } }
+    }
+
+    private var note: String? {
+        switch store.hostCatalog {
+        case .loading: String(localized: "Getting \(providerTitle) voices from your computer…")
+        case .needsPluginUpdate:
+            String(localized: "Update the bighelp plugin on your computer to choose from its voices. Until then, the agent keeps the voice it has.")
+        case .unavailable(let reason): reason
+        case .loaded, nil: nil
+        }
+    }
+
+    private func noteSection(_ note: String) -> some View {
+        Section {
+            HStack(spacing: BighelpTokens.space8) {
+                if store.hostCatalog == .loading { ProgressView() }
+                Text(note)
+                    .bighelpFont(.metadata)
+                    .foregroundStyle(theme.secondaryText)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("voice.option.note")
+        }
+        .listRowBackground(theme.surface)
+    }
+
+    private struct OptionSection { let title: String?; let options: [VoiceOption] }
+
+    /// Sections in the order their first option comes.
+    private func groups(_ options: [VoiceOption]) -> [OptionSection] {
+        var order: [String?] = []
+        var rows: [String?: [VoiceOption]] = [:]
+        for option in options {
+            if rows[option.group] == nil { order.append(option.group) }
+            rows[option.group, default: []].append(option)
+        }
+        return order.map { OptionSection(title: $0, options: rows[$0] ?? []) }
+    }
+
+    private func row(_ option: VoiceOption) -> some View {
+        let isSelected = option.id == selection
+        return Button {
+            choose(option.id)
+        } label: {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(option.name).foregroundStyle(theme.primaryText)
+                    if let detail = option.detail {
+                        Text(detail).bighelpFont(.metadata).foregroundStyle(theme.secondaryText)
+                    }
+                }
+                Spacer()
+                if isSelected {
+                    Image(systemName: "checkmark").foregroundStyle(theme.action).accessibilityHidden(true)
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: BighelpTokens.hitTarget, alignment: .leading)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .disabled(store.isSaving)
+        .accessibilityLabel(option.name)
+        .accessibilityValue(option.detail ?? "")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityIdentifier("voice.option." + (option.id.isEmpty ? "default" : option.id))
+    }
+
+    private var otherSection: some View {
+        Section {
+            let hint: LocalizedStringKey = kind == .voice ? "Voice name or ID" : "Model name"
+            TextField(hint, text: $other, prompt: Text(hint).bighelpFieldHint(theme))
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .focused($isOtherFocused)
+                .submitLabel(.done)
+                .onSubmit(useOther)
+                .accessibilityIdentifier("voice.option.other-field")
+            Button(kind == .voice ? LocalizedStringKey("Use this voice") : LocalizedStringKey("Use this model"),
+                   action: useOther)
+                .disabled(other.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || store.isSaving)
+                .accessibilityIdentifier("voice.option.other-use")
+        } header: {
+            Text("Other")
+        } footer: {
+            Text(kind == .voice
+                 ? String(localized: "For a voice \(providerTitle) has that isn't listed, such as one you made yourself.")
+                 : String(localized: "For a model your server has that isn't listed."))
+        }
+        .listRowBackground(theme.surface)
+    }
+
+    private func useOther() {
+        let value = other.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return }
+        isOtherFocused = false
+        choose(value)
+    }
+
+    private func choose(_ id: String) {
+        if kind == .voice { store.chooseVoice(id) } else { store.chooseModel(id) }
+        dismiss()
     }
 }
 

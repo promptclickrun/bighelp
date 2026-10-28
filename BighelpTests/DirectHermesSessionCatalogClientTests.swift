@@ -988,6 +988,12 @@ struct DirectHermesSessionCatalogClientTests {
         let client = Self.client(workspace, sink: { _ in })
         try client.restoreCreationState(saved)
         #expect(try client.pendingCreation(profileID: "alpha")?.storedSessionID == nil)
+
+        var other = saved
+        other.storedSessionID = "another-chat"
+        #expect(throws: WorkspaceClientError.invalidResponse, "Only that record is repaired") {
+            try other.validated(for: owner)
+        }
     }
 
     /// The agent's gateway couldn't start and Hermes made nothing: the socket makes the Bot Chat, so the

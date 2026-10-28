@@ -58,6 +58,62 @@ struct NativeWorkspaceSessionBridgeTests {
         #expect(try bridge.profileSessionOwnership(profileID: "sage").isEmpty)
     }
 
+    /// Each connection restores the saved creation records. One it refuses (2.6.30 saved such a Bot Chat
+    /// record) was thrown and stopped every chat on that computer; now only that record goes.
+    @Test func aSavedCreationRecordTheConnectionRefusesIsLeftOut() throws {
+        let authority = try WorkspaceAuthority.fixture(id: "bridge-records")
+        let owner = WorkspaceOwner(authority: authority, authenticationGeneration: UUID(), connectionGeneration: UUID())
+        func record(_ profile: String, phase: DirectHermesSessionCreationState.Phase, stored: String? = nil,
+                    registry: String? = nil, scope: String? = nil) -> (String, DirectHermesSessionCreationState) {
+            (Data(profile.utf8).base64EncodedString(), DirectHermesSessionCreationState(
+                schemaVersion: 1, intentID: UUID().uuidString, scopeID: scope ?? authority.cacheScopeID,
+                profileID: profile, purpose: .firstCanonical, connectionGeneration: UUID(), phase: phase,
+                storedSessionID: stored, canonicalRegistryID: registry))
+        }
+        let saved = Dictionary(uniqueKeysWithValues: [
+            record("alpha", phase: .createRequested),
+            record("beta", phase: .created, stored: "stored-without-runtime"),
+            record("gamma", phase: .createRequested, scope: "another-computer"),
+            // 2.6.30's Bot Chat record is repaired on restore, not left out.
+            record("delta", phase: .canonicalResolved, stored: "local-native", registry: "local-native"),
+        ])
+        let kept = NativeWorkspaceSessionBridge.restorableCreationStates(saved, scopeID: authority.cacheScopeID,
+                                                                         owner: owner)
+        #expect(Set(kept.values.map(\.profileID)) == ["alpha", "delta"])
+    }
+
+    /// A record that isn't this computer's no longer stops the computer's chats from opening at all.
+    @Test func theBridgeStartsWithoutASavedRecordThatIsntThisComputers() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "bridge-records-\(UUID().uuidString)")
+        let suite = "bridge-records-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer {
+            defaults.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: root)
+        }
+        let hosts = BighelpHostRegistry(root: root.appending(path: "hosts"), keychainService: suite,
+                                        independentRoot: root.appending(path: "independent"), defaults: defaults)
+        let authority = try WorkspaceAuthority.fixture(id: "bridge-records")
+        let sessions = root.appending(path: "sessions")
+        func record(_ profile: String, scope: String) -> DirectHermesSessionCreationState {
+            DirectHermesSessionCreationState(schemaVersion: 1, intentID: UUID().uuidString, scopeID: scope,
+                                             profileID: profile, purpose: .ordinary, connectionGeneration: UUID(),
+                                             phase: .createRequested)
+        }
+        try DemoRepository<[String: DirectHermesSessionCreationState]>(
+            directory: sessions, name: "native-session-creation", seed: [:]
+        ).save([
+            Data("alpha".utf8).base64EncodedString(): record("alpha", scope: authority.cacheScopeID),
+            Data("beta".utf8).base64EncodedString(): record("beta", scope: "another-computer"),
+        ])
+        _ = try NativeWorkspaceSessionBridge(connections: WorkspaceConnectionStore(hosts: hosts),
+                                             authority: authority, directory: sessions)
+        let kept = try DemoRepository<[String: DirectHermesSessionCreationState]>(
+            directory: sessions, name: "native-session-creation", seed: [:]
+        ).loadExistingPreservingSource()
+        #expect(kept?.values.map(\.profileID) == ["alpha"])
+    }
+
     @Test func retainedStreamMayAttemptDurableResumeAcrossACompactionSuccessor() throws {
         let authority = try WorkspaceAuthority.fixture(id: "bridge-lineage")
         let authentication = UUID()

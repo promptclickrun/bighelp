@@ -119,7 +119,11 @@ final class OnDeviceSpeechEngine {
         append(UInt16(2)); append(UInt16(16))
         data.append(contentsOf: Array("data".utf8)); append(payload)
         data.reserveCapacity(data.count + samples.count * 2)
-        for sample in samples { append(Int16((min(max(sample, -1), 1) * Float(Int16.max)).rounded())) }
+        // A NaN from the model would trap in Int16(_:): it plays as silence instead.
+        for sample in samples {
+            let clamped = sample.isFinite ? min(max(sample, -1), 1) : 0
+            append(Int16((clamped * Float(Int16.max)).rounded()))
+        }
         return data
     }
 

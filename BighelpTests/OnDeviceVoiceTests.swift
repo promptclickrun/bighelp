@@ -179,6 +179,9 @@ struct OnDeviceVoiceSettingsTests {
         #expect(wav[34] == 16 && wav[22] == 1)
         let loudest = Int16(wav[46]) | Int16(wav[47]) << 8
         #expect(loudest == Int16.max)
+        // A glitch from the model plays as silence instead of crashing the call.
+        let glitch = OnDeviceSpeechEngine.wav([.nan, .infinity], sampleRate: 24_000)
+        #expect(glitch.count == 44 + 4 && glitch[44..<48].allSatisfy { $0 == 0 })
     }
 
     @Test func speaksWithTheComputerWhileThisDevicesVoiceIsntDownloaded() async throws {

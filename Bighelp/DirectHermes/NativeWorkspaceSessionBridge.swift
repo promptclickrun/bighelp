@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 @MainActor
 /// Owns the sole stream registry, creation journal and lifecycle. Extensions preserve this shared actor boundary.
@@ -93,7 +94,10 @@ final class NativeWorkspaceSessionBridge: SessionCatalogClient {
                 self.creationStates = states
             }
         )
-        for state in self.creationStates.values { try client.restoreCreationState(state) }
+        let saved = self.creationStates
+        let usable = Self.restorableCreationStates(saved, scopeID: self.authority.cacheScopeID, owner: owner)
+        if usable.count != saved.count { self.keepCreationStates(usable, leftOut: saved.count - usable.count) }
+        for state in usable.values { try client.restoreCreationState(state) }
         if let previous = self.lastCatalogClient { client.adoptHistory(from: previous) }
         self.lastCatalogClient = client
         return client
@@ -108,13 +112,33 @@ final class NativeWorkspaceSessionBridge: SessionCatalogClient {
         drafts = DirectHermesDraftStore(root: directory.appending(path: "submission-journals", directoryHint: .isDirectory))
         creationRepository = DemoRepository(directory: directory, name: "native-session-creation", seed: [:],
                                             protectedDataAvailability: protectedData)
-        creationStates = try creationRepository.loadExistingPreservingSource() ?? [:]
-        guard creationStates.count <= 128,
-              creationStates.allSatisfy({ key, state in
-                  state.scopeID == authority.cacheScopeID
-                      && key == Data(state.profileID.utf8).base64EncodedString()
-              }) else { throw WorkspaceClientError.invalidResponse }
+        let saved = try creationRepository.loadExistingPreservingSource() ?? [:]
+        creationStates = Self.restorableCreationStates(saved, scopeID: authority.cacheScopeID, owner: nil)
+        guard creationStates.count <= 128 else { throw WorkspaceClientError.invalidResponse }
+        if creationStates.count != saved.count {
+            keepCreationStates(creationStates, leftOut: saved.count - creationStates.count)
+        }
     }
+
+    /// The saved creation records this computer (and, given one, this connection) can use. A record is
+    /// only a retry breadcrumb for a chat being made, so one that doesn't fit is left out rather than
+    /// thrown: thrown, one bad record (2.6.30 saved one for each plugin-made Bot Chat) stopped opening
+    /// and starting every chat on that computer, also after a restart.
+    static func restorableCreationStates(
+        _ states: [String: DirectHermesSessionCreationState], scopeID: String, owner: WorkspaceOwner?
+    ) -> [String: DirectHermesSessionCreationState] {
+        states.filter { key, state in
+            state.scopeID == scopeID && key == Data(state.profileID.utf8).base64EncodedString()
+                && (owner.map { (try? state.validated(for: $0)) != nil } ?? true)
+        }
+    }
+
+    private func keepCreationStates(_ states: [String: DirectHermesSessionCreationState], leftOut: Int) {
+        Self.log.error("Left out \(leftOut, privacy: .public) saved chat creation record(s) that didn't fit")
+        creationStates = states
+        try? creationRepository.save(states)
+    }
+    private static let log = Logger(subsystem: "app.loopdy.mobile", category: "SessionCreation")
 
     func currentCoordinate(for id: String) -> WorkspaceSessionCoordinate? {
         guard !retired, let owner = connections.owner, owner.authority == authority else { return nil }

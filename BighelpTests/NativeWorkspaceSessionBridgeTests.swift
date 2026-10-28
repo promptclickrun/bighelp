@@ -64,20 +64,22 @@ struct NativeWorkspaceSessionBridgeTests {
         let authority = try WorkspaceAuthority.fixture(id: "bridge-records")
         let owner = WorkspaceOwner(authority: authority, authenticationGeneration: UUID(), connectionGeneration: UUID())
         func record(_ profile: String, phase: DirectHermesSessionCreationState.Phase, stored: String? = nil,
-                    scope: String? = nil) -> (String, DirectHermesSessionCreationState) {
+                    registry: String? = nil, scope: String? = nil) -> (String, DirectHermesSessionCreationState) {
             (Data(profile.utf8).base64EncodedString(), DirectHermesSessionCreationState(
                 schemaVersion: 1, intentID: UUID().uuidString, scopeID: scope ?? authority.cacheScopeID,
                 profileID: profile, purpose: .firstCanonical, connectionGeneration: UUID(), phase: phase,
-                storedSessionID: stored))
+                storedSessionID: stored, canonicalRegistryID: registry))
         }
         let saved = Dictionary(uniqueKeysWithValues: [
             record("alpha", phase: .createRequested),
             record("beta", phase: .created, stored: "stored-without-runtime"),
             record("gamma", phase: .createRequested, scope: "another-computer"),
+            // 2.6.30's Bot Chat record is repaired on restore, not left out.
+            record("delta", phase: .canonicalResolved, stored: "local-native", registry: "local-native"),
         ])
         let kept = NativeWorkspaceSessionBridge.restorableCreationStates(saved, scopeID: authority.cacheScopeID,
                                                                          owner: owner)
-        #expect(kept.values.map(\.profileID) == ["alpha"])
+        #expect(Set(kept.values.map(\.profileID)) == ["alpha", "delta"])
     }
 
     /// A record that isn't this computer's no longer stops the computer's chats from opening at all.

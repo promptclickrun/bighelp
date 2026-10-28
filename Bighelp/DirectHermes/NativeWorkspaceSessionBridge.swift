@@ -134,9 +134,10 @@ final class NativeWorkspaceSessionBridge: SessionCatalogClient {
     }
 
     private func keepCreationStates(_ states: [String: DirectHermesSessionCreationState], leftOut: Int) {
-        Self.log.error("Left out \(leftOut, privacy: .public) saved chat creation record(s) that didn't fit")
         creationStates = states
-        try? creationRepository.save(states)
+        let saved = (try? creationRepository.save(states)) != nil
+        Self.log.error(
+            "Left out \(leftOut, privacy: .public) bad chat creation record(s); saved: \(saved, privacy: .public)")
     }
     private static let log = Logger(subsystem: "app.loopdy.mobile", category: "SessionCreation")
 

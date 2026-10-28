@@ -137,3 +137,170 @@ struct SimpleBotDefaultModelSheet: View {
         } catch {}
     }
 }
+
+/// Info › Character: the bot's shape and color, Reset to default, and More avatars (the full studio,
+/// which the profile opens once this sheet has gone).
+struct SimpleBotCharacterSheet: View {
+    @Binding var mark: SimpleBotMark
+    let canEdit: Bool
+    let status: String
+    let onReset: () -> Void
+    let onMoreAvatars: () -> Void
+    let onDone: () -> Void
+    @BighelpThemeReader private var theme
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: BighelpTokens.space12) {
+                    SimpleBotsCard {
+                        SimpleBotMarkPicker(mark: $mark)
+                            .padding(.vertical, BighelpTokens.space24)
+                            .padding(.horizontal, BighelpTokens.space8)
+                            .disabled(!canEdit)
+                        SimpleBotsDivider()
+                        link("Reset to default", identifier: "simple-bots.profile.reset-mark", action: onReset)
+                        SimpleBotsDivider()
+                        link("More avatars", identifier: "simple-bots.profile.more-avatars", action: onMoreAvatars)
+                    }
+                    Text(status)
+                        .font(.bighelp(.subheadline))
+                        .foregroundStyle(theme.tertiaryText)
+                        .padding(.horizontal, BighelpTokens.space20)
+                        .accessibilityIdentifier("simple-bots.profile.mark-status")
+                }
+                .padding(.horizontal, BighelpTokens.space20)
+                .padding(.vertical, BighelpTokens.space16)
+                .frame(maxWidth: 720)
+                .frame(maxWidth: .infinity)
+            }
+            .background(theme.canvas.ignoresSafeArea())
+            .navigationTitle("Character")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done", action: onDone)
+                        .accessibilityIdentifier("simple-bots.character.done")
+                }
+            }
+        }
+    }
+
+    private func link(_ title: LocalizedStringKey, identifier: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.bighelp(.body))
+                .foregroundStyle(theme.information)
+                .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+                .padding(.horizontal, BighelpTokens.space20)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .disabled(!canEdit)
+        .accessibilityIdentifier(identifier)
+    }
+}
+
+/// Each profile tab's frame in the row it sits in, for the bar over a held tab and for dragging.
+struct SimpleBotTabFrames: PreferenceKey {
+    static let defaultValue: [SimpleBotProfileTab: CGRect] = [:]
+    static func reduce(value: inout [SimpleBotProfileTab: CGRect], nextValue: () -> [SimpleBotProfileTab: CGRect]) {
+        value.merge(nextValue()) { $1 }
+    }
+}
+
+/// Rearrange: the profile's tabs as glass chips, dragged into a new order right where they are.
+/// They hold still until moved (no wiggle); VoiceOver moves them with Move Left and Move Right.
+struct SimpleBotTabArranger: View {
+    let tabs: [SimpleBotProfileTab]
+    let onMove: (SimpleBotProfileTab, Int) -> Void
+    @State private var frames: [SimpleBotProfileTab: CGRect] = [:]
+    @State private var dragging: SimpleBotProfileTab?
+    /// Where the dragged chip was when the drag began; it follows the finger from there.
+    @State private var start: CGRect = .zero
+    @State private var translation: CGSize = .zero
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @BighelpThemeReader private var theme
+
+    private static let space = "simple-bots.profile.tab-arranger"
+
+    var body: some View {
+        WorkflowFlowLayout(spacing: BighelpTokens.space8) {
+            ForEach(tabs) { chip($0) }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .coordinateSpace(.named(Self.space))
+        .onPreferenceChange(SimpleBotTabFrames.self) { frames = $0 }
+        .padding(.vertical, BighelpTokens.space4)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("simple-bots.profile.tabs.arranger")
+    }
+
+    private func chip(_ tab: SimpleBotProfileTab) -> some View {
+        let isDragging = dragging == tab
+        return HStack(spacing: BighelpTokens.space8) {
+            Image(systemName: "line.3.horizontal")
+                .font(.bighelp(.footnote, weight: .semibold))
+                .foregroundStyle(theme.secondaryText)
+            Text(tab.title)
+                .font(.bighelp(.body))
+                .foregroundStyle(theme.primaryText)
+        }
+        .padding(.horizontal, BighelpTokens.space16)
+        .frame(minHeight: BighelpTokens.hitTarget)
+        .contentShape(Capsule())
+        .bighelpNavigationGlass(in: Capsule(), isInteractive: true)
+        .background {
+            GeometryReader { proxy in
+                Color.clear.preference(key: SimpleBotTabFrames.self, value: [tab: proxy.frame(in: .named(Self.space))])
+            }
+        }
+        .offset(isDragging ? offset(of: tab) : .zero)
+        .scaleEffect(isDragging ? 1.05 : 1)
+        .shadow(color: .black.opacity(isDragging ? 0.18 : 0), radius: 10, y: 6)
+        .zIndex(isDragging ? 1 : 0)
+        .gesture(drag(tab))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(tab.title)
+        .accessibilityHint(Text("Drag to move this tab."))
+        .accessibilityActions {
+            if let index = tabs.firstIndex(of: tab) {
+                if index > 0 { Button("Move Left") { onMove(tab, index - 1) } }
+                if index < tabs.count - 1 { Button("Move Right") { onMove(tab, index + 1) } }
+            }
+        }
+        .accessibilityIdentifier("simple-bots.profile.tabs.chip.\(tab.rawValue)")
+    }
+
+    private func offset(of tab: SimpleBotProfileTab) -> CGSize {
+        guard let now = frames[tab] else { return translation }
+        return CGSize(width: start.minX + translation.width - now.minX,
+                      height: start.minY + translation.height - now.minY)
+    }
+
+    private func drag(_ tab: SimpleBotProfileTab) -> some Gesture {
+        DragGesture(minimumDistance: 4, coordinateSpace: .named(Self.space))
+            .onChanged { value in
+                if dragging != tab {
+                    dragging = tab
+                    start = frames[tab] ?? .zero
+                }
+                translation = value.translation
+                let center = CGPoint(x: start.midX + value.translation.width, y: start.midY + value.translation.height)
+                guard let from = tabs.firstIndex(of: tab),
+                      let target = tabs.indices.first(where: { index in
+                          guard index != from, let frame = frames[tabs[index]],
+                                frame.insetBy(dx: 0, dy: -BighelpTokens.space8).contains(center) else { return false }
+                          // Past the other chip's middle the way it's going, so two chips never swap back and forth.
+                          return index > from ? center.x > frame.midX : center.x < frame.midX
+                      }) else { return }
+                withAnimation(reduceMotion ? nil : .snappy(duration: 0.25)) { onMove(tab, target) }
+            }
+            .onEnded { _ in
+                withAnimation(reduceMotion ? nil : .snappy(duration: 0.25)) {
+                    dragging = nil
+                    translation = .zero
+                }
+            }
+    }
+}

@@ -12,6 +12,35 @@ struct SimpleBotFilesTests {
         #expect(SimpleBotProfileTab.available(showsComputer: false, showsDashboard: false) == [.info, .files, .media])
     }
 
+    /// Rearrange's order: names it doesn't know (a tab an older build dropped) go, and tabs it doesn't
+    /// have yet (a newer build's) come after the rest.
+    @Test func profileTabsFollowTheSavedOrder() {
+        #expect(SimpleBotProfileTabs.order("files,info") == [.files, .info, .dashboard, .computer, .media])
+        #expect(SimpleBotProfileTabs.order("media,later,media") == [.media, .dashboard, .info, .computer, .files])
+        #expect(SimpleBotProfileTabs.order("") == SimpleBotProfileTab.allCases)
+        #expect(SimpleBotProfileTab.available(showsComputer: false,
+                                              order: SimpleBotProfileTabs.order("files,computer,info"))
+            == [.files, .info, .dashboard, .media])
+    }
+
+    /// Rearranging moves only the tabs on screen; one this bot doesn't show (Computer) keeps its place.
+    @Test func rearrangingTheShownTabsKeepsAHiddenOneInPlace() {
+        let shown = SimpleBotProfileTabs.moving(.files, to: 0, in: [.dashboard, .info, .files, .media])
+        #expect(shown == [.files, .dashboard, .info, .media])
+        #expect(SimpleBotProfileTabs.merging(shown, into: [.dashboard, .info, .computer, .files, .media])
+            == [.files, .dashboard, .computer, .info, .media])
+        #expect(SimpleBotProfileTabs.moving(.dashboard, to: 3, in: [.dashboard, .info, .files, .media])
+            == [.info, .files, .media, .dashboard])
+    }
+
+    /// A profile opens on the tab set with Set Default, Dashboard until then, or the first one shown
+    /// when this bot doesn't have that tab.
+    @Test func aProfileOpensOnTheDefaultTab() {
+        #expect(SimpleBotProfileTabs.opening(defaultTab: "files", in: [.dashboard, .info, .files]) == .files)
+        #expect(SimpleBotProfileTabs.opening(defaultTab: nil, in: [.info, .dashboard, .files]) == .dashboard)
+        #expect(SimpleBotProfileTabs.opening(defaultTab: "computer", in: [.info, .files]) == .info)
+    }
+
     @Test func aRowOpensByWhatItIs() {
         let folder = Self.file("/w/Reports", directory: true)
         let video = Self.file("/w/clip.mp4", size: 40_000_000, mime: "video/mp4")

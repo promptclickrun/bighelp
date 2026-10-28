@@ -133,6 +133,74 @@ final class SimpleBotsUITests: BighelpUITestCase {
         save("simple-default-model-dark", app)
     }
 
+    /// A bot's profile: Default Voice sits under Default Model and opens the voice picker;
+    /// Advanced Options sits under it and opens the plain-language settings with tappable notes.
+    @MainActor
+    func testProfileOpensDefaultVoiceAndAdvancedOptions() throws {
+        for appearance in ["light", "dark"] {
+            let app = launch(appearance: appearance)
+            XCTAssertTrue(app.descendants(matching: .any)["simple-bots.home"].waitForExistence(timeout: 15))
+            app.buttons["simple-bots.primary"].tap()
+            let identity = app.buttons["chat.identity"]
+            XCTAssertTrue(identity.waitForExistence(timeout: 10))
+            let profile = app.descendants(matching: .any)["simple-bots.profile"]
+            // A tap while the chat is still sliding in can miss; one more is enough.
+            identity.tap()
+            if !profile.waitForExistence(timeout: 5) { identity.tap() }
+            XCTAssertTrue(profile.waitForExistence(timeout: 5))
+            let info = app.buttons["simple-bots.profile.tab.info"]
+            XCTAssertTrue(info.waitForExistence(timeout: 5))
+            info.tap()
+
+            let model = app.buttons["simple-bots.profile.default-model"]
+            let voice = app.buttons["simple-bots.profile.default-voice"]
+            let advanced = app.buttons["simple-bots.profile.advanced-options"]
+            XCTAssertTrue(model.waitForExistence(timeout: 10))
+            XCTAssertTrue(voice.waitForExistence(timeout: 10), "Default Voice is under Default Model")
+            XCTAssertTrue(advanced.waitForExistence(timeout: 5), "Advanced Options is under Default Voice")
+            XCTAssertGreaterThan(voice.frame.minY, model.frame.minY)
+            XCTAssertGreaterThan(advanced.frame.minY, voice.frame.minY)
+            var scrolls = 0
+            while !(voice.isHittable && advanced.isHittable), scrolls < 6 {
+                app.swipeUp(velocity: .slow)
+                scrolls += 1
+            }
+            save("simple-profile-voice-rows-\(appearance)", app)
+
+            voice.tap()
+            XCTAssertTrue(app.descendants(matching: .any)["simple-bots.default-voice.mode"]
+                .waitForExistence(timeout: 5), "The sheet picks TTS or GPT Live")
+            XCTAssertTrue(app.buttons["simple-bots.default-voice.done"].exists)
+            save("simple-default-voice-\(appearance)", app)
+            let tts = app.descendants(matching: .any)["simple-bots.default-voice.mode"].buttons["TTS"]
+            if tts.exists {
+                tts.tap()
+                XCTAssertTrue(app.buttons["simple-bots.default-voice.save"].waitForExistence(timeout: 5),
+                              "TTS shows the voice settings with Save")
+                save("simple-default-voice-tts-\(appearance)", app)
+            }
+            app.buttons["simple-bots.default-voice.done"].tap()
+            XCTAssertTrue(app.descendants(matching: .any)["simple-bots.profile"].waitForExistence(timeout: 5),
+                          "Done comes back to the profile")
+
+            XCTAssertTrue(advanced.waitForExistence(timeout: 5))
+            advanced.tap()
+            XCTAssertTrue(app.descendants(matching: .any)["advanced.group.safety"]
+                .waitForExistence(timeout: 10), "The safety group loads")
+            XCTAssertTrue(app.descendants(matching: .any)["advanced.option.approvals.mode"].exists,
+                          "Approvals is one control")
+            save("simple-advanced-options-\(appearance)", app)
+
+            let help = app.buttons["advanced.help.approvals.mode"]
+            XCTAssertTrue(help.waitForExistence(timeout: 5))
+            help.tap()
+            XCTAssertTrue(app.descendants(matching: .any)["advanced.help.popover"]
+                .waitForExistence(timeout: 5), "The note says what each choice does")
+            save("simple-advanced-help-\(appearance)", app)
+            app.terminate()
+        }
+    }
+
     /// A bot's profile: Files and Media after Computer. Files opens a folder in place, Back goes up,
     /// and a file opens in the chat preview; Media shows the bot's photos and videos.
     @MainActor

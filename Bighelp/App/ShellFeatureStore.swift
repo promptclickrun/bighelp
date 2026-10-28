@@ -788,7 +788,8 @@ final class ShellFeatureStore {
 
     private static func sameNavigationSession(_ lhs: SessionRecord, _ rhs: SessionRecord) -> Bool {
         lhs.id == rhs.id && lhs.kind == rhs.kind && lhs.agentIDs == rhs.agentIDs
-            && lhs.remoteStoredID == rhs.remoteStoredID && lhs.remoteSource == rhs.remoteSource
+            && lhs.remoteStoredID == rhs.remoteStoredID
+            && DirectHermesIdentity.sameSessionSource(lhs.remoteSource, rhs.remoteSource)
             && lhs.botModeRoomID == rhs.botModeRoomID
     }
 

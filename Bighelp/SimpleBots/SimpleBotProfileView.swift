@@ -13,6 +13,10 @@ struct SimpleBotProfileContext {
     let onEditDetails: (AgentProfile) -> Void
     /// The bot's default model and reasoning, where the computer lets the app read and change them.
     var makeModelDefaults: ((String) -> AgentRuntimeDefaultsEditorModel?)? = nil
+    /// The bot's default voice (Default Voice); nil where the computer can't read or change it.
+    var makeVoiceSettings: ((String) -> SimpleBotVoiceSettings?)? = nil
+    /// The bot's everyday settings (Advanced Options); nil where the computer can't read or change them.
+    var makeAdvancedOptions: ((String) -> AdvancedOptionsStore?)? = nil
     /// The folder the computer shares (Files); nil without a computer.
     var makeFilesSource: (() -> (any SimpleBotFilesSource)?)? = nil
     /// Photos and videos from the bot's chats (Media); nil while no computer is connected.
@@ -63,6 +67,10 @@ struct SimpleBotProfileView: View {
     @State private var isStudioPresented = false
     @State private var modelDefaults: AgentRuntimeDefaultsEditorModel?
     @State private var isModelPresented = false
+    @State private var voiceSettings: SimpleBotVoiceSettings?
+    @State private var isVoicePresented = false
+    @State private var advancedOptions: AdvancedOptionsStore?
+    @State private var isAdvancedPresented = false
     @State private var files: SimpleBotFilesModel?
     @State private var media = AgentMediaStore()
     @State private var isMediaConnected = false
@@ -95,6 +103,13 @@ struct SimpleBotProfileView: View {
         .task(id: agentID) {
             modelDefaults = context.canEdit ? context.makeModelDefaults?(agentID) : nil
             await modelDefaults?.loadIfNeeded()
+        }
+        .task(id: agentID) {
+            voiceSettings = context.canEdit ? context.makeVoiceSettings?(agentID) : nil
+            if let store = voiceSettings?.store, store.configuration == nil { await store.load() }
+        }
+        .task(id: agentID) {
+            advancedOptions = context.canEdit ? context.makeAdvancedOptions?(agentID) : nil
         }
         .task(id: agentID) {
             if context.dashboard != nil, dashboard?.agentID != agentID {
@@ -149,6 +164,23 @@ struct SimpleBotProfileView: View {
         .bighelpSheet(isPresented: $isModelPresented) {
             if let profile, let modelDefaults {
                 SimpleBotDefaultModelSheet(defaults: modelDefaults, botName: profile.name) { isModelPresented = false }
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+                    .bighelpSheetSize(.standard)
+            }
+        }
+        .bighelpSheet(isPresented: $isVoicePresented) {
+            if let profile, let voiceSettings {
+                SimpleBotDefaultVoiceSheet(voice: voiceSettings, botName: profile.name) { isVoicePresented = false }
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+                    .bighelpSheetSize(.standard)
+            }
+        }
+        .bighelpSheet(isPresented: $isAdvancedPresented) {
+            if let profile, let advancedOptions {
+                AdvancedOptionsView(store: advancedOptions, botName: profile.name,
+                                    onOpenRawConfiguration: nil) { isAdvancedPresented = false }
                     .presentationDetents([.large])
                     .presentationDragIndicator(.visible)
                     .bighelpSheetSize(.standard)
@@ -430,6 +462,24 @@ struct SimpleBotProfileView: View {
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("simple-bots.profile.default-model")
                 }
+                if let voiceSettings {
+                    SimpleBotsDivider()
+                    Button { isVoicePresented = true } label: {
+                        SimpleBotsRow(title: String(localized: "Default Voice"), leading: Image(systemName: "waveform"),
+                                      value: voiceSummary(voiceSettings))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("simple-bots.profile.default-voice")
+                }
+                if advancedOptions != nil {
+                    SimpleBotsDivider()
+                    Button { isAdvancedPresented = true } label: {
+                        SimpleBotsRow(title: String(localized: "Advanced Options"),
+                                      leading: Image(systemName: "slider.horizontal.3"))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("simple-bots.profile.advanced-options")
+                }
             }
             .padding(.top, BighelpTokens.space12)
 
@@ -567,6 +617,15 @@ struct SimpleBotProfileView: View {
                 saveState = String(localized: "The computer didn't take the new avatar. Try again.")
             }
         }
+    }
+
+    private func voiceSummary(_ voice: SimpleBotVoiceSettings) -> String? {
+        let settings = voice.settings
+        return SimpleBotDefaultVoiceSummary.text(
+            mode: settings.voiceConversationMode,
+            liveProvider: settings.liveVoiceProvider,
+            liveVoice: settings.liveVoice(for: settings.liveVoiceProvider),
+            store: voice.store)
     }
 
     private func modelName(_ defaults: AgentRuntimeDefaultsEditorModel) -> String {

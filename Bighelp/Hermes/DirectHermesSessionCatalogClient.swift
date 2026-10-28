@@ -1679,8 +1679,15 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
             count = 0
         }
         guard count >= 0 else { throw WorkspaceClientError.invalidResponse }
+        // Hermes renames an app-created Bot Chat to `Bot Chat (<source> <id>)` when another agent
+        // delivers into that agent's chat, and starts a fresh one. Show the kept chat as an ordinary
+        // chat, as after New Bot Chat. Display only: the host title is never written back.
+        let setAside = !matchesCanonical
+            && DirectHermesIdentity.sameSessionSource(source, "bighelp")
+            && SessionRecord.isDisplacedBotChatTitle(title)
+        let shownTitle = setAside ? SessionRecord.retiredBotChatTitle(at: updated) : (title.isEmpty ? "Untitled" : title)
         var record = SessionRecord(
-            id: appID, kind: .direct, agentIDs: [profile.id], title: title.isEmpty ? "Untitled" : title,
+            id: appID, kind: .direct, agentIDs: [profile.id], title: shownTitle,
             remoteStoredID: id, remoteSource: source, isPinned: try DirectHermesSessionValidation.flag(value["pinned"]) ?? false,
             createdAt: started, updatedAt: updated, hasAcceptedMessage: count > 0
         )

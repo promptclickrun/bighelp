@@ -1,6 +1,6 @@
 import SwiftUI
 
-private enum VoiceSettingsField { case voice, model, server, key }
+enum VoiceSettingsField { case voice, model, server, key }
 
 enum CodexLiveVoicePluginAvailability: Equatable, Sendable {
     case unknown
@@ -258,7 +258,7 @@ private struct VoicePreferenceSections: View {
 }
 
 @MainActor
-private struct VoiceSettingsEditor: View {
+struct VoiceSettingsEditor: View {
     @Bindable var store: VoiceSettingsStore
     @FocusState.Binding var focusedField: VoiceSettingsField?
     @Binding var isChoosingProvider: Bool
@@ -429,7 +429,7 @@ private struct VoiceSettingsEditor: View {
 
 /// Every speech provider on one page, grouped by where it runs.
 @MainActor
-private struct VoiceProviderList: View {
+struct VoiceProviderList: View {
     let providers: [VoiceProviderConfiguration]
     let selection: String
     let onSelect: (String) -> Void

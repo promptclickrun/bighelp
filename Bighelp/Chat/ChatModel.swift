@@ -118,6 +118,8 @@ final class ChatModel {
     @ObservationIgnored internal(set) var lastCompactionAt: Date?
     /// Send was tapped while the chat catches up; the message waits in the box until it ends.
     var isAwaitingCatchUp = false
+    /// How long a message waits in the box for a catch-up before Send gives up on it.
+    @ObservationIgnored var catchUpTimeout: Duration = .seconds(30)
     /// An open under way (`ShellFeatureStore.startNavigationHydration`) while the chat shows its saved
     /// copy. Send stays on: a message waits in the box until the open ends, then goes out.
     private(set) var isOpening = false
@@ -802,7 +804,7 @@ final class ChatModel {
         guard (client as? DirectHermesConversationClient) === owner,
               session.id == conversationID else { return }
         let hasSameContextOwner = sourceSession?.remoteStoredID == session.remoteStoredID
-            && sourceSession?.remoteSource == session.remoteSource
+            && DirectHermesIdentity.sameSessionSource(sourceSession?.remoteSource, session.remoteSource)
             && sourceSession?.agentIDs == session.agentIDs
         if sourceSession != nil, !hasSameContextOwner {
             sessionTodos = nil
@@ -883,7 +885,7 @@ final class ChatModel {
         !referenceOwnerRetired && session.id == conversationID
             && session.agentIDs == memberIDs
             && session.remoteStoredID == sourceSession?.remoteStoredID
-            && session.remoteSource == sourceSession?.remoteSource
+            && DirectHermesIdentity.sameSessionSource(session.remoteSource, sourceSession?.remoteSource)
     }
 
     /// The native bridge verified the first durable catalog row against the

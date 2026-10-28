@@ -2,9 +2,22 @@ import Foundation
 
 /// Hermes' built-in speech (TTS) providers as of Hermes 0.21, and the settings
 /// each one reads from `tts.<id>` in an agent's config.yaml. Providers set up on
-/// the host as custom commands (`tts.providers.<name>`) come from the host's
-/// config instead, as `.custom`.
+/// the host as custom commands (`tts.providers.<name>`) and speech plugins (such
+/// as Phonon) come from the host's config instead, as `.custom`.
 struct VoiceProviderSpec: Equatable, Sendable {
+    /// Where an agent's config.yaml keeps the voice for a provider. Hermes reads
+    /// it from a different place for each kind, so a voice written to the wrong
+    /// one is ignored and every agent keeps sounding the same.
+    enum VoiceLocation: Sendable, Equatable {
+        /// `tts.<id>.<field>`: Hermes' built-in providers.
+        case section
+        /// A speech plugin. Hermes passes a plugin only the top-level `tts.voice`;
+        /// the plugin itself falls back to its own `tts.<id>.voice`.
+        case plugin
+        /// A custom command: `{voice}` comes from `tts.providers.<id>.voice`.
+        case commandProvider
+    }
+
     enum Kind: Int, Comparable, CaseIterable, Sendable {
         /// Runs on this iPhone or iPad (`OnDeviceVoiceModel`): no account, key or internet.
         /// Chosen per agent on the device; the computer never sees it.
@@ -44,6 +57,19 @@ struct VoiceProviderSpec: Equatable, Sendable {
     /// OpenAI's `base_url`, which points it at a self-hosted OpenAI-compatible
     /// server such as Kokoro or Speaches.
     var supportsServerURL = false
+    var voiceLocation: VoiceLocation = .section
+
+    /// A custom command provider (`tts.providers.<id>`): the voice is its own
+    /// `voice` entry, whatever the command does with it.
+    static func commandProvider(_ id: String) -> VoiceProviderSpec {
+        VoiceProviderSpec(id: id, title: id, kind: .custom, voiceField: "voice", voiceLocation: .commandProvider)
+    }
+
+    /// A speech plugin the app has no catalog entry for, such as Phonon. Hermes
+    /// offers no route that lists a plugin's voices, so the voice is typed.
+    static func plugin(_ id: String) -> VoiceProviderSpec {
+        VoiceProviderSpec(id: id, title: id, kind: .custom, voiceField: "voice", voiceLocation: .plugin)
+    }
 
     static let builtIn: [VoiceProviderSpec] = [
         .init(id: "piper", title: "Piper", kind: .onYourComputer,
@@ -99,6 +125,7 @@ extension VoiceProviderConfiguration {
         self.init(id: spec.id, title: spec.title, voiceID: voiceID, apiKeyConfigured: apiKeyConfigured,
                   model: model, serverURL: serverURL, kind: spec.kind,
                   hasVoice: spec.voiceField != nil, hasModel: spec.modelField != nil,
-                  needsAPIKey: !spec.keyNames.isEmpty, supportsServerURL: spec.supportsServerURL)
+                  needsAPIKey: !spec.keyNames.isEmpty, supportsServerURL: spec.supportsServerURL,
+                  voiceLocation: spec.voiceLocation)
     }
 }

@@ -1494,6 +1494,66 @@ struct DirectHermesSessionCatalogClientTests {
         #expect(!host.hidden)
     }
 
+    /// When another agent delivers into a Bot Chat Hermes can't tie to a delivery queue, it renames that
+    /// chat `Bot Chat (<source> <id>)`, keeps its history and starts a new one. Shown as it is, the old
+    /// chat looks like a broken one; it shows as an ordinary chat set aside, like after New Bot Chat.
+    @Test func aBotChatHermesSetAsideShowsAsAnOrdinaryChatWithItsHistory() async throws {
+        var displaced = try #require(Self.session(id: "bot-old").object)
+        displaced["title"] = .string("Bot Chat (bighelp bot-old)")
+        displaced["source"] = .string("bighelp")
+        displaced["last_active"] = .number(50)
+        var live = try #require(Self.session(id: "local-new").object)
+        live["title"] = .string("Bot Chat")
+        live["source"] = .string("local")
+        let workspace = try SessionWorkspaceStub()
+        workspace.handler = { operation, _ in
+            switch operation {
+            case .profilesList: return Self.profiles(canonical: "local-new", resolved: "local-new")
+            case .sessionsList: return Self.ownershipPage([.object(live), .object(displaced)])
+            default: throw WorkspaceClientError.invalidRequest
+            }
+        }
+        let records = try await Self.client(workspace).list()
+        let aside = try #require(records.first { $0.remoteStoredID == "bot-old" })
+        #expect(aside.title == SessionRecord.retiredBotChatTitle(at: Date(timeIntervalSince1970: 50)))
+        #expect(!aside.isBotChat)
+        #expect(aside.hasAcceptedMessage)
+        let current = try #require(records.first { $0.remoteStoredID == "local-new" })
+        #expect(current.title == "Bot Chat")
+        #expect(current.isBotChat)
+    }
+
+    @Test func onlyAChatHermesSetAsideIsRenamedOnScreen() async throws {
+        func row(_ id: String, title: String, source: String = "bighelp") throws -> BighelpJSONValue {
+            var value = try #require(Self.session(id: id).object)
+            value["title"] = .string(title)
+            value["source"] = .string(source)
+            return .object(value)
+        }
+        let rows = try [
+            row("a", title: "Bot Chat (bighelp b)"),
+            row("c", title: "Bot Chat (notes)"),
+            row("d", title: "Bot Chat notes (bighelp d)"),
+            row("e", title: "Bot Chat (tui e)", source: "tui"),
+            row("local-new", title: "Bot Chat (bighelp local-new)"),
+        ]
+        let workspace = try SessionWorkspaceStub()
+        workspace.handler = { operation, _ in
+            switch operation {
+            case .profilesList: return Self.profiles(canonical: "local-new", resolved: "local-new")
+            case .sessionsList: return Self.ownershipPage(rows)
+            default: throw WorkspaceClientError.invalidRequest
+            }
+        }
+        let records = try await Self.client(workspace).list()
+        func title(_ id: String) -> String? { records.first { $0.remoteStoredID == id }?.title }
+        #expect(title("a") == SessionRecord.retiredBotChatTitle(at: Date(timeIntervalSince1970: 2)))
+        #expect(title("c") == "Bot Chat (notes)")
+        #expect(title("d") == "Bot Chat notes (bighelp d)")
+        #expect(title("e") == "Bot Chat (tui e)")
+        #expect(title("local-new") == "Bot Chat (bighelp local-new)")
+    }
+
     /// Without a source Hermes labels the chat "tui" and tells the agent it's in a terminal: no files,
     /// no cards, reminders can't reach anyone. Reopened chats must keep the same label.
     @Test func chatsTellHermesTheyComeFromBighelp() async throws {

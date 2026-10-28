@@ -107,6 +107,31 @@ not arbitrary ancestor or branch operations. Stored metadata readback verifies
 returned flags where REST exposes them; `unread` uses the mutation
 acknowledgement because detail does not expose an equivalent Boolean.
 
+### Bot Chat and Hermes' own changes
+
+Hermes can change a Bot Chat row after the app made it. The app tolerates three
+cases and never writes a compensating change to Hermes.
+
+- **Source label.** Hermes can restamp a chat's source between `bighelp` and
+  `local` when another agent reaches it. Identity checks treat those two labels as one
+  source (`DirectHermesIdentity.sameSessionSource`). Every other label still has to
+  match exactly, and a missing source never matches a present one.
+- **Displaced Bot Chat.** When another agent delivers into the profile's Bot Chat,
+  Hermes can rename an app-made row to `Bot Chat (<label> <id>)` and create a new
+  `local-` canonical row. The old row keeps its history. The catalog shows it as an
+  ordinary chat with the retired Bot Chat title, so the history stays easy to find
+  and open. The mapping is display-only, applies only to a non-canonical `bighelp` or
+  `local` row whose title has exactly that shape, and the host title is not rewritten.
+  The profile's `canonical_session` still drives the live Bot Chat.
+- **Catch-up before Send.** A reread that runs while Send is pending is bounded
+  (`ChatModel.catchUpTimeout`, 30 seconds). A reread that never settles no longer leaves
+  Send disabled until the app restarts.
+
+Hermes owns the two Bot Chat changes above. A native fix needs these upstream
+changes: keep the canonical row's source label stable after its first stamp; do not
+displace a Bot Chat row a native open created; and let `session.create` with the title
+"Bot Chat" stage the canonical row the way Hermes' own Bot Chat creation does.
+
 Edits of a saved chat go through `DirectHermesSessionEditor`. Current Hermes answers the dashboard's `PATCH` and
 `DELETE /api/sessions/{id}` with 404 `not_found` for chats the app made over the socket, so hide and unhide
 (`session.set_hidden`), archive and restore (`session.archive`) and delete (`session.delete`, refused by Hermes while

@@ -7,7 +7,7 @@ extension NativeWorkspaceSessionBridge {
     func isWarmSession(_ record: SessionRecord, model: ChatModel) -> Bool {
         guard !retired, let owner = connections.owner, owner.authority == authority,
               let stream = streams[record.id], stream.owner == owner,
-              stream.record.remoteSource == record.remoteSource,
+              DirectHermesIdentity.sameSessionSource(stream.record.remoteSource, record.remoteSource),
               stream.boundModel === model else { return false }
         return Self.canReturnToPreparedStream(record: record, model: model, owner: owner,
             streamOwner: stream.owner, recoveredCoordinate: stream.recoveredCoordinate, client: stream.client)
@@ -227,7 +227,7 @@ extension NativeWorkspaceSessionBridge {
               retainedRecord.kind == record.kind,
               retainedRecord.agentIDs == record.agentIDs,
               retainedRecord.remoteStoredID == record.remoteStoredID,
-              retainedRecord.remoteSource == record.remoteSource,
+              DirectHermesIdentity.sameSessionSource(retainedRecord.remoteSource, record.remoteSource),
               streamOwner == owner,
               client.model === model,
               model.nativeConversationClient === client,

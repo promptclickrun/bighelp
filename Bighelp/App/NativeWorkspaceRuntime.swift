@@ -551,7 +551,7 @@ final class NativeWorkspaceRuntime {
                 current.id == record.id && current.kind == record.kind
                     && current.agentIDs == record.agentIDs
                     && current.remoteStoredID == record.remoteStoredID
-                    && current.remoteSource == record.remoteSource
+                    && DirectHermesIdentity.sameSessionSource(current.remoteSource, record.remoteSource)
               }) == true,
               bridge.retainsCanonicalSession(record, model: model) else {
             throw WorkspaceClientError.ownerChanged

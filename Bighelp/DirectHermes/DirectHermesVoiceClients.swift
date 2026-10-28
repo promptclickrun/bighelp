@@ -169,7 +169,20 @@ final class DirectHermesVoiceSettingsClient: VoiceSettingsClient {
         // named here change.
         var tts: [String: BighelpJSONValue] = ["provider": .string(settings.providerID)]
         var section: [String: BighelpJSONValue] = [:]
-        if selected.hasVoice, let field = spec?.voiceField { section[field] = .string(settings.voiceID) }
+        if selected.hasVoice {
+            switch selected.voiceLocation {
+            case .section:
+                if let field = spec?.voiceField { section[field] = .string(settings.voiceID) }
+            case .plugin:
+                // Hermes hands a plugin only the top-level voice, and the plugin
+                // falls back to its own section, so both stay in step.
+                tts["voice"] = .string(settings.voiceID)
+                section["voice"] = .string(settings.voiceID)
+            case .commandProvider:
+                // The command's {voice} comes from its own provider entry.
+                tts["providers"] = .object([settings.providerID: .object(["voice": .string(settings.voiceID)])])
+            }
+        }
         if let model = settings.model, let spec, let field = spec.modelField {
             // A merge can't delete a key, so clearing the model restores the default.
             let value = model.isEmpty ? spec.defaultModel : model
@@ -255,9 +268,21 @@ final class DirectHermesVoiceSettingsClient: VoiceSettingsClient {
         let selected = normalizedProvider(tts["provider"]?.string)
         let providers = try providerSpecs(selected: selected, tts: tts).map { spec in
             let section = tts[spec.id]?.object ?? [:]
+            let voiceID: String
+            switch spec.voiceLocation {
+            case .section:
+                voiceID = try field(spec.voiceField, in: section, fallback: spec.defaultVoice)
+            case .plugin:
+                let own = try field(spec.voiceField, in: section, fallback: spec.defaultVoice)
+                let topLevel = spec.id == selected ? try field("voice", in: tts, fallback: "") : ""
+                voiceID = topLevel.isEmpty ? own : topLevel
+            case .commandProvider:
+                let entry = tts["providers"]?.object?[spec.id]?.object ?? [:]
+                voiceID = try field("voice", in: entry, fallback: "")
+            }
             return VoiceProviderConfiguration(
                 spec: spec,
-                voiceID: try field(spec.voiceField, in: section, fallback: spec.defaultVoice),
+                voiceID: voiceID,
                 apiKeyConfigured: keyConfigured(spec, section: section, keys: keys),
                 model: try field(spec.modelField, in: section, fallback: spec.defaultModel),
                 serverURL: spec.supportsServerURL ? try field("base_url", in: section, fallback: "") : ""
@@ -281,8 +306,9 @@ final class DirectHermesVoiceSettingsClient: VoiceSettingsClient {
         return VoiceSettingsConfiguration(revision: revision, providerID: selected, providers: providers)
     }
 
-    /// The selected provider first when the app doesn't know it, then every
-    /// built-in provider, then the host's own command providers.
+    /// The selected provider first when the app doesn't know it (a speech plugin
+    /// such as Phonon), then every built-in provider, then the host's own
+    /// command providers.
     private static func providerSpecs(selected: String, tts: [String: BighelpJSONValue]) -> [VoiceProviderSpec] {
         var result = VoiceProviderSpec.builtIn
         let custom = (tts["providers"]?.object ?? [:])
@@ -292,10 +318,12 @@ final class DirectHermesVoiceSettingsClient: VoiceSettingsClient {
                 return !command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             }
             .keys.sorted()
-            .map { VoiceProviderSpec(id: $0, title: $0, kind: .custom) }
+            .map { VoiceProviderSpec.commandProvider($0) }
         result += custom
         if !result.contains(where: { $0.id == selected }) {
-            result.insert(.unknown(selected), at: 0)
+            // Hermes picks `nous` itself, so only a named plugin gets a voice field.
+            let spec = selected == "nous" || !validName(selected) ? VoiceProviderSpec.unknown(selected) : .plugin(selected)
+            result.insert(spec, at: 0)
         }
         return result
     }

@@ -305,6 +305,10 @@ extension RootShellView {
                 }) == true else { return nil }
                 return AgentRuntimeDefaultsEditorModel(agentID: id, client: agentRuntimeDefaults)
             },
+            makeVoiceSettings: { id in makeSimpleBotVoiceSettings(for: id, owner: owner) },
+            makeAdvancedOptions: { id in
+                makeSimpleBotHostConfiguration().map { AdvancedOptionsStore(client: $0, profile: id) }
+            },
             makeFilesSource: { makeSimpleBotFilesSource() },
             makeMediaClient: { makeSimpleBotMediaClient() },
             showsHiddenFiles: settings.nerdModeEnabled,
@@ -345,17 +349,40 @@ extension RootShellView {
         }
     }
 
+    /// The demo copy while fixtures are on, else the connected computer's config.
+    func makeSimpleBotHostConfiguration() -> (any SimpleBotHostConfiguring)? {
+        usesWorkspaceFixtures && workspaceConnections?.isDirectSelected != true
+            ? SimpleBotDemoConfiguration.shared
+            : currentWorkspaceOwner.map { _ in
+                SimpleBotWorkspaceConfiguration(workspace: { [weak workspaceConnections] in workspaceConnections?.workspace })
+            }
+    }
+
+    /// The bot's voice on its own computer; the demo copy while fixtures are on and no computer is connected.
+    func makeSimpleBotVoiceSettings(for agentID: String, owner: WorkspaceOwner?) -> SimpleBotVoiceSettings? {
+        if let owner, owner.authority.kind == .direct {
+            guard currentWorkspaceCapabilities.supports(.voiceOutput, owner: owner, profileID: agentID),
+                  let client = voiceSettingsClient else { return nil }
+            return SimpleBotVoiceSettings(
+                store: VoiceSettingsStore(agentID: agentID, client: client, isCurrent: voiceSettingsIsCurrent),
+                settings: settings)
+        }
+        #if DEBUG
+        if usesWorkspaceFixtures {
+            return SimpleBotVoiceSettings(
+                store: VoiceSettingsStore(agentID: agentID, client: voiceSettingsPreview, isCurrent: { true }),
+                settings: settings)
+        }
+        #endif
+        return nil
+    }
+
     /// Bots mode's Settings sheet; All Settings leads to everything else.
     func simpleBotsSettings() -> some View {
         let close = { isUnifiedSettingsPresented = false }
         let profile = agents.resolvedAgent(explicitID: nil)?.id ?? "default"
         let agents = agents
-        let configuration: (any SimpleBotHostConfiguring)? = usesWorkspaceFixtures
-            && workspaceConnections?.isDirectSelected != true
-            ? SimpleBotDemoConfiguration.shared
-            : currentWorkspaceOwner.map { _ in
-                SimpleBotWorkspaceConfiguration(workspace: { [weak workspaceConnections] in workspaceConnections?.workspace })
-            }
+        let configuration = makeSimpleBotHostConfiguration()
         return SimpleBotsSettingsView(context: SimpleBotsSettingsContext(
             settings: settings, userIdentity: userIdentity, agents: agents,
             makeHostSettings: {

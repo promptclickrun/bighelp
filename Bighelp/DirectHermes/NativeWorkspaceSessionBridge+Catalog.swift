@@ -128,7 +128,7 @@ extension NativeWorkspaceSessionBridge {
                     || (!DirectHermesIdentity.matches(stream.record.remoteStoredID, record.remoteStoredID)
                         && !DirectHermesIdentity.matches(record.remoteStoredID, stream.client.storedID)
                         && !adoptsExactLiveIdentity)
-                    || (!DirectHermesIdentity.matches(stream.record.remoteSource, record.remoteSource)
+                    || (!DirectHermesIdentity.sameSessionSource(stream.record.remoteSource, record.remoteSource)
                         && !adoptsSavedSource) {
                     // Same visible ID does not grant a replacement coordinate
                     // the old canvas or an in-progress preparation owner.

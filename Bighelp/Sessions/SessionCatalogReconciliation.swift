@@ -111,7 +111,7 @@ enum SessionCatalogReconciliation {
         guard let lhsStoredID = lhs.remoteStoredID,
               let rhsStoredID = rhs.remoteStoredID else { return false }
         return lhsStoredID == rhsStoredID
-            && lhs.remoteSource == rhs.remoteSource
+            && DirectHermesIdentity.sameSessionSource(lhs.remoteSource, rhs.remoteSource)
             && lhs.agentIDs == rhs.agentIDs
     }
 
@@ -185,9 +185,11 @@ enum SessionCatalogReconciliation {
             && local.id.hasPrefix(DirectHermesSessionIdentity.prefix + ":")
             && local.kind == .direct && incoming.kind == .direct
             && local.agentIDs == incoming.agentIDs
-            && (local.remoteSource == nil || local.remoteSource == merged.remoteSource)
+            && (local.remoteSource == nil
+                || DirectHermesIdentity.sameSessionSource(local.remoteSource, merged.remoteSource))
         let hasSameTranscriptOwner = (local.remoteStoredID == merged.remoteStoredID
-            && local.remoteSource == merged.remoteSource) || hasExactNativeAppIdentity
+            && DirectHermesIdentity.sameSessionSource(local.remoteSource, merged.remoteSource))
+            || hasExactNativeAppIdentity
         if hasSameTranscriptOwner, local.agentIDs == merged.agentIDs,
            let roster = local.sessionSubagents,
            roster.updatedAt >= (merged.sessionSubagents?.updatedAt ?? 0) {

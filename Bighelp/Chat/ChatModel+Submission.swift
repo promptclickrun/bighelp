@@ -1,5 +1,24 @@
 import Foundation
 
+/// Settles a wait for whichever of three things comes first (the work, a timer, cancellation)
+/// without ever waiting on the one that lost.
+@MainActor
+private final class CatchUpRace {
+    var continuation: CheckedContinuation<Void, Never>?
+    var hydration: Task<Void, Never>?
+    var timer: Task<Void, Never>?
+    private(set) var isFinished = false
+
+    func finish() {
+        guard !isFinished else { return }
+        isFinished = true
+        hydration?.cancel()
+        timer?.cancel()
+        continuation?.resume()
+        continuation = nil
+    }
+}
+
 extension ChatModel {
     var retainedUnsentSubmissions: [DirectHermesDraftStore.Submission] {
         guard !referenceOwnerRetired, let native = nativeConversationClient,
@@ -40,6 +59,31 @@ extension ChatModel {
         !pendingIndependentMessageIDs.isEmpty
     }
 
+    /// A catch-up that never settles must not leave Send off for the rest of the app's life: the
+    /// message stays in the box, and a later Send goes through once the chat is ready.
+    private func awaitCatchUp(of native: DirectHermesConversationClient) async {
+        let timeout = catchUpTimeout
+        let race = CatchUpRace()
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                guard !race.isFinished else {
+                    continuation.resume()
+                    return
+                }
+                race.continuation = continuation
+                race.hydration = Task { @MainActor in
+                    try? await native.awaitHydrationIfNeeded()
+                    race.finish()
+                }
+                race.timer = Task { @MainActor in
+                    try? await Task.sleep(for: timeout)
+                    race.finish()
+                }
+            }
+        } onCancel: {
+            Task { @MainActor in race.finish() }
+        }
+    }
 
     func send() async {
         // While a turn runs, this chat's own prompt counts as pending until the
@@ -63,7 +107,7 @@ extension ChatModel {
            native.acceptsSubmissionAfterCatchUp {
             guard !isAwaitingCatchUp else { return }
             isAwaitingCatchUp = true
-            try? await native.awaitHydrationIfNeeded()
+            await awaitCatchUp(of: native)
             isAwaitingCatchUp = false
             guard directTransportIsReady, !isSending else { return }
         }

@@ -669,6 +669,21 @@ extension SessionRecord {
     static func retiredBotChatTitle(at date: Date) -> String {
         "Bot Chat · " + date.formatted(date: .abbreviated, time: .shortened)
     }
+
+    /// The title Hermes gives a Bot Chat it sets aside when another agent delivers into that agent's
+    /// chat: `Bot Chat (<source label> <session id>)`. A look-alike such as `Bot Chat (notes)` is not one.
+    static func isDisplacedBotChatTitle(_ title: String) -> Bool {
+        let prefix = "Bot Chat ("
+        guard title.hasPrefix(prefix), title.hasSuffix(")") else { return false }
+        let inside = title.dropFirst(prefix.count).dropLast()
+        let parts = inside.split(separator: " ", omittingEmptySubsequences: false)
+        guard parts.count == 2,
+              let label = parts.first, let sessionID = parts.last,
+              !label.isEmpty, !sessionID.isEmpty,
+              label.allSatisfy({ $0.isLetter || $0 == "_" }),
+              !sessionID.contains(where: \.isWhitespace) else { return false }
+        return true
+    }
 }
 
 extension SessionSummary {

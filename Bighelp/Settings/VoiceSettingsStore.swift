@@ -13,6 +13,7 @@ struct VoiceProviderConfiguration: Equatable, Sendable, Identifiable {
     var hasModel = false
     var needsAPIKey = true
     var supportsServerURL = false
+    var voiceLocation: VoiceProviderSpec.VoiceLocation = .section
 }
 
 struct VoiceSettingsConfiguration: Equatable, Sendable {
@@ -163,6 +164,15 @@ final class VoiceSettingsStore {
         fillFromSelectedProvider()
         sampleError = nil
         edited()
+    }
+
+    /// Puts every field back to what the host has saved, without loading again.
+    func discardEdits() {
+        guard let configuration, !isSaving else { return }
+        providerID = configuration.providerID
+        fillFromSelectedProvider()
+        sampleError = nil
+        errorMessage = nil
     }
 
     func save() async {

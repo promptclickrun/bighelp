@@ -107,6 +107,32 @@ not arbitrary ancestor or branch operations. Stored metadata readback verifies
 returned flags where REST exposes them; `unread` uses the mutation
 acknowledgement because detail does not expose an equivalent Boolean.
 
+### Bot Chats are Hermes' own
+
+Hermes delivers what other agents send (`message_agent`, peer DMs) into the session titled exactly "Bot Chat"
+(`gateway/session_bot.py`). It takes over only its own native local chat (a `local-…` ID) or an older chat from
+one of its own local surfaces (`cli`, `tui`, `gui`, `desktop`, `oneshot`, `tool`, `acp`). Any other "Bot Chat" is
+moved aside: renamed `Bot Chat (<source> <id>)`, made visible, and replaced by a new one Hermes makes, without the
+old context. A Bot Chat the app made over its socket (source `bighelp`) was such a chat, so the first message
+another agent sent an agent replaced its Bot Chat.
+
+- **Hermes makes it.** `createFirstCanonicalChat` (an agent's first Bot Chat, and the one after New Bot Chat) asks
+  the plugin (`bot-chat/create`, `native-bot-chat-v1`), which has the agent's own Hermes gateway make it the way
+  Hermes' delivery does. The creation's intent ID is the retry key, so a lost reply never makes two. A plugin
+  without the route gets the socket's `session.create`, as before.
+- **New Bot Chat** stays: the open Bot Chat is renamed `Bot Chat · <date>` first, which frees the title, and the
+  plugin makes the next one.
+- **Source label.** Hermes stores its own chats as `local`; the app's resume stamps `bighelp`, which gives the
+  agent bighelp's brief. Identity checks treat those two labels as one (`DirectHermesIdentity.sameSessionSource`),
+  and the app resumes a `local` chat whose ID starts with `local-`. Every other label still has to match exactly.
+- **Chats moved aside before this** keep their history. The catalog shows a non-canonical `bighelp` or `local`
+  chat titled exactly `Bot Chat (<label> <id>)` as an ordinary chat named like a retired Bot Chat; the host title
+  isn't rewritten.
+- **A failed open** shows the saved copy without a connection of its own. The chat opens again by itself while it
+  is on screen (`ShellFeatureStore.failedOpenRetryDelays`) and when the person comes back to it, so Send works
+  again without restarting the app.
+- **Catch-up before Send** waits at most `ChatModel.catchUpTimeout` (30 seconds); the message stays in the box.
+
 Edits of a saved chat go through `DirectHermesSessionEditor`. Current Hermes answers the dashboard's `PATCH` and
 `DELETE /api/sessions/{id}` with 404 `not_found` for chats the app made over the socket, so hide and unhide
 (`session.set_hidden`), archive and restore (`session.archive`) and delete (`session.delete`, refused by Hermes while

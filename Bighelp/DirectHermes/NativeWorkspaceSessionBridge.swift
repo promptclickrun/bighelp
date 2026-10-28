@@ -152,7 +152,7 @@ final class NativeWorkspaceSessionBridge: SessionCatalogClient {
     }
 
     static func sameOrAdoptingSource(_ previous: String?, _ current: String?) -> Bool {
-        DirectHermesIdentity.matches(previous, current) || (previous == nil && current != nil)
+        DirectHermesIdentity.sameSessionSource(previous, current) || (previous == nil && current != nil)
     }
 
     func conversationClient(for record: SessionRecord) -> any ConversationClient {

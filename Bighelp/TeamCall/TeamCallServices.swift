@@ -63,6 +63,11 @@ final class DirectHermesTeamCallServices: TeamCallServices {
 
     func makeVoice(profileID: String) -> (any TeamCallVoice)? {
         guard let current else { return nil }
+        // A voice chosen for this agent on this device (Settings › Voice) speaks here too, as in its chats.
+        if let choice = OnDeviceVoiceChoices.shared.choice(computer: authority.cacheScopeID, agentID: profileID),
+           let model = OnDeviceVoiceModel.model(id: choice.modelID), OnDeviceSpeechEngine.shared.canSpeak(model) {
+            return OnDeviceTeamCallVoice(model: model, voice: choice.voice, engine: .shared)
+        }
         return DirectHermesVoiceSpeechOutput(
             workspace: current.workspace, owner: current.owner, profileID: profileID,
             currentOwner: { [weak connections] in connections?.owner }
@@ -102,5 +107,23 @@ final class DirectHermesTeamCallServices: TeamCallServices {
             configs.append((profileID, config))
         }
         return configs.isEmpty ? nil : TeamCallVoiceSettings.resolve(configs: configs)
+    }
+}
+
+/// A member whose voice runs on this device: each piece is made here, as WAV, and played in turn.
+@MainActor
+final class OnDeviceTeamCallVoice: TeamCallVoice {
+    private let model: OnDeviceVoiceModel
+    private let voice: String
+    private let engine: OnDeviceSpeechEngine
+
+    init(model: OnDeviceVoiceModel, voice: String, engine: OnDeviceSpeechEngine) {
+        self.model = model
+        self.voice = voice
+        self.engine = engine
+    }
+
+    func synthesize(_ text: String) async throws -> TeamCallAudio {
+        TeamCallAudio(data: try await engine.synthesize(text, model: model, voice: voice), mimeType: "audio/wav")
     }
 }

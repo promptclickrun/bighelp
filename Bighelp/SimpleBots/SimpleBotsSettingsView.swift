@@ -1,8 +1,8 @@
 import Observation
 import SwiftUI
 
-/// Hermes settings Bots mode shows: approvals and the time zone, read
-/// from and saved to the bot's own config on its computer.
+/// A bot's config.yaml on its computer, as Bots mode reads and saves it: the time zone here,
+/// and Advanced Options (approvals and the rest).
 @MainActor
 protocol SimpleBotHostConfiguring: AnyObject {
     func read(profile: String) async throws -> [String: BighelpJSONValue]
@@ -65,17 +65,14 @@ final class SimpleBotDemoConfiguration: SimpleBotHostConfiguring {
     }
 }
 
-/// Auto-review and the time zone for a bot. Auto-review on is Hermes' smart
-/// approvals (a reviewer lets safe actions through and asks you about risky
-/// ones); off is manual (you're asked every time). It never turns approvals off.
+/// The time zone the bots on a computer work in. Approvals live in each bot's Advanced
+/// Options, which Settings links to, so only one place writes them.
 @MainActor
 @Observable
 final class SimpleBotHostSettings {
     enum Load: Equatable { case idle, loading, loaded, unavailable }
 
     private(set) var load: Load = .idle
-    private(set) var autoReview = true
-    private(set) var rules = ""
     /// Hermes' time zone; empty means the computer's own.
     private(set) var timeZone = ""
     private(set) var isSaving = false
@@ -101,16 +98,6 @@ final class SimpleBotHostSettings {
         }
     }
 
-    func setAutoReview(_ on: Bool) async {
-        await save(["approvals": .object(["mode": .string(on ? "smart" : "manual")])],
-                   profiles: [profile])
-    }
-
-    func setRules(_ text: String) async {
-        await save(["approvals": .object(["smart_policy": .string(text.trimmingCharacters(in: .whitespacesAndNewlines))])],
-                   profiles: [profile])
-    }
-
     /// The time zone every bot on this computer works in (schedules, "today").
     func setTimeZone(_ identifier: String) async {
         guard identifier != timeZone else { return }
@@ -132,17 +119,8 @@ final class SimpleBotHostSettings {
     }
 
     private func apply(_ config: [String: BighelpJSONValue]) {
-        let approvals = config["approvals"]?.object ?? [:]
-        // Hermes' default is smart; "off" (no approvals) reads as on/off only by what it does.
-        let mode = approvals["mode"]?.string?.lowercased() ?? "smart"
-        autoReview = mode == "smart"
-        rules = approvals["smart_policy"]?.string ?? ""
         timeZone = config["timezone"]?.string ?? ""
-        approvalsOff = mode == "off" || mode == "false"
     }
-
-    /// Hermes runs with approvals off: risky actions go ahead without asking.
-    private(set) var approvalsOff = false
 }
 
 /// What Bots mode's Settings needs from the shell.
@@ -167,13 +145,15 @@ struct SimpleBotsSettingsContext {
     /// Archived Chats, and opening one of them.
     var catalog: SessionCatalogStore? = nil
     var onOpenSession: (SessionSummary) -> Void = { _ in }
+    /// A bot's Advanced Options, where its approvals are set; nil hides the row.
+    var makeAdvancedOptions: ((String) -> AdvancedOptionsContext?)? = nil
 }
 
 enum SimpleBotsSettingsPage: Hashable {
     case you, appearance, notifications, apps, chat
 }
 
-/// Bots mode's Settings: you, usage, apps, your primary bot's approvals
+/// Bots mode's Settings: you, usage, apps, your primary bot's approvals (its Advanced Options)
 /// and time zone, notifications and appearance, then the way back to all of bighelp.
 @MainActor
 struct SimpleBotsSettingsView: View {
@@ -181,7 +161,7 @@ struct SimpleBotsSettingsView: View {
 
     @State private var host: SimpleBotHostSettings?
     @State private var teamwork: TeamworkModel?
-    @State private var isRulesPresented = false
+    @State private var advanced: AdvancedOptionsContext?
     @State private var isTimeZonePresented = false
     @AppStorage("bighelp.simple-bots.automatic-time-zone") private var automaticTimeZone = false
     @Environment(\.scenePhase) private var scenePhase
@@ -228,17 +208,17 @@ struct SimpleBotsSettingsView: View {
         .task {
             if host == nil { host = context.makeHostSettings() }
             if teamwork == nil { teamwork = context.makeTeamwork() }
+            if let primary, advanced?.store.profile != primary.id {
+                advanced = context.makeAdvancedOptions?(primary.id)
+            }
             await host?.refresh()
+            // The Approvals row's value; the page it opens shares this store.
+            await advanced?.store.refresh()
         }
         .task {
             if let usage = context.usage, usage.state == .idle { await usage.load(refresh: false) }
         }
         .task(id: scenePhase) { await followDeviceTimeZone() }
-        .bighelpSheet(isPresented: $isRulesPresented) {
-            if let host = host {
-                SimpleBotRulesEditor(host: host).bighelpSheetSize(.large)
-            }
-        }
         .bighelpSheet(isPresented: $isTimeZonePresented) {
             if let host = host {
                 SimpleBotTimeZonePicker(current: host.timeZone) { identifier in
@@ -301,27 +281,19 @@ struct SimpleBotsSettingsView: View {
         VStack(alignment: .leading, spacing: BighelpTokens.space8) {
             SimpleBotsSectionLabel(title: primary?.name ?? String(localized: "Bot"))
             SimpleBotsCard {
-                if let host = host, host.load == .loaded {
-                    Toggle(isOn: Binding(get: { host.autoReview },
-                                         set: { on in Task { await host.setAutoReview(on) } })) {
-                        rowText(String(localized: "Auto-review"), detail: host.approvalsOff
-                                ? String(localized: "Approvals are off on this computer: risky actions run without asking.")
-                                : String(localized: "A reviewer lets safe shell, MCP and computer actions through and asks you about risky ones."))
-                    }
-                    .tint(SimpleBotColor.green.color)
-                    .disabled(host.isSaving)
-                    .padding(.horizontal, BighelpTokens.space20)
-                    .padding(.vertical, BighelpTokens.space12)
-                    .accessibilityIdentifier("simple-bots.settings.auto-review")
-                    SimpleBotsDivider()
-                    Button { isRulesPresented = true } label: {
-                        SimpleBotsRow(title: String(localized: "Auto-review Rules"),
-                                      value: host.rules.isEmpty ? String(localized: "None") : String(localized: "Set"))
+                if let advanced, let primary {
+                    NavigationLink {
+                        AdvancedOptionsPage(context: advanced, botName: primary.name)
+                    } label: {
+                        SimpleBotsRow(title: String(localized: "Approvals"),
+                                      value: advanced.store.load == .loaded
+                                        ? advanced.store.valueText(for: AdvancedOptionsCatalog.approvals) : nil)
                     }
                     .buttonStyle(.plain)
-                    .disabled(!host.autoReview)
-                    .accessibilityIdentifier("simple-bots.settings.rules")
+                    .accessibilityIdentifier("simple-bots.settings.approvals")
                     SimpleBotsDivider()
+                }
+                if let host = host, host.load == .loaded {
                     Toggle(isOn: Binding(get: { automaticTimeZone }, set: { on in
                         automaticTimeZone = on
                         if on { Task { await host.setTimeZone(TimeZone.current.identifier) } }
@@ -522,51 +494,5 @@ struct SimpleBotsSettingsView: View {
         if host.load != .loaded { await host.refresh() }
         guard host.load == .loaded, host.timeZone != TimeZone.current.identifier else { return }
         await host.setTimeZone(TimeZone.current.identifier)
-    }
-}
-
-/// Auto-review Rules: extra words for Hermes' reviewer ("Never let it delete files").
-@MainActor
-private struct SimpleBotRulesEditor: View {
-    let host: SimpleBotHostSettings
-    @State private var text: String
-    @Environment(\.dismiss) private var dismiss
-    @BighelpThemeReader private var theme
-
-    init(host: SimpleBotHostSettings) {
-        self.host = host
-        _text = State(initialValue: host.rules)
-    }
-
-    var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: BighelpTokens.space12) {
-                Text("Tell the reviewer what to always ask you about, in your own words.")
-                    .font(.bighelp(.subheadline))
-                    .foregroundStyle(theme.secondaryText)
-                TextEditor(text: $text)
-                    .font(.bighelp(.body))
-                    .scrollContentBackground(.hidden)
-                    .padding(BighelpTokens.space12)
-                    .background(theme.surface, in: .rect(cornerRadius: BighelpTokens.radius20, style: .continuous))
-                    .accessibilityIdentifier("simple-bots.rules.editor")
-            }
-            .padding(BighelpTokens.space16)
-            .background(theme.canvas.ignoresSafeArea())
-            .navigationTitle("Auto-review Rules")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        Task {
-                            await host.setRules(text)
-                            if host.errorMessage == nil { dismiss() }
-                        }
-                    }
-                    .disabled(host.isSaving)
-                }
-            }
-        }
     }
 }

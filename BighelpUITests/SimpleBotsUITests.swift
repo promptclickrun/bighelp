@@ -40,8 +40,8 @@ final class SimpleBotsUITests: BighelpUITestCase {
             app.buttons["simple-bots.settings"].tap()
             XCTAssertTrue(app.descendants(matching: .any)["simple-bots.settings"].waitForExistence(timeout: 5))
             XCTAssertTrue(app.switches["simple-bots.settings.mode"].exists)
-            XCTAssertTrue(app.descendants(matching: .any)["simple-bots.settings.auto-review"].waitForExistence(timeout: 5),
-                          "Auto-review reads the demo host's approvals")
+            XCTAssertTrue(app.buttons["simple-bots.settings.approvals"].waitForExistence(timeout: 5),
+                          "Approvals links to the primary bot's Advanced Options")
             save("simple-settings-\(appearance)", app)
             app.buttons["simple-bots.settings.close"].tap()
 
@@ -131,6 +131,112 @@ final class SimpleBotsUITests: BighelpUITestCase {
         XCTAssertTrue(app.navigationBars["Default Model"].waitForExistence(timeout: 5)
                       || app.staticTexts["Default Model"].waitForExistence(timeout: 2))
         save("simple-default-model-dark", app)
+    }
+
+    /// A bot's profile: Default Voice sits under Default Model and opens the voice picker;
+    /// Advanced Options sits under it and opens the plain-language settings with tappable notes.
+    @MainActor
+    func testProfileOpensDefaultVoiceAndAdvancedOptions() throws {
+        for appearance in ["light", "dark"] {
+            let app = launch(appearance: appearance)
+            XCTAssertTrue(app.descendants(matching: .any)["simple-bots.home"].waitForExistence(timeout: 15))
+            app.buttons["simple-bots.primary"].tap()
+            let identity = app.buttons["chat.identity"]
+            XCTAssertTrue(identity.waitForExistence(timeout: 10))
+            let profile = app.descendants(matching: .any)["simple-bots.profile"]
+            // A tap while the chat is still sliding in can miss; one more is enough.
+            identity.tap()
+            if !profile.waitForExistence(timeout: 5) { identity.tap() }
+            XCTAssertTrue(profile.waitForExistence(timeout: 5))
+            let info = app.buttons["simple-bots.profile.tab.info"]
+            XCTAssertTrue(info.waitForExistence(timeout: 5))
+            info.tap()
+
+            let model = app.buttons["simple-bots.profile.default-model"]
+            let voice = app.buttons["simple-bots.profile.default-voice"]
+            let advanced = app.buttons["simple-bots.profile.advanced-options"]
+            XCTAssertTrue(model.waitForExistence(timeout: 10))
+            XCTAssertTrue(voice.waitForExistence(timeout: 10), "Default Voice is under Default Model")
+            XCTAssertTrue(advanced.waitForExistence(timeout: 5), "Advanced Options is under Default Voice")
+            XCTAssertGreaterThan(voice.frame.minY, model.frame.minY)
+            XCTAssertGreaterThan(advanced.frame.minY, voice.frame.minY)
+            var scrolls = 0
+            while !(voice.isHittable && advanced.isHittable), scrolls < 6 {
+                app.swipeUp(velocity: .slow)
+                scrolls += 1
+            }
+            save("simple-profile-voice-rows-\(appearance)", app)
+
+            voice.tap()
+            XCTAssertTrue(app.descendants(matching: .any)["simple-bots.default-voice.mode"]
+                .waitForExistence(timeout: 5), "The sheet picks TTS or GPT Live")
+            XCTAssertTrue(app.buttons["simple-bots.default-voice.done"].exists)
+            save("simple-default-voice-\(appearance)", app)
+            let tts = app.descendants(matching: .any)["simple-bots.default-voice.mode"].buttons["TTS"]
+            if tts.exists {
+                tts.tap()
+                XCTAssertTrue(app.buttons["simple-bots.default-voice.save"].waitForExistence(timeout: 5),
+                              "TTS shows the voice settings with Save")
+                save("simple-default-voice-tts-\(appearance)", app)
+            }
+            app.buttons["simple-bots.default-voice.done"].tap()
+            XCTAssertTrue(app.descendants(matching: .any)["simple-bots.profile"].waitForExistence(timeout: 5),
+                          "Done comes back to the profile")
+
+            XCTAssertTrue(advanced.waitForExistence(timeout: 5))
+            advanced.tap()
+            XCTAssertTrue(app.descendants(matching: .any)["advanced.group.safety"]
+                .waitForExistence(timeout: 10), "The safety group loads")
+            let approvals = app.buttons["advanced.option.approvals.mode"]
+            XCTAssertTrue(approvals.exists, "Approvals is one menu")
+            XCTAssertEqual(approvals.value as? String, "Smart")
+            XCTAssertTrue(app.buttons["advanced.page.skillsAndTools"].exists, "Nerd Mode's pages are here too")
+            save("simple-advanced-options-\(appearance)", app)
+
+            // Off takes the safety net away, so it asks first.
+            approvals.tap()
+            app.buttons["Off"].firstMatch.tap()
+            XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout: 5), "Turning approvals off asks first")
+            save("simple-advanced-approvals-off-\(appearance)", app)
+            app.alerts.firstMatch.buttons["Cancel"].tap()
+            XCTAssertEqual(approvals.value as? String, "Smart", "Cancel keeps approvals on")
+
+            let help = app.buttons["advanced.help.approvals.mode"]
+            XCTAssertTrue(help.waitForExistence(timeout: 5))
+            help.tap()
+            XCTAssertTrue(app.descendants(matching: .any)["advanced.help.popover"]
+                .waitForExistence(timeout: 5), "The note says what each choice does")
+            save("simple-advanced-help-\(appearance)", app)
+            app.otherElements["PopoverDismissRegion"].firstMatch.tap()
+
+            // For experts, at the bottom: the bot's own config.yaml.
+            let raw = app.buttons["advanced.page.rawConfiguration"]
+            XCTAssertTrue(raw.waitForExistence(timeout: 5))
+            scrolls = 0
+            while !raw.isHittable, scrolls < 8 {
+                app.swipeUp(velocity: .slow)
+                scrolls += 1
+            }
+            save("simple-advanced-experts-\(appearance)", app)
+            raw.tap()
+            XCTAssertTrue(app.textViews["host.raw-config.editor"].waitForExistence(timeout: 10),
+                          "Edit config.yaml opens the editor")
+            app.terminate()
+        }
+    }
+
+    /// Bots mode's Settings: Approvals opens the primary bot's Advanced Options, the one place approvals are set.
+    @MainActor
+    func testSettingsApprovalsOpensThePrimaryBotsAdvancedOptions() {
+        let app = launch(appearance: "light")
+        XCTAssertTrue(app.descendants(matching: .any)["simple-bots.home"].waitForExistence(timeout: 15))
+        app.buttons["simple-bots.settings"].tap()
+        let approvals = app.buttons["simple-bots.settings.approvals"]
+        XCTAssertTrue(approvals.waitForExistence(timeout: 5))
+        approvals.tap()
+        XCTAssertTrue(app.buttons["advanced.option.approvals.mode"].waitForExistence(timeout: 10))
+        XCTAssertEqual(app.buttons["advanced.option.approvals.mode"].value as? String, "Smart")
+        save("simple-settings-approvals-light", app)
     }
 
     /// A bot's profile: Files and Media after Computer. Files opens a folder in place, Back goes up,

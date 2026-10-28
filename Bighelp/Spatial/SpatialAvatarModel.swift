@@ -169,13 +169,14 @@ final class SpatialAvatarModel {
             let chat = try await readyChat()
             guard let workspace, let sessionID else { return nil }
             seenItemIDs = Set(chat.items.map(\.id))
+            let preference = settings.voicePreference(computer: voiceComputer, agentID: agent?.id)
             let presentation = workspace.featureStore.makeVoicePresentation(
                 for: sessionID,
                 mode: settings.voiceMode,
                 transcription: settings.voiceTranscription,
-                conversationMode: settings.voiceConversationMode,
-                liveProvider: settings.liveVoiceProvider,
-                liveVoice: settings.liveVoice(for: settings.liveVoiceProvider)
+                conversationMode: preference.mode,
+                liveProvider: preference.liveProvider,
+                liveVoice: preference.liveVoice
             )
             voice = presentation
             return presentation
@@ -190,6 +191,9 @@ final class SpatialAvatarModel {
     func endVoice() {
         voice = nil
     }
+
+    /// The computer the agent is on (`cacheScopeID`), which its own voice choices are kept under.
+    var voiceComputer: String? { workspace?.catalog.currentHostID() }
 
     func dismissReply() {
         seenItemIDs = Set(chat?.items.map(\.id) ?? [])

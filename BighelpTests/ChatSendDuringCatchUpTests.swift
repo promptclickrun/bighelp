@@ -96,6 +96,58 @@ struct ChatSendDuringCatchUpTests {
         try await load.value
         #expect(fixture.model.canSend)
     }
+
+    /// A catch-up that never settles must not leave Send waiting for it for good: the waiting
+    /// message goes back in the box and the next tap works once the chat is caught up.
+    @Test(.timeLimit(.minutes(1)))
+    func aCatchUpThatNeverSettlesGivesUpAndKeepsSendWorking() async throws {
+        let fixture = try CatchUpFixture()
+        defer { fixture.close() }
+        try await fixture.client.recover(epoch: "epoch")
+        fixture.model.draft = "Hello there"
+        fixture.model.catchUpTimeout = .milliseconds(50)
+
+        fixture.rpc.holdsActivation = true
+        defer { fixture.rpc.releaseActivation() }
+        let catchUp = Task { try await fixture.client.recover(epoch: "epoch") }
+        try await fixture.waitUntil { fixture.rpc.isHoldingActivation }
+
+        await fixture.model.send()
+        #expect(!fixture.model.isAwaitingCatchUp)
+        #expect(fixture.model.draft == "Hello there")
+        #expect(fixture.rpc.submits.isEmpty)
+
+        fixture.rpc.releaseActivation()
+        try await catchUp.value
+        #expect(fixture.model.canSend)
+        let send = Task { await fixture.model.send() }
+        try await fixture.waitUntil { !fixture.rpc.submits.isEmpty }
+        #expect(fixture.rpc.submits == ["Hello there"])
+        send.cancel()
+        await send.value
+    }
+
+    /// Giving up on a message that waits for a catch-up, by cancelling it, frees Send.
+    @Test func aCancelledWaitingSendLeavesSendFree() async throws {
+        let fixture = try CatchUpFixture()
+        defer { fixture.close() }
+        try await fixture.client.recover(epoch: "epoch")
+        fixture.model.draft = "Hello there"
+
+        fixture.rpc.holdsActivation = true
+        let catchUp = Task { try await fixture.client.recover(epoch: "epoch") }
+        try await fixture.waitUntil { fixture.rpc.isHoldingActivation }
+
+        let send = Task { await fixture.model.send() }
+        try await fixture.waitUntil { fixture.model.isAwaitingCatchUp }
+        send.cancel()
+        await send.value
+        #expect(!fixture.model.isAwaitingCatchUp)
+        #expect(fixture.model.draft == "Hello there")
+
+        fixture.rpc.releaseActivation()
+        try await catchUp.value
+    }
 }
 
 /// Holds an open under way until `open()`.

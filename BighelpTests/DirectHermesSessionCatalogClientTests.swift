@@ -916,8 +916,91 @@ struct DirectHermesSessionCatalogClientTests {
         #expect(resolved.coordinate.storedSessionID == "created")
         #expect(resolved.canonicalRegistryID == "created")
         #expect(resolved.durability == .persisted)
-        #expect(states.map(\.phase) == [.createRequested, .created, .titleRequested, .awaitingRegistry, .canonicalResolved])
+        // Saved before the plugin's try (this host's plugin can't make it), then again before the socket's.
+        #expect(states.map(\.phase) == [.createRequested, .createRequested, .created, .titleRequested, .awaitingRegistry,
+                                        .canonicalResolved])
         #expect(!workspace.calls.contains { $0.operation == .promptSubmit })
+    }
+
+    /// A Bot Chat the app made over its socket was one Hermes moved aside, renamed `Bot Chat (bighelp <id>)`,
+    /// the first time another agent messaged the agent. With the plugin's route, Hermes makes it as its own.
+    @Test func hermesMakesTheBotChatWhenThePluginCan() async throws {
+        let workspace = try SessionWorkspaceStub()
+        workspace.pluginOperations = [.botChatCreate]
+        var states: [DirectHermesSessionCreationState] = []
+        workspace.handler = { operation, payload in
+            switch operation {
+            case .profilesList: return Self.profiles()
+            case .nativeSessionList: return ["sessions": .array([])]
+            case .botChatCreate:
+                #expect(states.last?.phase == .createRequested)
+                #expect(payload == ["profile": .string("alpha"),
+                                    "idempotencyKey": .string(states.last?.intentID.lowercased() ?? "missing")])
+                return ["ok": .boolean(true), "storedSessionId": .string("local-native"), "created": .boolean(true),
+                        "native": .boolean(true)]
+            case .sessionResume:
+                #expect(payload["session_id"] == .string("local-native"))
+                return Self.attached(stored: "local-native")
+            default: throw WorkspaceClientError.invalidRequest
+            }
+        }
+        let client = Self.client(workspace, folder: { _ in "/approved/work" }, sink: { states.append($0) })
+        let resolved = try await client.createFirstCanonicalChat(profileID: "alpha")
+        #expect(resolved.coordinate.storedSessionID == "local-native")
+        #expect(resolved.canonicalRegistryID == "local-native")
+        #expect(states.map(\.phase) == [.createRequested, .canonicalResolved])
+        #expect(!workspace.calls.contains { [.sessionCreate, .sessionTitle].contains($0.operation) },
+                "The app made the Bot Chat over its socket")
+    }
+
+    /// The agent's gateway couldn't start and Hermes made nothing: the socket makes the Bot Chat, so the
+    /// person can still chat.
+    @Test func aBotChatStillOpensWhenTheAgentsGatewayCantStart() async throws {
+        let workspace = try SessionWorkspaceStub()
+        workspace.pluginOperations = [.botChatCreate]
+        var titled = false
+        workspace.handler = { operation, _ in
+            switch operation {
+            case .profilesList: return Self.profiles()
+            case .nativeSessionList: return ["sessions": .array(titled ? [Self.registry("created")] : [])]
+            case .botChatCreate: throw WorkspaceClientError.rejected(code: "bot_chat_gateway_unavailable")
+            case .sessionCreate: return Self.created(stored: "created", cwd: "/approved/work")
+            case .sessionTitle:
+                titled = true
+                return ["pending": .boolean(false), "title": .string("Bot Chat")]
+            case .sessionResume: return Self.attached(stored: "created")
+            default: throw WorkspaceClientError.invalidRequest
+            }
+        }
+        let client = Self.client(workspace, folder: { _ in "/approved/work" }, sink: { _ in })
+        let resolved = try await client.createFirstCanonicalChat(profileID: "alpha")
+        #expect(resolved.coordinate.storedSessionID == "created")
+        #expect(workspace.calls.filter { $0.operation == .sessionCreate }.count == 1)
+    }
+
+    /// A lost reply: the next try asks again under the same key, so Hermes hands back the same chat.
+    @Test func aRetriedHermesBotChatUsesTheSameKey() async throws {
+        let workspace = try SessionWorkspaceStub()
+        workspace.pluginOperations = [.botChatCreate]
+        var keys: [BighelpJSONValue?] = []
+        var fails = true
+        workspace.handler = { operation, payload in
+            switch operation {
+            case .profilesList: return Self.profiles()
+            case .nativeSessionList: return ["sessions": .array([])]
+            case .botChatCreate:
+                keys.append(payload["idempotencyKey"])
+                if fails { fails = false; throw WorkspaceClientError.transportUnavailable }
+                return ["ok": .boolean(true), "storedSessionId": .string("local-native")]
+            case .sessionResume: return Self.attached(stored: "local-native")
+            default: throw WorkspaceClientError.invalidRequest
+            }
+        }
+        let client = Self.client(workspace, folder: { _ in "/approved/work" }, sink: { _ in })
+        await #expect(throws: (any Error).self) { try await client.createFirstCanonicalChat(profileID: "alpha") }
+        let resolved = try await client.createFirstCanonicalChat(profileID: "alpha")
+        #expect(resolved.coordinate.storedSessionID == "local-native")
+        #expect(keys.count == 2 && keys[0] == keys[1])
     }
 
     @Test func missingDurableSinkPreventsCreateAndFailedSinkDoesNotDispatch() async throws {
@@ -1494,6 +1577,66 @@ struct DirectHermesSessionCatalogClientTests {
         #expect(!host.hidden)
     }
 
+    /// When another agent delivers into a Bot Chat Hermes can't tie to a delivery queue, it renames that
+    /// chat `Bot Chat (<source> <id>)`, keeps its history and starts a new one. Shown as it is, the old
+    /// chat looks like a broken one; it shows as an ordinary chat set aside, like after New Bot Chat.
+    @Test func aBotChatHermesSetAsideShowsAsAnOrdinaryChatWithItsHistory() async throws {
+        var displaced = try #require(Self.session(id: "bot-old").object)
+        displaced["title"] = .string("Bot Chat (bighelp bot-old)")
+        displaced["source"] = .string("bighelp")
+        displaced["last_active"] = .number(50)
+        var live = try #require(Self.session(id: "local-new").object)
+        live["title"] = .string("Bot Chat")
+        live["source"] = .string("local")
+        let workspace = try SessionWorkspaceStub()
+        workspace.handler = { operation, _ in
+            switch operation {
+            case .profilesList: return Self.profiles(canonical: "local-new", resolved: "local-new")
+            case .sessionsList: return Self.ownershipPage([.object(live), .object(displaced)])
+            default: throw WorkspaceClientError.invalidRequest
+            }
+        }
+        let records = try await Self.client(workspace).list()
+        let aside = try #require(records.first { $0.remoteStoredID == "bot-old" })
+        #expect(aside.title == SessionRecord.retiredBotChatTitle(at: Date(timeIntervalSince1970: 50)))
+        #expect(!aside.isBotChat)
+        #expect(aside.hasAcceptedMessage)
+        let current = try #require(records.first { $0.remoteStoredID == "local-new" })
+        #expect(current.title == "Bot Chat")
+        #expect(current.isBotChat)
+    }
+
+    @Test func onlyAChatHermesSetAsideIsRenamedOnScreen() async throws {
+        func row(_ id: String, title: String, source: String = "bighelp") throws -> BighelpJSONValue {
+            var value = try #require(Self.session(id: id).object)
+            value["title"] = .string(title)
+            value["source"] = .string(source)
+            return .object(value)
+        }
+        let rows = try [
+            row("a", title: "Bot Chat (bighelp b)"),
+            row("c", title: "Bot Chat (notes)"),
+            row("d", title: "Bot Chat notes (bighelp d)"),
+            row("e", title: "Bot Chat (tui e)", source: "tui"),
+            row("local-new", title: "Bot Chat (bighelp local-new)"),
+        ]
+        let workspace = try SessionWorkspaceStub()
+        workspace.handler = { operation, _ in
+            switch operation {
+            case .profilesList: return Self.profiles(canonical: "local-new", resolved: "local-new")
+            case .sessionsList: return Self.ownershipPage(rows)
+            default: throw WorkspaceClientError.invalidRequest
+            }
+        }
+        let records = try await Self.client(workspace).list()
+        func title(_ id: String) -> String? { records.first { $0.remoteStoredID == id }?.title }
+        #expect(title("a") == SessionRecord.retiredBotChatTitle(at: Date(timeIntervalSince1970: 2)))
+        #expect(title("c") == "Bot Chat (notes)")
+        #expect(title("d") == "Bot Chat notes (bighelp d)")
+        #expect(title("e") == "Bot Chat (tui e)")
+        #expect(title("local-new") == "Bot Chat (bighelp local-new)")
+    }
+
     /// Without a source Hermes labels the chat "tui" and tells the agent it's in a terminal: no files,
     /// no cards, reminders can't reach anyone. Reopened chats must keep the same label.
     @Test func chatsTellHermesTheyComeFromBighelp() async throws {
@@ -1667,6 +1810,9 @@ final class SessionWorkspaceStub: WorkspaceOperationPerforming {
     var activeSessions: [BighelpJSONValue]? = []
     var replayEpoch = "fixture-process"
     var hasSocketEdits = false
+    /// Plugin routes this host's plugin has (`/native/context` features). Ordinary fixtures stand
+    /// for a plugin without them, which the real client reports as an unsupported operation.
+    var pluginOperations: Set<WorkspaceOperation> = []
     var epochHandler: (@MainActor () async throws -> [String: BighelpJSONValue])?
     var handler: @MainActor (WorkspaceOperation, [String: BighelpJSONValue]) async throws -> [String: BighelpJSONValue] = { _, _ in
         throw WorkspaceClientError.invalidRequest
@@ -1678,6 +1824,11 @@ final class SessionWorkspaceStub: WorkspaceOperationPerforming {
     func perform(_ operation: WorkspaceOperation, payload: [String: BighelpJSONValue],
                  owner: WorkspaceOwner) async throws -> [String: BighelpJSONValue] {
         guard owner == self.owner else { throw WorkspaceClientError.ownerChanged }
+        if DirectHermesNativePluginClient.supports(operation) {
+            guard pluginOperations.contains(operation) else { throw WorkspaceClientError.unavailable(.unsupportedOperation) }
+            calls.append(.init(operation: operation, payload: payload))
+            return try await handler(operation, payload)
+        }
         // The real client refuses fields its routes don't list before anything
         // reaches Hermes; a stub that skipped this once hid a new-chat failure.
         _ = try DirectHermesWorkspaceClient.route(operation, payload: payload)

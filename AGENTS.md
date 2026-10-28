@@ -201,6 +201,11 @@ change in both repos.
   models. Phonon needs iOS 18 or later: `Packages/PhononTTS` keeps the app's minimum and marks its API
   `@available`, so never raise the app's minimum for it. Its core has no visionOS or Intel slices, so only
   iPhone and iPad link it (the Mac DMG is universal).
+- **Voice mode per agent** (`AgentVoiceChoices`): TTS or GPT Live, and the GPT Live voice, are kept per computer
+  and agent on the device; Settings › Voice holds the default for agents without their own, and Bots mode's
+  Default Voice sets an agent's. Anything that opens voice for an agent reads its effective mode. Voices and
+  models are picked from lists (`VoiceOptions`; ElevenLabs from the account, speech plugins from the plugin's
+  `voice-catalog`), with a typed Other only where a provider takes any value.
 - **Auto TTS** (`ChatReplyReader`): Settings › Voice › Use TTS on every response and the chat's + menu are one
   switch. A chat reads a reply once its turn ends, never what it held when it opened, and stops on a new
   message, voice mode or leaving the chat.
@@ -219,8 +224,16 @@ change in both repos.
   v0.22.4's gateway listener on the session path; features, retry and discard, RoomLink and seatable
   profiles differ. Go by what `groups.capabilities` and each pending action say, never the version
   (docs/HERMES_BOT_MODE.md, vectors in `BighelpTests/Fixtures/HermesGroups`).
-- **Bot Chats are hidden in Hermes:** `GET /api/sessions` never returns them; the catalog list adds each
-  agent's (`canonical_session`, `canonicalBotChat`) so a refresh can't drop it. Hermes names it only when
+- **Hermes makes every Bot Chat:** Hermes delivers other agents' messages into the chat titled "Bot Chat" and
+  takes over only its own native chat (`local-…`); a Bot Chat made over the app's socket (source `bighelp`) got
+  renamed `Bot Chat (bighelp <id>)` and replaced, context and all, the first time another agent wrote. So the first
+  Bot Chat and New Bot Chat's next one come from the plugin's `bot-chat/create` (`native-bot-chat-v1`), which has
+  the agent's gateway make it; the socket's `session.create` is only the fallback for older plugins. Hermes stores
+  these chats as `local` and the app's resume stamps `bighelp`: identity treats the two as one
+  (`DirectHermesIdentity.sameSessionSource`). docs/DIRECT_HERMES_SESSIONS.md › Bot Chats are Hermes' own.
+- **Bot Chats can be hidden in Hermes:** the app's used to be (Hermes' own are visible, and the catalog folds
+  them into the Bot Chat), and `GET /api/sessions` never returns hidden ones; the catalog list adds each agent's
+  (`canonical_session`, `canonicalBotChat`) so a refresh can't drop it. Hermes names it only when
   `profiles.list` asks for the agents' sessions (`include_sessions`, its default), so the catalog asks; without
   them every refresh dropped the saved Bot Chat, and the first tap on a bot waited on a full lookup.
 - **Archived:** the catalog lists `archived=include` and keeps rows Hermes' idle sweep archived

@@ -13,6 +13,7 @@ struct VoiceProviderConfiguration: Equatable, Sendable, Identifiable {
     var hasModel = false
     var needsAPIKey = true
     var supportsServerURL = false
+    var voiceLocation: VoiceProviderSpec.VoiceLocation = .section
 }
 
 struct VoiceSettingsConfiguration: Equatable, Sendable {
@@ -63,23 +64,29 @@ final class VoiceSettingsStore {
     private(set) var isSaving = false
     private(set) var errorMessage: String?
     private(set) var confirmation: String?
+    /// What providers that list their voices on the computer offer, by provider (ElevenLabs, speech plugins).
+    private(set) var hostCatalogs: [String: VoiceHostCatalogState] = [:]
     @ObservationIgnored private let client: any VoiceSettingsClient
+    @ObservationIgnored private let options: (any VoiceOptionsClient)?
     @ObservationIgnored private let isCurrent: @MainActor () -> Bool
     /// Whether an on-device provider can speak yet (its model downloaded).
     @ObservationIgnored private let isOnDeviceReady: @MainActor (String) -> Bool
 
-    init(agentID: String, client: any VoiceSettingsClient,
+    /// `options` reads voices a provider lists on the computer; without it, pickers show the app's own lists.
+    init(agentID: String, client: any VoiceSettingsClient, options: (any VoiceOptionsClient)? = nil,
          isCurrent: @escaping @MainActor () -> Bool = { true },
          isOnDeviceReady: @escaping @MainActor (String) -> Bool = { providerID in
              OnDeviceVoiceModel.model(providerID: providerID).map(OnDeviceVoiceInstaller.shared.isInstalled) ?? false
          }) {
         self.agentID = agentID
         self.client = client
+        self.options = options
         self.isCurrent = isCurrent
         self.isOnDeviceReady = isOnDeviceReady
     }
 
     @ObservationIgnored private var generation = 0
+    @ObservationIgnored private var catalogGeneration = 0
     @ObservationIgnored private var editRevision = 0
 
     var selectedProvider: VoiceProviderConfiguration? {
@@ -88,7 +95,8 @@ final class VoiceSettingsStore {
 
     var canSave: Bool {
         guard isCurrent(), !isLoading, !isSaving, let configuration, let selectedProvider,
-              !selectedProvider.hasVoice || (!normalizedVoice.isEmpty && Self.validText(normalizedVoice, 160)),
+              !selectedProvider.hasVoice || !normalizedVoice.isEmpty,
+              !selectedProvider.takesVoice || Self.validText(normalizedVoice, 160),
               Self.validText(normalizedModel, 160),
               normalizedServerURL.isEmpty || Self.validServerURL(normalizedServerURL),
               Self.validText(normalizedKey, 4096),
@@ -113,7 +121,72 @@ final class VoiceSettingsStore {
     }
 
     private var changedVoice: Bool {
-        selectedProvider?.hasVoice == true && normalizedVoice != selectedProvider?.voiceID
+        selectedProvider?.takesVoice == true && normalizedVoice != selectedProvider?.voiceID
+    }
+
+    /// The voices the selected provider's picker lists.
+    var voiceChoices: VoiceOptionList? {
+        selectedProvider.map {
+            VoiceOptions.voices(for: $0, model: model, serverURL: serverURL, host: hostCatalog, current: voiceID)
+        }
+    }
+
+    var modelChoices: VoiceOptionList? {
+        selectedProvider.map { VoiceOptions.models(for: $0, serverURL: serverURL, current: model) }
+    }
+
+    /// What the selected provider lists on the computer, where it lists its voices there.
+    var hostCatalog: VoiceHostCatalogState? { hostCatalogs[providerID] }
+
+    /// The name the chosen voice goes by.
+    var voiceName: String {
+        selectedProvider.map {
+            VoiceOptions.voiceName(voiceID, provider: $0, model: model, serverURL: serverURL, host: hostCatalog)
+        } ?? voiceID
+    }
+
+    var modelName: String {
+        selectedProvider.map { VoiceOptions.modelName(model, provider: $0, serverURL: serverURL) } ?? model
+    }
+
+    /// A pick from the voice picker.
+    func chooseVoice(_ id: String) {
+        guard !isSaving else { return }
+        voiceID = id
+    }
+
+    /// A pick from the model picker. A voice the new model doesn't speak (OpenAI's `tts-1` has fewer)
+    /// goes back to the provider's default, so Save never sends a pair the provider refuses.
+    func chooseModel(_ id: String) {
+        guard !isSaving, let selectedProvider else { return }
+        model = id
+        let voices = VoiceOptions.voices(for: selectedProvider, model: model, serverURL: serverURL,
+                                         host: hostCatalog, current: "")
+        guard selectedProvider.takesVoice, !voices.allowsOther,
+              !voices.options.contains(where: { $0.id == normalizedVoice }) else { return }
+        let fallback = VoiceProviderSpec.builtIn(selectedProvider.id)?.defaultVoice
+        voiceID = voices.options.first { $0.id == fallback }?.id ?? voices.options.first?.id ?? voiceID
+    }
+
+    /// Reads the selected provider's voices from the computer, once, where it lists them there: the
+    /// agent's own ElevenLabs voices, or a speech plugin's (`voice-catalog`).
+    func loadHostCatalog() async {
+        guard isCurrent(), let provider = selectedProvider, provider.listsVoicesOnComputer, let options else { return }
+        switch hostCatalogs[provider.id] {
+        case .loading, .loaded, .needsPluginUpdate: return
+        case .unavailable, nil: break
+        }
+        let request = catalogGeneration
+        hostCatalogs[provider.id] = .loading
+        do {
+            let catalog = try await options.catalog(agentID: agentID, provider: provider)
+            guard request == catalogGeneration, isCurrent() else { return }
+            hostCatalogs[provider.id] = .loaded(catalog)
+        } catch {
+            guard request == catalogGeneration else { return }
+            // Left before it answered: the next visit asks again.
+            hostCatalogs[provider.id] = Task.isCancelled || !isCurrent() ? nil : Self.catalogState(error, provider)
+        }
     }
 
     private var changedModel: String? {
@@ -165,10 +238,19 @@ final class VoiceSettingsStore {
         edited()
     }
 
+    /// Puts every field back to what the host has saved, without loading again.
+    func discardEdits() {
+        guard let configuration, !isSaving else { return }
+        providerID = configuration.providerID
+        fillFromSelectedProvider()
+        sampleError = nil
+        errorMessage = nil
+    }
+
     func save() async {
         guard canSave, let configuration else { return }
         let update = VoiceSettingsUpdate(expectedRevision: configuration.revision,
-            providerID: providerID, voiceID: selectedProvider?.hasVoice == true ? normalizedVoice : "",
+            providerID: providerID, voiceID: selectedProvider?.takesVoice == true ? normalizedVoice : "",
             apiKey: normalizedKey.isEmpty ? nil : normalizedKey,
             model: changedModel, serverURL: changedServerURL)
         let request = generation
@@ -182,11 +264,13 @@ final class VoiceSettingsStore {
             guard generation == request, isCurrent(), !Task.isCancelled else { return }
             guard value.providerID == update.providerID,
                   let saved = value.providers.first(where: { $0.id == update.providerID }),
-                  !saved.hasVoice || saved.voiceID == update.voiceID,
+                  !saved.takesVoice || saved.voiceID == update.voiceID,
                   !saved.needsAPIKey || saved.apiKeyConfigured else {
                 throw VoiceSettingsError.invalidResponse
             }
             self.configuration = value
+            // A new key can open the account's own voices.
+            if update.apiKey != nil { hostCatalogs[update.providerID] = nil }
             if editRevision == edits {
                 providerID = value.providerID
                 fillFromSelectedProvider()
@@ -217,6 +301,8 @@ final class VoiceSettingsStore {
 
     func invalidate() {
         generation += 1
+        catalogGeneration += 1
+        hostCatalogs = [:]
         configuration = nil
         providerID = ""
         voiceID = ""
@@ -278,6 +364,14 @@ final class VoiceSettingsStore {
             return "Couldn't play a sample. Check \(title) on your computer, then try again."
         }
     }
+    private static func catalogState(_ error: any Error, _ provider: VoiceProviderConfiguration) -> VoiceHostCatalogState {
+        switch error {
+        case VoiceOptionsError.needsPluginUpdate: .needsPluginUpdate
+        case VoiceOptionsError.unavailable(let reason): .unavailable(reason)
+        default: .unavailable(String(localized: "Couldn't get \(provider.title) voices from your computer. Try again in a moment."))
+        }
+    }
+
     private func edited() {
         editRevision += 1
         confirmation = nil

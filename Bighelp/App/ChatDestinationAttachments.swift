@@ -91,14 +91,7 @@ extension ChatDestinationView {
                 attachmentFlow.isActionMenuPresented = false
                 Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(180))
-                    voicePresentation = featureStore.makeVoicePresentation(
-                        for: model.conversationID,
-                        mode: settings.voiceMode,
-                        transcription: settings.voiceTranscription,
-                        conversationMode: settings.voiceConversationMode,
-                        liveProvider: settings.liveVoiceProvider,
-                        liveVoice: settings.liveVoice(for: settings.liveVoiceProvider)
-                    )
+                    voicePresentation = makeVoice(agentVoice.mode)
                 }
             case .startSession:
                 attachmentFlow.isActionMenuPresented = false

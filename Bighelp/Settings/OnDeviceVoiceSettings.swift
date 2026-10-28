@@ -1,9 +1,10 @@
 import SwiftUI
 
-/// Voice settings' Save, on the page and on the voice list it pushes.
+/// Voice settings' Save, on the page and on the voice list it pushes, and on a bot's Default Voice.
 @MainActor
 struct VoiceSettingsSaveButton: View {
     let store: VoiceSettingsStore?
+    var identifier = "voice.settings.save"
     var beforeSave: () -> Void = {}
 
     var body: some View {
@@ -26,7 +27,7 @@ struct VoiceSettingsSaveButton: View {
             }
         }
         .disabled(store?.canSave != true)
-        .accessibilityIdentifier("voice.settings.save")
+        .accessibilityIdentifier(identifier)
     }
 }
 

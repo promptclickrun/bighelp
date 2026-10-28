@@ -78,6 +78,88 @@ struct SessionContentRepositoryTests {
         }
     }
 
+    @Test func sessionSourceTreatsOnlyTheBighelpAndLocalLabelsAsTheSameChat() {
+        // Hermes rewrites a Bot Chat's stored source to "local" on a peer refresh and the app's
+        // resume stamps it back to "bighelp". Both labels name one chat.
+        #expect(DirectHermesIdentity.sameSessionSource("bighelp", "local"))
+        #expect(DirectHermesIdentity.sameSessionSource("local", "bighelp"))
+        #expect(DirectHermesIdentity.sameSessionSource("bighelp", "bighelp"))
+        #expect(DirectHermesIdentity.sameSessionSource("local", "local"))
+        #expect(DirectHermesIdentity.sameSessionSource(nil, nil))
+        #expect(!DirectHermesIdentity.sameSessionSource(nil, "bighelp"))
+        #expect(!DirectHermesIdentity.sameSessionSource("local", nil))
+        // Hermes makes a Bot Chat as `cli` and stores it as `local` once it runs.
+        #expect(DirectHermesIdentity.sameSessionSource("cli", "bighelp"))
+        #expect(DirectHermesIdentity.sameSessionSource("cli", "local"))
+        #expect(!DirectHermesIdentity.sameSessionSource("tui", "bighelp"))
+        #expect(!DirectHermesIdentity.sameSessionSource("desktop", "local"))
+        #expect(!DirectHermesIdentity.sameSessionSource("other-source", "cli"))
+        #expect(DirectHermesIdentity.sameSessionSource("cli", "cli"))
+    }
+
+    @Test func aBotChatWhoseSourceFlipsBetweenBighelpAndLocalIsStillTheSameChat() {
+        let roster = SessionSubagentRosterSnapshot(sessionID: "bot-chat", subagents: [], updatedAt: 5)
+        let todos = SessionTodoSnapshot(sessionID: "bot-chat", revision: 3, todos: [], updatedAt: 1)
+        let kept = TimelineItem(id: "kept", role: .assistant,
+            sender: .agent(id: "default", snapshot: .init(name: "Hermes")),
+            content: .message("Reply that must survive the flip"), metadata: .init(delivery: "Saved", sourceOrder: 1))
+        let local = SessionRecord(id: "bot-chat", kind: .direct, agentIDs: ["default"], title: "Bot Chat",
+            remoteStoredID: "local-2b97e876", remoteSource: "bighelp",
+            sessionTodos: todos, sessionSubagents: roster, parentSessionID: "parent-session",
+            draft: "Half-typed message", items: [kept])
+        var flipped = local
+        flipped.remoteSource = "local"
+        flipped.items = []
+        flipped.draft = ""
+        flipped.parentSessionID = nil
+        flipped.sessionTodos = nil
+        flipped.sessionSubagents = nil
+
+        #expect(SessionCatalogReconciliation.hasSameDurableIdentity(local, flipped))
+        #expect(SessionCatalogReconciliation.hasSameDurableIdentity(flipped, local))
+
+        let merged = SessionCatalogReconciliation.merged(local: local, incoming: flipped)
+        #expect(merged.draft == "Half-typed message")
+        #expect(merged.parentSessionID == "parent-session")
+        #expect(merged.items == [kept])
+        #expect(merged.sessionTodos?.revision == 3)
+        #expect(merged.sessionSubagents?.updatedAt == 5)
+
+        let reconciled = SessionCatalogReconciliation.reconciled(local: [local], authoritativeIncoming: [flipped])
+        #expect(reconciled.count == 1)
+        #expect(reconciled.first?.draft == "Half-typed message")
+    }
+
+    @Test func aDifferentSourceStillMeansADifferentChat() {
+        let local = SessionRecord(id: "chat", kind: .direct, agentIDs: ["default"], title: "Chat",
+            remoteStoredID: "stored", remoteSource: "bighelp")
+        for other in ["tui", "desktop", "other-source"] {
+            var incoming = local
+            incoming.remoteSource = other
+            #expect(!SessionCatalogReconciliation.hasSameDurableIdentity(local, incoming))
+        }
+    }
+
+    @Test func nativeSessionBridgeKeepsAStreamWhenHermesFlipsTheSourceLabel() {
+        #expect(NativeWorkspaceSessionBridge.sameOrAdoptingSource("bighelp", "local"))
+        #expect(NativeWorkspaceSessionBridge.sameOrAdoptingSource("local", "bighelp"))
+        #expect(NativeWorkspaceSessionBridge.sameOrAdoptingSource(nil, "local"))
+        #expect(NativeWorkspaceSessionBridge.sameOrAdoptingSource("cli", "local"))
+        #expect(!NativeWorkspaceSessionBridge.sameOrAdoptingSource("bighelp", "tui"))
+        #expect(!NativeWorkspaceSessionBridge.sameOrAdoptingSource("local", nil))
+    }
+
+    @Test func aLocalSourceBotChatCanStillBeResumedNatively() throws {
+        let summary = try #require(DirectHermesSessionSummary(
+            .object(["id": .string("local-1d1b3370"), "source": .string("local"), "title": .string("Bot Chat")]),
+            profile: "default"))
+        #expect(summary.supportsNativeResume)
+        let foreign = try #require(DirectHermesSessionSummary(
+            .object(["id": .string("20261018_170901_d6b411"), "source": .string("telegram")]),
+            profile: "default"))
+        #expect(!foreign.supportsNativeResume)
+    }
+
     @Test func nativeVersionedCheckpointsPreserveRecordedHistoryAndRejectLegacyWriters() async throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }

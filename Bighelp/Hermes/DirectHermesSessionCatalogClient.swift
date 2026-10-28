@@ -727,6 +727,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
             // #440: the create's reply was lost before any title was asked for, so this attempt can't
             // hold the agent's Bot Chat. Create again under the same key: Hermes hands back the same
             // session while it still has it, else makes a fresh one. Never a permanent refusal.
+            if let made = try await hermesMadeBotChat(pending, profile: profile) { return made }
             state = pending
             binding = try await dispatchCreate(&state, profile: profile)
         } else if let pending = creations[key], pending.purpose == .firstCanonical, pending.phase != .complete,
@@ -748,6 +749,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
             }
         } else {
             state = try await newCreation(profile: profile, purpose: .firstCanonical)
+            if let made = try await hermesMadeBotChat(state, profile: profile) { return made }
             binding = try await dispatchCreate(&state, profile: profile)
         }
         guard let runtime = binding.coordinate.runtimeSessionID else { throw WorkspaceClientError.invalidResponse }
@@ -1506,6 +1508,43 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         return try registryValue(value)
     }
 
+    /// The agent's Bot Chat, made by Hermes itself through the plugin (`native-bot-chat-v1`): Hermes'
+    /// own native chat, the kind its delivery from other agents adopts. A Bot Chat the app makes over
+    /// its socket is one Hermes can't adopt, so the first message another agent sent the agent moved it
+    /// aside, renamed `Bot Chat (bighelp <id>)`, and started a fresh one without its context. The
+    /// creation's intent ID is the retry key, so a lost reply never makes two. Nil when the plugin
+    /// doesn't have the route yet: the socket makes it as before.
+    private func hermesMadeBotChat(_ creation: DirectHermesSessionCreationState,
+                                   profile: Profile) async throws -> DirectHermesResolvedSession? {
+        var state = creation
+        try persistBeforeDispatch(state)
+        let response: [String: BighelpJSONValue]
+        do {
+            response = try await perform(.botChatCreate, [
+                "profile": .string(profile.id), "idempotencyKey": .string(state.intentID.lowercased()),
+            ])
+        } catch WorkspaceClientError.unavailable(.unsupportedOperation) {
+            return nil
+        } catch WorkspaceClientError.unavailable(.pluginRequired) {
+            return nil
+        } catch WorkspaceClientError.rejected(code: "bot_chat_gateway_unavailable", _) {
+            // The agent's own gateway couldn't start, and nothing was made: chatting matters more, so the
+            // socket makes it as before (one Hermes may still replace when another agent writes).
+            return nil
+        }
+        guard response["ok"]?.boolean == true else { throw WorkspaceClientError.invalidResponse }
+        let stored = try DirectHermesSessionValidation.string(response["storedSessionId"])
+        try DirectHermesSessionValidation.coordinate(stored)
+        let registered = Registry(id: stored, resolvedID: nil)
+        canonicalIDs[DirectHermesSessionIdentity.key(profile.id)] = registered
+        let resolved = try await openRegistry(registered, profile: profile)
+        state.storedSessionID = stored
+        state.phase = .canonicalResolved
+        state.canonicalRegistryID = stored
+        try retain(state)
+        return resolved
+    }
+
     /// The chat holding the title "Bot Chat" when Hermes refused it to a new one (4022):
     /// Hermes finds it by name on resume, as `hermes -c "Bot Chat"` does, even one its
     /// list doesn't show. Nil when the agent has none (4007).
@@ -1679,8 +1718,15 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
             count = 0
         }
         guard count >= 0 else { throw WorkspaceClientError.invalidResponse }
+        // Hermes renames an app-created Bot Chat to `Bot Chat (<source> <id>)` when another agent
+        // delivers into that agent's chat, and starts a fresh one. Show the kept chat as an ordinary
+        // chat, as after New Bot Chat. Display only: the host title is never written back.
+        let setAside = !matchesCanonical
+            && DirectHermesIdentity.sameSessionSource(source, "bighelp")
+            && SessionRecord.isDisplacedBotChatTitle(title)
+        let shownTitle = setAside ? SessionRecord.retiredBotChatTitle(at: updated) : (title.isEmpty ? "Untitled" : title)
         var record = SessionRecord(
-            id: appID, kind: .direct, agentIDs: [profile.id], title: title.isEmpty ? "Untitled" : title,
+            id: appID, kind: .direct, agentIDs: [profile.id], title: shownTitle,
             remoteStoredID: id, remoteSource: source, isPinned: try DirectHermesSessionValidation.flag(value["pinned"]) ?? false,
             createdAt: started, updatedAt: updated, hasAcceptedMessage: count > 0
         )

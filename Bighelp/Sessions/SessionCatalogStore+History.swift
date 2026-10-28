@@ -176,7 +176,7 @@ extension SessionCatalogStore {
             let current = session(id: id),
             current.agentIDs == record.agentIDs,
             current.remoteStoredID == record.remoteStoredID,
-            current.remoteSource == record.remoteSource
+            DirectHermesIdentity.sameSessionSource(current.remoteSource, record.remoteSource)
         else { throw CancellationError() }
         guard hydrated.id == id else { throw SessionCatalogError.invalidSession }
         let protectedHydration = protectAcceptedStop(hydrated)

@@ -415,6 +415,8 @@ private extension DirectHermesVoiceClientTests {
         let custom = result.providers.filter { $0.kind == .custom }
         #expect(custom.map(\.id) == ["kokoro"])
         #expect(custom.first?.hasVoice == false)
+        // Its voice can be set, but needn't be: empty runs the command's own.
+        #expect(custom.first?.takesVoice == true)
         #expect(custom.first?.needsAPIKey == false)
     }
 
@@ -478,6 +480,225 @@ private extension DirectHermesVoiceClientTests {
                                    "base_url": .string("http://10.0.0.5:8880/v1")]),
             ])]),
         ], owner: owner)))
+    }
+
+    @Test func directSettingsOffersAVoiceFieldForAPluginProviderAndReadsHermesPrecedence() async throws {
+        let owner = try Self.owner()
+        let transport = DirectHermesVoiceTransportFixture(owner: owner)
+        transport.results[WorkspaceOperation.keysList.rawValue] = Self.keysResponse(openAI: false, elevenLabs: false)
+        var config = Self.configResponse(providerID: "phonon")
+        var tts = config["tts"]?.object ?? [:]
+        tts["phonon"] = .object(["voice": .string("Ava")])
+        config["tts"] = .object(tts)
+        transport.results[WorkspaceOperation.workspaceConfigGet.rawValue] = config
+        let client = DirectHermesVoiceSettingsClient(workspace: transport, owner: owner, currentOwner: { owner })
+
+        let sectionOnly = try await client.load(agentID: "finance")
+        let plugin = try #require(sectionOnly.providers.first { $0.id == "phonon" })
+        #expect(plugin.hasVoice)
+        #expect(plugin.voiceID == "Ava")
+        #expect(!plugin.needsAPIKey)
+
+        // Hermes hands a plugin only the top-level voice, so it wins over the provider's own section.
+        tts["voice"] = .string("Kai")
+        config["tts"] = .object(tts)
+        transport.results[WorkspaceOperation.workspaceConfigGet.rawValue] = config
+        let topLevel = try await client.load(agentID: "finance")
+        #expect(topLevel.providers.first { $0.id == "phonon" }?.voiceID == "Kai")
+    }
+
+    @Test func directSettingsSavesAPluginVoiceWhereHermesPassesItToThePlugin() async throws {
+        let owner = try Self.owner()
+        let transport = DirectHermesVoiceTransportFixture(owner: owner)
+        transport.results[WorkspaceOperation.keysList.rawValue] = Self.keysResponse(openAI: false, elevenLabs: false)
+        transport.results[WorkspaceOperation.workspaceConfigSet.rawValue] = ["ok": .boolean(true)]
+        var baseline = Self.configResponse(providerID: "phonon")
+        var baselineTTS = baseline["tts"]?.object ?? [:]
+        baselineTTS["phonon"] = .object(["voice": .string("Easton")])
+        baseline["tts"] = .object(baselineTTS)
+        var saved = baseline
+        var savedTTS = baselineTTS
+        savedTTS["voice"] = .string("Kai")
+        savedTTS["phonon"] = .object(["voice": .string("Kai")])
+        saved["tts"] = .object(savedTTS)
+        transport.sequences[WorkspaceOperation.workspaceConfigGet.rawValue] = [baseline, baseline, saved]
+        let client = DirectHermesVoiceSettingsClient(workspace: transport, owner: owner, currentOwner: { owner })
+        let loaded = try await client.load(agentID: "finance")
+        transport.resetCalls()
+
+        let result = try await client.update(agentID: "finance", settings: VoiceSettingsUpdate(
+            expectedRevision: loaded.revision, providerID: "phonon", voiceID: "Kai", apiKey: nil))
+
+        #expect(result.providers.first { $0.id == "phonon" }?.voiceID == "Kai")
+        #expect(transport.voiceCalls.contains(.init(operation: .workspaceConfigSet, payload: [
+            "profile": .string("finance"),
+            "config": .object(["tts": .object([
+                "provider": .string("phonon"),
+                "voice": .string("Kai"),
+                "phonon": .object(["voice": .string("Kai")]),
+            ])]),
+        ], owner: owner)))
+    }
+
+    @Test func directSettingsSavesACommandProviderVoiceInItsOwnEntry() async throws {
+        let owner = try Self.owner()
+        let transport = DirectHermesVoiceTransportFixture(owner: owner)
+        transport.results[WorkspaceOperation.keysList.rawValue] = Self.keysResponse(openAI: false, elevenLabs: false)
+        transport.results[WorkspaceOperation.workspaceConfigSet.rawValue] = ["ok": .boolean(true)]
+        func config(voice: String) -> [String: BighelpJSONValue] {
+            var value = Self.configResponse(providerID: "phonon")
+            var tts = value["tts"]?.object ?? [:]
+            tts["providers"] = .object([
+                "phonon": .object([
+                    "type": .string("command"),
+                    "command": .string("hermes-phonon-tts.py {input_path} {output_path} {voice}"),
+                    "voice": .string(voice),
+                ]),
+            ])
+            value["tts"] = .object(tts)
+            return value
+        }
+        transport.sequences[WorkspaceOperation.workspaceConfigGet.rawValue] = [
+            config(voice: "Easton"), config(voice: "Easton"), config(voice: "Ava"),
+        ]
+        let client = DirectHermesVoiceSettingsClient(workspace: transport, owner: owner, currentOwner: { owner })
+        let loaded = try await client.load(agentID: "finance")
+        let command = try #require(loaded.providers.first { $0.id == "phonon" })
+        #expect(command.kind == .custom)
+        #expect(command.takesVoice)
+        #expect(!command.hasVoice)
+        #expect(command.voiceID == "Easton")
+        transport.resetCalls()
+
+        let result = try await client.update(agentID: "finance", settings: VoiceSettingsUpdate(
+            expectedRevision: loaded.revision, providerID: "phonon", voiceID: "Ava", apiKey: nil))
+
+        #expect(result.providers.first { $0.id == "phonon" }?.voiceID == "Ava")
+        #expect(transport.voiceCalls.contains(.init(operation: .workspaceConfigSet, payload: [
+            "profile": .string("finance"),
+            "config": .object(["tts": .object([
+                "provider": .string("phonon"),
+                "providers": .object(["phonon": .object(["voice": .string("Ava")])]),
+            ])]),
+        ], owner: owner)))
+    }
+
+    @Test func directSettingsSavesACommandProviderWithoutAVoice() async throws {
+        let owner = try Self.owner()
+        let transport = DirectHermesVoiceTransportFixture(owner: owner)
+        transport.results[WorkspaceOperation.keysList.rawValue] = Self.keysResponse(openAI: false, elevenLabs: false)
+        transport.results[WorkspaceOperation.workspaceConfigSet.rawValue] = ["ok": .boolean(true)]
+        func config(provider: String) -> [String: BighelpJSONValue] {
+            var value = Self.configResponse(providerID: provider)
+            var tts = value["tts"]?.object ?? [:]
+            tts["providers"] = .object(["kokoro": .object(["command": .string("kokoro {voice} -o {output_path}")])])
+            value["tts"] = .object(tts)
+            return value
+        }
+        transport.sequences[WorkspaceOperation.workspaceConfigGet.rawValue] = [
+            config(provider: "openai"), config(provider: "openai"), config(provider: "kokoro"),
+        ]
+        let client = DirectHermesVoiceSettingsClient(workspace: transport, owner: owner, currentOwner: { owner })
+        let loaded = try await client.load(agentID: "finance")
+        transport.resetCalls()
+
+        let result = try await client.update(agentID: "finance", settings: VoiceSettingsUpdate(
+            expectedRevision: loaded.revision, providerID: "kokoro", voiceID: "", apiKey: nil))
+
+        #expect(result.providerID == "kokoro")
+        #expect(transport.voiceCalls.contains(.init(operation: .workspaceConfigSet, payload: [
+            "profile": .string("finance"),
+            "config": .object(["tts": .object([
+                "provider": .string("kokoro"),
+                "providers": .object(["kokoro": .object(["voice": .string("")])]),
+            ])]),
+        ], owner: owner)))
+    }
+
+    @Test func aPluginsOwnVoicesComeFromTheVoiceCatalogRoute() async throws {
+        let owner = try Self.owner()
+        let transport = DirectHermesVoiceTransportFixture(owner: owner)
+        transport.results[WorkspaceOperation.voiceCatalog.rawValue] = [
+            "ok": .boolean(true), "provider": .string("phonon"),
+            "voices": .array([
+                .object(["id": .string("Ava"), "name": .string("Ava"), "language": .string("en-US")]),
+                .object(["id": .string("Kai")]),
+                .object(["id": .string("Ava"), "name": .string("A second Ava")]),
+                .object(["name": .string("No ID")]),
+                .object(["id": .string(String(repeating: "x", count: 161))]),
+            ]),
+            "models": .array([.object(["id": .string("31m"), "name": .string("Phonon 31m")])]),
+            "defaultVoice": .string("Ava"),
+        ]
+        let client = DirectHermesVoiceOptionsClient(workspace: transport, owner: owner, currentOwner: { owner })
+
+        let catalog = try await client.catalog(agentID: "finance", provider: Self.plugin("phonon"))
+
+        #expect(transport.voiceCalls == [.init(operation: .voiceCatalog, payload: [
+            "profile": .string("finance"), "provider": .string("phonon"),
+        ], owner: owner)])
+        #expect(catalog.voices.map(\.id) == ["Ava", "Kai"])
+        #expect(catalog.voices.first?.group != nil)
+        #expect(catalog.voices.last?.name == "Kai")
+        #expect(catalog.models.map(\.name) == ["Phonon 31m"])
+        #expect(catalog.defaultVoice == "Ava")
+    }
+
+    @Test func theVoiceCatalogKeepsToThePluginsBounds() throws {
+        let rows = (0..<600).map { BighelpJSONValue.object(["id": .string("voice-\($0)")]) }
+        let models = (0..<80).map { BighelpJSONValue.object(["id": .string("model-\($0)")]) }
+        let catalog = try DirectHermesVoiceOptionsClient.pluginCatalog(
+            ["ok": .boolean(true), "voices": .array(rows), "models": .array(models)], provider: "phonon")
+
+        #expect(catalog.voices.count == DirectHermesVoiceOptionsClient.maximumVoices)
+        #expect(catalog.models.count == DirectHermesVoiceOptionsClient.maximumModels)
+        #expect(throws: WorkspaceClientError.invalidResponse) {
+            try DirectHermesVoiceOptionsClient.pluginCatalog(["ok": .boolean(true), "provider": .string("piper")],
+                                                             provider: "phonon")
+        }
+        #expect(throws: WorkspaceClientError.invalidResponse) {
+            try DirectHermesVoiceOptionsClient.pluginCatalog(["ok": .boolean(false)], provider: "phonon")
+        }
+    }
+
+    @Test func aPluginWithoutTheVoiceCatalogSaysToUpdateIt() async throws {
+        let owner = try Self.owner()
+        let transport = DirectHermesVoiceTransportFixture(owner: owner)
+        transport.failures[WorkspaceOperation.voiceCatalog.rawValue] = WorkspaceClientError.unavailable(.unsupportedOperation)
+        let client = DirectHermesVoiceOptionsClient(workspace: transport, owner: owner, currentOwner: { owner })
+
+        await #expect(throws: VoiceOptionsError.needsPluginUpdate) {
+            try await client.catalog(agentID: "finance", provider: Self.plugin("phonon"))
+        }
+    }
+
+    @Test func elevenLabsVoicesComeFromTheAgentsOwnAccount() async throws {
+        let owner = try Self.owner()
+        let transport = DirectHermesVoiceTransportFixture(owner: owner)
+        let account = ElevenLabsAccountFixture()
+        account.answer = DirectHermesVoiceCatalog(isAvailable: true, voices: [
+            .init(id: "premade-1", name: "Rachel", label: "Rachel (premade)"),
+            .init(id: "clone-1", name: "My voice", label: "My voice (cloned)"),
+        ], unavailableReason: nil)
+        let client = DirectHermesVoiceOptionsClient(workspace: transport, owner: owner, currentOwner: { owner },
+                                                    elevenLabsVoices: { try await account.voices($0) })
+        let elevenLabs = VoiceProviderConfiguration(spec: VoiceProviderSpec.builtIn("elevenlabs")!, voiceID: "clone-1",
+                                                    apiKeyConfigured: true, model: "", serverURL: "")
+
+        let catalog = try await client.catalog(agentID: "finance", provider: elevenLabs)
+
+        #expect(account.asked == ["finance"])
+        #expect(transport.voiceCalls.isEmpty)
+        #expect(catalog.voices.map(\.id) == ["clone-1", "premade-1"], "Your own voices come first")
+
+        account.answer = DirectHermesVoiceCatalog(isAvailable: false, voices: [], unavailableReason: "unauthorized")
+        await #expect(throws: VoiceOptionsError.self) {
+            try await client.catalog(agentID: "finance", provider: elevenLabs)
+        }
+    }
+
+    static func plugin(_ id: String) -> VoiceProviderConfiguration {
+        VoiceProviderConfiguration(spec: .plugin(id), voiceID: "", apiKeyConfigured: false, model: "", serverURL: "")
     }
 
     static func configResponse(
@@ -550,7 +771,7 @@ private final class DirectHermesVoiceTransportFixture: WorkspaceOperationPerform
         payload: [String: BighelpJSONValue],
         owner: WorkspaceOwner
     ) async throws -> [String: BighelpJSONValue] {
-        guard [.workspaceConfigGet, .workspaceConfigSet, .keysList, .keysSet, .voiceSpeak, .voiceWarm]
+        guard [.workspaceConfigGet, .workspaceConfigSet, .keysList, .keysSet, .voiceSpeak, .voiceWarm, .voiceCatalog]
             .contains(operation) else {
             throw WorkspaceClientError.unavailable(.unsupportedOperation)
         }
@@ -566,6 +787,17 @@ private final class DirectHermesVoiceTransportFixture: WorkspaceOperationPerform
     }
 
     func resetCalls() { voiceCalls.removeAll() }
+}
+
+@MainActor
+private final class ElevenLabsAccountFixture {
+    var asked: [String] = []
+    var answer = DirectHermesVoiceCatalog(isAvailable: false, voices: [], unavailableReason: nil)
+
+    func voices(_ profile: String) async throws -> DirectHermesVoiceCatalog {
+        asked.append(profile)
+        return answer
+    }
 }
 
 @MainActor

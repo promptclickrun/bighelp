@@ -54,7 +54,7 @@ extension ChatModel {
         companionHistoryRevision &+= 1
         nativeAffectionReaction = nil
         let hasSameContextOwner = sourceSession?.remoteStoredID == session.remoteStoredID
-            && sourceSession?.remoteSource == session.remoteSource
+            && DirectHermesIdentity.sameSessionSource(sourceSession?.remoteSource, session.remoteSource)
             && sourceSession?.agentIDs == session.agentIDs
         if sourceSession != nil, !hasSameContextOwner {
             sessionTodos = nil

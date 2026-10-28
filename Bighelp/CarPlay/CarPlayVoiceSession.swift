@@ -23,7 +23,7 @@ enum BighelpCarPlayServices {
 /// A hands-free voice chat with the agent last picked in the car (else the
 /// default agent), for the car. The iPhone is
 /// usually locked, so its own voice screen can't listen; this runs the same
-/// voice session without a screen, using the voice chosen in Settings.
+/// voice session without a screen, in the voice chosen for the agent (its own, else Settings).
 @MainActor
 @Observable
 final class CarPlayVoiceSession {
@@ -95,8 +95,8 @@ final class CarPlayVoiceSession {
         let current = generation
         phase = .connecting
         isMuted = false
-        let mode = settings()?.voiceConversationMode ?? .turnBased
-        guard microphoneAllowed(), mode == .codexLive || speechAllowed() else {
+        // Speech recognition is checked once the agent, and so its voice type, is known.
+        guard microphoneAllowed() else {
             phase = .problem(Self.permissionProblem)
             return
         }
@@ -123,6 +123,13 @@ final class CarPlayVoiceSession {
                 return releaseHostConnection()
             }
             if agentID == agent.id { preference.agentID = agent.id }
+            // The agent's own voice type from its Default Voice, else Settings › Voice.
+            let agentVoice = settings()?.voicePreference(computer: workspace.catalog.currentHostID(), agentID: agent.id)
+            let mode = agentVoice?.mode ?? .turnBased
+            guard mode == .codexLive || speechAllowed() else {
+                phase = .problem(Self.permissionProblem)
+                return releaseHostConnection()
+            }
             agentName = agent.name
             self.agent = agent
             agentImageURL = agentImageURLs[agent.id]
@@ -141,9 +148,8 @@ final class CarPlayVoiceSession {
                 mode: .pressToTalk,
                 transcription: settings()?.voiceTranscription ?? .onDevice,
                 conversationMode: mode,
-                liveProvider: settings()?.liveVoiceProvider ?? .codexSubscription,
-                liveVoice: settings().map { $0.liveVoice(for: $0.liveVoiceProvider) }
-                    ?? LiveVoiceProvider.codexSubscription.defaultVoice
+                liveProvider: agentVoice?.liveProvider ?? .codexSubscription,
+                liveVoice: agentVoice?.liveVoice ?? LiveVoiceProvider.codexSubscription.defaultVoice
             )
             waitingOn = .voice
             if let live = presentation.liveModel {

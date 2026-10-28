@@ -152,7 +152,7 @@ final class DirectHermesVoiceSettingsClient: VoiceSettingsClient {
             throw VoiceSettingsError.invalidResponse
         }
         let spec = VoiceProviderSpec.builtIn(settings.providerID)
-        let voiceChanged = selected.hasVoice && selected.voiceID != settings.voiceID
+        let voiceChanged = selected.takesVoice && selected.voiceID != settings.voiceID
         if current.configuration.providerID == settings.providerID, !voiceChanged, settings.apiKey == nil,
            settings.model == nil, settings.serverURL == nil {
             return current.configuration
@@ -169,7 +169,20 @@ final class DirectHermesVoiceSettingsClient: VoiceSettingsClient {
         // named here change.
         var tts: [String: BighelpJSONValue] = ["provider": .string(settings.providerID)]
         var section: [String: BighelpJSONValue] = [:]
-        if selected.hasVoice, let field = spec?.voiceField { section[field] = .string(settings.voiceID) }
+        if selected.takesVoice {
+            switch selected.voiceLocation {
+            case .section:
+                if let field = spec?.voiceField { section[field] = .string(settings.voiceID) }
+            case .plugin:
+                // Hermes hands a plugin only the top-level voice, and the plugin
+                // falls back to its own section, so both stay in step.
+                tts["voice"] = .string(settings.voiceID)
+                section["voice"] = .string(settings.voiceID)
+            case .commandProvider:
+                // The command's {voice} comes from its own provider entry; empty is the command's own.
+                tts["providers"] = .object([settings.providerID: .object(["voice": .string(settings.voiceID)])])
+            }
+        }
         if let model = settings.model, let spec, let field = spec.modelField {
             // A merge can't delete a key, so clearing the model restores the default.
             let value = model.isEmpty ? spec.defaultModel : model
@@ -192,7 +205,7 @@ final class DirectHermesVoiceSettingsClient: VoiceSettingsClient {
         let verified = try await read(profile: profile)
         guard verified.configuration.providerID == settings.providerID,
               let saved = verified.configuration.providers.first(where: { $0.id == settings.providerID }),
-              !saved.hasVoice || saved.voiceID == settings.voiceID,
+              !saved.takesVoice || saved.voiceID == settings.voiceID,
               settings.apiKey == nil || saved.apiKeyConfigured,
               settings.serverURL == nil || saved.serverURL == settings.serverURL else {
             throw VoiceSettingsError.invalidResponse
@@ -255,9 +268,21 @@ final class DirectHermesVoiceSettingsClient: VoiceSettingsClient {
         let selected = normalizedProvider(tts["provider"]?.string)
         let providers = try providerSpecs(selected: selected, tts: tts).map { spec in
             let section = tts[spec.id]?.object ?? [:]
+            let voiceID: String
+            switch spec.voiceLocation {
+            case .section:
+                voiceID = try field(spec.voiceField, in: section, fallback: spec.defaultVoice)
+            case .plugin:
+                let own = try field(spec.voiceField, in: section, fallback: spec.defaultVoice)
+                let topLevel = spec.id == selected ? try field("voice", in: tts, fallback: "") : ""
+                voiceID = topLevel.isEmpty ? own : topLevel
+            case .commandProvider:
+                let entry = tts["providers"]?.object?[spec.id]?.object ?? [:]
+                voiceID = try field("voice", in: entry, fallback: "")
+            }
             return VoiceProviderConfiguration(
                 spec: spec,
-                voiceID: try field(spec.voiceField, in: section, fallback: spec.defaultVoice),
+                voiceID: voiceID,
                 apiKeyConfigured: keyConfigured(spec, section: section, keys: keys),
                 model: try field(spec.modelField, in: section, fallback: spec.defaultModel),
                 serverURL: spec.supportsServerURL ? try field("base_url", in: section, fallback: "") : ""
@@ -281,8 +306,9 @@ final class DirectHermesVoiceSettingsClient: VoiceSettingsClient {
         return VoiceSettingsConfiguration(revision: revision, providerID: selected, providers: providers)
     }
 
-    /// The selected provider first when the app doesn't know it, then every
-    /// built-in provider, then the host's own command providers.
+    /// The selected provider first when the app doesn't know it (a speech plugin
+    /// such as Phonon), then every built-in provider, then the host's own
+    /// command providers.
     private static func providerSpecs(selected: String, tts: [String: BighelpJSONValue]) -> [VoiceProviderSpec] {
         var result = VoiceProviderSpec.builtIn
         let custom = (tts["providers"]?.object ?? [:])
@@ -292,10 +318,12 @@ final class DirectHermesVoiceSettingsClient: VoiceSettingsClient {
                 return !command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             }
             .keys.sorted()
-            .map { VoiceProviderSpec(id: $0, title: $0, kind: .custom) }
+            .map { VoiceProviderSpec.commandProvider($0) }
         result += custom
         if !result.contains(where: { $0.id == selected }) {
-            result.insert(.unknown(selected), at: 0)
+            // Hermes picks `nous` itself, so only a named plugin gets a voice field.
+            let spec = selected == "nous" || !validName(selected) ? VoiceProviderSpec.unknown(selected) : .plugin(selected)
+            result.insert(spec, at: 0)
         }
         return result
     }
@@ -332,6 +360,118 @@ final class DirectHermesVoiceSettingsClient: VoiceSettingsClient {
     private static func validText(_ value: String, maximum: Int, allowEmpty: Bool = false) -> Bool {
         (allowEmpty || !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             && value.utf8.count <= maximum
+            && !value.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains)
+    }
+}
+
+/// The voices a provider lists on the computer, for Voice settings' pickers: the agent's own
+/// ElevenLabs voices (Hermes' `/api/audio/elevenlabs/voices`, as its desktop app reads them) and a
+/// speech plugin's, such as Phonon (the bighelp plugin's `voice-catalog`).
+@MainActor
+final class DirectHermesVoiceOptionsClient: VoiceOptionsClient {
+    /// The plugin's bounds (`native-voice-catalog-v1`): at most 500 voices and 50 models, each name at
+    /// most 160 bytes.
+    nonisolated static let maximumVoices = 500
+    nonisolated static let maximumModels = 50
+
+    private let scope: DirectHermesCoreRequestScope
+    private let elevenLabsVoices: (@MainActor (String) async throws -> DirectHermesVoiceCatalog)?
+
+    init(workspace: any WorkspaceOperationPerforming, owner: WorkspaceOwner,
+         currentOwner: @escaping @MainActor () -> WorkspaceOwner?,
+         elevenLabsVoices: (@MainActor (String) async throws -> DirectHermesVoiceCatalog)? = nil) {
+        scope = .init(workspace: workspace, owner: owner, currentOwner: currentOwner)
+        self.elevenLabsVoices = elevenLabsVoices
+    }
+
+    /// The lists of the computer `connections` uses now; nil while none is connected.
+    static func connected(_ connections: WorkspaceConnectionStore?) -> DirectHermesVoiceOptionsClient? {
+        guard let connections, let owner = connections.owner, owner.authority.kind == .direct,
+              let workspace = connections.workspace else { return nil }
+        let current: @MainActor () -> WorkspaceOwner? = { [weak connections] in connections?.owner }
+        return DirectHermesVoiceOptionsClient(workspace: workspace, owner: owner, currentOwner: current,
+            elevenLabsVoices: { [weak connections] profile in
+                guard let http = connections?.hosts.selectedWorkspace?.nativeClient else {
+                    throw WorkspaceClientError.ownerChanged
+                }
+                return try await DirectHermesVoiceConfigurationClient(http: http, owner: owner, currentOwner: current)
+                    .listElevenLabsVoices(profileID: profile)
+            })
+    }
+
+    func catalog(agentID: String, provider: VoiceProviderConfiguration) async throws -> VoiceHostCatalog {
+        let profile = try DirectHermesCoreRequestScope.profile(agentID)
+        if provider.id == "elevenlabs" { return try await elevenLabs(profile: profile) }
+        guard provider.voiceLocation == .plugin else { return VoiceHostCatalog(voices: []) }
+        let value: [String: BighelpJSONValue]
+        do {
+            value = try await scope.perform(.voiceCatalog, [
+                "profile": .string(profile), "provider": .string(provider.id),
+            ])
+        } catch let error as WorkspaceClientError {
+            switch error {
+            case .unavailable(.unsupportedOperation), .unavailable(.pluginRequired):
+                // A plugin from before `voice-catalog`, or none at all.
+                throw VoiceOptionsError.needsPluginUpdate
+            default:
+                throw error
+            }
+        }
+        return try Self.pluginCatalog(value, provider: provider.id)
+    }
+
+    private func elevenLabs(profile: String) async throws -> VoiceHostCatalog {
+        guard let elevenLabsVoices else {
+            throw VoiceOptionsError.unavailable(String(localized: "Connect to your computer to see your ElevenLabs voices."))
+        }
+        let catalog = try await elevenLabsVoices(profile)
+        guard catalog.isAvailable else {
+            throw VoiceOptionsError.unavailable(catalog.unavailableReason == "unauthorized"
+                ? String(localized: "ElevenLabs didn't accept the saved API key. Check it, then try again.")
+                : String(localized: "Save an ElevenLabs API key to choose from your own voices."))
+        }
+        // Your own voices (cloned, designed) before ElevenLabs' ready-made ones.
+        let readyMade = String(localized: "Ready-made"), yours = String(localized: "Your voices")
+        let voices = catalog.voices.map { voice in
+            VoiceOption(id: voice.id, name: voice.name.isEmpty ? voice.id : voice.name,
+                        group: Self.category(of: voice) == "premade" ? readyMade : yours)
+        }
+        return VoiceHostCatalog(voices: voices.filter { $0.group == yours } + voices.filter { $0.group == readyMade })
+    }
+
+    /// Hermes labels each voice "Name (category)".
+    private static func category(of voice: DirectHermesVoiceDescriptor) -> String {
+        guard voice.label.hasSuffix(")"), let open = voice.label.lastIndex(of: "(") else { return "" }
+        return String(voice.label[voice.label.index(after: open)..<voice.label.index(before: voice.label.endIndex)])
+            .lowercased()
+    }
+
+    /// The plugin's answer. Rows it can't read are skipped, not the whole list; an answer for another
+    /// provider is refused.
+    nonisolated static func pluginCatalog(_ value: [String: BighelpJSONValue], provider: String) throws -> VoiceHostCatalog {
+        guard value["ok"]?.boolean == true else { throw WorkspaceClientError.invalidResponse }
+        if let named = value["provider"]?.string, named != provider { throw WorkspaceClientError.invalidResponse }
+        let defaultVoice = value["defaultVoice"]?.string.flatMap { validName($0) ? $0 : nil }
+        return VoiceHostCatalog(voices: options(value["voices"], limit: maximumVoices, withLanguage: true),
+                                models: options(value["models"], limit: maximumModels, withLanguage: false),
+                                defaultVoice: defaultVoice)
+    }
+
+    private nonisolated static func options(_ value: BighelpJSONValue?, limit: Int,
+                                            withLanguage: Bool) -> [VoiceOption] {
+        var seen = Set<String>()
+        return (value?.array ?? []).prefix(limit).compactMap { row -> VoiceOption? in
+            guard let object = row.object, let id = object["id"]?.string, validName(id),
+                  seen.insert(id).inserted else { return nil }
+            let name = object["name"]?.string.flatMap { validName($0) ? $0 : nil } ?? id
+            let language = withLanguage ? object["language"]?.string.flatMap { validName($0) ? $0 : nil } : nil
+            return VoiceOption(id: id, name: name,
+                               group: language.map { Locale.current.localizedString(forIdentifier: $0) ?? $0 })
+        }
+    }
+
+    private nonisolated static func validName(_ value: String) -> Bool {
+        !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && value.utf8.count <= 160
             && !value.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains)
     }
 }

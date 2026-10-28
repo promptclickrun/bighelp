@@ -31,6 +31,14 @@ struct OnDeviceVoiceLiveTests {
         #expect(events.items.first == .started)
         #expect(events.items.last == .finished)
         #expect(events.items.contains { if case .level(let value) = $0 { value > 0 } else { false } })
+
+        // A team call: each member's piece in its own voice, never the last speaker's.
+        let zoey = try await engine.synthesize("Team call check.", model: .phonon, voice: "Zoey")
+        let hugh = try await engine.synthesize("Team call check.", model: .phonon, voice: "Hugh")
+        let zoeyAgain = try await engine.synthesize("Team call check.", model: .phonon, voice: "Zoey")
+        #expect(zoey.count > 44 && hugh.count > 44)
+        #expect(zoey != hugh, "Two members spoke in one voice")
+        #expect(zoey == zoeyAgain || zoeyAgain != hugh)
     }
 
     private func isBusy(_ state: OnDeviceVoiceInstaller.State) -> Bool {

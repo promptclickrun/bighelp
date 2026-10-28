@@ -206,6 +206,112 @@ struct VoiceSettingsStoreTests {
         #expect(client.updates.last?.serverURL == "http://10.0.0.5:8880/v1")
         #expect(client.updates.last?.model == nil)
     }
+
+    @Test func aCustomCommandProviderSavesWithoutAVoice() async {
+        let client = VoiceSettingsProbe()
+        client.configuration = VoiceSettingsConfiguration(revision: "revision-1", providerID: "openai", providers: [
+            .init(id: "openai", title: "OpenAI", voiceID: "alloy", apiKeyConfigured: true),
+            .init(spec: .commandProvider("kokoro"), voiceID: "", apiKeyConfigured: false, model: "", serverURL: ""),
+        ])
+        let store = VoiceSettingsStore(agentID: "finance", client: client)
+        await store.load()
+        store.selectProvider("kokoro")
+        #expect(store.voiceID.isEmpty)
+        #expect(store.canSave, "An empty voice runs the command's own")
+        await store.save()
+        #expect(client.updates.last == VoiceSettingsUpdate(expectedRevision: "revision-1",
+            providerID: "kokoro", voiceID: "", apiKey: nil))
+        #expect(store.confirmation == "Voice settings saved.")
+
+        store.chooseVoice("af_bella")
+        #expect(store.canSave)
+        #expect(store.voiceChoices?.allowsOther == true)
+    }
+
+    @Test func pickedVoicesAndModelsAreWhatSaveSends() async {
+        let client = VoiceSettingsProbe()
+        client.configuration = VoiceSettingsConfiguration(revision: "revision-1", providerID: "openai", providers: [
+            .init(spec: VoiceProviderSpec.builtIn("openai")!, voiceID: "ballad", apiKeyConfigured: true,
+                  model: "gpt-4o-mini-tts", serverURL: ""),
+        ])
+        let store = VoiceSettingsStore(agentID: "finance", client: client)
+        await store.load()
+        #expect(store.voiceName == "Ballad")
+        #expect(store.modelName == "GPT-4o mini TTS")
+
+        store.chooseModel("tts-1")
+        #expect(store.voiceID == "alloy", "tts-1 has no Ballad, so the voice goes back to the default")
+        #expect(store.voiceChoices?.options.contains { $0.id == "ballad" } == false)
+        store.chooseVoice("coral")
+        await store.save()
+        #expect(client.updates.last == VoiceSettingsUpdate(expectedRevision: "revision-1",
+            providerID: "openai", voiceID: "coral", apiKey: nil, model: "tts-1"))
+    }
+
+    @Test func aPluginsVoicesComeFromTheComputerOnce() async {
+        let client = VoiceSettingsProbe()
+        client.configuration = VoiceSettingsConfiguration(revision: "revision-1", providerID: "phonon", providers: [
+            .init(spec: .plugin("phonon"), voiceID: "Ava", apiKeyConfigured: false, model: "", serverURL: ""),
+        ])
+        let options = VoiceOptionsProbe()
+        options.answer = VoiceHostCatalog(voices: [.init(id: "Ava", name: "Ava Warm"), .init(id: "Kai", name: "Kai")])
+        let store = VoiceSettingsStore(agentID: "finance", client: client, options: options)
+        await store.load()
+        #expect(store.voiceChoices?.options.map(\.id) == ["Ava"], "Before the list, only the voice in use")
+
+        await store.loadHostCatalog()
+        await store.loadHostCatalog()
+
+        #expect(options.calls == ["finance/phonon"])
+        #expect(store.voiceChoices?.options.map(\.id) == ["Ava", "Kai"])
+        #expect(store.voiceChoices?.allowsOther == false)
+        #expect(store.voiceName == "Ava Warm")
+        store.invalidate()
+        #expect(store.hostCatalogs.isEmpty)
+    }
+
+    @Test func anOlderPluginKeepsTheVoiceInUseAndSaysToUpdate() async {
+        let client = VoiceSettingsProbe()
+        client.configuration = VoiceSettingsConfiguration(revision: "revision-1", providerID: "phonon", providers: [
+            .init(spec: .plugin("phonon"), voiceID: "Ava", apiKeyConfigured: false, model: "", serverURL: ""),
+        ])
+        let options = VoiceOptionsProbe()
+        options.error = VoiceOptionsError.needsPluginUpdate
+        let store = VoiceSettingsStore(agentID: "finance", client: client, options: options)
+        await store.load()
+        await store.loadHostCatalog()
+
+        #expect(store.hostCatalog == .needsPluginUpdate)
+        #expect(store.voiceChoices == VoiceOptionList(options: [
+            VoiceOption(id: "Ava", name: "Ava", detail: "Not in the list"),
+        ]))
+        #expect(!store.canSave)
+    }
+
+    @Test func anUnexpectedListFailureIsPlainWordsAndAsksAgainNextTime() async {
+        let client = VoiceSettingsProbe()
+        client.configuration = VoiceSettingsConfiguration(revision: "revision-1", providerID: "elevenlabs", providers: [
+            .init(spec: VoiceProviderSpec.builtIn("elevenlabs")!, voiceID: "pNInz6obpgDQGcFmaJgB",
+                  apiKeyConfigured: true, model: "eleven_multilingual_v2", serverURL: ""),
+        ])
+        let options = VoiceOptionsProbe()
+        options.error = WorkspaceClientError.transportUnavailable
+        let store = VoiceSettingsStore(agentID: "finance", client: client, options: options)
+        await store.load()
+        await store.loadHostCatalog()
+        guard case .unavailable(let reason) = store.hostCatalog else {
+            Issue.record("Expected a plain reason")
+            return
+        }
+        #expect(reason.contains("ElevenLabs"))
+        #expect(store.voiceName == "Adam", "Hermes' default voice still has its name")
+
+        options.error = nil
+        options.answer = VoiceHostCatalog(voices: [.init(id: "clone-1", name: "My voice")])
+        await store.loadHostCatalog()
+        #expect(options.calls.count == 2)
+        #expect(store.voiceChoices?.options.map(\.id) == ["pNInz6obpgDQGcFmaJgB", "clone-1"])
+    }
 }
 
 @MainActor
@@ -242,7 +348,8 @@ private final class VoiceSettingsProbe: VoiceSettingsClient {
                         voiceID: settings.voiceID, apiKeyConfigured: settings.apiKey != nil || provider.apiKeyConfigured,
                         model: settings.model ?? provider.model, serverURL: settings.serverURL ?? provider.serverURL,
                         kind: provider.kind, hasVoice: provider.hasVoice, hasModel: provider.hasModel,
-                        needsAPIKey: provider.needsAPIKey, supportsServerURL: provider.supportsServerURL)
+                        needsAPIKey: provider.needsAPIKey, supportsServerURL: provider.supportsServerURL,
+                        voiceLocation: provider.voiceLocation)
                     : provider
             })
         return configuration
@@ -250,3 +357,16 @@ private final class VoiceSettingsProbe: VoiceSettingsClient {
 }
 
 @MainActor private final class VoiceSettingsOwner { var current = true }
+
+@MainActor
+private final class VoiceOptionsProbe: VoiceOptionsClient {
+    var answer = VoiceHostCatalog(voices: [])
+    var error: (any Error)?
+    private(set) var calls: [String] = []
+
+    func catalog(agentID: String, provider: VoiceProviderConfiguration) async throws -> VoiceHostCatalog {
+        calls.append(agentID + "/" + provider.id)
+        if let error { throw error }
+        return answer
+    }
+}

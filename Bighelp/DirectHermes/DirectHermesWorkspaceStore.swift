@@ -936,7 +936,11 @@ struct DirectHermesSessionSummary: Identifiable {
     let preview: String
     let source: String
     var id: String { storedID }
-    var supportsNativeResume: Bool { [DirectHermesReleaseContract.sessionSource, "desktop", "tui", "cli"].contains(source) }
+    var supportsNativeResume: Bool {
+        if [DirectHermesReleaseContract.sessionSource, "desktop", "tui", "cli"].contains(source) { return true }
+        // Hermes rewrites a Bot Chat's stored source to "local"; only its own `local-` rows are ours to resume.
+        return source == "local" && storedID.hasPrefix("local-")
+    }
     init?(_ value: BighelpJSONValue, profile: String) {
         guard let object = value.object, let id = object["id"]?.string, !id.isEmpty else { return nil }
         storedID = object["resolved_id"]?.string ?? id

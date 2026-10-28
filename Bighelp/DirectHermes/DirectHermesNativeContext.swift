@@ -401,6 +401,13 @@ final class DirectHermesNativePluginClient {
             // Read every few seconds while Bots mode's home or the Agents screen shows; at most 64 agents.
             return Route(path: "agents/activity", feature: DirectHermesBotChatActivityClient.feature,
                          isMutation: false, maximumResponseBytes: 32_768, timeout: 10)
+        case .botChatCreate:
+            // Hermes may start the agent's own gateway first.
+            return Route(path: "bot-chat/create", feature: "native-bot-chat-v1", isMutation: true,
+                         maximumResponseBytes: 16_384, timeout: 60)
+        case .voiceCatalog:
+            return Route(path: "voice-catalog", feature: "native-voice-catalog-v1", isMutation: false,
+                         maximumResponseBytes: 131_072, timeout: 20)
         case .teamSettings:
             // Turning it on saves each agent's config on the computer.
             return Route(path: "team", feature: DirectHermesTeamworkClient.feature, isMutation: true,

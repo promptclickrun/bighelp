@@ -1538,7 +1538,8 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         let registered = Registry(id: stored, resolvedID: nil)
         canonicalIDs[DirectHermesSessionIdentity.key(profile.id)] = registered
         let resolved = try await openRegistry(registered, profile: profile)
-        state.storedSessionID = stored
+        // Resolved by its registry ID, as a Bot Chat found there is: a stored ID without a runtime ID
+        // is a record the next connection refuses.
         state.phase = .canonicalResolved
         state.canonicalRegistryID = stored
         try retain(state)

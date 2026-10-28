@@ -3,6 +3,12 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.31
+
+### Fixed
+
+- **New Bot Chat:** after you start a new Bot Chat, bighelp opens it again when you return to the app. New chats with that bot also start again. Before, bighelp showed "Unable to open" for both, also after a restart.
+
 ## 2.6.30
 
 ### Bots

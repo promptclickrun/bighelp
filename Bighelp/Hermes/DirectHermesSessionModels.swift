@@ -107,6 +107,14 @@ struct DirectHermesSessionCreationState: Codable, Equatable, Sendable {
     func validated(for owner: WorkspaceOwner) throws -> Self {
         guard schemaVersion == 1, scopeID == owner.cacheScopeID,
               UUID(uuidString: intentID) != nil else { throw WorkspaceClientError.invalidResponse }
+        // 2.6.30 saved a Bot Chat the plugin made with its stored ID and no runtime ID. Refused, it
+        // stopped every chat on that computer after the next reconnect. The registry ID names the chat.
+        if phase == .canonicalResolved, runtimeSessionID == nil, let storedSessionID,
+           storedSessionID == canonicalRegistryID {
+            var repaired = self
+            repaired.storedSessionID = nil
+            return try repaired.validated(for: owner)
+        }
         try DirectHermesSessionValidation.coordinate(profileID, maximum: 128)
         if let storedSessionID { try DirectHermesSessionValidation.coordinate(storedSessionID) }
         if let runtimeSessionID { try DirectHermesSessionValidation.coordinate(runtimeSessionID) }

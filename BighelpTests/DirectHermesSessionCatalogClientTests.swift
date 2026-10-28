@@ -953,6 +953,43 @@ struct DirectHermesSessionCatalogClientTests {
                 "The app made the Bot Chat over its socket")
     }
 
+    /// Every connection reloads the saved creation records, and one it refuses stops every chat on that
+    /// computer: the Bot Chat Hermes made, and a new chat, both "an unsupported or invalid response".
+    @Test func aHermesMadeBotChatsRecordLoadsOnTheNextConnection() async throws {
+        let workspace = try SessionWorkspaceStub()
+        workspace.pluginOperations = [.botChatCreate]
+        var saved: DirectHermesSessionCreationState?
+        workspace.handler = { operation, _ in
+            switch operation {
+            case .profilesList: return Self.profiles()
+            case .nativeSessionList: return ["sessions": .array([])]
+            case .botChatCreate: return ["ok": .boolean(true), "storedSessionId": .string("local-native")]
+            case .sessionResume: return Self.attached(stored: "local-native")
+            default: throw WorkspaceClientError.invalidRequest
+            }
+        }
+        _ = try await Self.client(workspace, sink: { saved = $0 }).createFirstCanonicalChat(profileID: "alpha")
+        let record = try JSONDecoder().decode(DirectHermesSessionCreationState.self,
+                                              from: JSONEncoder().encode(try #require(saved)))
+        #expect(record.phase == .canonicalResolved && record.canonicalRegistryID == "local-native")
+        let authority = try #require(workspace.owner?.authority)
+        workspace.owner = WorkspaceOwner(authority: authority, authenticationGeneration: UUID(), connectionGeneration: UUID())
+        try Self.client(workspace, sink: { _ in }).restoreCreationState(record)
+    }
+
+    /// 2.6.30 saved that record with the Bot Chat's stored ID and no runtime ID. Phones that have one load it.
+    @Test func aBotChatRecordFrom2_6_30Loads() async throws {
+        let workspace = try SessionWorkspaceStub()
+        let owner = try #require(workspace.owner)
+        let saved = DirectHermesSessionCreationState(
+            schemaVersion: 1, intentID: UUID().uuidString, scopeID: owner.cacheScopeID, profileID: "alpha",
+            purpose: .firstCanonical, connectionGeneration: UUID(), phase: .canonicalResolved,
+            storedSessionID: "local-native", runtimeSessionID: nil, canonicalRegistryID: "local-native")
+        let client = Self.client(workspace, sink: { _ in })
+        try client.restoreCreationState(saved)
+        #expect(try client.pendingCreation(profileID: "alpha")?.storedSessionID == nil)
+    }
+
     /// The agent's gateway couldn't start and Hermes made nothing: the socket makes the Bot Chat, so the
     /// person can still chat.
     @Test func aBotChatStillOpensWhenTheAgentsGatewayCantStart() async throws {

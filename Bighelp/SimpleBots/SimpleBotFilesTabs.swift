@@ -60,19 +60,6 @@ enum SimpleBotProfileTabs {
         let chosen = defaultTab.flatMap(SimpleBotProfileTab.init(rawValue:)) ?? .dashboard
         return shown.contains(chosen) ? chosen : (shown.first ?? .info)
     }
-
-    #if DEBUG
-    /// UI tests start from the tabs as shipped with `-test-reset-profile-tabs`, once per launch, so a
-    /// test that changed them can't leave the next one opening on another tab.
-    @MainActor static func resetForUITests() {
-        guard !didResetForUITests,
-              ProcessInfo.processInfo.arguments.contains("-test-reset-profile-tabs") else { return }
-        didResetForUITests = true
-        UserDefaults.standard.removeObject(forKey: orderKey)
-        UserDefaults.standard.removeObject(forKey: defaultKey)
-    }
-    @MainActor private static var didResetForUITests = false
-    #endif
 }
 
 /// A bot's Files tab: its folder on the computer, one folder at a time. Folders open in place

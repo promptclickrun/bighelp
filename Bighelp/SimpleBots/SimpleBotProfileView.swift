@@ -59,7 +59,9 @@ struct SimpleBotProfileView: View {
     @AppStorage(SimpleBotProfileTabs.orderKey) private var tabOrder = ""
     @AppStorage(SimpleBotProfileTabs.defaultKey) private var defaultTab: String?
     @State private var heldTab: Tab?
-    @State private var tabFrames: [Tab: CGRect] = [:]
+    /// The tab the bar was last shown over: it keeps its place and buttons while it fades away.
+    @State private var popoverTab: Tab?
+    @State private var tabFrames = SimpleBotTabFrameStore()
     @State private var isArrangingTabs = false
     @State private var tabNotice: String?
     @State private var isCharacterPresented = false
@@ -87,20 +89,13 @@ struct SimpleBotProfileView: View {
     @State private var isMediaConnected = false
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.appAppearance) private var appearance
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.companionAgentScope) private var scope
     @Environment(\.companionStore) private var companions
     @BighelpThemeReader private var theme
-
-    init(agentID: String, context: SimpleBotProfileContext) {
-        self.agentID = agentID
-        self.context = context
-        #if DEBUG
-        SimpleBotProfileTabs.resetForUITests()
-        #endif
-    }
 
     private var profile: AgentProfile? { context.agents.profiles.first { $0.id == agentID } }
     private var isPrimary: Bool {
@@ -323,9 +318,10 @@ struct SimpleBotProfileView: View {
                     case .media: mediaTab(profile)
                     }
                 }
-                // Rearranging is about the tabs; what's under them waits, faded as one layer.
-                .compositingGroup()
-                .opacity(isArrangingTabs ? 0.4 : 1)
+                // Rearranging is about the tabs; what's under them waits behind a veil of the page.
+                .overlay {
+                    if isArrangingTabs { theme.canvas.opacity(0.6).transition(.opacity) }
+                }
                 .allowsHitTesting(!isArrangingTabs)
                 .accessibilityHidden(isArrangingTabs)
             }
@@ -411,13 +407,13 @@ struct SimpleBotProfileView: View {
                 Rectangle().fill(theme.separator).frame(height: BighelpTokens.hairline)
             }
             .coordinateSpace(.named(Self.tabSpace))
-            .onPreferenceChange(SimpleBotTabFrames.self) { tabFrames = $0 }
+            .onPreferenceChange(SimpleBotTabFrames.self) { tabFrames.frames = $0 }
             // One popover for the row, over the held tab: Set Default and Rearrange.
             .popover(isPresented: Binding(get: { heldTab != nil }, set: { if !$0 { heldTab = nil } }),
-                     attachmentAnchor: .rect(.rect(heldTab.flatMap { tabFrames[$0] } ?? .zero)),
+                     attachmentAnchor: .rect(.rect(popoverTab.flatMap { tabFrames.frames[$0] } ?? .zero)),
                      arrowEdge: .bottom) {
-                if let heldTab {
-                    tabActions(heldTab)
+                if let popoverTab {
+                    tabActions(popoverTab)
                         .presentationCompactAdaptation(.popover)
                         .bighelpPopoverDismissal(isPresented: Binding(get: { self.heldTab != nil },
                                                                       set: { if !$0 { self.heldTab = nil } }))
@@ -454,7 +450,10 @@ struct SimpleBotProfileView: View {
                                                value: [item: proxy.frame(in: .named(Self.tabSpace))])
                     }
                 }
-                .simultaneousGesture(LongPressGesture(minimumDuration: 0.45).onEnded { _ in heldTab = item })
+                .simultaneousGesture(LongPressGesture(minimumDuration: 0.45).onEnded { _ in
+                    popoverTab = item
+                    heldTab = item
+                })
                 #if targetEnvironment(macCatalyst)
                 // The Mac's way to the same choices.
                 .contextMenu {
@@ -472,8 +471,11 @@ struct SimpleBotProfileView: View {
 
     /// What holding a tab offers, in a small glass bar above it.
     private func tabActions(_ item: Tab) -> some View {
-        let isDefault = SimpleBotProfileTabs.opening(defaultTab: defaultTab, in: availableTabs) == item
-        return HStack(spacing: 0) {
+        // The saved choice only: the tab a profile falls back to can still be chosen.
+        let isDefault = (defaultTab.flatMap(Tab.init(rawValue:)) ?? .dashboard) == item
+        let stacked = dynamicTypeSize.isAccessibilitySize
+        let layout = stacked ? AnyLayout(VStackLayout(spacing: 0)) : AnyLayout(HStackLayout(spacing: 0))
+        return layout {
             Button { setDefaultTab(item) } label: {
                 Label("Set Default", systemImage: isDefault ? "checkmark" : "pin")
                     .foregroundStyle(isDefault ? theme.secondaryText : theme.primaryText)
@@ -484,7 +486,8 @@ struct SimpleBotProfileView: View {
             .disabled(isDefault)
             .accessibilityValue(isDefault ? Text("Profiles open on this tab") : Text(""))
             .accessibilityIdentifier("simple-bots.profile.tab-actions.default")
-            Rectangle().fill(theme.separator).frame(width: BighelpTokens.hairline, height: 24)
+            Rectangle().fill(theme.separator)
+                .frame(width: stacked ? nil : BighelpTokens.hairline, height: stacked ? BighelpTokens.hairline : 24)
             Button { startArrangingTabs() } label: {
                 Label("Rearrange", systemImage: "arrow.left.arrow.right")
                     .foregroundStyle(theme.primaryText)
@@ -514,6 +517,7 @@ struct SimpleBotProfileView: View {
         if tab == nil { tab = shownTab }
         heldTab = nil
         withAnimation(reduceMotion ? nil : .snappy) { isArrangingTabs = true }
+        AccessibilityNotification.Announcement(String(localized: "Drag a tab to move it, then tap Done.")).post()
     }
 
     private func finishArranging() {

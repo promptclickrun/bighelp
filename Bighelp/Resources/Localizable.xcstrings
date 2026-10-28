@@ -375,6 +375,23 @@
         }
       }
     },
+    "%@, %lld of %lld": {
+      "comment": "Simplified Chinese draft for a bot profile's tabs in Bots mode (Set Default, Rearrange); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, %lld of %lld"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@，第 %lld 个，共 %lld 个"
+          }
+        }
+      }
+    },
     "%@, pinned": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -3999,6 +4016,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "完成"
+          }
+        }
+      }
+    },
+    "Drag a tab to move it, then tap Done.": {
+      "comment": "Simplified Chinese draft for a bot profile's tabs in Bots mode (Set Default, Rearrange); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drag a tab to move it, then tap Done."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "拖动标签来移动它，然后轻点完成。"
           }
         }
       }

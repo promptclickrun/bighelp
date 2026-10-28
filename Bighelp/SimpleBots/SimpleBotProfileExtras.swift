@@ -201,6 +201,12 @@ struct SimpleBotCharacterSheet: View {
     }
 }
 
+/// The profile's tab frames, kept without redrawing the profile: at large text sizes the tab row
+/// scrolls and they change every frame, and only a hold reads them.
+final class SimpleBotTabFrameStore {
+    var frames: [SimpleBotProfileTab: CGRect] = [:]
+}
+
 /// Each profile tab's frame in the row it sits in, for the bar over a held tab and for dragging.
 struct SimpleBotTabFrames: PreferenceKey {
     static let defaultValue: [SimpleBotProfileTab: CGRect] = [:]
@@ -219,6 +225,8 @@ struct SimpleBotTabArranger: View {
     /// Where the dragged chip was when the drag began; it follows the finger from there.
     @State private var start: CGRect = .zero
     @State private var translation: CGSize = .zero
+    /// Back to false when a drag ends or the system cancels it, which skips `onEnded`.
+    @GestureState private var isPressing = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @BighelpThemeReader private var theme
 
@@ -231,6 +239,13 @@ struct SimpleBotTabArranger: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .coordinateSpace(.named(Self.space))
         .onPreferenceChange(SimpleBotTabFrames.self) { frames = $0 }
+        .onChange(of: isPressing) { _, pressing in
+            guard !pressing, dragging != nil else { return }
+            withAnimation(reduceMotion ? nil : .snappy(duration: 0.25)) {
+                dragging = nil
+                translation = .zero
+            }
+        }
         .padding(.vertical, BighelpTokens.space4)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("simple-bots.profile.tabs.arranger")
@@ -265,11 +280,16 @@ struct SimpleBotTabArranger: View {
         .accessibilityHint(Text("Drag to move this tab."))
         .accessibilityActions {
             if let index = tabs.firstIndex(of: tab) {
-                if index > 0 { Button("Move Left") { onMove(tab, index - 1) } }
-                if index < tabs.count - 1 { Button("Move Right") { onMove(tab, index + 1) } }
+                if index > 0 { Button("Move Left") { move(tab, to: index - 1) } }
+                if index < tabs.count - 1 { Button("Move Right") { move(tab, to: index + 1) } }
             }
         }
         .accessibilityIdentifier("simple-bots.profile.tabs.chip.\(tab.rawValue)")
+    }
+
+    private func move(_ tab: SimpleBotProfileTab, to index: Int) {
+        onMove(tab, index)
+        AccessibilityNotification.Announcement(String(localized: "\(tab.title), \(index + 1) of \(tabs.count)")).post()
     }
 
     private func offset(of tab: SimpleBotProfileTab) -> CGSize {
@@ -280,6 +300,7 @@ struct SimpleBotTabArranger: View {
 
     private func drag(_ tab: SimpleBotProfileTab) -> some Gesture {
         DragGesture(minimumDistance: 4, coordinateSpace: .named(Self.space))
+            .updating($isPressing) { _, pressing, _ in pressing = true }
             .onChanged { value in
                 if dragging != tab {
                     dragging = tab

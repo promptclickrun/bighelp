@@ -130,14 +130,13 @@ final class SimpleBotsUITests: BighelpUITestCase {
         XCTAssertLessThan(files.frame.minX, dashboard.frame.minX, "Files moved before Dashboard")
 
         app.terminate()
-        app = launch(appearance: "light", resetsProfileTabs: false)
+        // The same test's relaunch keeps its settings (BighelpApp resets them once per test).
+        app = launch(appearance: "light")
         openPrimaryProfile(app)
         XCTAssertTrue(app.buttons["simple-bots.profile.tab.files"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["simple-bots.profile.tab.files"].isSelected, "Profiles open on the default")
         save("simple-tab-default-light", app)
         app.terminate()
-        // Leave the tabs as shipped for the tests after this one.
-        launch(appearance: "light").terminate()
     }
 
     @MainActor
@@ -660,12 +659,11 @@ final class SimpleBotsUITests: BighelpUITestCase {
     }
 
     @MainActor
-    private func launch(appearance: String, extra: [String] = [], resetsProfileTabs: Bool = true) -> XCUIApplication {
+    private func launch(appearance: String, extra: [String] = []) -> XCUIApplication {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
                                "-bighelp.settings.simple-bots", "YES",
                                "-loopdy.demo.appearance", appearance] + extra
-            + (resetsProfileTabs ? ["-test-reset-profile-tabs"] : [])
         app.launch()
         return app
     }

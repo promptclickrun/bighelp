@@ -3,6 +3,19 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.32
+
+### Bots
+
+- **One look for each tab:** in a bot's profile, the Dashboard tab shows the bot's picture, name and role the same as the other tabs.
+- **Character:** in a bot's profile, select **Info > Character** to change the bot's shape and color. **Reset to default** and **More avatars** are there too.
+- **Set Default:** touch and hold a tab in a bot's profile, then select **Set Default**. The next profile that you open starts on that tab. This setting is the same for all bots.
+- **Rearrange:** touch and hold a tab, then select **Rearrange**. Drag the tabs into a new order, then tap **Done**. This order is the same for all bots.
+
+### Fixed
+
+- **Chats on a computer:** if one saved chat record is incorrect, bighelp ignores only that record. Before, no chat on that computer opened or started.
+
 ## 2.6.31
 
 ### Fixed

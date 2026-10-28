@@ -479,13 +479,18 @@ text is SF Pro, as everywhere.
   order, and the answer always shows.
 - **Swipes**: from the left edge back to your bots; from the right, this bot's profile (the primary bot's on
   the home). The full app's swipe choices lead to places this mode hides, so they don't apply here.
-- **Profile**: the mark, name and role, then Info (Character, Instructions, Default Model, Default Voice,
-  Advanced Options, Routines) and Computer (its screen, when the host has one). More avatars opens the full
-  avatar studio (`AvatarCreatorView`) with the marks as its Bots section; Save applies the pick at once. Default
-  Model is the model and reasoning picker, saved as the bot's default for chats. Default Voice picks this bot's
-  TTS or GPT Live and its provider, model and voice from lists (saved per bot). Advanced Options is the bot's
-  one simple doorway to its Nerd Mode settings: plain rows with a tip each (Approvals: Smart, Manual or Off),
-  and links to its Nerd Mode pages under For experts, without Nerd Mode turned on.
+- **Profile**: the mark, name and role over every tab (Dashboard too), then the tabs: Dashboard, Info (Character,
+  Instructions, Default Model, Default Voice, Advanced Options, Routines), Computer (its screen, when the host has
+  one), Files and Media. Holding a tab shows a glass bar above it with Set Default (the tab profiles open on;
+  Dashboard until one is set; a note confirms it) and Rearrange (the tabs become glass chips to drag where they
+  are, the tab below fades, Done in the header). Both are one choice for every bot (`SimpleBotProfileTabs`); the
+  Mac also offers them on a right-click. Character is Info's first row, with the bot's mark at its end; it opens a
+  sheet with the shapes, colors, Reset to default and More avatars. More avatars opens the full avatar studio
+  (`AvatarCreatorView`) with the marks as its Bots section; Save applies the pick at once. Default Model is the
+  model and reasoning picker, saved as the bot's default for chats. Default Voice picks this bot's TTS or GPT Live
+  and its provider, model and voice from lists (saved per bot). Advanced Options is the bot's one simple doorway
+  to its Nerd Mode settings: plain rows with a tip each (Approvals: Smart, Manual or Off), and links to its Nerd
+  Mode pages under For experts, without Nerd Mode turned on.
 - **Settings**: you and Usage (your tightest plan limit); Connect apps; the primary bot's Approvals (opens its
   Advanced Options, the one place approvals are set) and the time zone every bot works in (or this device's,
   automatically); Teamwork; Bot Computer; Notifications and Appearance; then the switch back and All Settings.

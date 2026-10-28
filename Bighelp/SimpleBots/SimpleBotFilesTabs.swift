@@ -17,8 +17,48 @@ enum SimpleBotProfileTab: String, CaseIterable, Identifiable {
         }
     }
 
-    static func available(showsComputer: Bool, showsDashboard: Bool = true) -> [Self] {
-        allCases.filter { ($0 != .computer || showsComputer) && ($0 != .dashboard || showsDashboard) }
+    static func available(showsComputer: Bool, showsDashboard: Bool = true, order: [Self] = allCases) -> [Self] {
+        order.filter { ($0 != .computer || showsComputer) && ($0 != .dashboard || showsDashboard) }
+    }
+}
+
+/// The tab a bot's profile opens on and the order of its tabs: hold a tab for Set Default and
+/// Rearrange. One choice for every bot, kept on this device.
+enum SimpleBotProfileTabs {
+    static let orderKey = "bighelp.simple-bots.profile.tab-order"
+    static let defaultKey = "bighelp.simple-bots.profile.default-tab"
+
+    /// The saved order ("files,info,…"). A name it doesn't know goes; a tab it doesn't have comes last.
+    static func order(_ saved: String) -> [SimpleBotProfileTab] {
+        var seen = Set<SimpleBotProfileTab>()
+        let listed = saved.split(separator: ",").compactMap { SimpleBotProfileTab(rawValue: String($0)) }
+            .filter { seen.insert($0).inserted }
+        return listed + SimpleBotProfileTab.allCases.filter { !seen.contains($0) }
+    }
+
+    static func saved(_ order: [SimpleBotProfileTab]) -> String {
+        order.map(\.rawValue).joined(separator: ",")
+    }
+
+    static func moving(_ tab: SimpleBotProfileTab, to index: Int,
+                       in shown: [SimpleBotProfileTab]) -> [SimpleBotProfileTab] {
+        guard let from = shown.firstIndex(of: tab) else { return shown }
+        var result = shown
+        result.remove(at: from)
+        result.insert(tab, at: min(max(index, 0), result.count))
+        return result
+    }
+
+    /// The whole order after the shown tabs were rearranged: a tab this bot doesn't show keeps its place.
+    static func merging(_ shown: [SimpleBotProfileTab], into order: [SimpleBotProfileTab]) -> [SimpleBotProfileTab] {
+        var next = shown.makeIterator()
+        return order.map { shown.contains($0) ? (next.next() ?? $0) : $0 }
+    }
+
+    /// The tab a profile opens on: the default, Dashboard until one is set, else the first one shown.
+    static func opening(defaultTab: String?, in shown: [SimpleBotProfileTab]) -> SimpleBotProfileTab {
+        let chosen = defaultTab.flatMap(SimpleBotProfileTab.init(rawValue:)) ?? .dashboard
+        return shown.contains(chosen) ? chosen : (shown.first ?? .info)
     }
 }
 

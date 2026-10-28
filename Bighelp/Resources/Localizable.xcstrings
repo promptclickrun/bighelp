@@ -375,6 +375,23 @@
         }
       }
     },
+    "%@, %lld of %lld": {
+      "comment": "Simplified Chinese draft for a bot profile's tabs in Bots mode (Set Default, Rearrange); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, %lld of %lld"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@，第 %lld 个，共 %lld 个"
+          }
+        }
+      }
+    },
     "%@, pinned": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -4003,6 +4020,23 @@
         }
       }
     },
+    "Drag a tab to move it, then tap Done.": {
+      "comment": "Simplified Chinese draft for a bot profile's tabs in Bots mode (Set Default, Rearrange); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drag a tab to move it, then tap Done."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "拖动标签来移动它，然后轻点完成。"
+          }
+        }
+      }
+    },
     "Drag to change its place": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -4016,6 +4050,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "拖动以更改位置"
+          }
+        }
+      }
+    },
+    "Drag to move this tab.": {
+      "comment": "Simplified Chinese draft for a bot profile's tabs in Bots mode (Set Default, Rearrange); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drag to move this tab."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "拖动以移动此标签。"
           }
         }
       }
@@ -6468,6 +6519,40 @@
         }
       }
     },
+    "Move Left": {
+      "comment": "Simplified Chinese draft for a bot profile's tabs in Bots mode (Set Default, Rearrange); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move Left"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "左移"
+          }
+        }
+      }
+    },
+    "Move Right": {
+      "comment": "Simplified Chinese draft for a bot profile's tabs in Bots mode (Set Default, Rearrange); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move Right"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "右移"
+          }
+        }
+      }
+    },
     "Move down": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -8808,6 +8893,40 @@
         }
       }
     },
+    "Profiles now open on %@": {
+      "comment": "Simplified Chinese draft for a bot profile's tabs in Bots mode (Set Default, Rearrange); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profiles now open on %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "资料页现在从%@打开"
+          }
+        }
+      }
+    },
+    "Profiles open on this tab": {
+      "comment": "Simplified Chinese draft for a bot profile's tabs in Bots mode (Set Default, Rearrange); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profiles open on this tab"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "资料页从此标签打开"
+          }
+        }
+      }
+    },
     "Project changes": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -10399,6 +10518,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "已设置"
+          }
+        }
+      }
+    },
+    "Set Default": {
+      "comment": "Simplified Chinese draft for a bot profile's tabs in Bots mode (Set Default, Rearrange); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set Default"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "设为默认"
           }
         }
       }

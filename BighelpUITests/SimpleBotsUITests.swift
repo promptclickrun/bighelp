@@ -80,15 +80,76 @@ final class SimpleBotsUITests: BighelpUITestCase {
             XCTAssertTrue(app.descendants(matching: .any)["simple-bots.profile"].waitForExistence(timeout: 5))
             XCTAssertTrue(app.descendants(matching: .any)["dashboard"].waitForExistence(timeout: 5), "Dashboard opens first")
             app.buttons["simple-bots.profile.tab.info"].tap()
+            save("simple-profile-\(appearance)", app)
+            // Info › Character: the picker in a sheet.
+            app.buttons["simple-bots.profile.character"].tap()
             app.buttons["simple-bots.shape.star"].tap()
             app.buttons["simple-bots.color.purple"].tap()
             let status = app.staticTexts["simple-bots.profile.mark-status"]
             XCTAssertTrue(status.waitForExistence(timeout: 5))
-            save("simple-profile-\(appearance)", app)
+            save("simple-character-\(appearance)", app)
+            app.buttons["simple-bots.character.done"].tap()
+            XCTAssertTrue(status.waitForNonExistence(timeout: 5), "Done closes the sheet")
             app.swipeUp()
             save("simple-profile-lower-\(appearance)", app)
             app.terminate()
         }
+    }
+
+    /// Holding a profile tab: Set Default makes profiles open on it (not the one shown now), and Rearrange
+    /// turns the tabs into chips to drag where they are. Both stay for the next launch.
+    @MainActor
+    func testHoldingATabSetsTheDefaultAndRearrangesTheTabs() throws {
+        var app = launch(appearance: "light")
+        openPrimaryProfile(app)
+        let files = app.buttons["simple-bots.profile.tab.files"]
+        let dashboard = app.buttons["simple-bots.profile.tab.dashboard"]
+        XCTAssertTrue(files.waitForExistence(timeout: 5))
+        XCTAssertTrue(dashboard.isSelected, "Dashboard until a default is set")
+
+        files.press(forDuration: 0.8)
+        let setDefault = app.buttons["simple-bots.profile.tab-actions.default"]
+        XCTAssertTrue(setDefault.waitForExistence(timeout: 5), "Holding a tab offers Set Default")
+        XCTAssertTrue(app.buttons["simple-bots.profile.tab-actions.rearrange"].exists, "and Rearrange")
+        XCTAssertTrue(dashboard.isSelected, "Holding a tab doesn't open it")
+        save("simple-tab-hold-light", app)
+        setDefault.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["simple-bots.profile.tab-notice"].waitForExistence(timeout: 5))
+        XCTAssertTrue(dashboard.isSelected, "It stays on the tab shown")
+
+        files.press(forDuration: 0.8)
+        app.buttons["simple-bots.profile.tab-actions.rearrange"].tap()
+        let filesChip = app.descendants(matching: .any)["simple-bots.profile.tabs.chip.files"]
+        let dashboardChip = app.descendants(matching: .any)["simple-bots.profile.tabs.chip.dashboard"]
+        XCTAssertTrue(filesChip.waitForExistence(timeout: 5), "Rearrange shows the tabs as chips")
+        save("simple-tab-arrange-light", app)
+        filesChip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(forDuration: 0.3, thenDragTo: dashboardChip.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.5)))
+        app.buttons["simple-bots.profile.tabs.done"].tap()
+        XCTAssertTrue(files.waitForExistence(timeout: 5))
+        XCTAssertLessThan(files.frame.minX, dashboard.frame.minX, "Files moved before Dashboard")
+
+        app.terminate()
+        // The same test's relaunch keeps its settings (BighelpApp resets them once per test).
+        app = launch(appearance: "light")
+        openPrimaryProfile(app)
+        XCTAssertTrue(app.buttons["simple-bots.profile.tab.files"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["simple-bots.profile.tab.files"].isSelected, "Profiles open on the default")
+        save("simple-tab-default-light", app)
+        app.terminate()
+    }
+
+    @MainActor
+    private func openPrimaryProfile(_ app: XCUIApplication) {
+        XCTAssertTrue(app.descendants(matching: .any)["simple-bots.home"].waitForExistence(timeout: 15))
+        app.buttons["simple-bots.primary"].tap()
+        let identity = app.buttons["chat.identity"]
+        XCTAssertTrue(identity.waitForExistence(timeout: 10))
+        let profile = app.descendants(matching: .any)["simple-bots.profile"]
+        // A tap while the chat is still sliding in can miss; one more is enough.
+        identity.tap()
+        if !profile.waitForExistence(timeout: 5) { identity.tap() }
+        XCTAssertTrue(profile.waitForExistence(timeout: 5))
     }
 
     /// A bot's profile: More avatars opens the full studio with the marks in it, and Save comes back
@@ -107,6 +168,7 @@ final class SimpleBotsUITests: BighelpUITestCase {
         info.tap()
         save("simple-profile-rows-dark", app)
 
+        app.buttons["simple-bots.profile.character"].tap()
         let more = app.buttons["simple-bots.profile.more-avatars"]
         XCTAssertTrue(more.waitForExistence(timeout: 5))
         more.tap()
@@ -114,7 +176,6 @@ final class SimpleBotsUITests: BighelpUITestCase {
         XCTAssertTrue(bots.waitForExistence(timeout: 5), "The studio offers the bot marks")
         XCTAssertTrue(app.buttons["avatar.creator.category.bighelp"].exists, "And every other avatar")
         bots.tap()
-        // The profile under the sheet has the same picker; these are the studio's.
         let marks = app.descendants(matching: .any)["avatar.creator.bots"]
         XCTAssertTrue(marks.waitForExistence(timeout: 5))
         marks.buttons["simple-bots.shape.heart"].tap()

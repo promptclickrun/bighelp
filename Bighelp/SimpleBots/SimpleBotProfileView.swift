@@ -42,10 +42,11 @@ struct SimpleBotDashboardHooks {
     let onSend: (String, String) -> Void
 }
 
-/// A bot's profile in Bots mode: its mark, name and role, then Dashboard (its
-/// Feed, Ideas and Goals as piles to swipe; it opens first), Info (its look,
-/// instructions and routines), Computer (its screen, when the host has one),
-/// Files (its folder on the computer) and Media (photos and videos from its chats).
+/// A bot's profile in Bots mode: its mark, name and role over every tab, then Dashboard (its
+/// Feed, Ideas and Goals as piles to swipe), Info (Character, instructions and routines),
+/// Computer (its screen, when the host has one), Files (its folder on the computer) and Media
+/// (photos and videos from its chats). Holding a tab offers Set Default (the tab profiles open
+/// on; Dashboard until one is set) and Rearrange, both the same for every bot.
 @MainActor
 struct SimpleBotProfileView: View {
     let agentID: String
@@ -53,7 +54,18 @@ struct SimpleBotProfileView: View {
 
     private typealias Tab = SimpleBotProfileTab
 
-    @State private var tab: Tab = .dashboard
+    /// Nil until a tab is picked: the profile shows the one it opens on.
+    @State private var tab: Tab?
+    @AppStorage(SimpleBotProfileTabs.orderKey) private var tabOrder = ""
+    @AppStorage(SimpleBotProfileTabs.defaultKey) private var defaultTab: String?
+    @State private var heldTab: Tab?
+    /// The tab the bar was last shown over: it keeps its place and buttons while it fades away.
+    @State private var popoverTab: Tab?
+    @State private var tabFrames = SimpleBotTabFrameStore()
+    @State private var isArrangingTabs = false
+    @State private var tabNotice: String?
+    @State private var isCharacterPresented = false
+    @State private var opensStudioAfterCharacter = false
     @State private var dashboard: BoardDashboardModel?
     @State private var mark: SimpleBotMark?
     @State private var saveTask: Task<Void, Never>?
@@ -76,6 +88,8 @@ struct SimpleBotProfileView: View {
     @State private var media = AgentMediaStore()
     @State private var isMediaConnected = false
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.appAppearance) private var appearance
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.colorSchemeContrast) private var contrast
@@ -150,6 +164,26 @@ struct SimpleBotProfileView: View {
                     .bighelpSheetSize(.large)
             }
         }
+        .bighelpSheet(isPresented: $isCharacterPresented, onDismiss: {
+            // After the sheet has gone, so the studio can show.
+            guard opensStudioAfterCharacter else { return }
+            opensStudioAfterCharacter = false
+            isStudioPresented = true
+        }) {
+            if let profile {
+                SimpleBotCharacterSheet(
+                    mark: markBinding(profile), canEdit: context.canEdit, status: markStatus,
+                    onReset: { pick(.defaultMark(for: profile.id), for: profile) },
+                    onMoreAvatars: {
+                        opensStudioAfterCharacter = true
+                        isCharacterPresented = false
+                    },
+                    onDone: { isCharacterPresented = false })
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .bighelpSheetSize(.standard)
+            }
+        }
         .bighelpSheet(isPresented: $isStudioPresented) {
             if let profile {
                 AvatarCreatorView(
@@ -217,6 +251,7 @@ struct SimpleBotProfileView: View {
                                                           set: { if !$0 { templateNotice = nil } })) {
             Button("OK") { templateNotice = nil }
         } message: { Text(templateNotice ?? "") }
+        .overlay(alignment: .bottom) { tabNoticeBar }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("simple-bots.profile")
     }
@@ -227,7 +262,19 @@ struct SimpleBotProfileView: View {
                 dismiss()
             }
             Spacer()
-            if let profile {
+            if isArrangingTabs {
+                Button { finishArranging() } label: {
+                    Text("Done")
+                        .font(.bighelp(.body, weight: .semibold))
+                        .foregroundStyle(theme.primaryText)
+                        .padding(.horizontal, BighelpTokens.space20)
+                        .frame(minHeight: BighelpTokens.hitTarget)
+                        .contentShape(Capsule())
+                        .bighelpNavigationGlass(in: Capsule(), isInteractive: true)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("simple-bots.profile.tabs.done")
+            } else if let profile {
                 SimpleBotsCircleButton(systemImage: "square.and.arrow.up", label: "Save as Template",
                                        identifier: "simple-bots.profile.template") { isSavingTemplate = true }
                 Menu {
@@ -259,21 +306,24 @@ struct SimpleBotProfileView: View {
     private func content(_ profile: AgentProfile) -> some View {
         ScrollView {
             VStack(spacing: BighelpTokens.space24) {
-                if shownTab == .dashboard {
-                    // One row, so the piles fit under it.
-                    compactIdentity(profile)
-                } else {
-                    face(profile)
-                    identityCard(profile)
-                }
+                face(profile)
+                identityCard(profile)
                 tabBar
-                switch shownTab {
-                case .dashboard: dashboardTab(profile)
-                case .info: info(profile)
-                case .computer: computer(profile)
-                case .files: filesTab(profile)
-                case .media: mediaTab(profile)
+                Group {
+                    switch shownTab {
+                    case .dashboard: dashboardTab(profile)
+                    case .info: info(profile)
+                    case .computer: computer(profile)
+                    case .files: filesTab(profile)
+                    case .media: mediaTab(profile)
+                    }
                 }
+                // Rearranging is about the tabs; what's under them waits behind a veil of the page.
+                .overlay {
+                    if isArrangingTabs { theme.canvas.opacity(0.6).transition(.opacity) }
+                }
+                .allowsHitTesting(!isArrangingTabs)
+                .accessibilityHidden(isArrangingTabs)
             }
             .padding(.horizontal, BighelpTokens.space20)
             .padding(.bottom, BighelpTokens.space32)
@@ -281,50 +331,24 @@ struct SimpleBotProfileView: View {
             .frame(maxWidth: .infinity)
         }
         .scrollIndicators(.hidden)
+        // A drag moves a tab, not the page.
+        .scrollDisabled(isArrangingTabs)
     }
 
     private func face(_ profile: AgentProfile) -> some View {
-        Group {
-            if let mark {
-                SimpleBotMarkView(mark: mark, size: 132, isPrimary: isPrimary)
-            } else {
-                SimpleBotFace(agentID: profile.id, name: profile.name,
-                              imageURL: context.agents.avatarURL(for: profile), size: 132, isPrimary: isPrimary)
-            }
-        }
-        .padding(.top, BighelpTokens.space8)
-        .animation(.snappy, value: mark)
+        face(profile, size: 132, isPrimary: isPrimary)
+            .padding(.top, BighelpTokens.space8)
+            .animation(.snappy, value: mark)
     }
 
-    /// The Dashboard's header: the mark, then the name over the role, on one row.
-    private func compactIdentity(_ profile: AgentProfile) -> some View {
-        HStack(spacing: BighelpTokens.space12) {
-            Group {
-                if let mark {
-                    SimpleBotMarkView(mark: mark, size: 52, isPrimary: isPrimary)
-                } else {
-                    SimpleBotFace(agentID: profile.id, name: profile.name,
-                                  imageURL: context.agents.avatarURL(for: profile), size: 52, isPrimary: isPrimary)
-                }
-            }
-            .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(profile.name)
-                    .font(.bighelp(.title3, weight: .bold))
-                    .foregroundStyle(theme.primaryText)
-                    .lineLimit(2)
-                if !profile.role.isEmpty {
-                    Text(profile.role)
-                        .font(.bighelp(.subheadline))
-                        .foregroundStyle(theme.secondaryText)
-                        .lineLimit(2)
-                }
-            }
-            Spacer(minLength: 0)
+    @ViewBuilder
+    private func face(_ profile: AgentProfile, size: CGFloat, isPrimary: Bool) -> some View {
+        if let mark {
+            SimpleBotMarkView(mark: mark, size: size, isPrimary: isPrimary)
+        } else {
+            SimpleBotFace(agentID: profile.id, name: profile.name,
+                          imageURL: context.agents.avatarURL(for: profile), size: size, isPrimary: isPrimary)
         }
-        .padding(.top, BighelpTokens.space4)
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isHeader)
     }
 
     private func identityCard(_ profile: AgentProfile) -> some View {
@@ -349,17 +373,23 @@ struct SimpleBotProfileView: View {
     }
 
     private var availableTabs: [Tab] {
-        Tab.available(showsComputer: screen?.showsTab == true, showsDashboard: context.dashboard != nil)
+        Tab.available(showsComputer: screen?.showsTab == true, showsDashboard: context.dashboard != nil,
+                      order: SimpleBotProfileTabs.order(tabOrder))
     }
 
-    /// The first tab when the chosen one went away (the screen closed).
+    /// The picked tab while it's there (the screen can close), else the one profiles open on.
     private var shownTab: Tab {
-        availableTabs.contains(tab) ? tab : (availableTabs.first ?? .info)
+        if let tab, availableTabs.contains(tab) { return tab }
+        return SimpleBotProfileTabs.opening(defaultTab: defaultTab, in: availableTabs)
     }
+
+    private static let tabSpace = "simple-bots.profile.tabs"
 
     @ViewBuilder
     private var tabBar: some View {
-        if availableTabs.count > 1 {
+        if isArrangingTabs {
+            SimpleBotTabArranger(tabs: availableTabs) { moveTab($0, to: $1) }
+        } else if availableTabs.count > 1 {
             // All the tabs on one line, closer together where they must be: with Dashboard there
             // are five, which didn't fit an iPhone 17 Pro and were cut at the margin. Only larger
             // text scrolls them, out to the screen's edges so a tab slides off rather than being cut.
@@ -376,13 +406,31 @@ struct SimpleBotProfileView: View {
             .overlay(alignment: .bottom) {
                 Rectangle().fill(theme.separator).frame(height: BighelpTokens.hairline)
             }
+            .coordinateSpace(.named(Self.tabSpace))
+            .onPreferenceChange(SimpleBotTabFrames.self) { tabFrames.frames = $0 }
+            // One popover for the row, over the held tab: Set Default and Rearrange.
+            .popover(isPresented: Binding(get: { heldTab != nil }, set: { if !$0 { heldTab = nil } }),
+                     attachmentAnchor: .rect(.rect(popoverTab.flatMap { tabFrames.frames[$0] } ?? .zero)),
+                     arrowEdge: .bottom) {
+                if let popoverTab {
+                    tabActions(popoverTab)
+                        .presentationCompactAdaptation(.popover)
+                        .bighelpPopoverDismissal(isPresented: Binding(get: { self.heldTab != nil },
+                                                                      set: { if !$0 { self.heldTab = nil } }))
+                }
+            }
+            .sensoryFeedback(.impact(weight: .medium), trigger: heldTab) { _, held in held != nil }
         }
     }
 
     private func tabRow(spacing: CGFloat) -> some View {
         HStack(spacing: spacing) {
             ForEach(availableTabs) { item in
-                Button { tab = item } label: {
+                Button {
+                    // Letting go of a hold isn't a tap.
+                    guard heldTab == nil else { return }
+                    tab = item
+                } label: {
                     VStack(spacing: BighelpTokens.space8) {
                         Text(item.title)
                             .font(.bighelp(.body))
@@ -396,56 +444,140 @@ struct SimpleBotProfileView: View {
                     .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
+                .background {
+                    GeometryReader { proxy in
+                        Color.clear.preference(key: SimpleBotTabFrames.self,
+                                               value: [item: proxy.frame(in: .named(Self.tabSpace))])
+                    }
+                }
+                .simultaneousGesture(LongPressGesture(minimumDuration: 0.45).onEnded { _ in
+                    popoverTab = item
+                    heldTab = item
+                })
+                #if targetEnvironment(macCatalyst)
+                // The Mac's way to the same choices.
+                .contextMenu {
+                    Button("Set Default", systemImage: "pin") { setDefaultTab(item) }
+                    Button("Rearrange", systemImage: "arrow.left.arrow.right") { startArrangingTabs() }
+                }
+                #endif
                 .accessibilityAddTraits(shownTab == item ? .isSelected : [])
+                .accessibilityAction(named: Text("Set Default")) { setDefaultTab(item) }
+                .accessibilityAction(named: Text("Rearrange")) { startArrangingTabs() }
                 .accessibilityIdentifier("simple-bots.profile.tab.\(item.rawValue)")
             }
         }
     }
 
+    /// What holding a tab offers, in a small glass bar above it.
+    private func tabActions(_ item: Tab) -> some View {
+        // The saved choice only: the tab a profile falls back to can still be chosen.
+        let isDefault = (defaultTab.flatMap(Tab.init(rawValue:)) ?? .dashboard) == item
+        let stacked = dynamicTypeSize.isAccessibilitySize
+        let layout = stacked ? AnyLayout(VStackLayout(spacing: 0)) : AnyLayout(HStackLayout(spacing: 0))
+        return layout {
+            Button { setDefaultTab(item) } label: {
+                Label("Set Default", systemImage: isDefault ? "checkmark" : "pin")
+                    .foregroundStyle(isDefault ? theme.secondaryText : theme.primaryText)
+                    .padding(.horizontal, BighelpTokens.space16)
+                    .frame(minHeight: BighelpTokens.hitTarget)
+                    .contentShape(.rect)
+            }
+            .disabled(isDefault)
+            .accessibilityValue(isDefault ? Text("Profiles open on this tab") : Text(""))
+            .accessibilityIdentifier("simple-bots.profile.tab-actions.default")
+            Rectangle().fill(theme.separator)
+                .frame(width: stacked ? nil : BighelpTokens.hairline, height: stacked ? BighelpTokens.hairline : 24)
+            Button { startArrangingTabs() } label: {
+                Label("Rearrange", systemImage: "arrow.left.arrow.right")
+                    .foregroundStyle(theme.primaryText)
+                    .padding(.horizontal, BighelpTokens.space16)
+                    .frame(minHeight: BighelpTokens.hitTarget)
+                    .contentShape(.rect)
+            }
+            .accessibilityIdentifier("simple-bots.profile.tab-actions.rearrange")
+        }
+        .buttonStyle(.plain)
+        .labelStyle(.titleAndIcon)
+        .font(.bighelp(.subheadline, weight: .semibold))
+        .fixedSize()
+    }
+
+    private func setDefaultTab(_ item: Tab) {
+        // Stay on the tab shown now; the new default is for the next profile opened.
+        if tab == nil { tab = shownTab }
+        defaultTab = item.rawValue
+        heldTab = nil
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
+            tabNotice = String(localized: "Profiles now open on \(item.title)")
+        }
+    }
+
+    private func startArrangingTabs() {
+        if tab == nil { tab = shownTab }
+        heldTab = nil
+        withAnimation(reduceMotion ? nil : .snappy) { isArrangingTabs = true }
+        AccessibilityNotification.Announcement(String(localized: "Drag a tab to move it, then tap Done.")).post()
+    }
+
+    private func finishArranging() {
+        withAnimation(reduceMotion ? nil : .snappy) { isArrangingTabs = false }
+    }
+
+    private func moveTab(_ item: Tab, to index: Int) {
+        let shown = SimpleBotProfileTabs.moving(item, to: index, in: availableTabs)
+        let order = SimpleBotProfileTabs.merging(shown, into: SimpleBotProfileTabs.order(tabOrder))
+        tabOrder = SimpleBotProfileTabs.saved(order)
+    }
+
+    @ViewBuilder
+    private var tabNoticeBar: some View {
+        if let tabNotice {
+            Text(tabNotice)
+                .font(.bighelp(.subheadline, weight: .medium))
+                .foregroundStyle(theme.primaryText)
+                .padding(.horizontal, BighelpTokens.space20)
+                .frame(minHeight: BighelpTokens.hitTarget)
+                .bighelpNavigationGlass(in: Capsule())
+                .padding(.bottom, BighelpTokens.space24)
+                .transition(.opacity)
+                .task(id: tabNotice) {
+                    AccessibilityNotification.Announcement(tabNotice).post()
+                    try? await Task.sleep(for: .seconds(3))
+                    guard !Task.isCancelled else { return }
+                    withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { self.tabNotice = nil }
+                }
+                .accessibilityIdentifier("simple-bots.profile.tab-notice")
+        }
+    }
+
+    private func markBinding(_ profile: AgentProfile) -> Binding<SimpleBotMark> {
+        Binding(get: { mark ?? SimpleBotMarkStore.shared.mark(scope: scope, agentID: profile.id)
+                    ?? .defaultMark(for: profile.id) },
+                set: { pick($0, for: profile) })
+    }
+
+    private var markStatus: String {
+        saveState ?? (context.canEdit ? String(localized: "How this Bot's mark looks everywhere")
+                                      : String(localized: "This computer doesn't let the app change this bot."))
+    }
+
     private func info(_ profile: AgentProfile) -> some View {
         VStack(alignment: .leading, spacing: BighelpTokens.space12) {
-            SimpleBotsSectionLabel(title: String(localized: "Character"))
             SimpleBotsCard {
-                SimpleBotMarkPicker(mark: Binding(
-                    get: { mark ?? SimpleBotMarkStore.shared.mark(scope: scope, agentID: profile.id)
-                        ?? .defaultMark(for: profile.id) },
-                    set: { pick($0, for: profile) }))
-                    .padding(.vertical, BighelpTokens.space24)
-                    .padding(.horizontal, BighelpTokens.space8)
-                    .disabled(!context.canEdit)
-                SimpleBotsDivider()
-                Button { pick(.defaultMark(for: profile.id), for: profile) } label: {
-                    Text("Reset to default")
-                        .font(.bighelp(.body))
-                        .foregroundStyle(theme.information)
-                        .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
-                        .padding(.horizontal, BighelpTokens.space20)
-                        .contentShape(.rect)
+                // The shape and color picker, Reset to default and More avatars, in a sheet.
+                Button { isCharacterPresented = true } label: {
+                    SimpleBotsRow(title: String(localized: "Character"), leading: Image(systemName: "face.smiling")) {
+                        HStack(spacing: BighelpTokens.space8) {
+                            face(profile, size: 28, isPrimary: false)
+                                .accessibilityHidden(true)
+                            SimpleBotsDisclosure()
+                        }
+                    }
                 }
                 .buttonStyle(.plain)
-                .disabled(!context.canEdit)
-                .accessibilityIdentifier("simple-bots.profile.reset-mark")
+                .accessibilityIdentifier("simple-bots.profile.character")
                 SimpleBotsDivider()
-                Button { isStudioPresented = true } label: {
-                    Text("More avatars")
-                        .font(.bighelp(.body))
-                        .foregroundStyle(theme.information)
-                        .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
-                        .padding(.horizontal, BighelpTokens.space20)
-                        .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
-                .disabled(!context.canEdit)
-                .accessibilityIdentifier("simple-bots.profile.more-avatars")
-            }
-            Text(saveState ?? (context.canEdit ? String(localized: "How this Bot's mark looks everywhere")
-                                               : String(localized: "This computer doesn't let the app change this bot.")))
-                .font(.bighelp(.subheadline))
-                .foregroundStyle(theme.tertiaryText)
-                .padding(.horizontal, BighelpTokens.space20)
-                .accessibilityIdentifier("simple-bots.profile.mark-status")
-
-            SimpleBotsCard {
                 Button { isInstructionsPresented = true } label: {
                     SimpleBotsRow(title: String(localized: "Instructions"), leading: Image(systemName: "doc.text"))
                 }
@@ -487,7 +619,6 @@ struct SimpleBotProfileView: View {
                     .accessibilityIdentifier("simple-bots.profile.advanced-options")
                 }
             }
-            .padding(.top, BighelpTokens.space12)
 
             routines(profile)
         }

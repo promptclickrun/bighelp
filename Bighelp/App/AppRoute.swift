@@ -68,8 +68,9 @@ enum AppRoute: Hashable {
     case devFactoryRecipe(id: String)
     case devFactoryGroup(id: String)
     case devFactoryChanges(runID: String)
-    /// Bots mode: a bot's profile, from its chat's name or a long press.
-    case simpleBotProfile(agentID: String)
+    /// Bots mode: a bot's profile, from its chat's name or a long press. `opening` is for code that
+    /// shows a person one tab and sheet (an agent's drive); nil opens it as a tap does.
+    case simpleBotProfile(agentID: String, opening: BotProfileOpening? = nil)
 
     /// Screens about every computer, which stay put when the working computer changes.
     var isAllHosts: Bool { self == .allHostsChats }

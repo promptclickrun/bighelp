@@ -204,6 +204,20 @@ final class SkillsHubManagementModel: CapabilityActionTrackingState {
 
     func dismissReview() { review = nil }
 
+    /// The newest copy of `item` the host listed (official, search results or featured), so a
+    /// skill's page shows an install as soon as a refresh reports it.
+    func latest(_ item: SkillHubItem) -> SkillHubItem {
+        snapshot?.official.first { $0.id == item.id }
+            ?? searchResult?.items.first { $0.id == item.id }
+            ?? snapshot?.featured.first { $0.id == item.id }
+            ?? item
+    }
+
+    /// A hub's name for a source ID.
+    func sourceLabel(_ source: String) -> String {
+        snapshot?.sources.first { $0.id == source }?.label ?? source
+    }
+
     func uninstall(_ item: SkillHubItem) async {
         await perform {
             let result = try await client.uninstall(name: item.name)

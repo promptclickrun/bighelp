@@ -94,7 +94,7 @@ extension RootShellView {
         guard !open.isEmpty else { return true }
         var reattached = true
         for destination in Set(open) where opensHostAdministration(destination)
-            || (CapabilitiesManagementKind(destination: destination) != nil && !usesWorkspaceFixtures) {
+            || (CapabilitiesManagementKind(destination: destination).map(opensNativeCapabilities) ?? false) {
             let owner = administrationPresentations[destination]?.owner ?? capabilitiesPresentations[destination]?.owner
             if let owner, owner == administrationOwner || owner == currentWorkspaceOwner { continue }
             reattached = presentWorkspaceDestination(destination, reattaching: true) && reattached
@@ -167,9 +167,11 @@ extension RootShellView {
             if !reattaching { appState.open(.workspaceManagement(destination)) }
             return true
         }
-        if let kind = CapabilitiesManagementKind(destination: destination), !usesWorkspaceFixtures {
+        if let kind = CapabilitiesManagementKind(destination: destination), opensNativeCapabilities(kind) {
             var presentation: NativeCapabilitiesPresentation?
-            if let owner = currentWorkspaceOwner,
+            if usesDemoCapabilityCatalogs {
+                presentation = makeDemoCapabilitiesPresentation(kind)
+            } else if let owner = currentWorkspaceOwner,
                let direct = workspaceConnections?.hosts.selectedWorkspace?.nativeClient {
                 let profileID = workspaceAgentID
                 let current: @MainActor () -> WorkspaceOwner? = {
@@ -236,6 +238,43 @@ extension RootShellView {
             appState.open(.workspaceManagement(destination))
         }
         return true
+    }
+
+    /// Demo runs open Plugins and the Skills Hub on made-up catalogs (`DemoCapabilityCatalogHost`);
+    /// MCP and Toolsets keep the fixture list.
+    var usesDemoCapabilityCatalogs: Bool {
+        #if DEBUG
+        return usesWorkspaceFixtures && workspaceConnections?.isDirectSelected != true
+        #else
+        return false
+        #endif
+    }
+
+    /// Whether `kind` opens its native management screen rather than the fixture list.
+    func opensNativeCapabilities(_ kind: CapabilitiesManagementKind) -> Bool {
+        !usesWorkspaceFixtures || (usesDemoCapabilityCatalogs && (kind == .skills || kind == .plugins))
+    }
+
+    /// Demo runs: the real Skills Hub and Plugins clients against the made-up host.
+    private func makeDemoCapabilitiesPresentation(_ kind: CapabilitiesManagementKind) -> NativeCapabilitiesPresentation? {
+        #if DEBUG
+        guard let owner = currentWorkspaceOwner else { return nil }
+        let profileID = workspaceAgentID
+        let current: @MainActor () -> WorkspaceOwner? = {
+            guard workspaceAgentID == profileID else { return nil }
+            return currentWorkspaceOwner
+        }
+        let host = DemoCapabilityCatalogHost.shared
+        return NativeCapabilitiesPresentation(
+            kind: kind, owner: owner, profileID: profileID,
+            dependencies: CapabilitiesManagementDependencies(
+                skills: DirectHermesSkillsHubClient(http: host, owner: owner, profileID: profileID, currentOwner: current),
+                mcp: DirectHermesMCPClient(http: host, owner: owner, profileID: profileID, currentOwner: current),
+                plugins: DirectHermesPluginLifecycleClient(http: host, owner: owner, currentOwner: current),
+                toolsets: DirectHermesToolsetClient(http: host, owner: owner, profileID: profileID, currentOwner: current)))
+        #else
+        return nil
+        #endif
     }
 
     /// Demo runs: the same host page on made-up data (`DemoModels`).

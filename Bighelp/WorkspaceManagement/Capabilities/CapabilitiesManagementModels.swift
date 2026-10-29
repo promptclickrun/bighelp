@@ -360,7 +360,20 @@ struct PluginCatalogEntry: Identifiable, Equatable, Sendable {
     let updateAvailable: Bool
     let runtimeStatus: String?
     let removedReason: String?
+    // Storefront fields. Hosts add, omit or rename these, so each is optional and
+    // a bad value hides only itself (`DirectHermesPluginLifecycleClient.decodeCatalog`).
+    /// A human name, where the catalog gives one.
+    var title: String? = nil
+    /// The catalog's topic (tools, memory, desktop…), lowercased.
+    var category: String? = nil
+    /// A banner picture, https only.
+    var imageURL: URL? = nil
+    var screenshotURLs: [URL] = []
+    var version: String? = nil
+    var knownIssues: [String] = []
     var id: String { name }
+    /// What the storefront calls it: its title, else its catalog name.
+    var displayName: String { title ?? name }
 }
 
 struct InstalledPlugin: Identifiable, Equatable, Sendable {
@@ -382,6 +395,8 @@ struct PluginSnapshot: Equatable, Sendable {
     let installed: [InstalledPlugin]
     let catalog: [PluginCatalogEntry]
     let removedCatalogEntries: [String]
+    /// Catalog rows that didn't decode and were left out.
+    var skippedCatalogRows = 0
 }
 
 @MainActor

@@ -3,6 +3,13 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.34
+
+### Fixed
+
+- **Pictures from agents:** pictures that an agent sends now show in the chat when the reply arrives while bighelp is in the background. Before, the chat showed the loading tile and did not show the pictures.
+- **Show me where with more than one computer:** when bighelp shows the bots of all your computers, the agent now opens the place on the computer that you use. The bar shows the correct agent name. Before, the page did not change, and the bar could show the name of an agent on a different computer.
+
 ## 2.6.33
 
 ### Agents

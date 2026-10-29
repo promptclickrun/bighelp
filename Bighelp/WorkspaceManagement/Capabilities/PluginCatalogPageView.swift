@@ -10,6 +10,7 @@ struct PluginCatalogPageView: View {
     let entry: PluginCatalogEntry
 
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @State private var confirmsInstall = false
 
     /// The latest copy from the host, so Install's result shows here.
     private var current: PluginCatalogEntry {
@@ -65,7 +66,7 @@ struct PluginCatalogPageView: View {
             if !entry.screenshotURLs.isEmpty {
                 VStack(alignment: .leading, spacing: BighelpTokens.space8) {
                     CatalogShelf(items: entry.screenshotURLs.map(Screenshot.init),
-                                 width: { min(max($0 * 0.66, 220), 380) }) { shot in
+                                 columns: .screenshots) { shot in
                         Color.clear
                             .aspectRatio(16.0 / 10.0, contentMode: .fit)
                             .overlay { CatalogArtwork(url: shot.url, category: entry.catalogCategory) }
@@ -88,6 +89,14 @@ struct PluginCatalogPageView: View {
         .navigationTitle(entry.displayName)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { model.clearMessages() }
+        // The last look before anything changes: what it adds, from where, at which commit.
+        .confirmationDialog(Text("Install \(entry.displayName)?"), isPresented: $confirmsInstall,
+                            titleVisibility: .visible) {
+            Button("Install and turn on") { Task { await model.install(entry) } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(Self.installMessage(entry, hostName: hostName))
+        }
         .accessibilityIdentifier("plugin.page")
     }
 
@@ -117,7 +126,7 @@ struct PluginCatalogPageView: View {
                 CatalogPrimaryButton(title: model.isBusy ? String(localized: "Installing…")
                                                          : String(localized: "Install on \(hostName)"),
                                      isEnabled: !model.isBusy) {
-                    Task { await model.install(entry) }
+                    confirmsInstall = true
                 }
                 .accessibilityIdentifier("plugin.install")
                 Text("Plugins change every agent on this computer. Hermes runs its own security review, and bighelp never forces an install.")
@@ -180,6 +189,16 @@ struct PluginCatalogPageView: View {
                 .foregroundStyle(theme.action)
             }
         }
+    }
+
+    /// "Install and turn on Recall on Home? It adds 4 tools and 1 hook, from <repo> at aeefa20."
+    static func installMessage(_ entry: PluginCatalogEntry, hostName: String) -> String {
+        let capabilities = entry.capabilities
+        let tools = capabilities.tools.count, hooks = capabilities.hooks.count
+        let adds = String(localized: "It adds \(tools.formatted()) \(tools == 1 ? "tool" : "tools") and \(hooks.formatted()) \(hooks == 1 ? "hook" : "hooks")")
+        let keys = capabilities.requiredEnvironment.isEmpty ? ""
+            : " " + String(localized: "You add its keys after: \(capabilities.requiredEnvironment.prefix(10).joined(separator: ", ")).")
+        return String(localized: "Install and turn on \(entry.displayName) on \(hostName)? \(adds), from \(entry.repository) at \(String(entry.commitSHA.prefix(7))).") + keys
     }
 
     /// "4 tools · 1 hook", or that it declares nothing.

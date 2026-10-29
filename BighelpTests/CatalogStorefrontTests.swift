@@ -6,7 +6,7 @@ import Testing
 /// rows' tier, category and pictures, and the official skills' topics.
 @MainActor
 struct CatalogStorefrontTests {
-    @Test func pluginCatalogReadsStorefrontFieldsAndSkipsOnlyAnUnreadableRow() async throws {
+    @Test func pluginCatalogReadsStorefrontFieldsAndSkipsUnreadableAndRepeatedRows() async throws {
         let owner = WorkspaceOwner(
             authority: try .direct(endpointIdentity: "https://hermes.example", providerID: "basic", userID: "person"),
             authenticationGeneration: UUID(), connectionGeneration: UUID()
@@ -15,8 +15,9 @@ struct CatalogStorefrontTests {
 
         let snapshot = try await client.load()
 
+        // One name is one card: a second "recall" row is left out and counted, like the unpinned row.
         #expect(snapshot.catalog.map(\.name) == ["recall", "plain"])
-        #expect(snapshot.skippedCatalogRows == 1)
+        #expect(snapshot.skippedCatalogRows == 2)
         let recall = try #require(snapshot.catalog.first)
         #expect(recall.displayName == "Recall")
         #expect(recall.category == "memory")
@@ -57,6 +58,9 @@ struct CatalogStorefrontTests {
         #expect(storefront.shelves.map(\.id) == ["memory", "tools", "general", "platform", "desktop"])
         #expect(storefront.shelves.first?.entries.map(\.name) == ["wiki", "recall", "habit"])
         #expect(storefront.shelves.last?.category.title == "For Hermes Desktop")
+        // Lists load banners only from official and verified plugins' rows.
+        #expect(storefront.hero?.listedImageURL != nil)
+        #expect(entry("art", tier: "community", category: "tools", image: true).listedImageURL == nil)
         #expect(PluginStorefront.matching("memory", in: catalog).map(\.name) == ["wiki", "recall", "habit"])
         #expect(PluginStorefront.matching("", in: catalog).last?.catalogCategory == .desktop)
     }
@@ -94,6 +98,38 @@ struct CatalogStorefrontTests {
         #expect(storefront.officialTopics.first?.items.count == 2)
         #expect(storefront.hubs.map(\.id) == ["skills-sh"])
         #expect(storefront.enabledCount == 1 && storefront.disabledCount == 1)
+    }
+
+    @Test func shelvesShowOnlyWholeCards() {
+        // A phone's width inside the page margins, then an iPad's.
+        for length in [358.0, 992.0] {
+            for columns in [CatalogShelfColumns.cards, .tiles, .screenshots] {
+                let count = CGFloat(columns.count(in: length))
+                let width = columns.width(in: length)
+                #expect(abs(width * count + CatalogMetrics.shelfSpacing * (count - 1) - length) < 0.001)
+                #expect(width >= columns.minimumWidth)
+            }
+        }
+        #expect(CatalogShelfColumns.cards.count(in: 358) == 2)
+        #expect(CatalogShelfColumns.tiles.count(in: 358) == 3)
+        #expect(CatalogShelfColumns.cards.count(in: 992) > 2)
+    }
+
+    @Test func aSkillAddedFromSearchResultsReadsAsInstalledAfterAReload() async throws {
+        let client = SkillsHost()
+        let model = SkillsHubManagementModel(client: client)
+        await model.load()
+        model.query = "trip"
+        await model.search()
+        let found = try #require(model.searchResult?.items.first)
+        #expect(!model.latest(found).isInstalled)
+
+        client.installed = [found.id]
+        await model.load()
+
+        // The search results still say not installed; the reload's installed list wins.
+        #expect(model.searchResult?.items.first?.isInstalled == false)
+        #expect(model.latest(found).isInstalled)
     }
 
     private func entry(_ name: String, tier: String, category: String?, image: Bool = false,
@@ -136,6 +172,7 @@ private final class CatalogHost: DirectHermesAuthenticatedHTTP {
                         "docs_url": .string("not a link"), "known_issues": .array([.string("One."), .null, .string("Two.")]),
                     ]),
                     row("unpinned", extra: ["sha": .string("main")]),
+                    row("recall", extra: ["title": .string("A second Recall")]),
                 ]),
                 "removed": .array([]),
             ])
@@ -159,4 +196,37 @@ private final class CatalogHost: DirectHermesAuthenticatedHTTP {
         row.merge(extra) { _, new in new }
         return .object(row)
     }
+}
+
+/// A Skills Hub whose installed list changes between loads, as Hermes' does after an install.
+@MainActor
+private final class SkillsHost: SkillsHubManagementClient {
+    let owner = WorkspaceOwner(
+        authority: try! .direct(endpointIdentity: "https://hermes.example", providerID: "basic", userID: "person"),
+        authenticationGeneration: UUID(), connectionGeneration: UUID()
+    )
+    let profileID = "default"
+    var installed: Set<String> = []
+
+    private let trip = SkillHubItem(id: "clawhub/trip-planner", name: "trip-planner", summary: "Plans a trip.",
+                                    source: "clawhub", trustLevel: "community", repository: nil, tags: [],
+                                    category: nil, isInstalled: false)
+
+    func load() async throws -> SkillHubSnapshot {
+        SkillHubSnapshot(sources: [], featured: [], official: [], installedSkills: [],
+                         installedIdentifiers: installed, indexAvailable: true)
+    }
+    func search(query: String, source: String) async throws -> SkillHubSearchResult {
+        SkillHubSearchResult(items: [trip], sourceCounts: [:], timedOutSources: [])
+    }
+    func preview(identifier: String) async throws -> SkillHubPreview { throw CapabilitiesManagementError.invalidRequest }
+    func scan(identifier: String) async throws -> SkillHubScan { throw CapabilitiesManagementError.invalidRequest }
+    func setEnabled(_ enabled: Bool, skillName: String) async throws -> InstalledSkill {
+        throw CapabilitiesManagementError.invalidRequest
+    }
+    func install(identifier: String, preview: SkillHubPreview, scan: SkillHubScan) async throws -> CapabilityWriteResult {
+        throw CapabilitiesManagementError.invalidRequest
+    }
+    func uninstall(name: String) async throws -> CapabilityWriteResult { throw CapabilitiesManagementError.invalidRequest }
+    func updateInstalled() async throws -> CapabilityWriteResult { throw CapabilitiesManagementError.invalidRequest }
 }

@@ -26,7 +26,9 @@ final class DirectHermesPluginLifecycleClient: PluginLifecycleManagementClient {
         let catalog = try await catalogValue
         let installed = try CapabilitiesPayload.rows(hub["plugins"], decodeInstalled)
         let catalogRows = try CapabilitiesPayload.array(catalog["entries"])
-        let entries = catalogRows.compactMap { try? decodeCatalog($0) }
+        // A name is a row's identity on screen; a second row with the same name is left out.
+        var names = Set<String>()
+        let entries = catalogRows.compactMap { try? decodeCatalog($0) }.filter { names.insert($0.name).inserted }
         let removed = try CapabilitiesPayload.rows(catalog["removed"]) { value -> String in
             let row = try CapabilitiesPayload.object(value)
             let name = try CapabilitiesPayload.text(row["name"], maximumBytes: 160)

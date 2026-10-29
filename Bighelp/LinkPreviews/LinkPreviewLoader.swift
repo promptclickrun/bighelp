@@ -42,7 +42,13 @@ struct LinkPreviewLoader: Sendable {
         let type = response.mimeType?.lowercased() ?? ""
 
         if type.hasPrefix("image/") {
-            let picture = try await picture(page)
+            // A link straight to a picture: use what was read, unless it was cut off at the limit.
+            let picture: (data: Data, aspect: Double)
+            if data.count < Self.maximumPageBytes {
+                picture = try Self.cardPicture(data)
+            } else {
+                picture = try await self.picture(page)
+            }
             return Loaded(preview: LinkPreview(url: page, imageURL: page, imageAspect: picture.aspect),
                           imageData: picture.data)
         }

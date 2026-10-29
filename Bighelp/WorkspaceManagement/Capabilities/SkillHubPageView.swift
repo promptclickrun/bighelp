@@ -2,8 +2,9 @@ import SwiftUI
 
 /// A Hub skill's page: its tile, name, where it comes from and how far Hermes trusts it, and one
 /// Add button. Opening the page runs Hermes' preview and security scan, so the verdict and files
-/// show before Add; a scan that blocks the skill leaves Add off. Add installs exactly the
-/// identifier that was scanned, never with a force flag.
+/// show before Add (above it when the scan found things to check); a scan that blocks the skill
+/// leaves Add off. Add asks once more, then installs exactly the identifier that was scanned,
+/// never with a force flag.
 @MainActor
 struct SkillHubPageView: View {
     @Bindable var model: SkillsHubManagementModel
@@ -12,6 +13,7 @@ struct SkillHubPageView: View {
 
     @State private var confirmsRemoval = false
     @State private var isAdding = false
+    @State private var confirmsAdd = false
     @State private var showsMarkdown = false
 
     private var review: SkillsHubManagementModel.Review? {
@@ -29,13 +31,15 @@ struct SkillHubPageView: View {
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                // Findings to check come before Add, so they're read first.
+                if let review, review.scan.policy != .allow { verdict(review.scan) }
                 action(item)
                 CatalogStatusBanner(support: model.support, isBusy: model.isBusy,
                                     errorMessage: model.errorMessage, successMessage: model.successMessage,
                                     retry: { Task { await model.inspect(item) } })
                     .padding(.horizontal, -CatalogMetrics.margin)
                 if let review {
-                    verdict(review.scan)
+                    if review.scan.policy == .allow { verdict(review.scan) }
                     files(review.preview)
                 }
             }
@@ -48,6 +52,17 @@ struct SkillHubPageView: View {
         .task(id: item.id) {
             model.clearMessages()
             if !item.isInstalled, review == nil { await model.inspect(item) }
+        }
+        .confirmationDialog(Text("Add \(item.name)?"), isPresented: $confirmsAdd, titleVisibility: .visible) {
+            Button(review?.scan.policy == .ask ? "Add anyway" : "Add") {
+                Task {
+                    await model.installReviewed(item.id)
+                    if model.errorMessage == nil { isAdding = true }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(addMessage(item))
         }
         .confirmationDialog("Remove this skill?", isPresented: $confirmsRemoval, titleVisibility: .visible) {
             Button("Remove \(item.name)", role: .destructive) { Task { await model.uninstall(item) } }
@@ -68,6 +83,13 @@ struct SkillHubPageView: View {
                     .font(.bighelp(.title, weight: .heavy))
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
+            }
+            if let repository = item.repository, !repository.isEmpty {
+                Text("From \(repository)")
+                    .font(.bighelp(.footnote))
+                    .foregroundStyle(theme.secondaryText)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             BighelpFlowLayout(spacing: 6) {
                 if !item.trustLevel.isEmpty { CatalogBadge(text: item.trustLevel, style: .tier) }
@@ -108,14 +130,11 @@ struct SkillHubPageView: View {
                     CatalogPrimaryButton(title: model.isBusy ? String(localized: "Adding…")
                                                              : String(localized: "Add to \(profileName)"),
                                          isEnabled: !model.isBusy) {
-                        Task {
-                            await model.installReviewed()
-                            if model.errorMessage == nil { isAdding = true }
-                        }
+                        confirmsAdd = true
                     }
                     .accessibilityIdentifier("skill.add")
                     note(review.scan.policy == .ask
-                         ? "Hermes' scan found things to look at first. They're listed below."
+                         ? "Hermes' scan found things to look at first. They're listed above."
                          : "Hermes checked this skill. Add installs exactly what it checked.")
                 }
             } else {
@@ -186,6 +205,14 @@ struct SkillHubPageView: View {
             .font(.bighelp(.footnote))
             .foregroundStyle(theme.secondaryText)
             .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func addMessage(_ item: SkillHubItem) -> String {
+        guard let scan = review?.scan, scan.policy == .ask else {
+            return String(localized: "Hermes' scan found nothing to check. \(item.name) is added to \(profileName) for new chats.")
+        }
+        let count = max(scan.findings.count, 1)
+        return String(localized: "Hermes' scan found \(count.formatted()) \(count == 1 ? "thing" : "things") to check. Add \(item.name) anyway?")
     }
 
     private static func decision(_ policy: SkillHubScan.Policy) -> String {

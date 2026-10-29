@@ -274,6 +274,16 @@ bundled artwork. Successful catalog withdrawal removes the remote override on
 the next refresh, but cannot remotely erase copies on offline devices. Daily
 refreshes and failure backoff limit traffic without background polling.
 
+### Plugin catalog pictures
+
+The Plugins storefront shows banner pictures and screenshots that a plugin's catalog
+row links to. Lists (shelves, the official pick, See all and search results) load a
+banner only for official and verified plugins. A community plugin's pictures are on a
+server its author controls, so they load only on that plugin's own page, after the
+person opens it. Pictures load like link previews: public HTTPS hosts only, no
+cookies or credentials, size-bounded, shrunk to card size and kept in Caches for a
+week.
+
 ### On-device voices
 
 An agent can speak with Phonon on the iPhone or iPad instead of its computer's

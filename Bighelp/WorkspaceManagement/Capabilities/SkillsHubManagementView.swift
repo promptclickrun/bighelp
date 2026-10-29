@@ -180,7 +180,7 @@ struct SkillsHubManagementView: View {
             VStack(alignment: .leading, spacing: BighelpTokens.space8) {
                 CatalogSectionHeader(title: String(localized: "Official"), count: nil,
                                      seeAllIdentifier: "skills.seeAll.official") { officialPage(storefront) }
-                CatalogShelf(items: storefront.officialShelf, width: CatalogMetrics.tileWidth) { tile($0) }
+                CatalogShelf(items: storefront.officialShelf, columns: .tiles) { tile($0) }
             }
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("skills.shelf.official")

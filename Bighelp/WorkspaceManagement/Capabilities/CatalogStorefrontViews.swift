@@ -8,19 +8,44 @@ import UIKit
 enum CatalogMetrics {
     static let margin = BighelpTokens.space16
     static let cardSpacing = BighelpTokens.space12
+    /// Between a shelf's cards: the page margin, so the card after the last whole one starts
+    /// exactly at the screen's edge and none of it shows.
+    static let shelfSpacing = margin
     static let sectionSpacing = BighelpTokens.space24
     static let artworkRadius: CGFloat = 14
     static let heroRadius: CGFloat = 22
 
-    /// A shelf card's width: two whole cards and the edge of the next on a phone, more on wider screens.
-    static func cardWidth(_ length: CGFloat) -> CGFloat { min(max(length * 0.42, 150), 230) }
-    /// A square skill tile's width: three and a bit on a phone.
-    static func tileWidth(_ length: CGFloat) -> CGFloat { min(max(length * 0.29, 104), 150) }
+}
+
+/// How many whole cards a shelf shows across: at least `minimum`, more while each stays at least
+/// `minimumWidth` wide. A shelf never shows part of a card at its edge.
+struct CatalogShelfColumns: Sendable {
+    let minimumWidth: CGFloat
+    let minimum: Int
+
+    /// Plugin cards: two on a phone.
+    static let cards = CatalogShelfColumns(minimumWidth: 150, minimum: 2)
+    /// Square skill tiles: three on a phone.
+    static let tiles = CatalogShelfColumns(minimumWidth: 100, minimum: 3)
+    /// Screenshots: one on a phone.
+    static let screenshots = CatalogShelfColumns(minimumWidth: 260, minimum: 1)
+
+    func count(in length: CGFloat) -> Int {
+        let spacing = CatalogMetrics.shelfSpacing
+        return max(minimum, Int((length + spacing) / (minimumWidth + spacing)))
+    }
+
+    /// One card's width when `count(in:)` cards and their gaps fill `length` exactly.
+    func width(in length: CGFloat) -> CGFloat {
+        let count = CGFloat(count(in: length))
+        return (length - CatalogMetrics.shelfSpacing * (count - 1)) / count
+    }
 }
 
 /// A plugin's banner picture, or its topic's tile until (or unless) the picture loads. Pictures
 /// load through the link-preview store: public https hosts only, no cookies, size-bounded,
-/// shrunk to card size and kept on disk for a week.
+/// shrunk to card size and kept on disk for a week. A picture already in memory shows at once,
+/// so scrolling back to a card doesn't flash its tile.
 struct CatalogArtwork: View {
     let url: URL?
     let category: CatalogCategory
@@ -28,6 +53,18 @@ struct CatalogArtwork: View {
     var cornerRadius: CGFloat = CatalogMetrics.artworkRadius
 
     @State private var picture: UIImage?
+    @State private var shownURL: URL?
+
+    init(url: URL?, category: CatalogCategory, symbolSize: CGFloat = 30,
+         cornerRadius: CGFloat = CatalogMetrics.artworkRadius) {
+        self.url = url
+        self.category = category
+        self.symbolSize = symbolSize
+        self.cornerRadius = cornerRadius
+        let cached = url.flatMap { LinkPreviewStore.shared.cachedPicture(for: $0) }
+        _picture = State(initialValue: cached)
+        _shownURL = State(initialValue: cached == nil ? nil : url)
+    }
 
     var body: some View {
         CatalogCategoryTile(category: category, symbolSize: symbolSize, cornerRadius: cornerRadius)
@@ -41,7 +78,9 @@ struct CatalogArtwork: View {
             }
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .task(id: url) {
+                guard url != shownURL || picture == nil else { return }
                 picture = nil
+                shownURL = url
                 guard let url else { return }
                 let store = LinkPreviewStore.shared
                 guard case .preview = await store.load(url), !Task.isCancelled else { return }
@@ -109,17 +148,20 @@ struct CatalogBadge: View {
 }
 
 /// "Get" or "Open" on a card. The whole card is the button; this only says what it does.
+/// `filled` is the hero's: the action color, at least a touch target tall.
 struct CatalogGetLabel: View {
     let text: String
     var prominent = true
+    var filled = false
 
     var body: some View {
         Text(text)
-            .font(.bighelp(.subheadline, weight: .heavy))
-            .foregroundStyle(prominent ? theme.action : theme.primaryText)
-            .padding(.horizontal, BighelpTokens.space16)
+            .font(.bighelp(filled ? .body : .subheadline, weight: .heavy))
+            .foregroundStyle(filled ? theme.actionForeground : prominent ? theme.action : theme.primaryText)
+            .padding(.horizontal, filled ? BighelpTokens.space20 : BighelpTokens.space16)
             .padding(.vertical, 6)
-            .background(theme.surface, in: Capsule())
+            .frame(minHeight: filled ? BighelpTokens.hitTarget : nil)
+            .background(filled ? theme.action : theme.surface, in: Capsule())
             .fixedSize()
     }
 
@@ -176,24 +218,26 @@ extension CatalogSectionHeader where Destination == EmptyView {
     }
 }
 
-/// A row of whole cards that scrolls sideways and stops on a card, lined up with the page margin,
-/// so the next card shows at the edge.
+/// A row of whole cards that scrolls sideways. Whole cards fill the width inside the page
+/// margins, and a swipe stops on a card, so no card is ever cut at the edge; See all shows the rest.
+/// The cards in a row are as tall as the tallest, so a card's last line (Get) lines up.
 struct CatalogShelf<Item: Identifiable, Card: View>: View {
     let items: [Item]
-    let width: (CGFloat) -> CGFloat
+    let columns: CatalogShelfColumns
     @ViewBuilder let card: (Item) -> Card
 
     var body: some View {
         ScrollView(.horizontal) {
-            LazyHStack(alignment: .top, spacing: CatalogMetrics.cardSpacing) {
+            // Not lazy: a shelf holds at most a dozen cards, and every card must be measured
+            // to make the row as tall as the tallest.
+            HStack(alignment: .top, spacing: CatalogMetrics.shelfSpacing) {
                 ForEach(items) { item in
-                    // Each card takes the height its width needs, so a name that wraps
-                    // doesn't shrink its picture.
                     card(item)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .containerRelativeFrame(.horizontal) { length, _ in width(length) }
+                        .frame(maxHeight: .infinity, alignment: .top)
+                        .containerRelativeFrame(.horizontal) { length, _ in columns.width(in: length) }
                 }
             }
+            .fixedSize(horizontal: false, vertical: true)
             .scrollTargetLayout()
         }
         .scrollTargetBehavior(.viewAligned)
@@ -219,6 +263,8 @@ struct CatalogGrid<Item: Identifiable, Card: View>: View {
 }
 
 /// A plugin as a card: banner (or topic tile) at 2:1, its name, one line, and Get or Open.
+/// Only official and verified plugins load their banner here: a community plugin's picture is
+/// on its author's server, so it loads only on the plugin's own page, once the person opens it.
 struct PluginCatalogCard: View {
     let entry: PluginCatalogEntry
 
@@ -226,20 +272,23 @@ struct PluginCatalogCard: View {
         VStack(alignment: .leading, spacing: BighelpTokens.space8) {
             Color.clear
                 .aspectRatio(2, contentMode: .fit)
-                .overlay { CatalogArtwork(url: entry.imageURL, category: entry.catalogCategory) }
-            // Two lines kept for each, so cards side by side in a shelf are the same height.
+                .overlay { CatalogArtwork(url: entry.listedImageURL, category: entry.catalogCategory) }
             Text(entry.displayName)
                 .font(.bighelp(.subheadline, weight: .bold))
                 .foregroundStyle(theme.primaryText)
-                .lineLimit(2, reservesSpace: true)
-            Text(entry.summary)
-                .font(.bighelp(.footnote))
-                .foregroundStyle(theme.secondaryText)
-                .lineLimit(2, reservesSpace: true)
+                .fixedSize(horizontal: false, vertical: true)
+            if !entry.summary.isEmpty {
+                Text(entry.summary)
+                    .font(.bighelp(.footnote))
+                    .foregroundStyle(theme.secondaryText)
+                    .lineLimit(2)
+            }
+            // In a shelf the card is as tall as the row's tallest, and Get sits at the bottom.
+            Spacer(minLength: 0)
             CatalogGetLabel(text: entry.isInstalled ? String(localized: "Open") : String(localized: "Get"),
                             prominent: !entry.isInstalled)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .contentShape(.rect)
     }
 
@@ -269,18 +318,21 @@ struct SkillCatalogTile: View {
                             .accessibilityHidden(true)
                     }
                 }
-            // Two lines kept for the name, so tiles side by side in a shelf are the same height.
             Text(item.name)
                 .font(.bighelp(.subheadline, weight: .bold))
                 .foregroundStyle(theme.primaryText)
-                .lineLimit(2, reservesSpace: true)
+                .fixedSize(horizontal: false, vertical: true)
             Text(item.catalogCategory?.title ?? sourceLabel)
                 .font(.bighelp(.caption))
                 .foregroundStyle(theme.secondaryText)
-                .lineLimit(1)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .contentShape(.rect)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text([item.name, item.catalogCategory?.title ?? sourceLabel,
+                                  item.isInstalled ? String(localized: "Installed") : nil]
+            .compactMap { $0 }.joined(separator: ", ")))
     }
 
     @BighelpThemeReader private var theme

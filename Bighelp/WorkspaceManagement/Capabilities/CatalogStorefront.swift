@@ -70,6 +70,10 @@ extension PluginCatalogEntry {
     }
 
     var isTrusted: Bool { tierRank < 2 }
+
+    /// The banner a list (shelf, hero, grid) may load: official and verified plugins only. A
+    /// community plugin's picture is on its author's server and loads only on its own page.
+    var listedImageURL: URL? { isTrusted ? imageURL : nil }
 }
 
 /// The Plugins home: one featured plugin, a shelf of official and verified ones, then a shelf per
@@ -85,7 +89,7 @@ struct PluginStorefront: Equatable {
     let hero: PluginCatalogEntry?
     /// Official before verified, without the hero.
     let trusted: [PluginCatalogEntry]
-    /// Biggest topic first, then by name; desktop last.
+    /// Biggest topic first, ties by the host's topic name; desktop last.
     let shelves: [Shelf]
 
     init(catalog: [PluginCatalogEntry]) {
@@ -107,7 +111,7 @@ struct PluginStorefront: Equatable {
                 let leftDesktop = left.category == .desktop, rightDesktop = right.category == .desktop
                 if leftDesktop != rightDesktop { return rightDesktop }
                 if left.entries.count != right.entries.count { return left.entries.count > right.entries.count }
-                return left.category.title.localizedStandardCompare(right.category.title) == .orderedAscending
+                return left.category.id < right.category.id
             }
     }
 
@@ -162,7 +166,7 @@ struct SkillStorefront: Equatable {
             .map { Topic(category: $0.key, items: $0.value) }
             .sorted { left, right in
                 if left.items.count != right.items.count { return left.items.count > right.items.count }
-                return left.category.title.localizedStandardCompare(right.category.title) == .orderedAscending
+                return left.category.id < right.category.id
             }
 
         var seenTopics = Set<String>()

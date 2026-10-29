@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// Plugins as a storefront (Settings › Hermes tools › Plugins): search, a featured official
-/// plugin, the official and verified ones, then a shelf per topic. A card opens the plugin's page,
+/// Plugins as a storefront (Settings › Hermes tools › Plugins): search, an official plugin, the official and verified ones, then a shelf per topic. A card opens the plugin's page,
 /// whose one Install button installs the pinned commit it shows. Installed plugins are a toolbar
 /// button away.
 @MainActor
@@ -63,7 +62,8 @@ struct PluginLifecycleManagementView: View {
         }
         if let hero = storefront.hero {
             VStack(alignment: .leading, spacing: BighelpTokens.space8) {
-                Text("Featured")
+                // Hermes has no featured list: this is the first official plugin it lists.
+                Text("Official pick")
                     .font(.bighelp(.footnote, weight: .bold))
                     .tracking(0.6)
                     .textCase(.uppercase)
@@ -98,7 +98,7 @@ struct PluginLifecycleManagementView: View {
             CatalogSectionHeader(title: title, count: count, seeAllIdentifier: "plugins.seeAll.\(id)") {
                 PluginCategoryView(model: model, hostName: hostName, title: title, entries: entries)
             }
-            CatalogShelf(items: Array(entries.prefix(12)), width: CatalogMetrics.cardWidth) { entry in
+            CatalogShelf(items: Array(entries.prefix(12)), columns: .cards) { entry in
                 card(entry)
             }
         }
@@ -142,7 +142,7 @@ private struct PluginHeroCard: View {
                 .frame(height: sizeClass == .regular ? 260 : 176)
                 .frame(maxWidth: .infinity)
                 .overlay {
-                    CatalogArtwork(url: entry.imageURL, category: entry.catalogCategory, symbolSize: 56, cornerRadius: 0)
+                    CatalogArtwork(url: entry.listedImageURL, category: entry.catalogCategory, symbolSize: 56, cornerRadius: 0)
                 }
                 .overlay(alignment: .bottomLeading) {
                     VStack(alignment: .leading, spacing: BighelpTokens.space4) {
@@ -168,7 +168,7 @@ private struct PluginHeroCard: View {
                     .lineLimit(3)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 CatalogGetLabel(text: entry.isInstalled ? String(localized: "Open") : String(localized: "Get"),
-                                prominent: !entry.isInstalled)
+                                prominent: !entry.isInstalled, filled: !entry.isInstalled)
             }
             .padding(.horizontal, CatalogMetrics.margin)
             .padding(.vertical, 14)

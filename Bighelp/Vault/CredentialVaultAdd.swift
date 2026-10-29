@@ -41,10 +41,21 @@ final class CredentialVaultTyping {
     }
 
     func clearSecrets() {
-        password = ""
-        authenticatorKey = ""
-        cardNumber = ""
-        securityCode = ""
+        clearSecrets(of: .login)
+        clearSecrets(of: .payment)
+    }
+
+    /// One part's secrets, once that part is saved.
+    func clearSecrets(of kind: CredentialVaultItem.Kind) {
+        switch kind {
+        case .login:
+            password = ""
+            authenticatorKey = ""
+        case .payment:
+            cardNumber = ""
+            securityCode = ""
+        case .address: break
+        }
     }
 }
 
@@ -188,6 +199,9 @@ final class CredentialVaultAddModel: Identifiable {
             message = problem.message
             return false
         }
+        // A saved card or address removed meanwhile can't be copied: a new one is typed instead.
+        if case .saved(let id) = cardChoice, vault.group(id) == nil { cardChoice = .new }
+        if case .saved(let id) = addressChoice, vault.group(id) == nil { addressChoice = .new }
         // Everything is checked before anything is sent.
         var plan: [(part: Part, step: Step)] = []
         for part in pending {
@@ -215,6 +229,7 @@ final class CredentialVaultAddModel: Identifiable {
                     try await vault.link(group, to: targets)
                 }
                 saved.insert(part)
+                typing.clearSecrets(of: part.kind)
             } catch {
                 failed = part
                 message = Self.failure(part, error)
@@ -308,7 +323,7 @@ private struct CredentialVaultAddPicks: View {
             }
             .modifier(CredentialVaultColumn())
         }
-        .scrollDismissesKeyboard(.interactively)
+        .dismissesKeyboardOnScroll(true)
         .background(theme.canvas.ignoresSafeArea())
         .navigationTitle(String(localized: "Add a Website"))
         .navigationBarTitleDisplayMode(.inline)
@@ -411,11 +426,22 @@ private struct CredentialVaultAddDetails: View {
             }
             .modifier(CredentialVaultColumn())
         }
-        .scrollDismissesKeyboard(.interactively)
+        .dismissesKeyboardOnScroll(true)
         .background(theme.canvas.ignoresSafeArea())
         .navigationTitle(model.siteName)
         .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(model.isSaving)
+        // Once a part is saved for this website, the website stays: Close leaves with what's saved.
+        .navigationBarBackButtonHidden(model.isSaving || !model.saved.isEmpty)
+        .toolbar {
+            if !model.saved.isEmpty {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(String(localized: "Close"), action: onDone)
+                        .disabled(model.isSaving)
+                        .bighelpToolbarText()
+                        .accessibilityIdentifier("vault.add.close")
+                }
+            }
+        }
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: BighelpTokens.space8) {
                 Text(model.summary)
@@ -569,7 +595,7 @@ struct CredentialVaultEditView: View {
                 }
                 .modifier(CredentialVaultColumn())
             }
-            .scrollDismissesKeyboard(.interactively)
+            .dismissesKeyboardOnScroll(true)
             .background(theme.canvas.ignoresSafeArea())
             .navigationTitle(String(localized: "Edit \(group.kindTitle.lowercased())"))
             .navigationBarTitleDisplayMode(.inline)

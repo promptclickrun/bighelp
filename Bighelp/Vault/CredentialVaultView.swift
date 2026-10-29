@@ -331,6 +331,9 @@ private struct CredentialVaultSitePage: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: BighelpTokens.space8) {
+                if let message = model.message {
+                    CredentialVaultProblem(text: message).accessibilityIdentifier("vault.message")
+                }
                 if let site = model.site(origin) {
                     content(site)
                 } else {
@@ -347,14 +350,14 @@ private struct CredentialVaultSitePage: View {
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("vault.site-page")
+        .onAppear { model.message = nil }
+        .onChange(of: model.site(origin) == nil) { _, isGone in if isGone { dismiss() } }
         .confirmationDialog(String(localized: "Remove \(CredentialVault.siteName(origin))?"), isPresented: $confirmsRemove,
                             titleVisibility: .visible) {
             Button(String(localized: "Remove"), role: .destructive) {
+                // The page closes once the website is gone; a failed remove keeps it open with the reason.
                 guard let site = model.site(origin) else { return }
-                Task {
-                    await model.remove(site)
-                    dismiss()
-                }
+                Task { await model.remove(site) }
             }
         } message: {
             Text("\(model.agentName) won't be able to use what's saved here. A card or address used only on this website is removed too.")
@@ -405,7 +408,7 @@ private struct CredentialVaultSitePage: View {
                 .accessibilityIdentifier("vault.site.remove")
             }
             .padding(.top, BighelpTokens.space16)
-            CredentialVaultNote(text: String(localized: "Removes the login here and stops using the card and address here. They stay saved for your other websites."))
+            CredentialVaultNote(text: String(localized: "Removes the login here and stops using cards and addresses here. One used only on this website is removed too."))
         }
     }
 
@@ -463,6 +466,9 @@ private struct CredentialVaultItemPage: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: BighelpTokens.space8) {
+                if let message = model.message {
+                    CredentialVaultProblem(text: message).accessibilityIdentifier("vault.message")
+                }
                 if let group = model.group(groupID) {
                     content(group)
                 } else {
@@ -479,6 +485,9 @@ private struct CredentialVaultItemPage: View {
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("vault.item-page")
+        .onAppear { model.message = nil }
+        // Renamed or given another number in Change details, it's another item now: back to the list.
+        .onChange(of: model.group(groupID) == nil) { _, isGone in if isGone { dismiss() } }
         .alert(String(localized: "Use on another website"), isPresented: $asksSite) {
             TextField(String(localized: "Website, like example.com"), text: $typedSite)
                 .keyboardType(.URL)
@@ -498,10 +507,7 @@ private struct CredentialVaultItemPage: View {
         .confirmationDialog(removeTitle, isPresented: $confirmsRemove, titleVisibility: .visible) {
             Button(String(localized: "Remove"), role: .destructive) {
                 guard let group = model.group(groupID) else { return }
-                Task {
-                    await model.remove(group)
-                    dismiss()
-                }
+                Task { await model.remove(group) }
             }
         } message: {
             Text("\(model.agentName) won't be able to use it on any website anymore.")
@@ -713,6 +719,8 @@ struct CredentialVaultWalletTile: View {
 struct CredentialVaultCardFace: View {
     let group: CredentialVaultGroup
     var isLarge = false
+    /// Wider with larger text, so the name and digits stay whole.
+    @ScaledMetric(relativeTo: .body) private var tileWidth: CGFloat = 156
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
@@ -732,11 +740,14 @@ struct CredentialVaultCardFace: View {
             Text("•••• \(group.lastDigits ?? "")")
                 .font(.bighelp(isLarge ? .title2 : .body).monospacedDigit())
                 .kerning(isLarge ? 2 : 1)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
             CredentialVaultUsage(group: group, onDark: true, isLarge: isLarge)
         }
         .foregroundStyle(.white)
         .padding(isLarge ? BighelpTokens.space20 : BighelpTokens.space16)
-        .frame(width: isLarge ? 300 : 156, alignment: .leading)
+        .frame(width: isLarge ? nil : tileWidth, alignment: .leading)
+        .frame(maxWidth: isLarge ? 320 : nil, alignment: .leading)
         .frame(minHeight: isLarge ? 184 : 104)
         .background(colorScheme == .dark ? Color(hex: "2A2A2E") : Color(hex: "1C1C1E"), in: shape)
         .overlay { shape.strokeBorder(.white.opacity(colorScheme == .dark ? 0.14 : 0), lineWidth: 1) }
@@ -750,6 +761,7 @@ struct CredentialVaultCardFace: View {
 struct CredentialVaultAddressFace: View {
     let group: CredentialVaultGroup
     var isLarge = false
+    @ScaledMetric(relativeTo: .body) private var tileWidth: CGFloat = 156
     @BighelpThemeReader private var theme
 
     var body: some View {
@@ -771,7 +783,8 @@ struct CredentialVaultAddressFace: View {
         }
         .foregroundStyle(theme.primaryText)
         .padding(isLarge ? BighelpTokens.space20 : BighelpTokens.space16)
-        .frame(width: isLarge ? 300 : 156, alignment: .leading)
+        .frame(width: isLarge ? nil : tileWidth, alignment: .leading)
+        .frame(maxWidth: isLarge ? 320 : nil, alignment: .leading)
         .frame(minHeight: isLarge ? 184 : 104)
         .background(theme.surface, in: .rect(cornerRadius: isLarge ? 22 : 18, style: .continuous))
         .accessibilityElement(children: .combine)
@@ -797,7 +810,7 @@ private struct CredentialVaultUsage: View {
             .font(.bighelp(.footnote))
             .foregroundStyle(group.sites.isEmpty ? (onDark ? Color(hex: "FFC266") : theme.warning)
                              : onDark ? .white.opacity(0.78) : theme.secondaryText)
-            .lineLimit(isLarge ? 2 : 1)
+            .lineLimit(2)
     }
 }
 

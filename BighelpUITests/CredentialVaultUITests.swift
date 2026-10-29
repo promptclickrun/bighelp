@@ -95,6 +95,56 @@ final class CredentialVaultUITests: BighelpUITestCase {
         save("vault-card-page", app)
     }
 
+    /// A real host: a saved card goes on another website, and Add a Website takes it for a new one,
+    /// both copied by the plugin's vault/link. Set BIGHELP_VAULT_HOST (TEST_RUNNER_…) to an open host
+    /// whose default agent has a saved card named BIGHELP_VAULT_CARD on a website, with a plugin that
+    /// has native-vault-link-v1. Uninstall bighelp from the simulator first.
+    @MainActor
+    func testARealHostCopiesASavedCardWithoutTypingIt() throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard let address = environment["BIGHELP_VAULT_HOST"], let card = environment["BIGHELP_VAULT_CARD"] else {
+            throw XCTSkip("Set BIGHELP_VAULT_HOST and BIGHELP_VAULT_CARD for a scratch Hermes host")
+        }
+        let app = makeApp()
+        app.launch()
+        try onboardOpenHost(app, address: address)
+        let menu = app.buttons.matching(NSPredicate(format: "identifier IN %@", ["home.drawer.open", "chat.menu"])).firstMatch
+        XCTAssertTrue(menu.waitForExistence(timeout: 30))
+        menu.tap()
+        let vault = app.buttons["menu.vault"]
+        for _ in 0..<6 where !(vault.exists && vault.isHittable) { app.swipeUp() }
+        vault.tap()
+
+        let tile = button(app, containing: card)
+        XCTAssertTrue(tile.waitForExistence(timeout: 20), "The host's saved card is in the wallet")
+        save("vault-real-host-home", app)
+        tile.tap()
+        app.buttons["vault.item.use-on-site"].tap()
+        let field = app.alerts.textFields.firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.typeText("air.example.com")
+        app.alerts.buttons["Add"].tap()
+        XCTAssertTrue(app.staticTexts["air.example.com"].waitForExistence(timeout: 20), "The host copied it there")
+        XCTAssertFalse(app.descendants(matching: .any)["vault.message"].exists)
+        save("vault-real-host-card", app)
+        app.navigationBars.buttons.firstMatch.tap()
+
+        app.buttons["vault.add"].tap()
+        let site = app.textFields["vault.add.site"]
+        XCTAssertTrue(site.waitForExistence(timeout: 5))
+        site.tap()
+        site.typeText("pay.example.com\n")
+        app.buttons["vault.add.part.login"].tap()
+        app.buttons["vault.add.part.card"].tap()
+        app.buttons["vault.add.next"].tap()
+        let picked = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "vault.add.card.saved.")).firstMatch
+        XCTAssertTrue(picked.waitForExistence(timeout: 5), "The saved card is offered")
+        XCTAssertTrue(picked.isSelected, "and picked to start with")
+        app.buttons["vault.save"].tap()
+        XCTAssertTrue(app.buttons["vault.site.pay.example.com"].waitForExistence(timeout: 20), "One Save added the website")
+        save("vault-real-host-added", app)
+    }
+
     @MainActor
     private func openPrimaryProfile(_ app: XCUIApplication) {
         XCTAssertTrue(app.descendants(matching: .any)["simple-bots.home"].waitForExistence(timeout: 15))

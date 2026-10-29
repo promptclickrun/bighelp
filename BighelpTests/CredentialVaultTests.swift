@@ -182,6 +182,7 @@ struct CredentialVaultTests {
         #expect(add.failed == .card)
         #expect(add.message?.contains("card didn't save") == true)
         #expect(add.typing.cardNumber == "4242424242424242", "What was typed stays to try again")
+        #expect(add.typing.password.isEmpty, "The saved login's password goes at once")
         #expect(add.saveTitle == "Save the Card")
 
         #expect(await add.save())
@@ -231,6 +232,56 @@ struct CredentialVaultTests {
         #expect(service.links.count == 1, "A website it's already on isn't asked for again")
         #expect(await model.use(linked, on: "not a site") == false)
         #expect(model.message == CredentialVault.EntryProblem.site.message)
+    }
+
+    @Test func aCopyThatCantBeMadeSaysWhy() async throws {
+        let service = RecordingVault()
+        let model = await demoVault(service)
+        let unlinked = try #require(model.groups.first { $0.label == "Card ending 1881" })
+        service.demo.linksItems = false
+        #expect(await model.use(unlinked, on: "air.example.com") == false)
+        #expect(model.message == CredentialVaultModel.linkFailure(WorkspaceClientError.unavailable(.unsupportedOperation)))
+        #expect(model.group(unlinked.id)?.origins.isEmpty == true)
+    }
+
+    @Test func theWebsiteHermesWritesBackCountsHoweverItsSpelled() async throws {
+        let service = RecordingVault()
+        service.echoesOrigins = { $0.replacingOccurrences(of: "air.", with: "AIR.") + "/" }
+        let model = await demoVault(service)
+        let unlinked = try #require(model.groups.first { $0.label == "Card ending 1881" })
+        #expect(await model.use(unlinked, on: "air.example.com"), "https://AIR.example.com/ is the website asked for")
+    }
+
+    @Test func aSavedChoiceThatsGoneIsTypedInstead() async throws {
+        let model = await demoVault()
+        let add = CredentialVaultAddModel(vault: model, site: "store.example.com", parts: [.card])
+        guard case .saved(let id) = add.cardChoice, let card = model.group(id) else {
+            Issue.record("A saved card starts picked")
+            return
+        }
+        await model.remove(card)
+        #expect(await add.save() == false)
+        #expect(add.cardChoice == .new, "Its fields show again")
+        #expect(add.message == CredentialVault.EntryProblem.cardNumber.message)
+    }
+
+    @Test func aCheckThatCantReachTheComputerKeepsWhatTheLastOneFound() async {
+        let service = RecordingVault()
+        let model = await demoVault(service)
+        #expect(model.canLink)
+        service.cantCheck = true
+        await model.load()
+        #expect(model.canLink, "A moment without the plugin isn't an old plugin")
+    }
+
+    @Test func aRemoveThatFailsSaysSo() async throws {
+        let service = RecordingVault()
+        let model = await demoVault(service)
+        let parts = try #require(model.site("https://parts.example.net"))
+        service.failsRemoves = true
+        #expect(await model.remove(parts) == false)
+        #expect(model.message != nil)
+        #expect(model.site("https://parts.example.net") != nil)
     }
 
     @Test func stoppingOneWebsiteKeepsTheOthersAndTheLastOneStays() async throws {
@@ -355,6 +406,11 @@ private final class RecordingVault: CredentialVaultService {
     var links: [[String: BighelpJSONValue]] = []
     /// The next `vault.add` of this kind fails, as a computer that stops answering would.
     var failsNextAdd: String?
+    var failsRemoves = false
+    /// The plugin couldn't be asked whether it copies.
+    var cantCheck = false
+    /// How the copy route writes back each website.
+    var echoesOrigins: (String) -> String = { $0 }
 
     func call(_ method: String, params: [String: BighelpJSONValue]) async throws -> BighelpJSONValue {
         calls.append((method, params))
@@ -362,14 +418,21 @@ private final class RecordingVault: CredentialVaultService {
             failsNextAdd = nil
             throw DirectHermesError.notConnected
         }
+        if method == "vault.remove", failsRemoves { throw DirectHermesError.notConnected }
         return try await demo.call(method, params: params)
     }
 
-    func canLink() async -> Bool { await demo.canLink() }
+    func canLink() async -> Bool? { cantCheck ? nil : await demo.canLink() }
 
     func link(_ payload: [String: BighelpJSONValue]) async throws -> [String: BighelpJSONValue] {
         links.append(payload)
-        return try await demo.link(payload)
+        let reply = try await demo.link(payload)
+        let copies = (reply["copies"]?.array ?? []).map { copy -> BighelpJSONValue in
+            guard var row = copy.object, let origin = row["origin"]?.string else { return copy }
+            row["origin"] = .string(echoesOrigins(origin))
+            return .object(row)
+        }
+        return ["copies": .array(copies)]
     }
 }
 

@@ -9,15 +9,15 @@ import Observation
 protocol CredentialVaultService: AnyObject {
     func call(_ method: String, params: [String: BighelpJSONValue]) async throws -> BighelpJSONValue
     /// Whether the computer can copy a saved card or address to more websites (the plugin's
-    /// `vault/link`, `native-vault-link-v1`).
-    func canLink() async -> Bool
+    /// `vault/link`, `native-vault-link-v1`); nil when it couldn't be asked just now.
+    func canLink() async -> Bool?
     /// The plugin's `vault/link`: copies saved local cards and addresses to more websites on the
     /// computer, so their numbers never come to the phone.
     func link(_ payload: [String: BighelpJSONValue]) async throws -> [String: BighelpJSONValue]
 }
 
 extension CredentialVaultService {
-    func canLink() async -> Bool { false }
+    func canLink() async -> Bool? { false }
 
     func link(_ payload: [String: BighelpJSONValue]) async throws -> [String: BighelpJSONValue] {
         throw WorkspaceClientError.unavailable(.unsupportedOperation)
@@ -43,6 +43,8 @@ struct CredentialVaultItem: Identifiable, Equatable, Sendable {
     let kind: Kind
     let label: String
     let origin: String?
+    /// Hermes keeps it for no website. An origin the app couldn't read isn't this.
+    let hasNoOrigin: Bool
     let identifier: String?
     /// "local" for Hermes' own vault, otherwise the password manager it came from.
     let source: String
@@ -60,6 +62,7 @@ struct CredentialVaultItem: Identifiable, Equatable, Sendable {
         self.kind = kind
         self.label = label
         origin = CredentialVault.text(object["origin"], maximumBytes: 2_048).flatMap { $0.isEmpty ? nil : $0 }
+        hasNoOrigin = object["origin"] == nil || object["origin"] == .null || object["origin"]?.string == ""
         identifier = CredentialVault.text(object["identifier"], maximumBytes: 512).flatMap { $0.isEmpty ? nil : $0 }
         self.source = source
         generatesCodes = object["has_otp"]?.boolean == true
@@ -401,7 +404,8 @@ final class CredentialVaultModel: Identifiable {
             items = (listed.object?["items"]?.array ?? []).prefix(500).compactMap(CredentialVaultItem.init)
                 .sorted { ($0.isLocal ? 0 : 1, $0.label.lowercased()) < ($1.isLocal ? 0 : 1, $1.label.lowercased()) }
             sources = (found.object?["sources"]?.array ?? []).prefix(32).compactMap(CredentialVaultSource.init)
-            canLink = links
+            // A check that couldn't reach the plugin keeps what the last one found.
+            canLink = links ?? canLink
             state = .ready
         } catch {
             guard agent == agentID else { return }
@@ -475,13 +479,14 @@ final class CredentialVaultModel: Identifiable {
         let reply = try await service.link(profile.merging([
             "item_ids": .array([.string(source.id)]), "origins": .array(missing.map(BighelpJSONValue.string)),
         ]) { _, new in new })
+        // Hermes writes the website its own way; both sides are compared as the app writes them.
         let copied = Set((reply["copies"]?.array ?? []).compactMap { copy -> String? in
             guard let row = copy.object, row["item_id"]?.string == source.id,
                   ["created", "existing"].contains(row["status"]?.string ?? "") else { return nil }
-            return row["origin"]?.string
+            return row["origin"]?.string.flatMap(CredentialVault.origin(from:))
         })
         guard missing.allSatisfy(copied.contains) else { throw WorkspaceClientError.invalidResponse }
-        for item in group.items where item.isLocal && item.origin == nil {
+        for item in group.items where item.isLocal && item.hasNoOrigin {
             _ = try? await service.call("vault.remove", params: profile.merging(["id": .string(item.id)]) { _, new in new })
         }
     }
@@ -525,12 +530,19 @@ final class CredentialVaultModel: Identifiable {
     }
 
     /// Removes Hermes' own copies for a website. A card or address used only there goes with it.
-    func remove(_ site: CredentialVaultSite) async {
-        for item in site.items where item.isLocal { await remove(item) }
+    /// False when one of them couldn't be removed; `message` says so.
+    @discardableResult
+    func remove(_ site: CredentialVaultSite) async -> Bool {
+        var removed = true
+        for item in site.items where item.isLocal { removed = await remove(item) && removed }
+        return removed
     }
 
-    func remove(_ group: CredentialVaultGroup) async {
-        for item in group.items { await remove(item) }
+    @discardableResult
+    func remove(_ group: CredentialVaultGroup) async -> Bool {
+        var removed = true
+        for item in group.items where item.isLocal { removed = await remove(item) && removed }
+        return removed
     }
 
     private(set) var importProgress: (done: Int, total: Int)?
@@ -562,15 +574,18 @@ final class CredentialVaultModel: Identifiable {
         return (imported, failed)
     }
 
-    func remove(_ item: CredentialVaultItem) async {
-        guard item.isLocal, !isWorking else { return }
+    @discardableResult
+    func remove(_ item: CredentialVaultItem) async -> Bool {
+        guard item.isLocal, !isWorking else { return false }
         isWorking = true
         defer { isWorking = false }
         do {
             _ = try await service.call("vault.remove", params: profile.merging(["id": .string(item.id)]) { _, new in new })
             items.removeAll { $0.id == item.id }
+            return true
         } catch {
             message = String(localized: "Hermes couldn't remove that. Try again.")
+            return false
         }
     }
 
@@ -631,10 +646,18 @@ final class DirectHermesCredentialVaultService: CredentialVaultService {
         try await workspace.vaultRequest(method, params: params)
     }
 
-    func canLink() async -> Bool {
-        guard let client = plugin(), let owner = client.owner else { return false }
-        if client.nativeContext == nil { _ = try? await client.perform(.nativeContext, payload: [:], owner: owner) }
-        return client.nativeContext?.features.contains(CredentialVault.linkFeature) == true
+    func canLink() async -> Bool? {
+        guard let client = plugin(), let owner = client.owner else { return nil }
+        if client.nativeContext == nil {
+            do {
+                _ = try await client.perform(.nativeContext, payload: [:], owner: owner)
+            } catch WorkspaceClientError.unavailable {
+                return false
+            } catch {
+                return nil
+            }
+        }
+        return client.nativeContext.map { $0.features.contains(CredentialVault.linkFeature) }
     }
 
     func link(_ payload: [String: BighelpJSONValue]) async throws -> [String: BighelpJSONValue] {
@@ -722,7 +745,7 @@ final class DemoCredentialVaultService: CredentialVaultService {
         }
     }
 
-    func canLink() async -> Bool { linksItems }
+    func canLink() async -> Bool? { linksItems }
 
     /// The plugin's `vault/link`, the way it answers: one row per item and website, `existing`
     /// for a copy that's already there.

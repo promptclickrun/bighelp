@@ -255,12 +255,14 @@ struct SimpleBotsSettingsView: View {
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("simple-bots.settings.you")
+            .driveTarget("simple-bots.settings.you")
             SimpleBotsDivider()
             Button(action: context.onOpenUsage) {
                 SimpleBotsRow(title: String(localized: "Usage"), value: usagePercent.map { "\(Int($0.rounded()))%" })
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("simple-bots.settings.usage")
+            .driveTarget("simple-bots.settings.usage")
         }
     }
 
@@ -273,6 +275,7 @@ struct SimpleBotsSettingsView: View {
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("simple-bots.settings.apps")
+            .driveTarget("simple-bots.settings.apps")
         }
     }
 
@@ -291,6 +294,7 @@ struct SimpleBotsSettingsView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("simple-bots.settings.approvals")
+                    .driveTarget("simple-bots.settings.approvals")
                     SimpleBotsDivider()
                 }
                 if let host = host, host.load == .loaded {
@@ -305,6 +309,7 @@ struct SimpleBotsSettingsView: View {
                     .padding(.horizontal, BighelpTokens.space20)
                     .padding(.vertical, BighelpTokens.space12)
                     .accessibilityIdentifier("simple-bots.settings.auto-time-zone")
+                    .driveTarget("simple-bots.settings.auto-time-zone")
                     SimpleBotsDivider()
                     Button { isTimeZonePresented = true } label: {
                         SimpleBotsRow(title: String(localized: "Time Zone")) {
@@ -317,6 +322,7 @@ struct SimpleBotsSettingsView: View {
                     .buttonStyle(.plain)
                     .disabled(automaticTimeZone)
                     .accessibilityIdentifier("simple-bots.settings.time-zone")
+                    .driveTarget("simple-bots.settings.time-zone")
                     if let error = host.errorMessage {
                         SimpleBotsDivider()
                         Text(error)
@@ -350,6 +356,7 @@ struct SimpleBotsSettingsView: View {
                 .buttonStyle(.plain)
                 .disabled(primary == nil)
                 .accessibilityIdentifier("simple-bots.settings.computer")
+                .driveTarget("simple-bots.settings.computer")
             }
         }
     }
@@ -361,18 +368,21 @@ struct SimpleBotsSettingsView: View {
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("simple-bots.settings.notifications")
+            .driveTarget("simple-bots.settings.notifications")
             SimpleBotsDivider()
             NavigationLink(value: SimpleBotsSettingsPage.chat) {
                 SimpleBotsRow(title: String(localized: "Chat"))
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("simple-bots.settings.chat")
+            .driveTarget("simple-bots.settings.chat")
             SimpleBotsDivider()
             NavigationLink(value: SimpleBotsSettingsPage.appearance) {
                 SimpleBotsRow(title: String(localized: "Appearance"), value: appearanceSummary)
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("simple-bots.settings.appearance")
+            .driveTarget("simple-bots.settings.appearance")
             if BighelpChatSwitcher.isOffered(screen: screen) {
                 SimpleBotsDivider()
                 Toggle(isOn: Binding(get: { context.settings.chatSwitcherEnabled },
@@ -384,6 +394,7 @@ struct SimpleBotsSettingsView: View {
                 .padding(.horizontal, BighelpTokens.space20)
                 .padding(.vertical, BighelpTokens.space12)
                 .accessibilityIdentifier("simple-bots.settings.chat-switcher")
+                .driveTarget("simple-bots.settings.chat-switcher")
             }
         }
     }
@@ -400,6 +411,7 @@ struct SimpleBotsSettingsView: View {
             .padding(.horizontal, BighelpTokens.space20)
             .padding(.vertical, BighelpTokens.space12)
             .accessibilityIdentifier("simple-bots.settings.multi-gateway")
+            .driveTarget("simple-bots.settings.multi-gateway")
             if context.settings.simpleBotsMultiGateway {
                 SimpleBotsDivider()
                 Toggle(isOn: Binding(get: { context.settings.simpleBotsGatewayFilter },
@@ -411,6 +423,7 @@ struct SimpleBotsSettingsView: View {
                 .padding(.horizontal, BighelpTokens.space20)
                 .padding(.vertical, BighelpTokens.space12)
                 .accessibilityIdentifier("simple-bots.settings.gateway-filter")
+                .driveTarget("simple-bots.settings.gateway-filter")
             } else if !context.gateways.hosts.isEmpty {
                 SimpleBotsDivider()
                 Menu {
@@ -428,6 +441,7 @@ struct SimpleBotsSettingsView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("simple-bots.settings.active-gateway")
+                .driveTarget("simple-bots.settings.active-gateway")
             }
         }
     }
@@ -443,6 +457,7 @@ struct SimpleBotsSettingsView: View {
             .padding(.horizontal, BighelpTokens.space20)
             .padding(.vertical, BighelpTokens.space12)
             .accessibilityIdentifier("simple-bots.settings.mode")
+            .driveTarget("simple-bots.settings.mode")
             if let catalog = context.catalog {
                 SimpleBotsDivider()
                 NavigationLink {
@@ -454,15 +469,16 @@ struct SimpleBotsSettingsView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("simple-bots.settings.archived")
+                .driveTarget("simple-bots.settings.archived")
             }
             SimpleBotsDivider()
-            NavigationLink {
-                context.allSettings()
-            } label: {
+            // The sheet's stack draws the full Settings for this value (`RootShellView`).
+            NavigationLink(value: SettingsDestination.allSettings) {
                 SimpleBotsRow(title: String(localized: "All Settings"))
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("simple-bots.settings.all")
+            .driveTarget("simple-bots.settings.all")
         }
     }
 

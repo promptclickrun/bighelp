@@ -381,6 +381,7 @@
 		37D8C4DF6A7A0C7D16FF2301 /* VoiceLaunchCover.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75825C0D9C432116324712E3 /* VoiceLaunchCover.swift */; };
 		37E1B15E43AFAAD681410A94 /* ChatModel+Reactions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04C0A77E2E8EA521E679BE14 /* ChatModel+Reactions.swift */; };
 		37E5AD1F0826F177E8E90B7B /* BotModeRoomStore+NativeSubmission.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A4C155D911835D1E2994BFE /* BotModeRoomStore+NativeSubmission.swift */; };
+		37F542A5A3E36D345A930E17 /* SettingsDestinationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF90ECC55BC115094F427299 /* SettingsDestinationTests.swift */; };
 		380BEBE7B899E835C2B6D9F2 /* ObjectCardsFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33F8BECFE64269EAE3004D4 /* ObjectCardsFixture.swift */; };
 		38179F67B905DED56E9CEA0B /* AdvancedOptionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C66014ABEDB48C573C3047 /* AdvancedOptionsView.swift */; };
 		381C5D187D4D55D30DE40DB6 /* CompactChatMenuUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8020C3914A0DDC5D274AB35B /* CompactChatMenuUITests.swift */; };
@@ -846,6 +847,7 @@
 		7492C061A6996324F42C6A30 /* DeviceToolPermissions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EB3F9E2E81010BB667F4FE2 /* DeviceToolPermissions.swift */; };
 		749867B38957DFA5C9E90DC9 /* AppearanceSizeControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78705B25A7D9D785DC421550 /* AppearanceSizeControls.swift */; };
 		74D0C05E9DAC9AAE649F24F8 /* DeviceToolPermissionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E4A9CFF654000DFAEC8E208 /* DeviceToolPermissionsTests.swift */; };
+		74DE88B9E100CD090302285F /* SettingsDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E2D22067ABBEB0D4D724FBE /* SettingsDestination.swift */; };
 		7513F6A9564131935F9DC69B /* ChatTimelineKeptRowsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE10504C7ACA6DAC0F72C9B1 /* ChatTimelineKeptRowsTests.swift */; };
 		754BA4BE81D05357AF2D5A9B /* AvatarKit.json in Resources */ = {isa = PBXBuildFile; fileRef = ABB3BECDD5B9E82037109977 /* AvatarKit.json */; };
 		755B2AF3234CF8B3A31AB7B1 /* CardRepliesUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5F79F934C5B97C55FBDEB32 /* CardRepliesUITests.swift */; };
@@ -2895,6 +2897,7 @@
 		7DB1B9E73CD85A90EC183093 /* CapabilitiesManagementModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapabilitiesManagementModels.swift; sourceTree = "<group>"; };
 		7DEB7CF97F0548FE943B36FE /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		7E0D78136612EFA054AF2191 /* BotChatActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BotChatActivity.swift; sourceTree = "<group>"; };
+		7E2D22067ABBEB0D4D724FBE /* SettingsDestination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsDestination.swift; sourceTree = "<group>"; };
 		7E3F7BC4DE0D166012849DBB /* BighelpBoardWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpBoardWidgets.swift; sourceTree = "<group>"; };
 		7E6C5F041D5AA49174026344 /* VoiceOrb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceOrb.swift; sourceTree = "<group>"; };
 		7E72EC67FC663AE543259A11 /* UsageLimitsComputersTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageLimitsComputersTests.swift; sourceTree = "<group>"; };
@@ -3459,6 +3462,7 @@
 		CF09114FB6F2C004FCEABA09 /* context-unavailable.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "context-unavailable.json"; sourceTree = "<group>"; };
 		CF0B6639D867CF22E7E11476 /* ChatMentionIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMentionIdentity.swift; sourceTree = "<group>"; };
 		CF642C443188AD577300C716 /* ChatMarkdownTableTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMarkdownTableTests.swift; sourceTree = "<group>"; };
+		CF90ECC55BC115094F427299 /* SettingsDestinationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsDestinationTests.swift; sourceTree = "<group>"; };
 		CF9F2674039531137409B7D7 /* TemplateCategories.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateCategories.swift; sourceTree = "<group>"; };
 		CFD2EB9171DAF6783C60499D /* NativeWorkspaceSessionBridgeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeWorkspaceSessionBridgeTests.swift; sourceTree = "<group>"; };
 		CFDA4BCAE8C6D61D951B7EBD /* ScheduledAlertTapUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduledAlertTapUITests.swift; sourceTree = "<group>"; };
@@ -4820,6 +4824,7 @@
 				E7D61D803AFF04ABB33D6171 /* PluginUpdateStore.swift */,
 				553ACFA96DA3917C64AE2BD6 /* SessionAppearance.swift */,
 				C4BD93B8C1CCC8E538FF081F /* SessionAppearanceView.swift */,
+				7E2D22067ABBEB0D4D724FBE /* SettingsDestination.swift */,
 				E123B0E2B74533F9785306C5 /* SettingsPreferences.swift */,
 				DA29847ABB2B6CF61029A960 /* SettingsPresentation.swift */,
 				67F0B31843F2BBB8FE261D76 /* SettingsStore.swift */,
@@ -5252,6 +5257,7 @@
 				B1AB31F3EA0C09A5B9F3FABD /* SessionSectionOrganizationTests.swift */,
 				84E6FD40B1E479B7018012F1 /* SessionsModelTests.swift */,
 				D61D4A1568A237A5756BD16D /* SessionTodoSnapshotTests.swift */,
+				CF90ECC55BC115094F427299 /* SettingsDestinationTests.swift */,
 				07F4CF3C8735C83544AAD84F /* SettingsStoreTests.swift */,
 				EE5134A075FCBAC9ED508EB4 /* ShellFeatureStoreTests.swift */,
 				FDB3FAD01849E11043C1897E /* SimpleBotDefaultVoiceTests.swift */,
@@ -7904,6 +7910,7 @@
 				D0C3B765747C343219E7AD30 /* SessionTasksSheet.swift in Sources */,
 				5AF547BB3EDDF3683834789E /* SessionsModel.swift in Sources */,
 				E76DFCD3004B26CC4F2D656E /* SessionsView.swift in Sources */,
+				74DE88B9E100CD090302285F /* SettingsDestination.swift in Sources */,
 				2A1A5A34DBC88CDBBD58AB0D /* SettingsPreferences.swift in Sources */,
 				B3D4DF884C078EB77DB8E725 /* SettingsPresentation.swift in Sources */,
 				B60BC5275069EA540FB0545E /* SettingsStore.swift in Sources */,
@@ -8581,6 +8588,7 @@
 				5B044D26CE77E23BE97445FA /* SessionSectionOrganizationTests.swift in Sources */,
 				85A080E8964972F4611E1575 /* SessionTodoSnapshotTests.swift in Sources */,
 				7A757D30B04EAC5B05E8DCBE /* SessionsModelTests.swift in Sources */,
+				37F542A5A3E36D345A930E17 /* SettingsDestinationTests.swift in Sources */,
 				43F48EEDD559E98BF4D89792 /* SettingsStoreTests.swift in Sources */,
 				F92F1AC1D26135F63D3B5317 /* ShellFeatureStoreTests.swift in Sources */,
 				4280E7FC0E2FB1A6B18C64E9 /* SimpleBotDefaultVoiceTests.swift in Sources */,

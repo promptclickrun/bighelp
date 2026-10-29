@@ -18,6 +18,7 @@ struct AppsHubView: View {
                             symbol: "app.connected.to.app.below.fill")
                     }
                     .accessibilityIdentifier("apps.native")
+                    .driveTarget("apps.native")
                 }
                 NavigationLink {
                     ComposioAppsView(model: composio)
@@ -28,6 +29,7 @@ struct AppsHubView: View {
                         symbol: "square.grid.3x3.fill")
                 }
                 .accessibilityIdentifier("apps.composio")
+                .driveTarget("apps.composio")
             } footer: {
                 Text("Your agents can use the apps you connect, in any chat.")
             }

@@ -104,7 +104,11 @@ struct RootShellView: View {
     @State var workspaceSignIn: WorkspaceSignIn?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    @State var isUnifiedSettingsPresented = false
+    /// The Settings sheet, held by `AppState` so code outside the view can open it to a page.
+    var isUnifiedSettingsPresented: Bool {
+        get { appState.isSettingsPresented }
+        nonmutating set { appState.isSettingsPresented = newValue }
+    }
     @State private var isKeyboardVisible = false
     @State private var rootBottomSafeArea: CGFloat = 0
     @State private var afterSettingsDismiss: (() -> Void)?
@@ -715,23 +719,15 @@ struct RootShellView: View {
                 .modifier(OpenErrorPresentation(root: self))
         }
         .modifier(OpenErrorPresentation(root: self))
-        .bighelpSheet(isPresented: $isUnifiedSettingsPresented, onDismiss: {
+        .bighelpSheet(isPresented: Binding(get: { appState.isSettingsPresented },
+                                           set: { appState.isSettingsPresented = $0 }), onDismiss: {
+            // A swipe-down closes the sheet without `closeSettings`. Not when it has opened again.
+            if !appState.isSettingsPresented { appState.settingsPath = NavigationPath() }
             let action = afterSettingsDismiss
             afterSettingsDismiss = nil
             action?()
         }) {
-            NavigationStack {
-                if simpleBotsOn {
-                    simpleBotsSettings()
-                } else {
-                    // Done on every page closes Settings; Back steps through its pages.
-                    let settingsSheet = workspaceSettings().withDone { isUnifiedSettingsPresented = false }
-                    settingsSheet.settingsDone(settingsSheet)
-                }
-            }
-            .bighelpSheetSize()
-            .presentationDragIndicator(.visible)
-            .modifier(HostSetupSheet(registry: hostRegistry, isActive: true))
+            settingsSheetContent
         }
         .bighelpSheet(isPresented: $isHermesWorkspacePresented) {
             HermesWorkspacePickerView(
@@ -778,6 +774,28 @@ struct RootShellView: View {
             sessionRestoreTask = nil
             sessionRestoreRequest = nil
         }
+    }
+
+    /// The Settings sheet: Bots mode's short Settings, or the full one. Its stack's path lives in
+    /// `AppState`, and `SettingsDestination` values pushed on it draw here, so one place serves
+    /// the full Settings and Bots mode's All Settings row.
+    private var settingsSheetContent: some View {
+        // Done on every page closes Settings; Back steps through its pages.
+        let settingsSheet = workspaceSettings().withDone { isUnifiedSettingsPresented = false }
+        return NavigationStack(path: Binding(get: { appState.settingsPath },
+                                             set: { appState.settingsPath = $0 })) {
+            Group {
+                if simpleBotsOn {
+                    simpleBotsSettings()
+                } else {
+                    settingsSheet.settingsDone(settingsSheet)
+                }
+            }
+            .navigationDestination(for: SettingsDestination.self) { settingsSheet.showing($0) }
+        }
+        .bighelpSheetSize()
+        .presentationDragIndicator(.visible)
+        .modifier(HostSetupSheet(registry: hostRegistry, isActive: true))
     }
 
     private var showsBottomNavigation: Bool {

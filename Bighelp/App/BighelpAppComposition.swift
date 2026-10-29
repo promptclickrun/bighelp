@@ -347,9 +347,20 @@ struct BighelpAppComposition {
             },
             appearanceAllowed: defaults.object(forKey: DeviceToolPermissions.appearanceAllowedKey) == nil
                 || defaults.bool(forKey: DeviceToolPermissions.appearanceAllowedKey),
-            saveAppearanceAllowed: { if !usesFixtures { defaults.set($0, forKey: DeviceToolPermissions.appearanceAllowedKey) } }
+            saveAppearanceAllowed: { if !usesFixtures { defaults.set($0, forKey: DeviceToolPermissions.appearanceAllowedKey) } },
+            navigationAllowed: defaults.object(forKey: DeviceToolPermissions.navigationAllowedKey) == nil
+                || defaults.bool(forKey: DeviceToolPermissions.navigationAllowedKey),
+            saveNavigationAllowed: { if !usesFixtures { defaults.set($0, forKey: DeviceToolPermissions.navigationAllowedKey) } }
         )
         let appearanceTool = DeviceAppearanceTool(settings: settings)
+        let navigationTool = DeviceNavigationTool(.init(
+            mode: { settings.currentMode },
+            nerdMode: { settings.nerdModeEnabled },
+            botName: { DriveNavigator.shared.agent($0)?.name },
+            open: { place, steps, bot, note, context in
+                DriveNavigator.shared.open(place, steps: steps, bot: bot, note: note, agentID: context.agentID)
+            }
+        ))
         let deviceToolCoordinator = DeviceToolCoordinator(
             permissions: deviceToolPermissions,
             journal: DeviceToolFileJournal(url: dataDirectory.appending(path: "device-tool-outcomes-v1.json")),
@@ -361,6 +372,10 @@ struct BighelpAppComposition {
             execute: { operation, arguments, context, authorize in
                 if DeviceAppearanceTool.operations.contains(operation) {
                     return try appearanceTool.execute(operation: operation, arguments: arguments, authorize: authorize)
+                }
+                if DeviceNavigationTool.operations.contains(operation) {
+                    return try navigationTool.execute(
+                        operation: operation, arguments: arguments, context: context, authorize: authorize)
                 }
                 return try await deviceToolRouter.execute(
                     operation: operation, arguments: arguments, context: context, authorize: authorize)

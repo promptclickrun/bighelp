@@ -52,9 +52,14 @@ final class NativeDeviceToolSession {
     /// A plugin that keeps a call waiting for a while when the phone is only away (a channel closed
     /// with `reason: "paused"`), instead of failing it at once.
     static let waitFeature = "native-device-tools-wait-v1"
-    /// Appearance is on by default and never urgent, so a channel with nothing else polls every
-    /// 8 seconds: well inside the plugin's 30-second lease and tool timeout, a quarter of the traffic.
-    var pollInterval: Duration { enabled == [.appearance] ? .seconds(8) : .milliseconds(750) }
+    /// Appearance and Navigation are on by default and share nothing, so a channel with only them polls
+    /// every 8 seconds: well inside the plugin's 30-second lease and tool timeout, a quarter of the
+    /// traffic. An agent calls tools only while it answers, and the person who asked "show me" is
+    /// waiting, so while the chat's turn runs it polls as fast as any other channel.
+    var pollInterval: Duration {
+        enabled.isSubset(of: [.appearance, .navigation]) && !isAnswering() ? .seconds(8) : .milliseconds(750)
+    }
+    private let isAnswering: @MainActor () -> Bool
     private let isAvailable: @MainActor () -> Bool
     /// True when the channel ends because bighelp went to the background, not because the chat, host
     /// or a switch changed.
@@ -74,11 +79,13 @@ final class NativeDeviceToolSession {
          agentID: String, sessionID: String, enabled: Set<DeviceToolCapability>,
          isAvailable: @escaping @MainActor () -> Bool,
          isPaused: @escaping @MainActor () -> Bool = { false },
+         isAnswering: @escaping @MainActor () -> Bool = { false },
          closeCleanupFactory: (@MainActor (String) -> (@MainActor () async -> Void)?)? = nil,
          handle: @escaping Handler) {
         self.http = http; self.owner = owner; self.currentOwner = currentOwner
         self.scope = scope; self.agentID = agentID; self.sessionID = sessionID
         self.enabled = enabled; self.isAvailable = isAvailable; self.isPaused = isPaused; self.handle = handle
+        self.isAnswering = isAnswering
         self.closeCleanupFactory = closeCleanupFactory
     }
 
@@ -195,13 +202,25 @@ final class NativeDeviceToolSession {
             onConnected()
             while owns() {
                 try await pollOnce()
-                try await Task.sleep(for: pollInterval)
+                try await waitForNextPoll()
             }
         } catch {
             await close()
             throw error
         }
         await close()
+    }
+
+    /// Sleeps until the next poll in short slices, so a slow channel speeds up as soon as the chat's
+    /// answer starts: the person who asked to be shown shouldn't wait out an 8-second nap.
+    private func waitForNextPoll() async throws {
+        let fast = Duration.milliseconds(750)
+        var slept = Duration.zero
+        while slept < pollInterval {
+            if slept >= fast, isAnswering() { return }
+            try await Task.sleep(for: .milliseconds(250))
+            slept += .milliseconds(250)
+        }
     }
 
     func close() async {
@@ -331,12 +350,13 @@ enum DeviceToolChannelNote {
 
     static func connected(needsNewerPlugin: Set<DeviceToolCapability>) -> String? {
         let others = DeviceToolCapability.allCases.filter {
-            needsNewerPlugin.contains($0) && $0 != .location && $0 != .appearance
+            needsNewerPlugin.contains($0) && $0 != .location && $0.sharesPersonalData
         }
         let wants = [
             needsNewerPlugin.contains(.location) ? "share your location" : nil,
             others.isEmpty ? nil : "use \(ListFormatter.localizedString(byJoining: others.map(\.title)))",
             needsNewerPlugin.contains(.appearance) ? "let agents change how bighelp looks" : nil,
+            needsNewerPlugin.contains(.navigation) ? "let agents show you around bighelp" : nil,
         ].compactMap { $0 }
         guard !wants.isEmpty else { return nil }
         return "To \(wants.joined(separator: " and ")), update the bighelp plugin on this computer."

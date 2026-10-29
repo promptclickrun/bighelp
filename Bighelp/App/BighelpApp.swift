@@ -648,6 +648,8 @@ struct BighelpApp: App {
                     // Reconnecting after time away, shown without closing what's open.
                     .overlay { ConnectionIslandLayer().allowsHitTesting(false) }
                     #endif
+                    // An agent showing the person around: the island bar and the chat's dock (#662).
+                    .overlay { DriveOverlayLayer() }
                     .modifier(VoiceLaunchCoverOverlay())
                     .statusBarHidden(agentIsland.hidesStatusBar)
                     .animation(.snappy, value: agentIsland.hidesStatusBar)

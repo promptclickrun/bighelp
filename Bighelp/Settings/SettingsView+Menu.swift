@@ -5,14 +5,13 @@ extension SettingsView {
     func settingsMenuGroup(sections: [SettingsMenuSection]) -> some View {
         Section {
             ForEach(sections) { section in
-                NavigationLink {
-                    settingsDone(destination(for: section))
-                } label: {
+                settingsLink(to: .section(section)) {
                     settingsMenuRow(section)
                 }
                 .bighelpSettingsLink()
                 .accessibilityValue(section == .appearance ? appearanceSummary : "")
                 .accessibilityIdentifier(section.accessibilityIdentifier)
+                .driveTarget(section.accessibilityIdentifier)
             }
         }
         .listRowBackground(theme.surface)

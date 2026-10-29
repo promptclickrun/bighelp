@@ -5,24 +5,22 @@ extension SettingsView {
     /// Settings › Appearance: colors, light and dark, and the rest of the look on one page.
     var appearancePage: some View {
         AppearanceStudioView(settings: settings) {
-            NavigationLink {
-                settingsDone(ChatLayoutSettingsView())
-            } label: {
+            settingsLink(to: .chatLayout) {
                 AppearanceStudioRow(title: String(localized: "Chat layout"),
                                     detail: String(localized: "Avatar, name, text size and spacing"),
                                     systemImage: "text.bubble")
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("settings.appearance.chat-layout")
-            NavigationLink {
-                settingsDone(AppLayoutSettingsView(settings: settings))
-            } label: {
+            .driveTarget("settings.appearance.chat-layout")
+            settingsLink(to: .appLayout) {
                 AppearanceStudioRow(title: String(localized: "App layout"),
                                     detail: String(localized: "Bottom bar and menu order"),
                                     systemImage: "rectangle.bottomthird.inset.filled")
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("settings.appearance.app-layout")
+            .driveTarget("settings.appearance.app-layout")
             #if os(visionOS)
             transparency
                 .padding(BighelpTokens.space16)
@@ -289,6 +287,7 @@ extension SettingsView {
                 settingLabel(String(localized: "Return sends"), detail: Self.returnSendsDetail)
             }
             .accessibilityIdentifier("settings.chat.return-sends")
+            .driveTarget("settings.chat.return-sends")
         }
         .listRowBackground(theme.surface)
     }
@@ -318,6 +317,7 @@ extension SettingsView {
         .environment(\.defaultMinListRowHeight, BighelpTokens.hitTarget)
         .scrollContentBackground(.hidden)
         .background(theme.canvas.ignoresSafeArea())
+        .driveScrolls()
         .navigationTitle("Chat")
         .navigationBarTitleDisplayMode(.inline)
     }

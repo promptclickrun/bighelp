@@ -22,25 +22,23 @@ extension SettingsView {
                 }
             }
             if let composio = composioApps?() {
-                NavigationLink {
-                    settingsDone(AppsHubView(native: connectorApps?() ?? nil, composio: composio))
-                } label: {
+                settingsLink(to: .apps) {
                     rowLabel(String(localized: "Apps"), detail: String(localized: "Let agents use your email, notes and more"),
                              symbol: "app.connected.to.app.below.fill", showsChevron: BighelpPlatform.drawsOwnLinkChevron)
                         .bighelpSettingsLinkLabel()
                 }
                 .bighelpSettingsLink()
                 .accessibilityIdentifier("settings.apps")
+                .driveTarget("settings.apps")
             } else if let connectorApps, let apps = connectorApps() {
-                NavigationLink {
-                    settingsDone(ConnectorAppsView(model: apps))
-                } label: {
+                settingsLink(to: .apps) {
                     rowLabel(String(localized: "Apps"), detail: String(localized: "Let agents use your email, notes and more"),
                              symbol: "app.connected.to.app.below.fill", showsChevron: BighelpPlatform.drawsOwnLinkChevron)
                         .bighelpSettingsLinkLabel()
                 }
                 .bighelpSettingsLink()
                 .accessibilityIdentifier("settings.apps")
+                .driveTarget("settings.apps")
             }
             if let teamworkModel {
                 TeamworkToggle(model: teamworkModel) { detail in

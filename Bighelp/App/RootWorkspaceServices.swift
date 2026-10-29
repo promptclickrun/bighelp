@@ -159,7 +159,9 @@ extension RootShellView {
                         permissions.scope == scope && permissions.revision == revision
                             && Self.deviceToolsOpenNow && UIApplication.shared.isProtectedDataAvailable
                             && appState.activeConversationID == conversationID
-                    }, isPaused: { !Self.deviceToolsOpenNow }, handle: guarded)
+                    }, isPaused: { !Self.deviceToolsOpenNow },
+                    isAnswering: { features.preparedChatModel(id: conversationID)?.isSending == true },
+                    handle: guarded)
                 session = next
                 return next
             }, onConnected: { connected in

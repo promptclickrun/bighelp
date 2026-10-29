@@ -51,11 +51,16 @@ struct SimpleBotDashboardHooks {
 struct SimpleBotProfileView: View {
     let agentID: String
     let context: SimpleBotProfileContext
+    /// Where code asked this profile to open (an agent's drive); nil for a tap.
+    let opening: BotProfileOpening?
 
     private typealias Tab = SimpleBotProfileTab
 
-    /// Nil until a tab is picked: the profile shows the one it opens on.
+    /// Nil until a tab is picked: the profile shows the one it opens on. An opening starts it on
+    /// its own tab; this is never saved as the default.
     @State private var tab: Tab?
+    @State private var openedRoute = false
+    @State private var appliedDriveSerial: Int?
     @AppStorage(SimpleBotProfileTabs.orderKey) private var tabOrder = ""
     @AppStorage(SimpleBotProfileTabs.defaultKey) private var defaultTab: String?
     @State private var heldTab: Tab?
@@ -96,6 +101,13 @@ struct SimpleBotProfileView: View {
     @Environment(\.companionAgentScope) private var scope
     @Environment(\.companionStore) private var companions
     @BighelpThemeReader private var theme
+
+    init(agentID: String, context: SimpleBotProfileContext, opening: BotProfileOpening? = nil) {
+        self.agentID = agentID
+        self.context = context
+        self.opening = opening
+        _tab = State(initialValue: opening?.wantedTab)
+    }
 
     private var profile: AgentProfile? { context.agents.profiles.first { $0.id == agentID } }
     private var isPrimary: Bool {
@@ -145,6 +157,18 @@ struct SimpleBotProfileView: View {
             let mediaClient = context.makeMediaClient?()
             media.configure(client: mediaClient)
             isMediaConnected = mediaClient != nil
+        }
+        // Each opening is shown once: coming back to this profile later keeps the person's own choices.
+        .task(id: opening) {
+            guard !openedRoute else { return }
+            openedRoute = true
+            await applyOpening(opening)
+        }
+        // A drive already on this profile sends its next step here instead of pushing again.
+        .task(id: driveRequest) {
+            guard let driveRequest, driveRequest.serial != appliedDriveSerial else { return }
+            appliedDriveSerial = driveRequest.serial
+            await applyOpening(driveRequest.opening)
         }
         .task(id: agentID) {
             guard let service = context.screenService else { return }
@@ -277,6 +301,7 @@ struct SimpleBotProfileView: View {
             } else if let profile {
                 SimpleBotsCircleButton(systemImage: "square.and.arrow.up", label: "Save as Template",
                                        identifier: "simple-bots.profile.template") { isSavingTemplate = true }
+                    .driveTarget("simple-bots.profile.template")
                 Menu {
                     Button("Message", systemImage: "message") { context.onOpenChat(profile.id) }
                     if !isPrimary {
@@ -333,6 +358,7 @@ struct SimpleBotProfileView: View {
         .scrollIndicators(.hidden)
         // A drag moves a tab, not the page.
         .scrollDisabled(isArrangingTabs)
+        .driveScrolls()
     }
 
     private func face(_ profile: AgentProfile) -> some View {
@@ -379,8 +405,54 @@ struct SimpleBotProfileView: View {
 
     /// The picked tab while it's there (the screen can close), else the one profiles open on.
     private var shownTab: Tab {
-        if let tab, availableTabs.contains(tab) { return tab }
-        return SimpleBotProfileTabs.opening(defaultTab: defaultTab, in: availableTabs)
+        SimpleBotProfileTabs.shown(picked: tab, defaultTab: defaultTab, in: availableTabs)
+    }
+
+    /// Shows an opening's sheet. The tab is already on screen (`tab` started on it, and falls
+    /// back to the usual one while it isn't there). The sheet waits for the push to settle, since
+    /// one presented during it can drop, then for the parts behind it to load; if they never
+    /// come (no Dashboard, no screen, a computer that won't edit), nothing is shown.
+    private func applyOpening(_ opening: BotProfileOpening?) async {
+        if let wanted = opening?.wantedTab { tab = wanted }
+        guard let sheet = opening?.sheet else { return }
+        try? await Task.sleep(for: .milliseconds(500))
+        for _ in 0..<30 {
+            guard !Task.isCancelled else { return }
+            if sheet.canPresent(readiness) { break }
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        guard !Task.isCancelled, sheet.canPresent(readiness) else { return }
+        present(sheet)
+    }
+
+    /// A drive's step for this bot (`DriveNavigator.profileRequest`), while one is under way.
+    private var driveRequest: DriveNavigator.ProfileRequest? {
+        DriveNavigator.shared.profileRequest.flatMap { $0.agentID == agentID ? $0 : nil }
+    }
+
+    private var readiness: BotProfileReadiness {
+        BotProfileReadiness(
+            shownTab: shownTab, canEdit: context.canEdit,
+            hasDashboard: dashboard?.agentID == agentID && context.dashboard != nil,
+            hasModelDefaults: modelDefaults != nil, hasVoice: voice != nil,
+            hasAdvancedOptions: advancedOptions != nil, hasRoutines: context.scheduledTasks != nil)
+    }
+
+    private func present(_ sheet: BotProfileSheet) {
+        switch sheet {
+        case .templates(let kind): dashboard?.sheet = .templates(kind)
+        case .blueprints(let kind): dashboard?.sheet = .blueprints(kind)
+        case .seeAll(let kind): dashboard?.sheet = .seeAll(kind)
+        case .character: isCharacterPresented = true
+        case .instructions: isInstructionsPresented = true
+        case .photoActions: isPhotoActionsPresented = true
+        case .defaultModel: isModelPresented = true
+        case .defaultVoice: isVoicePresented = true
+        case .advancedOptions: isAdvancedPresented = true
+        case .avatarStudio: isStudioPresented = true
+        case .addRoutine: newRoutine = true
+        case .saveAsTemplate: isSavingTemplate = true
+        }
     }
 
     private static let tabSpace = "simple-bots.profile.tabs"
@@ -461,6 +533,7 @@ struct SimpleBotProfileView: View {
                     Button("Rearrange", systemImage: "arrow.left.arrow.right") { startArrangingTabs() }
                 }
                 #endif
+                .driveTarget("simple-bots.profile.tab.\(item.rawValue)")
                 .accessibilityAddTraits(shownTab == item ? .isSelected : [])
                 .accessibilityAction(named: Text("Set Default")) { setDefaultTab(item) }
                 .accessibilityAction(named: Text("Rearrange")) { startArrangingTabs() }
@@ -576,6 +649,7 @@ struct SimpleBotProfileView: View {
                     }
                 }
                 .buttonStyle(.plain)
+                .driveTarget("simple-bots.profile.character")
                 .accessibilityIdentifier("simple-bots.profile.character")
                 SimpleBotsDivider()
                 Button { isInstructionsPresented = true } label: {
@@ -583,6 +657,7 @@ struct SimpleBotProfileView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(!context.canEdit)
+                .driveTarget("simple-bots.profile.instructions")
                 .accessibilityIdentifier("simple-bots.profile.instructions")
                 SimpleBotsDivider()
                 Button { isPhotoActionsPresented = true } label: {
@@ -590,6 +665,7 @@ struct SimpleBotProfileView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(!context.canEdit)
+                .driveTarget("simple-bots.profile.photo-actions")
                 .accessibilityIdentifier("simple-bots.profile.photo-actions")
                 if let modelDefaults {
                     SimpleBotsDivider()
@@ -598,6 +674,7 @@ struct SimpleBotProfileView: View {
                                       value: modelName(modelDefaults))
                     }
                     .buttonStyle(.plain)
+                    .driveTarget("simple-bots.profile.default-model")
                     .accessibilityIdentifier("simple-bots.profile.default-model")
                 }
                 if let voice {
@@ -607,6 +684,7 @@ struct SimpleBotProfileView: View {
                                       value: voice.summary)
                     }
                     .buttonStyle(.plain)
+                    .driveTarget("simple-bots.profile.default-voice")
                     .accessibilityIdentifier("simple-bots.profile.default-voice")
                 }
                 if advancedOptions != nil {
@@ -616,6 +694,7 @@ struct SimpleBotProfileView: View {
                                       leading: Image(systemName: "slider.horizontal.3"))
                     }
                     .buttonStyle(.plain)
+                    .driveTarget("simple-bots.profile.advanced-options")
                     .accessibilityIdentifier("simple-bots.profile.advanced-options")
                 }
             }
@@ -655,6 +734,7 @@ struct SimpleBotProfileView: View {
                         .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
+                .driveTarget("simple-bots.profile.add-routine")
                 .accessibilityIdentifier("simple-bots.profile.add-routine")
             }
             .task { if store.loadState == .idle { await store.load() } }

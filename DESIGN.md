@@ -495,6 +495,25 @@ text is SF Pro, as everywhere.
   Advanced Options, the one place approvals are set) and the time zone every bot works in (or this device's,
   automatically); Teamwork; Bot Computer; Notifications and Appearance; then the switch back and All Settings.
 
+## An agent showing the way
+
+When the person asks where something is, the agent can open it (`iphone_navigation`). The look is
+"Island and dock" (#662):
+
+- **The bar** grows out of the Dynamic Island (a capsule at the top where there's none): the agent's
+  mark beside the camera, then "{Agent} is driving" and the steps as a trail that lights as each one
+  happens, and Return to chat. At the place it reads "{Agent} brought you here", with Stay here (✕).
+  The camera's spot stays clear; the status bar hides while it shows.
+- **The dock**: the chat steps aside into a card at the bottom (its picture shrinks into it). It
+  shows the agent's newest words, still arriving, and the chat's own message box: a message sent
+  there steers the running answer as Send does in the chat. At the place, the agent's note leads it.
+- **Between them** the app runs edge to edge. One still dot moves to each control and presses it
+  once; the drive ends on a still spotlight (the rest dims a little) around the place, scrolled into
+  view if it was further down. Nothing loops. With Reduce Motion the screens cross-fade, there's no
+  dot and no shrinking picture.
+- Return to chat puts back exactly the tab and pages the person had; the chat's draft and place
+  are its own and never change.
+
 ## Code mode
 
 An opt-in second home for coding (Settings › Code mode; Chat stays the default). Its home is the

@@ -33,8 +33,8 @@ extension RootShellView {
             codeBatchDestination(id: id)
         case (.devFactory, _), (.devFactoryRecipe, _), (.devFactoryGroup, _), (.devFactoryChanges, _):
             devFactoryDestination(route)
-        case (.simpleBotProfile(let agentID), _):
-            SimpleBotProfileView(agentID: agentID, context: simpleBotProfileContext(for: agentID))
+        case (.simpleBotProfile(let agentID, let opening), _):
+            SimpleBotProfileView(agentID: agentID, context: simpleBotProfileContext(for: agentID), opening: opening)
         case (.board(let tab), _):
             agentBoardPage(tab)
         case (.allHostsChats, _):

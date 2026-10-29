@@ -245,7 +245,7 @@ extension RootShellView {
             } else { nil }
             guard let botID = chatBot ?? agents.primaryAgentID ?? agents.profiles.first(where: \.isDefault)?.id
             else { return true }
-            if case .simpleBotProfile(let shown)? = appState.path.last, shown == botID { return true }
+            if case .simpleBotProfile(let shown, _)? = appState.path.last, shown == botID { return true }
             appState.open(.simpleBotProfile(agentID: botID))
             return true
         default:
@@ -409,10 +409,6 @@ extension RootShellView {
             usage: providerUsage,
             makeTeamwork: { teamworkModel() },
             page: { page in AnyView(workspaceSettings().withDone(close).simpleBotsPage(page)) },
-            allSettings: {
-                let settings = workspaceSettings().withDone(close)
-                return AnyView(settings.settingsDone(settings))
-            },
             onOpenUsage: { leaveSettings { appState.open(.usage) } },
             onOpenComputer: { id in leaveSettings { appState.open(.simpleBotProfile(agentID: id)) } },
             onDone: close,

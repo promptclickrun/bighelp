@@ -26,6 +26,7 @@ struct PermissionsSettingsView: View {
 
             Section {
                 AgentAppearancePermissionRow(permissions: center.deviceTools)
+                AgentNavigationPermissionRow(permissions: center.deviceTools)
             } footer: {
                 Text("Works only while you have the agent’s chat open. One switch for every host.")
                     .bighelpFont(.metadata)
@@ -64,6 +65,7 @@ struct PermissionsSettingsView: View {
         .environment(\.defaultMinListRowHeight, BighelpTokens.hitTarget)
         .scrollContentBackground(.hidden)
         .background(theme.canvas.ignoresSafeArea())
+        .driveScrolls()
         .navigationTitle("Device access")
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityIdentifier("settings.permissions")
@@ -142,6 +144,31 @@ private struct AgentAppearancePermissionRow: View {
             }
         }
         .accessibilityIdentifier("permissions.device-tools.appearance")
+        .driveTarget("permissions.device-tools.appearance")
+        .padding(.vertical, BighelpTokens.space4)
+    }
+}
+
+/// On until the person turns it off: it shares nothing, never changes a setting, and Return to chat
+/// puts everything back.
+@MainActor
+private struct AgentNavigationPermissionRow: View {
+    let permissions: DeviceToolPermissions
+
+    var body: some View {
+        Toggle(isOn: Binding(
+            get: { permissions.navigationAllowed },
+            set: { permissions.setNavigationAllowed($0) }
+        )) {
+            VStack(alignment: .leading, spacing: BighelpTokens.space4) {
+                Text("Let agents show you around bighelp").bighelpFont(.body, weight: .semibold)
+                Text("When you ask where something is, your agent can open that page or setting and point at it. It never changes anything for you.")
+                    .bighelpFont(.metadata).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .accessibilityIdentifier("permissions.device-tools.navigation")
+        .driveTarget("permissions.device-tools.navigation")
         .padding(.vertical, BighelpTokens.space4)
     }
 }

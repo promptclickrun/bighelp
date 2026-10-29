@@ -8,6 +8,22 @@ import UIKit
 
 // MARK: - Model
 
+/// The Dashboard's one sheet at a time.
+enum BoardDashboardSheet: Identifiable, Equatable {
+    case seeAll(AgentBoardItem.Kind), templates(AgentBoardItem.Kind), blueprints(AgentBoardItem.Kind)
+    case post(String), idea(AgentBoardItem)
+
+    var id: String {
+        switch self {
+        case .seeAll(let kind): "all.\(kind.rawValue)"
+        case .templates(let kind): "templates.\(kind.rawValue)"
+        case .blueprints(let kind): "blueprints.\(kind.rawValue)"
+        case .post(let id): "post.\(id)"
+        case .idea(let idea): "idea.\(idea.id)"
+        }
+    }
+}
+
 /// What one bot's Dashboard knows: its own board store, which follows the shell's connection, and
 /// what this device keeps (Not today, cards taken to the chat, the Undo bar, the tutorial).
 @MainActor
@@ -28,6 +44,12 @@ final class BoardDashboardModel {
     let store = AgentBoardStore()
     private(set) var undo: Undo?
     var tutorialStep: DashboardTutorialStep?
+    /// The sheet on the Dashboard. The model holds it so the profile can open one straight away
+    /// (`BotProfileOpening`); the view clears it when it goes.
+    var sheet: BoardDashboardSheet?
+    /// What a closing sheet asked for runs once it has closed (a push under a closing sheet gets
+    /// dropped).
+    @ObservationIgnored var afterSheet: (() -> Void)?
     /// Asked about or taken to the chat: off the piles while this profile is open (the host keeps them).
     private var takenToChat: Set<String> = []
     /// Swiped and on their way to the host: off the piles at once, back if the host says no.
@@ -227,7 +249,7 @@ struct BoardDashboardOverlays: ViewModifier {
 
 /// The Dashboard tab: Templates, then the Feed, Ideas and Goals piles.
 struct BoardDashboardView: View {
-    let model: BoardDashboardModel
+    @Bindable var model: BoardDashboardModel
     /// The bot's board, with its chat for Ask and blueprints.
     let context: AgentBoardContext
     /// The shell's board, whose connection this one follows.
@@ -236,25 +258,6 @@ struct BoardDashboardView: View {
     let shellBoardKey: @MainActor () -> RootShellView.AgentBoardClientKey
     let configureShellBoard: @MainActor (RootShellView.AgentBoardClientKey) async -> Void
 
-    /// One sheet at a time; what it asked for runs once it has closed (a push under a closing
-    /// sheet gets dropped).
-    enum Sheet: Identifiable, Equatable {
-        case seeAll(AgentBoardItem.Kind), templates(AgentBoardItem.Kind), blueprints(AgentBoardItem.Kind)
-        case post(String), idea(AgentBoardItem)
-
-        var id: String {
-            switch self {
-            case .seeAll(let kind): "all.\(kind.rawValue)"
-            case .templates(let kind): "templates.\(kind.rawValue)"
-            case .blueprints(let kind): "blueprints.\(kind.rawValue)"
-            case .post(let id): "post.\(id)"
-            case .idea(let idea): "idea.\(idea.id)"
-            }
-        }
-    }
-
-    @State private var sheet: Sheet?
-    @State private var afterSheet: (() -> Void)?
     @State private var filling: BoardBlueprint?
     @Environment(\.scenePhase) private var scenePhase
     @BighelpThemeReader private var theme
@@ -282,8 +285,8 @@ struct BoardDashboardView: View {
                 DashboardSection(kind: kind, cards: cards, model: model, context: context,
                                  isLoading: store.state != .loaded && store.items.isEmpty,
                                  neverHad: DashboardPiles.neverHad(kind, items: store.items),
-                                 onSeeAll: { sheet = .seeAll(kind) },
-                                 onTemplates: { sheet = .templates(kind) },
+                                 onSeeAll: { model.sheet = .seeAll(kind) },
+                                 onTemplates: { model.sheet = .templates(kind) },
                                  onOpen: { open($0) })
             }
         }
@@ -315,10 +318,15 @@ struct BoardDashboardView: View {
             if phase == .active { model.refreshSnoozes() }
         }
         .onAppear { model.isShown = true }
-        .onDisappear { model.isShown = false }
-        .bighelpSheet(item: $sheet, onDismiss: {
-            let next = afterSheet
-            afterSheet = nil
+        .onDisappear {
+            model.isShown = false
+            // A sheet doesn't outlive the tab it was opened from.
+            model.sheet = nil
+            model.afterSheet = nil
+        }
+        .bighelpSheet(item: $model.sheet, onDismiss: {
+            let next = model.afterSheet
+            model.afterSheet = nil
             next?()
         }) { shown in
             sheetContent(shown)
@@ -327,7 +335,7 @@ struct BoardDashboardView: View {
     }
 
     private var templatesRow: some View {
-        Button { sheet = .templates(.feed) } label: {
+        Button { model.sheet = .templates(.feed) } label: {
             HStack(spacing: BighelpTokens.space8) {
                 Image(systemName: "square.grid.2x2")
                     .font(.bighelp(.body, weight: .semibold))
@@ -344,19 +352,20 @@ struct BoardDashboardView: View {
         .bighelpPlainButtonStyle()
         .accessibilityLabel("Templates")
         .accessibilityHint("Starter prompts for Feed, Ideas and Goals, one card at a time")
+        .driveTarget("dashboard.templates")
         .accessibilityIdentifier("dashboard.templates")
     }
 
     private func open(_ item: AgentBoardItem) {
         switch item.kind {
-        case .feed: sheet = .post(item.id)
-        case .idea: sheet = .idea(item)
-        case .goal: sheet = .seeAll(.goal)
+        case .feed: model.sheet = .post(item.id)
+        case .idea: model.sheet = .idea(item)
+        case .goal: model.sheet = .seeAll(.goal)
         }
     }
 
     @ViewBuilder
-    private func sheetContent(_ shown: Sheet) -> some View {
+    private func sheetContent(_ shown: BoardDashboardSheet) -> some View {
         let inSheet = closingFirst(context)
         switch shown {
         case .seeAll(let kind):
@@ -374,8 +383,8 @@ struct BoardDashboardView: View {
                                     onUse: { blueprint in after { use(blueprint) } },
                                     onSeeEvery: { kind in
                                         // The full list replaces the deck once it has closed.
-                                        afterSheet = { sheet = .blueprints(kind) }
-                                        sheet = nil
+                                        model.afterSheet = { model.sheet = .blueprints(kind) }
+                                        model.sheet = nil
                                     })
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
@@ -403,8 +412,8 @@ struct BoardDashboardView: View {
 
     /// Closes the sheet, then does what it asked.
     private func after(_ action: @escaping () -> Void) {
-        afterSheet = action
-        sheet = nil
+        model.afterSheet = action
+        model.sheet = nil
     }
 
     /// As tapping a blueprint on its page: [blanks] first, then the message box; nothing is sent.
@@ -422,11 +431,11 @@ struct BoardDashboardView: View {
         AgentBoardContext(
             agentID: context.agentID, agentName: context.agentName, imageURL: context.imageURL,
             activity: context.activity, store: context.store,
-            onProfile: { sheet = nil }, onSwitchAgent: {},
+            onProfile: { model.sheet = nil }, onSwitchAgent: {},
             onAsk: { text in after { context.onAsk(text) } },
             onSend: { text in after { context.onSend(text) } },
             onMenu: {}, onNewChat: { after { context.onNewChat() } }, onPickAgents: {},
-            tools: [], onBack: { sheet = nil })
+            tools: [], onBack: { model.sheet = nil })
     }
 }
 
@@ -511,6 +520,7 @@ private struct DashboardSection: View {
             }
             .bighelpPlainButtonStyle()
             .accessibilityLabel("See all of \(kind.pageTitle)")
+            .driveTarget("dashboard.\(kind.rawValue).see-all")
             .accessibilityIdentifier("dashboard.\(kind.rawValue).see-all")
         }
     }
@@ -1232,6 +1242,7 @@ struct DashboardTemplatesSheet: View {
                                            height: cardHeight) {
                             card(top, deck: deck).id(top.id)
                         }
+                        .driveTarget("dashboard.templates.deck")
                         buttons(top)
                         Text("Swipe right to use a template, left to skip it. It opens \(botName)’s chat with the text in the message box; nothing runs until you tap Send.")
                             .font(.bighelp(.footnote))
@@ -1291,6 +1302,7 @@ struct DashboardTemplatesSheet: View {
                 }
                 .bighelpPlainButtonStyle()
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
+                .driveTarget("dashboard.templates.page.\(page.rawValue)")
                 .accessibilityIdentifier("dashboard.templates.page.\(page.rawValue)")
             }
         }

@@ -4,7 +4,7 @@ import CryptoKit
 
 /// The order here is the order of Settings › Device access.
 enum DeviceToolCapability: String, CaseIterable, Codable, Identifiable, Sendable {
-    case calendar, reminders, contacts, photos, location, geofences, alarms, music, focus, shortcuts, appearance
+    case calendar, reminders, contacts, photos, location, geofences, alarms, music, focus, shortcuts, appearance, navigation
     var id: String { rawValue }
 
     /// The plugin feature a host must list before the phone offers this tool.
@@ -14,6 +14,7 @@ enum DeviceToolCapability: String, CaseIterable, Codable, Identifiable, Sendable
         case .calendar, .reminders: nil
         case .location: "native-device-location-v1"
         case .appearance: "native-device-appearance-v1"
+        case .navigation: "native-device-navigation-v1"
         case .contacts: "native-device-contacts-v1"
         case .photos: "native-device-photos-v1"
         case .geofences: "native-device-geofences-v1"
@@ -24,10 +25,10 @@ enum DeviceToolCapability: String, CaseIterable, Codable, Identifiable, Sendable
         }
     }
 
-    /// Everything but Appearance shares the person's data or acts for them: each stays off for a
-    /// host until they allow it and iOS agrees. Appearance shares nothing and is easy to undo, so
-    /// it's on for every host until they turn it off.
-    var sharesPersonalData: Bool { self != .appearance }
+    /// Everything but Appearance and Navigation shares the person's data or acts for them: each stays
+    /// off for a host until they allow it and iOS agrees. Those two share nothing and are easy to undo
+    /// (Appearance, Return to chat), so they're on for every host until the person turns them off.
+    var sharesPersonalData: Bool { self != .appearance && self != .navigation }
 
     /// False where Apple has no such feature, so Device access leaves the row out instead of
     /// showing a switch that can never turn on.
@@ -71,6 +72,7 @@ enum DeviceToolCapability: String, CaseIterable, Codable, Identifiable, Sendable
         case .focus: String(localized: "Focus")
         case .shortcuts: String(localized: "Shortcuts")
         case .appearance: String(localized: "Appearance")
+        case .navigation: String(localized: "Show you around")
         }
     }
 
@@ -87,6 +89,7 @@ enum DeviceToolCapability: String, CaseIterable, Codable, Identifiable, Sendable
         case .focus: String(localized: "Tell your agent when a Focus is on, with the note you set for it.")
         case .shortcuts: String(localized: "Run the shortcuts you pick and give your agent what they return.")
         case .appearance: String(localized: "Switch light or dark mode and change your chat color when you ask.")
+        case .navigation: String(localized: "Open the page or setting you ask about and point at it.")
         }
     }
 }
@@ -110,6 +113,8 @@ enum DeviceToolSystemAccess: Equatable, Sendable {
 final class DeviceToolPermissions {
     /// Where "Let agents change how bighelp looks" is saved; missing means on.
     static let appearanceAllowedKey = "bighelp.device-tools.appearance"
+    /// Where "Let agents show you around bighelp" is saved; missing means on.
+    static let navigationAllowedKey = "bighelp.device-tools.navigation"
     /// Where the switches are saved: one list for this phone, for every computer and agent. A switch
     /// stays on until the person turns it off; iOS saying no only pauses its tool (`isUsable`).
     static let grantsKey = "bighelp.device-tools.grants"
@@ -123,12 +128,15 @@ final class DeviceToolPermissions {
     private var enabled: Set<DeviceToolCapability> = []
     /// Settings › Device access › "Let agents change how bighelp looks". One switch for every host.
     private(set) var appearanceAllowed: Bool
+    /// Settings › Device access › "Let agents show you around bighelp". One switch for every host.
+    private(set) var navigationAllowed: Bool
     private var statuses: [DeviceToolCapability: DeviceToolSystemAccess] = [:]
     private let readStatus: (DeviceToolCapability) async -> DeviceToolSystemAccess
     private let requestAccess: (DeviceToolCapability) async -> DeviceToolSystemAccess
     private let isForeground: () -> Bool
     private let writeGrants: (String, [String]) -> Void
     private let saveAppearanceAllowed: (Bool) -> Void
+    private let saveNavigationAllowed: (Bool) -> Void
     init(
         status: @escaping (DeviceToolCapability) async -> DeviceToolSystemAccess,
         request: @escaping (DeviceToolCapability) async -> DeviceToolSystemAccess,
@@ -137,7 +145,9 @@ final class DeviceToolPermissions {
         writeGrants: @escaping (String, [String]) -> Void,
         legacyGrants: () -> [[String]] = { [] },
         appearanceAllowed: Bool = true,
-        saveAppearanceAllowed: @escaping (Bool) -> Void = { _ in }
+        saveAppearanceAllowed: @escaping (Bool) -> Void = { _ in },
+        navigationAllowed: Bool = true,
+        saveNavigationAllowed: @escaping (Bool) -> Void = { _ in }
     ) {
         readStatus = status
         requestAccess = request
@@ -145,6 +155,8 @@ final class DeviceToolPermissions {
         self.writeGrants = writeGrants
         self.appearanceAllowed = appearanceAllowed
         self.saveAppearanceAllowed = saveAppearanceAllowed
+        self.navigationAllowed = navigationAllowed
+        self.saveNavigationAllowed = saveNavigationAllowed
         let saved = readGrants(Self.grantsKey)
         let names = saved ?? legacyGrants().flatMap { $0 }
         enabled = Set(names.compactMap(DeviceToolCapability.init(rawValue:)).filter(\.sharesPersonalData))
@@ -161,7 +173,11 @@ final class DeviceToolPermissions {
 
     /// The person's switch: on until they turn it off.
     func isEnabled(_ kind: DeviceToolCapability) -> Bool {
-        kind.sharesPersonalData ? enabled.contains(kind) : appearanceAllowed
+        switch kind {
+        case .appearance: appearanceAllowed
+        case .navigation: navigationAllowed
+        default: enabled.contains(kind)
+        }
     }
 
     /// Whether an agent can use it now: the switch is on, a computer is connected, and iOS allows it.
@@ -180,6 +196,18 @@ final class DeviceToolPermissions {
         revision &+= 1
         appearanceAllowed = allowed
         saveAppearanceAllowed(allowed)
+    }
+
+    /// Like Appearance: no iOS permission, and the switch alone decides.
+    func setNavigationAllowed(_ allowed: Bool) {
+        guard allowed != navigationAllowed else { return }
+        revision &+= 1
+        navigationAllowed = allowed
+        saveNavigationAllowed(allowed)
+    }
+
+    private func setAllowed(_ allowed: Bool, for kind: DeviceToolCapability) {
+        if kind == .navigation { setNavigationAllowed(allowed) } else { setAppearanceAllowed(allowed) }
     }
 
     /// Retires in-flight work without changing the user's saved choices.
@@ -203,7 +231,7 @@ final class DeviceToolPermissions {
 
     /// Synchronous revocation also invalidates operations awaiting OS callbacks.
     func disable(_ kind: DeviceToolCapability) {
-        guard kind.sharesPersonalData else { setAppearanceAllowed(false); return }
+        guard kind.sharesPersonalData else { setAllowed(false, for: kind); return }
         revision &+= 1
         choices &+= 1
         enabled.remove(kind)
@@ -212,7 +240,7 @@ final class DeviceToolPermissions {
 
     func setEnabled(_ enabled: Bool, for kind: DeviceToolCapability) async {
         guard enabled else { disable(kind); return }
-        guard kind.sharesPersonalData else { setAppearanceAllowed(true); return }
+        guard kind.sharesPersonalData else { setAllowed(true, for: kind); return }
         guard isForeground(), requestInFlight == nil, !isEnabled(kind) else { return }
         let choice = choices
         requestInFlight = kind

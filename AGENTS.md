@@ -107,6 +107,7 @@ change in both repos.
 | `Bighelp/Code/` | Code mode (Settings › Code mode): its home (`CodeHomeView`), the message box's chips (project, new worktree or local, branch), `CodeLauncher`, Changes and Ship |
 | `Bighelp/Connectors/` | Settings › Apps (`AppsHubView`): Hermes' connectors as Native App Connections (the inline connect cards in chat, `connection.request`, `ConnectorCardStore`; `ConnectorAppsModel`) and Composio Apps (`Composio/`, [docs/COMPOSIO_APPS.md](docs/COMPOSIO_APPS.md)) |
 | `Bighelp/BotScreen/` | Bot Screen: an agent's Linux screen (Hermes `display.*`) in its profile's Screen tab, a native RFB client (`RFB/`) and the full-screen viewer with take control and hand back |
+| `Bighelp/Driving/` | An agent showing the person a place (`iphone_navigation`, #662): the place catalog and its playbooks (`DriveCatalog`), the navigator that plays one (`DriveNavigator`), and the overlay (island bar, chat dock) in its own window |
 | `Bighelp/Usage/` | The Usage page (☰ › Usage): plans and limits (`ProviderUsageStore`), Hermes' own analytics per agent and computer (`UsageStore`, `HostUsageLoader`), charts |
 | `Bighelp/Voice/` | Turn-based and live voice; on-device voices (`OnDevice/`, Phonon in `Packages/PhononTTS`) |
 | `Bighelp/Spatial/` | Vision Pro: the agent in the room (`SpatialAvatarModel`, its volume and voice panel, its Settings section) |
@@ -293,6 +294,11 @@ change in both repos.
   `native-device-tools-agents-v1`; after the grace it closes as `paused` so the host waits for the phone.
   Two reach past the open chat: Arriving and leaving sends its message from the background (`DeviceGeofenceMonitor`),
   and a Shortcuts run keeps the call alive while Shortcuts is in front (`DeviceToolHandoff`).
+- **Agents show the way** (`iphone_navigation`, `Bighelp/Driving/`): a place in `DriveCatalog` is only one the
+  navigator can reach for real: a route, a tab, a bot profile tab or sheet (`BotProfileOpening`), or a Settings page
+  (`AppState.openSettings(at:)`, `SettingsDestination`). A place that opens only from a view's own `@State` needs a
+  way in first. A control a playbook taps or points at carries `.driveTarget(id)` (usually its accessibility id);
+  its page carries `.driveScrolls()` when the control can be off screen. A drive never changes a setting.
 - **Photo actions** ([docs/IMAGE_DRAFTS.md](docs/IMAGE_DRAFTS.md), plugin `native-image-drafts-v1`): a contact or
   event read from a picture is a `contact_draft` or `event_draft` card, never a write. Only the review's Save writes
   (`ImageDraftStore`): it claims the draft on the host, journals the write (`DeviceToolFileJournal`) and reads it back,

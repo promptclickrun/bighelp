@@ -277,7 +277,9 @@ change in both repos.
   routes serve them in ~3 MB pieces. After the first piece the rest download three at a time, and a dropped piece is
   asked for again from its offset. Finished files are kept on the phone (`AgentAttachmentCache`, Caches, 512 MB, least
   recently opened go first), so a reopened chat shows them at once. Until a file lands, its message shows a loading
-  tile (`PendingAgentFilesView`), never the raw line. Hosted image tools (Nous Portal, FAL) report the picture's
+  tile (`PendingAgentFilesView`), never the raw line. A reply read from the saved history (back after time away, a
+  reread) asks for its files too: every such read ends in `reconcileHydratedSession`, which starts
+  `scheduleMessageMedia`, and that reads the rows on screen, not only the live projection's (#665). Hosted image tools (Nous Portal, FAL) report the picture's
   https address instead of a host file; the card reads it from there (public hosts only, no cookies, bounded).
 - **Each agent's own files:** the plugin's `workspace-files/*` routes take an optional `profile` (plugin 3.20.0,
   `native-workspace-files-agents-v1`) and read that agent's working folder with the same refusals. A bot's Files

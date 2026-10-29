@@ -51,6 +51,9 @@ extension ChatModel {
             session.id == conversationID,
             session.kind == .direct
         else { return }
+        // A reply read from the saved history (back after time away, a reread) can name files
+        // the live connection never saw, and nothing live may follow it to ask for them.
+        defer { nativeConversationClient?.scheduleMessageMedia() }
         companionHistoryRevision &+= 1
         nativeAffectionReaction = nil
         let hasSameContextOwner = sourceSession?.remoteStoredID == session.remoteStoredID

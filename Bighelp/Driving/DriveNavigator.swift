@@ -25,9 +25,9 @@ struct DriveSnapshot: Equatable {
 @MainActor
 protocol DriveRouting: AnyObject {
     func snapshot() -> DriveSnapshot
-    func restore(_ snapshot: DriveSnapshot)
-    /// `bot`: the bot a profile step opens.
-    func perform(_ move: DriveMove, bot: String?)
+    func restore(_ snapshot: DriveSnapshot) async
+    /// `bot`: the bot a profile step opens. Waits for a closing sheet, since a push under one is dropped.
+    func perform(_ move: DriveMove, bot: String?) async
     /// Where a control is on screen now, if it is.
     func frame(_ target: String) -> CGRect?
 }
@@ -159,10 +159,11 @@ final class DriveNavigator {
         touch = nil
         spotlight = nil
         profileRequest = nil
-        if let saved { router?.restore(saved) }
         phase = .returning
         let drive = serial
+        let saved = saved
         ending = Task { [weak self] in
+            if let saved { await self?.router?.restore(saved) }
             try? await Task.sleep(for: .milliseconds(self?.reducesMotion == true ? 250 : 650))
             guard let self, !Task.isCancelled, self.serial == drive else { return }
             self.finish()
@@ -191,8 +192,15 @@ final class DriveNavigator {
     private func play(_ steps: [DriveStep], bot: String?, drive: Int) async {
         // The island grows and the chat steps aside before anything moves.
         guard await pause(reducesMotion ? 200 : 650), serial == drive, let router else { return }
+        // Where the drive left the app. If it's somewhere else at the next step, the person (or a
+        // host switch) moved it: they're driving now, so the drive steps out of the way.
+        var expected = router.snapshot()
         for (index, step) in steps.enumerated() {
             guard serial == drive else { return }
+            guard router.snapshot() == expected else {
+                stay()
+                return
+            }
             if step.points, let target = step.target {
                 touch = nil
                 // Never there: the trail stops at the last step the screen showed.
@@ -205,7 +213,11 @@ final class DriveNavigator {
                     presses &+= 1
                     guard await pause(180) else { return }
                 }
-                if let move = step.move { perform(move, bot: bot, router: router) }
+                if let move = step.move {
+                    await perform(move, bot: bot, router: router)
+                    guard !Task.isCancelled, serial == drive else { return }
+                    expected = router.snapshot()
+                }
                 // Proof the step happened: the next control a step taps shows up. One it points at may
                 // be further down the page; that step looks for it itself.
                 if let next = steps.dropFirst(index + 1).first(where: { $0.target != nil }), !next.points,
@@ -218,17 +230,19 @@ final class DriveNavigator {
             guard !Task.isCancelled, serial == drive else { return }
             lit = index + 1
         }
+        // A pointing step that gave up ends the loop too; only this drive, still running, arrives.
+        guard !Task.isCancelled, serial == drive else { return }
         touch = nil
         phase = .arrived
     }
 
-    private func perform(_ move: DriveMove, bot: String?, router: any DriveRouting) {
+    private func perform(_ move: DriveMove, bot: String?, router: any DriveRouting) async {
         if case .botProfile(let opening) = move, let bot,
            case .simpleBotProfile(let shown, _)? = router.snapshot().path.last, shown == bot {
             profileRequest = ProfileRequest(agentID: bot, opening: opening, serial: (profileRequest?.serial ?? 0) &+ 1)
             return
         }
-        router.perform(move, bot: bot)
+        await router.perform(move, bot: bot)
     }
 
     /// Looks for the control the drive ends on. Far down a page it isn't drawn yet, so the page is asked
@@ -278,27 +292,34 @@ final class AppDriveRouter: DriveRouting {
 
     func snapshot() -> DriveSnapshot { DriveSnapshot(tab: appState.selectedTab, path: appState.path) }
 
-    func restore(_ snapshot: DriveSnapshot) {
-        appState.closeSettings()
+    func restore(_ snapshot: DriveSnapshot) async {
+        await closeSettings()
         appState.selectedTab = snapshot.tab
         appState.path = snapshot.path
     }
 
-    func perform(_ move: DriveMove, bot: String?) {
+    func perform(_ move: DriveMove, bot: String?) async {
         switch move {
         case .settings(let pages):
             appState.openSettings(at: pages)
         case .push(let route):
-            appState.closeSettings()
+            await closeSettings()
             if appState.path.last != route { appState.open(route) }
         case .tab(let tab):
-            appState.closeSettings()
+            await closeSettings()
             appState.select(tab)
         case .botProfile(let opening):
             guard let bot else { return }
-            appState.closeSettings()
+            await closeSettings()
             appState.open(.simpleBotProfile(agentID: bot, opening: opening))
         }
+    }
+
+    /// A push under a closing sheet gets dropped (the shell's `leaveSettings` waits the same way).
+    private func closeSettings() async {
+        guard appState.isSettingsPresented else { return }
+        appState.closeSettings()
+        try? await Task.sleep(for: .milliseconds(450))
     }
 
     func frame(_ target: String) -> CGRect? { DriveTargets.shared.frame(target) }

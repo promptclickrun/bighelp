@@ -152,6 +152,7 @@ are returned only to their active caller, not cached for later retries.
 | `iphone_reminders` | List with optional list IDs, completion and undated filters; create; update/delete an exact ID with expected revision. An optional date filter requires start, end and time zone together. |
 | `iphone_location` | `current` only, with no other arguments: where the phone is right now. Needs plugin feature `native-device-location-v1`. |
 | `iphone_appearance` | `get` (no arguments) or `set` with `mode` and/or `color`: light or dark mode and the chat color. Needs plugin feature `native-device-appearance-v1`. |
+| `iphone_navigation` | `places` (optional `query`, `limit`) or `open` with `place`, optional `bot` and `note`: shows the person a page or setting in bighelp. Needs plugin feature `native-device-navigation-v1`. |
 | `iphone_contacts` | `list`, `create`, `update`, `delete`. Needs `native-device-contacts-v1`. |
 | `iphone_photos` | `list`, `albums`, `get`, `save`, `update`, `createAlbum`, `delete`. Needs `native-device-photos-v1`. |
 | `iphone_geofences` | `list`, `create`, `delete`: places the phone watches, and a message to the chat on arrival or departure. Needs `native-device-geofences-v1`. |
@@ -241,6 +242,40 @@ next pick there wins.
 - Demo mode: `-test-agent-appearance '{"mode":"dark","color":"rose"}'` sends that
   one call through the real coordinator and tool when the first chat opens
   (`DeviceAppearanceFixture`, `AgentAppearanceUITests`).
+
+## Navigation
+
+`navigation.places` and `navigation.open` (`DeviceNavigationTool`) let an agent show the
+person where something is in bighelp (#662). The app holds the list of places
+(`DriveCatalog`): each has an id, a title, one sentence on what it's for, search words, and a
+playbook per mode (Bots, Chat, Code). The plugin never holds a copy, so a new place ships with
+the app.
+
+- `places` takes an optional `query` (1–120 characters, the person's own words) and `limit`
+  (1–20, default 8). It answers `places` (each `id`, `title`, `what`, `steps`, and `needs`:
+  `"bot"` for a place inside one bot, else null) and `total`, for the mode the app is in. Nerd
+  Mode places are listed only while Nerd Mode is on.
+- `open` takes `place` (1–96 characters, lowercase letters, digits, `.` and `-`), and optional
+  `bot` (an agent id, 1–96 characters) and `note` (1–160 characters, shown beside the place).
+  A place inside one bot opens for `bot`, else for the agent in the chat. It answers `opened`,
+  the trail's `steps` and `mode` as soon as the drive starts. It fails with `unknown_place`,
+  `not_in_this_mode`, `needs_nerd_mode`, `needs_bot` (no bot with that id on this computer) or
+  `busy` (the app isn't ready to drive), before anything moves.
+- The drive (`DriveNavigator`) only moves between pages and points at controls. It never taps
+  Save, Send or Delete, never changes a switch, and never changes a setting on the way (a bot
+  it opens doesn't become the primary bot). Each step lights only once the screen shows it
+  happened; a control it points at that never shows leaves the trail where the screen
+  stopped. Return to chat puts back the tab and pages the person had; Stay here leaves them on
+  the place.
+- Like Appearance it shares nothing and needs no iOS permission: its switch ("Let agents show
+  you around bighelp", `bighelp.device-tools.navigation`, missing means on) is one setting for
+  every host. Neither operation is journaled. The phone sends `navigation` in `enabled` only
+  when `/native/context` lists `native-device-navigation-v1`.
+- A channel with only Appearance and Navigation polls every 8 seconds, except while the chat's
+  turn runs: an agent calls tools only while it answers, and the person who asked to be shown
+  is waiting, so then it polls every 0.75 seconds.
+- Demo mode: `-test-agent-drive <place id>` (and `-test-agent-drive-note "…"`) plays that drive
+  in the first chat that opens (`DriveFixture`, `AgentDriveUITests`).
 
 ## Contacts
 

@@ -15,10 +15,12 @@ struct DriveShellHooks: ViewModifier {
                 let state = appState, features = featureStore, directory = agents
                 DriveNavigator.shared.attach(
                     AppDriveRouter(appState: state),
-                    agent: { id in
-                        directory.profiles.first { $0.id == id }.map { DriveAgent(id: $0.id, name: $0.name, imageURL: nil) }
+                    agent: { [weak directory] id in
+                        directory?.profiles.first { $0.id == id }.map { DriveAgent(id: $0.id, name: $0.name, imageURL: nil) }
                     },
-                    chat: { state.chatOnScreen.flatMap { features.preparedChatModel(id: $0) } })
+                    chat: { [weak state, weak features] in
+                        state?.chatOnScreen.flatMap { features?.preparedChatModel(id: $0) }
+                    })
             }
             #if DEBUG
             .onAppear {

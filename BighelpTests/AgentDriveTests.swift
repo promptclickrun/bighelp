@@ -129,8 +129,8 @@ struct AgentDriveTests {
         #expect(navigator.lit == 4)
         #expect(navigator.spotlight == "dashboard.templates.deck")
         navigator.returnToChat()
-        #expect(router.restored == DriveSnapshot(tab: .sessions, path: [.chat(conversationID: "c1")]))
         try await waitUntil { navigator.phase == .idle }
+        #expect(router.restored == DriveSnapshot(tab: .sessions, path: [.chat(conversationID: "c1")]))
     }
 
     @Test func aStepLightsOnlyWhenTheScreenShowsIt() async throws {
@@ -164,6 +164,61 @@ struct AgentDriveTests {
         #expect(navigator.spotlight == nil)
     }
 
+    @Test func goingBackWhileTheDriveLooksNeverLandsOnArrived() async throws {
+        let router = FakeRouter(path: [])
+        router.shows = ["settings.menu.chat"]
+        let navigator = DriveNavigator()
+        navigator.attach(router, agent: { _ in nil }, chat: { nil })
+        let steps = try #require(DriveCatalog.place("settings.chat.return-sends")?.playbooks[.chat])
+        navigator.start(title: "Return sends", steps: steps, bot: nil, agent: DriveAgent(id: "a", name: "A", imageURL: nil),
+                        note: nil, chat: nil, reduceMotion: true)
+        try await waitUntil { navigator.scrollRequest != nil }
+        navigator.returnToChat()
+        for _ in 0..<40 {
+            #expect(navigator.phase != .arrived, "The stopped drive must not claim it arrived")
+            try await Task.sleep(for: .milliseconds(25))
+        }
+        try await waitUntil { navigator.phase == .idle }
+    }
+
+    @Test func aPersonMovingTheAppTakesOverFromTheDrive() async throws {
+        let router = FakeRouter(path: [.chat(conversationID: "c1")])
+        router.shows = []
+        let navigator = DriveNavigator()
+        navigator.attach(router, agent: { _ in nil }, chat: { nil })
+        let steps = try #require(DriveCatalog.place("bot.dashboard.templates.feed")?.playbooks[.bots])
+        navigator.start(title: "Feed templates", steps: steps, bot: (id: "nova", name: "Nova"),
+                        agent: DriveAgent(id: "nova", name: "Nova", imageURL: nil), note: nil, chat: nil, reduceMotion: true)
+        try await waitUntil { router.moves.count == 1 }
+        router.path = [.chat(conversationID: "c1")]
+        router.shows = nil
+        try await waitUntil { navigator.phase == .idle }
+        #expect(router.moves.count == 1, "No later step lands on whatever the person opened")
+        #expect(router.restored == nil, "They stay where they went")
+    }
+
+    /// Every control a playbook taps or points at is marked in the app, or the dot and the
+    /// spotlight would quietly skip it.
+    @Test func everyTargetInTheCatalogIsMarkedInTheApp() throws {
+        let sources = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .appending(path: "Bighelp")
+        guard let files = FileManager.default.enumerator(at: sources, includingPropertiesForKeys: nil) else {
+            Issue.record("No sources at \(sources.path)"); return
+        }
+        var code = ""
+        for case let file as URL in files where file.pathExtension == "swift" {
+            code += (try? String(contentsOf: file, encoding: .utf8)) ?? ""
+        }
+        let targets = Set(DriveCatalog.places.flatMap { $0.playbooks.values.flatMap { $0.compactMap(\.target) } })
+        let accessibility = SettingsMenuSection.allCases.map(\.accessibilityIdentifier)
+        for target in targets {
+            let head = target.split(separator: ".").dropLast().joined(separator: ".") + "."
+            let marked = code.contains("driveTarget(\"\(target)\")") || code.contains("driveTarget(\"\(head)\\(")
+                || (accessibility.contains(target) && code.contains("driveTarget(section.accessibilityIdentifier)"))
+            #expect(marked, "\(target) has no .driveTarget in the app")
+        }
+    }
+
     private func waitUntil(_ condition: @MainActor () -> Bool) async throws {
         for _ in 0..<480 where !condition() { try await Task.sleep(for: .milliseconds(25)) }
         #expect(condition())
@@ -181,8 +236,8 @@ private final class FakeRouter: DriveRouting {
     init(path: [AppRoute]) { self.path = path }
 
     func snapshot() -> DriveSnapshot { DriveSnapshot(tab: .sessions, path: path) }
-    func restore(_ snapshot: DriveSnapshot) { restored = snapshot; path = snapshot.path }
-    func perform(_ move: DriveMove, bot: String?) {
+    func restore(_ snapshot: DriveSnapshot) async { restored = snapshot; path = snapshot.path }
+    func perform(_ move: DriveMove, bot: String?) async {
         moves.append(move)
         if case .botProfile(let opening) = move, let bot { path.append(.simpleBotProfile(agentID: bot, opening: opening)) }
     }

@@ -59,6 +59,8 @@ struct SimpleBotProfileView: View {
     /// Nil until a tab is picked: the profile shows the one it opens on. An opening starts it on
     /// its own tab; this is never saved as the default.
     @State private var tab: Tab?
+    @State private var openedRoute = false
+    @State private var appliedDriveSerial: Int?
     @AppStorage(SimpleBotProfileTabs.orderKey) private var tabOrder = ""
     @AppStorage(SimpleBotProfileTabs.defaultKey) private var defaultTab: String?
     @State private var heldTab: Tab?
@@ -156,9 +158,18 @@ struct SimpleBotProfileView: View {
             media.configure(client: mediaClient)
             isMediaConnected = mediaClient != nil
         }
-        .task(id: opening) { await applyOpening(opening) }
+        // Each opening is shown once: coming back to this profile later keeps the person's own choices.
+        .task(id: opening) {
+            guard !openedRoute else { return }
+            openedRoute = true
+            await applyOpening(opening)
+        }
         // A drive already on this profile sends its next step here instead of pushing again.
-        .task(id: driveRequest) { if let driveRequest { await applyOpening(driveRequest.opening) } }
+        .task(id: driveRequest) {
+            guard let driveRequest, driveRequest.serial != appliedDriveSerial else { return }
+            appliedDriveSerial = driveRequest.serial
+            await applyOpening(driveRequest.opening)
+        }
         .task(id: agentID) {
             guard let service = context.screenService else { return }
             let model = BotScreenTabModel(agentID: agentID, service: service)

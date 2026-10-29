@@ -409,10 +409,6 @@ extension RootShellView {
             usage: providerUsage,
             makeTeamwork: { teamworkModel() },
             page: { page in AnyView(workspaceSettings().withDone(close).simpleBotsPage(page)) },
-            allSettings: {
-                let settings = workspaceSettings().withDone(close)
-                return AnyView(settings.settingsDone(settings))
-            },
             onOpenUsage: { leaveSettings { appState.open(.usage) } },
             onOpenComputer: { id in leaveSettings { appState.open(.simpleBotProfile(agentID: id)) } },
             onDone: close,

@@ -39,6 +39,7 @@ private struct DriveOverlayWindowHost: UIViewRepresentable {
         private var host: DriveHostingController?
         private let hitAreas = DriveOverlayHitAreas()
         private var hiding: Task<Void, Never>?
+        private var observing = false
 
         init(appearance: BighelpAppearanceContext) {
             self.appearance = appearance
@@ -75,7 +76,10 @@ private struct DriveOverlayWindowHost: UIViewRepresentable {
                 overlay.isHidden = true
                 self.overlay = overlay
                 self.host = host
-                observePhase()
+                if !observing {
+                    observing = true
+                    observePhase()
+                }
                 phaseChanged()
             }
             overlay?.overrideUserInterfaceStyle = traitCollection.userInterfaceStyle
@@ -98,7 +102,8 @@ private struct DriveOverlayWindowHost: UIViewRepresentable {
                 let bottom = scroll.contentSize.height + scroll.adjustedContentInset.bottom - scroll.bounds.height
                 let next = min(bottom, scroll.contentOffset.y + distance)
                 guard next > scroll.contentOffset.y + 1 else { return false }
-                scroll.setContentOffset(CGPoint(x: scroll.contentOffset.x, y: next), animated: true)
+                scroll.setContentOffset(CGPoint(x: scroll.contentOffset.x, y: next),
+                                        animated: !UIAccessibility.isReduceMotionEnabled)
                 return true
             }
             DriveNavigator.shared.capturePicture = { [weak window] in
@@ -195,8 +200,7 @@ struct DriveOverlayView: View {
             // The bar from the top edge; the dock above the home indicator and the keyboard.
             VStack(spacing: 0) {
                 DriveIslandBar(navigator: navigator, island: island, topInset: topInset, width: size.width,
-                               expanded: docked && showing)
-                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { barFrame = $0; publishHitAreas() }
+                               expanded: docked && showing) { barFrame = $0; publishHitAreas() }
                 Spacer(minLength: 0)
                 DriveDock(navigator: navigator, theme: theme)
                     .frame(maxWidth: 560)
@@ -256,6 +260,8 @@ private struct DriveIslandBar: View {
     let topInset: CGFloat
     let width: CGFloat
     let expanded: Bool
+    /// The bar's own frame, the only part of the top that takes a touch.
+    let onFrame: (CGRect) -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -269,8 +275,10 @@ private struct DriveIslandBar: View {
                 .fill(Color.black)
             content
                 .opacity(expanded ? 1 : 0)
-                .animation(expanded ? .easeOut(duration: 0.25).delay(0.22) : .easeIn(duration: 0.1), value: expanded)
+                .animation(reduceMotion ? nil : expanded ? .easeOut(duration: 0.25).delay(0.22) : .easeIn(duration: 0.1),
+                           value: expanded)
         }
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { onFrame($0) }
         .frame(width: expanded ? barWidth : collapsed.width, height: expanded ? height : collapsed.height)
         .opacity(expanded || island != nil ? 1 : 0)
         .padding(.top, expanded ? (island == nil ? topInset : 8) : collapsed.minY)
@@ -332,7 +340,8 @@ private struct DriveIslandBar: View {
                 .foregroundStyle(.white)
                 .frame(width: 32, height: 32)
                 .background(Circle().fill(Color.white.opacity(0.18)))
-                .contentShape(.circle)
+                .frame(minWidth: BighelpTokens.hitTarget, minHeight: BighelpTokens.hitTarget)
+                .contentShape(.rect)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Text("Stay here"))
@@ -347,7 +356,8 @@ private struct DriveIslandBar: View {
                 .padding(.horizontal, 14)
                 .frame(height: 32)
                 .background(Capsule().fill(Color.white))
-                .contentShape(.capsule)
+                .frame(minHeight: BighelpTokens.hitTarget)
+                .contentShape(.rect)
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("drive.return")
@@ -363,7 +373,7 @@ private struct DriveIslandBar: View {
                     Text(label)
                         .fontWeight(index < navigator.lit ? .semibold : .regular)
                         .foregroundStyle(index < navigator.lit ? Color.white : Color.white.opacity(0.55))
-                        .animation(.easeOut(duration: 0.25), value: navigator.lit)
+                        .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: navigator.lit)
                 }
             }
             .font(.bighelp(.footnote))
@@ -444,6 +454,10 @@ private struct DriveDockComposer: View {
     let agentName: String?
     let theme: BighelpTheme
 
+    /// A reply quote or references go out only through the chat's own box, which knows how to send
+    /// them; here Send waits for Return to chat.
+    private var sends: Bool { chat.canSend && chat.replyDraft == nil && chat.referenceSelections.isEmpty }
+
     var body: some View {
         HStack(spacing: 8) {
             TextField(agentName.map { String(localized: "Ask \($0)") } ?? String(localized: "Message"),
@@ -460,11 +474,12 @@ private struct DriveDockComposer: View {
                     .foregroundStyle(theme.actionForeground)
                     .frame(width: 36, height: 36)
                     .background(Circle().fill(theme.action))
-                    .contentShape(.circle)
+                    .frame(minWidth: BighelpTokens.hitTarget, minHeight: BighelpTokens.hitTarget)
+                    .contentShape(.rect)
             }
             .buttonStyle(.plain)
-            .disabled(!chat.canSend)
-            .opacity(chat.canSend ? 1 : 0.4)
+            .disabled(!sends)
+            .opacity(sends ? 1 : 0.4)
             .accessibilityLabel(Text("Send"))
             .accessibilityIdentifier("drive.dock.send")
         }
@@ -477,6 +492,7 @@ private struct DriveTouchDot: View {
     let theme: BighelpTheme
 
     @State private var ripple = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let frame = navigator.touch.flatMap { DriveTargets.shared.frame($0) }
@@ -496,7 +512,7 @@ private struct DriveTouchDot: View {
                     .transition(.opacity)
             }
         }
-        .animation(.easeInOut(duration: 0.45), value: frame)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.45), value: frame)
         .onChange(of: navigator.presses) { _, _ in
             ripple = false
             withAnimation(.easeOut(duration: 0.55)) { ripple = true }
@@ -511,6 +527,8 @@ private struct DriveTouchDot: View {
 private struct DriveSpotlight: View {
     let navigator: DriveNavigator
     let theme: BighelpTheme
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         GeometryReader { proxy in
@@ -528,7 +546,7 @@ private struct DriveSpotlight: View {
                         .position(x: frame.midX, y: frame.midY)
                 }
             }
-            .animation(.easeOut(duration: 0.35), value: frame)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.35), value: frame)
         }
         .allowsHitTesting(false)
     }

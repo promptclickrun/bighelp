@@ -202,13 +202,25 @@ final class NativeDeviceToolSession {
             onConnected()
             while owns() {
                 try await pollOnce()
-                try await Task.sleep(for: pollInterval)
+                try await waitForNextPoll()
             }
         } catch {
             await close()
             throw error
         }
         await close()
+    }
+
+    /// Sleeps until the next poll in short slices, so a slow channel speeds up as soon as the chat's
+    /// answer starts: the person who asked to be shown shouldn't wait out an 8-second nap.
+    private func waitForNextPoll() async throws {
+        let fast = Duration.milliseconds(750)
+        var slept = Duration.zero
+        while slept < pollInterval {
+            if slept >= fast, isAnswering() { return }
+            try await Task.sleep(for: .milliseconds(250))
+            slept += .milliseconds(250)
+        }
     }
 
     func close() async {

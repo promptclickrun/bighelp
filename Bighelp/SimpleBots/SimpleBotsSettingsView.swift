@@ -136,7 +136,6 @@ struct SimpleBotsSettingsContext {
     let makeTeamwork: () -> TeamworkModel?
     /// Settings' own pages (Settings › Appearance and the rest).
     let page: (SimpleBotsSettingsPage) -> AnyView
-    let allSettings: () -> AnyView
     let onOpenUsage: () -> Void
     let onOpenComputer: (String) -> Void
     let onDone: () -> Void

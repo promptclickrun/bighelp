@@ -25,14 +25,18 @@ final class DirectHermesPluginLifecycleClient: PluginLifecycleManagementClient {
         let hub = try await hubValue
         let catalog = try await catalogValue
         let installed = try CapabilitiesPayload.rows(hub["plugins"], decodeInstalled)
-        let entries = try CapabilitiesPayload.rows(catalog["entries"], decodeCatalog)
+        let catalogRows = try CapabilitiesPayload.array(catalog["entries"])
+        // A name is a row's identity on screen; a second row with the same name is left out.
+        var names = Set<String>()
+        let entries = catalogRows.compactMap { try? decodeCatalog($0) }.filter { names.insert($0.name).inserted }
         let removed = try CapabilitiesPayload.rows(catalog["removed"]) { value -> String in
             let row = try CapabilitiesPayload.object(value)
             let name = try CapabilitiesPayload.text(row["name"], maximumBytes: 160)
             let reason = try CapabilitiesPayload.text(row["reason"], maximumBytes: 2_048, required: false)
             return reason.isEmpty ? name : "\(name): \(reason)"
         }
-        return PluginSnapshot(installed: installed, catalog: entries, removedCatalogEntries: removed)
+        return PluginSnapshot(installed: installed, catalog: entries, removedCatalogEntries: removed,
+                              skippedCatalogRows: catalogRows.count - entries.count)
     }
 
     func rescan() async throws -> PluginSnapshot {
@@ -202,15 +206,6 @@ final class DirectHermesPluginLifecycleClient: PluginLifecycleManagementClient {
     private func decodeCatalog(_ value: BighelpJSONValue) throws -> PluginCatalogEntry {
         let row = try CapabilitiesPayload.object(value)
         let capabilities = try CapabilitiesPayload.object(row["capabilities"])
-        let rawURL = try CapabilitiesPayload.text(row["docs_url"], maximumBytes: 4_096, required: false)
-        let documentationURL: URL?
-        if rawURL.isEmpty { documentationURL = nil }
-        else {
-            guard let url = URL(string: rawURL), url.scheme?.lowercased() == "https", url.host != nil else {
-                throw CapabilitiesManagementError.invalidResponse
-            }
-            documentationURL = url
-        }
         let sha = try CapabilitiesPayload.text(row["sha"], maximumBytes: 40)
         guard sha.range(of: "^[0-9a-fA-F]{40}$", options: .regularExpression) != nil else {
             throw CapabilitiesManagementError.invalidResponse
@@ -223,7 +218,7 @@ final class DirectHermesPluginLifecycleClient: PluginLifecycleManagementClient {
             maintainer: try CapabilitiesPayload.text(row["maintainer"], maximumBytes: 256),
             tier: try CapabilitiesPayload.text(row["tier"], maximumBytes: 64),
             requiredHermesVersion: try CapabilitiesPayload.text(row["requires_hermes"], maximumBytes: 128, required: false),
-            documentationURL: documentationURL,
+            documentationURL: Self.httpsURL(row["docs_url"]),
             platforms: try CapabilitiesPayload.strings(row["platforms"]),
             capabilities: PluginCapabilitySummary(
                 tools: try CapabilitiesPayload.strings(capabilities["provides_tools"]),
@@ -235,7 +230,35 @@ final class DirectHermesPluginLifecycleClient: PluginLifecycleManagementClient {
             installedSHA: try CapabilitiesPayload.optionalText(row["installed_sha"], maximumBytes: 40),
             updateAvailable: try CapabilitiesPayload.boolean(row["update_available"]),
             runtimeStatus: try CapabilitiesPayload.optionalText(row["runtime_status"], maximumBytes: 32),
-            removedReason: nil
+            removedReason: nil,
+            title: Self.label(row["title"], maximumBytes: 160),
+            category: Self.label(row["category"], maximumBytes: 64)?.lowercased(),
+            imageURL: Self.httpsURL(row["image"]),
+            screenshotURLs: Array((row["screenshots"]?.array ?? []).compactMap(Self.httpsURL).prefix(12)),
+            version: Self.label(row["version"], maximumBytes: 64),
+            knownIssues: Self.knownIssues(row["known_issues"])
         )
+    }
+
+    // The storefront's fields are display-only: a missing or odd value is nil, never a refused row.
+
+    /// An https address with a host, else nil.
+    private static func httpsURL(_ value: BighelpJSONValue?) -> URL? {
+        guard let raw = value?.string, raw.utf8.count <= 4_096, let url = URL(string: raw),
+              url.scheme?.lowercased() == "https", url.host() != nil else { return nil }
+        return url
+    }
+
+    /// Short text, trimmed; nil when missing, empty or too long.
+    private static func label(_ value: BighelpJSONValue?, maximumBytes: Int) -> String? {
+        guard let value = (try? CapabilitiesPayload.optionalText(value, maximumBytes: maximumBytes)) ?? nil else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    /// `known_issues` comes as one string or a list of them.
+    private static func knownIssues(_ value: BighelpJSONValue?) -> [String] {
+        let values = value?.array ?? (value.map { [$0] } ?? [])
+        return Array(values.compactMap { label($0, maximumBytes: 2_048) }.prefix(10))
     }
 }

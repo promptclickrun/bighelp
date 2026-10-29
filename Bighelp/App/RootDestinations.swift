@@ -128,7 +128,7 @@ extension RootShellView {
                         WorkspaceUnavailableView(destination: destination, hostName: workspaceHostName,
                             reason: "Reopen this feature for the selected host and profile.")
                     }
-                } else if let kind = CapabilitiesManagementKind(destination: destination), !usesWorkspaceFixtures {
+                } else if let kind = CapabilitiesManagementKind(destination: destination), opensNativeCapabilities(kind) {
                     nativeCapabilitiesDestination(kind, destination: destination)
                 } else if opensHostAdministration(destination) {
                     hostAdministrationDestination(destination)

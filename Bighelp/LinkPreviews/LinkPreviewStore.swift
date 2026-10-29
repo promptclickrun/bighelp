@@ -86,6 +86,12 @@ final class LinkPreviewStore {
         return result
     }
 
+    /// The picture for `url`'s preview if it's already decoded in memory, without loading anything.
+    func cachedPicture(for url: URL) -> UIImage? {
+        guard let target = LinkPreviewPolicy.loadableURL(url) else { return nil }
+        return decoded.object(forKey: Self.key(target) as NSString)
+    }
+
     /// The kept picture for `url`'s preview, if it has one.
     func picture(for url: URL) async -> UIImage? {
         guard let target = LinkPreviewPolicy.loadableURL(url) else { return nil }

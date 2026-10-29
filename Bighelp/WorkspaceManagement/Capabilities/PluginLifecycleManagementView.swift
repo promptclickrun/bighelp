@@ -1,11 +1,191 @@
 import SwiftUI
 
+/// Plugins as a storefront (Settings › Hermes tools › Plugins): search, an official plugin, the official and verified ones, then a shelf per topic. A card opens the plugin's page,
+/// whose one Install button installs the pinned commit it shows. Installed plugins are a toolbar
+/// button away.
 @MainActor
 struct PluginLifecycleManagementView: View {
     @Bindable var model: PluginLifecycleManagementModel
     let hostName: String
-    @State private var installCandidate: PluginCatalogEntry?
     @State private var search = ""
+
+    var body: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: CatalogMetrics.sectionSpacing) {
+                BighelpSearchField(text: $search, prompt: String(localized: "Search plugins"),
+                                   accessibilityLabel: String(localized: "Search plugins"),
+                                   accessibilityIdentifier: "plugins.search")
+                    .padding(.horizontal, CatalogMetrics.margin)
+                    .padding(.top, BighelpTokens.space8)
+                status
+                if let snapshot = model.snapshot {
+                    if ManagementSearch.isActive(search) {
+                        results(PluginStorefront.matching(search, in: snapshot.catalog))
+                    } else {
+                        storefront(snapshot)
+                    }
+                }
+            }
+            .padding(.bottom, BighelpTokens.space32)
+        }
+        .catalogPage()
+        .bighelpRefreshable { await model.load() }
+        .task { if model.snapshot == nil { await model.load() } }
+        .toolbar {
+            if let snapshot = model.snapshot {
+                ToolbarItem(placement: .topBarTrailing) {
+                    NavigationLink {
+                        InstalledPluginsView(model: model, hostName: hostName)
+                    } label: {
+                        Text("Installed \(snapshot.installed.count.formatted())").bighelpToolbarText()
+                    }
+                    .accessibilityIdentifier("plugins.installed.open")
+                }
+            }
+        }
+        .accessibilityIdentifier("plugins.storefront")
+    }
+
+    private var status: some View {
+        CatalogStatusBanner(support: model.support, isBusy: model.isBusy,
+                            errorMessage: model.errorMessage, successMessage: model.successMessage,
+                            retry: { Task { await model.load() } })
+    }
+
+    @ViewBuilder
+    private func storefront(_ snapshot: PluginSnapshot) -> some View {
+        let storefront = PluginStorefront(catalog: snapshot.catalog)
+        if snapshot.catalog.isEmpty {
+            Text("This computer's plugin catalog is empty.")
+                .foregroundStyle(theme.secondaryText)
+                .padding(.horizontal, CatalogMetrics.margin)
+        }
+        if let hero = storefront.hero {
+            VStack(alignment: .leading, spacing: BighelpTokens.space8) {
+                // Hermes has no featured list: this is the first official plugin it lists.
+                Text("Official pick")
+                    .font(.bighelp(.footnote, weight: .bold))
+                    .tracking(0.6)
+                    .textCase(.uppercase)
+                    .foregroundStyle(theme.secondaryText)
+                    .accessibilityAddTraits(.isHeader)
+                NavigationLink { page(hero) } label: { PluginHeroCard(entry: hero) }
+                    .bighelpPlainButtonStyle(.rounded(CatalogMetrics.heroRadius))
+                    .accessibilityIdentifier("plugins.hero")
+            }
+            .padding(.horizontal, CatalogMetrics.margin)
+        }
+        if !storefront.trusted.isEmpty {
+            shelf(String(localized: "Official and verified"), id: "trusted", entries: storefront.trusted, count: nil)
+        }
+        ForEach(storefront.shelves) { shelf in
+            BighelpDeferredSection {
+                self.shelf(shelf.category.title, id: shelf.id, entries: shelf.entries, count: shelf.entries.count)
+            }
+        }
+        if snapshot.skippedCatalogRows > 0 {
+            Text(snapshot.skippedCatalogRows == 1
+                 ? "1 plugin in the catalog couldn't be read, so it isn't shown."
+                 : "\(snapshot.skippedCatalogRows.formatted()) plugins in the catalog couldn't be read, so they aren't shown.")
+                .font(.bighelp(.footnote))
+                .foregroundStyle(theme.secondaryText)
+                .padding(.horizontal, CatalogMetrics.margin)
+        }
+    }
+
+    private func shelf(_ title: String, id: String, entries: [PluginCatalogEntry], count: Int?) -> some View {
+        VStack(alignment: .leading, spacing: BighelpTokens.space8) {
+            CatalogSectionHeader(title: title, count: count, seeAllIdentifier: "plugins.seeAll.\(id)") {
+                PluginCategoryView(model: model, hostName: hostName, title: title, entries: entries)
+            }
+            CatalogShelf(items: Array(entries.prefix(12)), columns: .cards) { entry in
+                card(entry)
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("plugins.shelf.\(id)")
+    }
+
+    @ViewBuilder
+    private func results(_ entries: [PluginCatalogEntry]) -> some View {
+        if entries.isEmpty {
+            Text("No plugins match “\(search.trimmingCharacters(in: .whitespacesAndNewlines))”.")
+                .foregroundStyle(theme.secondaryText)
+                .padding(.horizontal, CatalogMetrics.margin)
+                .accessibilityIdentifier("management.search.empty")
+        } else {
+            CatalogGrid(items: entries) { card($0) }
+        }
+    }
+
+    private func card(_ entry: PluginCatalogEntry) -> some View {
+        NavigationLink { page(entry) } label: { PluginCatalogCard(entry: entry) }
+            .bighelpPlainButtonStyle(.rounded(CatalogMetrics.artworkRadius))
+            .accessibilityIdentifier("plugins.card.\(entry.name)")
+    }
+
+    private func page(_ entry: PluginCatalogEntry) -> some View {
+        PluginCatalogPageView(model: model, hostName: hostName, entry: entry)
+    }
+
+    @BighelpThemeReader private var theme
+}
+
+/// The featured plugin: its banner with tier, topic and name over it, then one line and Get.
+private struct PluginHeroCard: View {
+    let entry: PluginCatalogEntry
+    @Environment(\.horizontalSizeClass) private var sizeClass
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Color.clear
+                .frame(height: sizeClass == .regular ? 260 : 176)
+                .frame(maxWidth: .infinity)
+                .overlay {
+                    CatalogArtwork(url: entry.listedImageURL, category: entry.catalogCategory, symbolSize: 56, cornerRadius: 0)
+                }
+                .overlay(alignment: .bottomLeading) {
+                    VStack(alignment: .leading, spacing: BighelpTokens.space4) {
+                        BighelpFlowLayout(spacing: 6) {
+                            CatalogBadge(text: entry.tier, style: .tier)
+                            CatalogBadge(text: entry.catalogCategory.title, style: .onArtwork)
+                        }
+                        Text(entry.displayName)
+                            .font(.bighelp(.title, weight: .heavy))
+                            .foregroundStyle(.white)
+                            .shadow(color: .black.opacity(0.35), radius: 6, y: 1)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(CatalogMetrics.margin)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(LinearGradient(colors: [.clear, .black.opacity(0.45)], startPoint: .top, endPoint: .bottom))
+                }
+                .clipped()
+            HStack(alignment: .center, spacing: BighelpTokens.space12) {
+                Text(entry.summary)
+                    .font(.bighelp(.subheadline))
+                    .foregroundStyle(theme.secondaryText)
+                    .lineLimit(3)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                CatalogGetLabel(text: entry.isInstalled ? String(localized: "Open") : String(localized: "Get"),
+                                prominent: !entry.isInstalled, filled: !entry.isInstalled)
+            }
+            .padding(.horizontal, CatalogMetrics.margin)
+            .padding(.vertical, 14)
+        }
+        .background(theme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: CatalogMetrics.heroRadius, style: .continuous))
+        .contentShape(.rect)
+    }
+
+    @BighelpThemeReader private var theme
+}
+
+/// Every installed plugin on the computer, with Rescan; a row opens it.
+@MainActor
+private struct InstalledPluginsView: View {
+    @Bindable var model: PluginLifecycleManagementModel
+    let hostName: String
 
     var body: some View {
         List {
@@ -16,145 +196,46 @@ struct PluginLifecycleManagementView: View {
                 retry: { Task { await model.load() } }
             )
             if let snapshot = model.snapshot {
-                let installed = snapshot.installed.filter {
-                    ManagementSearch.matches(search, $0.name, $0.source, $0.runtimeStatus)
-                }
-                let catalog = snapshot.catalog.filter {
-                    ManagementSearch.matches(search, $0.name, $0.summary, $0.tier, $0.maintainer)
-                }
-                if ManagementSearch.isActive(search), installed.isEmpty, catalog.isEmpty {
-                    ManagementSearchEmptySection(search: search)
-                } else {
-                    Section {
-                        if snapshot.installed.isEmpty { Text("No installed plugins were reported.").foregroundStyle(.secondary) }
-                        ForEach(installed) { plugin in
-                            NavigationLink {
-                                InstalledPluginDetailView(model: model, pluginName: plugin.name)
-                            } label: {
-                                VStack(alignment: .leading, spacing: BighelpTokens.space4) {
-                                    Text(plugin.name)
-                                    Text("\(plugin.source) • \(plugin.runtimeStatus.capitalized)")
-                                        .font(.bighelp(.caption)).foregroundStyle(.secondary)
-                                }
-                                .frame(minHeight: BighelpTokens.hitTarget)
+                Section {
+                    if snapshot.installed.isEmpty { Text("No installed plugins were reported.").foregroundStyle(.secondary) }
+                    ForEach(snapshot.installed) { plugin in
+                        NavigationLink {
+                            InstalledPluginDetailView(model: model, pluginName: plugin.name)
+                        } label: {
+                            VStack(alignment: .leading, spacing: BighelpTokens.space4) {
+                                Text(plugin.name)
+                                Text("\(plugin.source) • \(plugin.runtimeStatus.capitalized)")
+                                    .font(.bighelp(.caption)).foregroundStyle(.secondary)
                             }
+                            .frame(minHeight: BighelpTokens.hitTarget)
                         }
-                        Button("Rescan installed plugins", systemImage: "arrow.clockwise") {
-                            Task { await model.rescan() }
-                        }
-                        .disabled(model.isBusy)
-                        .frame(minHeight: BighelpTokens.hitTarget)
-                    } header: { Text("Installed") }
-                      footer: { Text("Rescan refreshes discovery only; it does not install, enable, or restart plugins.") }
-
-                    Section {
-                        ForEach(catalog) { entry in
-                            VStack(alignment: .leading, spacing: BighelpTokens.space8) {
-                                HStack {
-                                    Text(entry.name).font(.bighelp(.headline))
-                                    Spacer()
-                                    Text(entry.tier.capitalized).font(.bighelp(.caption)).foregroundStyle(.secondary)
-                                }
-                                if !entry.summary.isEmpty { Text(entry.summary).font(.bighelp(.subheadline)) }
-                                LabeledContent("Capabilities", value: capabilitySummary(entry.capabilities))
-                                if entry.isInstalled {
-                                    Label(entry.updateAvailable ? "Update available" : "Installed", systemImage: "checkmark.circle")
-                                } else {
-                                    Button("Review pinned installation") { installCandidate = entry }
-                                        .buttonStyle(.bordered)
-                                        .disabled(model.isBusy)
-                                }
-                            }
-                            .padding(.vertical, BighelpTokens.space4)
-                        }
-                    } header: { Text("Available plugins") }
-                      footer: {
-                        Text("Review the pinned source and declared access before installing. bighelp never force-installs plugins.")
                     }
+                    Button("Rescan installed plugins", systemImage: "arrow.clockwise") {
+                        Task { await model.rescan() }
+                    }
+                    .disabled(model.isBusy)
+                    .frame(minHeight: BighelpTokens.hitTarget)
+                } header: { Text("Installed") }
+                  footer: { Text("Rescan refreshes discovery only; it does not install, enable, or restart plugins.") }
 
-                    if !snapshot.removedCatalogEntries.isEmpty, !ManagementSearch.isActive(search) {
-                        Section("Advanced · Removed from catalog") {
-                            ForEach(snapshot.removedCatalogEntries, id: \.self) { Text($0).font(.bighelp(.footnote)) }
-                        }
+                if !snapshot.removedCatalogEntries.isEmpty {
+                    Section("Advanced · Removed from catalog") {
+                        ForEach(snapshot.removedCatalogEntries, id: \.self) { Text($0).font(.bighelp(.footnote)) }
                     }
                 }
             }
         }
         .listStyle(.insetGrouped)
-        .searchable(text: $search, prompt: "Search plugins")
+        .navigationTitle("Installed")
+        .navigationBarTitleDisplayMode(.inline)
         .bighelpRefreshable { await model.load() }
-        .task { if model.snapshot == nil { await model.load() } }
-        .bighelpSheet(item: $installCandidate) { entry in
-            PluginInstallReviewView(entry: entry, isBusy: model.isBusy) {
-                installCandidate = nil
-                Task { await model.install(entry) }
-            }
-            .bighelpSheetSize(.standard)
-        }
-    }
-
-    private func capabilitySummary(_ capabilities: PluginCapabilitySummary) -> String {
-        let values = [
-            capabilities.tools.isEmpty ? nil : "\(capabilities.tools.count) tools",
-            capabilities.hooks.isEmpty ? nil : "\(capabilities.hooks.count) hooks",
-            capabilities.middleware.isEmpty ? nil : "\(capabilities.middleware.count) middleware",
-            capabilities.requiredEnvironment.isEmpty ? nil : "\(capabilities.requiredEnvironment.count) environment fields",
-        ].compactMap { $0 }
-        return values.isEmpty ? "No declared additions" : values.joined(separator: ", ")
+        .accessibilityIdentifier("plugins.installed")
     }
 }
 
-private struct PluginInstallReviewView: View {
-    let entry: PluginCatalogEntry
-    let isBusy: Bool
-    let install: () -> Void
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            List {
-                Section("Plugin") {
-                    LabeledContent("Plugin", value: entry.name)
-                    LabeledContent("Repository", value: entry.repository).textSelection(.enabled)
-                    LabeledContent("Commit", value: entry.commitSHA).textSelection(.enabled)
-                    LabeledContent("Maintainer", value: entry.maintainer)
-                    LabeledContent("Trust tier", value: entry.tier.capitalized)
-                    if !entry.platforms.isEmpty {
-                        LabeledContent("Platforms", value: entry.platforms.joined(separator: ", "))
-                    }
-                    if !entry.requiredHermesVersion.isEmpty {
-                        LabeledContent("Requires Hermes", value: entry.requiredHermesVersion)
-                    }
-                    if let url = entry.documentationURL { Link("Open documentation", destination: url) }
-                }
-                Section("Access") {
-                    declared("Tools", entry.capabilities.tools)
-                    declared("Hooks", entry.capabilities.hooks)
-                    declared("Middleware", entry.capabilities.middleware)
-                    declared("Environment fields", entry.capabilities.requiredEnvironment)
-                }
-                Section {
-                    Button("Install and enable this plugin") { install() }
-                        .disabled(isBusy)
-                        .frame(minHeight: BighelpTokens.hitTarget)
-                } footer: {
-                    Text("Hermes installs the displayed commit and performs its normal security review. bighelp does not force approval or restart Hermes.")
-                }
-            }
-            .navigationTitle("Review plugin")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction).bighelpToolbarText() } }
-        }
-    }
-
-    @ViewBuilder private func declared(_ title: String, _ values: [String]) -> some View {
-        if values.isEmpty { LabeledContent(title, value: "None") }
-        else { LabeledContent(title, value: values.prefix(50).joined(separator: ", ")) }
-    }
-}
-
+/// One installed plugin: enable or disable, update from Git, remove.
 @MainActor
-private struct InstalledPluginDetailView: View {
+struct InstalledPluginDetailView: View {
     @Bindable var model: PluginLifecycleManagementModel
     let pluginName: String
     @Environment(\.dismiss) private var dismiss

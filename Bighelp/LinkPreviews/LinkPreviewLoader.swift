@@ -42,7 +42,13 @@ struct LinkPreviewLoader: Sendable {
         let type = response.mimeType?.lowercased() ?? ""
 
         if type.hasPrefix("image/") {
-            let picture = try await picture(page)
+            // A link straight to a picture: use what was read, unless it was cut off at the limit.
+            let picture: (data: Data, aspect: Double)
+            if data.count < Self.maximumPageBytes {
+                picture = try Self.cardPicture(data)
+            } else {
+                picture = try await self.picture(page)
+            }
             return Loaded(preview: LinkPreview(url: page, imageURL: page, imageAspect: picture.aspect),
                           imageData: picture.data)
         }
@@ -193,6 +199,10 @@ extension LinkPreviewLoader {
             return (Data(json.utf8), HTTPURLResponse(url: url, statusCode: 200, httpVersion: "HTTP/1.1",
                                                      headerFields: ["Content-Type": "application/json"])!)
         }
+        if url.path.hasPrefix("/bighelp-demo-banner/") {
+            return (demoBanner(named: url.lastPathComponent), HTTPURLResponse(url: url, statusCode: 200,
+                httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "image/png"])!)
+        }
         if url.path == "/bighelp-demo-preview.png" || url.host() == "i.ytimg.com" {
             let picture = UIGraphicsImageRenderer(size: CGSize(width: 1200, height: 630), format: {
                 let format = UIGraphicsImageRendererFormat()
@@ -215,6 +225,41 @@ extension LinkPreviewLoader {
         """
         return (Data(html.utf8), HTTPURLResponse(url: url, statusCode: 200, httpVersion: "HTTP/1.1",
                                                  headerFields: ["Content-Type": "text/html; charset=utf-8"])!)
+    }
+
+    /// A made-up 2:1 banner for the demo plugin catalog: a dusk gradient and two hills, colored by name.
+    private static func demoBanner(named name: String) -> Data {
+        let palettes: [(UInt32, UInt32, UInt32)] = [
+            (0x2A3A5C, 0x5470B0, 0x1E2B46), (0x3B2A22, 0xE87D3E, 0x5C4334),
+            (0x1F3D34, 0x7CC79A, 0x16302A), (0x3A2350, 0xB58CF0, 0x2A1A3C),
+        ]
+        var hash: UInt32 = 2_166_136_261
+        for byte in name.utf8 { hash = (hash ^ UInt32(byte)) &* 16_777_619 }
+        let (back, glow, ground) = palettes[Int(hash % UInt32(palettes.count))]
+        func color(_ hex: UInt32) -> UIColor {
+            UIColor(red: CGFloat(hex >> 16 & 0xFF) / 255, green: CGFloat(hex >> 8 & 0xFF) / 255,
+                    blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
+        }
+        let size = CGSize(width: 1200, height: 600)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        return UIGraphicsImageRenderer(size: size, format: format).pngData { context in
+            color(back).setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+            color(glow).withAlphaComponent(0.55).setFill()
+            context.cgContext.fillEllipse(in: CGRect(x: 760 - CGFloat(hash % 300), y: -120, width: 560, height: 560))
+            color(glow).setFill()
+            context.cgContext.fillEllipse(in: CGRect(x: 560, y: 260, width: 300, height: 300))
+            color(ground).setFill()
+            let hill = UIBezierPath()
+            hill.move(to: CGPoint(x: 0, y: 520))
+            hill.addCurve(to: CGPoint(x: 1200, y: 420), controlPoint1: CGPoint(x: 300, y: 380),
+                          controlPoint2: CGPoint(x: 700, y: 620))
+            hill.addLine(to: CGPoint(x: 1200, y: 600))
+            hill.addLine(to: CGPoint(x: 0, y: 600))
+            hill.close()
+            hill.fill()
+        }
     }
     #endif
 }

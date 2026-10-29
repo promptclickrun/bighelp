@@ -193,9 +193,12 @@ final class SkillsHubManagementModel: CapabilityActionTrackingState {
         }
     }
 
-    func installReviewed() async {
+    /// Installs the reviewed skill, only when it is `identifier`: a page never installs a
+    /// review it isn't showing.
+    func installReviewed(_ identifier: String) async {
         guard let review else { return }
         await perform {
+            guard review.id == identifier else { throw CapabilitiesManagementError.invalidRequest }
             let result = try await client.install(identifier: review.id, preview: review.preview, scan: review.scan)
             self.review = nil
             try await accept(result) { snapshot = try await client.load() }
@@ -203,6 +206,25 @@ final class SkillsHubManagementModel: CapabilityActionTrackingState {
     }
 
     func dismissReview() { review = nil }
+
+    /// The newest copy of `item` the host listed (official, search results or featured), so a
+    /// skill's page shows an install as soon as a refresh reports it.
+    /// Installed whenever the latest reload lists its identifier, wherever it was found.
+    func latest(_ item: SkillHubItem) -> SkillHubItem {
+        let found = snapshot?.official.first { $0.id == item.id }
+            ?? searchResult?.items.first { $0.id == item.id }
+            ?? snapshot?.featured.first { $0.id == item.id }
+            ?? item
+        guard !found.isInstalled, snapshot?.installedIdentifiers.contains(found.id) == true else { return found }
+        return SkillHubItem(id: found.id, name: found.name, summary: found.summary, source: found.source,
+                            trustLevel: found.trustLevel, repository: found.repository, tags: found.tags,
+                            category: found.category, isInstalled: true)
+    }
+
+    /// A hub's name for a source ID.
+    func sourceLabel(_ source: String) -> String {
+        snapshot?.sources.first { $0.id == source }?.label ?? source
+    }
 
     func uninstall(_ item: SkillHubItem) async {
         await perform {

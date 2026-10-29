@@ -195,6 +195,8 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     case myTemplatesList = "my-templates.list"
     case myTemplatesSave = "my-templates.save"
     case myTemplatesDelete = "my-templates.delete"
+    /// A skill folder (.zip) uploaded to an agent, written with Hermes' own checks (plugin, `native-skills-import-v1`).
+    case skillsImport = "skills.import"
     /// Photo actions: an agent's settings, and drafts read from pictures that the person reviews
     /// before anything is written (plugin `native-image-drafts-v1`, docs/IMAGE_DRAFTS.md).
     case imageActionsGet = "image-actions.get"

@@ -47,9 +47,8 @@ struct DirectHermesCapabilityClientsTests {
         let store = SkillsAndToolsStore(client: client)
         await store.load(agentID: "studio")
         #expect(store.catalog?.management?.canUpdate == true)
-        #expect(store.catalog?.management?.canImport == false)
-        #expect(store.compatibilityMessage == catalog.toolsNotice)
-        #expect(store.compatibilityMessage?.contains("Update Hermes") == false)
+        #expect(store.catalog?.management?.canImport == true)
+        #expect(store.compatibilityMessage == nil)
     }
 
     @Test func skillsLoadAcceptsOfficialMCPToolFilterObjectWithoutInventingToolCount() async throws {
@@ -196,18 +195,77 @@ struct DirectHermesCapabilityClientsTests {
         }
     }
 
-    @Test func unsupportedImportDoesNotSendSkillBytesToAnInventedRoute() async throws {
+    /// Uploading a SKILL.md made every host say "browsing only". Stock Hermes makes the skill from
+    /// its SKILL.md, named by its own header.
+    @Test func anUploadedSkillFileMakesTheSkillByItsOwnName() async throws {
+        let workspace = try CapabilityWorkspace()
+        workspace.responses[.skillsToolsList] = ["skills": .array([])]
+        workspace.responses[.pluginsList] = ["plugins": .array([])]
+        workspace.responses[.mcpServersList] = ["servers": .array([])]
+        workspace.responses[.toolsetsList] = ["toolsets": .array([])]
+        let content = "---\nname: \"daily-notes\"\ndescription: Notes for each day.\n---\nWrite the notes.\n"
+        workspace.responses[.skillsToolsCreate] = ["success": .boolean(true), "name": .string("daily-notes")]
+        workspace.responses[.skillsToolsGet] = ["name": .string("daily-notes"), "content": .string(content)]
+        let store = SkillsAndToolsStore(client: DirectHermesSkillsAndToolsClient(
+            workspace: workspace, owner: workspace.initialOwner, currentOwner: { workspace.owner }))
+        await store.load(agentID: "studio")
+
+        let document = await store.importSkill(data: Data(("\u{FEFF}" + content).utf8), kind: "skillMd", agentID: "studio")
+        #expect(store.errorMessage == nil)
+        #expect(document?.skillID == "daily-notes")
+        let create = try #require(workspace.calls.first { $0.operation == .skillsToolsCreate })
+        #expect(create.payload["name"] == .string("daily-notes"))
+        #expect(create.payload["content"] == .string(content), "Hermes reads the header from the first line")
+    }
+
+    @Test func aSkillFileWithoutANameSaysSoAndSendsNothing() async throws {
         let workspace = try CapabilityWorkspace()
         let client = DirectHermesSkillsAndToolsClient(
-            workspace: workspace, owner: workspace.initialOwner,
-            currentOwner: { workspace.owner }
-        )
-        await #expect(throws: WorkspaceClientError.unavailable(.unsupportedOperation)) {
-            _ = try await client.importSkill(
-                data: Data("archive".utf8), kind: "zip", category: nil, agentID: "studio"
-            )
+            workspace: workspace, owner: workspace.initialOwner, currentOwner: { workspace.owner })
+        await #expect(throws: HermesSkillUploadError.missingName) {
+            _ = try await client.importSkill(data: Data("---\ndescription: No name.\n---\nBody.\n".utf8),
+                                             kind: "skillMd", category: nil, agentID: "studio")
         }
         #expect(workspace.calls.isEmpty)
+    }
+
+    /// A skill folder (scripts, references, assets) goes to the plugin, which writes it with
+    /// Hermes' own checks; the app reads the new skill back.
+    @Test func anUploadedSkillFolderGoesToThePluginAndIsReadBack() async throws {
+        let workspace = try CapabilityWorkspace()
+        workspace.responses[.skillsImport] = ["name": .string("daily-notes"), "category": .null,
+                                              "files": .array([.string("SKILL.md"), .string("scripts/notes.py")])]
+        workspace.responses[.skillsToolsGet] = ["name": .string("daily-notes"), "content": .string("---\nname: daily-notes\n---\n")]
+        let client = DirectHermesSkillsAndToolsClient(
+            workspace: workspace, owner: workspace.initialOwner, currentOwner: { workspace.owner })
+        let archive = Data([0x50, 0x4B, 0x03, 0x04]) + Data(repeating: 1, count: 64)
+
+        let document = try await client.importSkill(data: archive, kind: "zip", category: nil, agentID: "studio")
+        #expect(document.skillID == "daily-notes")
+        #expect(workspace.calls.map(\.operation) == [.skillsImport, .skillsToolsGet])
+        #expect(workspace.calls[0].payload["agentId"] == .string("studio"))
+        #expect(workspace.calls[0].payload["kind"] == .string("zip"))
+        #expect(workspace.calls[0].payload["data"] == .string(archive.base64EncodedString()))
+    }
+
+    /// An older plugin can't take a folder. The person is told to update it, and a single
+    /// SKILL.md still uploads.
+    @Test func aSkillFolderForAnOlderPluginSaysToUpdateIt() async throws {
+        let workspace = try CapabilityWorkspace()
+        workspace.unavailable = [.skillsImport]
+        workspace.responses[.skillsToolsList] = ["skills": .array([])]
+        workspace.responses[.pluginsList] = ["plugins": .array([])]
+        workspace.responses[.mcpServersList] = ["servers": .array([])]
+        workspace.responses[.toolsetsList] = ["toolsets": .array([])]
+        let client = DirectHermesSkillsAndToolsClient(
+            workspace: workspace, owner: workspace.initialOwner, currentOwner: { workspace.owner })
+        await #expect(throws: HermesSkillUploadError.folderNeedsPluginUpdate) {
+            _ = try await client.importSkill(data: Data([0x50, 0x4B, 0x03, 0x04]), kind: "zip",
+                                             category: nil, agentID: "studio")
+        }
+        #expect(workspace.calls.isEmpty)
+        #expect(HermesSkillUploadError.folderNeedsPluginUpdate.localizedDescription.contains("plugin"))
+        #expect(try await client.load(agentID: "studio").management?.canImport == true)
     }
 
     @Test func personalityLoadExposesOnlyConfiguredCustomDefinitionsAndActiveName() async throws {
@@ -326,10 +384,13 @@ private final class CapabilityWorkspace: WorkspaceOperationPerforming {
     var calls: [Call] = []
     var responses: [WorkspaceOperation: [String: BighelpJSONValue]] = [:]
     var sequence: [WorkspaceOperation: [[String: BighelpJSONValue]]] = [:]
+    var unavailable: Set<WorkspaceCapability> = []
 
     var capabilities: WorkspaceCapabilities {
         WorkspaceCapabilities(owner: owner, values: Dictionary(
-            uniqueKeysWithValues: WorkspaceCapability.allCases.map { ($0, .available) }
+            uniqueKeysWithValues: WorkspaceCapability.allCases.map {
+                ($0, unavailable.contains($0) ? .unavailable(.pluginRequired) : .available)
+            }
         ))
     }
 

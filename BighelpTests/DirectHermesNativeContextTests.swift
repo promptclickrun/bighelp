@@ -199,6 +199,31 @@ struct DirectHermesNativeContextTests {
         #expect(call.guardValue?.requestIDHeader == call.guardValue?.requestIDHeader.lowercased())
     }
 
+    /// A skill folder of up to 3 MB goes to the plugin whole, base64 in JSON, past the 1 MiB cap
+    /// that other plugin requests keep.
+    @Test func aSkillFolderUploadFitsItsRoute() async throws {
+        let owner = try owner()
+        let http = HTTP()
+        http.handler = { request, guardValue in
+            if let guardValue {
+                return try self.response(request, body: ["name": .string("daily-notes"), "files": .array([])],
+                    headers: ["ETag": guardValue.etag, "X-Loopdy-Request-ID": guardValue.requestIDHeader])
+            }
+            return try self.response(request, body: self.context(features: [
+                "native-context-v1", "serving-profile-v1", DirectHermesSkillsAndToolsClient.importFeature]))
+        }
+        let client = DirectHermesNativePluginClient(http: http, owner: owner, currentOwner: { owner })
+        let archive = Data(repeating: 7, count: DirectHermesSkillsAndToolsClient.maximumUploadBytes)
+        let payload: [String: BighelpJSONValue] = ["agentId": .string("default"), "fileName": .string("skill.zip"),
+                                                   "kind": .string("zip"), "data": .string(archive.base64EncodedString())]
+        _ = try await client.perform(.skillsImport, payload: payload)
+        let call = try #require(http.calls.last)
+        #expect(call.request.path == "/api/plugins/loopdy/native/skills/import")
+        #expect(call.request.body == payload)
+        let body = try JSONEncoder().encode(BighelpJSONValue.object(payload))
+        #expect(body.count <= DirectHermesHTTP.requestBodyLimit(route: call.request.path, method: "POST"))
+    }
+
     @Test func templateReadUsesOnlyFixedPathAndExactContextHeaders() async throws {
         let owner = try owner()
         let http = HTTP()

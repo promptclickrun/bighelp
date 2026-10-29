@@ -771,6 +771,9 @@ final class NativeWorkspaceRuntime {
                 }
                 if context.features.contains("native-agent-board-files-v1") { supported.insert(.agentBoardFiles) }
                 if context.features.contains("native-agent-board-answers-v1") { supported.insert(.agentBoardAnswers) }
+                if context.features.contains(DirectHermesSkillsAndToolsClient.importFeature) {
+                    supported.insert(.skillsImport)
+                }
             }
             configureRoomActivity(workspace: workspace, owner: owner, features: workspace.nativeContext?.features ?? [])
             // While "Share usage and diagnostics" is off, this computer is told to stop its own reports too.

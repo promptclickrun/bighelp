@@ -29,6 +29,9 @@ enum WorkspaceCapability: String, CaseIterable, Sendable {
     case agentBoardFiles
     /// Let's do it records the idea by its ID (plugin `native-agent-board-answers-v1`).
     case agentBoardAnswers
+    /// A skill folder (.zip) uploaded to an agent (plugin `native-skills-import-v1`). A single
+    /// SKILL.md needs only `skillsEdit`.
+    case skillsImport
 }
 
 enum WorkspaceUnavailableReason: String, Equatable, Sendable {

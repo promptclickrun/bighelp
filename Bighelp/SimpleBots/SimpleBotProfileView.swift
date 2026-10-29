@@ -16,6 +16,8 @@ struct SimpleBotProfileContext {
     /// The bot's default voice (Default Voice): its own voice type here, its speech provider on the
     /// computer; nil without a computer.
     var makeVoiceSettings: ((String) -> SimpleBotVoiceSettings?)? = nil
+    /// The bot's own Credential Vault (its logins, cards and addresses); nil without a computer to ask.
+    var makeCredentialVault: ((String) -> CredentialVaultModel?)? = nil
     /// The bot's Advanced Options: its settings and Nerd Mode pages; nil without a computer to ask.
     var makeAdvancedOptions: ((String) -> AdvancedOptionsContext?)? = nil
     /// The folder the computer shares (Files); nil without a computer.
@@ -89,6 +91,8 @@ struct SimpleBotProfileView: View {
     @State private var isVoicePresented = false
     @State private var advancedOptions: AdvancedOptionsContext?
     @State private var isAdvancedPresented = false
+    @State private var vault: CredentialVaultModel?
+    @State private var isVaultPresented = false
     @State private var files: SimpleBotFilesModel?
     @State private var media = AgentMediaStore()
     @State private var isMediaConnected = false
@@ -143,6 +147,16 @@ struct SimpleBotProfileView: View {
             // profile opens; kept through a reconnect's moment without a connection.
             guard context.canEdit, advancedOptions?.store.profile != agentID else { return }
             advancedOptions = context.makeAdvancedOptions?(agentID)
+        }
+        .task(id: "\(agentID)|\(context.canEdit)") {
+            // Like Advanced Options: made once the computer lets the app edit this bot.
+            guard context.canEdit, vault?.agentID != agentID else { return }
+            vault = context.makeCredentialVault?(agentID)
+        }
+        .task(id: vault.map { "\($0.id)|\(shownTab == .info)" }) {
+            // The row says how many websites the bot has: read once Info shows, not on every open.
+            guard shownTab == .info, let vault, vault.state == .loading else { return }
+            await vault.load()
         }
         .task(id: agentID) {
             if context.dashboard != nil, dashboard?.agentID != agentID {
@@ -237,6 +251,14 @@ struct SimpleBotProfileView: View {
         .bighelpSheet(isPresented: $isVoicePresented) {
             if let profile, let voice {
                 SimpleBotDefaultVoiceSheet(model: voice, botName: profile.name) { isVoicePresented = false }
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+                    .bighelpSheetSize(.standard)
+            }
+        }
+        .bighelpSheet(isPresented: $isVaultPresented) {
+            if let vault {
+                CredentialVaultView(model: vault)
                     .presentationDetents([.large])
                     .presentationDragIndicator(.visible)
                     .bighelpSheetSize(.standard)
@@ -684,6 +706,16 @@ struct SimpleBotProfileView: View {
                     .driveTarget("simple-bots.profile.default-voice")
                     .accessibilityIdentifier("simple-bots.profile.default-voice")
                 }
+                if let vault {
+                    SimpleBotsDivider()
+                    Button { isVaultPresented = true } label: {
+                        SimpleBotsRow(title: String(localized: "Credential Vault"), leading: Image(systemName: "lock.shield"),
+                                      value: vaultSummary(vault))
+                    }
+                    .buttonStyle(.plain)
+                    .driveTarget("simple-bots.profile.credential-vault")
+                    .accessibilityIdentifier("simple-bots.profile.credential-vault")
+                }
                 if advancedOptions != nil {
                     SimpleBotsDivider()
                     Button { isAdvancedPresented = true } label: {
@@ -697,6 +729,16 @@ struct SimpleBotProfileView: View {
             }
 
             routines(profile)
+        }
+    }
+
+    /// How many websites the bot can sign in or check out on, once the vault has been read.
+    private func vaultSummary(_ vault: CredentialVaultModel) -> String? {
+        guard vault.state == .ready else { return nil }
+        return switch vault.sites.count {
+        case 0: nil
+        case 1: String(localized: "1 website")
+        case let count: String(localized: "\(count) websites")
         }
     }
 

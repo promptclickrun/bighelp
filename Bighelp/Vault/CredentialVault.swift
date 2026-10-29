@@ -8,6 +8,20 @@ import Observation
 @MainActor
 protocol CredentialVaultService: AnyObject {
     func call(_ method: String, params: [String: BighelpJSONValue]) async throws -> BighelpJSONValue
+    /// Whether the computer can copy a saved card or address to more websites (the plugin's
+    /// `vault/link`, `native-vault-link-v1`).
+    func canLink() async -> Bool
+    /// The plugin's `vault/link`: copies saved local cards and addresses to more websites on the
+    /// computer, so their numbers never come to the phone.
+    func link(_ payload: [String: BighelpJSONValue]) async throws -> [String: BighelpJSONValue]
+}
+
+extension CredentialVaultService {
+    func canLink() async -> Bool { false }
+
+    func link(_ payload: [String: BighelpJSONValue]) async throws -> [String: BighelpJSONValue] {
+        throw WorkspaceClientError.unavailable(.unsupportedOperation)
+    }
 }
 
 /// One saved item as Hermes lists it: a label and where it's used, never the
@@ -91,18 +105,24 @@ enum CredentialVaultEntry {
 struct CredentialVaultGroup: Identifiable, Equatable {
     let items: [CredentialVaultItem]
 
-    var id: String { items[0].id }
+    /// The same for every copy, so it stays put while copies come and go.
+    var id: String { Self.key(items[0]) }
+    var firstItemID: String { items[0].id }
     var kind: CredentialVaultItem.Kind { items[0].kind }
     var label: String { items[0].label }
     var identifier: String? { items[0].identifier }
     var isLocal: Bool { items[0].isLocal }
     var source: String { items[0].source }
     var generatesCodes: Bool { items.contains(where: \.generatesCodes) }
+    /// The copies' websites as Hermes keeps them (`https://example.com`), in the order they were saved.
+    var origins: [String] {
+        var seen = Set<String>()
+        return items.compactMap(\.origin).filter { seen.insert($0).inserted }
+    }
     /// Sites by host, in the order they were saved.
     var sites: [String] {
         var seen = Set<String>()
-        return items.compactMap { $0.origin.flatMap { URLComponents(string: $0)?.host ?? $0 } }
-            .filter { seen.insert($0).inserted }
+        return origins.map(CredentialVault.siteName).filter { seen.insert($0).inserted }
     }
     /// Whether an agent can use it at all: cards and addresses need a site.
     var isUsable: Bool { kind == .login || !sites.isEmpty }
@@ -119,11 +139,17 @@ struct CredentialVaultGroup: Identifiable, Equatable {
         }
     }
 
+    /// A card's last four digits, which bighelp keeps in its name.
+    var lastDigits: String? {
+        guard kind == .payment, let range = label.range(of: #"\d{4}$"#, options: .regularExpression) else { return nil }
+        return String(label[range])
+    }
+
     var kindTitle: String {
         switch kind {
-        case .login: "Login"
-        case .payment: "Card"
-        case .address: "Address"
+        case .login: String(localized: "Login")
+        case .payment: String(localized: "Card")
+        case .address: String(localized: "Address")
         }
     }
 
@@ -133,17 +159,63 @@ struct CredentialVaultGroup: Identifiable, Equatable {
         var order: [String] = []
         var groups: [String: [CredentialVaultItem]] = [:]
         for item in items {
-            let key = item.isLocal ? "\(item.kind.rawValue)\u{1F}\(item.label)\u{1F}\(item.identifier ?? "")" : "id:" + item.id
+            let key = key(item)
             if groups[key] == nil { order.append(key) }
             groups[key, default: []].append(item)
         }
         return order.compactMap { groups[$0].map(CredentialVaultGroup.init(items:)) }
     }
+
+    private static func key(_ item: CredentialVaultItem) -> String {
+        item.isLocal ? "\(item.kind.rawValue)\u{1F}\(item.label)\u{1F}\(item.identifier ?? "")" : "id:" + item.id
+    }
+}
+
+/// One website and everything an agent may use there: its login, cards and addresses. Hermes keeps
+/// a copy of an item for each website, so a website lists the copies saved for it.
+struct CredentialVaultSite: Identifiable, Equatable {
+    let origin: String
+    let items: [CredentialVaultItem]
+
+    var id: String { origin }
+    var name: String { CredentialVault.siteName(origin) }
+    var logins: [CredentialVaultItem] { items.filter { $0.kind == .login } }
+    var cards: [CredentialVaultItem] { items.filter { $0.kind == .payment } }
+    var addresses: [CredentialVaultItem] { items.filter { $0.kind == .address } }
+    /// The kinds saved here, login first.
+    var kinds: [CredentialVaultItem.Kind] {
+        [.login, .payment, .address].filter { kind in items.contains { $0.kind == kind } }
+    }
+    /// Only Hermes' own copies can be removed here; a password manager's stay in the manager.
+    var hasLocalItems: Bool { items.contains(where: \.isLocal) }
+
+    /// Every website with something saved for it, by name.
+    static func grouped(_ items: [CredentialVaultItem]) -> [CredentialVaultSite] {
+        var order: [String] = []
+        var bySite: [String: [CredentialVaultItem]] = [:]
+        for item in items {
+            guard let origin = item.origin else { continue }
+            if bySite[origin] == nil { order.append(origin) }
+            bySite[origin, default: []].append(item)
+        }
+        return order.compactMap { origin in
+            bySite[origin].map { items in
+                CredentialVaultSite(origin: origin, items: [.login, .payment, .address].flatMap { kind in
+                    items.filter { $0.kind == kind }
+                })
+            }
+        }
+        .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
 }
 
 enum CredentialVault {
+    /// The plugin route that copies saved cards and addresses to more websites.
+    static let linkFeature = "native-vault-link-v1"
+
     /// `scheme://host[:port]` for what someone typed ("example.com",
-    /// "https://example.com/login"), or nil when it isn't a web address.
+    /// "https://example.com/login"), or nil when it isn't a web address. A default port is left
+    /// out, as Hermes leaves it out.
     static func origin(from typed: String) -> String? {
         let trimmed = typed.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, trimmed.utf8.count <= 2_048, !trimmed.contains(" ") else { return nil }
@@ -152,7 +224,19 @@ enum CredentialVault {
               let scheme = parts.scheme?.lowercased(), ["https", "http"].contains(scheme),
               let host = parts.host?.lowercased(), host.contains(".") || host == "localhost",
               parts.user == nil, parts.password == nil else { return nil }
-        return scheme + "://" + host + (parts.port.map { ":\($0)" } ?? "")
+        let port = parts.port.flatMap { (scheme == "https" && $0 == 443) || (scheme == "http" && $0 == 80) ? nil : $0 }
+        return scheme + "://" + host + (port.map { ":\($0)" } ?? "")
+    }
+
+    /// How a website reads on screen: its host, with a port when it has one.
+    static func siteName(_ origin: String) -> String {
+        guard let parts = URLComponents(string: origin), let host = parts.host else { return origin }
+        return host + (parts.port.map { ":\($0)" } ?? "")
+    }
+
+    /// A website as someone would type it back: the site's name, or the whole origin when it isn't https.
+    static func typedSite(_ origin: String) -> String {
+        origin.hasPrefix("https://") ? siteName(origin) : origin
     }
 
     static let maximumSites = 10
@@ -201,7 +285,7 @@ enum CredentialVault {
                 guard key.utf8.count <= 2_048 else { return .failure(.authenticatorKey) }
                 secret["otp_secret"] = .string(key)
             }
-            let title = named(label) ?? URLComponents(string: first)?.host ?? first
+            let title = named(label) ?? siteName(first)
             return .success(targets.map { ["kind": .string("login"), "label": .string(title), "origin": .string($0),
                                            "secret": .object(secret)] })
         case .card(let label, let sites, let name, let number, let month, let year, let securityCode, let postalCode):
@@ -242,15 +326,15 @@ enum CredentialVault {
 
         var message: String {
             switch self {
-            case .site: "Enter each site's address, like example.com."
-            case .tooManySites: "Link up to \(CredentialVault.maximumSites) sites."
-            case .identifier: "Enter the email or username you sign in with."
-            case .password: "Enter the password."
-            case .authenticatorKey: "That authenticator key is too long."
-            case .cardNumber: "Enter the card number."
-            case .expiry: "Enter the expiry month and year."
-            case .securityCode: "Enter the 3 or 4 digit security code."
-            case .address: "Enter the street, city, postal code and country."
+            case .site: String(localized: "Enter each site's address, like example.com.")
+            case .tooManySites: String(localized: "Link up to \(CredentialVault.maximumSites) sites.")
+            case .identifier: String(localized: "Enter the email or username you sign in with.")
+            case .password: String(localized: "Enter the password.")
+            case .authenticatorKey: String(localized: "That authenticator key is too long.")
+            case .cardNumber: String(localized: "Enter the card number.")
+            case .expiry: String(localized: "Enter the expiry month and year.")
+            case .securityCode: String(localized: "Enter the 3 or 4 digit security code.")
+            case .address: String(localized: "Enter the street, city, postal code and country.")
             }
         }
     }
@@ -283,6 +367,8 @@ final class CredentialVaultModel: Identifiable {
     private(set) var sources: [CredentialVaultSource] = []
     private(set) var state = State.loading
     private(set) var isWorking = false
+    /// The computer copies saved cards and addresses to more websites itself (plugin `vault/link`).
+    private(set) var canLink = false
     var message: String?
     @ObservationIgnored private let service: any CredentialVaultService
 
@@ -310,10 +396,12 @@ final class CredentialVaultModel: Identifiable {
         do {
             let listed = try await service.call("vault.list", params: profile)
             let found = try await service.call("vault.sources", params: profile)
+            let links = await service.canLink()
             guard agent == agentID else { return }
             items = (listed.object?["items"]?.array ?? []).prefix(500).compactMap(CredentialVaultItem.init)
                 .sorted { ($0.isLocal ? 0 : 1, $0.label.lowercased()) < ($1.isLocal ? 0 : 1, $1.label.lowercased()) }
             sources = (found.object?["sources"]?.array ?? []).prefix(32).compactMap(CredentialVaultSource.init)
+            canLink = links
             state = .ready
         } catch {
             guard agent == agentID else { return }
@@ -322,6 +410,16 @@ final class CredentialVaultModel: Identifiable {
     }
 
     var groups: [CredentialVaultGroup] { CredentialVaultGroup.grouped(items) }
+    /// Every website with something saved for it.
+    var sites: [CredentialVaultSite] { CredentialVaultSite.grouped(items) }
+    /// Saved cards, then addresses: one each, however many websites use it.
+    var wallet: [CredentialVaultGroup] {
+        let saved = groups.filter(\.isLocal)
+        return saved.filter { $0.kind == .payment } + saved.filter { $0.kind == .address }
+    }
+
+    func group(_ id: String) -> CredentialVaultGroup? { groups.first { $0.id == id } }
+    func site(_ origin: String) -> CredentialVaultSite? { sites.first { $0.origin == origin } }
 
     /// Sends a new item once per site. Editing replaces the old copies, which go only after every new
     /// one is saved, so a failed edit never loses what was there. Returns whether all were saved.
@@ -339,13 +437,13 @@ final class CredentialVaultModel: Identifiable {
         var saved = 0
         for request in requests {
             do {
-                _ = try await service.call("vault.add", params: profile.merging(request) { _, new in new })
+                try await add(request)
                 saved += 1
             } catch {
                 message = Self.isUnsupported(error)
-                    ? "This needs a newer Hermes on your computer."
-                    : saved == 0 ? "Hermes couldn't save that. Check the details and try again."
-                    : "Saved for \(saved) of \(requests.count) sites. Try the rest again."
+                    ? String(localized: "This needs a newer Hermes on your computer.")
+                    : saved == 0 ? String(localized: "Hermes couldn't save that. Check the details and try again.")
+                    : String(localized: "Saved for \(saved) of \(requests.count) sites. Try the rest again.")
                 await load()
                 return false
             }
@@ -358,6 +456,77 @@ final class CredentialVaultModel: Identifiable {
         message = nil
         await load()
         return true
+    }
+
+    /// Stores one copy (`vault.add`) for this agent. Add a Website checks every part first and
+    /// calls this once per part and website.
+    func add(_ request: [String: BighelpJSONValue]) async throws {
+        _ = try await service.call("vault.add", params: profile.merging(request) { _, new in new })
+    }
+
+    /// Copies a saved card or address to more websites on the computer; it's never typed again.
+    /// Its copies without a website go once it has one, since an agent can't use them anywhere.
+    func link(_ group: CredentialVaultGroup, to origins: [String]) async throws {
+        let missing = origins.filter { !group.origins.contains($0) }
+        guard !missing.isEmpty else { return }
+        guard group.kind != .login, let source = group.items.first(where: \.isLocal) else {
+            throw WorkspaceClientError.invalidRequest
+        }
+        let reply = try await service.link(profile.merging([
+            "item_ids": .array([.string(source.id)]), "origins": .array(missing.map(BighelpJSONValue.string)),
+        ]) { _, new in new })
+        let copied = Set((reply["copies"]?.array ?? []).compactMap { copy -> String? in
+            guard let row = copy.object, row["item_id"]?.string == source.id,
+                  ["created", "existing"].contains(row["status"]?.string ?? "") else { return nil }
+            return row["origin"]?.string
+        })
+        guard missing.allSatisfy(copied.contains) else { throw WorkspaceClientError.invalidResponse }
+        for item in group.items where item.isLocal && item.origin == nil {
+            _ = try? await service.call("vault.remove", params: profile.merging(["id": .string(item.id)]) { _, new in new })
+        }
+    }
+
+    /// A saved card's or address's page: Use on another website.
+    func use(_ group: CredentialVaultGroup, on typed: String) async -> Bool {
+        guard !isWorking else { return false }
+        guard let origin = CredentialVault.origin(from: typed) else {
+            message = CredentialVault.EntryProblem.site.message
+            return false
+        }
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            try await link(group, to: [origin])
+            message = nil
+            await load()
+            return true
+        } catch {
+            message = Self.linkFailure(error)
+            await load()
+            return false
+        }
+    }
+
+    /// What to say when copying to a website failed.
+    static func linkFailure(_ error: any Error) -> String {
+        switch error {
+        case WorkspaceClientError.unavailable:
+            String(localized: "Update the bighelp plugin on your computer to use this on another website.")
+        default:
+            String(localized: "Your computer didn't add the website. Try again.")
+        }
+    }
+
+    /// Stops using a card or address on one website. Its last website stays: removing that copy
+    /// removes the card or address, which Remove does with a question first.
+    func stop(_ group: CredentialVaultGroup, on origin: String) async {
+        guard group.origins.count > 1 else { return }
+        for item in group.items where item.isLocal && item.origin == origin { await remove(item) }
+    }
+
+    /// Removes Hermes' own copies for a website. A card or address used only there goes with it.
+    func remove(_ site: CredentialVaultSite) async {
+        for item in site.items where item.isLocal { await remove(item) }
     }
 
     func remove(_ group: CredentialVaultGroup) async {
@@ -383,7 +552,7 @@ final class CredentialVaultModel: Identifiable {
                 guard case .success(let requests) = CredentialVault.requests(for: .login(sites: [login.origin],
                     identifier: login.identifier, password: login.password, authenticatorKey: key)),
                       let request = requests.first else { continue }
-                saved = (try? await service.call("vault.add", params: profile.merging(request) { _, new in new })) != nil
+                saved = (try? await add(request)) != nil
             }
             if saved { imported += 1 } else { failed += 1 }
             importProgress = (imported + failed, logins.count)
@@ -401,24 +570,25 @@ final class CredentialVaultModel: Identifiable {
             _ = try await service.call("vault.remove", params: profile.merging(["id": .string(item.id)]) { _, new in new })
             items.removeAll { $0.id == item.id }
         } catch {
-            message = "Hermes couldn't remove that. Try again."
+            message = String(localized: "Hermes couldn't remove that. Try again.")
         }
     }
 
     func setEnabled(_ source: CredentialVaultSource, _ enabled: Bool) async {
         await run("vault.source.set", ["name": .string(source.name), "enabled": .boolean(enabled)],
-                  failure: "Hermes couldn't change \(source.displayName). Try again.")
+                  failure: String(localized: "Hermes couldn't change \(source.displayName). Try again."))
     }
 
     /// The master password goes to the manager on the computer once and is dropped.
     func unlock(_ source: CredentialVaultSource, password: String) async -> Bool {
         guard !password.isEmpty, password.utf8.count <= 4_096 else { return false }
         return await run("vault.unlock", ["name": .string(source.name), "password": .string(password)],
-                         failure: "That didn't unlock \(source.displayName). Check the master password.")
+                         failure: String(localized: "That didn't unlock \(source.displayName). Check the master password."))
     }
 
     func lock(_ source: CredentialVaultSource) async {
-        await run("vault.lock", ["name": .string(source.name)], failure: "Hermes couldn't lock \(source.displayName).")
+        await run("vault.lock", ["name": .string(source.name)],
+                  failure: String(localized: "Hermes couldn't lock \(source.displayName)."))
     }
 
     @discardableResult
@@ -439,21 +609,45 @@ final class CredentialVaultModel: Identifiable {
 
     private var profile: [String: BighelpJSONValue] { ["profile": .string(agentID)] }
 
-    private static func isUnsupported(_ error: any Error) -> Bool {
+    static func isUnsupported(_ error: any Error) -> Bool {
         if case DirectHermesError.rpcRejected(code: -32601, _)? = error as? DirectHermesError { return true }
         return false
     }
 }
 
-/// The selected host's own vault, over its authenticated socket.
+/// The selected host's own vault, over its authenticated socket, and the plugin's `vault/link`
+/// on the same computer.
 @MainActor
 final class DirectHermesCredentialVaultService: CredentialVaultService {
     private let workspace: DirectHermesWorkspaceStore
+    private let plugin: @MainActor () -> DirectHermesWorkspaceClient?
 
-    init(workspace: DirectHermesWorkspaceStore) { self.workspace = workspace }
+    init(workspace: DirectHermesWorkspaceStore, plugin: @escaping @MainActor () -> DirectHermesWorkspaceClient?) {
+        self.workspace = workspace
+        self.plugin = plugin
+    }
 
     func call(_ method: String, params: [String: BighelpJSONValue]) async throws -> BighelpJSONValue {
         try await workspace.vaultRequest(method, params: params)
+    }
+
+    func canLink() async -> Bool {
+        guard let client = plugin(), let owner = client.owner else { return false }
+        if client.nativeContext == nil { _ = try? await client.perform(.nativeContext, payload: [:], owner: owner) }
+        return client.nativeContext?.features.contains(CredentialVault.linkFeature) == true
+    }
+
+    func link(_ payload: [String: BighelpJSONValue]) async throws -> [String: BighelpJSONValue] {
+        guard let client = plugin(), let owner = client.owner else { throw WorkspaceClientError.transportUnavailable }
+        do {
+            return try await client.perform(.vaultLink, payload: payload, owner: owner)
+        } catch WorkspaceClientError.conflict {
+            // The plugin's context changed (412): the next call loads it again. Once.
+            return try await client.perform(.vaultLink, payload: payload, owner: owner)
+        } catch WorkspaceClientError.outcomeUnknown {
+            // A copy that's already there comes back as "existing", so asking again is safe.
+            return try await client.perform(.vaultLink, payload: payload, owner: owner)
+        }
     }
 }
 
@@ -466,6 +660,8 @@ final class DemoCredentialVaultService: CredentialVaultService {
                  "backend": .string("local"), "has_otp": .boolean(true)]),
         .object(["id": .string("demo-address"), "kind": .string("address"), "label": .string("Home"),
                  "origin": .string("https://shop.example.org"), "backend": .string("local")]),
+        .object(["id": .string("demo-address-2"), "kind": .string("address"), "label": .string("Home"),
+                 "origin": .string("https://parts.example.net"), "backend": .string("local")]),
         .object(["id": .string("demo-card-1"), "kind": .string("payment"), "label": .string("Everyday Visa ending 4242"),
                  "origin": .string("https://shop.example.org"), "backend": .string("local")]),
         .object(["id": .string("demo-card-2"), "kind": .string("payment"), "label": .string("Everyday Visa ending 4242"),
@@ -475,13 +671,14 @@ final class DemoCredentialVaultService: CredentialVaultService {
     ]
     private var managerUnlocked = false
     private var managerEnabled = true
+    var linksItems = true
 
     func call(_ method: String, params: [String: BighelpJSONValue]) async throws -> BighelpJSONValue {
         switch method {
         case "vault.list":
             let manager: [BighelpJSONValue] = managerUnlocked && managerEnabled ? [
-                .object(["id": .string("demo-manager"), "kind": .string("login"), "label": .string("shop.example.org"),
-                         "origin": .string("https://shop.example.org"), "identifier": .string("sam"),
+                .object(["id": .string("demo-manager"), "kind": .string("login"), "label": .string("mail.example.com"),
+                         "origin": .string("https://mail.example.com"), "identifier": .string("sam"),
                          "backend": .string("onepassword")]),
             ] : []
             return .object(["items": .array(items + manager)])
@@ -523,5 +720,42 @@ final class DemoCredentialVaultService: CredentialVaultService {
         default:
             throw DirectHermesError.rpcRejected(code: -32601)
         }
+    }
+
+    func canLink() async -> Bool { linksItems }
+
+    /// The plugin's `vault/link`, the way it answers: one row per item and website, `existing`
+    /// for a copy that's already there.
+    func link(_ payload: [String: BighelpJSONValue]) async throws -> [String: BighelpJSONValue] {
+        guard linksItems else { throw WorkspaceClientError.unavailable(.unsupportedOperation) }
+        let ids = payload["item_ids"]?.array?.compactMap(\.string) ?? []
+        let origins = payload["origins"]?.array?.compactMap(\.string) ?? []
+        var copies: [BighelpJSONValue] = []
+        for id in ids {
+            guard let source = items.first(where: { $0.object?["id"]?.string == id })?.object,
+                  source["kind"]?.string != "login" else {
+                throw WorkspaceClientError.rejected(code: "not_copyable")
+            }
+            for origin in origins {
+                let same = items.first { row in
+                    let row = row.object
+                    return row?["kind"] == source["kind"] && row?["label"] == source["label"]
+                        && row?["origin"]?.string == origin
+                }
+                if let same, let existing = same.object?["id"] {
+                    copies.append(.object(["item_id": .string(id), "origin": .string(origin), "id": existing,
+                                           "status": .string("existing")]))
+                    continue
+                }
+                let copy = "demo-" + UUID().uuidString.prefix(8).lowercased()
+                var row = source
+                row["id"] = .string(copy)
+                row["origin"] = .string(origin)
+                items.append(.object(row))
+                copies.append(.object(["item_id": .string(id), "origin": .string(origin), "id": .string(copy),
+                                       "status": .string("created")]))
+            }
+        }
+        return ["copies": .array(copies)]
     }
 }

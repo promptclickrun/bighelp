@@ -306,6 +306,7 @@ extension RootShellView {
                 return AgentRuntimeDefaultsEditorModel(agentID: id, client: agentRuntimeDefaults)
             },
             makeVoiceSettings: { id in makeSimpleBotVoiceSettings(for: id) },
+            makeCredentialVault: { makeCredentialVault(for: $0) },
             makeAdvancedOptions: { makeAdvancedOptions(for: $0) },
             makeFilesSource: { makeSimpleBotFilesSource() },
             makeMediaClient: { makeSimpleBotMediaClient() },

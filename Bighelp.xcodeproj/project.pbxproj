@@ -575,6 +575,7 @@
 		4E85FB531D16283A70EC6D77 /* bighelp-idle.json in Resources */ = {isa = PBXBuildFile; fileRef = 60FFF44FFC3C1E5D8FF87FA3 /* bighelp-idle.json */; };
 		4E944976F1F160B4EB1DA07D /* DemoHosts.swift in Sources */ = {isa = PBXBuildFile; fileRef = E884434B41BFED4DC5BB92D4 /* DemoHosts.swift */; };
 		4E9F1E2C7B85BBA8BD743646 /* PersonalitiesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 527A7141FF5FC064B6F83598 /* PersonalitiesView.swift */; };
+		4EABC22389A3436D1261CE44 /* CredentialVaultAdd.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFF9E81A01B04E26DFB54C5C /* CredentialVaultAdd.swift */; };
 		4ED009B7E7DD3B6E95D6DB81 /* DirectHermesCatalogPrefetch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A4BB70CE7023DAFFA6C5350 /* DirectHermesCatalogPrefetch.swift */; };
 		4ED1B739ABF6C910BDC51C7F /* AgentDuplicateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9DDA46C8D5D94F4628360B5 /* AgentDuplicateView.swift */; };
 		4ED4A40ABDBB0B15FBB5D05C /* RawConfigurationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 941A003838BB4E928B9DECCC /* RawConfigurationView.swift */; };
@@ -3272,6 +3273,7 @@
 		AF43FE7C65CE6F08A4870AA1 /* ModelNameCatalogStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelNameCatalogStore.swift; sourceTree = "<group>"; };
 		AF7C0582023B5FB0DAB091DF /* bighelp-thinking.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "bighelp-thinking.json"; sourceTree = "<group>"; };
 		AFC226437CC84C778C2073F0 /* BighelpBoardWidgetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpBoardWidgetTests.swift; sourceTree = "<group>"; };
+		AFF9E81A01B04E26DFB54C5C /* CredentialVaultAdd.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialVaultAdd.swift; sourceTree = "<group>"; };
 		AFFC40BDB331AB0165CD9E85 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		B0476538AF53E4A6601833D9 /* ChatActivityLedger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatActivityLedger.swift; sourceTree = "<group>"; };
 		B0640E3E2195E13C7537FDEF /* NotificationEventWireModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationEventWireModels.swift; sourceTree = "<group>"; };
@@ -4107,6 +4109,7 @@
 			isa = PBXGroup;
 			children = (
 				0A08E4F2667799009DAF1479 /* CredentialVault.swift */,
+				AFF9E81A01B04E26DFB54C5C /* CredentialVaultAdd.swift */,
 				A827D1766BB83A2036F4617A /* CredentialVaultImport.swift */,
 				5FB22627412BAA1980DD6B8A /* CredentialVaultView.swift */,
 			);
@@ -7492,6 +7495,7 @@
 				243E3FB9388CBAF7B70DF813 /* ConversationFixtures.swift in Sources */,
 				22938BF7A9E737D8FED74470 /* ConversationMessageWireModels.swift in Sources */,
 				2EA3ABC71FA667A87351F7E8 /* CredentialVault.swift in Sources */,
+				4EABC22389A3436D1261CE44 /* CredentialVaultAdd.swift in Sources */,
 				71FA8C2FE9169A006365650A /* CredentialVaultImport.swift in Sources */,
 				7D6245874ADECC2930343FD7 /* CredentialVaultView.swift in Sources */,
 				8369F0E1E52908E735D09E5E /* CuratorView.swift in Sources */,

@@ -359,6 +359,62 @@ struct DirectHermesGeneratedMediaTests {
         #expect(model.items.first?.content == .message("Here it is."))
     }
 
+    /// A reply that finished while bighelp was away comes back from Hermes' saved history
+    /// after recovery, and nothing live follows it. Its picture still loads instead of
+    /// staying on the loading tile.
+    @Test func aReplyThatFinishedWhileAwayLoadsItsPicture() async throws {
+        let (owner, transport, workspace) = try setup()
+        let bytes = image()
+        transport.result = .object(["data_url": .string("data:image/png;base64," + bytes.base64EncodedString())])
+        let (native, model, saved) = try catalogChat(transport: transport, workspace: workspace, owner: owner,
+            text: "Here it is.\nMEDIA:/host/.hermes/cache/images/puppy.png")
+        defer { native.suspend() }
+        native.needsCatalogHistoryReseed = true
+        try native.reseedFinishedTurn(saved)
+        for _ in 0..<200 where model.items.first?.attachments.isEmpty != false { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(model.items.first?.attachments.first?.data == bytes)
+        #expect(model.items.first?.content == .message("Here it is."))
+    }
+
+    /// A reread of the saved history straight into the open chat (after Stop, or a turn
+    /// Hermes ran on its own) can bring a reply the live connection never saw. Its
+    /// picture loads too.
+    @Test func aReplyFromAHistoryRereadLoadsItsPicture() async throws {
+        let (owner, transport, workspace) = try setup()
+        let bytes = image()
+        transport.result = .object(["data_url": .string("data:image/png;base64," + bytes.base64EncodedString())])
+        let (native, model, saved) = try catalogChat(transport: transport, workspace: workspace, owner: owner,
+            text: "Here it is.\nMEDIA:/host/.hermes/cache/images/puppy.png")
+        defer { native.suspend() }
+        model.reconcileHydratedSession(saved)
+        for _ in 0..<200 where model.items.first?.attachments.isEmpty != false { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(model.items.first?.attachments.first?.data == bytes)
+        #expect(model.items.first?.content == .message("Here it is."))
+        #expect(transport.requests.count == 1)
+    }
+
+    /// A reread of the saved history brings back the file line of a picture that never loaded.
+    /// The message tries again and says so again, instead of going back to the loading tile.
+    @Test func aRereadOfAPictureThatNeverLoadedSaysSoAgain() async throws {
+        let (owner, transport, workspace) = try setup()
+        transport.failure = WorkspaceClientError.transportUnavailable
+        let text = "Here it is.\nMEDIA:/host/.hermes/cache/images/puppy.png"
+        let (native, model, saved) = try catalogChat(transport: transport, workspace: workspace, owner: owner, text: text)
+        defer { native.suspend() }
+        native.mediaRetryDelays = [.milliseconds(5), .milliseconds(5)]
+        let unavailable = TimelineContent.message("Here it is.\nCouldn't load puppy.png. Reopen this chat to try again.")
+        model.reconcileHydratedSession(saved)
+        for _ in 0..<200 where model.items.first?.content != unavailable { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(model.items.first?.content == unavailable)
+        let tries = transport.requests.count
+
+        model.reconcileHydratedSession(saved)
+        #expect(model.items.first?.content == .message(text), "The reread brings the file line back")
+        for _ in 0..<200 where model.items.first?.content != unavailable { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(model.items.first?.content == unavailable)
+        #expect(transport.requests.count == tries + 1)
+    }
+
     /// When a picture can't be read at all, the message says so in plain words
     /// instead of showing the host's file path.
     @Test func aPictureThatNeverLoadsSaysSoWithoutItsPath() async throws {

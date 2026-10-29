@@ -162,8 +162,9 @@ extension DirectHermesConversationClient {
         markLinkedPicturesShownInReply()
         let owner = generation
         let stored = storedID
+        // The rows on screen: a reread of the saved history can put a reply only into the chat.
         // Newest first: a chat opens at its bottom, where the latest files are.
-        for item in projection.items.reversed() {
+        for item in (model?.items ?? projection.items).reversed() {
             guard attachmentTasks.count < 2 else { break }
             guard item.metadata.delivery != "Streaming", item.attachments.isEmpty,
                   case .message(let text) = item.content,
@@ -237,7 +238,7 @@ extension DirectHermesConversationClient {
         }
         guard !cards.isEmpty else { return }
         var shown: [String] = []
-        for item in projection.items where item.role == .assistant && item.metadata.delivery != "Streaming" {
+        for item in model.items where item.role == .assistant && item.metadata.delivery != "Streaming" {
             guard case .message(let text) = item.content,
                   let linked = LinkPreviewCandidate.firstURL(inMarkdown: text).flatMap(LinkPreviewPolicy.loadableURL),
                   let id = cards[linked] else { continue }
@@ -248,8 +249,15 @@ extension DirectHermesConversationClient {
 
     @discardableResult
     private func applyMessageMedia(_ result: ResolvedAgentAttachmentItem, replacing item: TimelineItem) -> Bool {
-        guard let enriched = projection.resolveMedia(result, replacing: item) else { return false }
-        return model?.applyNativeMedia(enriched, replacing: item, from: self) ?? true
+        if let enriched = projection.resolveMedia(result, replacing: item) {
+            return model?.applyNativeMedia(enriched, replacing: item, from: self) ?? true
+        }
+        // Not in the live projection (or not the same there): the files go on the row on screen.
+        guard let model, result.id == item.id,
+              !result.attachments.isEmpty || item.content != .message(result.text) else { return false }
+        return model.applyNativeMedia(TimelineItem(id: item.id, role: item.role, sender: item.sender,
+            content: .message(result.text), metadata: item.metadata, attachments: result.attachments),
+            replacing: item, from: self)
     }
 
     private func waitForLiveCard(_ item: TimelineItem, key: String, owner: UUID) {
@@ -270,9 +278,12 @@ extension DirectHermesConversationClient {
         let failures = (mediaFailures[failureKey] ?? 0) + 1
         mediaFailures[failureKey] = failures
         guard failures <= mediaRetryDelays.count else {
-            if item.role == .assistant, case .message(let text) = item.content {
-                applyMessageMedia(.init(id: item.id, text: DirectHermesGeneratedMediaClient.unavailableMessageText(text),
-                                        attachments: []), replacing: item)
+            if item.role == .assistant, case .message(let text) = item.content,
+               applyMessageMedia(.init(id: item.id, text: DirectHermesGeneratedMediaClient.unavailableMessageText(text),
+                                       attachments: []), replacing: item) {
+                // A reread of the saved history brings the file line back: it's asked for once more
+                // then (and says so again), not left on the loading tile.
+                attachmentAttempts[item.id] = nil
             }
             return
         }

@@ -3,6 +3,12 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.36
+
+### Fixed
+
+- **Bot profile tabs:** each tab name in a bot's profile shows whole, also with larger text. Tabs that do not fit on one line go onto a second line. Before, the last tab name was cut at the edge of the screen.
+
 ## 2.6.35
 
 ### Skills

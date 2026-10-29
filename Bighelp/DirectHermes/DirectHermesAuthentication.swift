@@ -259,6 +259,7 @@ final class DirectHermesHTTP {
         switch route {
         case "/api/sessions/import": return maximumSessionTransferBytes
         case "/api/audio/transcribe": return maximumVoiceTranscriptionRequestBytes
+        case "/api/plugins/loopdy/native/skills/import": return DirectHermesSkillsAndToolsClient.maximumUploadRequestBytes
         default: return maximumBodyBytes
         }
     }

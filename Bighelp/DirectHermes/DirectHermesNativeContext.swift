@@ -208,7 +208,8 @@ final class DirectHermesNativePluginClient {
             return try await loadContext(force: true).projection
         }
         let route = try Self.route(operation)
-        let requestLimit = Self.smallRequestFeatures.contains(route.feature) ? 196_608 : 1_048_576
+        let requestLimit = route.maximumRequestBytes
+            ?? (Self.smallRequestFeatures.contains(route.feature) ? 196_608 : 1_048_576)
         try DirectHermesWire.validateValueSize(.object(payload), limit: requestLimit)
         guard try JSONEncoder().encode(BighelpJSONValue.object(payload)).count <= requestLimit else {
             throw WorkspaceClientError.capacityExceeded
@@ -301,6 +302,9 @@ final class DirectHermesNativePluginClient {
         var maximumResponseBytes = DirectHermesWire.maximumMessageBytes
         var timeout: TimeInterval = 20
         var method: DirectHermesHTTPRequest.Method = .post
+        /// A route that takes file bytes; others keep the 1 MiB (or 192 KiB) request cap.
+        /// `DirectHermesHTTP.requestBodyLimit` must allow the same.
+        var maximumRequestBytes: Int?
     }
 
     private static func route(_ operation: WorkspaceOperation) throws -> Route {
@@ -422,6 +426,11 @@ final class DirectHermesNativePluginClient {
         case .myTemplatesDelete:
             return Route(path: "my-templates/delete", feature: MyTemplatesWire.feature, isMutation: true,
                          maximumResponseBytes: 16_384)
+        case .skillsImport:
+            // Up to 3 MB of zipped skill folder, base64 in JSON; the host checks and scans each file.
+            return Route(path: "skills/import", feature: DirectHermesSkillsAndToolsClient.importFeature, isMutation: true,
+                         maximumResponseBytes: 65_536, timeout: 60,
+                         maximumRequestBytes: DirectHermesSkillsAndToolsClient.maximumUploadRequestBytes)
         case .telemetrySet:
             // The switch for the host's own usage reports; `{"enabled": bool}`, answered the same as a read.
             return Route(path: "telemetry", feature: WorkspaceTelemetryHostEndpoint.feature, isMutation: true,
@@ -520,7 +529,9 @@ final class DirectHermesNativePluginClient {
 
     /// Plugin codes for "this computer can't do that at all", sent before any work starts.
     static let refusedBeforeStartingCodes: Set<String> = ["runner_unavailable", "workflows_unavailable", "store_unavailable",
-                                                         "bot_chat_gateway_unavailable"]
+                                                         "bot_chat_gateway_unavailable",
+                                                         // A failed skill upload is rolled back before the answer.
+                                                         "skill_import_failed", "skill_import_unavailable"]
 
     static func refusedBeforeStarting(_ response: DirectHermesHTTP.Response) -> Bool {
         guard let code = (try? response.object())?["error"]?.object?["code"]?.string else { return false }

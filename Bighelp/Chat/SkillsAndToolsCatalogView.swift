@@ -118,9 +118,10 @@ struct SkillsAndToolsCatalogView: View {
         do {
             let handle = try FileHandle(forReadingFrom: url)
             defer { try? handle.close() }
-            let data = try handle.read(upToCount: 1_500_001) ?? Data()
-            guard !data.isEmpty, data.count <= 1_500_000 else {
-                store.reportError("Choose a nonempty SKILL.md or ZIP no larger than 1.5 MB.")
+            let limit = DirectHermesSkillsAndToolsClient.maximumUploadBytes
+            let data = try handle.read(upToCount: limit + 1) ?? Data()
+            guard !data.isEmpty, data.count <= limit else {
+                store.reportError("Choose a SKILL.md, or a skill folder as a .zip, no larger than 3 MB.")
                 return
             }
             let kind = url.pathExtension.caseInsensitiveCompare("zip") == .orderedSame

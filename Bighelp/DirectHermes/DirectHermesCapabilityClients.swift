@@ -7,8 +7,47 @@ import Foundation
 /// creation/update through `/api/skills`, and enablement through
 /// `/api/skills/toggle`. The application operation performer owns the HTTP
 /// route mapping; this file only validates and projects the host responses.
+/// Why an uploaded skill couldn't be added, in words for the person.
+enum HermesSkillUploadError: LocalizedError, Equatable {
+    /// A skill folder (.zip) needs the plugin's `skills/import`; a single SKILL.md doesn't.
+    case folderNeedsPluginUpdate
+    /// The SKILL.md has no `name:` in its header.
+    case missingName
+    /// The header's name isn't one Hermes takes.
+    case invalidName(String)
+    /// The agent already has a skill by that name; an upload never replaces one.
+    case alreadyExists(String)
+    /// Over Hermes' limit for a SKILL.md (100,000 characters).
+    case tooLong
+    case unreadable
+
+    var errorDescription: String? {
+        switch self {
+        case .folderNeedsPluginUpdate:
+            "To upload a skill folder (.zip), update bighelp's plugin on this computer. A single SKILL.md file uploads now."
+        case .missingName:
+            "This SKILL.md has no name. Add a name: line to its header, between the --- lines."
+        case .invalidName(let name):
+            "Hermes can't use the name \"\(name)\". Use lowercase letters, digits, dots, dashes or underscores, up to 64."
+        case .alreadyExists(let name):
+            "This agent already has a skill named \(name). To change it, open it and edit it."
+        case .tooLong:
+            "This SKILL.md is too long for Hermes. A SKILL.md can have up to 100,000 characters."
+        case .unreadable:
+            "This SKILL.md isn't plain text. Save it as UTF-8 and upload it again."
+        }
+    }
+}
+
 @MainActor
 final class DirectHermesSkillsAndToolsClient: HermesSkillsAndToolsCatalogClient {
+    /// The plugin route that writes an uploaded skill folder with Hermes' own checks.
+    static let importFeature = "native-skills-import-v1"
+    /// The largest skill file or zipped folder the app sends; the plugin takes the same.
+    static let maximumUploadBytes = 3 * 1_024 * 1_024
+    /// That much as base64 in the request's JSON, with room for its other fields.
+    static let maximumUploadRequestBytes = ((maximumUploadBytes + 2) / 3) * 4 + 8_192
+
     private let service: DirectHermesAgentProfileService
     private var skillStates: [String: [String: Bool]] = [:]
 
@@ -56,12 +95,12 @@ final class DirectHermesSkillsAndToolsClient: HermesSkillsAndToolsCatalogClient 
             plugins: plugins,
             mcpServers: mcpServers,
             tools: toolsets,
+            // A SKILL.md uploads through the same create route; a folder (.zip) also needs the plugin,
+            // and says so if someone tries one on an older plugin.
             management: HermesCapabilityManagement(
-                canRead: true, canCreate: editAvailable, canUpdate: editAvailable, canImport: false
+                canRead: true, canCreate: editAvailable, canUpdate: editAvailable, canImport: editAvailable
             ),
-            toolsNotice: editAvailable
-                ? "Skill archive import is unavailable on this host. You can create and edit skills here."
-                : "Skill archive import is unavailable on this host."
+            toolsNotice: editAvailable ? "" : "Skill uploads and edits are unavailable on this host."
         )
     }
 
@@ -130,14 +169,55 @@ final class DirectHermesSkillsAndToolsClient: HermesSkillsAndToolsCatalogClient 
         category: String?,
         agentID: String
     ) async throws -> HermesSkillDocument {
-        guard !data.isEmpty, data.count <= 1_500_000,
+        guard !data.isEmpty, data.count <= Self.maximumUploadBytes,
               ["skillMd", "zip"].contains(kind) else { throw WorkspaceClientError.invalidRequest }
-        _ = try Self.profile(agentID)
-        _ = try Self.category(category)
-        // `/api/skills/hub/install` accepts a Hub identifier and performs a
-        // host-side download. It is not an upload endpoint and cannot safely
-        // represent the caller's bytes, so do not invent a transport here.
-        throw WorkspaceClientError.unavailable(.unsupportedOperation)
+        let agentID = try Self.profile(agentID)
+        let category = try Self.category(category)
+        if kind == "skillMd" {
+            // Stock Hermes makes a skill from its SKILL.md (`POST /api/skills`), named by its own header.
+            guard var content = String(data: data, encoding: .utf8) else { throw HermesSkillUploadError.unreadable }
+            if content.hasPrefix("\u{FEFF}") { content.removeFirst() }
+            guard content.utf8.count <= 100_000 else { throw HermesSkillUploadError.tooLong }
+            let name = try Self.frontmatterName(content)
+            // Hermes' own refusal names the skill's folder on the host.
+            if skillStates[agentID]?[name] != nil { throw HermesSkillUploadError.alreadyExists(name) }
+            return try await createSkill(name: name, content: content, category: category, agentID: agentID)
+        }
+        // A folder (scripts, references, assets) has no stock upload route: the plugin writes it with
+        // Hermes' own checks and scan (`skills/import`).
+        guard service.workspace.capabilities.supports(.skillsImport, owner: service.owner, profileID: agentID) else {
+            throw HermesSkillUploadError.folderNeedsPluginUpdate
+        }
+        var request: [String: BighelpJSONValue] = [
+            "agentId": .string(agentID), "fileName": .string("skill.zip"), "kind": .string("zip"),
+            "data": .string(data.base64EncodedString())
+        ]
+        if let category { request["category"] = .string(category) }
+        let receipt = try await service.request(.skillsImport, request, capability: .skillsImport, profileID: agentID)
+        guard let name = receipt["name"]?.string else { throw WorkspaceClientError.invalidResponse }
+        return try await skill(id: name, agentID: agentID)
+    }
+
+    /// The top-level `name:` in a SKILL.md's header, the lines between the opening `---` and the next.
+    /// An indented `name:` belongs to a nested key (an author, say), and ` # …` is a YAML comment.
+    static func frontmatterName(_ content: String) throws -> String {
+        let lines = content.components(separatedBy: .newlines).map { line in
+            String(line.reversed().drop(while: \.isWhitespace).reversed())
+        }
+        guard lines.first == "---" else { throw HermesSkillUploadError.missingName }
+        for line in lines.dropFirst() {
+            if line == "---" { break }
+            guard line.hasPrefix("name:") else { continue }
+            var name = line.dropFirst("name:".count).trimmingCharacters(in: .whitespaces)
+            if let comment = name.range(of: " #") { name = String(name[..<comment.lowerBound]) }
+            if name.count >= 2, let first = name.first, first == name.last, first == "\"" || first == "'" {
+                name = String(name.dropFirst().dropLast())
+            }
+            guard !name.isEmpty else { break }
+            guard let valid = try? skillName(name) else { throw HermesSkillUploadError.invalidName(name) }
+            return valid
+        }
+        throw HermesSkillUploadError.missingName
     }
 
     func control(kind: HermesCapabilityKind, id: String, agentID: String) async throws -> HermesCapabilityControl {

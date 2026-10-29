@@ -292,6 +292,11 @@ struct DirectHermesNativeContextTests {
         await #expect(throws: WorkspaceClientError.rejected(code: "runner_unavailable")) {
             try await client.perform(.cardsTemplatesInstall, payload: ["agentId": .string("default")])
         }
+        // A skill upload that failed is rolled back before the plugin answers.
+        code = "skill_import_failed"
+        await #expect(throws: WorkspaceClientError.rejected(code: "skill_import_failed")) {
+            try await client.perform(.cardsTemplatesInstall, payload: ["agentId": .string("default")])
+        }
         // Any other 503 to a change may have run: still unknown.
         code = "busy"
         await #expect(throws: WorkspaceClientError.outcomeUnknown) {

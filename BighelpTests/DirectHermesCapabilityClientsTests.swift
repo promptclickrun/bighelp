@@ -229,6 +229,46 @@ struct DirectHermesCapabilityClientsTests {
         #expect(workspace.calls.isEmpty)
     }
 
+    /// Only the header's own `name:` names the skill: not a nested one, and not a trailing comment.
+    @Test func theSkillNameIsTheHeadersOwn() throws {
+        let nested = "---\nauthor:\n  name: Someone Else\nname: daily-notes # the folder\ndescription: Notes.\n---\nBody.\n"
+        #expect(try DirectHermesSkillsAndToolsClient.frontmatterName(nested) == "daily-notes")
+        #expect(try DirectHermesSkillsAndToolsClient.frontmatterName("---\r\nname: 'crlf-skill'\r\n---\r\nBody.\r\n") == "crlf-skill")
+        #expect(throws: HermesSkillUploadError.missingName) {
+            try DirectHermesSkillsAndToolsClient.frontmatterName("Body first.\n---\nname: late\n---\n")
+        }
+        #expect(throws: HermesSkillUploadError.invalidName("Daily Notes")) {
+            try DirectHermesSkillsAndToolsClient.frontmatterName("---\nname: Daily Notes\n---\n")
+        }
+    }
+
+    /// A skill the agent already has, or a SKILL.md over Hermes' limit, is refused here in plain
+    /// words; Hermes' own refusal names the folder on the host.
+    @Test func aSkillThatIsThereOrTooLongIsRefusedBeforeSending() async throws {
+        let workspace = try CapabilityWorkspace()
+        workspace.responses[.skillsToolsList] = ["skills": .array([
+            .object(["name": .string("daily-notes"), "description": .string(""), "category": .string(""),
+                     "enabled": .boolean(true)])
+        ])]
+        workspace.responses[.pluginsList] = ["plugins": .array([])]
+        workspace.responses[.mcpServersList] = ["servers": .array([])]
+        workspace.responses[.toolsetsList] = ["toolsets": .array([])]
+        let client = DirectHermesSkillsAndToolsClient(
+            workspace: workspace, owner: workspace.initialOwner, currentOwner: { workspace.owner })
+        _ = try await client.load(agentID: "studio")
+        let loads = workspace.calls.count
+
+        await #expect(throws: HermesSkillUploadError.alreadyExists("daily-notes")) {
+            _ = try await client.importSkill(data: Data("---\nname: daily-notes\ndescription: Notes.\n---\n".utf8),
+                                             kind: "skillMd", category: nil, agentID: "studio")
+        }
+        let long = "---\nname: long-notes\ndescription: Notes.\n---\n" + String(repeating: "a", count: 100_001)
+        await #expect(throws: HermesSkillUploadError.tooLong) {
+            _ = try await client.importSkill(data: Data(long.utf8), kind: "skillMd", category: nil, agentID: "studio")
+        }
+        #expect(workspace.calls.count == loads)
+    }
+
     /// A skill folder (scripts, references, assets) goes to the plugin, which writes it with
     /// Hermes' own checks; the app reads the new skill back.
     @Test func anUploadedSkillFolderGoesToThePluginAndIsReadBack() async throws {

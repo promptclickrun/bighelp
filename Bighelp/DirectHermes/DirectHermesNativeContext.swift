@@ -529,7 +529,9 @@ final class DirectHermesNativePluginClient {
 
     /// Plugin codes for "this computer can't do that at all", sent before any work starts.
     static let refusedBeforeStartingCodes: Set<String> = ["runner_unavailable", "workflows_unavailable", "store_unavailable",
-                                                         "bot_chat_gateway_unavailable"]
+                                                         "bot_chat_gateway_unavailable",
+                                                         // A failed skill upload is rolled back before the answer.
+                                                         "skill_import_failed", "skill_import_unavailable"]
 
     static func refusedBeforeStarting(_ response: DirectHermesHTTP.Response) -> Bool {
         guard let code = (try? response.object())?["error"]?.object?["code"]?.string else { return false }

@@ -501,7 +501,7 @@ final class NativeWorkspaceRuntime {
     static let pluginCapabilities: Set<WorkspaceCapability> = [
         .liveVoice, .wikiRead, .wikiEdit, .wikiDisconnect, .cardTemplates, .cards, .forms, .cloudNotifications,
         .phoneTools, .projectChangesRead, .agentBoard, .agentBoardFeedback, .agentBoardGoalCategories, .agentBoardFiles,
-        .agentBoardAnswers,
+        .agentBoardAnswers, .skillsImport,
     ]
 
     func refresh() async {

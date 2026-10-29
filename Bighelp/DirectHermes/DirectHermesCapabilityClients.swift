@@ -15,6 +15,10 @@ enum HermesSkillUploadError: LocalizedError, Equatable {
     case missingName
     /// The header's name isn't one Hermes takes.
     case invalidName(String)
+    /// The agent already has a skill by that name; an upload never replaces one.
+    case alreadyExists(String)
+    /// Over Hermes' limit for a SKILL.md (100,000 characters).
+    case tooLong
     case unreadable
 
     var errorDescription: String? {
@@ -25,6 +29,10 @@ enum HermesSkillUploadError: LocalizedError, Equatable {
             "This SKILL.md has no name. Add a name: line to its header, between the --- lines."
         case .invalidName(let name):
             "Hermes can't use the name \"\(name)\". Use lowercase letters, digits, dots, dashes or underscores, up to 64."
+        case .alreadyExists(let name):
+            "This agent already has a skill named \(name). To change it, open it and edit it."
+        case .tooLong:
+            "This SKILL.md is too long for Hermes. A SKILL.md can have up to 100,000 characters."
         case .unreadable:
             "This SKILL.md isn't plain text. Save it as UTF-8 and upload it again."
         }
@@ -169,8 +177,11 @@ final class DirectHermesSkillsAndToolsClient: HermesSkillsAndToolsCatalogClient 
             // Stock Hermes makes a skill from its SKILL.md (`POST /api/skills`), named by its own header.
             guard var content = String(data: data, encoding: .utf8) else { throw HermesSkillUploadError.unreadable }
             if content.hasPrefix("\u{FEFF}") { content.removeFirst() }
-            return try await createSkill(name: try Self.frontmatterName(content), content: content,
-                                         category: category, agentID: agentID)
+            guard content.utf8.count <= 100_000 else { throw HermesSkillUploadError.tooLong }
+            let name = try Self.frontmatterName(content)
+            // Hermes' own refusal names the skill's folder on the host.
+            if skillStates[agentID]?[name] != nil { throw HermesSkillUploadError.alreadyExists(name) }
+            return try await createSkill(name: name, content: content, category: category, agentID: agentID)
         }
         // A folder (scripts, references, assets) has no stock upload route: the plugin writes it with
         // Hermes' own checks and scan (`skills/import`).
@@ -187,14 +198,18 @@ final class DirectHermesSkillsAndToolsClient: HermesSkillsAndToolsCatalogClient 
         return try await skill(id: name, agentID: agentID)
     }
 
-    /// The `name:` in a SKILL.md's header, the lines between the opening `---` and the next.
+    /// The top-level `name:` in a SKILL.md's header, the lines between the opening `---` and the next.
+    /// An indented `name:` belongs to a nested key (an author, say), and ` # …` is a YAML comment.
     static func frontmatterName(_ content: String) throws -> String {
-        let lines = content.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespaces) }
+        let lines = content.components(separatedBy: .newlines).map { line in
+            String(line.reversed().drop(while: \.isWhitespace).reversed())
+        }
         guard lines.first == "---" else { throw HermesSkillUploadError.missingName }
         for line in lines.dropFirst() {
             if line == "---" { break }
             guard line.hasPrefix("name:") else { continue }
             var name = line.dropFirst("name:".count).trimmingCharacters(in: .whitespaces)
+            if let comment = name.range(of: " #") { name = String(name[..<comment.lowerBound]) }
             if name.count >= 2, let first = name.first, first == name.last, first == "\"" || first == "'" {
                 name = String(name.dropFirst().dropLast())
             }

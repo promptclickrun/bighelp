@@ -462,17 +462,14 @@ struct SimpleBotProfileView: View {
         if isArrangingTabs {
             SimpleBotTabArranger(tabs: availableTabs) { moveTab($0, to: $1) }
         } else if availableTabs.count > 1 {
-            // All the tabs on one line, closer together where they must be: with Dashboard there
-            // are five, which didn't fit an iPhone 17 Pro and were cut at the margin. Only larger
-            // text scrolls them, out to the screen's edges so a tab slides off rather than being cut.
+            // Every label whole, always: on one line, closer together where they must be (with
+            // Dashboard there are five), and on two lines when larger text can't fit them on one.
+            // A row that scrolled cut the last label at the screen's edge (#645 and again).
             ViewThatFits(in: .horizontal) {
-                tabRow(spacing: BighelpTokens.space24)
-                tabRow(spacing: BighelpTokens.space16)
-                ScrollView(.horizontal) { tabRow(spacing: BighelpTokens.space16) }
-                    .scrollIndicators(.hidden)
-                    .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
-                    .contentMargins(.horizontal, BighelpTokens.space20, for: .scrollContent)
-                    .padding(.horizontal, -BighelpTokens.space20)
+                tabRow(AnyLayout(HStackLayout(spacing: BighelpTokens.space24)))
+                tabRow(AnyLayout(HStackLayout(spacing: BighelpTokens.space16)))
+                tabRow(AnyLayout(HStackLayout(spacing: BighelpTokens.space12)))
+                tabRow(AnyLayout(BighelpFlowLayout(spacing: BighelpTokens.space16, lineSpacing: 0)))
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .overlay(alignment: .bottom) {
@@ -495,8 +492,8 @@ struct SimpleBotProfileView: View {
         }
     }
 
-    private func tabRow(spacing: CGFloat) -> some View {
-        HStack(spacing: spacing) {
+    private func tabRow(_ layout: AnyLayout) -> some View {
+        layout {
             ForEach(availableTabs) { item in
                 Button {
                     // Letting go of a hold isn't a tap.

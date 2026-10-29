@@ -159,7 +159,7 @@ struct WorkflowRunMonitorView: View {
 
     private var runsColumn: some View {
         VStack(alignment: .leading, spacing: BighelpTokens.space12) {
-            WorkflowFlowLayout(spacing: BighelpTokens.space8) {
+            BighelpFlowLayout(spacing: BighelpTokens.space8) {
                     ForEach(WorkflowRunFilter.allCases) { filter in
                         let count = list.counts[filter]
                         Button {

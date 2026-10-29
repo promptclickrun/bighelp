@@ -614,6 +614,7 @@ struct SettingsView: View {
         .environment(\.defaultMinListRowHeight, BighelpTokens.hitTarget)
         .scrollContentBackground(.hidden)
         .background(theme.canvas.ignoresSafeArea())
+        .driveScrolls()
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .modifier(ClearCacheConfirmation(isPresented: $isClearCacheConfirmationPresented, onConfirm: clearLocalCache))

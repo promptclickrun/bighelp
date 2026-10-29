@@ -20,6 +20,12 @@ final class DriveTargets {
 }
 
 extension View {
+    /// Lets a drive scroll this page (a Form, List or ScrollView) to a control that isn't on screen yet:
+    /// rows far down a long list aren't drawn, so they have no frame until they're scrolled to.
+    func driveScrolls() -> some View {
+        modifier(DriveScrollModifier())
+    }
+
     /// Marks a control a drive can point at: a row, a tab or a button a place's playbook taps.
     /// Use the place catalog's target id (`DrivePlace`), which is usually the control's own
     /// accessibility identifier.
@@ -33,9 +39,26 @@ private struct DriveTargetModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            // What `driveScrolls()` scrolls to.
+            .id(id)
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
                 DriveTargets.shared.update(id, frame: frame)
             }
             .onDisappear { DriveTargets.shared.update(id, frame: nil) }
+    }
+}
+
+private struct DriveScrollModifier: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        ScrollViewReader { proxy in
+            content.onChange(of: DriveNavigator.shared.scrollRequest) { _, request in
+                guard let request else { return }
+                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.45)) {
+                    proxy.scrollTo(request.target, anchor: .center)
+                }
+            }
+        }
     }
 }

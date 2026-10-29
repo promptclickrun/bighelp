@@ -152,6 +152,14 @@ final class AppState {
         activeConversationID = id
     }
 
+    /// The chat the person is in: the active one, else the chat on top of the path (the Chat tab's own
+    /// chat opens without activating).
+    var chatOnScreen: String? {
+        if let activeConversationID { return activeConversationID }
+        if case .chat(let id)? = path.last { return id }
+        return nil
+    }
+
     func requestVoiceMode(for conversationID: String) {
         pendingVoiceConversationID = conversationID
     }

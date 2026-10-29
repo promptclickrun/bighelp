@@ -36,7 +36,7 @@ private struct DriveOverlayWindowHost: UIViewRepresentable {
     final class HostView: UIView {
         private var appearance: BighelpAppearanceContext
         private var overlay: PassthroughWindow?
-        private var host: UIHostingController<AnyView>?
+        private var host: DriveHostingController?
         private let hitAreas = DriveOverlayHitAreas()
         private var hiding: Task<Void, Never>?
 
@@ -69,7 +69,7 @@ private struct DriveOverlayWindowHost: UIViewRepresentable {
                 overlay.hitAreas = hitAreas
                 overlay.windowLevel = .normal + 2
                 overlay.backgroundColor = .clear
-                let host = UIHostingController(rootView: rootView())
+                let host = DriveHostingController(rootView: rootView())
                 host.view.backgroundColor = .clear
                 overlay.rootViewController = host
                 overlay.isHidden = true
@@ -79,6 +79,28 @@ private struct DriveOverlayWindowHost: UIViewRepresentable {
                 phaseChanged()
             }
             overlay?.overrideUserInterfaceStyle = traitCollection.userInterfaceStyle
+            DriveNavigator.shared.scrollPage = { [weak window] scrolling in
+                guard let window else { return false }
+                let distance: CGFloat
+                switch scrolling {
+                case .page: distance = window.bounds.height * 0.5
+                case .reveal(let frame):
+                    // Low on the screen it would sit under the dock: bring it up to a little above the middle.
+                    guard frame.midY > window.bounds.height * 0.6 else { return false }
+                    distance = frame.midY - window.bounds.height * 0.42
+                }
+                // The page under the middle of the screen: the first scroll view that scrolls up and down.
+                var view = window.hitTest(CGPoint(x: window.bounds.midX, y: window.bounds.midY), with: nil)
+                while let current = view, !((current as? UIScrollView).map { $0.contentSize.height > $0.bounds.height } ?? false) {
+                    view = current.superview
+                }
+                guard let scroll = view as? UIScrollView else { return false }
+                let bottom = scroll.contentSize.height + scroll.adjustedContentInset.bottom - scroll.bounds.height
+                let next = min(bottom, scroll.contentOffset.y + distance)
+                guard next > scroll.contentOffset.y + 1 else { return false }
+                scroll.setContentOffset(CGPoint(x: scroll.contentOffset.x, y: next), animated: true)
+                return true
+            }
             DriveNavigator.shared.capturePicture = { [weak window] in
                 guard let window else { return nil }
                 let renderer = UIGraphicsImageRenderer(bounds: window.bounds)
@@ -103,6 +125,7 @@ private struct DriveOverlayWindowHost: UIViewRepresentable {
 
         private func phaseChanged() {
             hiding?.cancel()
+            host?.setNeedsStatusBarAppearanceUpdate()
             if DriveNavigator.shared.phase != .idle {
                 host?.rootView = rootView()
                 overlay?.isHidden = false
@@ -116,6 +139,13 @@ private struct DriveOverlayWindowHost: UIViewRepresentable {
                 self?.hitAreas.frames = []
             }
         }
+    }
+
+    /// The overlay's window is the top one while it shows, so it decides the status bar: hidden, since
+    /// the bar fills the top of the screen and the time and battery would sit on its buttons.
+    final class DriveHostingController: UIHostingController<AnyView> {
+        override var prefersStatusBarHidden: Bool { DriveNavigator.shared.isShowing }
+        override var preferredStatusBarUpdateAnimation: UIStatusBarAnimation { .fade }
     }
 
     final class PassthroughWindow: UIWindow {
@@ -233,7 +263,7 @@ private struct DriveIslandBar: View {
 
     var body: some View {
         let collapsed = island ?? CGRect(x: (width - 126) / 2, y: topInset + 8, width: 126, height: 37)
-        let height: CGFloat = island == nil ? 96 : 116
+        let height: CGFloat = island == nil ? 96 : 124
         ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: expanded ? 32 : collapsed.height / 2, style: .continuous)
                 .fill(Color.black)
@@ -251,61 +281,76 @@ private struct DriveIslandBar: View {
         .accessibilityIdentifier("drive.bar")
     }
 
-    private var title: String {
+    private var arrived: Bool { navigator.phase == .arrived }
+
+    private var title: some View {
         let name = navigator.agent?.name ?? String(localized: "Your agent")
-        return navigator.phase == .arrived
-            ? String(localized: "\(name) brought you to \(navigator.placeTitle)")
-            : String(localized: "\(name) is driving")
+        return Text(arrived ? String(localized: "\(name) brought you here") : String(localized: "\(name) is driving"))
+            .font(.bighelp(.subheadline, weight: .semibold))
+            .foregroundStyle(.white)
+            .lineLimit(1)
+            .minimumScaleFactor(0.85)
     }
 
     private var content: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .center) {
-                DriveAgentMark(agent: navigator.agent, size: 30)
-                if island == nil {
-                    Text(title).font(.bighelp(.subheadline, weight: .semibold)).foregroundStyle(.white).lineLimit(1)
+            if let island {
+                // Beside the camera: the agent to its left, Stay here to its right. The rest goes below.
+                HStack {
+                    DriveAgentMark(agent: navigator.agent, size: 30)
+                    Spacer(minLength: island.width + 16)
+                    if arrived { stayButton }
                 }
-                Spacer(minLength: island?.width ?? 8)
-                buttons
-            }
-            .frame(height: 36)
-            .padding(.top, island == nil ? 12 : 9)
-            if island != nil {
-                Text(title).font(.bighelp(.subheadline, weight: .semibold)).foregroundStyle(.white).lineLimit(1)
-                    .padding(.top, 8)
+                .frame(height: island.height)
+                .padding(.top, max(0, island.minY - 8))
+                HStack(spacing: 8) {
+                    title
+                    Spacer(minLength: 8)
+                    returnButton
+                }
+                .padding(.top, 8)
+            } else {
+                HStack(spacing: 10) {
+                    DriveAgentMark(agent: navigator.agent, size: 30)
+                    title
+                    Spacer(minLength: 8)
+                    if arrived { stayButton }
+                    returnButton
+                }
+                .frame(height: 36)
+                .padding(.top, 12)
             }
             trail.padding(.top, 6)
         }
         .padding(.horizontal, 14)
     }
 
-    private var buttons: some View {
-        HStack(spacing: 8) {
-            if navigator.phase == .arrived {
-                Button { navigator.stay() } label: {
-                    Image(systemName: "xmark")
-                        .font(.bighelp(.footnote, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(width: 32, height: 32)
-                        .background(Circle().fill(Color.white.opacity(0.18)))
-                        .contentShape(.circle)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(Text("Stay here"))
-                .accessibilityIdentifier("drive.stay")
-            }
-            Button { navigator.returnToChat() } label: {
-                Text("Return to chat")
-                    .font(.bighelp(.footnote, weight: .semibold))
-                    .foregroundStyle(.black)
-                    .padding(.horizontal, 14)
-                    .frame(height: 32)
-                    .background(Capsule().fill(Color.white))
-                    .contentShape(.capsule)
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("drive.return")
+    private var stayButton: some View {
+        Button { navigator.stay() } label: {
+            Image(systemName: "xmark")
+                .font(.bighelp(.footnote, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 32, height: 32)
+                .background(Circle().fill(Color.white.opacity(0.18)))
+                .contentShape(.circle)
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("Stay here"))
+        .accessibilityIdentifier("drive.stay")
+    }
+
+    private var returnButton: some View {
+        Button { navigator.returnToChat() } label: {
+            Text("Return to chat")
+                .font(.bighelp(.footnote, weight: .semibold))
+                .foregroundStyle(.black)
+                .padding(.horizontal, 14)
+                .frame(height: 32)
+                .background(Capsule().fill(Color.white))
+                .contentShape(.capsule)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("drive.return")
     }
 
     private var trail: some View {
@@ -338,15 +383,27 @@ private struct DriveDock: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 10) {
                 DriveAgentMark(agent: navigator.agent, size: 26)
-                Text(latest)
-                    .font(.bighelp(.subheadline))
-                    .foregroundStyle(theme.primaryText)
-                    .lineLimit(3, reservesSpace: false)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .accessibilityIdentifier("drive.dock.latest")
+                VStack(alignment: .leading, spacing: 4) {
+                    // Where the drive ended: the agent's note on what the person is looking at.
+                    if let note = shownNote {
+                        Text(note)
+                            .font(.bighelp(.subheadline, weight: .semibold))
+                            .foregroundStyle(theme.primaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("drive.note")
+                    }
+                    if !answer.isEmpty {
+                        Text(Self.inline(answer))
+                            .font(.bighelp(.subheadline))
+                            .foregroundStyle(shownNote == nil ? theme.primaryText : theme.secondaryText)
+                            .lineLimit(shownNote == nil ? 3 : 2)
+                            .accessibilityIdentifier("drive.dock.latest")
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             if let chat = navigator.chat {
-                DriveDockComposer(chat: chat, theme: theme)
+                DriveDockComposer(chat: chat, agentName: navigator.agent?.name, theme: theme)
             }
         }
         .padding(14)
@@ -360,13 +417,23 @@ private struct DriveDock: View {
         .accessibilityIdentifier("drive.dock")
     }
 
-    /// The agent's newest message, the one streaming now.
-    private var latest: String {
-        guard let chat = navigator.chat else { return navigator.note ?? "" }
+    /// Bold, italics, code and links as the chat shows them; the rest as written.
+    private static func inline(_ markdown: String) -> AttributedString {
+        (try? AttributedString(markdown: markdown, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
+            ?? AttributedString(markdown)
+    }
+
+    private var shownNote: String? { navigator.phase == .arrived ? navigator.note : nil }
+
+    /// The agent's newest message, the one streaming now, without the blank lines between paragraphs.
+    private var answer: String {
+        guard let chat = navigator.chat else { return "" }
         for item in chat.items.reversed() where item.role == .assistant {
-            if case .message(let text) = item.content, !text.isEmpty { return text }
+            if case .message(let text) = item.content, !text.isEmpty {
+                return text.split(separator: "\n", omittingEmptySubsequences: true).joined(separator: "\n")
+            }
         }
-        return navigator.note ?? ""
+        return ""
     }
 }
 
@@ -374,11 +441,13 @@ private struct DriveDock: View {
 /// (a running answer takes it as a steer).
 private struct DriveDockComposer: View {
     @Bindable var chat: ChatModel
+    let agentName: String?
     let theme: BighelpTheme
 
     var body: some View {
         HStack(spacing: 8) {
-            TextField(String(localized: "Message"), text: $chat.draft, axis: .vertical)
+            TextField(agentName.map { String(localized: "Ask \($0)") } ?? String(localized: "Message"),
+                      text: $chat.draft, axis: .vertical)
                 .lineLimit(1...3)
                 .font(.bighelp(.body))
                 .padding(.horizontal, 14)
@@ -457,28 +526,11 @@ private struct DriveSpotlight: View {
                         .strokeBorder(theme.action, lineWidth: 2)
                         .frame(width: frame.width, height: frame.height)
                         .position(x: frame.midX, y: frame.midY)
-                    if let note = navigator.note {
-                        noteBubble(note, below: frame.maxY < proxy.size.height * 0.62, frame: frame, width: proxy.size.width)
-                    }
                 }
             }
             .animation(.easeOut(duration: 0.35), value: frame)
         }
         .allowsHitTesting(false)
-    }
-
-    private func noteBubble(_ note: String, below: Bool, frame: CGRect, width: CGFloat) -> some View {
-        Text(note)
-            .font(.bighelp(.subheadline))
-            .foregroundStyle(theme.primaryText)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(theme.canvas)
-                .shadow(color: .black.opacity(0.2), radius: 12, y: 4))
-            .frame(maxWidth: min(width - 32, 360))
-            .fixedSize(horizontal: false, vertical: true)
-            .position(x: width / 2, y: below ? frame.maxY + 44 : frame.minY - 44)
-            .accessibilityIdentifier("drive.note")
     }
 }
 

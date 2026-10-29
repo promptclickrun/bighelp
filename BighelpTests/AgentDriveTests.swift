@@ -150,8 +150,22 @@ struct AgentDriveTests {
         #expect(navigator.phase == .idle && router.restored == nil, "Stay leaves the person where they are")
     }
 
+    @Test func aControlThatNeverShowsIsAskedForThenLeftUnlit() async throws {
+        let router = FakeRouter(path: [])
+        router.shows = ["settings.menu.chat"]
+        let navigator = DriveNavigator()
+        navigator.attach(router, agent: { _ in nil }, chat: { nil })
+        let steps = try #require(DriveCatalog.place("settings.chat.return-sends")?.playbooks[.chat])
+        navigator.start(title: "Return sends", steps: steps, bot: nil, agent: DriveAgent(id: "a", name: "A", imageURL: nil),
+                        note: nil, chat: nil, reduceMotion: true)
+        try await waitUntil { navigator.phase == .arrived }
+        #expect(navigator.scrollRequest?.target == "settings.chat.return-sends", "The page is asked to scroll to it")
+        #expect(navigator.lit == steps.count - 1, "The trail stops at the last step the screen showed")
+        #expect(navigator.spotlight == nil)
+    }
+
     private func waitUntil(_ condition: @MainActor () -> Bool) async throws {
-        for _ in 0..<200 where !condition() { try await Task.sleep(for: .milliseconds(25)) }
+        for _ in 0..<480 where !condition() { try await Task.sleep(for: .milliseconds(25)) }
         #expect(condition())
     }
 }

@@ -317,6 +317,7 @@ extension SettingsView {
         .environment(\.defaultMinListRowHeight, BighelpTokens.hitTarget)
         .scrollContentBackground(.hidden)
         .background(theme.canvas.ignoresSafeArea())
+        .driveScrolls()
         .navigationTitle("Chat")
         .navigationBarTitleDisplayMode(.inline)
     }

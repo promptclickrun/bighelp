@@ -347,6 +347,7 @@ struct SimpleBotProfileView: View {
         .scrollIndicators(.hidden)
         // A drag moves a tab, not the page.
         .scrollDisabled(isArrangingTabs)
+        .driveScrolls()
     }
 
     private func face(_ profile: AgentProfile) -> some View {

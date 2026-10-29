@@ -18,13 +18,17 @@ struct DriveShellHooks: ViewModifier {
                     agent: { id in
                         directory.profiles.first { $0.id == id }.map { DriveAgent(id: $0.id, name: $0.name, imageURL: nil) }
                     },
-                    chat: { state.activeConversationID.flatMap { features.preparedChatModel(id: $0) } })
+                    chat: { state.chatOnScreen.flatMap { features.preparedChatModel(id: $0) } })
             }
             #if DEBUG
-            .task(id: appState.activeConversationID) {
-                guard usesDemoFixtures, let id = appState.activeConversationID else { return }
-                await DriveFixture.play(arguments: ProcessInfo.processInfo.arguments, mode: settings.currentMode,
-                                        chat: featureStore.preparedChatModel(id: id))
+            .onAppear {
+                guard usesDemoFixtures, ProcessInfo.processInfo.arguments.contains(DriveFixture.launchArgument) else { return }
+                let state = appState, features = featureStore, settings = settings
+                // Not a `.task`: the root's tasks stop once a chat covers it (AGENTS.md › Root `.task(id:)`).
+                Task {
+                    await DriveFixture.play(arguments: ProcessInfo.processInfo.arguments, mode: { settings.currentMode },
+                                            chat: { state.chatOnScreen.flatMap { features.preparedChatModel(id: $0) } })
+                }
             }
             #endif
     }
@@ -40,11 +44,19 @@ enum DriveFixture {
     static let noteArgument = "-test-agent-drive-note"
     private static var played = false
 
-    static func play(arguments: [String], mode: BighelpMode, chat: ChatModel?) async {
-        guard !played, let place = value(after: launchArgument, in: arguments).flatMap(DriveCatalog.place),
-              let steps = place.playbooks[mode], let agentID = chat?.memberIDs.first else { return }
+    /// Waits up to 20 seconds for a chat to be on screen (a test taps one, or the demo opens it), then
+    /// plays the drive a moment later, once.
+    static func play(arguments: [String], mode: () -> BighelpMode, chat: () -> ChatModel?) async {
+        guard !played, let place = value(after: launchArgument, in: arguments).flatMap(DriveCatalog.place) else { return }
+        var open: ChatModel?
+        for _ in 0..<80 {
+            open = chat()
+            if open != nil { break }
+            try? await Task.sleep(for: .milliseconds(250))
+        }
+        guard let agentID = open?.memberIDs.first, let steps = place.playbooks[mode()] else { return }
         try? await Task.sleep(for: .milliseconds(1500))
-        guard !Task.isCancelled, !played else { return }
+        guard !played else { return }
         played = true
         let bot = place.needs.contains(.bot) ? DriveNavigator.shared.agent(agentID).map { (id: $0.id, name: $0.name) } : nil
         DriveNavigator.shared.open(place, steps: steps, bot: bot,

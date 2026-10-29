@@ -65,6 +65,7 @@ struct PermissionsSettingsView: View {
         .environment(\.defaultMinListRowHeight, BighelpTokens.hitTarget)
         .scrollContentBackground(.hidden)
         .background(theme.canvas.ignoresSafeArea())
+        .driveScrolls()
         .navigationTitle("Device access")
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityIdentifier("settings.permissions")

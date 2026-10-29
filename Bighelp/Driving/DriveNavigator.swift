@@ -8,6 +8,13 @@ struct DriveAgent: Equatable, Sendable {
     let imageURL: URL?
 }
 
+/// How a drive scrolls the page: down by most of a screen, or just enough that a control sits clear
+/// of the dock.
+enum DriveScroll {
+    case page
+    case reveal(CGRect)
+}
+
 /// Where the person was before a drive, for Return to chat.
 struct DriveSnapshot: Equatable {
     var tab: AppTab
@@ -68,6 +75,13 @@ final class DriveNavigator {
     /// The control the arrival spotlight marks.
     private(set) var spotlight: String?
     private(set) var profileRequest: ProfileRequest?
+    /// A control the page should scroll to, because it isn't on screen (`driveScrolls()`).
+    private(set) var scrollRequest: ScrollRequest?
+
+    struct ScrollRequest: Equatable {
+        let target: String
+        let serial: Int
+    }
     /// The chat as it looked when the drive began, for the dock's step-aside and its way back.
     private(set) var chatPicture: UIImage?
     /// With Reduce Motion: no touch dot, and cross-fades instead of moves.
@@ -79,6 +93,8 @@ final class DriveNavigator {
     private var agentLookup: (@MainActor (String) -> DriveAgent?)?
     private var chatOnScreen: (@MainActor () -> ChatModel?)?
     var capturePicture: (@MainActor () -> UIImage?)?
+    /// Scrolls the page under the middle of the screen, as a person would. False when it can't.
+    var scrollPage: (@MainActor (DriveScroll) -> Bool)?
 
     private var saved: DriveSnapshot?
     private var task: Task<Void, Never>?
@@ -166,6 +182,7 @@ final class DriveNavigator {
         touch = nil
         spotlight = nil
         profileRequest = nil
+        scrollRequest = nil
         saved = nil
         chatPicture = nil
         chat = nil
@@ -177,8 +194,9 @@ final class DriveNavigator {
         for (index, step) in steps.enumerated() {
             guard serial == drive else { return }
             if step.points, let target = step.target {
-                await appear(target)
                 touch = nil
+                // Never there: the trail stops at the last step the screen showed.
+                guard await find(target) else { break }
                 spotlight = target
             } else {
                 if step.move != nil, let target = step.target, !reducesMotion, router.frame(target) != nil {
@@ -188,9 +206,11 @@ final class DriveNavigator {
                     guard await pause(180) else { return }
                 }
                 if let move = step.move { perform(move, bot: bot, router: router) }
-                // Proof the step happened: the next control a step needs shows up.
-                if let next = steps.dropFirst(index + 1).compactMap(\.target).first {
-                    await appear(next)
+                // Proof the step happened: the next control a step taps shows up. One it points at may
+                // be further down the page; that step looks for it itself.
+                if let next = steps.dropFirst(index + 1).first(where: { $0.target != nil }), !next.points,
+                   let target = next.target {
+                    await appear(target)
                 } else {
                     guard await pause(reducesMotion ? 300 : 700) else { return }
                 }
@@ -211,13 +231,36 @@ final class DriveNavigator {
         router.perform(move, bot: bot)
     }
 
-    /// Waits up to 3 seconds for a control to show. A place that never shows it (a slow computer,
-    /// a part this bot doesn't have) still ends the drive; the trail stops where the screen did.
-    private func appear(_ target: String) async {
-        for _ in 0..<60 {
-            if router?.frame(target) != nil || Task.isCancelled { return }
+    /// Looks for the control the drive ends on. Far down a page it isn't drawn yet, so the page is asked
+    /// to scroll to it (`driveScrolls()`), then scrolled a screen at a time, as a person would look.
+    /// Once found, it's brought up out from under the dock.
+    private func find(_ target: String) async -> Bool {
+        if await !appear(target, tries: 12) {
+            scrollRequest = ScrollRequest(target: target, serial: (scrollRequest?.serial ?? 0) &+ 1)
+            var found = await appear(target, tries: 10)
+            var pages = 0
+            while !found, pages < 8, scrollPage?(.page) == true {
+                pages += 1
+                found = await appear(target, tries: 12)
+            }
+            guard found else { return false }
+        }
+        if let frame = router?.frame(target), scrollPage?(.reveal(frame)) == true {
+            _ = await pause(450)
+        }
+        return router?.frame(target) != nil
+    }
+
+    /// Waits for a control to show, 50 ms a try (3 seconds by default), and says whether it did. A
+    /// place that never shows it (a slow computer, a part this bot doesn't have) still ends the drive.
+    @discardableResult
+    private func appear(_ target: String, tries: Int = 60) async -> Bool {
+        for _ in 0..<tries {
+            if router?.frame(target) != nil { return true }
+            if Task.isCancelled { return false }
             try? await Task.sleep(for: .milliseconds(50))
         }
+        return router?.frame(target) != nil
     }
 
     private func pause(_ milliseconds: Int) async -> Bool {

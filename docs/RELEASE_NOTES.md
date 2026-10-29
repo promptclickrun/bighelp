@@ -3,6 +3,14 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.37
+
+### Skills and plugins
+
+- **Plugins:** the plugin catalog opens on an official pick, a shelf of official and verified plugins, and a shelf for each topic. Tap **See all** to see all the plugins in a topic. Tap a plugin to see what it adds, the keys that it needs and the version that installs. Then tap **Install**, and confirm.
+- **Skills Hub:** the Skills Hub shows your agent's skills, the official skills from Hermes in a shelf, and the hubs that you can search. Tap a skill to see its files and the result of the safety check. Then tap **Add**, and confirm. If the check blocks a skill, you cannot add it.
+- **Pictures:** official and verified plugins show their banner in the catalog. A community plugin shows its pictures only when you open its page.
+
 ## 2.6.36
 
 ### Fixed

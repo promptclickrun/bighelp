@@ -60,6 +60,14 @@ enum SimpleBotProfileTabs {
         let chosen = defaultTab.flatMap(SimpleBotProfileTab.init(rawValue:)) ?? .dashboard
         return shown.contains(chosen) ? chosen : (shown.first ?? .info)
     }
+
+    /// The tab on screen: the picked one while it's there (the screen can close, and a tab code
+    /// asked for may not exist for this bot), else the one profiles open on.
+    static func shown(picked: SimpleBotProfileTab?, defaultTab: String?,
+                      in shown: [SimpleBotProfileTab]) -> SimpleBotProfileTab {
+        if let picked, shown.contains(picked) { return picked }
+        return opening(defaultTab: defaultTab, in: shown)
+    }
 }
 
 /// A bot's Files tab: its folder on the computer, one folder at a time. Folders open in place

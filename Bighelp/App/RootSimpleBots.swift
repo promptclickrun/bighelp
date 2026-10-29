@@ -245,7 +245,7 @@ extension RootShellView {
             } else { nil }
             guard let botID = chatBot ?? agents.primaryAgentID ?? agents.profiles.first(where: \.isDefault)?.id
             else { return true }
-            if case .simpleBotProfile(let shown)? = appState.path.last, shown == botID { return true }
+            if case .simpleBotProfile(let shown, _)? = appState.path.last, shown == botID { return true }
             appState.open(.simpleBotProfile(agentID: botID))
             return true
         default:

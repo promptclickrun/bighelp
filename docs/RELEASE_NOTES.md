@@ -3,6 +3,13 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.35
+
+### Skills
+
+- **Import a skill:** in an agent's **Skills & Tools**, tap **+**, then **Import SKILL.md or ZIP**. Choose a SKILL.md file, or a skill folder in a .zip file. The agent gets the skill. Before, each import showed "This host supports browsing only".
+- **Skill folders:** a .zip can have the folders scripts, references, templates and assets. The computer checks each file and scans the skill before the agent can use it. A skill folder needs bighelp's plugin version 3.35.0 or later on the computer. A SKILL.md file works with all versions.
+
 ## 2.6.34
 
 ### Fixed

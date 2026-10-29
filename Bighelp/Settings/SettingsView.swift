@@ -45,6 +45,12 @@ struct SettingsView: View {
     /// Shows just this page (Fleet settings links Appearance and Chat here, so there's one copy of each).
     private var openSection: SettingsMenuSection?
     private var simplePage: SimpleBotsSettingsPage?
+    /// Shows just this pushed page (the Settings sheet's stack pushes `SettingsDestination` values).
+    private var pushedPage: SettingsDestination?
+    /// The Settings sheet's stack takes value links; the main stack, typed `[AppRoute]`, ignores
+    /// them, so there the rows push the page itself (`settingsLink`). Set with `withDone`: only
+    /// the sheet has a Done.
+    private var pushesByValue = false
     @Environment(\.bighelpNotificationContext) private var notificationContext
     @State private var pluginUpdates: PluginUpdateStore?
     /// Held in state so this screen redraws when the check finishes; the shared
@@ -74,6 +80,7 @@ struct SettingsView: View {
     func withDone(_ action: @escaping () -> Void) -> SettingsView {
         var copy = self
         copy.onDone = action
+        copy.pushesByValue = true
         return copy
     }
 
@@ -158,7 +165,8 @@ struct SettingsView: View {
 
     var body: some View {
         Group {
-            if let simplePage { simpleBotsPageContent(simplePage) }
+            if let pushedPage { settingsDone(page(for: pushedPage)) }
+            else if let simplePage { simpleBotsPageContent(simplePage) }
             else if let openSection { destination(for: openSection) }
             else if let focusedDestination { focusedPage(focusedDestination) }
             else { menuPage }
@@ -170,6 +178,74 @@ struct SettingsView: View {
         var page = self
         page.openSection = section
         return page
+    }
+
+    /// This pushed page alone, for the Settings sheet's `navigationDestination`. Built in `body`,
+    /// like `opening(_:)`, so the page reads the theme live.
+    func showing(_ destination: SettingsDestination) -> Self {
+        var page = self
+        page.pushedPage = destination
+        return page
+    }
+
+    /// A row that opens one Settings page: pushed by value in the sheet, so `AppState.openSettings`
+    /// can reach it, and as the page itself in the main stack. The page is type-erased: the menu
+    /// is one of the pages, and an opaque type can't contain itself.
+    @ViewBuilder
+    func settingsLink<Label: View>(to destination: SettingsDestination,
+                                   @ViewBuilder label: () -> Label) -> some View {
+        if pushesByValue {
+            NavigationLink(value: destination, label: label)
+        } else {
+            NavigationLink {
+                AnyView(settingsDone(page(for: destination)))
+            } label: {
+                label()
+            }
+        }
+    }
+
+    /// What each `SettingsDestination` draws, without its Done.
+    @ViewBuilder
+    private func page(for destination: SettingsDestination) -> some View {
+        switch destination {
+        case .section(let section): self.destination(for: section)
+        case .chatLayout: ChatLayoutSettingsView()
+        case .appLayout: AppLayoutSettingsView(settings: settings)
+        case .apps: appsPage
+        case .nativeAppConnections:
+            if let apps = connectorApps?() {
+                ConnectorAppsView(model: apps)
+            } else {
+                appsUnavailable
+            }
+        case .composioApps:
+            if let composio = composioApps?() {
+                ComposioAppsView(model: composio)
+            } else {
+                appsUnavailable
+            }
+        case .connection: connectionPage
+        case .bots(let botsPage): simpleBotsPageContent(botsPage)
+        case .allSettings: menuPage
+        }
+    }
+
+    /// Settings › Apps: the hub when Composio is there, else the computer's own connectors.
+    @ViewBuilder
+    private var appsPage: some View {
+        if let composio = composioApps?() {
+            AppsHubView(native: connectorApps?() ?? nil, composio: composio)
+        } else if let connectorApps, let apps = connectorApps() {
+            ConnectorAppsView(model: apps)
+        } else {
+            appsUnavailable
+        }
+    }
+
+    private var appsUnavailable: some View {
+        ContentUnavailableView("Apps need your computer", systemImage: "app.connected.to.app.below.fill",
+                               description: Text("Connect to your computer, then come back."))
     }
 
     private var menuPage: some View {
@@ -292,21 +368,26 @@ struct SettingsView: View {
                 hostsPage
             } extras: {
                 if settings.nerdModeEnabled {
-                    NavigationLink {
-                        settingsDone(settingsPage(title: String(localized: "Connection")) {
-                            currentConnection
-                            BighelpPluginCapabilitiesSection(connections: workspaceConnections,
-                                                             permissionCenter: permissionCenter,
-                                                             showsPluginSummary: false)
-                            localCache
-                        })
-                    } label: {
+                    settingsLink(to: .connection) {
                         Label("Connection & plugin features", systemImage: "point.3.connected.trianglepath.dotted")
                     }
+                    .accessibilityIdentifier("settings.system.connection")
+                    .driveTarget("settings.system.connection")
                 }
             }
         } else {
             hostsPage
+        }
+    }
+
+    /// System › Connection & plugin features, which Nerd Mode adds to the System screen.
+    private var connectionPage: some View {
+        settingsPage(title: String(localized: "Connection")) {
+            currentConnection
+            BighelpPluginCapabilitiesSection(connections: workspaceConnections,
+                                             permissionCenter: permissionCenter,
+                                             showsPluginSummary: false)
+            localCache
         }
     }
 

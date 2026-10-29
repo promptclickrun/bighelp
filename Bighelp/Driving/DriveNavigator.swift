@@ -195,6 +195,8 @@ final class DriveNavigator {
         // Where the drive left the app. If it's somewhere else at the next step, the person (or a
         // host switch) moved it: they're driving now, so the drive steps out of the way.
         var expected = router.snapshot()
+        // On the Mac a sheet is its own panel, above the overlay's window: no dot or spotlight in it.
+        var inPanel = false
         for (index, step) in steps.enumerated() {
             guard serial == drive else { return }
             guard router.snapshot() == expected else {
@@ -205,9 +207,9 @@ final class DriveNavigator {
                 touch = nil
                 // Never there: the trail stops at the last step the screen showed.
                 guard await find(target) else { break }
-                spotlight = target
+                if !inPanel { spotlight = target }
             } else {
-                if step.move != nil, let target = step.target, !reducesMotion, router.frame(target) != nil {
+                if step.move != nil, let target = step.target, !reducesMotion, !inPanel, router.frame(target) != nil {
                     touch = target
                     guard await pause(450) else { return }
                     presses &+= 1
@@ -217,6 +219,7 @@ final class DriveNavigator {
                     await perform(move, bot: bot, router: router)
                     guard !Task.isCancelled, serial == drive else { return }
                     expected = router.snapshot()
+                    inPanel = BighelpPlatform.isMac && move.opensSheet
                 }
                 // Proof the step happened: the next control a step taps shows up. One it points at may
                 // be further down the page; that step looks for it itself.
@@ -279,6 +282,17 @@ final class DriveNavigator {
 
     private func pause(_ milliseconds: Int) async -> Bool {
         (try? await Task.sleep(for: .milliseconds(milliseconds))) != nil
+    }
+}
+
+private extension DriveMove {
+    /// Settings and a profile's sheets show as sheets; pages and tabs don't.
+    var opensSheet: Bool {
+        switch self {
+        case .settings: true
+        case .botProfile(let opening): opening.sheet != nil
+        case .push, .tab: false
+        }
     }
 }
 

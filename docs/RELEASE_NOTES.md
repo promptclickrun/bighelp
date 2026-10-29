@@ -3,6 +3,17 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.33
+
+### Agents
+
+- **Show me where:** ask your agent where a page or setting is. For example, ask "How do I see what my Feed can do?" The agent opens that place in bighelp and points at it.
+- **Watch the way:** a bar grows out of the top of the screen. It shows the agent's name and each step as it happens. Your chat stays at the bottom of the screen, and you can still send messages there.
+- **Return to chat:** tap **Return to chat** to see your chat again as it was. Tap **x** to stay on the page.
+- **Only moves:** the agent never changes a setting and never taps Save, Send or Delete for you.
+- **To stop it:** in **Settings > Permissions**, set **Let agents show you around bighelp** to off.
+- This needs bighelp's plugin version 3.34.0 or later on the computer.
+
 ## 2.6.32
 
 ### Bots

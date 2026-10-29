@@ -347,7 +347,10 @@ struct BighelpAppComposition {
             },
             appearanceAllowed: defaults.object(forKey: DeviceToolPermissions.appearanceAllowedKey) == nil
                 || defaults.bool(forKey: DeviceToolPermissions.appearanceAllowedKey),
-            saveAppearanceAllowed: { if !usesFixtures { defaults.set($0, forKey: DeviceToolPermissions.appearanceAllowedKey) } }
+            saveAppearanceAllowed: { if !usesFixtures { defaults.set($0, forKey: DeviceToolPermissions.appearanceAllowedKey) } },
+            navigationAllowed: defaults.object(forKey: DeviceToolPermissions.navigationAllowedKey) == nil
+                || defaults.bool(forKey: DeviceToolPermissions.navigationAllowedKey),
+            saveNavigationAllowed: { if !usesFixtures { defaults.set($0, forKey: DeviceToolPermissions.navigationAllowedKey) } }
         )
         let appearanceTool = DeviceAppearanceTool(settings: settings)
         let deviceToolCoordinator = DeviceToolCoordinator(

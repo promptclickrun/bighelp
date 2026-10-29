@@ -457,7 +457,7 @@ final class LiveAppleDeviceToolNativeBoundary: AppleDeviceToolNativeBoundary {
         case .calendar: eventKitStatus(.event)
         case .reminders: eventKitStatus(.reminder)
         case .location: await location.status()
-        case .appearance: .available
+        case .appearance, .navigation: .available
         // The router sends these to their own tools.
         default: .unavailable
         }
@@ -468,7 +468,7 @@ final class LiveAppleDeviceToolNativeBoundary: AppleDeviceToolNativeBoundary {
         case .calendar: await requestFullCalendarAccess()
         case .reminders: await requestFullReminderAccess()
         case .location: await location.request()
-        case .appearance: .available
+        case .appearance, .navigation: .available
         default: .unavailable
         }
     }

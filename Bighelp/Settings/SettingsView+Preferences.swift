@@ -287,6 +287,7 @@ extension SettingsView {
                 settingLabel(String(localized: "Return sends"), detail: Self.returnSendsDetail)
             }
             .accessibilityIdentifier("settings.chat.return-sends")
+            .driveTarget("settings.chat.return-sends")
         }
         .listRowBackground(theme.surface)
     }

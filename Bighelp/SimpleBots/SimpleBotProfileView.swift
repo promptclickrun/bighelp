@@ -156,7 +156,9 @@ struct SimpleBotProfileView: View {
             media.configure(client: mediaClient)
             isMediaConnected = mediaClient != nil
         }
-        .task(id: opening) { await applyOpening() }
+        .task(id: opening) { await applyOpening(opening) }
+        // A drive already on this profile sends its next step here instead of pushing again.
+        .task(id: driveRequest) { if let driveRequest { await applyOpening(driveRequest.opening) } }
         .task(id: agentID) {
             guard let service = context.screenService else { return }
             let model = BotScreenTabModel(agentID: agentID, service: service)
@@ -398,7 +400,7 @@ struct SimpleBotProfileView: View {
     /// back to the usual one while it isn't there). The sheet waits for the push to settle, since
     /// one presented during it can drop, then for the parts behind it to load; if they never
     /// come (no Dashboard, no screen, a computer that won't edit), nothing is shown.
-    private func applyOpening() async {
+    private func applyOpening(_ opening: BotProfileOpening?) async {
         if let wanted = opening?.wantedTab { tab = wanted }
         guard let sheet = opening?.sheet else { return }
         try? await Task.sleep(for: .milliseconds(500))
@@ -409,6 +411,11 @@ struct SimpleBotProfileView: View {
         }
         guard !Task.isCancelled, sheet.canPresent(readiness) else { return }
         present(sheet)
+    }
+
+    /// A drive's step for this bot (`DriveNavigator.profileRequest`), while one is under way.
+    private var driveRequest: DriveNavigator.ProfileRequest? {
+        DriveNavigator.shared.profileRequest.flatMap { $0.agentID == agentID ? $0 : nil }
     }
 
     private var readiness: BotProfileReadiness {

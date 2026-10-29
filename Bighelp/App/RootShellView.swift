@@ -364,6 +364,8 @@ struct RootShellView: View {
         // A voice start that can't open says why; the voice stage mustn't hide that.
         .onChange(of: actionErrorMessage != nil) { _, failed in if failed { VoiceLaunchState.shared.finish() } }
         .onAppear { watchForLostChats() }
+        .modifier(DriveShellHooks(appState: appState, featureStore: featureStore, agents: agents,
+                                  settings: settings, usesDemoFixtures: usesDemoFixtures))
         .modifier(BighelpShortcutParameterUpdates(agents: agents, scheduledTasks: featureStore.scheduledTasks,
                                                   rooms: botModeRooms, catalog: sessionCatalog))
         .onChange(of: acceptsIncomingLinks) { _, ready in

@@ -61,6 +61,8 @@ enum DeviceToolCatalog {
         writes(.shortcuts, "run", liveOnly: ["output", "truncated"], kept: ["status"])
         // Setting a look twice is the same as once, so there's nothing to reconcile.
         reads(.appearance, "get", "set")
+        // Moves between pages and points; it never changes the person's data or a setting.
+        reads(.navigation, "places", "open")
         return all
     }()
 

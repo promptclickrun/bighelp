@@ -143,6 +143,7 @@ private struct AgentAppearancePermissionRow: View {
             }
         }
         .accessibilityIdentifier("permissions.device-tools.appearance")
+        .driveTarget("permissions.device-tools.appearance")
         .padding(.vertical, BighelpTokens.space4)
     }
 }
@@ -166,6 +167,7 @@ private struct AgentNavigationPermissionRow: View {
             }
         }
         .accessibilityIdentifier("permissions.device-tools.navigation")
+        .driveTarget("permissions.device-tools.navigation")
         .padding(.vertical, BighelpTokens.space4)
     }
 }

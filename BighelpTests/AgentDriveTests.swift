@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Testing
 import UIKit
 @testable import Bighelp
@@ -197,6 +198,25 @@ struct AgentDriveTests {
         #expect(router.restored == nil, "They stay where they went")
     }
 
+    /// A gateway switch while a drive shows: the drive's pages and its way back belong to the last
+    /// gateway, so it ends there, and the new gateway's navigation isn't given them.
+    @Test func aGatewaySwitchEndsTheDriveOnTheLastGateway() async throws {
+        let first = FakeRouter(path: [.chat(conversationID: "c1")])
+        let navigator = DriveNavigator()
+        navigator.attach(first, agent: { _ in nil }, chat: { nil })
+        let steps = try #require(DriveCatalog.place("bot.dashboard.templates.feed")?.playbooks[.bots])
+        navigator.start(title: "Feed templates", steps: steps, bot: (id: "nova", name: "Nova"),
+                        agent: DriveAgent(id: "nova", name: "Nova", imageURL: nil), note: nil, chat: nil, reduceMotion: true)
+        try await waitUntil { navigator.phase == .arrived }
+        let second = FakeRouter(path: [])
+        navigator.attach(second, agent: { _ in nil }, chat: { nil })
+        #expect(navigator.phase == .idle)
+        navigator.returnToChat()
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(second.restored == nil)
+        #expect(second.moves.isEmpty)
+    }
+
     /// Every control a playbook taps or points at is marked in the app, or the dot and the
     /// spotlight would quietly skip it.
     @Test func everyTargetInTheCatalogIsMarkedInTheApp() throws {
@@ -217,6 +237,41 @@ struct AgentDriveTests {
                 || (accessibility.contains(target) && code.contains("driveTarget(section.accessibilityIdentifier)"))
             #expect(marked, "\(target) has no .driveTarget in the app")
         }
+    }
+
+    // MARK: Shell
+
+    /// Multi-gateway: each gateway has its own navigation, chats and agents, and switching keeps
+    /// the shell's view. A drive after a switch moves the gateway on screen, for its own agent,
+    /// not the first gateway's agent with the same id (`default` on both).
+    @Test func aDriveAfterAGatewaySwitchMovesTheGatewayOnScreen() async throws {
+        let navigator = DriveNavigator()
+        let mac = DriveGateway(agentName: "Gordie"), azure = DriveGateway(agentName: "Alfie")
+        let source = DriveGatewaySource(gateway: mac)
+        let controller = UIHostingController(rootView: DriveGatewayHarness(source: source, navigator: navigator))
+        let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        window.rootViewController = controller
+        window.isHidden = false
+        defer { navigator.stay(); window.isHidden = true; window.rootViewController = nil }
+        func settle(_ condition: @MainActor () -> Bool) async throws {
+            for _ in 0..<200 where !condition() {
+                controller.view.layoutIfNeeded()
+                try await Task.sleep(for: .milliseconds(20))
+            }
+        }
+        try await settle { navigator.agent("default") != nil }
+        #expect(navigator.agent("default")?.name == "Gordie")
+
+        source.gateway = azure
+        try await settle { navigator.agent("default")?.name == "Alfie" }
+        #expect(navigator.agent("default")?.name == "Alfie")
+        let place = try #require(DriveCatalog.place("settings.chat.return-sends"))
+        _ = navigator.open(place, steps: try #require(place.playbooks[.chat]), bot: nil, note: nil, agentID: "default")
+        #expect(navigator.agent?.name == "Alfie")
+        try await settle { azure.appState.isSettingsPresented }
+        #expect(azure.appState.isSettingsPresented)
+        #expect(!mac.appState.isSettingsPresented)
     }
 
     private func waitUntil(_ condition: @MainActor () -> Bool) async throws {
@@ -260,5 +315,41 @@ private final class ToolFixture {
                 self?.opened.append((place.id, bot?.id, note))
                 return steps.map { $0.label(bot: bot?.name) }
             }))
+    }
+}
+
+/// One gateway's own navigation, chats and agents, as each `NativeWorkspaceRuntime` keeps them.
+@MainActor
+private final class DriveGateway {
+    let appState = AppState()
+    let agents: AgentDirectoryStore
+    let features: ShellFeatureStore
+
+    init(agentName: String) {
+        var agent = AgentProfile.defaultFixture
+        agent.name = agentName
+        agents = AgentDirectoryStore(client: AgentDirectoryFixtureClient(profiles: [agent]), defaults: isolatedDefaults(),
+                                     profiles: [agent])
+        features = ShellFeatureStore(timing: .immediate, catalog: SessionCatalogStore(client: ShortcutSessionCatalogClientFixture()),
+                                     agents: agents)
+    }
+}
+
+@MainActor @Observable
+private final class DriveGatewaySource {
+    var gateway: DriveGateway
+    init(gateway: DriveGateway) { self.gateway = gateway }
+}
+
+/// The shell's hooks on whichever gateway is in use, as `BighelpApp.rootShell` hands them over.
+private struct DriveGatewayHarness: View {
+    let source: DriveGatewaySource
+    let navigator: DriveNavigator
+    let settings = SettingsStore(defaults: isolatedDefaults())
+
+    var body: some View {
+        let gateway = source.gateway
+        Color.clear.modifier(DriveShellHooks(appState: gateway.appState, featureStore: gateway.features, agents: gateway.agents,
+                                             settings: settings, usesDemoFixtures: false, navigator: navigator))
     }
 }

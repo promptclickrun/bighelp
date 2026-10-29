@@ -8,12 +8,17 @@ struct DriveShellHooks: ViewModifier {
     let agents: AgentDirectoryStore
     let settings: SettingsStore
     let usesDemoFixtures: Bool
+    var navigator: DriveNavigator = .shared
 
     func body(content: Content) -> some View {
         content
-            .onAppear {
+            // Each gateway has its own navigation, chats and agents, and a gateway switch keeps this view
+            // and hands it the new ones, so the drive is given them again: once only, it moved the first
+            // gateway's navigation, off screen, for that gateway's agent with the same id (#666).
+            .onChange(of: [ObjectIdentifier(appState), ObjectIdentifier(featureStore), ObjectIdentifier(agents)],
+                      initial: true) {
                 let state = appState, features = featureStore, directory = agents
-                DriveNavigator.shared.attach(
+                navigator.attach(
                     AppDriveRouter(appState: state),
                     agent: { [weak directory] id in
                         directory?.profiles.first { $0.id == id }.map { DriveAgent(id: $0.id, name: $0.name, imageURL: nil) }

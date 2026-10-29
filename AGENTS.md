@@ -429,6 +429,10 @@ change in both repos.
   makes a new one. Keep per-computer state (like "this host has Kanban") by `cacheScopeID`, and don't turn a failed
   check during a reconnect into "unavailable" (`KanbanAvailability`). The owner is nil while the connection is
   closed: that gap isn't another computer, so a page's data stays (`use(host:)` ignores nil).
+- **Each gateway has its own objects:** `AppState`, the stores and the chats belong to one gateway
+  (`NativeWorkspaceRuntime`), and a gateway switch keeps `RootShellView` and hands it the new ones. Anything handed
+  over once in `.onAppear` keeps the first gateway's: an agent's drive moved a navigation that wasn't on screen
+  (#666). Hand it over again when they change (`DriveShellHooks`).
 
 ### Crashes that only happen on a real iPhone
 

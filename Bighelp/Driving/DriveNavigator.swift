@@ -105,6 +105,12 @@ final class DriveNavigator {
 
     func attach(_ router: any DriveRouting, agent: @escaping @MainActor (String) -> DriveAgent?,
                 chat: @escaping @MainActor () -> ChatModel?) {
+        // Another gateway's navigation (#666): the drive's pages and its way back were the last one's.
+        if isShowing {
+            task?.cancel()
+            ending?.cancel()
+            finish()
+        }
         self.router = router
         agentLookup = agent
         chatOnScreen = chat

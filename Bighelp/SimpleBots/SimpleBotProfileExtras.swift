@@ -233,7 +233,7 @@ struct SimpleBotTabArranger: View {
     private static let space = "simple-bots.profile.tab-arranger"
 
     var body: some View {
-        WorkflowFlowLayout(spacing: BighelpTokens.space8) {
+        BighelpFlowLayout(spacing: BighelpTokens.space8) {
             ForEach(tabs) { chip($0) }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

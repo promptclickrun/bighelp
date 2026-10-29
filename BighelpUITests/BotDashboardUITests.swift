@@ -3,6 +3,57 @@ import XCTest
 /// A bot's profile opens on its Dashboard: Feed, Ideas and Goals as piles. Swiping the top Feed
 /// card left clears it, with Undo.
 final class BotDashboardUITests: BighelpUITestCase {
+    /// A bot profile's tabs (five with Dashboard) sit on one line with every label whole: not cut
+    /// at the page's margin, and not run into the next tab (#645, and again after #663).
+    @MainActor
+    func testProfileTabLabelsAreWhole() throws {
+        for size in ["UICTContentSizeCategoryL", "UICTContentSizeCategoryXL", "UICTContentSizeCategoryXXL",
+                     "UICTContentSizeCategoryXXXL"] {
+            try checkProfileTabs(textSize: size)
+        }
+    }
+
+    @MainActor
+    private func checkProfileTabs(textSize: String) throws {
+        let app = makeApp()
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
+                               "-bighelp.settings.simple-bots", "YES", "-loopdy.demo.appearance", "dark",
+                               "-UIPreferredContentSizeCategoryName", textSize]
+        app.launch()
+        defer { app.terminate() }
+        let primary = app.buttons["simple-bots.primary"]
+        XCTAssertTrue(primary.waitForExistence(timeout: 15))
+        primary.tap()
+        let identity = app.buttons["chat.identity"]
+        XCTAssertTrue(identity.waitForExistence(timeout: 10))
+        let profile = app.descendants(matching: .any)["simple-bots.profile"]
+        identity.tap()
+        if !profile.waitForExistence(timeout: 5) { identity.tap() }
+        XCTAssertTrue(app.buttons["simple-bots.profile.tab.dashboard"].waitForExistence(timeout: 5))
+
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "profile-tabs-" + textSize
+        shot.lifetime = .keepAlways
+        add(shot)
+
+        // Each tab's frame is its label's (the label is fixed at its own size): it must lie inside
+        // the page's margins, clear of the tab before it on its line.
+        let screen = app.windows.firstMatch.frame
+        let tabs = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'simple-bots.profile.tab.'"))
+            .allElementsBoundByIndex.filter { !$0.identifier.contains("tab-actions") }
+        XCTAssertEqual(tabs.count, 5, "Five tabs with Dashboard")
+        var lastMaxX = -CGFloat.infinity
+        var lineY = -CGFloat.infinity
+        for tab in tabs.sorted(by: { ($0.frame.minY, $0.frame.minX) < ($1.frame.minY, $1.frame.minX) }) {
+            print("TAB \(textSize) \(tab.identifier) \(tab.label) frame=\(tab.frame) screen=\(screen)")
+            if tab.frame.minY > lineY + 1 { lineY = tab.frame.minY; lastMaxX = -CGFloat.infinity }
+            XCTAssertGreaterThanOrEqual(tab.frame.minX, screen.minX + 16, "\(textSize): \(tab.identifier) starts inside the margin")
+            XCTAssertLessThanOrEqual(tab.frame.maxX, screen.maxX - 16, "\(textSize): \(tab.identifier) ends inside the margin")
+            XCTAssertGreaterThanOrEqual(tab.frame.minX, lastMaxX, "\(textSize): \(tab.identifier) doesn't run into the tab before it")
+            lastMaxX = tab.frame.maxX
+        }
+    }
+
     @MainActor
     func testProfileOpensOnTheDashboardAndASwipeClearsAPost() throws {
         let app = makeApp()

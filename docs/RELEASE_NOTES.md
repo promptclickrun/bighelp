@@ -3,6 +3,16 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.38
+
+### Credential Vault
+
+- **In each bot's profile:** open a bot's profile, tap **Info**, then tap **Credential Vault**. The row is above **Advanced Options**. It shows the number of websites that the bot can use.
+- **Wallet and websites:** the vault shows your saved cards and addresses in a wallet. Below the wallet, it shows each website and the items that you saved for it.
+- **Add a website in one step:** tap **Add a Website**. Type the website, and select **Login**, **Card** or **Address**. Tap **Next**, type the details, and tap **Save**. One Save keeps all of the items.
+- **Use a saved card again:** when you add a website, you can select a saved card or address. You do not type it again. This needs bighelp's plugin version 3.36.0 or later on the computer.
+- **If one item does not save:** the other items stay saved. Only the item that did not save stays open, with its details. Tap **Save** again.
+
 ## 2.6.37
 
 ### Skills and plugins

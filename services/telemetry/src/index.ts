@@ -1,5 +1,6 @@
 import { WorkerEntrypoint } from "cloudflare:workers";
 import { forwardEvents } from "./appinsights.js";
+import { hostLocation } from "./geo.js";
 import { networkKey } from "./network.js";
 import { SCHEMA } from "./schema.js";
 import { sanitizeEvents, validateBatch } from "./validate.js";
@@ -136,7 +137,10 @@ async function handleBatch(request: Request, env: TelemetryEnv, ctx: ExecutionCo
   if (!(await allowed(env.RL_ID, `id:${batch.id}`))) throw reject(429, "telemetry_rate_limited");
 
   if (batch.events.length > 0) {
-    ctx.waitUntil(forwardEvents(env.APPINSIGHTS_CONNECTION_STRING, batch, batch.events));
+    // Host reports also carry where the host is: its country and, in the US, its state, as Cloudflare's edge
+    // assigned them to the connection. App and notification-extension reports carry no location.
+    const server = batch.source === "host" ? { ...hostLocation(request.cf) } : undefined;
+    ctx.waitUntil(forwardEvents(env.APPINSIGHTS_CONNECTION_STRING, { ...batch, server }, batch.events));
   }
   return reply({ accepted: batch.events.length, dropped: batch.dropped }, 202);
 }

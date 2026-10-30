@@ -53,6 +53,8 @@ export interface EnvelopeContext {
   id?: string;
   session?: string;
   context?: Record<string, string>;
+  // Values the Worker adds itself, after validation (a host's country and US state). A client can't set them.
+  server?: Readonly<Record<string, string>>;
 }
 
 export function buildEnvelopes(
@@ -84,7 +86,7 @@ export function buildEnvelopes(
       baseData: {
         ver: 2,
         name: event.name,
-        properties: { ...context, ...event.properties },
+        properties: { ...context, ...event.properties, ...batch.server },
         measurements: { ...event.measurements },
       },
     },

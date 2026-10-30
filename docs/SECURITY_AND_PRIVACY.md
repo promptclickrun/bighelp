@@ -99,7 +99,9 @@ extension writes nothing and the app throws away what is there.
 The service is a Cloudflare Worker (`telemetry.bighelp.app`). It checks every batch against an
 allowlist, rate-limits by install ID and by a keyed hash of the network address (the address itself is
 never stored, logged or forwarded), and forwards what passes to Microsoft Azure (Application Insights
-and Log Analytics), where it is kept for 90 days.
+and Log Analytics), where it is kept for 90 days. Reports from a Hermes host (not from the app) also get the
+host's country and, in the US, its state, as Cloudflare's edge assigns them to the connection; no city
+or address is kept. See [TELEMETRY.md](TELEMETRY.md#host-location).
 
 ### The off switch
 

@@ -18,7 +18,8 @@ the file is dropped at the edge.
 - **A Hermes host with the bighelp plugin** sends `host.started`, `turn.completed`, `tool.completed`,
   `alert.queued`, `alert.sent` and `error`. They carry durations, counts, outcomes, the provider and model ID, and
   the plugin and Hermes versions. Tool names are sent only for built-in Hermes tools and `bighelp_*` tools. Other
-  tools report `mcp` or `custom`.
+  tools report `mcp` or `custom`. The Worker adds the host's country and, in the United States, its state (see
+  [Host location](#host-location)).
 - **The Link relay** reports `push.sent`, `push.token_invalid`, `push.retry`, `push.dlq`, `push.fallback_buzzkit` and
   `push.shadow`: the event type, a result code, timings and counts.
 
@@ -42,7 +43,20 @@ How this is enforced:
 - **Unknown names are dropped.** An unknown event name or key never reaches storage.
 - **No address.** The Worker uses the client address only to make a keyed hash for rate limiting. It does not store,
   log or forward the address, and it sends Azure `0.0.0.0` in the location field.
+- **Host location is coarse.** See [Host location](#host-location).
 - **Only the Worker holds the Azure key.** The app and the plugin hold no Azure credential.
+
+## Host location
+
+Reports from a Hermes host carry two extra values the host never sends itself: `country`, the two-letter code
+Cloudflare's edge assigns to the connection (for example `DE`), and `usState`, the state code for a host in the
+United States (for example `TX`, or `DC`). The Worker reads them from the request's Cloudflare properties after the
+batch passes validation, so a host can't set or change them. Nothing finer is kept: no city, postal code or
+coordinates, and not the address. Unknown and Tor connections get neither value, and a US region that is not one of
+the 50 states or DC keeps only the country. App, notification-extension and relay reports carry no location.
+
+This is where the connection comes from, not where a person lives. A host on a cloud server reports its data
+center's country, and a host behind a VPN reports the VPN's.
 
 ## Where it goes and how long it stays
 

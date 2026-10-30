@@ -313,6 +313,12 @@ final class DirectHermesNativePluginClient {
             return Route(path: "voice/" + operation.rawValue.replacingOccurrences(of: "native.voice.", with: ""),
                          feature: "native-voice-v1", isMutation: ![.nativeVoiceStatus, .nativeVoicePoll].contains(operation),
                          maximumResponseBytes: 196_608)
+        case .nativeVoiceGeminiStatus:
+            return Route(path: "voice/status", feature: "native-voice-gemini-v1", isMutation: false,
+                         maximumResponseBytes: 196_608)
+        case .nativeVoiceGeminiOffer:
+            return Route(path: "voice/offer", feature: "native-voice-gemini-v1", isMutation: true,
+                         maximumResponseBytes: 196_608)
         case .projectsGitCapabilities:
             return Route(path: "projects/git/capabilities", feature: "native-project-git-read-v1",
                          isMutation: false, maximumResponseBytes: 196_608)

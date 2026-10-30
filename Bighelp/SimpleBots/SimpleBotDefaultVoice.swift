@@ -2,7 +2,7 @@ import Observation
 import SwiftUI
 
 /// What a bot's profile needs to show and edit the voice the bot speaks with: its own voice type and
-/// GPT Live 1 voice, kept on this device, and its speech provider on its computer.
+/// Full Duplex provider and voice, kept on this device, and its speech provider on its computer.
 @MainActor
 struct SimpleBotVoiceSettings {
     let settings: SettingsStore
@@ -67,8 +67,13 @@ final class SimpleBotVoiceModel {
         voice.choices.setMode(nil, computer: voice.computer, agentID: agentID)
     }
 
+    /// Full Duplex provider for this bot only.
+    func setLiveProvider(_ provider: LiveVoiceProvider) {
+        voice.choices.setLiveProvider(provider, computer: voice.computer, agentID: agentID)
+    }
+
     func setLiveVoice(_ value: String) {
-        voice.choices.setLiveVoice(value, for: settings.liveVoiceProvider, computer: voice.computer, agentID: agentID)
+        voice.choices.setLiveVoice(value, for: preference.liveProvider, computer: voice.computer, agentID: agentID)
     }
 }
 
@@ -78,7 +83,7 @@ enum SimpleBotDefaultVoiceSummary {
     static func text(voice: AgentVoicePreference, store: VoiceSettingsStore?) -> String? {
         switch voice.mode {
         case .codexLive:
-            return "\(VoiceConversationMode.codexLive.title) · \(voice.liveVoice.capitalized)"
+            return "\(VoiceConversationMode.codexLive.title) · \(voice.liveProvider.shortTitle) · \(voice.liveVoice.capitalized)"
         case .turnBased:
             // What the computer has saved, not edits still open in the sheet.
             guard let configuration = store?.configuration,
@@ -145,7 +150,7 @@ struct SimpleBotDefaultVoiceSheet: View {
             .modifier(VoiceSettingsPages(store: store, page: $page))
             .confirmationDialog(String(localized: "Use separately billed API voice?"),
                                 isPresented: $confirmAPIBilling, titleVisibility: .visible) {
-                Button(String(localized: "Use API key provider")) { settings.liveVoiceProvider = .apiKey }
+                Button(String(localized: "Use API key provider")) { model.setLiveProvider(.apiKey) }
                 Button(String(localized: "Keep Codex subscription"), role: .cancel) {}
             } message: {
                 Text("An API key may add separate OpenAI charges.")
@@ -201,21 +206,20 @@ struct SimpleBotDefaultVoiceSheet: View {
     @ViewBuilder
     private var gptLiveSections: some View {
         Section {
-            Picker(String(localized: "Sign in with"), selection: liveProvider) {
-                Text(LiveVoiceProvider.codexSubscription.title).tag(LiveVoiceProvider.codexSubscription)
-                Text(LiveVoiceProvider.apiKey.title).tag(LiveVoiceProvider.apiKey)
+            Picker(String(localized: "Provider"), selection: liveProvider) {
+                ForEach(LiveVoiceProvider.allCases) { Text($0.title).tag($0) }
             }
             .accessibilityIdentifier("simple-bots.default-voice.live-provider")
             Picker(String(localized: "Voice"), selection: liveVoice) {
-                ForEach(settings.liveVoiceProvider.voices, id: \.self) { Text($0.capitalized).tag($0) }
+                ForEach(preference.liveProvider.voices, id: \.self) { Text($0.capitalized).tag($0) }
             }
             .accessibilityIdentifier("simple-bots.default-voice.live-voice")
         } header: {
             Text(VoiceConversationMode.codexLive.title)
         } footer: {
             Text(settings.autoSpeakRepliesEnabled
-                 ? String(localized: "The voice is just for \(botName); the sign-in is the same for every agent. Auto TTS reads replies with the speech provider below.")
-                 : String(localized: "The voice is just for \(botName); the sign-in is the same for every agent."))
+                 ? String(localized: "The provider and voice are just for \(botName). Auto TTS reads replies with the speech provider below.")
+                 : String(localized: "The provider and voice are just for \(botName)."))
         }
         if hostRegistry?.selectedHost != nil {
             HostPluginFeatureSection(feature: .liveVoice)
@@ -249,12 +253,12 @@ struct SimpleBotDefaultVoiceSheet: View {
 
     private var liveProvider: Binding<LiveVoiceProvider> {
         Binding(
-            get: { settings.liveVoiceProvider },
+            get: { preference.liveProvider },
             set: { value in
                 if value == .apiKey {
                     confirmAPIBilling = true
                 } else {
-                    settings.liveVoiceProvider = value
+                    model.setLiveProvider(value)
                 }
             }
         )

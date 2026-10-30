@@ -207,11 +207,10 @@ private struct VoicePreferenceSections: View {
 
         if settings.voiceConversationMode == .codexLive {
             Section {
-                Picker("Sign in with", selection: provider) {
-                    Text(LiveVoiceProvider.codexSubscription.title)
-                        .tag(LiveVoiceProvider.codexSubscription)
-                    Text(LiveVoiceProvider.apiKey.title)
-                        .tag(LiveVoiceProvider.apiKey)
+                Picker("Provider", selection: provider) {
+                    ForEach(LiveVoiceProvider.allCases) { option in
+                        Text(option.title).tag(option)
+                    }
                 }
                 .accessibilityIdentifier("voice.settings.live-provider")
                 Picker("Voice", selection: voice) {
@@ -221,9 +220,9 @@ private struct VoicePreferenceSections: View {
                 }
                 .accessibilityIdentifier("voice.settings.live-voice")
             } header: {
-                Text("GPT Live 1")
+                Text(VoiceConversationMode.codexLive.title)
             } footer: {
-                Text("Sign-ins stay on your computer. An API key may add separate OpenAI charges. The voice is the default for every agent.")
+                Text("Sign-ins and keys stay on your computer. An API key may add separate charges, and Gemini Live uses the agent's Gemini key. This is the default for every agent; an agent's Default Voice can pick its own.")
             }
             HostPluginFeatureSection(feature: .liveVoice)
         } else {

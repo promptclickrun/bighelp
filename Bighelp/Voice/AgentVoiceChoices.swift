@@ -1,9 +1,9 @@
 import Foundation
 import Observation
 
-/// Each agent's own voice type (TTS or GPT Live 1) and GPT Live 1 voice, chosen in its Default Voice
-/// (Bots mode) and kept on this device by computer and agent, like `OnDeviceVoiceChoices`. An agent
-/// without its own uses Settings › Voice, the default for every agent.
+/// Each agent's own voice type (TTS or Full Duplex), Full Duplex provider and voice, chosen in its
+/// Default Voice (Bots mode) and kept on this device by computer and agent, like `OnDeviceVoiceChoices`.
+/// An agent without its own uses Settings › Voice, the default for every agent.
 @MainActor
 @Observable
 final class AgentVoiceChoices {
@@ -11,10 +11,12 @@ final class AgentVoiceChoices {
     struct Choice: Codable, Equatable, Sendable {
         /// A `VoiceConversationMode`; nil follows the default for every agent.
         var mode: String?
-        /// GPT Live 1's voice by sign-in (`LiveVoiceProvider`): each sign-in has voices of its own.
+        /// A `LiveVoiceProvider`; nil follows the default for every agent.
+        var liveProvider: String?
+        /// The Full Duplex voice by provider (`LiveVoiceProvider`): each provider has voices of its own.
         var liveVoices: [String: String]?
 
-        var isEmpty: Bool { mode == nil && (liveVoices ?? [:]).isEmpty }
+        var isEmpty: Bool { mode == nil && liveProvider == nil && (liveVoices ?? [:]).isEmpty }
     }
 
     static let shared = AgentVoiceChoices()
@@ -41,7 +43,17 @@ final class AgentVoiceChoices {
         update(computer, agentID) { $0.mode = mode?.rawValue }
     }
 
-    /// The agent's own GPT Live 1 voice for `provider`, if it has one that sign-in still offers.
+    /// The agent's own Full Duplex provider, if it has one this version knows.
+    func liveProvider(computer: String, agentID: String) -> LiveVoiceProvider? {
+        saved[Self.entry(computer, agentID)]?.liveProvider.flatMap(LiveVoiceProvider.init(rawValue:))
+    }
+
+    /// nil goes back to the default for every agent.
+    func setLiveProvider(_ provider: LiveVoiceProvider?, computer: String, agentID: String) {
+        update(computer, agentID) { $0.liveProvider = provider?.rawValue }
+    }
+
+    /// The agent's own Full Duplex voice for `provider`, if it has one that provider still offers.
     func liveVoice(for provider: LiveVoiceProvider, computer: String, agentID: String) -> String? {
         saved[Self.entry(computer, agentID)]?.liveVoices?[provider.rawValue].flatMap {
             provider.voices.contains($0) ? $0 : nil
@@ -79,11 +91,13 @@ final class AgentVoiceChoices {
 /// The voice an agent talks in when voice opens: its own choices where it has them, else Settings › Voice.
 struct AgentVoicePreference: Equatable, Sendable {
     let mode: VoiceConversationMode
-    /// How GPT Live 1 signs in. The same for every agent: it's a billing choice.
+    /// Who runs Full Duplex for this agent: its own choice, else Settings › Voice.
     let liveProvider: LiveVoiceProvider
     let liveVoice: String
     /// The voice type is the agent's own, not the default for every agent.
     let hasOwnMode: Bool
+    /// The Full Duplex provider is the agent's own, not the default for every agent.
+    var hasOwnLiveProvider = false
 }
 
 extension SettingsStore {
@@ -91,16 +105,17 @@ extension SettingsStore {
     /// every agent: nothing can be kept for an agent the app can't name.
     func voicePreference(computer: String?, agentID: String?,
                          choices: AgentVoiceChoices = .shared) -> AgentVoicePreference {
-        let provider = liveVoiceProvider
         guard let computer, let agentID, !computer.isEmpty, !agentID.isEmpty else {
-            return AgentVoicePreference(mode: voiceConversationMode, liveProvider: provider,
-                                        liveVoice: liveVoice(for: provider), hasOwnMode: false)
+            return AgentVoicePreference(mode: voiceConversationMode, liveProvider: liveVoiceProvider,
+                                        liveVoice: liveVoice(for: liveVoiceProvider), hasOwnMode: false)
         }
         let own = choices.mode(computer: computer, agentID: agentID)
+        let ownProvider = choices.liveProvider(computer: computer, agentID: agentID)
+        let provider = ownProvider ?? liveVoiceProvider
         return AgentVoicePreference(
             mode: own ?? voiceConversationMode, liveProvider: provider,
             liveVoice: choices.liveVoice(for: provider, computer: computer, agentID: agentID) ?? liveVoice(for: provider),
-            hasOwnMode: own != nil)
+            hasOwnMode: own != nil, hasOwnLiveProvider: ownProvider != nil)
     }
 
     /// Voice opens as TTS from now on, where the agent's voice type comes from: its own choice when it

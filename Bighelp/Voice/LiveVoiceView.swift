@@ -75,7 +75,7 @@ struct LiveVoiceView: View {
                         }
                         messages
                         Spacer(minLength: BighelpTokens.space16)
-                        Text("Stopping voice does not cancel work Hermes already accepted.")
+                        Text("Ending the call does not stop work that already started.")
                             .bighelpFont(.metadata)
                             .foregroundStyle(theme.tertiaryText)
                             .multilineTextAlignment(.center)

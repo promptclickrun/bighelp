@@ -189,6 +189,11 @@ change in both repos.
 - **A turn stays pending while it streams:** after `prompt.submit` returns `streaming`, the chat isn't "ready for a
   new turn" until the turn ends. A mid-turn Send must go through the steer/queue path (`sendMidSession`). Steer is
   the default.
+- **Live voice is Full Duplex, and it is the agent:** each agent picks its provider (GPT-Live on the Codex
+  subscription or an API key, or Gemini Live) and voice (`AgentVoiceChoices`). The plugin's brief names the
+  agent, so the voice model speaks as it, never about "your agent". Gemini's media and events stay between the
+  phone and Gemini (`GeminiLiveAudioPeer`, a single-use token from the plugin); its work still goes through the
+  chat, and results go back as `UPDATE` text (docs/DIRECT_STREAMING_AND_LIVE_VOICE.md).
 - **Live voice multitasks:** requests from the voice model never wait for each other. One runs as a turn in
   the chat when it's free; one made while the chat works runs at once as a Hermes background task for it
   (`ChatModel.runNativeVoiceRequest`, `prompt.background`) and answers the call on its own. Background tasks

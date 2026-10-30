@@ -8,6 +8,8 @@ protocol LiveVoiceAudioPeer: AnyObject {
     var onInterruption: (@MainActor (Bool) -> Void)? { get set }
     func makeOffer() async throws -> String
     func applyAnswer(_ sdp: String) async throws
+    /// What the plugin's offer returned. WebRTC peers take only an answer SDP.
+    func apply(_ answer: LiveVoiceAnswer) async throws
     func setMuted(_ muted: Bool)
     func setPlaybackMuted(_ muted: Bool)
     func setSpeakerEnabled(_ enabled: Bool) throws
@@ -17,7 +19,23 @@ protocol LiveVoiceAudioPeer: AnyObject {
     func close()
 }
 
+extension LiveVoiceAudioPeer {
+    func apply(_ answer: LiveVoiceAnswer) async throws {
+        guard case .sdp(let sdp) = answer else { throw BighelpRealtimeAudioPeer.Failure.invalidSDP }
+        try await applyAnswer(sdp)
+    }
+}
+
 extension BighelpRealtimeAudioPeer: LiveVoiceAudioPeer {}
+
+/// A call whose provider events come over the phone's own connection (Gemini) instead of the host's
+/// feed. Its events use the feed's vocabulary; work results go back to it as text.
+@MainActor
+protocol LiveVoiceLocalSession: AnyObject {
+    var onEvent: (@MainActor ([String: BighelpJSONValue]) -> Void)? { get set }
+    func sendText(_ text: String)
+    func answerFunction(id: String, name: String, response: [String: BighelpJSONValue])
+}
 
 enum LiveVoiceWorkStatus: Equatable, Sendable {
     case idle
@@ -27,7 +45,7 @@ enum LiveVoiceWorkStatus: Equatable, Sendable {
     var title: String {
         switch self {
         case .idle: ""
-        case .working: "Working with Hermes"
+        case .working: "Working on it"
         case .resultSent: "Result sent to voice"
         }
     }
@@ -180,7 +198,7 @@ final class LiveVoiceModel {
                 try requireCurrent(token)
                 supportsSpeechInterrupt = status["interruptSupported"]?.boolean == true
                 guard status["available"]?.boolean != false, status["enabled"]?.boolean != false else {
-                    throw LiveVoiceControlError.unavailable
+                    throw selectedProvider == .gemini ? LiveVoiceControlError.geminiKeyMissing : .unavailable
                 }
                 let nextPeer = makePeer()
                 peer = nextPeer
@@ -195,7 +213,7 @@ final class LiveVoiceModel {
                     voiceID: id, provider: selectedProvider, voice: selectedVoice, sdp: offer
                 )
                 try requireCurrent(token)
-                try await nextPeer.applyAnswer(answer)
+                try await nextPeer.apply(answer)
                 try requireCurrent(token)
                 answerApplied = true
                 reconcileReadiness()
@@ -253,7 +271,7 @@ final class LiveVoiceModel {
         do {
             try peer?.setSpeakerEnabled(enabled)
             speakerEnabled = enabled
-        } catch { errorMessage = Self.safeMessage(error) }
+        } catch { errorMessage = Self.safeMessage(error, provider: provider) }
     }
 
     func resumeAudio() {
@@ -265,7 +283,7 @@ final class LiveVoiceModel {
             peer?.setMuted(isMuted)
             phase = .connecting
             reconcileReadiness()
-        } catch { errorMessage = Self.safeMessage(error) }
+        } catch { errorMessage = Self.safeMessage(error, provider: provider) }
     }
 
     func interruptSpeech() async {
@@ -279,7 +297,7 @@ final class LiveVoiceModel {
             // A control receipt is not evidence that audible output stopped.
         } catch {
             guard generation == token else { return }
-            errorMessage = Self.safeMessage(error)
+            errorMessage = Self.safeMessage(error, provider: provider)
         }
     }
 
@@ -369,7 +387,9 @@ final class LiveVoiceModel {
         case "transport_closed", "closed":
             stopLocal()
             phase = .ended
-            cleanupMessage = "The host closed live voice. Accepted tasks were not cancelled."
+            cleanupMessage = provider == .gemini
+                ? "Gemini ended the call. Work you started keeps going."
+                : "The host closed live voice. Accepted tasks were not cancelled."
         default: break // Unknown events cannot execute/control tasks.
         }
     }
@@ -507,7 +527,7 @@ final class LiveVoiceModel {
         let id = offerSubmitted ? voiceID : nil
         stopLocal()
         phase = .failed
-        errorMessage = Self.safeMessage(error)
+        errorMessage = Self.safeMessage(error, provider: provider)
         if let id { requestClose(id) }
     }
 
@@ -531,9 +551,10 @@ final class LiveVoiceModel {
         }
     }
 
-    static func safeMessage(_ error: any Error) -> String {
+    static func safeMessage(_ error: any Error, provider: LiveVoiceProvider = .codexSubscription) -> String {
         if let error = error as? BighelpRealtimeAudioPeer.Failure { return error.localizedDescription }
         if let error = error as? LiveVoiceControlError { return error.localizedDescription }
+        if provider == .gemini { return geminiMessage(error) }
         // Plain words for host answers. Never surface arbitrary provider or
         // transport text, SDP or headers.
         switch error as? WorkspaceClientError {
@@ -553,6 +574,41 @@ final class LiveVoiceModel {
             return "Your computer couldn't start the Codex voice call. Try again, or use TTS voice mode."
         case nil:
             return "Live voice couldn't connect. Try again, or use TTS voice mode."
+        }
+    }
+
+    /// Gemini's calls start with the agent's own Gemini key on the computer and a newer plugin.
+    private static func geminiMessage(_ error: any Error) -> String {
+        switch error as? WorkspaceClientError {
+        case .authenticationRequired?:
+            return "Sign in to your computer again, then try live voice."
+        case .unavailable?:
+            return "Update the bighelp plugin on your computer to talk with Gemini Live."
+        case .rejected(let code, _)? where code == "voice_already_active":
+            return "Another live voice call is still open with your computer. End it, then try again."
+        case .rejected(let code, _)? where code == "profile_not_found":
+            return "This agent is no longer on your computer."
+        case .rejected(let code?, _)? where code.hasPrefix("voice_provider_"):
+            switch String(code.dropFirst("voice_provider_".count)) {
+            case "credentials_unavailable":
+                return "This agent has no Gemini API key on your computer. Add one as GEMINI_API_KEY, then try again."
+            case "authentication_failed":
+                return "Gemini didn't accept this agent's API key. Check the key on your computer, then try again."
+            case "access_denied":
+                return "This Gemini key can't start live voice."
+            case "rate_limited":
+                return "Gemini is limiting voice calls right now. Wait a minute, then try again."
+            case "setup_timeout":
+                return "Gemini took too long to start the call. Try again."
+            case "unsupported_voice":
+                return "That voice isn't available for live voice. Pick another in Settings › Voice."
+            default:
+                return "Gemini couldn't start the voice call. Try again, or use TTS voice mode."
+            }
+        case .ownerChanged?:
+            return "Your connection to your computer changed. Close voice and open it again."
+        case .some, nil:
+            return "Gemini Live couldn't connect. Try again, or use TTS voice mode."
         }
     }
 

@@ -426,6 +426,9 @@ final class DirectHermesNativePluginClient {
         case .myTemplatesDelete:
             return Route(path: "my-templates/delete", feature: MyTemplatesWire.feature, isMutation: true,
                          maximumResponseBytes: 16_384)
+        case .vaultLink:
+            return Route(path: "vault/link", feature: CredentialVault.linkFeature, isMutation: true,
+                         maximumResponseBytes: 65_536)
         case .skillsImport:
             // Up to 3 MB of zipped skill folder, base64 in JSON; the host checks and scans each file.
             return Route(path: "skills/import", feature: DirectHermesSkillsAndToolsClient.importFeature, isMutation: true,

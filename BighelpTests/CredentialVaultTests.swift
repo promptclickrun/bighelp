@@ -9,6 +9,7 @@ struct CredentialVaultTests {
         ("https://Example.com/login?next=1", "https://example.com"),
         ("http://192.168.1.20:8080/admin", "http://192.168.1.20:8080"),
         (" shop.example.org ", "https://shop.example.org"),
+        ("https://example.com:443/pay", "https://example.com"),
     ])
     func aTypedSiteBecomesItsOrigin(typed: String, origin: String) {
         #expect(CredentialVault.origin(from: typed) == origin)
@@ -93,7 +94,7 @@ struct CredentialVaultTests {
         let saved = await model.save(.card(label: "Travel card", sites: ["air.example.com"], name: "",
             number: "5555555555551881", month: "4", year: "2030", securityCode: "321", postalCode: ""), replacing: old)
         #expect(saved)
-        #expect(!model.items.contains { $0.id == old.id })
+        #expect(!model.items.contains { item in old.items.contains { $0.id == item.id } })
         let renamed = model.groups.first { $0.label == "Travel card ending 1881" }
         #expect(renamed?.sites == ["air.example.com"])
 
@@ -120,6 +121,191 @@ struct CredentialVaultTests {
         #expect(add?.params["profile"] == .string("juniper"))
         #expect(add?.params["secret"]?.object?["password"] == .string("made-up-pass"))
         #expect(model.message == nil)
+    }
+
+    @Test func websitesListWhatAnAgentCanUseThereAndTheWalletHoldsEachCardOnce() async throws {
+        let model = await demoVault()
+        #expect(model.sites.map(\.name) == ["example.com", "parts.example.net", "shop.example.org"])
+        let shop = try #require(model.site("https://shop.example.org"))
+        #expect(shop.kinds == [.payment, .address])
+        #expect(shop.hasLocalItems)
+        #expect(model.wallet.map(\.label) == ["Card ending 1881", "Everyday Visa ending 4242", "Home"],
+                "Cards then addresses, each once however many websites use it")
+        #expect(model.wallet.first { $0.label == "Home" }?.sites == ["shop.example.org", "parts.example.net"])
+    }
+
+    @Test func oneSaveStoresEachPickedPartAndCopiesASavedAddressInsteadOfTypingIt() async throws {
+        let service = RecordingVault()
+        let model = await demoVault(service)
+        let home = try #require(model.wallet.first { $0.label == "Home" })
+        let add = CredentialVaultAddModel(vault: model, parts: [.login, .card, .address])
+        #expect(add.addressChoice == .saved(home.id), "A saved address is picked to start with")
+        add.sites = ["store.example.com/checkout"]
+        add.cardChoice = .new
+        add.typing.identifier = "sam@example.com"
+        add.typing.password = "made-up-pass"
+        add.typing.cardNumber = "4242 4242 4242 4242"
+        add.typing.month = "8"
+        add.typing.year = "2030"
+        add.typing.securityCode = "123"
+
+        #expect(await add.save())
+        let adds = service.calls.filter { $0.method == "vault.add" }
+        #expect(adds.map { $0.params["kind"] } == [.string("login"), .string("payment")])
+        #expect(adds.allSatisfy { $0.params["origin"] == .string("https://store.example.com") })
+        #expect(adds.allSatisfy { $0.params["profile"] == .string("default") })
+        let link = try #require(service.links.first)
+        #expect(service.links.count == 1)
+        #expect(link["profile"] == .string("default"))
+        #expect(link["item_ids"] == .array([.string(home.firstItemID)]))
+        #expect(link["origins"] == .array([.string("https://store.example.com")]))
+        #expect(link.keys.sorted() == ["item_ids", "origins", "profile"], "No secret goes with a copy")
+        #expect(model.site("https://store.example.com")?.kinds == [.login, .payment, .address])
+        #expect(add.typing.password.isEmpty && add.typing.cardNumber.isEmpty, "Secrets go once they're saved")
+    }
+
+    @Test func aPartThatFailsStaysAndTryingAgainSendsOnlyThatPart() async {
+        let service = RecordingVault()
+        service.failsNextAdd = "payment"
+        let model = await demoVault(service)
+        let add = CredentialVaultAddModel(vault: model, site: "https://store.example.com", parts: [.login, .card])
+        add.cardChoice = .new
+        add.typing.identifier = "sam"
+        add.typing.password = "made-up-pass"
+        add.typing.cardNumber = "4242424242424242"
+        add.typing.month = "8"
+        add.typing.year = "30"
+        add.typing.securityCode = "123"
+
+        #expect(await add.save() == false)
+        #expect(add.saved == [.login])
+        #expect(add.failed == .card)
+        #expect(add.message?.contains("card didn't save") == true)
+        #expect(add.typing.cardNumber == "4242424242424242", "What was typed stays to try again")
+        #expect(add.typing.password.isEmpty, "The saved login's password goes at once")
+        #expect(add.saveTitle == "Save the Card")
+
+        #expect(await add.save())
+        let logins = service.calls.filter { $0.method == "vault.add" && $0.params["kind"] == .string("login") }
+        #expect(logins.count == 1, "The login isn't sent twice")
+        #expect(model.site("https://store.example.com")?.kinds == [.login, .payment])
+    }
+
+    @Test func nothingIsSentWhileAPartIsIncomplete() async {
+        let service = RecordingVault()
+        let model = await demoVault(service)
+        let add = CredentialVaultAddModel(vault: model, site: "store.example.com", parts: [.login, .card])
+        add.cardChoice = .new
+        add.typing.identifier = "sam"
+        add.typing.password = "made-up-pass"
+        add.typing.cardNumber = "12"
+
+        #expect(await add.save() == false)
+        #expect(add.failed == .card)
+        #expect(add.message == CredentialVault.EntryProblem.cardNumber.message)
+        #expect(!service.calls.contains { $0.method == "vault.add" }, "The login waits for the card to be right")
+        #expect(add.saved.isEmpty)
+    }
+
+    @Test func withoutTheCopyRouteSavedCardsArentOffered() async {
+        let service = RecordingVault()
+        service.demo.linksItems = false
+        let model = await demoVault(service)
+        #expect(!model.canLink)
+        let add = CredentialVaultAddModel(vault: model, parts: [.card, .address])
+        #expect(add.savedCards.isEmpty && add.savedAddresses.isEmpty)
+        #expect(add.cardChoice == .new && add.addressChoice == .new)
+    }
+
+    @Test func aSavedCardGoesOnAnotherWebsiteOnceAndItsCopyWithoutOneGoes() async throws {
+        let service = RecordingVault()
+        let model = await demoVault(service)
+        let unlinked = try #require(model.groups.first { $0.label == "Card ending 1881" })
+        #expect(await model.use(unlinked, on: "air.example.com"))
+        let linked = try #require(model.group(unlinked.id))
+        #expect(linked.origins == ["https://air.example.com"])
+        #expect(linked.items.allSatisfy { $0.origin != nil }, "A copy no website can use is removed")
+
+        let count = model.items.count
+        #expect(await model.use(linked, on: "https://air.example.com/"))
+        #expect(model.items.count == count)
+        #expect(service.links.count == 1, "A website it's already on isn't asked for again")
+        #expect(await model.use(linked, on: "not a site") == false)
+        #expect(model.message == CredentialVault.EntryProblem.site.message)
+    }
+
+    @Test func aCopyThatCantBeMadeSaysWhy() async throws {
+        let service = RecordingVault()
+        let model = await demoVault(service)
+        let unlinked = try #require(model.groups.first { $0.label == "Card ending 1881" })
+        service.demo.linksItems = false
+        #expect(await model.use(unlinked, on: "air.example.com") == false)
+        #expect(model.message == CredentialVaultModel.linkFailure(WorkspaceClientError.unavailable(.unsupportedOperation)))
+        #expect(model.group(unlinked.id)?.origins.isEmpty == true)
+    }
+
+    @Test func theWebsiteHermesWritesBackCountsHoweverItsSpelled() async throws {
+        let service = RecordingVault()
+        service.echoesOrigins = { $0.replacingOccurrences(of: "air.", with: "AIR.") + "/" }
+        let model = await demoVault(service)
+        let unlinked = try #require(model.groups.first { $0.label == "Card ending 1881" })
+        #expect(await model.use(unlinked, on: "air.example.com"), "https://AIR.example.com/ is the website asked for")
+    }
+
+    @Test func aSavedChoiceThatsGoneIsTypedInstead() async throws {
+        let model = await demoVault()
+        let add = CredentialVaultAddModel(vault: model, site: "store.example.com", parts: [.card])
+        guard case .saved(let id) = add.cardChoice, let card = model.group(id) else {
+            Issue.record("A saved card starts picked")
+            return
+        }
+        await model.remove(card)
+        #expect(await add.save() == false)
+        #expect(add.cardChoice == .new, "Its fields show again")
+        #expect(add.message == CredentialVault.EntryProblem.cardNumber.message)
+    }
+
+    @Test func aCheckThatCantReachTheComputerKeepsWhatTheLastOneFound() async {
+        let service = RecordingVault()
+        let model = await demoVault(service)
+        #expect(model.canLink)
+        service.cantCheck = true
+        await model.load()
+        #expect(model.canLink, "A moment without the plugin isn't an old plugin")
+    }
+
+    @Test func aRemoveThatFailsSaysSo() async throws {
+        let service = RecordingVault()
+        let model = await demoVault(service)
+        let parts = try #require(model.site("https://parts.example.net"))
+        service.failsRemoves = true
+        #expect(await model.remove(parts) == false)
+        #expect(model.message != nil)
+        #expect(model.site("https://parts.example.net") != nil)
+    }
+
+    @Test func stoppingOneWebsiteKeepsTheOthersAndTheLastOneStays() async throws {
+        let model = await demoVault()
+        let everyday = try #require(model.groups.first { $0.label == "Everyday Visa ending 4242" })
+        await model.stop(everyday, on: "https://parts.example.net")
+        let left = try #require(model.group(everyday.id))
+        #expect(left.origins == ["https://shop.example.org"])
+        await model.stop(left, on: "https://shop.example.org")
+        #expect(model.group(everyday.id)?.origins == ["https://shop.example.org"], "Remove, which asks first, takes the last one")
+    }
+
+    @Test func removingAWebsiteRemovesOnlyItsOwnCopies() async throws {
+        let model = await demoVault()
+        let parts = try #require(model.site("https://parts.example.net"))
+        await model.remove(parts)
+        #expect(model.site("https://parts.example.net") == nil)
+        #expect(model.wallet.first { $0.label == "Everyday Visa ending 4242" }?.sites == ["shop.example.org"])
+        #expect(model.wallet.first { $0.label == "Home" }?.sites == ["shop.example.org"])
+    }
+
+    @Test func theCopyRouteIsThePluginsVaultLink() {
+        #expect(DirectHermesNativePluginClient.responseBudget(.vaultLink)?.path == "/api/plugins/loopdy/native/vault/link")
+        #expect(CredentialVault.linkFeature == "native-vault-link-v1")
     }
 
     @Test func anOlderHermesSaysToUpdate() async {
@@ -207,13 +393,46 @@ struct CredentialVaultImportTests {
 }
 
 @MainActor
+private func demoVault(_ service: any CredentialVaultService = DemoCredentialVaultService()) async -> CredentialVaultModel {
+    let model = CredentialVaultModel(service: service, agents: [.init(id: "default", name: "Default")], agentID: "default")
+    await model.load()
+    return model
+}
+
+@MainActor
 private final class RecordingVault: CredentialVaultService {
     let demo = DemoCredentialVaultService()
     var calls: [(method: String, params: [String: BighelpJSONValue])] = []
+    var links: [[String: BighelpJSONValue]] = []
+    /// The next `vault.add` of this kind fails, as a computer that stops answering would.
+    var failsNextAdd: String?
+    var failsRemoves = false
+    /// The plugin couldn't be asked whether it copies.
+    var cantCheck = false
+    /// How the copy route writes back each website.
+    var echoesOrigins: (String) -> String = { $0 }
 
     func call(_ method: String, params: [String: BighelpJSONValue]) async throws -> BighelpJSONValue {
         calls.append((method, params))
+        if method == "vault.add", let kind = failsNextAdd, params["kind"]?.string == kind {
+            failsNextAdd = nil
+            throw DirectHermesError.notConnected
+        }
+        if method == "vault.remove", failsRemoves { throw DirectHermesError.notConnected }
         return try await demo.call(method, params: params)
+    }
+
+    func canLink() async -> Bool? { cantCheck ? nil : await demo.canLink() }
+
+    func link(_ payload: [String: BighelpJSONValue]) async throws -> [String: BighelpJSONValue] {
+        links.append(payload)
+        let reply = try await demo.link(payload)
+        let copies = (reply["copies"]?.array ?? []).map { copy -> BighelpJSONValue in
+            guard var row = copy.object, let origin = row["origin"]?.string else { return copy }
+            row["origin"] = .string(echoesOrigins(origin))
+            return .object(row)
+        }
+        return ["copies": .array(copies)]
     }
 }
 

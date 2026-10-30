@@ -597,6 +597,18 @@ only (`Bighelp/Vault`): `vault.list`/`vault.sources` for labels, never values;
 these). A secret typed or imported here is sent once and never stored. CSV
 imports are read in memory where the file is and show only sites and usernames.
 
+Hermes binds each local item to one origin, so an item used on several websites
+is several copies under one name (`CredentialVaultGroup`); the vault shows them
+as one card or address in the Wallet, and groups every copy by website
+(`CredentialVaultSite`). Hermes can't change or copy an item, and the app never
+reads a secret back, so the plugin's `vault/link` route (`native-vault-link-v1`)
+copies saved cards and addresses to more websites on the computer, in the
+agent's own vault: the phone sends item IDs and websites, never a card number.
+A copy that's already there comes back `existing`, so asking again is safe. Add
+a Website (`CredentialVaultAddModel`) checks every part before it sends any,
+then sends them one by one; a part that fails stays, and trying again sends
+only what isn't saved yet.
+
 During a browser task Hermes asks the person through server requests:
 `vault.code` (a site's one-time code), `vault.save_login` (a login to save for
 the page's origin; the answer is JSON `{identifier, password}`) and

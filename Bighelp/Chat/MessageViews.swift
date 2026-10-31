@@ -54,7 +54,9 @@ struct TimelineSenderResolver {
            let reply = ChatReplyQuote.split(text) {
             // The quote above the bubble speaks for itself.
             description = reply.body
-        } else if item.role == .assistant, case .message(let text) = item.content {
+        } else if item.role == .assistant, case .message(let raw) = item.content {
+            // Files still to come have their own tile and label: never read a host path aloud.
+            let text = item.attachments.isEmpty ? DirectHermesGeneratedMediaClient.pendingFiles(raw, role: .assistant).text : raw
             let prose = ReferenceCodec.decode(text).prose
             let projection = ChatCardMessageProjection(source: prose, role: .assistant)
             let hasOnlyText = projection.segments.allSatisfy { if case .markdown = $0 { true } else { false } }
@@ -161,10 +163,10 @@ struct TimelineItemView: View {
                 }
             } else if !pendingFiles.fileNames.isEmpty {
                 if pendingFiles.text.isEmpty {
-                    PendingAgentFilesView(fileNames: pendingFiles.fileNames)
+                    pendingFilesView(pendingFiles.fileNames)
                         .alignmentGuide(.messageContentBottom) { $0[.bottom] }
                 } else {
-                    PendingAgentFilesView(fileNames: pendingFiles.fileNames)
+                    pendingFilesView(pendingFiles.fileNames)
                 }
             }
             switch item.content {
@@ -235,6 +237,14 @@ struct TimelineItemView: View {
         return DirectHermesGeneratedMediaClient.pendingFiles(text, role: item.role)
     }
 
+    /// Loading tiles, or why the files stopped loading with Try again.
+    private func pendingFilesView(_ fileNames: [String]) -> some View {
+        let id = item.id
+        return PendingAgentFilesView(fileNames: fileNames, failure: item.metadata.fileFailure,
+                                     isStreaming: item.metadata.delivery == "Streaming",
+                                     onRetry: fileRetry.map { action in { action.retry(id) } })
+    }
+
     private var attachmentGallery: some View {
         ChatAttachmentGallery(attachments: item.attachments, alignsTrailing: item.role == .human)
             .opacity(pendingSend == nil ? 1 : 0.62)
@@ -298,6 +308,7 @@ struct TimelineItemView: View {
     @Environment(\.bighelpUIV3Enabled) private var uiV3Enabled
     @Environment(\.chatMessageContinuesGroup) private var continuesGroup
     @Environment(\.chatMessageContinuesPrevious) private var continuesPrevious
+    @Environment(\.chatAgentFileRetry) private var fileRetry
 }
 
 private struct PendingSendStatusView: View {

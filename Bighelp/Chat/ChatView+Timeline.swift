@@ -67,6 +67,11 @@ extension ChatView {
             }
         }
     }
+    /// Try again on a message whose files stopped loading; it reaches the chat's model.
+    private var agentFileRetry: ChatAgentFileRetry {
+        ChatAgentFileRetry { [weak model] id in model?.retryAgentFiles(itemID: id) }
+    }
+
     var timeline: some View {
         var transcript: ChatTranscriptCanvasCache.Canvas?
         let rows = canvasRows {
@@ -95,6 +100,7 @@ extension ChatView {
                          ? ChatMessageGrouping.groupedSpacing : canvasRowBottomSpacing(row))
                 .environment(\.chatMessageContinuesGroup, groupedIDs.contains(row.id))
                 .environment(\.chatMessageContinuesPrevious, continuedIDs.contains(row.id))
+                .environment(\.chatAgentFileRetry, agentFileRetry)
         }
         .simultaneousGesture(TapGesture().onEnded { dismissKeyboard() })
         // Only the timeline's rows share one loader (sheets over the chat keep their own).

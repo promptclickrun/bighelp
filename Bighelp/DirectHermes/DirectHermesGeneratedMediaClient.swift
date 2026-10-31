@@ -66,8 +66,8 @@ final class DirectHermesGeneratedMediaClient: GeneratedMediaResolving, AgentAtta
                 resolved.append(.init(id: item.id, text: cached.text, attachments: cached.attachments))
                 continue
             }
-            if item.role == .assistant, item.text.contains("MEDIA:"),
-               let native = try await resolveNatively(item, agentID: agentID, storedID: storedID) {
+            let asksPlugin = item.role == .assistant && item.text.contains("MEDIA:")
+            if asksPlugin, let native = try await resolveNatively(item, agentID: agentID, storedID: storedID) {
                 if !native.attachments.isEmpty {
                     await cache?.store(.init(text: native.text, attachments: native.attachments), for: key)
                 }
@@ -81,8 +81,15 @@ final class DirectHermesGeneratedMediaClient: GeneratedMediaResolving, AgentAtta
             }
             var seen = Set<Data>()
             let unique = markers.filter { seen.insert(Data($0.path.utf8)).inserted }
-            let attachments = try await fetch(unique.map(\.path), agentID: agentID, storedID: storedID,
+            let attachments: [ChatAttachment]
+            do {
+                attachments = try await fetch(unique.map(\.path), agentID: agentID, storedID: storedID,
                                               messageID: item.role == .human ? item.id : nil)
+            } catch let error where asksPlugin && !(error is CancellationError)
+                        && ![.unreachable, .tooBig].contains(AgentFileFailure(error)) {
+                // Without the plugin's route only Hermes' caches and working folder can be read.
+                throw AgentFileLoadError(failure: .updatePlugin)
+            }
             // Remove only references whose bytes were actually delivered. Preserve
             // every other character, including failed or unsupported references.
             let paths = Set(unique.prefix(attachments.count).map { Data($0.path.utf8) })
@@ -206,22 +213,37 @@ final class DirectHermesGeneratedMediaClient: GeneratedMediaResolving, AgentAtta
         guard let rows = response["items"]?.array, rows.count == 1, let row = rows[0].object,
               row["itemId"]?.string == item.id, let text = row["text"]?.string,
               let listed = row["attachments"]?.array else { throw WorkspaceClientError.invalidResponse }
+        // Newer plugins say why a file didn't come (`unavailable`); older ones send nothing.
+        var failure = row["unavailable"]?.array?.lazy.compactMap { $0.object?["reason"]?.string }
+            .first.map(AgentFileFailure.init(pluginReason:))
         var attachments: [ChatAttachment] = []
         var total = 0
         for value in listed.prefix(GeneratedMediaResolution.maximumArtifactCount) {
             guard let meta = value.object, let id = meta["id"]?.string, let name = meta["fileName"]?.string,
-                  let mime = meta["mimeType"]?.string, let size = meta["byteCount"]?.integer,
-                  (1...ChatAttachment.maximumAgentBytes).contains(size) else { throw WorkspaceClientError.invalidResponse }
+                  let mime = meta["mimeType"]?.string, let size = meta["byteCount"]?.integer, size > 0
+            else { throw WorkspaceClientError.invalidResponse }
             let sum = total.addingReportingOverflow(size)
-            guard !sum.overflow, sum.partialValue <= GeneratedMediaResolution.maximumTotalBytes else { break }
+            guard size <= ChatAttachment.maximumAgentBytes, !sum.overflow,
+                  sum.partialValue <= GeneratedMediaResolution.maximumTotalBytes else {
+                failure = .tooBig
+                break
+            }
             total = sum.partialValue
             let data = try await fetchNative(id, agentID: agentID, size: size)
-            let attachment = try Self.nativeAttachment(id: id, fileName: name, mimeType: mime, data: data)
-            if mime.hasPrefix("video/") { try await Self.validateVideo(attachment) }
+            let attachment: ChatAttachment
+            do {
+                attachment = try Self.nativeAttachment(id: id, fileName: name, mimeType: mime, data: data)
+                if mime.hasPrefix("video/") { try await Self.validateVideo(attachment) }
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                throw AgentFileLoadError(failure: .unreadable)
+            }
             attachments.append(attachment)
         }
         // A refused or empty resolution keeps the agent's original text readable.
-        return .init(id: item.id, text: attachments.isEmpty ? item.text : text, attachments: attachments)
+        return .init(id: item.id, text: attachments.isEmpty ? item.text : text, attachments: attachments,
+                     failure: attachments.isEmpty ? failure : nil)
     }
 
     /// One file a Feed post carries (plugin `native-agent-board-files-v1`). The phone names
@@ -392,7 +414,8 @@ final class DirectHermesGeneratedMediaClient: GeneratedMediaResolving, AgentAtta
     /// The files a finished message names that haven't reached this device
     /// yet, and its words without them: the files show as loading tiles.
     static func pendingFiles(_ text: String, role: TimelineRole) -> (text: String, fileNames: [String]) {
-        guard role == .assistant else { return (text, []) }
+        // Every row's body asks; most messages name no file.
+        guard role == .assistant, ChatTextMarker.mayContain("MEDIA:", in: text) else { return (text, []) }
         let markers = mediaMarkers(text)
         guard !markers.isEmpty else { return (text, []) }
         let lines = Set(markers.map { Data($0.line.utf8) })
@@ -416,15 +439,6 @@ final class DirectHermesGeneratedMediaClient: GeneratedMediaResolving, AgentAtta
             (Data($0.line.utf8), "Attachment unavailable: " + URL(fileURLWithPath: $0.path).lastPathComponent)
         }, uniquingKeysWith: { first, _ in first })
         guard !labels.isEmpty else { return text }
-        return text.components(separatedBy: "\n").map { labels[Data($0.utf8)] ?? $0 }.joined(separator: "\n")
-    }
-
-    /// What a finished message says once its files still can't be read.
-    static func unavailableMessageText(_ text: String) -> String {
-        let labels = Dictionary(mediaMarkers(text).map {
-            (Data($0.line.utf8), "Couldn't load " + URL(fileURLWithPath: $0.path).lastPathComponent
-                + ". Reopen this chat to try again.")
-        }, uniquingKeysWith: { first, _ in first })
         return text.components(separatedBy: "\n").map { labels[Data($0.utf8)] ?? $0 }.joined(separator: "\n")
     }
 

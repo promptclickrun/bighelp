@@ -365,10 +365,13 @@ final class DirectHermesConversationClient: StreamingConversationClient, Stoppab
     }
 
     func rebind(_ rpc: any DirectHermesRPC) {
+        let reconnected = !connected
         if !connected { isHydrating = true }
         self.rpc = rpc
         connected = true
         model?.reconcileNativeReactionConnectionState(from: self)
+        // Files the computer didn't answer for are asked for again on the new connection.
+        if reconnected { model?.forgetUnreachableAgentFiles(from: self) }
     }
 
     func rebind(_ rpc: any DirectHermesRPC,

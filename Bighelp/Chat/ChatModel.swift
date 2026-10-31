@@ -216,6 +216,9 @@ final class ChatModel {
     /// Messages whose files reached this device, by the saved text that named
     /// them, so a history reload of that same text keeps the files on screen.
     @ObservationIgnored var deliveredFileSources: [String: String] = [:]
+    /// Messages whose files stopped loading, by the text that named them and why. A reload
+    /// of that same text shows the reason and Try again, not loading tiles again.
+    @ObservationIgnored var agentFileFailures: [String: (text: String, failure: AgentFileFailure)] = [:]
     @ObservationIgnored var hasDeferredTranscriptChanges = false
 
     var transcriptProjectionWorkCount = 0

@@ -24,8 +24,8 @@ extension DirectHermesConversationClient {
             // refresh into a false successful no-op.
             self.recoveryTask = nil
         }
-        attachmentAttempts.removeAll()
-        resetMediaRetries()
+        // File loads go on through a recovery on the same connection, their tries still counted: a chat that
+        // recovers often (a reread, opening it again) once kept a failing file on its loading tile for good.
         let owner = generation
         isHydrating = true
         let task = Task { @MainActor [weak self] in

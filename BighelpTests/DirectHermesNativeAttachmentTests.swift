@@ -131,6 +131,63 @@ struct DirectHermesNativeAttachmentTests {
         #expect(result.attachments.isEmpty)
     }
 
+    /// Newer plugins say why a file didn't come; the message shows that reason.
+    @Test func theHostSaysWhyAFileDidntCome() async throws {
+        let owner = try makeOwner()
+        let http = AttachmentHTTP(features: ["native-agent-attachments-v1"])
+        http.file = nil
+        http.unavailableReason = "missing"
+        let workspace = DirectHermesWorkspaceClient(rpc: NoRPC(), http: http, owner: owner,
+                                                    capabilities: .init(owner: owner), currentOwner: { owner })
+        let resolver = DirectHermesGeneratedMediaClient(workspace: workspace, owner: owner, currentOwner: { owner })
+        let text = "Here.\nMEDIA:/srv/demo/screens/panel.png"
+        let result = try #require(try await resolver.resolve(agentID: "default", storedID: "stored",
+                                                             items: [.init(id: "m1", text: text)]).first)
+        #expect(result.attachments.isEmpty)
+        #expect(result.text == text)
+        #expect(result.failure == .missing)
+    }
+
+    /// A file bigger than this device keeps says so, without downloading any of it.
+    @Test func aFileTooBigForThisDeviceSaysSo() async throws {
+        let owner = try makeOwner()
+        let http = AttachmentHTTP(features: ["native-agent-attachments-v1"])
+        http.file = Data(repeating: 1, count: 8)
+        http.byteCount = ChatAttachment.maximumAgentBytes + 1
+        let workspace = DirectHermesWorkspaceClient(rpc: NoRPC(), http: http, owner: owner,
+                                                    capabilities: .init(owner: owner), currentOwner: { owner })
+        let resolver = DirectHermesGeneratedMediaClient(workspace: workspace, owner: owner, currentOwner: { owner })
+        let result = try #require(try await resolver.resolve(agentID: "default", storedID: "stored",
+            items: [.init(id: "m1", text: "MEDIA:/Users/me/Downloads/Report.pdf")]).first)
+        #expect(result.attachments.isEmpty)
+        #expect(result.failure == .tooBig)
+        #expect(!http.requests.contains { $0.path.hasSuffix("/fetch") })
+    }
+
+    /// With no plugin route, Hermes' own reads reach only its caches and working folder: a file
+    /// elsewhere says to update the plugin.
+    @Test func withoutThePluginRouteAFileElsewhereSaysToUpdateThePlugin() async throws {
+        let owner = try makeOwner()
+        let http = AttachmentHTTP(features: [])
+        http.stockFailure = WorkspaceClientError.rejected(code: "forbidden")
+        let workspace = DirectHermesWorkspaceClient(rpc: NoRPC(), http: http, owner: owner,
+                                                    capabilities: .init(owner: owner), currentOwner: { owner })
+        let resolver = DirectHermesGeneratedMediaClient(workspace: workspace, owner: owner, currentOwner: { owner })
+        await #expect(throws: AgentFileLoadError(failure: .updatePlugin)) {
+            try await resolver.resolve(agentID: "default", storedID: "stored",
+                                       items: [.init(id: "m1", text: "MEDIA:/srv/demo/screens/panel.png")])
+        }
+        // A computer that doesn't answer says that instead.
+        http.stockFailure = WorkspaceClientError.transportUnavailable
+        do {
+            _ = try await resolver.resolve(agentID: "default", storedID: "stored",
+                                           items: [.init(id: "m1", text: "MEDIA:/srv/demo/screens/panel.png")])
+            Issue.record("Expected a failure")
+        } catch {
+            #expect(AgentFileFailure(error) == .unreachable)
+        }
+    }
+
     @Test func hostsWithoutThePluginRouteFallBackToStockMediaReads() async throws {
         let owner = try makeOwner()
         let http = AttachmentHTTP(features: [])
@@ -248,6 +305,12 @@ private final class AttachmentHTTP: DirectHermesAuthenticatedHTTP, DirectHermesN
     /// Offsets whose first request times out.
     var failOnce: Set<Int> = []
     var fetchDelay: Duration?
+    /// The size the resolve answer names, when it differs from the file's.
+    var byteCount: Int?
+    /// The plugin's reason for a file it didn't send (`unavailable`).
+    var unavailableReason: String?
+    /// What Hermes' own media read answers.
+    var stockFailure: any Error = WorkspaceClientError.transportUnavailable
     private(set) var fetchedOffsets: [Int] = []
     private(set) var mostAtOnce = 0
     private var inFlight = 0
@@ -255,7 +318,7 @@ private final class AttachmentHTTP: DirectHermesAuthenticatedHTTP, DirectHermesN
 
     func request(_ request: DirectHermesHTTPRequest) async throws -> BighelpJSONValue {
         requests.append(request)
-        throw WorkspaceClientError.transportUnavailable
+        throw stockFailure
     }
 
     func nativeResponse(_ request: DirectHermesHTTPRequest,
@@ -286,11 +349,16 @@ private final class AttachmentHTTP: DirectHermesAuthenticatedHTTP, DirectHermesN
                 let item = try #require(body["items"]?.array?.first?.object)
                 let attachments: [BighelpJSONValue] = file.map { data in
                     [.object(["id": .string(String(repeating: "c", count: 32)), "fileName": .string("Report.pdf"),
-                              "mimeType": .string("application/pdf"), "byteCount": .integer(data.count)])]
+                              "mimeType": .string("application/pdf"), "byteCount": .integer(byteCount ?? data.count)])]
                 } ?? []
-                object = ["items": .array([.object(["itemId": item["itemId"]!,
+                var row: [String: BighelpJSONValue] = ["itemId": item["itemId"]!,
                     "text": .string(file == nil ? item["text"]!.string! : "Here is the report."),
-                    "attachments": .array(attachments)])])]
+                    "attachments": .array(attachments)]
+                if let unavailableReason {
+                    row["unavailable"] = .array([.object(["fileName": .string("panel.png"),
+                                                          "reason": .string(unavailableReason)])])
+                }
+                object = ["items": .array([.object(row)])]
             } else {
                 let data = try #require(file)
                 let offset = try #require(body["offset"]?.integer)

@@ -139,6 +139,7 @@ final class ChatModel {
                 if oldValue {
                     lastTurnEndedAt = Date()
                     flushPersistence()
+                    if let native = nativeConversationClient { forgetAgentFileFailures(from: native, onlyRefused: true) }
                 }
             }
         }
@@ -617,6 +618,8 @@ final class ChatModel {
         guard client is NativeWorkspaceUnavailableClient || nativeConversationClient === native else { return false }
         client = native
         native.model = self
+        // A client attached later can already be connected, so its rebind never counts as a reconnect.
+        forgetAgentFileFailures(from: native)
         if let context = native.sessionContext { reconcileSessionContext(context) }
         scheduleNativeGoalControlRefresh()
         BighelpVisibleChats.shared.identityChanged()

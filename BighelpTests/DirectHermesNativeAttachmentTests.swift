@@ -164,6 +164,21 @@ struct DirectHermesNativeAttachmentTests {
         #expect(!http.requests.contains { $0.path.hasSuffix("/fetch") })
     }
 
+    /// A file too big for this device leaves out only that file: the files after it still load.
+    @Test func aFileTooBigDoesntStopTheFilesAfterIt() async throws {
+        let owner = try makeOwner()
+        let http = AttachmentHTTP(features: ["native-agent-attachments-v1"])
+        let pdf = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 10, height: 10)).pdfData { $0.beginPage() }
+        http.file = pdf
+        http.oversizedFirst = true
+        let workspace = DirectHermesWorkspaceClient(rpc: NoRPC(), http: http, owner: owner,
+                                                    capabilities: .init(owner: owner), currentOwner: { owner })
+        let resolver = DirectHermesGeneratedMediaClient(workspace: workspace, owner: owner, currentOwner: { owner })
+        let result = try #require(try await resolver.resolve(agentID: "default", storedID: "stored",
+            items: [.init(id: "m1", text: "MEDIA:/Users/me/Movies/Big.mov\nMEDIA:/Users/me/Downloads/Report.pdf")]).first)
+        #expect(result.attachments.map(\.fileName) == ["Report.pdf"])
+    }
+
     /// With no plugin route, Hermes' own reads reach only its caches and working folder: a file
     /// elsewhere says to update the plugin.
     @Test func withoutThePluginRouteAFileElsewhereSaysToUpdateThePlugin() async throws {
@@ -309,6 +324,8 @@ private final class AttachmentHTTP: DirectHermesAuthenticatedHTTP, DirectHermesN
     var byteCount: Int?
     /// The plugin's reason for a file it didn't send (`unavailable`).
     var unavailableReason: String?
+    /// The resolve answer lists a file too big for this device before `file`.
+    var oversizedFirst = false
     /// What Hermes' own media read answers.
     var stockFailure: any Error = WorkspaceClientError.transportUnavailable
     private(set) var fetchedOffsets: [Int] = []
@@ -347,10 +364,15 @@ private final class AttachmentHTTP: DirectHermesAuthenticatedHTTP, DirectHermesN
                                                  "byteCount": .integer(data.count)])]
             } else if request.path.hasSuffix("/resolve") {
                 let item = try #require(body["items"]?.array?.first?.object)
-                let attachments: [BighelpJSONValue] = file.map { data in
+                var attachments: [BighelpJSONValue] = file.map { data in
                     [.object(["id": .string(String(repeating: "c", count: 32)), "fileName": .string("Report.pdf"),
                               "mimeType": .string("application/pdf"), "byteCount": .integer(byteCount ?? data.count)])]
                 } ?? []
+                if oversizedFirst {
+                    attachments.insert(.object(["id": .string(String(repeating: "e", count: 32)),
+                                                "fileName": .string("Big.mov"), "mimeType": .string("video/quicktime"),
+                                                "byteCount": .integer(ChatAttachment.maximumAgentBytes + 1)]), at: 0)
+                }
                 var row: [String: BighelpJSONValue] = ["itemId": item["itemId"]!,
                     "text": .string(file == nil ? item["text"]!.string! : "Here is the report."),
                     "attachments": .array(attachments)]

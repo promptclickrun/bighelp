@@ -223,10 +223,11 @@ final class DirectHermesGeneratedMediaClient: GeneratedMediaResolving, AgentAtta
                   let mime = meta["mimeType"]?.string, let size = meta["byteCount"]?.integer, size > 0
             else { throw WorkspaceClientError.invalidResponse }
             let sum = total.addingReportingOverflow(size)
+            // Only this file stays out: the ones after it still load.
             guard size <= ChatAttachment.maximumAgentBytes, !sum.overflow,
                   sum.partialValue <= GeneratedMediaResolution.maximumTotalBytes else {
                 failure = .tooBig
-                break
+                continue
             }
             total = sum.partialValue
             let data = try await fetchNative(id, agentID: agentID, size: size)

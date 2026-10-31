@@ -182,10 +182,12 @@ extension ChatView {
             ChatAgentTalkRail(talk: talk, chatAgentID: model.agentID, senderResolver: senderResolver,
                               live: model.agentTalkLive.activities, loadSteps: model.agentTalkStepsLoader)
         case .earlierMessage(let item):
+            // Not one of this chat's own messages: Try again couldn't reach it.
             TimelineItemView(item: item, onApprovalTap: onApprovalTap,
                              pendingSend: model.pendingMidSessionBehavior(for: item.id).map(ChatPendingSend.midSession),
                              senderResolver: senderResolver, showsSenderName: model.isBotMode,
                              mentionIdentities: model.messageMentionIdentities)
+                .environment(\.chatAgentFileRetry, nil)
         case .staged(let item):
             TimelineItemView(item: item, onApprovalTap: onApprovalTap, pendingSend: .staged,
                              senderResolver: senderResolver, mentionIdentities: model.messageMentionIdentities)

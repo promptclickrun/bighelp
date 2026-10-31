@@ -145,7 +145,8 @@ struct TimelineMetadata: Codable, Equatable, Sendable {
     /// kept. A live change for the message (`nativeMessageReactionSnapshots`) wins.
     var reactions: [NativeMessageReaction]?
     /// Display only, never saved: the files this message names stopped loading,
-    /// and why (`ChatModel.agentFileFailures`). A chat opened again tries again.
+    /// and why (`ChatModel.agentFileFailures`). A new connection or the chat attached again tries
+    /// again, unless the file is too big for this device.
     var fileFailure: AgentFileFailure?
 
     private enum CodingKeys: String, CodingKey {

@@ -401,15 +401,22 @@ extension ChatModel {
         updateProjectedMessage(items[index])
     }
 
-    /// A new connection: messages whose computer didn't answer load again. Other reasons
-    /// (missing, refused, too big) don't change by themselves and wait for Try again.
-    func forgetUnreachableAgentFiles(from owner: DirectHermesConversationClient) {
+    /// Messages whose files stopped load again, with their tries counted afresh. A new connection or
+    /// the chat attached again: every reason but a file too big for this device, which stays too big
+    /// (the plugin may have been updated, or the file saved since). A turn that ends (`onlyRefused`):
+    /// a reply Hermes hadn't saved yet, which it refuses until then.
+    func forgetAgentFileFailures(from owner: DirectHermesConversationClient, onlyRefused: Bool = false) {
         guard (client as? DirectHermesConversationClient) === owner else { return }
-        for (id, failed) in agentFileFailures where failed.failure == .unreachable {
+        let forgotten = agentFileFailures.filter { _, failed in
+            onlyRefused ? failed.failure == .refused : failed.failure != .tooBig
+        }.keys
+        for id in forgotten {
             agentFileFailures[id] = nil
-            guard let index = itemIndexByID[id], items[index].metadata.fileFailure != nil else { continue }
-            replaceItem(at: index, with: Self.showingFileFailure(nil, on: items[index]))
-            updateProjectedMessage(items[index])
+            if let index = itemIndexByID[id], items[index].metadata.fileFailure != nil {
+                replaceItem(at: index, with: Self.showingFileFailure(nil, on: items[index]))
+                updateProjectedMessage(items[index])
+            }
+            _ = owner.retryMessageMedia(itemID: id)
         }
     }
 

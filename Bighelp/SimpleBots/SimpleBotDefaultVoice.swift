@@ -62,7 +62,7 @@ final class SimpleBotVoiceModel {
         settings.setVoiceConversationMode(mode, computer: voice.computer, agentID: agentID, choices: voice.choices)
     }
 
-    /// Back to the default for every agent (Settings › Voice).
+    /// Back to the default for every agent (Settings › Voice › All agents).
     func useDefaultMode() {
         voice.choices.setMode(nil, computer: voice.computer, agentID: agentID)
     }
@@ -187,19 +187,12 @@ struct SimpleBotDefaultVoiceSheet: View {
             .bighelpSegmentedPicker()
             .frame(minHeight: BighelpTokens.hitTarget)
             .accessibilityIdentifier("simple-bots.default-voice.mode")
-            Text(preference.mode.detail)
-                .bighelpFont(.metadata)
-                .foregroundStyle(.secondary)
             if preference.hasOwnMode {
                 Button(String(localized: "Use the default for every agent")) { model.useDefaultMode() }
                     .accessibilityIdentifier("simple-bots.default-voice.use-default")
             }
         } header: {
             Text(botName)
-        } footer: {
-            Text(preference.hasOwnMode
-                 ? String(localized: "Just for \(botName). Settings › Voice sets the default for every other agent.")
-                 : String(localized: "\(botName) uses the default for every agent, from Settings › Voice. A choice here is just for \(botName)."))
         }
     }
 
@@ -216,10 +209,6 @@ struct SimpleBotDefaultVoiceSheet: View {
             .accessibilityIdentifier("simple-bots.default-voice.live-voice")
         } header: {
             Text(VoiceConversationMode.codexLive.title)
-        } footer: {
-            Text(settings.autoSpeakRepliesEnabled
-                 ? String(localized: "The provider and voice are just for \(botName). Auto TTS reads replies with the speech provider below.")
-                 : String(localized: "The provider and voice are just for \(botName)."))
         }
         if hostRegistry?.selectedHost != nil {
             HostPluginFeatureSection(feature: .liveVoice)

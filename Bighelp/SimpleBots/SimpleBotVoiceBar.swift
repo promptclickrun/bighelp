@@ -32,6 +32,14 @@ struct SimpleBotVoiceBar: View {
                 microphoneButton
                 endButton
             }
+            if let statusLine {
+                Text(statusLine)
+                    .bighelpFont(.metadata)
+                    .foregroundStyle(theme.secondaryText)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier("simple-bots.voice.status")
+            }
             Capsule().fill(theme.tertiaryText.opacity(0.5)).frame(width: 36, height: 4)
                 .accessibilityHidden(true)
         }
@@ -54,6 +62,19 @@ struct SimpleBotVoiceBar: View {
     }
 
     private var isLive: Bool { presentation.liveModel != nil }
+
+    /// What the call is doing, so a call that doesn't connect or ends never looks like one that works:
+    /// the step while it connects, an error, else the newest words from either side.
+    private var statusLine: String? {
+        guard let live = presentation.liveModel else {
+            return presentation.conversationMode == .codexLive
+                ? String(localized: "Full Duplex couldn't start in this chat, so this is TTS voice.") : nil
+        }
+        if let error = live.errorMessage ?? live.cleanupMessage { return error }
+        guard live.phase == .live else { return live.phase.title }
+        let words = live.assistantCaption.isEmpty ? live.userCaption : live.assistantCaption
+        return words.isEmpty ? nil : String(words.suffix(160))
+    }
 
     private var agentColor: Color {
         let mark = SimpleBotMarkStore.shared.mark(scope: scope, agentID: agentID)

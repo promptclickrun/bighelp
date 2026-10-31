@@ -14,10 +14,12 @@ State-backed relay clients explicitly negotiate `state-backed-presentation-v1`. 
 
 ## Voice
 
-Live voice is called **Full Duplex** in the app. Each agent can pick its own provider and voice in its Default
-Voice (`AgentVoiceChoices`); an agent without its own uses Settings › Voice. The voice model is the agent itself:
-the plugin builds its brief from the agent's name and `SOUL.md`, so it speaks in the first person and never says
-"your agent" or "Hermes".
+Live voice is called **Full Duplex** in the app. Each agent has one voice type (TTS or Full Duplex), provider and
+voice, kept on the device for its computer (`AgentVoiceChoices`). Settings › Voice, the bot's Default Voice in Bots
+mode and the chat's voice button all read and change the same choice; with no computer connected, Settings › Voice
+edits the defaults. The voice button starts the call at once, in both voice types, and End goes back to the chat.
+The voice model is the agent itself: the plugin builds its brief from the agent's name and `SOUL.md`, so it speaks
+in the first person and never says "your agent" or "Hermes".
 
 ### GPT-Live
 
@@ -39,8 +41,12 @@ Nothing goes through the host's feed. `GeminiLiveTranslator` turns Gemini's mess
 GPT-Live gets from `poll`, so `NativeLiveVoiceSession` routes work the same way:
 
 - `start_work` is answered at once with "started", and the request runs like any delegation (a turn in the open
-  chat, or a background task while the chat works). Its reply goes back as text that starts with `UPDATE`, and the
-  agent tells the person right away, cutting in if it is speaking.
+  chat, or a background task while the chat works). When the agent already said its line ("On it") in that turn,
+  the answer is `SILENT`, so it doesn't acknowledge twice.
+- Results go back as text that starts with `UPDATE`. Text sent to Gemini is answered at once and cuts off
+  whatever it is saying, so `GeminiLiveAudioPeer` holds each update until nobody speaks: Gemini's own speech
+  detection says the person stopped, its reply ended and its audio finished playing (`isQuiet`). Updates go one
+  at a time, so the agent never cuts off one result to read the next.
 - `check_work` is answered from the requests in flight and the last ones that finished.
 - After a cut-in, Gemini ends the abandoned turn with an empty `turnComplete` before the reply to the cut-in;
   the translator ignores it.

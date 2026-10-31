@@ -4,10 +4,11 @@ enum HostPluginFeature: String, Hashable, Sendable {
     case liveVoice, deviceAccess
 
     var capability: String { self == .liveVoice ? "native-voice-v1" : "native-device-tools-v1" }
-    var title: String { self == .liveVoice ? "Codex Live Voice" : "Device access" }
-    var detail: String {
+    var title: String { self == .liveVoice ? "bighelp plugin" : "Device access" }
+    /// Voice settings show only the plugin's status line; every voice mode needs the plugin.
+    var detail: String? {
         self == .liveVoice
-            ? "Codex Live Voice requires the bighelp plugin on your Hermes host, plus a Codex subscription signed in on that host."
+            ? nil
             : "Phone tools like Calendar, Contacts, Photos, and Location need the bighelp plugin on your Hermes host. You choose each permission separately on this \(BighelpPlatform.isMac ? "Mac" : "iPhone")."
     }
     var installIdentifier: String {
@@ -41,7 +42,9 @@ struct HostPluginFeatureSection: View {
 
     var body: some View {
         Section {
-            Text(feature.detail).fixedSize(horizontal: false, vertical: true)
+            if let detail = feature.detail {
+                Text(detail).fixedSize(horizontal: false, vertical: true)
+            }
             Label(status, systemImage: ready ? "checkmark.circle" : "puzzlepiece.extension")
                 .bighelpFont(.metadata).foregroundStyle(.secondary)
                 .accessibilityIdentifier("settings.plugin-status.\(feature.rawValue)")
@@ -73,11 +76,11 @@ struct HostPluginFeatureSection: View {
         } header: {
             Text(feature.title)
         } footer: {
-            Text(feature == .deviceAccess
-                 ? BighelpPlatform.isMac
-                    ? "Installation leaves macOS permissions off. Keep bighelp open while your agent uses this Mac."
-                    : "Installation leaves iOS permissions off. Keep bighelp open while your agent uses this iPhone."
-                 : "Voice connects directly to Hermes. Notifications are optional and set up separately.")
+            if feature == .deviceAccess {
+                Text(BighelpPlatform.isMac
+                     ? "Installation leaves macOS permissions off. Keep bighelp open while your agent uses this Mac."
+                     : "Installation leaves iOS permissions off. Keep bighelp open while your agent uses this iPhone.")
+            }
         }
         .task(id: identity) { await check() }
         .onDisappear { requestID = UUID(); setup?.cancel() }
@@ -107,7 +110,7 @@ struct HostPluginFeatureSection: View {
               let workspace = registry.selectedWorkspace, workspace.isConnected,
               let direct = workspace.nativeClient,
               let authority = workspace.savedConnection?.workspaceAuthority else {
-            status = "Connect to a Hermes host to set up this feature."
+            status = "Connect to a Hermes host to check the plugin."
             return
         }
         let generation = registry.generation

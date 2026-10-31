@@ -132,11 +132,8 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         app.buttons["chat.voice"].firstMatch.tap()
         let unavailable = app.buttons["voice.live-unavailable.use-turn-based"]
         let failed = app.buttons["live-voice.use-turn-based"]
-        let start = app.buttons["live-voice.start"]
-        if start.waitForExistence(timeout: 5), !unavailable.exists {
-            start.tap()
-            _ = failed.waitForExistence(timeout: 20)
-        }
+        // Live voice starts as its screen opens.
+        if !unavailable.waitForExistence(timeout: 5) { _ = failed.waitForExistence(timeout: 20) }
         let turnBased = unavailable.exists ? unavailable : failed
         XCTAssertTrue(turnBased.waitForExistence(timeout: 10), "A way to turn-based voice must be offered.")
         capture("voice-fallback-offered", app)
@@ -935,7 +932,6 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         app.buttons["settings.chat.voice-settings"].tap()
         let voicePlugin = app.descendants(matching: .any).matching(identifier: "settings.plugin-status.liveVoice").firstMatch
         XCTAssertTrue(voicePlugin.waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Codex Live Voice requires the bighelp plugin")).firstMatch.exists)
         capture("real-host-voice-plugin-settings-116", app)
         app.navigationBars.buttons.firstMatch.tap()
         app.navigationBars.buttons.firstMatch.tap()
@@ -1006,8 +1002,8 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         app.buttons["root.new-chat"].tap()
         XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 15))
         app.buttons["chat.voice"].tap()
-        XCTAssertTrue(app.buttons["live-voice.start"].waitForExistence(timeout: 10))
-        app.buttons["live-voice.start"].tap()
+        // Live voice starts as its screen opens: no Start tap.
+        XCTAssertTrue(app.buttons["live-voice.end"].waitForExistence(timeout: 30))
         defer {
             if app.buttons["live-voice.end"].exists { app.buttons["live-voice.end"].tap() }
             if app.buttons["live-voice.close"].exists { app.buttons["live-voice.close"].tap() }

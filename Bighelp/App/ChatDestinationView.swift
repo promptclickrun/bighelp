@@ -317,7 +317,7 @@ struct ChatDestinationView: View {
                 imageURL: profile.flatMap { agents.avatarURL(for: $0) }, permissionCenter: permissionCenter,
                 onSwitchMode: { mode in
                     // The bar is over one bot's chat: the switch is that bot's own choice.
-                    settings.setVoiceConversationMode(mode, computer: voiceComputer, agentID: agentID)
+                    settings.setVoiceConversationMode(mode, computer: voiceComputer, agentID: voiceAgentID)
                     self.voiceBar = makeVoice(mode)
                 },
                 onEnded: { withAnimation(.snappy(duration: 0.25)) { self.voiceBar = nil } }

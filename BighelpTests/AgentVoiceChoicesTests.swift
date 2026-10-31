@@ -69,7 +69,11 @@ struct AgentVoiceChoicesTests {
         settings.voiceConversationMode = .codexLive
 
         settings.useTurnBasedVoice(computer: "computer-a", agentID: "finance", choices: choices)
-        #expect(settings.voiceConversationMode == .turnBased, "No choice of its own: the default changes, as before")
+        #expect(choices.mode(computer: "computer-a", agentID: "finance") == .turnBased,
+                "The agent's own choice, the same in every mode")
+        #expect(settings.voiceConversationMode == .codexLive, "Other agents keep the default")
+        settings.useTurnBasedVoice(computer: nil, agentID: nil, choices: choices)
+        #expect(settings.voiceConversationMode == .turnBased, "Without an agent: the default changes")
 
         settings.voiceConversationMode = .codexLive
         choices.setMode(.codexLive, computer: "computer-a", agentID: "travel")
@@ -153,5 +157,30 @@ struct AgentVoiceChoicesTests {
         let voice = settings.voicePreference(computer: "computer-a", agentID: "juniper", choices: reread)
         #expect(voice.liveProvider == settings.liveVoiceProvider)
         #expect(!voice.hasOwnLiveProvider)
+    }
+
+    @Test func settingsAndBotsModeEditTheSameChoiceForAnAgent() throws {
+        let (settings, choices, defaults) = try make()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        settings.voiceConversationMode = .turnBased
+        settings.liveVoiceProvider = .codexSubscription
+
+        // Settings › Voice with Juniper picked.
+        settings.setVoiceConversationMode(.codexLive, computer: "computer-a", agentID: "juniper", choices: choices)
+        settings.setLiveProvider(.gemini, computer: "computer-a", agentID: "juniper", choices: choices)
+        settings.setLiveVoice("Charon", computer: "computer-a", agentID: "juniper", choices: choices)
+
+        // Juniper's Default Voice in Bots mode reads the same values.
+        let bot = SimpleBotVoiceModel(agentID: "juniper", voice: SimpleBotVoiceSettings(
+            settings: settings, choices: choices, computer: "computer-a", connection: { nil }, makeStore: { nil }))
+        #expect(bot.preference.mode == .codexLive)
+        #expect(bot.preference.liveProvider == .gemini)
+        #expect(bot.preference.liveVoice == "Charon")
+
+        // And a change there is what Settings shows next.
+        bot.setMode(.turnBased)
+        #expect(settings.voicePreference(computer: "computer-a", agentID: "juniper", choices: choices).mode == .turnBased)
+        #expect(settings.voiceConversationMode == .turnBased && settings.liveVoiceProvider == .codexSubscription,
+                "The defaults for every other agent stay as they were")
     }
 }

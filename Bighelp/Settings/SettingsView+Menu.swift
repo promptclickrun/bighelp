@@ -17,11 +17,25 @@ extension SettingsView {
         .listRowBackground(theme.surface)
     }
 
+    /// The agent Voice settings opens on (`VoiceSettingsView`), so the row says what that page shows.
+    var voiceSettingsAgentID: String? {
+        agents.first { $0.id == agentDirectory?.selectedAgentID }?.id
+            ?? agents.first(where: \.isDefault)?.id ?? agents.first?.id
+    }
+
+    /// The voice type that agent uses; Full Duplex names its provider (GPT-Live or Gemini Live).
+    private var voiceDetail: String {
+        let voice = settings.voicePreference(computer: workspaceConnections?.owner?.cacheScopeID,
+                                             agentID: voiceSettingsAgentID)
+        return voice.mode == .codexLive
+            ? "\(VoiceConversationMode.codexLive.title) · \(voice.liveProvider.shortTitle)"
+            : String(localized: "TTS · reads replies aloud")
+    }
+
     func menuDetail(_ section: SettingsMenuSection) -> String {
         switch section {
         case .appearance: appearanceSummary
-        case .voice: settings.voiceConversationMode == .codexLive
-            ? String(localized: "GPT Live 1 · a live conversation") : String(localized: "TTS · reads replies aloud")
+        case .voice: voiceDetail
         default: section.detail
         }
     }

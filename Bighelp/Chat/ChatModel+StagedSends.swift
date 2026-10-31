@@ -30,6 +30,15 @@ extension ChatModel {
         return nativeConversationClient.map { !$0.connected || $0.isHydrating } ?? false
     }
 
+    /// No connection at all yet: the computer is still connecting, or the app just came back.
+    var lacksSocket: Bool {
+        guard !isBotMode else { return false }
+        #if DEBUG && (targetEnvironment(simulator) || targetEnvironment(macCatalyst))
+        if ChatConnectingPreview.isConnecting { return true }
+        #endif
+        return client is NativeWorkspaceUnavailableClient || nativeConversationClient?.connected == false
+    }
+
     /// Without a connection, but not for long enough to give up on it.
     var waitsForConnection: Bool { lacksConnection && !connectionIsOverdue }
 
@@ -48,7 +57,7 @@ extension ChatModel {
         guard !lacksConnection else { return false }
         guard isSending else { return directTransportIsReady }
         return isMidSessionTurnLive && !hasExclusiveMidSessionSubmission
-            && nativeConversationClient?.preparingAttachmentID == nil
+            && nativeConversationClient.map { $0.hasAuthoritativeEventCoverage && $0.preparingAttachmentID == nil } ?? true
     }
 
     /// Moves the box into the chat, where the message waits for `drainStagedSends`; the box
@@ -98,7 +107,9 @@ extension ChatModel {
     private func drainStagedSends(_ id: UUID) async {
         defer { if stagedSendDrain?.id == id { stagedSendDrain = nil } }
         while let next = stagedSends.first {
-            guard await waitForConnection(until: { takesMessageNow }), stagedSends.first?.id == next.id else {
+            let ready = await waitForConnection(until: { takesMessageNow || failureMessage != nil })
+            // A send ahead of them failed (and says why): the rest don't go out without it.
+            guard ready, failureMessage == nil, stagedSends.first?.id == next.id else {
                 returnStagedSendsToBox()
                 return
             }
@@ -141,28 +152,28 @@ extension ChatModel {
     /// The chat never came for the staged messages: they go back in the box, oldest first and
     /// before anything typed since, so nothing is lost.
     func returnStagedSendsToBox() {
-        let staged = stagedSends
-        guard !staged.isEmpty else { return }
-        stagedSends = []
-        putBackInBox(staged.map(\.outgoing.message)
-                        .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-                        .joined(separator: "\n\n"),
-                     attachments: staged.flatMap(\.outgoing.attachments),
-                     orderedAttachments: staged.flatMap(\.outgoing.orderedAttachments))
+        let count = stagedSends.count
+        guard count > 0 else { return }
+        putBackInBox("", attachments: [], orderedAttachments: [])
         // A send that stopped on its own (an attachment the chat can't send) already said why.
         guard failureMessage == nil else { return }
-        let messages = staged.count == 1 ? "your message is" : "your messages are"
+        let messages = count == 1 ? "your message is" : "your messages are"
         failureMessage = lacksConnection
             ? "Your computer didn't answer, so \(messages) back in the message box."
             : "Hermes couldn't take it yet, so \(messages) back in the message box."
     }
 
     /// Puts an unsent message back in the box, before anything typed since, so neither is lost.
+    /// Messages still waiting behind it can't go out without it: they come back too, after it.
     func putBackInBox(_ message: String, attachments: [ChatAttachment], orderedAttachments: [ChatDraftAttachment]) {
-        draft = [message, draft].filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        let waiting = stagedSends
+        stagedSends = []
+        draft = ([message] + waiting.map(\.outgoing.message) + [draft])
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
             .joined(separator: "\n\n")
-        draftAttachments = attachments + draftAttachments
-        orderedDraftAttachments = orderedAttachments + orderedDraftAttachments
+        draftAttachments = attachments + waiting.flatMap(\.outgoing.attachments) + draftAttachments
+        orderedDraftAttachments = orderedAttachments + waiting.flatMap(\.outgoing.orderedAttachments)
+            + orderedDraftAttachments
     }
 }
 

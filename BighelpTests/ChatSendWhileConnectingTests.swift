@@ -176,6 +176,41 @@ struct ChatSendWhileConnectingTests {
         #expect(model.stagedMidSessionBehavior(plain) == .interruptAndSend)
     }
 
+    /// Messages behind one that failed don't go out without it: they come back to the box, in order.
+    @Test func aFailureAheadSendsNothingAfterIt() async throws {
+        let model = ChatModel(conversationID: "connecting", client: NativeWorkspaceUnavailableClient(), initialItems: [])
+        model.draft = "First"
+        await model.send()
+        model.draft = "Second"
+        await model.send()
+        model.failureMessage = "Message could not be delivered. Try again."
+        for _ in 0..<200 where !model.stagedSends.isEmpty { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(model.draft == "First\n\nSecond")
+        #expect(model.failureMessage == "Message could not be delivered. Try again.")
+    }
+
+    @Test func aMessagePutBackComesBeforeTheOnesWaitingBehindIt() async {
+        let model = ChatModel(conversationID: "connecting", client: NativeWorkspaceUnavailableClient(), initialItems: [])
+        model.draft = "Waiting"
+        await model.send()
+        model.draft = "Typed since"
+        model.putBackInBox("Failed", attachments: [], orderedAttachments: [])
+        #expect(model.stagedSends.isEmpty)
+        #expect(model.draft == "Failed\n\nWaiting\n\nTyped since")
+    }
+
+    /// Back on its connection mid-turn, a chat still sorting out a lost message doesn't steer yet.
+    @Test func aWaitingMessageDoesNotSteerAChatThatNeedsRecovery() async throws {
+        let fixture = try ConnectingFixture()
+        defer { fixture.close() }
+        try await fixture.client.recover(epoch: "epoch")
+        fixture.emit("message.start", [:])
+        #expect(fixture.model.isMidSessionTurnLive)
+        #expect(fixture.model.takesMessageNow)
+        fixture.client.needsRecovery = true
+        #expect(!fixture.model.takesMessageNow)
+    }
+
     /// A command is read by the connection (`/…`), so it waits in the box until the chat connects.
     @Test func aCommandWaitsInTheBox() {
         let model = ChatModel(conversationID: "connecting", client: NativeWorkspaceUnavailableClient(), initialItems: [])

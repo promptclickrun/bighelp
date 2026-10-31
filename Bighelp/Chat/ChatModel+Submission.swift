@@ -258,17 +258,13 @@ extension ChatModel {
                 // the local presentation during the delay: retain unsent intent,
                 // not an invented accepted human row beside that server turn.
                 // A card's answer isn't composer text: drop its row, keep the draft.
-                if !restoresDraft || draft.isEmpty {
-                    if restoresDraft {
-                        draft = message
-                        draftAttachments = attachments
-                        orderedDraftAttachments = orderedAttachments
-                    }
-                    if let localHumanID {
-                        removeItem(id: localHumanID)
-                        removeProjectedMessage(id: localHumanID)
-                        native.retainVisibleState()
-                    }
+                if restoresDraft {
+                    putBackInBox(message, attachments: attachments, orderedAttachments: orderedAttachments)
+                }
+                if let localHumanID {
+                    removeItem(id: localHumanID)
+                    removeProjectedMessage(id: localHumanID)
+                    native.retainVisibleState()
                 }
             }
             return
@@ -370,9 +366,10 @@ extension ChatModel {
             return
         }
         // Stop stays on while the chat connects: it goes as soon as the chat has its connection.
-        if lacksConnection {
+        // A connected chat rereading what Hermes saved stops at once, as before.
+        if lacksSocket {
             isStopping = true
-            let connected = await waitForConnection(until: { !lacksConnection })
+            let connected = await waitForConnection(until: { !lacksSocket })
             isStopping = false
             guard connected else {
                 failureMessage = "The active turn could not be stopped. Try again."
@@ -749,9 +746,7 @@ extension ChatModel {
         orderedAttachments: [ChatDraftAttachment], restoresDraft: Bool = true
     ) {
         if restoresDraft, draft.isEmpty, orderedDraftAttachments.isEmpty {
-            draft = message
-            draftAttachments = attachments
-            orderedDraftAttachments = orderedAttachments
+            putBackInBox(message, attachments: attachments, orderedAttachments: orderedAttachments)
         }
         // The protected journal retains A even if a newer composer B prevents
         // restoration. Only A's optimistic presentation is removed.

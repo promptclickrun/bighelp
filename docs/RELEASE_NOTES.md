@@ -3,6 +3,19 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.43
+
+### Usage widgets
+
+- **Styles:** touch and hold a Usage widget, tap **Edit Widget**, and select a **Style**. Each size shows your plans as meters or as rings. **Automatic** shows one plan or all of them.
+- **New sizes:** an extra-large widget on iPad and Vision Pro, and a line above the clock on the Lock Screen.
+- **Near the limit:** a plan turns amber at 80% used and red at 100%. A used-up plan shows a lock and the time until it resets.
+
+### Fixed
+
+- **Gemini Live:** the agent's replies play to the end. Before, the first replies of a call often showed their words but made no sound, and noise in the room cut later replies off. You can still talk over the agent to stop it.
+- **Pictures in chat:** a picture that an agent sent shows, or the message tells you why it did not come, with **Try again**. Before, some pictures stayed on the loading animation. The reason needs bighelp's plugin version 3.39.0 or later on the computer.
+
 ## 2.6.42
 
 ### Chat

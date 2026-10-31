@@ -1128,6 +1128,14 @@ final class DirectHermesAuthenticator {
         )
     }
 
+    /// A big file's piece, signed in now, for a session that sends it later (`BighelpBackgroundUploads`).
+    func authenticatedBigFileChunkRequest(_ chunk: DirectHermesBigFileChunk,
+                                          nativeGuard: DirectHermesNativeRequestGuard) async throws -> URLRequest {
+        let tokens = try await authenticatedTokens()
+        return try http.bigFileChunkRequest(chunk, bearer: tokens.bearer, legacyToken: tokens.dashboard,
+                                            nativeGuard: nativeGuard)
+    }
+
     private func dashboardToken() async throws -> String {
         let response = try await http.send(route: "/", accept: "text/html")
         try DirectHermesHTTP.requireSuccess(response)

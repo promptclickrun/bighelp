@@ -311,6 +311,17 @@ change in both repos.
   client attached to the chat starts the tries again for every reason but too big; a turn that ends does for
   refused (a reply Hermes hadn't saved yet). A tile with nothing finishing it shows Try again after
   `AgentFileLoad.stallAfter` anyway. The `ChatFiles` log has each try's reason.
+- **Big files people send** (over `ChatAttachment.maximumBytes`, 8 MiB, up to 256 MiB; plugin `native-uploads-v1`,
+  bighelp-plugin's docs/BIG_FILES.md): Hermes' `file.attach` takes a file in one socket frame, so bigger files go
+  to the plugin's `uploads/*` routes in 4 MiB pieces instead (`BigFileUploader`), in any order, from a background
+  `URLSession` (`BighelpBackgroundUploads`) that iOS keeps sending while the app is away. The host records a piece
+  only once all of it arrived; after a drop the app asks `status` and sends only the rest, and starting the same
+  file again (a relaunch) gets the same upload back. The app keeps its own copy on disk (`ChatBigFile`,
+  `BigFileStore`) and never holds the whole file in memory. `finish` checks the file's SHA-256 and names the
+  staged copy, which goes to stock `file.attach` by `path`: Hermes copies it into the agent's attachments and,
+  for a binary file, tells the agent its type, size and place on disk, never its bytes. A video also gets the
+  app's `[Video attached: …]` line with its length, which the chat hides. Hosts without the feature keep the
+  8 MiB limit and say to update the plugin.
 - **Each agent's own files:** the plugin's `workspace-files/*` routes take an optional `profile` (plugin 3.20.0,
   `native-workspace-files-agents-v1`) and read that agent's working folder with the same refusals. A bot's Files
   tab sends its ID (`DirectHermesManagedFilesClient(agentID:)`); the serving agent never names itself, so older

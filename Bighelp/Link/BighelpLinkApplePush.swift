@@ -320,6 +320,13 @@ final class BighelpLinkApplicationDelegate: NSObject, UIApplicationDelegate,
         return true
     }
 
+    /// The pieces of a big file finished while bighelp was suspended (`BighelpBackgroundUploads`).
+    func application(_ application: UIApplication, handleEventsForBackgroundURLSession identifier: String,
+                     completionHandler: @escaping @Sendable () -> Void) {
+        guard identifier == BighelpBackgroundUploads.identifier else { return completionHandler() }
+        BighelpBackgroundUploads.shared.handleEvents(completion: completionHandler)
+    }
+
     // UIKit wants both answers below on the main thread. The async forms of
     // these methods answered from wherever their work finished, and clearing
     // a notification (which wakes the app in the background) then aborted it.

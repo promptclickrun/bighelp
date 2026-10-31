@@ -197,7 +197,11 @@ change in both repos.
   subscription or an API key, or Gemini Live) and voice (`AgentVoiceChoices`). The plugin's brief names the
   agent, so the voice model speaks as it, never about "your agent". Gemini's media and events stay between the
   phone and Gemini (`GeminiLiveAudioPeer`, a single-use token from the plugin); its work still goes through the
-  chat, and results go back as `UPDATE` text (docs/DIRECT_STREAMING_AND_LIVE_VOICE.md).
+  chat, and results go back as `UPDATE` text (docs/DIRECT_STREAMING_AND_LIVE_VOICE.md). Voice processing makes
+  a configuration change right after the engine starts: every restart stops the player first
+  (`GeminiLiveAudioPeer.restart`), or it takes Gemini's voice and plays none. A test that only counts bytes
+  received can't see that; check what finished playing. Nerd Mode's call audio report on the call screen
+  (`GeminiLiveAudioDiagnostics`, log category `LiveVoiceAudio`) shows where the sound stops on a device.
 - **Live voice multitasks:** requests from the voice model never wait for each other. One runs as a turn in
   the chat when it's free; one made while the chat works runs at once as a Hermes background task for it
   (`ChatModel.runNativeVoiceRequest`, `prompt.background`) and answers the call on its own. Background tasks

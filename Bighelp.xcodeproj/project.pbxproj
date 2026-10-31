@@ -1027,6 +1027,7 @@
 		8A5B2DD7632882A15FAFD471 /* KanbanAvailabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD70C77DE16F0C5CDD82DD3E /* KanbanAvailabilityTests.swift */; };
 		8A682F8BA69AFC7E538F6899 /* AppleDeviceToolService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33F9EE654CBD35C5C2B5D853 /* AppleDeviceToolService.swift */; };
 		8A79D0A026B2159D4089C56F /* BotChatUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3CCA76D09B4A42D0FD343AB /* BotChatUITests.swift */; };
+		8AC96E8C611E8BB1D6827B17 /* GeminiLiveAudioReportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6764D4FE1C1FC7B8695075EA /* GeminiLiveAudioReportTests.swift */; };
 		8ACC3ADA08598009A4B2CBAE /* AgentTemplateLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 363125E35F32B409045A5DD4 /* AgentTemplateLibrary.swift */; };
 		8AD07EFBEA77678E73BE2C04 /* NativeAdministrationPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03D04FFCD9DC9D14397F3CAD /* NativeAdministrationPresentation.swift */; };
 		8ADD4A53282EFAC9259538A0 /* DriveNavigator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7056FAAB2C927FEA3485BEFF /* DriveNavigator.swift */; };
@@ -1547,6 +1548,7 @@
 		CFC2936896B5888D43D622E8 /* GitHubDeviceCode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78569AED58B1C7BD8A6C15F7 /* GitHubDeviceCode.swift */; };
 		CFC89295FDF6FFE3E9014982 /* BighelpSideStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D5A4B2F15407D6F507943DC /* BighelpSideStrip.swift */; };
 		CFDA4DE204A0F1BEA7F14ADC /* BighelpTabGlyph.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAC11665E89F25A9F0B6B70C /* BighelpTabGlyph.swift */; };
+		D03E70D2E968432CAB945230 /* GeminiLivePlayerRestartTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB545DEB88099F0D05789AF1 /* GeminiLivePlayerRestartTests.swift */; };
 		D092244D061D543D007B9F92 /* WikiDraftStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F605047400252670A1610388 /* WikiDraftStore.swift */; };
 		D0A185AF92F9D96A22F30250 /* SimpleBotsAppearanceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A3BBD4EAE2A44378C37BEE0 /* SimpleBotsAppearanceUITests.swift */; };
 		D0AC686A15F5FA50431BC875 /* RawConfigurationEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A26CF36B1A30E3091497D85 /* RawConfigurationEditor.swift */; };
@@ -1683,6 +1685,7 @@
 		E248A50A3BC66416D6C26004 /* ModelReasoningDefaultsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51EBF6C938422836EEFF31AF /* ModelReasoningDefaultsTests.swift */; };
 		E266B93BAD01B706DE1A752F /* UsageSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6454E72718581BF4DD7C86F9 /* UsageSummary.swift */; };
 		E2946FD1DCCD9FDC821D2FB5 /* CompanionCatalogPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17C05FAA2E33A99B4113D919 /* CompanionCatalogPicker.swift */; };
+		E2B650F2E6C666A347C1916F /* GeminiLiveAudioReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8FCB52A58D38CE645CCA340 /* GeminiLiveAudioReport.swift */; };
 		E2B771B30C555C4A476D2426 /* KanbanBoardModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1DB559BCA138130360AAB97 /* KanbanBoardModelTests.swift */; };
 		E2E71B0A0841C04595031A0D /* DeviceLocationFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03F2BE61948FF19AE45EEE5B /* DeviceLocationFixture.swift */; };
 		E321D19D467864BCE80DFAE2 /* NativeBotModeHandles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E3EE6A61F6893406ADE37AA /* NativeBotModeHandles.swift */; };
@@ -2775,6 +2778,7 @@
 		66E4E333550166DD2DCFE881 /* ChatActivityPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatActivityPresentation.swift; sourceTree = "<group>"; };
 		6727783596E13201D941EE7D /* bighelp-trick-heart.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "bighelp-trick-heart.json"; sourceTree = "<group>"; };
 		67523907B748CF380DF5E276 /* ScheduleRequestBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleRequestBuilder.swift; sourceTree = "<group>"; };
+		6764D4FE1C1FC7B8695075EA /* GeminiLiveAudioReportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiLiveAudioReportTests.swift; sourceTree = "<group>"; };
 		6772541AD53BC7065CD5D78C /* AppLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLayoutTests.swift; sourceTree = "<group>"; };
 		67834B3EF415CFFF4DB8778F /* DirectHermesHostOperationsClient+Inventory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DirectHermesHostOperationsClient+Inventory.swift"; sourceTree = "<group>"; };
 		6787F09E4FAAC9A79C987333 /* RootCode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootCode.swift; sourceTree = "<group>"; };
@@ -3499,6 +3503,7 @@
 		CB4B4700B35DCCABC0FCEFED /* DirectHermesKanbanClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectHermesKanbanClient.swift; sourceTree = "<group>"; };
 		CB4DF9151CCC62975FB4482F /* CodeHomeStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeHomeStore.swift; sourceTree = "<group>"; };
 		CB4E645EFD7E7E20859B7E65 /* DirectHermesAgentProfileCloneClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectHermesAgentProfileCloneClient.swift; sourceTree = "<group>"; };
+		CB545DEB88099F0D05789AF1 /* GeminiLivePlayerRestartTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiLivePlayerRestartTests.swift; sourceTree = "<group>"; };
 		CB86E3AA15B897A533D618A5 /* ClarificationFallbackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClarificationFallbackTests.swift; sourceTree = "<group>"; };
 		CB9FF7B35EAC57B17AB008F9 /* RichDraftEditingTransaction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RichDraftEditingTransaction.swift; sourceTree = "<group>"; };
 		CBD4175E3FCA7AC3EA38E5AA /* DirectHermesSessionControlClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectHermesSessionControlClient.swift; sourceTree = "<group>"; };
@@ -3801,6 +3806,7 @@
 		F83C6C89073925B7B902D076 /* NativeLiveVoiceSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeLiveVoiceSession.swift; sourceTree = "<group>"; };
 		F8864550F66BDF61AD736AA9 /* SkillsHubManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkillsHubManagementView.swift; sourceTree = "<group>"; };
 		F88EB8201529B07C80DE0C9B /* HermesBotModeActivityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesBotModeActivityTests.swift; sourceTree = "<group>"; };
+		F8FCB52A58D38CE645CCA340 /* GeminiLiveAudioReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiLiveAudioReport.swift; sourceTree = "<group>"; };
 		F8FFBC9B200835B3E101AA83 /* BighelpMenuUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpMenuUITests.swift; sourceTree = "<group>"; };
 		F91AB3213E2C4E85CBED57B4 /* ConversationClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationClient.swift; sourceTree = "<group>"; };
 		F92745044C01ED431726BEDF /* BighelpTabGlyphTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpTabGlyphTests.swift; sourceTree = "<group>"; };
@@ -5203,7 +5209,9 @@
 				DBCD5BED0DF914830CCEA8A1 /* FleetSwitchFallbackTests.swift */,
 				3D4E35462E68325AB197929D /* ForceRefreshSessionTests.swift */,
 				B3B8B411D4DDBEACAECC5BF9 /* ForegroundAlertTests.swift */,
+				6764D4FE1C1FC7B8695075EA /* GeminiLiveAudioReportTests.swift */,
 				C1AEC5E55113E285DDB16191 /* GeminiLiveEchoGateTests.swift */,
+				CB545DEB88099F0D05789AF1 /* GeminiLivePlayerRestartTests.swift */,
 				D51F66A3393E8DF152C00E0D /* GeminiLiveRealServiceTests.swift */,
 				299C6D9E931A8B3364430E01 /* GeminiLiveWireTests.swift */,
 				F0BEC630295845F372BFA4B4 /* GeneratedMediaLifecycleTests.swift */,
@@ -5817,6 +5825,7 @@
 				00DF0766AB2AE7BC5A0FD831 /* BighelpVoiceSessionClient.swift */,
 				97C4947AC3EDDEA0A082CA13 /* DeferredVoiceSessionClient.swift */,
 				C416CC342BB5C934FA2EC1BC /* GeminiLiveAudioPeer.swift */,
+				F8FCB52A58D38CE645CCA340 /* GeminiLiveAudioReport.swift */,
 				7ACFAB7015C10B9B588021F4 /* GeminiLiveWire.swift */,
 				E2733FF4EBE31845361EA75E /* LiveVoiceControlClient.swift */,
 				6BFBFE60217D0F9676F7FD23 /* LiveVoiceModel.swift */,
@@ -7731,6 +7740,7 @@
 				98BCDE99C7F506CDC74308D0 /* FloatingTabBar.swift in Sources */,
 				BF4CB44F60316B4A88AA1D9A /* FocusedTextEditor.swift in Sources */,
 				489E33414695B4DAFEBDBCCE /* GeminiLiveAudioPeer.swift in Sources */,
+				E2B650F2E6C666A347C1916F /* GeminiLiveAudioReport.swift in Sources */,
 				AE082CBB2444BDE5DC767EDB /* GeminiLiveWire.swift in Sources */,
 				64A4DB3742C4A15DFBAA5F06 /* GeneratedCards.swift in Sources */,
 				CD9537C11B8F4B07382AAA22 /* GeneratedMediaAcceptanceFixture.swift in Sources */,
@@ -8590,7 +8600,9 @@
 				734E867FAFA35F5E1564F452 /* FleetSwitchFallbackTests.swift in Sources */,
 				E20BEE93D780D1651EE2D98B /* ForceRefreshSessionTests.swift in Sources */,
 				65FEFED9B711B1896CFD3AE7 /* ForegroundAlertTests.swift in Sources */,
+				8AC96E8C611E8BB1D6827B17 /* GeminiLiveAudioReportTests.swift in Sources */,
 				B93DF21E1572E52310E43529 /* GeminiLiveEchoGateTests.swift in Sources */,
+				D03E70D2E968432CAB945230 /* GeminiLivePlayerRestartTests.swift in Sources */,
 				7B5233398F218FC389E7E087 /* GeminiLiveRealServiceTests.swift in Sources */,
 				F19AF7B46B46105CDBFCABF2 /* GeminiLiveWireTests.swift in Sources */,
 				C263D09076A2146A67329700 /* GeneratedMediaLifecycleTests.swift in Sources */,

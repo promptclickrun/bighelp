@@ -5,7 +5,7 @@ import Foundation
 /// token, and one voice-processing audio engine. Voice processing cancels the agent's voice from the
 /// microphone without muting it, so the person can talk over the agent and it stops.
 @MainActor
-final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
+final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession, LiveVoiceAudioReporting {
     var onConnectionState: (@MainActor (BighelpRealtimeAudioPeer.ConnectionState) -> Void)?
     var onAudioRoute: (@MainActor (String) -> Void)?
     var onInterruption: (@MainActor (Bool) -> Void)?
@@ -37,6 +37,8 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
     private var awaitingReplySince: Date?
     private var quietDelivery: Task<Void, Never>?
     private var speakerOutputPolicy: BighelpSpeakerOutputPolicy = .none
+    private let diagnostics = GeminiLiveAudioDiagnostics()
+    private var reportLog: Task<Void, Never>?
     private var closed = false
 
     init(sessionCoordinator: VoiceAudioSessionCoordinator = .shared) {
@@ -52,6 +54,7 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
         try Task.checkCancellation()
         guard !closed else { throw BighelpRealtimeAudioPeer.Failure.closed }
         guard granted else { throw BighelpRealtimeAudioPeer.Failure.microphoneDenied }
+        diagnostics.begin()
         try startAudio()
         return ""
     }
@@ -77,6 +80,14 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
             throw BighelpRealtimeAudioPeer.Failure.negotiation
         }
         receiver = Task { [weak self] in await self?.receive(from: task) }
+        // The device's own record of the call, in the log as well as on screen.
+        reportLog = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(10))
+                guard let self, !self.closed else { return }
+                GeminiLiveAudioDiagnostics.log.info("\(self.audioReport(), privacy: .public)")
+            }
+        }
     }
 
     // MARK: LiveVoiceLocalSession
@@ -162,7 +173,11 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
             policy: speakerOutputPolicy, hasExternalRoute: external,
             currentBuiltInSpeaker: outputs.contains { $0.portType == .builtInSpeaker }) {
             do { try session.overrideOutputAudioPort(.speaker) }
-            catch { throw BighelpRealtimeAudioPeer.Failure.audioUnavailable }
+            catch {
+                diagnostics.event("choosing the speaker failed")
+                throw BighelpRealtimeAudioPeer.Failure.audioUnavailable
+            }
+            diagnostics.event("speaker chosen")
         }
         onAudioRoute?(Self.routeName())
     }
@@ -172,13 +187,30 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
         guard !engine.isRunning else { return }
         do {
             try SystemVoiceAudioSession().setActive(true)
-            try engine.start()
+            diagnostics.playerStopping()
+            try Self.restart(player) {
+                try engine.start()
+                player.play()
+            }
         } catch {
             throw BighelpRealtimeAudioPeer.Failure.audioUnavailable
         }
-        player.play()
+        playbackEndsAt = Date()
+        uplink.agentPlays(until: playbackEndsAt)
         try? reapplySpeakerOutputIfNeeded()
     }
+
+    /// Starts the engine again after it stopped (a configuration change, the end of an interruption). The
+    /// player stops first: started again while it still said it was playing, it took every new piece of
+    /// Gemini's voice and played none. Voice processing makes a configuration change right after the
+    /// engine starts, so every call was silent until Gemini cut itself off, which stopped the player.
+    static func restart(_ player: AVAudioPlayerNode, start: () throws -> Void) rethrows {
+        player.stop()
+        try start()
+    }
+
+    /// What the call's sound has done so far (tests read it; Nerd Mode shows the full report).
+    var audioCounts: GeminiLiveAudioDiagnostics.Counts { diagnostics.current }
 
     func statistics() async throws -> BighelpRealtimeAudioPeer.MediaStatistics {
         var statistics = BighelpRealtimeAudioPeer.MediaStatistics()
@@ -197,9 +229,29 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
         return statistics
     }
 
+    // MARK: LiveVoiceAudioReporting
+
+    func audioReport() -> String {
+        diagnostics.report(GeminiLiveAudioState(engine: engine, player: player))
+    }
+
+    func restartPlayback() {
+        guard !closed, hold.isHeld else { return }
+        diagnostics.event("Restart sound: player \(player.isPlaying ? "playing" : "stopped"), engine \(engine.isRunning ? "running" : "stopped")")
+        diagnostics.playerStopping()
+        player.stop()
+        playbackEndsAt = Date()
+        uplink.agentPlays(until: playbackEndsAt)
+        if engine.isRunning { player.play() } else { try? resumeAudio() }
+        try? reapplySpeakerOutputIfNeeded()
+        diagnostics.event("Restart sound done: player \(player.isPlaying ? "playing" : "stopped")")
+    }
+
     func close() {
         guard !closed else { return }
         closed = true
+        diagnostics.event("call closed")
+        reportLog?.cancel()
         quietDelivery?.cancel()
         pendingTexts.removeAll()
         receiver?.cancel()
@@ -223,6 +275,7 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
             try session.configureForLiveCall()
             try session.setActive(true)
             hold.sessionActivated()
+            diagnostics.event("session on")
             try engine.inputNode.setVoiceProcessingEnabled(true)
             engine.attach(player)
             engine.connect(player, to: engine.mainMixerNode, format: playbackFormat)
@@ -231,9 +284,11 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
             observeSession()
             try startEngine()
         } catch {
+            diagnostics.event("audio couldn't start")
             stopAudio()
             throw BighelpRealtimeAudioPeer.Failure.audioUnavailable
         }
+        diagnostics.event("engine started")
         onAudioRoute?(Self.routeName())
     }
 
@@ -244,6 +299,10 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
         let format = input.outputFormat(forBus: 0)
         try uplink.prepare(from: format)
         input.installTap(onBus: 0, bufferSize: 2_048, format: format, block: GeminiLiveUplink.tap(uplink))
+        // What the engine actually puts out. Put back with each start, in the mixer's format of the moment.
+        let mixer = engine.mainMixerNode
+        mixer.removeTap(onBus: 0)
+        mixer.installTap(onBus: 0, bufferSize: 4_096, format: nil, block: GeminiLiveAudioDiagnostics.mixerTap(diagnostics))
         engine.prepare()
         try engine.start()
         player.play()
@@ -252,21 +311,32 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
     /// AirPods, a car or a sample-rate change stop the engine and change the input's format.
     private func restartAfterConfigurationChange() {
         guard !closed, hold.isHeld else { return }
+        diagnostics.count { $0.configurationChanges += 1 }
+        diagnostics.event("configuration change: engine \(engine.isRunning ? "running" : "stopped"), player \(player.isPlaying ? "playing" : "stopped")")
         do {
             try SystemVoiceAudioSession().setActive(true)
-            try startEngine()
+            diagnostics.playerStopping()
+            try Self.restart(player) { try startEngine() }
         } catch {
+            diagnostics.event("engine restart failed")
             publish(.failed)
             return
         }
+        diagnostics.count { $0.engineRestarts += 1 }
+        diagnostics.event("engine restarted: player \(player.isPlaying ? "playing" : "stopped")")
+        // What was scheduled went with the stopped player.
+        playbackEndsAt = Date()
+        uplink.agentPlays(until: playbackEndsAt)
         try? reapplySpeakerOutputIfNeeded()
     }
 
     private func stopAudio() {
         for observer in observers { NotificationCenter.default.removeObserver(observer) }
         observers = []
+        diagnostics.playerStopping()
         player.stop()
         engine.inputNode.removeTap(onBus: 0)
+        engine.mainMixerNode.removeTap(onBus: 0)
         engine.stop()
         hold.release()
     }
@@ -292,6 +362,7 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
                     // Audio before the session is set up is not Gemini's order.
                     uplink.attach(task)
                     publish(.connected)
+                    diagnostics.event("Gemini ready")
                 }
                 switch message {
                 case .audio, .assistantText: lastOutputAt = Date()
@@ -309,6 +380,9 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
         case .event(let event): onEvent?(event)
         case .play(let pcm): play(pcm)
         case .stopPlayback:
+            diagnostics.count { $0.geminiStops += 1 }
+            diagnostics.event("Gemini stopped its reply; playback cleared")
+            diagnostics.playerStopping()
             player.stop()
             playbackEndsAt = Date()
             uplink.agentPlays(until: playbackEndsAt)
@@ -322,8 +396,14 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
     /// 24 kHz 16-bit little-endian mono, scheduled behind what is already playing.
     private func play(_ pcm: Data) {
         let count = pcm.count / 2
-        guard count > 0, engine.isRunning,
-              let buffer = AVAudioPCMBuffer(pcmFormat: playbackFormat, frameCapacity: AVAudioFrameCount(count)),
+        guard count > 0 else { return }
+        diagnostics.count { $0.receivedChunks += 1; $0.receivedBytes += pcm.count }
+        guard engine.isRunning else {
+            if diagnostics.current.droppedChunks == 0 { diagnostics.event("Gemini audio arrived with the engine stopped") }
+            diagnostics.count { $0.droppedChunks += 1 }
+            return
+        }
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: playbackFormat, frameCapacity: AVAudioFrameCount(count)),
               let channel = buffer.floatChannelData?[0] else { return }
         buffer.frameLength = AVAudioFrameCount(count)
         var peak: Float = 0
@@ -340,8 +420,14 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
         outputLevel = (Double(peak), now)
         playbackEndsAt = max(now, playbackEndsAt).addingTimeInterval(Double(count) / GeminiLiveWire.outputSampleRate)
         uplink.agentPlays(until: playbackEndsAt)
-        player.scheduleBuffer(buffer)
-        if !player.isPlaying { player.play() }
+        player.scheduleBuffer(buffer, completionCallbackType: .dataPlayedBack,
+                              completionHandler: GeminiLiveAudioDiagnostics.finished(diagnostics,
+                                                                                     scheduledAfter: diagnostics.stopsSoFar))
+        diagnostics.count { $0.scheduledBuffers += 1 }
+        if !player.isPlaying {
+            diagnostics.event("player started for new audio")
+            player.play()
+        }
     }
 
     private func send(_ frame: Data) {
@@ -363,6 +449,8 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
             let began = raw.flatMap(AVAudioSession.InterruptionType.init(rawValue:)) == .began
             MainActor.assumeIsolated {
                 guard let self, !self.closed else { return }
+                if began { self.diagnostics.count { $0.interruptions += 1 } }
+                self.diagnostics.event(began ? "interruption began" : "interruption ended")
                 if !began {
                     do { try self.resumeAudio() } catch {
                         self.publish(.failed)
@@ -377,12 +465,36 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
             MainActor.assumeIsolated { self?.restartAfterConfigurationChange() }
         })
         observers.append(center.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil,
-                                            queue: .main) { [weak self] _ in
+                                            queue: .main) { [weak self] note in
+            let reason = (note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt)
+                .flatMap(AVAudioSession.RouteChangeReason.init(rawValue:))
             MainActor.assumeIsolated {
                 guard let self, !self.closed, self.hold.isHeld else { return }
+                self.diagnostics.count { $0.routeChanges += 1 }
+                let outputs = AVAudioSession.sharedInstance().currentRoute.outputs
+                    .map { $0.portType.rawValue.replacingOccurrences(of: "AVAudioSessionPort", with: "") }
+                self.diagnostics.event("route change (\(Self.name(reason))): out \(outputs.joined(separator: "+"))")
                 try? self.reapplySpeakerOutputIfNeeded()
             }
         })
+        observers.append(center.addObserver(forName: AVAudioSession.mediaServicesWereResetNotification, object: nil,
+                                            queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.diagnostics.event("media services were reset") }
+        })
+    }
+
+    private static func name(_ reason: AVAudioSession.RouteChangeReason?) -> String {
+        switch reason {
+        case .newDeviceAvailable: "new device"
+        case .oldDeviceUnavailable: "device gone"
+        case .categoryChange: "category change"
+        case .override: "override"
+        case .wakeFromSleep: "wake"
+        case .noSuitableRouteForCategory: "no route"
+        case .routeConfigurationChange: "configuration"
+        case .unknown, nil: "unknown"
+        @unknown default: "other"
+        }
     }
 
     private static func routeName() -> String {
@@ -393,6 +505,11 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
 /// The live-call lease and the active audio session. A peer dropped without `close()` (a call that ended
 /// while the microphone prompt was up) still releases them, or every later TTS and call would be refused.
 final class GeminiLiveAudioHold: @unchecked Sendable {
+    private static let deactivationLock = NSLock()
+    nonisolated(unsafe) private static var deactivatedAt: Date?
+    /// When a Gemini call last turned the shared session off: one dropped late would turn it off under the next.
+    static var lastDeactivation: Date? { deactivationLock.withLock { deactivatedAt } }
+
     private let lock = NSLock()
     private var lease: VoiceAudioSessionLiveCallLease?
     private var sessionActive = false
@@ -422,7 +539,10 @@ final class GeminiLiveAudioHold: @unchecked Sendable {
         self.lease = nil
         sessionActive = false
         lock.unlock()
-        if active { try? SystemVoiceAudioSession().setActive(false) }
+        if active {
+            try? SystemVoiceAudioSession().setActive(false)
+            Self.deactivationLock.withLock { Self.deactivatedAt = Date() }
+        }
         lease?.release()
     }
 

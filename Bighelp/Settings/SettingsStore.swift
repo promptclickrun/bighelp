@@ -63,11 +63,6 @@ final class SettingsStore {
         didSet { defaults.set(bubbleFollowsTheme, forKey: Keys.bubbleFollowsTheme) }
     }
 
-    /// Agent replies sit in a bubble (the default), or on the page at the chat's full width.
-    var agentMessageBackground: Bool {
-        didSet { defaults.set(agentMessageBackground, forKey: Keys.agentMessageBackground) }
-    }
-
     /// "Theme", "Custom" or the built-in color's name.
     var bubbleColorName: String {
         if themeGivesBubbles { return String(localized: "Theme") }
@@ -530,7 +525,6 @@ final class SettingsStore {
         bubbleColor = defaults.string(forKey: Keys.bubbleColor).flatMap(BighelpBubbleColor.init(rawValue:))
         customBubbleHex = BighelpCustomBubbleColor.validated(defaults.string(forKey: Keys.customBubbleColor))
         bubbleFollowsTheme = defaults.bool(forKey: Keys.bubbleFollowsTheme)
-        agentMessageBackground = defaults.bool(forKey: Keys.agentMessageBackground, default: true)
         windowTransparency = defaults.object(forKey: Keys.windowTransparency) == nil
             ? BighelpVisionGlass.defaultTransparency
             : defaults.double(forKey: Keys.windowTransparency)
@@ -865,7 +859,6 @@ private extension SettingsStore {
         static let bubbleColor = "loopdy.appearance.bubbleColor"
         static let customBubbleColor = "loopdy.appearance.customBubbleColor"
         static let bubbleFollowsTheme = "bighelp.appearance.bubble-follows-theme"
-        static let agentMessageBackground = "bighelp.appearance.agent-message-background"
         static let windowTransparency = "loopdy.appearance.windowTransparency"
         static let responseHaptics = "loopdy.chat.responseHaptics"
         static let showProjectChanges = "loopdy.chat.showProjectChanges"

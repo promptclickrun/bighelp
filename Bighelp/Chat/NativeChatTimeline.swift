@@ -483,6 +483,8 @@ struct ChatCanvasRowContext: Equatable {
     var groupedIDs: Set<String> = []
     var continuedIDs: Set<String> = []
     var density: ChatDensity = .comfortable
+    /// Agent replies in a bubble or on the page; a change draws every row again, once.
+    var agentStyle: ChatAgentMessageStyle = .bubble
 }
 
 struct NativeChatTimeline<Content: View>: UIViewRepresentable {
@@ -858,6 +860,7 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             let previousContext = rowContext
             rowContext = parent.rowContext
             let styleChanged = style != nextStyle || previousContext.density != rowContext.density
+                || previousContext.agentStyle != rowContext.agentStyle
             style = nextStyle
             self.environment = environment
             let reset = conversationID != parent.conversationID || ownerID != parent.ownerID

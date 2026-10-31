@@ -120,7 +120,6 @@ enum BighelpLightBackground: String, CaseIterable, Identifiable, Sendable {
         default: preset.name
         }
     }
-    var detail: String { self == .cream ? String(localized: "Warm and soft") : String(localized: "Clean, bright white") }
     var neutral: BighelpTheme {
         switch self {
         case .cream: .light
@@ -143,7 +142,6 @@ enum BighelpDarkBackground: String, CaseIterable, Identifiable, Sendable {
         default: preset.name
         }
     }
-    var detail: String { self == .graphite ? String(localized: "Soft charcoal, easy on the eyes") : String(localized: "True black, saves battery on OLED") }
     var neutral: BighelpTheme {
         switch self {
         case .graphite: .graphiteDark

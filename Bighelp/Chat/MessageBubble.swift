@@ -127,6 +127,7 @@ struct MessageBubble: View {
     @State private var cardCopyContext = ChatCardCopyContext()
     @AppStorage(ChatLayoutPreferences.textSizeKey) private var chatTextSize: ChatTextSize = .defaultSize
     @AppStorage(LinkPreviewPreferences.enabledKey) private var showsLinkPreviews = true
+    @AppStorage(ChatLayoutPreferences.agentMessageStyleKey) private var agentStyle: ChatAgentMessageStyle = .bubble
 
     init(
         messageID: String = "",
@@ -195,7 +196,8 @@ struct MessageBubble: View {
                     maximumWidthFraction: uiV3Enabled
                         ? BighelpV3MessagePresentation.maximumWidthFraction(
                             role: role,
-                            hasRichContent: projection.cardProjection.hasRichContent
+                            hasRichContent: projection.cardProjection.hasRichContent,
+                            agentStyle: agentStyle
                         )
                         : presentation.maximumWidthFraction,
                     contentFitsWidth: uiV3Enabled
@@ -320,6 +322,12 @@ struct MessageBubble: View {
         interaction: ChatBubbleInteraction
     ) -> some View {
         if ChatMessageInteractionPolicy.usesInlineNativeSelection(
+            role: role,
+            uiV3Enabled: uiV3Enabled
+        ), !BighelpV3MessagePresentation.drawsBubble(role: role, agentStyle: agentStyle, isInterim: false) {
+            // On the page there's no padding to hold actions: the text view's own menu has them all.
+            content
+        } else if ChatMessageInteractionPolicy.usesInlineNativeSelection(
             role: role,
             uiV3Enabled: uiV3Enabled
         ) {

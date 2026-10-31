@@ -776,6 +776,16 @@ struct BighelpAppearanceContext: Equatable, Sendable {
         self.bubbleFollowsTheme = bubbleFollowsTheme
         self.windowTransparency = windowTransparency
     }
+
+    /// The same choices, shown in one mode (previews, widgets, exports).
+    func forcing(_ scheme: ColorScheme) -> BighelpAppearanceContext {
+        var context = BighelpAppearanceContext(
+            appearance: scheme == .dark ? .dark : .light, lightBackground: lightBackground,
+            darkBackground: darkBackground, bubbleColor: bubbleColor, customBubbleHex: customBubbleHex,
+            bubbleFollowsTheme: bubbleFollowsTheme, windowTransparency: windowTransparency)
+        context.simpleBots = simpleBots
+        return context
+    }
 }
 
 extension BighelpTheme {

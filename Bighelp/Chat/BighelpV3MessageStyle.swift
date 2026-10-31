@@ -15,9 +15,30 @@ enum BighelpV3MessagePresentation {
     static let videoPreviewMaximumWidth: CGFloat = 360
     static let tailRadius: CGFloat = 6
 
-    static func maximumWidthFraction(role: TimelineRole, hasRichContent: Bool) -> CGFloat {
+    static func maximumWidthFraction(role: TimelineRole, hasRichContent: Bool,
+                                     agentStyle: ChatAgentMessageStyle = .bubble) -> CGFloat {
+        if role == .assistant, agentStyle == .page { return 1 }
         if hasRichContent { return richContentMaximumWidthFraction }
         return role == .human ? outgoingMaximumWidthFraction : incomingMaximumWidthFraction
+    }
+
+    /// Agent replies on the page have no bubble around them. Interim replies have their own look.
+    static func drawsBubble(role: TimelineRole, agentStyle: ChatAgentMessageStyle, isInterim: Bool) -> Bool {
+        !isInterim && (role == .human || agentStyle == .bubble)
+    }
+
+    /// The room inside a message's bubble; none across a reply on the page, a little above and below.
+    static func contentInsets(role: TimelineRole, density: ChatDensity, agentStyle: ChatAgentMessageStyle,
+                              isInterim: Bool) -> EdgeInsets {
+        if isInterim {
+            return EdgeInsets(top: BighelpTokens.space4, leading: BighelpTokens.space12,
+                              bottom: BighelpTokens.space4, trailing: 0)
+        }
+        guard drawsBubble(role: role, agentStyle: agentStyle, isInterim: false) else {
+            return EdgeInsets(top: BighelpTokens.space4, leading: 0, bottom: BighelpTokens.space4, trailing: 0)
+        }
+        return EdgeInsets(top: density.bubbleVerticalPadding, leading: density.bubbleHorizontalPadding,
+                          bottom: density.bubbleVerticalPadding, trailing: density.bubbleHorizontalPadding)
     }
 }
 
@@ -64,6 +85,7 @@ enum ChatMessageGrouping {
 struct BighelpV3MessageSurface: ViewModifier {
     @Environment(\.chatMessageContinuesGroup) private var continuesGroup
     @AppStorage(ChatLayoutPreferences.densityKey) private var density: ChatDensity = .comfortable
+    @AppStorage(ChatLayoutPreferences.agentMessageStyleKey) private var agentStyle: ChatAgentMessageStyle = .bubble
     let role: TimelineRole
     let theme: BighelpTheme
     let increasedContrast: Bool
@@ -72,13 +94,14 @@ struct BighelpV3MessageSurface: ViewModifier {
     var isInterim = false
 
     func body(content: Content) -> some View {
+        // One structure for every look, so a change restyles the text view in place.
+        let bubble = BighelpV3MessagePresentation.drawsBubble(role: role, agentStyle: agentStyle, isInterim: isInterim)
         content
-            .padding(.leading, isInterim ? BighelpTokens.space12 : 0)
-            .padding(.horizontal, isInterim ? 0 : density.bubbleHorizontalPadding)
-            .padding(.vertical, isInterim ? BighelpTokens.space4 : density.bubbleVerticalPadding)
-            .background(shape.fill(isInterim ? Color.clear : fillColor))
+            .padding(BighelpV3MessagePresentation.contentInsets(role: role, density: density, agentStyle: agentStyle,
+                                                                isInterim: isInterim))
+            .background(shape.fill(bubble ? fillColor : Color.clear))
             .overlay {
-                if increasedContrast, !isInterim {
+                if increasedContrast, bubble {
                     shape.strokeBorder(theme.primaryText, lineWidth: 2)
                         .allowsHitTesting(false)
                 }

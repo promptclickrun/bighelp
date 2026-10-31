@@ -130,7 +130,8 @@ struct ThemePresetTests {
         #expect(settings.lightBackground == .cream && settings.darkBackground == .graphite)
         #expect(settings.lightBackground.preset == .warm && settings.darkBackground.preset == .warm)
         #expect(settings.bubbleColor == .tangerine && !settings.bubbleFollowsTheme)
-        #expect(settings.agentMessageBackground, "Agent messages keep their bubble")
+        #expect(UserDefaults(suiteName: suiteName)?.string(forKey: ChatLayoutPreferences.agentMessageStyleKey) == nil,
+                "Agent messages keep their bubble")
         let after = defaults.dictionaryRepresentation().filter { $0.key.hasPrefix("loopdy.appearance") }
         #expect(NSDictionary(dictionary: before).isEqual(to: after), "Opening the app rewrites nothing")
         for dark in [false, true] {
@@ -144,14 +145,40 @@ struct ThemePresetTests {
         #expect(fresh.lightBackground.preset == .classic && fresh.darkBackground.preset == .classic)
     }
 
-    @Test func agentMessageBackgroundIsSaved() {
-        let suiteName = "agent-message-background-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-        let settings = SettingsStore(defaults: defaults)
-        #expect(settings.agentMessageBackground)
-        settings.agentMessageBackground = false
-        #expect(!SettingsStore(defaults: defaults).agentMessageBackground)
+    /// On the page an agent reply has no bubble: no fill, no padding across, the lane's full width.
+    /// Your own messages, interim replies and the bubble look stay as they were.
+    @Test func agentRepliesOnThePageDropOnlyTheirBubble() {
+        typealias Layout = BighelpV3MessagePresentation
+        for density in ChatDensity.allCases {
+            let page = Layout.contentInsets(role: .assistant, density: density, agentStyle: .page, isInterim: false)
+            #expect(page.leading == 0 && page.trailing == 0)
+            #expect(!Layout.drawsBubble(role: .assistant, agentStyle: .page, isInterim: false))
+            #expect(Layout.maximumWidthFraction(role: .assistant, hasRichContent: false, agentStyle: .page) == 1)
+            #expect(Layout.maximumWidthFraction(role: .assistant, hasRichContent: true, agentStyle: .page) == 1)
+
+            let bubble = Layout.contentInsets(role: .assistant, density: density, agentStyle: .bubble, isInterim: false)
+            #expect(bubble.leading == density.bubbleHorizontalPadding && bubble.top == density.bubbleVerticalPadding)
+            #expect(Layout.drawsBubble(role: .assistant, agentStyle: .bubble, isInterim: false))
+            #expect(Layout.maximumWidthFraction(role: .assistant, hasRichContent: false, agentStyle: .bubble)
+                    == Layout.incomingMaximumWidthFraction)
+
+            for style in ChatAgentMessageStyle.allCases {
+                #expect(Layout.drawsBubble(role: .human, agentStyle: style, isInterim: false), "Yours keep a bubble")
+                #expect(Layout.contentInsets(role: .human, density: density, agentStyle: style, isInterim: false)
+                        == bubble)
+                #expect(Layout.maximumWidthFraction(role: .human, hasRichContent: false, agentStyle: style)
+                        == Layout.outgoingMaximumWidthFraction)
+                #expect(Layout.contentInsets(role: .assistant, density: density, agentStyle: style, isInterim: true)
+                        == EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 0), "Interim replies keep their look")
+            }
+        }
+    }
+
+    @Test func agentMessageStyleIsSavedAndStartsAsBubble() {
+        #expect(ChatAgentMessageStyle(rawValue: "bubble") == .bubble && ChatAgentMessageStyle(rawValue: "page") == .page)
+        #expect(ChatCanvasRowContext().agentStyle == .bubble)
+        // The timeline draws every row again when it changes, as it does for density.
+        #expect(ChatCanvasRowContext(agentStyle: .page) != ChatCanvasRowContext())
     }
 
     @Test func everyPresetHasBothModes() {

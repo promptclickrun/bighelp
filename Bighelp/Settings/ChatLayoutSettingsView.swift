@@ -7,6 +7,8 @@ enum ChatLayoutPreferences {
     static let showsAgentNameKey = "bighelp.chat.shows-agent-name"
     static let textSizeKey = "bighelp.chat.text-size"
     static let densityKey = "bighelp.chat.density"
+    /// Settings › Appearance › Agent messages (`ChatAgentMessageStyle`).
+    static let agentMessageStyleKey = "bighelp.appearance.agent-messages"
     /// With a hardware keyboard, Return sends (true) or adds a line (false).
     static let returnSendsKey = "bighelp.chat.return-sends"
     /// Settings › Chat › Session title: the chat's title under the agent's name. Off by default.
@@ -104,6 +106,22 @@ enum ChatDensity: String, CaseIterable, Identifiable, Sendable {
         self == .compact ? 11 : BighelpV3MessagePresentation.horizontalContentPadding
     }
     var bubbleVerticalPadding: CGFloat { self == .compact ? 7 : 10 }
+}
+
+/// Agent replies in a bubble (the default), or on the page at the chat lane's full width with no
+/// fill, border or bubble padding. The person's own messages keep their bubble either way.
+enum ChatAgentMessageStyle: String, CaseIterable, Identifiable, Sendable {
+    case bubble
+    case page
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .bubble: String(localized: "Bubble")
+        case .page: String(localized: "On the page")
+        }
+    }
 }
 
 /// Settings › Appearance › Chat layout.

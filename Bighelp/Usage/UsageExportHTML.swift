@@ -18,10 +18,7 @@ struct UsageExportPalette: Equatable, Sendable {
 
     /// Exports are always light, in the person's own colors.
     static func lightAppearance(_ appearance: BighelpAppearanceContext) -> BighelpAppearanceContext {
-        BighelpAppearanceContext(appearance: .light, lightBackground: appearance.lightBackground,
-                                 darkBackground: appearance.darkBackground, bubbleColor: appearance.bubbleColor,
-                                 customBubbleHex: appearance.customBubbleHex,
-                                 bubbleFollowsTheme: appearance.bubbleFollowsTheme)
+        appearance.forcing(.light)
     }
 
     init() {}

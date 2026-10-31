@@ -24,7 +24,7 @@ are historical (`docs/ui-v3-design.md`).
   lowercase b and kicks out at the bottom left as a chat-bubble tail. It appears in chrome (root nav bars, icon,
   setup) and as the app's loaders, never as a chat participant and never in an agent color. In the wordmark the mark
   stands in for the b, then "ighelp" in the kit's outlined Nunito: ink by day, cream after dark. See **Noodle** below.
-- **Ink** is the default look, the one Bots mode always had: a Paper page (#FFFFFF) by day and Black at night,
+- **Ink** is the default look, the one Bots mode always had: Classic's Paper page (#FFFFFF) by day and Black at night,
   black bubbles by day (dark gray #3A3A3F after dark), and buttons and tinted text in the page's ink. Its switches
   are green, since an ink switch would be white on white after dark. Every control that acts (New chat, the
   selected tab, buttons, chips, row icons) takes the color picked in Appearance (`theme.action` and
@@ -33,12 +33,26 @@ are historical (`docs/ui-v3-design.md`).
   colors, like an agent's mark, not controls. All of this lives in `BighelpTheme` so screens read theme tokens, not
   system colors.
 - Settings › **Appearance** (`AppearanceStudioView`) is the one place for the look: a live light/dark preview,
-  12 bubble colors (`BighelpBubbleColor`: Ink, the default and saved as no choice, first; Lavender is Ember's own
-  violet), the light page (Paper #FFFFFF, the default, or Cream #FFF9F5), the dark page (Black #000000, the
-  default, or Graphite #1C1C1F), Automatic/Light/Dark and Chat layout. High contrast keeps its
-  own pages. There are no other themes: the old theme list (Nous, Superpilot, custom themes with import, export,
-  fonts and logos) was removed because picking a bubble color quietly replaced it. First-run setup offers the same
-  bubble colors (`AppearanceBubbleGrid`).
+  Color scheme (System, Light, Dark, each a small phone in the picked themes), Themes, Agent messages, Bubble
+  color, Text and buttons, and Chat layout. Its Color scheme row and Themes grid follow T3 Code's Appearance
+  screen (MIT; credit in `Bighelp/Resources/ThirdParty-NOTICES.txt`).
+  - **Themes** (`BighelpThemePreset`) is a grid of cards, each with a light orb and a dark orb. Tapping an orb
+    picks that theme for that mode, so light and dark can come from different themes; the picked orbs carry
+    the accent ring and a sun or a moon. At the largest text sizes each card takes a whole row. Classic (Paper
+    #FFFFFF and Black #000000, the default) and Warm (Cream #FFF9F5 and Graphite #1C1C1F) are bighelp's own
+    pages and keep your bubble color. Steel, Berry, Moss, Harbor, Clay and Violet set the page, cards, text,
+    muted text, borders, the agent message color and an accent together; their palettes come from
+    `Scripts/theme-presets.py`. A theme fills the light and dark background settings people already had, so
+    the old values (cream, paper, graphite, black) still mean the same pages. High contrast keeps its own
+    pages over any theme.
+  - **Bubble color**: 12 colors (`BighelpBubbleColor`: Ink, the default and saved as no choice, first; Lavender
+    is Ember's own violet), Custom, and Theme, shown when a picked theme has an accent: your bubbles and buttons
+    then take each mode's theme accent. Picking a theme with an accent selects Theme; picking any other color
+    replaces it. First-run setup offers the same bubble colors (`AppearanceBubbleGrid`).
+  - **Agent messages** (`ChatAgentMessageStyle`): Bubble, the default, or On the page, where agent replies sit
+    on the page at the chat lane's full width with no fill, border or bubble padding. Your own messages keep
+    their bubble; cards, tool rows, files and link previews keep their own surfaces. The choice is in
+    `ChatCanvasRowContext`, so a change draws the rows again once.
 - Agents are organic blobs and glossy orbs in their own palette color (`AgentPersonaAvatar`, via `AvatarView`).
   The avatar is the live status indicator: idle, listening, thinking, replying, all set, has an update
   (`AgentLiveState`). States must come from real data.

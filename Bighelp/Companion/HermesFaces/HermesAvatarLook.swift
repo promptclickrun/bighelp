@@ -134,8 +134,8 @@ struct HermesBlobShape: Equatable, Sendable {
 
     mutating func taller(seed: String) { setRatio(position("body.ratio", seed: seed) + Self.sizeStep) }
     mutating func wider(seed: String) { setRatio(position("body.ratio", seed: seed) - Self.sizeStep) }
-    mutating func smaller(seed: String) { update { $0.size = HermesBlobEdits.clamped(position("body.r", seed: seed) - Self.sizeStep) } }
-    mutating func bigger(seed: String) { update { $0.size = HermesBlobEdits.clamped(position("body.r", seed: seed) + Self.sizeStep) } }
+    mutating func smaller(seed: String) { setSize(position("body.r", seed: seed) - Self.sizeStep) }
+    mutating func bigger(seed: String) { setSize(position("body.r", seed: seed) + Self.sizeStep) }
 
     func canGrowTaller(seed: String) -> Bool { position("body.ratio", seed: seed) < HermesBlobEdits.maximum }
     func canGrowWider(seed: String) -> Bool { position("body.ratio", seed: seed) > 0 }
@@ -154,14 +154,26 @@ struct HermesBlobShape: Equatable, Sendable {
         let strength = wobble(seed: seed)
         let mirrored = isMirrored(seed: seed)
         setPositions(Self.scaledSeedBumps(count: count, strength: strength, seed: seed))
-        if mirrored, count.isMultiple(of: 2) { setMirrored(true, seed: seed) }
+        guard mirrored else { return }
+        if count.isMultiple(of: 2) { setMirrored(true, seed: seed) } else { update { $0.mirrored = false } }
     }
 
     /// How much the outline wobbles: 0 smooth, 0.5 the seed's own, 1 twice that.
+    /// Read from the points that stayed inside blobatar's range; a point at an end
+    /// was cut short there, so it says less than the strength that put it there.
     func wobble(seed: String) -> Double {
-        let own = Self.reach((0..<bumps(seed: seed)).map { Self.seedBump($0, seed: seed) })
-        guard own > 0 else { return 0.5 }
-        return min(1, max(0, Self.reach(bumpPositions(seed: seed)) / own * 0.5))
+        let positions = bumpPositions(seed: seed)
+        let scales = positions.indices.compactMap { index -> Double? in
+            let own = Self.seedBump(index, seed: seed) - 0.5
+            let value = positions[index]
+            guard abs(own) > 0.02, value > 0, value < HermesBlobEdits.maximum else { return nil }
+            return (value - 0.5) / own
+        }.sorted()
+        guard !scales.isEmpty else {
+            // Every point flat, or every point cut short.
+            return positions.allSatisfy { abs($0 - 0.5) < 0.006 } ? 0 : 1
+        }
+        return min(1, max(0, scales[scales.count / 2] / 2))
     }
 
     mutating func setWobble(_ strength: Double, seed: String) {
@@ -170,13 +182,9 @@ struct HermesBlobShape: Equatable, Sendable {
         if mirrored { setMirrored(true, seed: seed) }
     }
 
-    /// Whether the outline matches left and right.
-    func isMirrored(seed: String) -> Bool {
-        let positions = bumpPositions(seed: seed)
-        let count = positions.count
-        guard count.isMultiple(of: 2) else { return false }
-        return (0..<count).allSatisfy { abs(positions[$0] - positions[Self.mirror($0, count: count)]) < 0.001 }
-    }
+    /// Whether the outline matches left and right. Kept as its own flag: a smooth
+    /// outline matches too, and it mustn't turn the mirror on by itself.
+    func isMirrored(seed: String) -> Bool { edits?.mirrored == true }
 
     /// Mirroring copies the right side onto the left; an odd count takes the next even one.
     /// Turning it off gives the left side the seed's own bumps again, at the same strength.
@@ -184,6 +192,7 @@ struct HermesBlobShape: Equatable, Sendable {
         var count = bumps(seed: seed)
         guard isOn else {
             setPositions(Self.scaledSeedBumps(count: count, strength: wobble(seed: seed), seed: seed))
+            update { $0.mirrored = false }
             return
         }
         var positions = bumpPositions(seed: seed)
@@ -195,6 +204,7 @@ struct HermesBlobShape: Equatable, Sendable {
             positions[Self.mirror(index, count: count)] = positions[index]
         }
         setPositions(positions)
+        update { $0.mirrored = true }
     }
 
     private func bumpPositions(seed: String) -> [Double] {
@@ -203,6 +213,7 @@ struct HermesBlobShape: Equatable, Sendable {
     }
 
     private mutating func setRatio(_ value: Double) { update { $0.ratio = HermesBlobEdits.clamped(value) } }
+    private mutating func setSize(_ value: Double) { update { $0.size = HermesBlobEdits.clamped(value) } }
 
     private mutating func update(_ change: (inout HermesBlobEdits) -> Void) {
         var next = edits ?? HermesBlobEdits()
@@ -226,15 +237,13 @@ struct HermesBlobShape: Equatable, Sendable {
     /// Point `i` sits at `2πi/count` from the right, so its mirror across the middle is `count/2 - i`.
     private static func mirror(_ index: Int, count: Int) -> Int { ((count / 2 - index) % count + count) % count }
     private static func isRightSide(_ index: Int, count: Int) -> Bool { cos(2 * Double.pi * Double(index) / Double(count)) > -1e-9 }
-    private static func reach(_ positions: [Double]) -> Double {
-        positions.isEmpty ? 0 : positions.map { abs($0 - 0.5) }.reduce(0, +) / Double(positions.count)
-    }
 }
 
 /// Hand edits on a blob face, as blobatar trait positions (0…1, two places), so
 /// any blobatar renderer can draw them with `traits`. Written as the shape
-/// string's fourth part: `e1,h75,s25,n8,w50.62.38…` (version, `body.ratio`,
-/// `body.r`, `body.pts`, then `body.r0`, `body.r1`…). It never holds a `:`.
+/// string's fourth part: `e1,h75,s25,n8,w50.62.38…,m` (version, `body.ratio`,
+/// `body.r`, `body.pts`, then `body.r0`, `body.r1`…, and `m` when the outline is
+/// mirrored, which is only for the editor: the points already match). It never holds a `:`.
 struct HermesBlobEdits: Equatable, Sendable {
     /// `body.ratio`: higher is taller, lower is wider.
     var ratio: Double?
@@ -244,14 +253,17 @@ struct HermesBlobEdits: Equatable, Sendable {
     var bumps: Int?
     /// `body.r<i>`: how far each point reaches; 0.5 is none.
     var wobble: [Double]?
+    /// The editor keeps the left side a copy of the right.
+    var mirrored = false
 
     static let maximum = 0.99
 
-    init(ratio: Double? = nil, size: Double? = nil, bumps: Int? = nil, wobble: [Double]? = nil) {
+    init(ratio: Double? = nil, size: Double? = nil, bumps: Int? = nil, wobble: [Double]? = nil, mirrored: Bool = false) {
         self.ratio = ratio
         self.size = size
         self.bumps = bumps
         self.wobble = wobble
+        self.mirrored = mirrored
     }
 
     /// Reads the fourth part; nil for anything it can't read in full, so the seed face shows.
@@ -260,6 +272,7 @@ struct HermesBlobEdits: Equatable, Sendable {
         let tokens = text.split(separator: ",").map(String.init)
         guard tokens.first == "e1" else { return nil }
         for token in tokens.dropFirst() {
+            if token == "m" { mirrored = true; continue }
             guard let key = token.first else { return nil }
             let value = String(token.dropFirst())
             switch key {
@@ -279,7 +292,7 @@ struct HermesBlobEdits: Equatable, Sendable {
         if let wobble, bumps == nil { bumps = wobble.count }
     }
 
-    var isEmpty: Bool { ratio == nil && size == nil && bumps == nil && wobble == nil }
+    var isEmpty: Bool { ratio == nil && size == nil && bumps == nil && wobble == nil && !mirrored }
 
     var string: String {
         var tokens = ["e1"]
@@ -287,6 +300,7 @@ struct HermesBlobEdits: Equatable, Sendable {
         if let size { tokens.append("s\(Self.digits(size))") }
         if let bumps { tokens.append("n\(bumps)") }
         if let wobble { tokens.append("w" + wobble.map(Self.digits).joined(separator: ".")) }
+        if mirrored { tokens.append("m") }
         return tokens.joined(separator: ",")
     }
 

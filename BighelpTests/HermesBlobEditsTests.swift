@@ -75,8 +75,9 @@ struct HermesBlobEditsTests {
     }
 
     @Test func tallerWiderAndSmallerStepFromTheSeed() {
-        var shape = HermesBlobShape(seedPart: "nova", kind: .organic)
+        var shape = HermesBlobShape(seedPart: "nova", kind: .organic, edits: HermesBlobEdits(ratio: 0.5))
         let start = shape.position("body.ratio", seed: "nova")
+        #expect(start == 0.5)
         shape.taller(seed: "nova")
         #expect(abs((shape.edits?.ratio ?? 0) - min(0.99, start + HermesBlobShape.sizeStep)) < 0.011)
         shape.wider(seed: "nova")
@@ -87,6 +88,9 @@ struct HermesBlobEditsTests {
         for _ in 0..<10 { shape.smaller(seed: "nova") }
         #expect(shape.edits?.size == 0)
         #expect(!shape.canShrink(seed: "nova"))
+        for _ in 0..<10 { shape.taller(seed: "nova") }
+        #expect(shape.edits?.ratio == HermesBlobEdits.maximum)
+        #expect(!shape.canGrowTaller(seed: "nova"))
     }
 
     @Test func wobbleStrengthScalesTheSeedsBumps() throws {
@@ -107,6 +111,9 @@ struct HermesBlobEditsTests {
         #expect(shape.edits?.wobble?.count == 6)
         shape.setBumps(8, seed: "nova")
         #expect(shape.bumps(seed: "nova") == 8)
+        shape.setMirrored(true, seed: "nova")
+        shape.setBumps(7, seed: "nova")
+        #expect(!shape.isMirrored(seed: "nova"))
     }
 
     @Test func mirrorMakesTheOutlineMatchLeftAndRight() throws {
@@ -121,8 +128,23 @@ struct HermesBlobEditsTests {
         for index in 0..<wobble.count {
             #expect(wobble[index] == wobble[(wobble.count / 2 - index + wobble.count) % wobble.count])
         }
+        #expect(HermesBlobShape(shape.string) == shape)
         shape.setMirrored(false, seed: "nova")
         #expect(!shape.isMirrored(seed: "nova"))
+    }
+
+    @Test func aSmoothOutlineIsNotMirroredUntilAskedAndKeepsItsMirror() {
+        var shape = HermesBlobShape(seedPart: "nova", kind: .organic)
+        shape.setWobble(0, seed: "nova")
+        #expect(!shape.isMirrored(seed: "nova"))
+        shape.setMirrored(true, seed: "nova")
+        shape.setWobble(0.8, seed: "nova")
+        #expect(shape.isMirrored(seed: "nova"))
+        let wobble = shape.edits?.wobble ?? []
+        #expect(wobble.count.isMultiple(of: 2))
+        for index in wobble.indices {
+            #expect(wobble[index] == wobble[(wobble.count / 2 - index + wobble.count) % wobble.count])
+        }
     }
 
     @Test func aSavedEditedLookReadsBackTheSame() throws {

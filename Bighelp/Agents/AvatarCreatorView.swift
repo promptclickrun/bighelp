@@ -277,7 +277,7 @@ final class AvatarCreatorModel {
     private var faceHistory: [FaceState] = []
     private static let faceHistoryLimit = 50
 
-    var canUndoFace: Bool { !faceHistory.isEmpty }
+    var canUndoFace: Bool { faceHistory.contains { $0 != FaceState(shape: blobShape, color: faceColor) } }
 
     /// Every face change goes through here, so Undo can step back through them.
     func editFace(_ change: (inout HermesBlobShape, inout String?) -> Void) {
@@ -299,10 +299,16 @@ final class AvatarCreatorModel {
         if faceHistory.count > Self.faceHistoryLimit { faceHistory.removeFirst() }
     }
 
+    /// Steps back to the last face that differs from this one; a kept face that
+    /// matches it (a drag that changed nothing) is skipped.
     func undoFace() {
-        guard let last = faceHistory.popLast() else { return }
-        blobShape = last.shape
-        faceColor = last.color
+        let now = FaceState(shape: blobShape, color: faceColor)
+        while let last = faceHistory.popLast() {
+            guard last != now else { continue }
+            blobShape = last.shape
+            faceColor = last.color
+            return
+        }
     }
 
     /// A finished face from a set: its seed, silhouette and edits, in the color its seed gives.

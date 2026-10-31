@@ -661,6 +661,12 @@ sections can crash only on devices ("Thread stack size exceeded").
   each new connection while bighelp is open, every 15 minutes, and on Background App Refresh; only a read
   where every part worked counts toward the 15 minutes. A read the moment bighelp comes back used the closing
   connection, failed, and then held off every retry.
+- A Usage widget's Plans choice (several, in the picked order; styles about one plan show the first) feeds
+  every style; the single Plan from before stays as a hidden fallback. Each size's styles show several plans
+  as meters or as rings. Names people give plans (Usage › a plan's ••• › Rename…, or Choose) are per
+  gateway, since one provider can be another account on another computer: `BighelpPlanNames` keeps them in
+  the app group, keyed by `ProviderUsagePreferences.key(for:)`, and the widget puts them on itself
+  (`BighelpUsageSnapshot.named`), so a rename only reloads the widgets.
 - A Shortcut on a gateway that isn't in use switches bighelp to it, and the app starts connecting at once.
   `reconnect()` returns at once while another connection is under way, so the Shortcut waits for that one
   (`BighelpShortcutConnectionWait`). `ShortcutGatewaySwitchHostUITests` checks it on two real hosts.
@@ -756,7 +762,8 @@ New code uses Bighelp names. Don't "finish" the rename on this list.
 
 ### Provider logos
 
-- Logos are bundled SVGs in `Bighelp/Resources/Assets.xcassets/ProviderLogo*.imageset`.
+- Logos are bundled SVGs in `Bighelp/Resources/ProviderLogos.xcassets/ProviderLogo*.imageset`, a catalog of
+  their own that the widget extension includes too (the Usage widget draws them).
 - To add one:
   - Add it to `APPROVED_NAMES` in `Scripts/publish-provider-logos.py`.
   - Record it in `ProviderLogos-PROVENANCE.md` and `ProviderLogos-NOTICES.txt`.

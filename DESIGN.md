@@ -160,8 +160,16 @@ computer called only by its address shows as "Computer 2". **Bots** shows one, t
 medium, large) on a chosen gateway, on the plain page color: each bot's face (a Simple Bot shape standing free, a
 photo in a circle, its default shape without a picture) over its name, and a tap opens its Bot Chat on that gateway.
 The app writes every gateway's bots and faces into the app group (`BighelpBotsWidgetFeed`, the computer in use live
-and the others from All agents), so the widget keeps them with bighelp closed. On Vision Pro the same widgets sit on
-a wall or table as glass, without the Lock Screen sizes.
+and the others from All agents), so the widget keeps them with bighelp closed. **Usage** shows each plan's limits as
+the plugin reports them, for the gateway in use or a chosen one. Each size lists only its own styles: small (Ring,
+Two meters, What's left, Four plans, Closest to limit), medium (One plan, Every plan, Next resets, Side by side),
+large (Every plan, One plan), extra large (a column per plan), Cost and tokens in the first three, and the Lock
+Screen (a line over the clock, a gauge, and a rectangle with one plan, every plan or the next reset). Automatic
+picks one plan or several by what there is. A share turns amber at 80% used and red at 100%, and a used-up limit
+shows a lock and the countdown to its reset in every style. Logos come from `ProviderLogos.xcassets` and each
+provider's color shows in full color only; tinted, clear and Lock Screen looks draw one ink, so meters and locks
+carry the meaning. It shows only what Hermes and the plugin report: no pace, no daily share of a limit, no API-rate
+value. On Vision Pro the same widgets sit on a wall or table as glass, without the Lock Screen sizes.
 
 Apps: **Artifacts** lists what the agent made or changed lately, newest first, from one plugin request
 (`files.recent`, plugin 2.15+): its `write_file`/`patch` history and deliveries plus new top-level files. It never

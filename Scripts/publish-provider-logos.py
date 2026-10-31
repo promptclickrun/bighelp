@@ -20,7 +20,7 @@ import xml.etree.ElementTree as ET
 import zlib
 
 ROOT = Path(__file__).resolve().parents[1]
-ASSETS = ROOT / "Bighelp/Resources/Assets.xcassets"
+ASSETS = ROOT / "Bighelp/Resources/ProviderLogos.xcassets"
 NOTICES = ROOT / "Bighelp/Resources/ProviderLogos-NOTICES.txt"
 APPROVED_NAMES = frozenset(
     "ProviderLogo" + name for name in (

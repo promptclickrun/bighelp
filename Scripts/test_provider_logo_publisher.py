@@ -55,7 +55,7 @@ class ProviderLogoPublisherTests(unittest.TestCase):
             base = Path(output) / "provider-logos" / "v1"
             catalog = json.loads((base / "manifest.json").read_text())
             self.assertEqual(catalog["schemaVersion"], 1)
-            sets = sorted((ROOT / "Bighelp/Resources/Assets.xcassets").glob("ProviderLogo*.imageset"))
+            sets = sorted((ROOT / "Bighelp/Resources/ProviderLogos.xcassets").glob("ProviderLogo*.imageset"))
             self.assertEqual(set(catalog["logos"]), {s.stem for s in sets})
             for name, entry in catalog["logos"].items():
                 self.assertEqual(set(entry), {"light", "dark"})

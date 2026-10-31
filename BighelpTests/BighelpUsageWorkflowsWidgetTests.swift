@@ -207,13 +207,9 @@ struct BighelpUsageWorkflowsWidgetTests {
                     ("workflows", AnyView(BighelpWorkflowsWidgetView(entry: WorkflowsWidgetEntry.preview, familyOverride: family))),
                     ("workflows-none", AnyView(BighelpWorkflowsWidgetView(entry: emptyRuns, familyOverride: family))),
                 ]
-                for content in [UsageWidgetContent.overview, .plans, .cost, .tokens, .models] {
-                    let preview = UsageWidgetEntry.preview
-                    let entry = UsageWidgetEntry(date: .now, snapshot: preview.snapshot, palette: palette,
-                                                 content: content, planID: nil)
-                    views.append(("usage-\(content.rawValue)",
-                                  AnyView(BighelpUsageWidgetView(entry: entry, familyOverride: family))))
-                }
+                // Every Usage style is drawn in BighelpUsageWidgetRenderTests.
+                let usage = UsageWidgetEntry(date: .now, snapshot: UsageWidgetEntry.preview.snapshot, palette: palette)
+                views.append(("usage", AnyView(BighelpUsageWidgetView(entry: usage, familyOverride: family))))
                 for (kind, view) in views {
                     let content = view
                         .padding(16)

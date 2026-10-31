@@ -78,7 +78,32 @@ final class ProviderUsageUITests: BighelpUITestCase {
         showAll.tap()
         app.buttons["usage.limits.done"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["provider-usage.openrouter"].waitForExistence(timeout: 5))
+
+        // A plan's menu names it; the card shows the name over the provider's, and the name can go again.
+        rename("claude", to: "Personal Claude", in: app, page: page)
+        let name = app.staticTexts["provider-usage.claude.name"]
+        XCTAssertEqual(name.label, "Personal Claude")
+        save("usage-7-named-plan-\(appearance)", app)
+        rename("claude", to: "", in: app, page: page)
+        XCTAssertEqual(name.label, "Claude")
         XCTAssertEqual(app.state, .runningForeground)
+    }
+
+    /// Rename… in a plan card's menu: replaces the name, or clears it with "".
+    @MainActor
+    private func rename(_ providerID: String, to name: String, in app: XCUIApplication, page: XCUIElement) {
+        let more = app.buttons["provider-usage.\(providerID).more"]
+        for _ in 0..<6 where !clearOfHeader(more, in: app) { page.swipeDown() }
+        XCTAssertTrue(more.waitForExistence(timeout: 3))
+        more.tap()
+        let rename = app.buttons["Rename…"]
+        XCTAssertTrue(rename.waitForExistence(timeout: 3))
+        rename.tap()
+        let field = app.alerts.textFields.firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 3))
+        field.tap()
+        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 40) + name)
+        app.alerts.buttons["Save"].firstMatch.tap()
     }
 
     @MainActor

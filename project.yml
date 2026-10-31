@@ -181,6 +181,8 @@ targets:
     sources:
       - path: BighelpLiveActivity
       - path: BighelpActivityShared
+      # The Usage widget draws the same provider logos as the app.
+      - path: Bighelp/Resources/ProviderLogos.xcassets
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.loopdy.mobile.live-activity

@@ -74,7 +74,7 @@ struct UsageView: View {
         }
         .bighelpSheet(isPresented: $isChoosingProviders) {
             NavigationStack {
-                ProviderUsageSettingsView(store: providerUsage)
+                ProviderUsageSettingsView(store: providerUsage, gatewayID: selectedHostID)
                     .toolbar {
                         ToolbarItem(placement: .confirmationAction) {
                             Button("Done") { isChoosingProviders = false }

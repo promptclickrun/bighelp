@@ -15,7 +15,10 @@ enum BighelpWidgetGatewayPublisher {
         last = list
         try? list.save()
         // No computers listed yet (still loading) never clears the copies.
-        if !list.gateways.isEmpty { removeCopies(keeping: Set(list.gateways.map(\.id)), in: directory) }
+        if !list.gateways.isEmpty {
+            removeCopies(keeping: Set(list.gateways.map(\.id)), in: directory)
+            BighelpPlanNames.keep(gateways: Set(list.gateways.map(\.id)))
+        }
         for kind in BighelpWidgetSnapshot.widgetKinds + [BighelpUsageSnapshot.kind] {
             WidgetCenter.shared.reloadTimelines(ofKind: kind)
         }

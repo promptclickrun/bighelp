@@ -7,9 +7,16 @@ short sentences, one instruction in each step, and the active voice.
 
 ### Usage widgets
 
-- **Styles:** touch and hold a Usage widget, tap **Edit Widget**, and select a **Style**. Each size shows your plans as meters or as rings. **Automatic** shows one plan or all of them.
-- **New sizes:** an extra-large widget on iPad and Vision Pro, and a line above the clock on the Lock Screen.
+- **New designs:** each Usage widget size has new styles. Touch and hold a widget, tap **Edit Widget**, and select a **Style**. **Automatic** shows one plan or all of them.
+- **Lock Screen:** you can put Usage on the Lock Screen. Select a line above the clock, a gauge or a rectangle.
+- **iPad and Vision Pro:** the extra large size shows a column for each plan.
+- **Plans that you select:** in **Edit Widget**, select **Plans**. The widget shows them in your order, as meters or as rings.
 - **Near the limit:** a plan turns amber at 80% used and red at 100%. A used-up plan shows a lock and the time until it resets.
+- **Plan names:** you can give a plan a name. In **Usage**, tap **•••** on a plan, and then tap **Rename…**. The widgets show the name too.
+
+### Changed
+
+- **Cost and tokens:** the **Show** choice is gone. A Usage widget that showed Cost, Tokens or Top models now starts on **Automatic**. To show them again, select the **Cost and tokens** style in **Edit Widget**.
 
 ### Fixed
 

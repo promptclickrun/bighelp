@@ -2,7 +2,8 @@ import AVFoundation
 import Foundation
 import os
 
-/// A call whose peer keeps an audio report: Nerd Mode shows it on the call screen, with Restart sound.
+/// A call whose peer keeps an audio report: Settings › Voice › Debug shows it on the call screen and has
+/// Restart sound (`LiveVoiceDebug`).
 @MainActor
 protocol LiveVoiceAudioReporting: AnyObject {
     func audioReport() -> String

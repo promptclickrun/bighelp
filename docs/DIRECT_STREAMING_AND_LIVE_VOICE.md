@@ -63,11 +63,13 @@ A Gemini session lasts up to 30 minutes from its token; the call ends when Gemin
 Voice processing makes a configuration change right after the engine starts, on iPhone and in the simulator. The
 engine stops, and the peer starts it again (`GeminiLiveAudioPeer.restart`). The player stops first: started
 again while it still said it was playing, it took every piece of Gemini's voice and played none, until Gemini
-cut itself off and the player stopped. In Nerd Mode the call screen shows a call audio report, once a second:
-what Gemini sent, what was scheduled and finished, the main mixer's output level, the engine, the session and
-the route, and each change with its time (`GeminiLiveAudioDiagnostics`, also in the `LiveVoiceAudio` log). Copy
-report puts it on the clipboard; Restart sound stops and starts the player only. Bots mode's voice bar has both
-in its menu.
+cut itself off and the player stopped. Each call keeps a call audio report: what Gemini sent, what was
+scheduled and finished, the main mixer's output level, the engine, the session and the route, and each change
+with its time (`GeminiLiveAudioDiagnostics`, also in the `LiveVoiceAudio` log every 10 s). Settings › Voice ›
+Debug, in Nerd Mode only, has a switch for each part the call screen shows (`LiveVoiceDebug`, both off at
+first): Show call sound report shows it once a second, and Copy report button puts Copy report there and in
+Bots mode's voice bar menu. Its Restart sound stops and starts the player of the Gemini Live call in progress
+only (`LiveVoiceCurrentCall`, a weak reference the call clears as it ends).
 
 ## Team call
 

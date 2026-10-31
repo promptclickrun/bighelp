@@ -511,9 +511,13 @@ struct BighelpAppComposition {
         #endif
         #if DEBUG
         if usesFixtures, arguments.contains("-test-live-voice") {
+            let keepsReport = arguments.contains(DemoLiveVoiceReportCall.launchArgument)
             featureStore.configureLiveVoiceFactory { session, agent, _ in
                 let owner = LiveVoiceOwner(hostID: "fixture-host", authorizationID: "inert-ui-fixture",
                     agentID: session.agentIDs.first ?? "fixture-agent", sessionID: session.id)
+                if keepsReport {
+                    return DemoLiveVoiceReportCall.model(owner: owner, agentName: agent?.name ?? "bighelp")
+                }
                 let control = LiveVoiceControlClient(owner: owner, operation: { _, _ in
                     // Never reaches the peer, microphone, network or provider.
                     throw LiveVoiceControlError.unavailable

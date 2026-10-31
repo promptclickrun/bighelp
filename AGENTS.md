@@ -200,8 +200,9 @@ change in both repos.
   chat, and results go back as `UPDATE` text (docs/DIRECT_STREAMING_AND_LIVE_VOICE.md). Voice processing makes
   a configuration change right after the engine starts: every restart stops the player first
   (`GeminiLiveAudioPeer.restart`), or it takes Gemini's voice and plays none. A test that only counts bytes
-  received can't see that; check what finished playing. Nerd Mode's call audio report on the call screen
-  (`GeminiLiveAudioDiagnostics`, log category `LiveVoiceAudio`) shows where the sound stops on a device.
+  received can't see that; check what finished playing. The call audio report (`GeminiLiveAudioDiagnostics`,
+  log category `LiveVoiceAudio`) shows where the sound stops on a device; Settings › Voice › Debug (Nerd Mode)
+  shows it on the call screen and has Restart sound.
   With plugin `native-voice-context-v1`, the offer also says who is talking and where
   (`LiveVoiceCallContext`): the agent's shown name, the person's saved name (never "You"), the time zone and,
   only while Device access › Location is usable, a coarse place (`LiveVoicePlace`: city, region, country from

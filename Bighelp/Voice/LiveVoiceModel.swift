@@ -131,6 +131,8 @@ final class LiveVoiceModel {
     @ObservationIgnored private var jobsRequest = UUID()
     @ObservationIgnored private var isSpeechControlPending = false
     @ObservationIgnored private var admittedDelegationIDs: Set<String> = []
+    /// Settings › Voice › Debug's Restart sound reaches the call in progress through it.
+    @ObservationIgnored var currentCall = LiveVoiceCurrentCall.shared
 
     init(
         agentName: String,
@@ -164,6 +166,7 @@ final class LiveVoiceModel {
     func start() {
         guard canStart else { return }
         Telemetry.featureUsed(.voiceLive)
+        currentCall.began(self)
         generation = UUID()
         let token = generation
         let id = "voice_\(UUID().uuidString)"
@@ -262,14 +265,18 @@ final class LiveVoiceModel {
         peer?.setMuted(muted)
     }
 
-    /// Nerd Mode's report of where this call's sound goes on the device; nil for a call without one (GPT-Live).
+    /// The report of where this call's sound goes on the device (Settings › Voice › Debug); nil for a call
+    /// without one (GPT-Live).
     func audioReport() -> String? { (peer as? LiveVoiceAudioReporting)?.audioReport() }
 
     /// Cheap to ask on every redraw, unlike the report itself.
     var keepsAudioReport: Bool { peer is LiveVoiceAudioReporting }
 
-    /// Nerd Mode's Restart sound: stops and starts the call's player only.
+    /// Settings › Voice › Debug's Restart sound: stops and starts the call's player only.
     func restartPlayback() { (peer as? LiveVoiceAudioReporting)?.restartPlayback() }
+
+    /// Reads `phase`, so Settings sees the call open and end.
+    var canRestartPlayback: Bool { isCallOpen && keepsAudioReport }
 
     func setSpeakerMuted(_ muted: Bool) {
         guard canControlAudio else { return }
@@ -516,6 +523,7 @@ final class LiveVoiceModel {
     }
 
     private func stopLocal() {
+        currentCall.ended(self)
         generation = UUID()
         startTask?.cancel()
         startTask = nil

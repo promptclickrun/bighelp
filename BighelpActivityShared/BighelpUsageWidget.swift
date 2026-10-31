@@ -4,7 +4,8 @@ import WidgetKit
 
 /// What the Usage widget shows: the plans and limits Hermes found on the
 /// computer, and what the agents used over the last 30 days (estimated cost,
-/// tokens, the models they used most). The app writes it; the widget only reads it.
+/// tokens, the models they used most). Each gateway has its own; the app writes
+/// them and the widget only reads them.
 struct BighelpUsageSnapshot: Codable, Equatable, Sendable {
     /// One subscription or API account, with its limits as a share left.
     struct Plan: Codable, Equatable, Sendable, Identifiable {
@@ -66,29 +67,50 @@ struct BighelpUsageSnapshot: Codable, Equatable, Sendable {
     var totals: Totals?
     var models: [Model] = []
     var daily: [Day] = []
+    /// Why there are no numbers yet ("Couldn't reach this host."), while none were ever read.
+    var note: String?
     var generatedAt: Date = .distantPast
 
     static let empty = BighelpUsageSnapshot()
     static let kind = "BighelpUsageWidget"
+    /// The demo's numbers: it has no gateway IDs.
     static let fileName = "bighelp-usage-widget-v1.json"
+    static let gatewayFilePrefix = "bighelp-usage-widget-v1-"
     static let maximumPlans = 12
     static let maximumModels = 5
 
-    static var fileURL: URL? {
-        FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: BighelpWidgetSnapshot.appGroup)?
-            .appendingPathComponent(fileName, isDirectory: false)
+    static var directory: URL? {
+        FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: BighelpWidgetSnapshot.appGroup)
     }
 
-    static func load() -> BighelpUsageSnapshot {
-        guard let url = fileURL, let data = try? Data(contentsOf: url), data.count <= 131_072,
+    /// A gateway's file, by its ID in bighelp (a UUID); nil is the demo's.
+    static func fileURL(gateway: String?, in directory: URL? = directory) -> URL? {
+        let name: String
+        if let gateway {
+            guard let id = UUID(uuidString: gateway) else { return nil }
+            name = gatewayFilePrefix + id.uuidString + ".json"
+        } else {
+            name = fileName
+        }
+        return directory?.appendingPathComponent(name, isDirectory: false)
+    }
+
+    static func load(gateway: String?, in directory: URL? = directory) -> BighelpUsageSnapshot {
+        guard let url = fileURL(gateway: gateway, in: directory), let data = try? Data(contentsOf: url),
+              data.count <= 131_072,
               let value = try? JSONDecoder.bighelpWidget.decode(Self.self, from: data) else { return .empty }
         return value
     }
 
-    func save() throws {
-        guard let url = Self.fileURL else { return }
+    func save(gateway: String?, in directory: URL? = Self.directory) throws {
+        guard let url = Self.fileURL(gateway: gateway, in: directory) else { return }
         try JSONEncoder.bighelpWidget.encode(self)
             .write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+    }
+
+    /// What a widget set to `gateway` shows; nil follows the gateway in use.
+    static func shown(gateway: String?) -> BighelpUsageSnapshot {
+        load(gateway: gateway ?? BighelpWidgetGatewayList.inUseID())
     }
 
     var hasData: Bool { totals != nil || plans != nil }
@@ -120,19 +142,27 @@ struct UsageWidgetPlan: AppEntity {
     var displayRepresentation: DisplayRepresentation { DisplayRepresentation(title: "\(name)") }
 }
 
+/// The plans on the widget's gateway.
 struct UsageWidgetPlanQuery: EntityQuery {
+    @IntentParameterDependency<UsageWidgetIntent>(\.$gateway) private var intent
+
     func entities(for identifiers: [String]) async throws -> [UsageWidgetPlan] {
         try await suggestedEntities().filter { identifiers.contains($0.id) }
     }
 
     func suggestedEntities() async throws -> [UsageWidgetPlan] {
-        (BighelpUsageSnapshot.load().plans ?? []).map { UsageWidgetPlan(id: $0.id, name: $0.name) }
+        (BighelpUsageSnapshot.shown(gateway: intent?.gateway.hostID).plans ?? [])
+            .map { UsageWidgetPlan(id: $0.id, name: $0.name) }
     }
 }
 
 struct UsageWidgetIntent: WidgetConfigurationIntent {
     static let title: LocalizedStringResource = "Usage"
-    static let description = IntentDescription("Choose what to show: plans and limits, cost, tokens or top models.")
+    static let description = IntentDescription(
+        "Choose a gateway and what to show: plans and limits, cost, tokens or top models.")
+
+    @Parameter(title: "Gateway")
+    var gateway: BighelpWidgetGateway?
 
     @Parameter(title: "Show", default: .overview)
     var content: UsageWidgetContent
@@ -149,6 +179,8 @@ struct UsageWidgetEntry: TimelineEntry {
     let palette: BighelpWidgetSnapshot
     let content: UsageWidgetContent
     let planID: String?
+    /// The chosen gateway; nil follows the one in use. A tap opens Usage there.
+    var hostID: String? = nil
 
     var plans: [BighelpUsageSnapshot.Plan] {
         let plans = snapshot.plans ?? []
@@ -203,13 +235,14 @@ struct UsageWidgetProvider: AppIntentTimelineProvider {
     }
 
     func timeline(for configuration: UsageWidgetIntent, in context: Context) async -> Timeline<UsageWidgetEntry> {
-        // The app reloads this when it reads new numbers; this is only a safety net.
+        // The app reloads this when it reads new numbers, also from the background; this is only a safety net.
         Timeline(entries: [entry(for: configuration)], policy: .after(.now.addingTimeInterval(60 * 60)))
     }
 
     private func entry(for configuration: UsageWidgetIntent) -> UsageWidgetEntry {
-        UsageWidgetEntry(date: .now, snapshot: BighelpUsageSnapshot.load(), palette: BighelpWidgetSnapshot.load(),
-                         content: configuration.content, planID: configuration.plan?.id)
+        let hostID = configuration.gateway?.hostID
+        return UsageWidgetEntry(date: .now, snapshot: .shown(gateway: hostID), palette: .load(gateway: hostID),
+                                content: configuration.content, planID: configuration.plan?.id, hostID: hostID)
     }
 }
 
@@ -255,8 +288,7 @@ struct BighelpUsageWidgetView: View {
                     header
                     if !snapshot.hasData {
                         Spacer(minLength: 0)
-                        Text("Open Usage in bighelp to see your numbers here.")
-                            .font(.caption).foregroundStyle(colors.secondary)
+                        Text(waiting).font(.caption).foregroundStyle(colors.secondary)
                         Spacer(minLength: 0)
                     } else {
                         content
@@ -265,8 +297,11 @@ struct BighelpUsageWidgetView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
         }
-        .widgetURL(BighelpUsageSnapshot.url)
+        .widgetURL(BighelpWidgetSnapshot.link(BighelpUsageSnapshot.url, onGateway: entry.hostID))
     }
+
+    /// No numbers yet: why, or that they come on their own.
+    private var waiting: String { snapshot.note ?? "Your numbers show here once bighelp reads them." }
 
     private var title: String {
         switch entry.content {
@@ -386,7 +421,7 @@ struct BighelpUsageWidgetView: View {
 
     @ViewBuilder private var plansFallback: some View {
         Text(snapshot.plansNote ?? (snapshot.plans == nil
-             ? "Open Usage in bighelp to see your plans here."
+             ? snapshot.note ?? "Your plans show here once bighelp reads them."
              : "No plans found on your computer."))
             .font(.caption).foregroundStyle(colors.secondary)
     }
@@ -457,7 +492,7 @@ struct BighelpUsageWidgetView: View {
                 }
             }
         } else {
-            Text("Open Usage in bighelp to see your numbers here.").font(.caption).foregroundStyle(colors.secondary)
+            Text(waiting).font(.caption).foregroundStyle(colors.secondary)
             Spacer(minLength: 0)
         }
     }
@@ -494,7 +529,7 @@ struct BighelpUsageWidgetView: View {
 
     @ViewBuilder private var models: some View {
         if snapshot.models.isEmpty {
-            Text(snapshot.totals == nil ? "Open Usage in bighelp to see your numbers here." : "No model use in the last \(snapshot.days) days.")
+            Text(snapshot.totals == nil ? waiting : "No model use in the last \(snapshot.days) days.")
                 .font(.caption).foregroundStyle(colors.secondary)
             Spacer(minLength: 0)
         } else {
@@ -580,7 +615,7 @@ struct BighelpUsageWidgetView: View {
                              : "\(UsageWidgetFormat.tokens(totals.tokens)) tokens · \(snapshot.days) days")
                             .font(.caption).lineLimit(1)
                     } else {
-                        Text("Open Usage in bighelp").font(.caption)
+                        Text("No numbers yet").font(.caption)
                     }
                 }
             }
@@ -619,7 +654,7 @@ struct BighelpUsageWidget: Widget {
             }
         }
         .configurationDisplayName("Usage")
-        .description("Plans and limits, estimated cost, tokens or top models. Pick what to show.")
+        .description("Plans and limits, estimated cost, tokens or top models. Pick a gateway and what to show.")
         .supportedFamilies(Self.families)
         .bighelpWidgetPlacement()
     }

@@ -84,6 +84,78 @@ struct BighelpUsageWorkflowsWidgetTests {
         #expect(plans[0].inUse)
     }
 
+    @Test func aFailedReadDoesNotHoldBackTheNextOne() async throws {
+        let folder = try temporaryFolder(), home = UUID().uuidString
+        let reads = Box(0)
+        let sources = UsageWidgetPublisher.Sources(inUseID: { home }, readInUse: {
+            reads.value += 1
+            return HostUsage(id: home, name: "Home", failure: "bighelp isn't connected to this computer right now.")
+        }, others: nil)
+        await UsageWidgetPublisher.refresh(sources, gateways: [nil], directory: folder)
+        #expect(BighelpUsageSnapshot.load(gateway: home, in: folder).note
+                == "bighelp isn't connected to this computer right now.", "With no numbers yet, the widget says why")
+        await UsageWidgetPublisher.refresh(sources, gateways: [nil], directory: folder)
+        #expect(reads.value == 2, "Nothing was read the first time, so the next refresh reads again")
+    }
+
+    @Test func totalsMissingAnAgentNeverReplaceTheGatewaysTotals() async throws {
+        let folder = try temporaryFolder(), home = UUID().uuidString
+        let full = HostUsage(id: home, name: "Home", agents: [
+            AgentUsage(id: "juno", name: "Juno", report: UsageFixtures.report(seed: 3, days: 30)),
+            AgentUsage(id: "rio", name: "Rio", report: UsageFixtures.report(seed: 8, days: 30)),
+        ])
+        var partial = full
+        partial.agents.removeFirst()
+        partial.unreadAgents = ["Juno"]
+        let next = Box(partial)
+        let sources = UsageWidgetPublisher.Sources(inUseID: { home }, readInUse: { next.value }, others: nil)
+
+        await UsageWidgetPublisher.refresh(sources, gateways: [nil], directory: folder)
+        #expect(BighelpUsageSnapshot.load(gateway: home, in: folder).totals == nil)
+        #expect(BighelpUsageSnapshot.load(gateway: home, in: folder).note == "Couldn't read every agent's usage.")
+
+        next.value = full
+        await UsageWidgetPublisher.refresh(sources, gateways: [nil], directory: folder)
+        let shown = try #require(BighelpUsageSnapshot.load(gateway: home, in: folder).totals)
+        #expect(BighelpUsageSnapshot.load(gateway: home, in: folder).note == nil)
+        var snapshot = BighelpUsageSnapshot.empty
+        UsageWidgetPublisher.apply(UsageSummary(hosts: [full], days: 30), to: &snapshot)
+        #expect(shown == snapshot.totals, "Both agents, read together")
+    }
+
+    @Test func eachUsageWidgetReadsItsOwnGateway() async throws {
+        let folder = try temporaryFolder(), home = UUID().uuidString, studio = UUID()
+        let others = StudioUsage(studio: studio)
+        let sources = UsageWidgetPublisher.Sources(inUseID: { home }, readInUse: {
+            HostUsage(id: home, name: "Home", agents: [AgentUsage(id: "juno", name: "Juno",
+                                                                   report: UsageFixtures.report(seed: 3, days: 30))])
+        }, others: others)
+        // One widget follows the gateway in use, two are set to Studio.
+        await UsageWidgetPublisher.refresh(sources, gateways: [nil, studio.uuidString, studio.uuidString], directory: folder)
+        let homeNumbers = BighelpUsageSnapshot.load(gateway: home, in: folder)
+        let studioNumbers = BighelpUsageSnapshot.load(gateway: studio.uuidString, in: folder)
+        #expect(homeNumbers.totals != nil && studioNumbers.totals != nil)
+        #expect(homeNumbers.totals != studioNumbers.totals, "Each gateway keeps its own numbers")
+        #expect(studioNumbers.plans?.map(\.id) == ["claude"], "Another gateway's plans come with its usage")
+        #expect(others.reads == [studio], "Studio is read once, over its own sign-in")
+
+        // Read a minute ago: the next refresh leaves both alone.
+        await UsageWidgetPublisher.refresh(sources, gateways: [studio.uuidString], directory: folder)
+        #expect(others.reads == [studio])
+    }
+
+    @Test func numbersReadAfterASwitchAreNotFiledUnderTheOldGateway() async throws {
+        let folder = try temporaryFolder(), home = UUID().uuidString, studio = UUID().uuidString
+        let inUse = Box(home)
+        let sources = UsageWidgetPublisher.Sources(inUseID: { inUse.value }, readInUse: {
+            inUse.value = studio
+            return HostUsage(id: studio, name: "Studio", agents: [AgentUsage(id: "rio", name: "Rio",
+                                                                             report: UsageFixtures.report(seed: 8, days: 30))])
+        }, others: nil)
+        await UsageWidgetPublisher.refresh(sources, gateways: [nil], directory: folder)
+        #expect(!BighelpUsageSnapshot.load(gateway: home, in: folder).hasData)
+    }
+
     @Test func usageNumbersReadShort() {
         #expect(UsageWidgetFormat.cost(598.84) == "$598.84")
         #expect(UsageWidgetFormat.tokens(96_600_000) == "96.6M")
@@ -160,6 +232,41 @@ struct BighelpUsageWorkflowsWidgetTests {
                     }
                 }
             }
+        }
+    }
+
+    private func temporaryFolder() throws -> URL {
+        let folder = FileManager.default.temporaryDirectory.appending(path: "usage-widget-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        return folder
+    }
+
+    private final class Box<Value> {
+        var value: Value
+        init(_ value: Value) { self.value = value }
+    }
+
+    /// Another gateway, Studio: one agent's usage and a Claude plan, over its own sign-in.
+    private final class StudioUsage: FleetHostReading {
+        let studio: UUID
+        private(set) var reads: [UUID] = []
+        init(studio: UUID) { self.studio = studio }
+
+        var hosts: [FleetHost] { [FleetHost(id: studio, name: "Studio", isSelected: false)] }
+        func read(_ hostID: UUID, avatars: FleetAvatarFolder) async throws -> FleetSnapshot { FleetSnapshot(refreshedAt: .now) }
+        func select(_ hostID: UUID) {}
+        func canOpen(_ hostID: UUID) -> Bool { true }
+        func setPinned(_ pinned: Bool, hostID: UUID, profileID: String) -> Bool { false }
+
+        func usage(_ hostID: UUID, name: String, days: Int, refresh: Bool) async -> HostUsage {
+            reads.append(hostID)
+            let claude = ProviderUsage(id: "claude", name: "Claude", status: .ok, message: nil, plan: "Max", detectedVia: [],
+                                       activeInHermes: true, windows: [.init(label: "Week", usedPercent: 40, resetsAt: nil, detail: nil)],
+                                       facts: [], manageURL: nil, approximate: false)
+            return HostUsage(id: hostID.uuidString, name: "Studio",
+                             agents: [AgentUsage(id: "rio", name: "Rio", report: UsageFixtures.report(seed: 8, days: 30))],
+                             limits: .loaded(ProviderUsageReport(agentID: "default", fetchedAt: nil, cached: false,
+                                                                 providers: [claude])))
         }
     }
 

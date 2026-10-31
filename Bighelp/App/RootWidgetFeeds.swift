@@ -1,11 +1,15 @@
 import SwiftUI
 
-/// The Usage and Workflows widgets read what the app saves while it's open.
-/// Both read only when one of them is on the Home Screen.
+/// The Usage and Workflows widgets read what the app saves. Both read only when
+/// one of them is on the Home Screen; Usage also reads from the background.
 extension RootShellView {
+    /// Each connection (a reconnect when bighelp comes back makes a new one) reads again, once
+    /// the agents are known.
     struct UsageWidgetKey: Equatable {
-        let usage: UsageReaderKey
-        let plans: ProviderUsageKey
+        let owner: WorkspaceOwner?
+        let agentsKnown: Bool
+        let fixtures: Bool
+        let hostID: String
         let isActive: Bool
     }
 
@@ -16,7 +20,8 @@ extension RootShellView {
     }
 
     var usageWidgetKey: UsageWidgetKey {
-        UsageWidgetKey(usage: usageReaderKey, plans: providerUsageKey, isActive: scenePhase == .active)
+        UsageWidgetKey(owner: currentWorkspaceOwner, agentsKnown: agents.knowsProfiles,
+                       fixtures: providerUsageKey.fixtures, hostID: usageHostID, isActive: scenePhase == .active)
     }
 
     var workflowsWidgetKey: WorkflowsWidgetKey {
@@ -24,20 +29,29 @@ extension RootShellView {
                            isAvailable: workflowsAvailability.isAvailable == true, isActive: scenePhase == .active)
     }
 
-    /// The last 30 days and the plans, at most every 15 minutes while bighelp is open.
-    func refreshUsageWidget() async {
-        guard scenePhase == .active, await UsageWidgetPublisher.isInstalled() else { return }
-        let made = usageReader(usageReaderKey)
-        let key = providerUsageKey
-        let plans: (any ProviderUsageClient)? = if key.fixtures {
-            DemoProviderUsageClient()
-        } else if key.signIn != nil, let connections = workspaceConnections {
-            DirectHermesProviderUsageClient(currentWorkspace: { [weak connections] in connections?.workspace })
-        } else {
-            nil
+    /// Each Usage widget's gateway, while bighelp is open: now and every 15 minutes.
+    func followUsageWidget() async {
+        guard scenePhase == .active else { return }
+        while !Task.isCancelled {
+            if let sources = usageWidgetSources { UsageWidgetPublisher.start(sources) }
+            try? await Task.sleep(for: UsageWidgetPublisher.interval)
         }
-        await UsageWidgetPublisher.refresh(reader: made?.reader, plans: plans, agentID: homeAgent?.id ?? "default",
-                                           scope: made?.scope)
+    }
+
+    /// The demo's own numbers, or the gateway in use over this connection and the others over theirs.
+    /// Nothing while the connection is down (a read then fails, and the reconnect reads anyway) or
+    /// before the agents are known (a read then has only the default agent's).
+    private var usageWidgetSources: UsageWidgetPublisher.Sources? {
+        if providerUsageKey.fixtures {
+            let host = usageReaderKey, agents = self.agents
+            let reader = DemoUsageReader(hostID: host.hostID, hostName: host.hostName,
+                                         agents: { agents.profiles.map { ($0.id, $0.name) } }, fleet: nil)
+            // The demo's sample gateways: its numbers go where the widgets look for the one in use.
+            return .init(inUseID: { BighelpWidgetGatewayList.inUseID() }, reader: reader, plans: DemoProviderUsageClient(),
+                         agentID: homeAgent?.id ?? "default", others: nil)
+        }
+        guard currentWorkspaceOwner != nil, agents.knowsProfiles, let connections = workspaceConnections else { return nil }
+        return .live(connections: connections, agents: agents, fleet: fleet)
     }
 
     /// Running workflows, read while bighelp is open and a run is going.

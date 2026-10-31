@@ -76,15 +76,20 @@ struct AgentAvatarLook: Codable, Equatable, Sendable {
 
 /// A blob face's shape string, as Hermes Desktop writes it:
 /// `blobatar` follows the name, `blobatar:<seed>` is locked,
-/// and a third part pins one of the silhouettes.
+/// and a third part pins one of the silhouettes. bighelp adds a fourth for
+/// hand edits (`HermesBlobEdits`), which Desktop skips: it reads two parts
+/// after `blobatar` and rebuilds the string without the rest when it edits.
 struct HermesBlobShape: Equatable, Sendable {
     /// The locked seed; empty while the face follows the name.
     var seedPart: String
     var kind: HermesBlobFace.Kind?
+    /// Hand edits on top of the seed's body; nil draws the seed face as blobatar does.
+    var edits: HermesBlobEdits?
 
-    init(seedPart: String = "", kind: HermesBlobFace.Kind? = nil) {
+    init(seedPart: String = "", kind: HermesBlobFace.Kind? = nil, edits: HermesBlobEdits? = nil) {
         self.seedPart = seedPart
         self.kind = kind
+        self.edits = edits
     }
 
     init?(_ shape: String?) {
@@ -92,9 +97,12 @@ struct HermesBlobShape: Equatable, Sendable {
         let parts = shape.split(separator: ":", omittingEmptySubsequences: false).map(String.init)
         seedPart = parts.count > 1 ? parts[1] : ""
         kind = parts.count > 2 ? HermesBlobFace.Kind(rawValue: parts[2]) : nil
+        // Edits that don't read leave the seed face, never a blank one.
+        edits = parts.count > 3 ? HermesBlobEdits(parts[3]) : nil
     }
 
     var string: String {
+        if let edits, !edits.isEmpty { return "blobatar:\(seedPart):\(kind?.rawValue ?? ""):\(edits.string)" }
         if let kind { return "blobatar:\(seedPart):\(kind.rawValue)" }
         return seedPart.isEmpty ? "blobatar" : "blobatar:\(seedPart)"
     }
@@ -112,4 +120,192 @@ struct HermesBlobShape: Equatable, Sendable {
         let alphabet = Array("0123456789abcdefghijklmnopqrstuvwxyz")
         return String((0..<8).map { _ in alphabet.randomElement()! })
     }
+
+    // MARK: Hand edits
+
+    /// How far one Taller, Wider or Smaller tap moves its trait.
+    static let sizeStep = 0.25
+
+    /// The trait's position (0…1) this face draws with: the edit, else the seed's.
+    func position(_ key: String, seed: String) -> Double {
+        if let value = edits?.traits[key] { return value }
+        return BlobTraits(seed: seed, overrides: kind.map { ["shape": $0.trait] } ?? [:])(key)
+    }
+
+    mutating func taller(seed: String) { setRatio(position("body.ratio", seed: seed) + Self.sizeStep) }
+    mutating func wider(seed: String) { setRatio(position("body.ratio", seed: seed) - Self.sizeStep) }
+    mutating func smaller(seed: String) { update { $0.size = HermesBlobEdits.clamped(position("body.r", seed: seed) - Self.sizeStep) } }
+    mutating func bigger(seed: String) { update { $0.size = HermesBlobEdits.clamped(position("body.r", seed: seed) + Self.sizeStep) } }
+
+    func canGrowTaller(seed: String) -> Bool { position("body.ratio", seed: seed) < HermesBlobEdits.maximum }
+    func canGrowWider(seed: String) -> Bool { position("body.ratio", seed: seed) > 0 }
+    func canShrink(seed: String) -> Bool { position("body.r", seed: seed) > 0 }
+    func canGrow(seed: String) -> Bool { position("body.r", seed: seed) < HermesBlobEdits.maximum }
+
+    /// Outline points (6…8), as blobatar's `body.pts` picks them.
+    func bumps(seed: String) -> Int {
+        if let count = edits?.wobble?.count { return count }
+        return Self.count(at: position("body.pts", seed: seed))
+    }
+
+    /// A new count keeps the wobble's strength, and the mirror when the count is even.
+    mutating func setBumps(_ count: Int, seed: String) {
+        let count = min(8, max(6, count))
+        let strength = wobble(seed: seed)
+        let mirrored = isMirrored(seed: seed)
+        setPositions(Self.scaledSeedBumps(count: count, strength: strength, seed: seed))
+        if mirrored, count.isMultiple(of: 2) { setMirrored(true, seed: seed) }
+    }
+
+    /// How much the outline wobbles: 0 smooth, 0.5 the seed's own, 1 twice that.
+    func wobble(seed: String) -> Double {
+        let own = Self.reach((0..<bumps(seed: seed)).map { Self.seedBump($0, seed: seed) })
+        guard own > 0 else { return 0.5 }
+        return min(1, max(0, Self.reach(bumpPositions(seed: seed)) / own * 0.5))
+    }
+
+    mutating func setWobble(_ strength: Double, seed: String) {
+        let mirrored = isMirrored(seed: seed)
+        setPositions(Self.scaledSeedBumps(count: bumps(seed: seed), strength: strength, seed: seed))
+        if mirrored { setMirrored(true, seed: seed) }
+    }
+
+    /// Whether the outline matches left and right.
+    func isMirrored(seed: String) -> Bool {
+        let positions = bumpPositions(seed: seed)
+        let count = positions.count
+        guard count.isMultiple(of: 2) else { return false }
+        return (0..<count).allSatisfy { abs(positions[$0] - positions[Self.mirror($0, count: count)]) < 0.001 }
+    }
+
+    /// Mirroring copies the right side onto the left; an odd count takes the next even one.
+    /// Turning it off gives the left side the seed's own bumps again, at the same strength.
+    mutating func setMirrored(_ isOn: Bool, seed: String) {
+        var count = bumps(seed: seed)
+        guard isOn else {
+            setPositions(Self.scaledSeedBumps(count: count, strength: wobble(seed: seed), seed: seed))
+            return
+        }
+        var positions = bumpPositions(seed: seed)
+        if !count.isMultiple(of: 2) {
+            count += 1
+            positions = Self.scaledSeedBumps(count: count, strength: wobble(seed: seed), seed: seed)
+        }
+        for index in 0..<count where Self.isRightSide(index, count: count) {
+            positions[Self.mirror(index, count: count)] = positions[index]
+        }
+        setPositions(positions)
+    }
+
+    private func bumpPositions(seed: String) -> [Double] {
+        if let wobble = edits?.wobble { return wobble }
+        return (0..<bumps(seed: seed)).map { Self.seedBump($0, seed: seed) }
+    }
+
+    private mutating func setRatio(_ value: Double) { update { $0.ratio = HermesBlobEdits.clamped(value) } }
+
+    private mutating func update(_ change: (inout HermesBlobEdits) -> Void) {
+        var next = edits ?? HermesBlobEdits()
+        change(&next)
+        edits = next.isEmpty ? nil : next
+    }
+
+    private mutating func setPositions(_ positions: [Double]) {
+        update { edits in
+            edits.bumps = positions.count
+            edits.wobble = positions.map(HermesBlobEdits.clamped)
+        }
+    }
+
+    private static func seedBump(_ index: Int, seed: String) -> Double { BlobTraits(seed: seed)("body.r\(index)") }
+    private static func scaledSeedBumps(count: Int, strength: Double, seed: String) -> [Double] {
+        let scale = max(0, min(1, strength)) * 2
+        return (0..<count).map { 0.5 + (seedBump($0, seed: seed) - 0.5) * scale }
+    }
+    private static func count(at position: Double) -> Int { 6 + min(2, Int((position * 3).rounded(.down))) }
+    /// Point `i` sits at `2πi/count` from the right, so its mirror across the middle is `count/2 - i`.
+    private static func mirror(_ index: Int, count: Int) -> Int { ((count / 2 - index) % count + count) % count }
+    private static func isRightSide(_ index: Int, count: Int) -> Bool { cos(2 * Double.pi * Double(index) / Double(count)) > -1e-9 }
+    private static func reach(_ positions: [Double]) -> Double {
+        positions.isEmpty ? 0 : positions.map { abs($0 - 0.5) }.reduce(0, +) / Double(positions.count)
+    }
+}
+
+/// Hand edits on a blob face, as blobatar trait positions (0…1, two places), so
+/// any blobatar renderer can draw them with `traits`. Written as the shape
+/// string's fourth part: `e1,h75,s25,n8,w50.62.38…` (version, `body.ratio`,
+/// `body.r`, `body.pts`, then `body.r0`, `body.r1`…). It never holds a `:`.
+struct HermesBlobEdits: Equatable, Sendable {
+    /// `body.ratio`: higher is taller, lower is wider.
+    var ratio: Double?
+    /// `body.r`: lower is smaller.
+    var size: Double?
+    /// `body.pts`: outline points, 6…8.
+    var bumps: Int?
+    /// `body.r<i>`: how far each point reaches; 0.5 is none.
+    var wobble: [Double]?
+
+    static let maximum = 0.99
+
+    init(ratio: Double? = nil, size: Double? = nil, bumps: Int? = nil, wobble: [Double]? = nil) {
+        self.ratio = ratio
+        self.size = size
+        self.bumps = bumps
+        self.wobble = wobble
+    }
+
+    /// Reads the fourth part; nil for anything it can't read in full, so the seed face shows.
+    init?(_ text: String) {
+        guard text.utf8.count <= 120 else { return nil }
+        let tokens = text.split(separator: ",").map(String.init)
+        guard tokens.first == "e1" else { return nil }
+        for token in tokens.dropFirst() {
+            guard let key = token.first else { return nil }
+            let value = String(token.dropFirst())
+            switch key {
+            case "h": guard let number = Self.percent(value) else { return nil }; ratio = number
+            case "s": guard let number = Self.percent(value) else { return nil }; size = number
+            case "n": guard let count = Int(value), (6...8).contains(count) else { return nil }; bumps = count
+            case "w":
+                let numbers = value.split(separator: ".", omittingEmptySubsequences: false).map { Self.percent(String($0)) }
+                guard (6...8).contains(numbers.count), numbers.allSatisfy({ $0 != nil }) else { return nil }
+                wobble = numbers.compactMap { $0 }
+            default:
+                // A later version's key: skip it rather than lose the rest.
+                continue
+            }
+        }
+        if let wobble, let bumps, wobble.count != bumps { return nil }
+        if let wobble, bumps == nil { bumps = wobble.count }
+    }
+
+    var isEmpty: Bool { ratio == nil && size == nil && bumps == nil && wobble == nil }
+
+    var string: String {
+        var tokens = ["e1"]
+        if let ratio { tokens.append("h\(Self.digits(ratio))") }
+        if let size { tokens.append("s\(Self.digits(size))") }
+        if let bumps { tokens.append("n\(bumps)") }
+        if let wobble { tokens.append("w" + wobble.map(Self.digits).joined(separator: ".")) }
+        return tokens.joined(separator: ",")
+    }
+
+    /// The blobatar trait overrides these edits draw with.
+    var traits: [String: Double] {
+        var result: [String: Double] = [:]
+        if let ratio { result["body.ratio"] = ratio }
+        if let size { result["body.r"] = size }
+        if let bumps { result["body.pts"] = (Double(bumps - 6) + 0.5) / 3 }
+        for (index, value) in (wobble ?? []).enumerated() { result["body.r\(index)"] = value }
+        return result
+    }
+
+    static func clamped(_ value: Double) -> Double { (min(maximum, max(0, value)) * 100).rounded() / 100 }
+
+    private static func percent(_ text: String) -> Double? {
+        guard (1...2).contains(text.count), text.allSatisfy({ $0.isASCII && $0.isNumber }), let number = Int(text) else { return nil }
+        return Double(number) / 100
+    }
+
+    private static func digits(_ value: Double) -> String { String(Int((clamped(value) * 100).rounded())) }
 }

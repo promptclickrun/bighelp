@@ -63,8 +63,11 @@ enum HermesBlobFace {
         }
     }
 
-    static func render(seed: String, kind: Kind? = nil) -> Rendering {
-        let t = BlobTraits(seed: seed, overrides: kind.map { ["shape": $0.trait] } ?? [:])
+    /// `edits` are bighelp's hand edits, applied as blobatar trait overrides.
+    static func render(seed: String, kind: Kind? = nil, edits: HermesBlobEdits? = nil) -> Rendering {
+        var overrides = edits?.traits ?? [:]
+        if let kind { overrides["shape"] = kind.trait }
+        let t = BlobTraits(seed: seed, overrides: overrides)
         let palette = BlobColor.palette(hue: t.num("hue", 0, 360), tone: t("tone"))
         let layout = BlobLayout(t)
         var body: [Part] = layout.petals.map { .circle(cx: $0.cx, cy: $0.cy, r: $0.r) }

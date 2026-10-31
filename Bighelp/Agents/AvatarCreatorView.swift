@@ -253,13 +253,64 @@ final class AvatarCreatorModel {
         selectedPetFrame = frame
     }
 
+    /// A fresh seed draws a fresh face, so hand edits made for the last one go.
     func randomizeFace() {
-        blobShape.seedPart = HermesBlobShape.randomSeed()
+        editFace { shape, _ in
+            shape.seedPart = HermesBlobShape.randomSeed()
+            shape.edits = nil
+        }
     }
 
     /// Lock keeps today's face even if the name changes; unlock follows the name again.
     func toggleFaceLock(name: String) {
-        blobShape.seedPart = blobShape.isLocked ? "" : name
+        editFace { shape, _ in shape.seedPart = shape.isLocked ? "" : name }
+    }
+
+    // MARK: Face edits and Undo
+
+    /// A face as it was before an edit, for Undo.
+    private struct FaceState: Equatable {
+        var shape: HermesBlobShape
+        var color: String?
+    }
+
+    private var faceHistory: [FaceState] = []
+    private static let faceHistoryLimit = 50
+
+    var canUndoFace: Bool { !faceHistory.isEmpty }
+
+    /// Every face change goes through here, so Undo can step back through them.
+    func editFace(_ change: (inout HermesBlobShape, inout String?) -> Void) {
+        var shape = blobShape
+        var color = faceColor
+        change(&shape, &color)
+        guard shape != blobShape || color != faceColor else { return }
+        recordFaceUndo()
+        blobShape = shape
+        faceColor = color
+    }
+
+    /// Keeps the face as it is now. A slider calls it once as a drag starts, so one
+    /// Undo takes back the whole drag.
+    func recordFaceUndo() {
+        let now = FaceState(shape: blobShape, color: faceColor)
+        guard faceHistory.last != now else { return }
+        faceHistory.append(now)
+        if faceHistory.count > Self.faceHistoryLimit { faceHistory.removeFirst() }
+    }
+
+    func undoFace() {
+        guard let last = faceHistory.popLast() else { return }
+        blobShape = last.shape
+        faceColor = last.color
+    }
+
+    /// A finished face from a set: its seed, silhouette and edits, in the color its seed gives.
+    func apply(_ preset: AvatarFacePreset) {
+        editFace { shape, color in
+            shape = preset.shape
+            color = nil
+        }
     }
 
     func select(_ pet: PetdexPet, gallery: PetdexGalleryModel) async {

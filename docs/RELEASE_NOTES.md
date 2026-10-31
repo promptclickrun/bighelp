@@ -3,6 +3,22 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.40
+
+### Full Duplex voice
+
+- **One answer when you ask:** on a Gemini call, the agent says "On it" one time. Before, it often said it two times. This also applies when you add to a request during the call.
+- **Results one at a time:** when work finishes, the agent waits until nobody speaks. Then it tells you. It does not stop one result to start the next one.
+- **Starts at once:** tap the voice button, and Full Duplex starts. You do not tap **Start**. Tap **End** to go back to the chat.
+- **Your language:** the agent speaks the language of your phone. It changes language only when you speak a different language to it. This needs bighelp's plugin version 3.38.0 or later on the computer.
+- **One voice choice for each agent:** **Settings › Voice**, the bot's **Default Voice** in Bots mode and the voice button in a chat change the same choice. In **Settings › Voice**, select an agent at the top, or select **All agents** for the default.
+- **Bots mode:** the voice bar shows what the call does, or why it did not start.
+
+### Fixed
+
+- **Settings › Voice:** the page has no long text under each setting.
+- **Mac:** after you select Gemini Live, the **Voice** row in Settings shows Gemini Live. Before, it showed GPT-Live.
+
 ## 2.6.39
 
 ### Full Duplex voice

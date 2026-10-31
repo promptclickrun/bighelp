@@ -3,6 +3,14 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.42
+
+### Chat
+
+- **Send while the chat connects:** when you return to bighelp, or open an agent on a different gateway, Send and the message box stay on. If you send before the chat connects, the chat shows your message at once. "Sending…" shows below it. bighelp sends the message when the chat connects.
+- **Two messages in a row:** if you send two messages before the chat connects, bighelp sends them in order. The second message steers the agent's answer to the first.
+- **No connection:** if the chat cannot connect in 25 seconds, Send goes off. bighelp puts the messages that wait into the message box again, so you do not lose them.
+
 ## 2.6.41
 
 ### Fixed

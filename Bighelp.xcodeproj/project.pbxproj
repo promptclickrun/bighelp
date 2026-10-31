@@ -1640,6 +1640,7 @@
 		DC78FF2CB9A9D070CA8B6E31 /* WorkspaceGrantedFilesClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75BC105CA160422A2BAFE38B /* WorkspaceGrantedFilesClientTests.swift */; };
 		DC7BE2F053D440DFC34BF34B /* BighelpFlowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE6693C39DFFE2BE8B3E7490 /* BighelpFlowLayout.swift */; };
 		DCA875E23AC81AC45FC8B087 /* AppStoreScreenshotUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E063E0682AC8293005BF72D6 /* AppStoreScreenshotUITests.swift */; };
+		DCB92022DECE6F6EFCD9D0E4 /* AvatarFaceStudio.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2A0A50A767F97777ED5B33F /* AvatarFaceStudio.swift */; };
 		DCE2AEF72BAD507D236E11A5 /* AdvancedOptionsPages.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1E19430B8201A8AC2B59ADC /* AdvancedOptionsPages.swift */; };
 		DD197ACC9BA172200E9E5472 /* BotChatActivityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30032BB7A11575E32DECD170 /* BotChatActivityTests.swift */; };
 		DD3C714309567DDD3A92CC46 /* TelemetryTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59A48681DBB3045BCA4DA5EA /* TelemetryTransport.swift */; };
@@ -3341,6 +3342,7 @@
 		B21A4DAF16C06699A239D845 /* ChatReplyUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatReplyUITests.swift; sourceTree = "<group>"; };
 		B22571E8F505DF1823F34C87 /* ChatMessageShareSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMessageShareSheet.swift; sourceTree = "<group>"; };
 		B2959D3C5D33528BE75E28D0 /* ReminderLocationTriggerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderLocationTriggerTests.swift; sourceTree = "<group>"; };
+		B2A0A50A767F97777ED5B33F /* AvatarFaceStudio.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarFaceStudio.swift; sourceTree = "<group>"; };
 		B2A6F6A9C1A94A35757FF24B /* AppStoreScreenshotFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStoreScreenshotFixture.swift; sourceTree = "<group>"; };
 		B2F653D00F8A7467F524639E /* StockGitReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StockGitReviewView.swift; sourceTree = "<group>"; };
 		B321D90339E5BC788A69BB1A /* ChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
@@ -4848,6 +4850,7 @@
 				0F108CDF2AF7D1B53DC2FE7B /* AgentTemplateFillView.swift */,
 				363125E35F32B409045A5DD4 /* AgentTemplateLibrary.swift */,
 				39E2D77A3FB09D926BCE99A5 /* AvatarCreatorView.swift */,
+				B2A0A50A767F97777ED5B33F /* AvatarFaceStudio.swift */,
 				7E0D78136612EFA054AF2191 /* BotChatActivity.swift */,
 				E66CF2C4316246F7516BB541 /* MyTemplates.swift */,
 				3F1EFA3A141B8A46192AF5C5 /* Teamwork.swift */,
@@ -7203,6 +7206,7 @@
 				A2D80677AD33A8EECA8CD62A /* AvatarCatalogStore.swift in Sources */,
 				FAAA76C9160F98400D2C272B /* AvatarCreatorView.swift in Sources */,
 				D280B2496291C9F92B769CEA /* AvatarFacePresets.swift in Sources */,
+				DCB92022DECE6F6EFCD9D0E4 /* AvatarFaceStudio.swift in Sources */,
 				852F991748D0493762AB9BFA /* AvatarImageProcessor.swift in Sources */,
 				14D42954287FAAB485569BEB /* AvatarKit.swift in Sources */,
 				16AF9EA38B08E36915448FF8 /* AvatarKitRenderer.swift in Sources */,

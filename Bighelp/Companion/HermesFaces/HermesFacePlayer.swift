@@ -44,31 +44,73 @@ enum AvatarPlayState: String, CaseIterable, Identifiable, Sendable {
     }
 
     var animates: Bool { self != .still }
+
+    /// A moment of the state's motion that shows it at a glance: the top of a hop,
+    /// eyes open, its effect in view. The strip's faces rest here.
+    var keyTime: Double {
+        switch self {
+        case .bounce: Double.pi / 10
+        case .love: Double.pi / 6
+        case .celebrate: Double.pi / 12
+        case .speak: 0.4
+        default: AvatarKitScene.stillTime
+        }
+    }
 }
 
 /// A blob face acting out a `BuddyPose`: the body hops, leans and squashes,
 /// the eyes blink, close or smile, and the pose's effect (hearts, Zzz, a
 /// thought) floats at the top right, drawn by `BuddyPainter` as on characters.
+/// Motion follows the loaders' rules: Reduce Motion, Low Power Mode, a scene in
+/// the background or `bighelpLoaderMotionOverride` hold it in its key pose.
 struct HermesBlobFacePlayer: View {
+    enum Playback: Equatable {
+        /// Plays the state over and over: the designer's big face.
+        case loop
+        /// Plays the state once each time `trigger` changes (and once on appear), then rests.
+        case once(trigger: Int)
+    }
+
     let seed: String
     let kind: HermesBlobFace.Kind?
     var edits: HermesBlobEdits?
     var color: String?
     let state: AvatarPlayState
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    var playback = Playback.loop
+    @BighelpLoaderMotionReader private var motion
+    /// While a one-time play runs: when it started.
+    @State private var playStart: Date?
+
+    /// How long one play of a strip face lasts.
+    static let onceDuration: Double = 1.8
 
     var body: some View {
         let face = HermesBlobFacePaths(seed: seed, kind: kind, edits: edits, color: color)
         Group {
-            if state.animates, !reduceMotion {
+            if state.animates, motion.animates, playback == .loop {
                 TimelineView(.animation) { timeline in
                     canvas(face, time: timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 3600))
                 }
+            } else if state.animates, motion.animates, let playStart {
+                TimelineView(.animation) { timeline in
+                    canvas(face, time: state.keyTime + timeline.date.timeIntervalSince(playStart))
+                }
             } else {
-                canvas(face, time: AvatarKitScene.stillTime)
+                canvas(face, time: state.keyTime)
             }
         }
+        .task(id: onceTrigger) {
+            guard let onceTrigger, onceTrigger >= 0 else { return }
+            playStart = .now
+            try? await Task.sleep(for: .seconds(Self.onceDuration))
+            playStart = nil
+        }
         .accessibilityHidden(true)
+    }
+
+    private var onceTrigger: Int? {
+        if case .once(let trigger) = playback { return trigger }
+        return nil
     }
 
     private func canvas(_ face: HermesBlobFacePaths, time: Double) -> some View {

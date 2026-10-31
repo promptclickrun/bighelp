@@ -63,6 +63,16 @@ enum HermesBlobFace {
         }
     }
 
+    /// The silhouette a seed draws: the pinned one, else the one its `shape` trait falls in.
+    static func silhouette(seed: String, kind: Kind?) -> Kind {
+        if let kind { return kind }
+        let value = BlobTraits(seed: seed)("shape")
+        return BlobLayout.bands.first { value < $0.1 }?.0 ?? .triangle
+    }
+
+    /// Whether the outline is drawn through `body.r<i>` points, which wobble and mirror edit.
+    static func hasWobblyOutline(_ kind: Kind) -> Bool { kind == .organic || kind == .cloud }
+
     /// `edits` are bighelp's hand edits, applied as blobatar trait overrides.
     static func render(seed: String, kind: Kind? = nil, edits: HermesBlobEdits? = nil) -> Rendering {
         var overrides = edits?.traits ?? [:]
@@ -264,7 +274,7 @@ private struct BlobLayout {
     private(set) var eyes: [BlobGeometry.Superellipse] = []
 
     /// The frozen band table: upper edge of each silhouette's band.
-    private static let bands: [(HermesBlobFace.Kind, Double)] = [
+    fileprivate static let bands: [(HermesBlobFace.Kind, Double)] = [
         (.round, 0.22), (.organic, 0.48), (.boxy, 0.6), (.capsule, 0.7), (.nub, 0.79),
         (.cloud, 0.86), (.droplet, 0.915), (.hexagon, 0.95), (.sun, 0.98), (.triangle, 1),
     ]

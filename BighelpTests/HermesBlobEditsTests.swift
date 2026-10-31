@@ -230,6 +230,21 @@ struct HermesBlobEditsTests {
         #expect(reopened.blobShape.isMirrored(seed: "nova"))
     }
 
+    @Test func everyPlayStateIsAMoodTheCharactersAlreadyActOut() {
+        #expect(AvatarPlayState.allCases.count == 12)
+        for state in AvatarPlayState.allCases where state != .still {
+            #expect(BuddyPose.moods.contains(state.mood ?? ""), "\(state)")
+        }
+        #expect(AvatarPlayState.still.mood == nil)
+        #expect(!AvatarPlayState.still.animates)
+        // The states with an effect show it in their key pose.
+        let effects: [AvatarPlayState: BuddyEffect] = [.love: .hearts, .sleep: .sleep, .think: .thought,
+                                                       .celebrate: .sparkles, .oops: .tear, .work: .code]
+        for (state, effect) in effects {
+            #expect(BuddyPose.make(mood: state.mood, time: state.keyTime).effect == effect, "\(state)")
+        }
+    }
+
     private static func aspect(_ rendering: HermesBlobFace.Rendering) -> CGFloat {
         guard case .path(let d) = rendering.body.last else { return 0 }
         let box = SVGPathData.path(d).boundingRect

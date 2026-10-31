@@ -49,6 +49,17 @@ final class SystemVoiceAudioSession: VoiceAudioSessionControlling, @unchecked Se
         }
     }
 
+    /// A live call cancels its own echo (WebRTC for GPT-Live, the engine's voice processing for Gemini), so
+    /// it gets the speakerphone tuning and the same setup on every call. The turn-based chat's choice by
+    /// `isEchoCancelledInputAvailable` changes with the route, and stacked the system's echo cancelling on
+    /// the engine's own: Gemini's voice sometimes didn't play.
+    static let liveCallMode: AVAudioSession.Mode = .videoChat
+    static let liveCallOptions: AVAudioSession.CategoryOptions = [.allowBluetooth, .defaultToSpeaker]
+
+    func configureForLiveCall() throws {
+        try session.setCategory(.playAndRecord, mode: Self.liveCallMode, options: Self.liveCallOptions)
+    }
+
     /// Media volume where the microphone can cancel the speaker's echo; else a call mode.
     static func conversationMode(echoCancellationAvailable: Bool) -> AVAudioSession.Mode {
         echoCancellationAvailable ? .default : .videoChat

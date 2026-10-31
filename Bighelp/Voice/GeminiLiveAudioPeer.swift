@@ -36,6 +36,7 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
     private var pendingTexts: [String] = []
     private var awaitingReplySince: Date?
     private var quietDelivery: Task<Void, Never>?
+    private var speakerOutputPolicy: BighelpSpeakerOutputPolicy = .none
     private var closed = false
 
     init(sessionCoordinator: VoiceAudioSessionCoordinator = .shared) {
@@ -140,14 +141,30 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
         guard !closed, hold.isHeld else { throw BighelpRealtimeAudioPeer.Failure.closed }
         do { try AVAudioSession.sharedInstance().overrideOutputAudioPort(enabled ? .speaker : .none) }
         catch { throw BighelpRealtimeAudioPeer.Failure.audioUnavailable }
+        speakerOutputPolicy = enabled ? .forceSpeaker : .systemRoute
         onAudioRoute?(Self.routeName())
     }
 
     /// The built-in speaker for a fresh call, unless the person already chose headphones or a car.
     func setDefaultSpeakerOutput() throws {
-        let outputs = AVAudioSession.sharedInstance().currentRoute.outputs
+        guard !closed, hold.isHeld else { throw BighelpRealtimeAudioPeer.Failure.closed }
+        speakerOutputPolicy = .defaultSpeaker
+        try reapplySpeakerOutputIfNeeded()
+    }
+
+    /// iOS forgets the speaker whenever the route changes (the engine's voice processing starting, a
+    /// configuration change, an interruption), so it's chosen again each time, as GPT-Live's peer does.
+    private func reapplySpeakerOutputIfNeeded() throws {
+        let session = AVAudioSession.sharedInstance()
+        let outputs = session.currentRoute.outputs
         let external = outputs.contains { !($0.portType == .builtInReceiver || $0.portType == .builtInSpeaker) }
-        if !external { try setSpeakerEnabled(true) } else { onAudioRoute?(Self.routeName()) }
+        if BighelpRealtimeAudioPeer.shouldApplySpeakerOutput(
+            policy: speakerOutputPolicy, hasExternalRoute: external,
+            currentBuiltInSpeaker: outputs.contains { $0.portType == .builtInSpeaker }) {
+            do { try session.overrideOutputAudioPort(.speaker) }
+            catch { throw BighelpRealtimeAudioPeer.Failure.audioUnavailable }
+        }
+        onAudioRoute?(Self.routeName())
     }
 
     func resumeAudio() throws {
@@ -160,6 +177,7 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
             throw BighelpRealtimeAudioPeer.Failure.audioUnavailable
         }
         player.play()
+        try? reapplySpeakerOutputIfNeeded()
     }
 
     func statistics() async throws -> BighelpRealtimeAudioPeer.MediaStatistics {
@@ -202,18 +220,20 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
         hold.take(lease)
         do {
             let session = SystemVoiceAudioSession()
-            try session.configure(for: .conversation)
+            try session.configureForLiveCall()
             try session.setActive(true)
             hold.sessionActivated()
             try engine.inputNode.setVoiceProcessingEnabled(true)
             engine.attach(player)
             engine.connect(player, to: engine.mainMixerNode, format: playbackFormat)
+            // Before the engine starts: the route and configuration changes its start causes are the
+            // ones that matter.
+            observeSession()
             try startEngine()
         } catch {
             stopAudio()
             throw BighelpRealtimeAudioPeer.Failure.audioUnavailable
         }
-        observeSession()
         onAudioRoute?(Self.routeName())
     }
 
@@ -237,8 +257,9 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
             try startEngine()
         } catch {
             publish(.failed)
+            return
         }
-        onAudioRoute?(Self.routeName())
+        try? reapplySpeakerOutputIfNeeded()
     }
 
     private func stopAudio() {
@@ -356,8 +377,8 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
         observers.append(center.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil,
                                             queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
-                guard let self, !self.closed else { return }
-                self.onAudioRoute?(Self.routeName())
+                guard let self, !self.closed, self.hold.isHeld else { return }
+                try? self.reapplySpeakerOutputIfNeeded()
             }
         })
     }

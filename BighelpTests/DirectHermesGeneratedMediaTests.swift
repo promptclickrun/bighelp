@@ -394,25 +394,165 @@ struct DirectHermesGeneratedMediaTests {
     }
 
     /// A reread of the saved history brings back the file line of a picture that never loaded.
-    /// The message tries again and says so again, instead of going back to the loading tile.
-    @Test func aRereadOfAPictureThatNeverLoadedSaysSoAgain() async throws {
+    /// The message keeps saying why, with Try again, instead of going back to the loading tile.
+    @Test func aRereadKeepsWhyAPictureDidntLoad() async throws {
         let (owner, transport, workspace) = try setup()
         transport.failure = WorkspaceClientError.transportUnavailable
         let text = "Here it is.\nMEDIA:/host/.hermes/cache/images/puppy.png"
         let (native, model, saved) = try catalogChat(transport: transport, workspace: workspace, owner: owner, text: text)
         defer { native.suspend() }
         native.mediaRetryDelays = [.milliseconds(5), .milliseconds(5)]
-        let unavailable = TimelineContent.message("Here it is.\nCouldn't load puppy.png. Reopen this chat to try again.")
         model.reconcileHydratedSession(saved)
-        for _ in 0..<200 where model.items.first?.content != unavailable { try await Task.sleep(for: .milliseconds(5)) }
-        #expect(model.items.first?.content == unavailable)
+        for _ in 0..<200 where model.items.first?.metadata.fileFailure == nil { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(model.items.first?.metadata.fileFailure == .unreachable)
+        #expect(model.items.first?.content == .message(text))
         let tries = transport.requests.count
 
         model.reconcileHydratedSession(saved)
-        #expect(model.items.first?.content == .message(text), "The reread brings the file line back")
-        for _ in 0..<200 where model.items.first?.content != unavailable { try await Task.sleep(for: .milliseconds(5)) }
-        #expect(model.items.first?.content == unavailable)
-        #expect(transport.requests.count == tries + 1)
+        native.scheduleMessageMedia()
+        #expect(model.items.first?.content == .message(text))
+        #expect(model.items.first?.metadata.fileFailure == .unreachable, "Still says why after the reread")
+        for _ in 0..<20 { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(transport.requests.count == tries, "It waits for Try again")
+    }
+
+    /// Try again asks the computer again, and the picture shows once it answers.
+    @Test func tryAgainLoadsThePictureOnceTheComputerAnswers() async throws {
+        let (owner, transport, workspace) = try setup()
+        transport.failure = WorkspaceClientError.transportUnavailable
+        let text = "Here it is.\nMEDIA:/host/.hermes/cache/images/puppy.png"
+        let (native, model, saved) = try catalogChat(transport: transport, workspace: workspace, owner: owner, text: text)
+        defer { native.suspend() }
+        native.mediaRetryDelays = [.milliseconds(5)]
+        model.reconcileHydratedSession(saved)
+        for _ in 0..<200 where model.items.first?.metadata.fileFailure == nil { try await Task.sleep(for: .milliseconds(5)) }
+        let id = try #require(model.items.first?.id)
+        #expect(model.items.first?.metadata.fileFailure == .unreachable)
+
+        let bytes = image()
+        transport.failure = nil
+        transport.result = .object(["data_url": .string("data:image/png;base64," + bytes.base64EncodedString())])
+        model.retryAgentFiles(itemID: id)
+        #expect(model.items.first?.metadata.fileFailure == nil, "Back to loading at once")
+        for _ in 0..<200 where model.items.first?.attachments.isEmpty != false { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(model.items.first?.attachments.first?.data == bytes)
+        #expect(model.items.first?.content == .message("Here it is."))
+        #expect(model.items.first?.metadata.fileFailure == nil)
+    }
+
+    /// A picture the computer didn't answer for loads by itself on the next connection.
+    @Test func aNewConnectionLoadsAPictureTheComputerDidntAnswerFor() async throws {
+        let (owner, transport, workspace) = try setup()
+        transport.failure = WorkspaceClientError.transportUnavailable
+        let text = "Here it is.\nMEDIA:/host/.hermes/cache/images/puppy.png"
+        let (native, model, saved) = try catalogChat(transport: transport, workspace: workspace, owner: owner, text: text)
+        defer { native.suspend() }
+        native.mediaRetryDelays = []
+        model.reconcileHydratedSession(saved)
+        for _ in 0..<200 where model.items.first?.metadata.fileFailure == nil { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(model.items.first?.metadata.fileFailure == .unreachable)
+
+        let bytes = image()
+        transport.failure = nil
+        transport.result = .object(["data_url": .string("data:image/png;base64," + bytes.base64EncodedString())])
+        native.suspend()
+        native.rebind(transport)
+        #expect(model.items.first?.metadata.fileFailure == nil)
+        native.scheduleMessageMedia()
+        for _ in 0..<200 where model.items.first?.attachments.isEmpty != false { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(model.items.first?.attachments.first?.data == bytes)
+    }
+
+    /// A new connection tries again whatever stopped the files (an updated plugin, a file saved
+    /// since), except a file too big for this device, which stays too big.
+    @Test func aNewConnectionTriesAgainForEveryReasonButTooBig() async throws {
+        let (owner, transport, workspace) = try setup()
+        transport.failure = WorkspaceClientError.transportUnavailable
+        let text = "Here it is.\nMEDIA:/host/.hermes/cache/images/puppy.png"
+        let (native, model, saved) = try catalogChat(transport: transport, workspace: workspace, owner: owner, text: text)
+        defer { native.suspend() }
+        native.mediaRetryDelays = []
+        model.reconcileHydratedSession(saved)
+        for _ in 0..<200 where model.items.first?.metadata.fileFailure == nil { try await Task.sleep(for: .milliseconds(5)) }
+        let id = try #require(model.items.first?.id)
+        #expect(model.markAgentFilesFailed(.updatePlugin, itemID: id, text: text, from: native))
+
+        let bytes = image()
+        transport.failure = nil
+        transport.result = .object(["data_url": .string("data:image/png;base64," + bytes.base64EncodedString())])
+        native.suspend()
+        native.rebind(transport)
+        #expect(model.items.first?.metadata.fileFailure == nil)
+        for _ in 0..<200 where model.items.first?.attachments.isEmpty != false { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(model.items.first?.attachments.first?.data == bytes)
+
+        let big = "Too big.\nMEDIA:/host/.hermes/cache/images/huge.png"
+        #expect(model.markAgentFilesFailed(.tooBig, itemID: "other", text: big, from: native))
+        native.suspend()
+        native.rebind(transport)
+        #expect(model.agentFileFailure(itemID: "other", text: big) == .tooBig)
+    }
+
+    /// A reply Hermes hadn't saved yet is refused; when the turn ends it's asked for again.
+    @Test func aTurnThatEndsTriesARefusedReplyAgain() async throws {
+        let (owner, transport, workspace) = try setup()
+        transport.failure = WorkspaceClientError.transportUnavailable
+        let text = "Here it is.\nMEDIA:/host/.hermes/cache/images/puppy.png"
+        let (native, model, saved) = try catalogChat(transport: transport, workspace: workspace, owner: owner, text: text)
+        defer { native.suspend() }
+        native.mediaRetryDelays = []
+        model.reconcileHydratedSession(saved)
+        for _ in 0..<200 where model.items.first?.metadata.fileFailure == nil { try await Task.sleep(for: .milliseconds(5)) }
+        let id = try #require(model.items.first?.id)
+        model.isSending = true
+        #expect(model.markAgentFilesFailed(.refused, itemID: id, text: text, from: native))
+
+        let bytes = image()
+        transport.failure = nil
+        transport.result = .object(["data_url": .string("data:image/png;base64," + bytes.base64EncodedString())])
+        model.isSending = false
+        #expect(model.items.first?.metadata.fileFailure == nil)
+        for _ in 0..<200 where model.items.first?.attachments.isEmpty != false { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(model.items.first?.attachments.first?.data == bytes)
+    }
+
+    /// Try again with no connection to ask says so at once, instead of loading again.
+    @Test func tryAgainWithNoConnectionSaysTheComputerDidntAnswer() async throws {
+        let (owner, transport, workspace) = try setup()
+        transport.failure = WorkspaceClientError.transportUnavailable
+        let text = "Here it is.\nMEDIA:/host/.hermes/cache/images/puppy.png"
+        let (native, model, saved) = try catalogChat(transport: transport, workspace: workspace, owner: owner, text: text)
+        native.mediaRetryDelays = []
+        model.reconcileHydratedSession(saved)
+        for _ in 0..<200 where model.items.first?.metadata.fileFailure == nil { try await Task.sleep(for: .milliseconds(5)) }
+        let id = try #require(model.items.first?.id)
+        native.suspend()
+        model.retryAgentFiles(itemID: id)
+        #expect(model.items.first?.metadata.fileFailure == .unreachable)
+    }
+
+    /// The chat recovers its connection between the picture's tries (a reread, opening it
+    /// again). Each recovery used to forget the tries, so a picture that can't be read
+    /// stayed on its loading tile for as long as the chat kept recovering.
+    @Test func aRecoveryBetweenTriesStillEndsTheLoad() async throws {
+        let (owner, transport, workspace) = try setup()
+        transport.failure = WorkspaceClientError.transportUnavailable
+        let text = "Here it is.\nMEDIA:/host/.hermes/cache/images/puppy.png"
+        let (native, model, saved) = try catalogChat(transport: transport, workspace: workspace, owner: owner, text: text)
+        defer { native.suspend() }
+        native.mediaRetryDelays = [.milliseconds(40), .milliseconds(40), .milliseconds(40)]
+        model.reconcileHydratedSession(saved)
+        for _ in 0..<60 where !Self.filesEnded(model.items.first) {
+            try await Task.sleep(for: .milliseconds(25))
+            try? await native.recoverPreservingLiveTransport(epoch: "epoch")
+        }
+        #expect(Self.filesEnded(model.items.first), "The tile ends instead of loading for good")
+        #expect(model.items.first?.metadata.fileFailure == .unreachable)
+        #expect(transport.requests.count == native.mediaRetryDelays.count + 1)
+    }
+
+    private static func filesEnded(_ item: TimelineItem?) -> Bool {
+        item?.attachments.isEmpty == true && item?.metadata.fileFailure != nil
     }
 
     /// When a picture can't be read at all, the message says so in plain words
@@ -426,9 +566,9 @@ struct DirectHermesGeneratedMediaTests {
         #expect(DirectHermesGeneratedMediaClient.unresolvedMessageText(text, role: .assistant)
                 == "Here it is.\nLoading puppy.png…")
         finish(native, text: text)
-        let unavailable = TimelineContent.message("Here it is.\nCouldn't load puppy.png. Reopen this chat to try again.")
-        for _ in 0..<200 where model.items.first?.content != unavailable { try await Task.sleep(for: .milliseconds(5)) }
-        #expect(model.items.first?.content == unavailable)
+        for _ in 0..<200 where model.items.first?.metadata.fileFailure == nil { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(model.items.first?.metadata.fileFailure == .unreachable)
+        #expect(DirectHermesGeneratedMediaClient.pendingFiles(text, role: .assistant) == ("Here it is.", ["puppy.png"]))
         #expect(transport.requests.count == 3)
     }
 
@@ -693,6 +833,24 @@ struct DirectHermesGeneratedMediaTests {
         #expect(results.map(\.text) == items.map(\.text))
         #expect(results.allSatisfy { $0.attachments.isEmpty })
         #expect(transport.requests.isEmpty)
+    }
+
+    /// A person's own picture that can't be read is asked for a few times, then left alone:
+    /// its message has no loading tile to end, and it must not ask again and again.
+    @Test func aPersonsPictureThatCantLoadIsAskedForAFewTimesOnly() async throws {
+        let (owner, transport, workspace) = try setup()
+        transport.failure = WorkspaceClientError.transportUnavailable
+        let (native, model, saved) = try catalogChat(transport: transport, workspace: workspace, owner: owner, text: "")
+        defer { native.suspend() }
+        native.mediaRetryDelays = [.milliseconds(5)]
+        var record = saved
+        record.items = [TimelineItem(id: saved.id + ":row:1", role: .human, sender: .user(snapshot: .init(name: "You")),
+            content: .message("My photo.\n@image:/host/.hermes/cache/images/photo.png"),
+            metadata: .init(source: "Direct Hermes", delivery: "Saved", sourceOrder: 1))]
+        model.reconcileHydratedSession(record)
+        for _ in 0..<60 { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(transport.requests.count == native.mediaRetryDelays.count + 1)
+        #expect(model.items.first?.metadata.fileFailure == nil)
     }
 
     @Test func refusedUserImageNeverFallsBackOrExposesHostPathInPresentation() async throws {

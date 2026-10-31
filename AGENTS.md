@@ -289,6 +289,14 @@ change in both repos.
   reread) asks for its files too: every such read ends in `reconcileHydratedSession`, which starts
   `scheduleMessageMedia`, and that reads the rows on screen, not only the live projection's (#665). Hosted image tools (Nous Portal, FAL) report the picture's
   https address instead of a host file; the card reads it from there (public hosts only, no cookies, bounded).
+  A loading tile always ends. After its tries (`mediaRetryDelays`), the message shows why in plain words with Try
+  again (`AgentFileFailure` on `TimelineMetadata.fileFailure`, kept through rereads by `ChatModel.agentFileFailures`).
+  The plugin says why a file didn't come (`unavailable`: missing, refused, too large); with no plugin route, a file
+  outside Hermes' caches says to update the plugin. A recovery on the same connection leaves the tries alone: it
+  once reset them, and a chat that recovered often kept a failing file loading for good. A new connection or a
+  client attached to the chat starts the tries again for every reason but too big; a turn that ends does for
+  refused (a reply Hermes hadn't saved yet). A tile with nothing finishing it shows Try again after
+  `AgentFileLoad.stallAfter` anyway. The `ChatFiles` log has each try's reason.
 - **Each agent's own files:** the plugin's `workspace-files/*` routes take an optional `profile` (plugin 3.20.0,
   `native-workspace-files-agents-v1`) and read that agent's working folder with the same refusals. A bot's Files
   tab sends its ID (`DirectHermesManagedFilesClient(agentID:)`); the serving agent never names itself, so older

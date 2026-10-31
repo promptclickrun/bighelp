@@ -165,6 +165,8 @@ struct ResolvedAgentAttachmentItem: Equatable, Sendable {
     let id: String
     let text: String
     let attachments: [ChatAttachment]
+    /// Why a file it names didn't come, when the host said (plugin `unavailable`).
+    var failure: AgentFileFailure? = nil
 }
 
 @MainActor

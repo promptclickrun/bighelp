@@ -362,15 +362,86 @@ extension ChatModel {
     /// lines. Where this device already shows those files for that exact text,
     /// keep them rather than going back to loading tiles.
     func keepingDeliveredFiles(_ incoming: [TimelineItem]) -> [TimelineItem] {
-        guard !deliveredFileSources.isEmpty else { return incoming }
+        guard !deliveredFileSources.isEmpty || !agentFileFailures.isEmpty else { return incoming }
         return incoming.map { row in
-            guard row.attachments.isEmpty, case .message(let text) = row.content,
-                  deliveredFileSources[row.id] == text, let index = itemIndexByID[row.id],
+            guard row.attachments.isEmpty, case .message(let text) = row.content else { return row }
+            if let failed = agentFileFailures[row.id], failed.text == text {
+                return Self.showingFileFailure(failed.failure, on: row)
+            }
+            guard deliveredFileSources[row.id] == text, let index = itemIndexByID[row.id],
                   items[index].role == row.role, !items[index].attachments.isEmpty else { return row }
             let shown = items[index]
             return TimelineItem(id: row.id, role: row.role, sender: row.sender, content: shown.content,
                                 metadata: row.metadata, attachments: shown.attachments)
         }
+    }
+
+    /// The app stopped trying to load the files this message names: it shows why, with Try again.
+    @discardableResult
+    func markAgentFilesFailed(_ failure: AgentFileFailure, itemID: String, text: String,
+                              from owner: DirectHermesConversationClient) -> Bool {
+        guard (client as? DirectHermesConversationClient) === owner, !referenceOwnerRetired else { return false }
+        agentFileFailures[itemID] = (text, failure)
+        showAgentFileFailure(itemID: itemID)
+        return true
+    }
+
+    /// The reason this message's files stopped loading, while it still names them with that text.
+    func agentFileFailure(itemID: String, text: String) -> AgentFileFailure? {
+        guard let failed = agentFileFailures[itemID], failed.text == text else { return nil }
+        return failed.failure
+    }
+
+    /// A row drawn again from the host's copy gets its reason back (a reload can skip `keepingDeliveredFiles`).
+    func showAgentFileFailure(itemID: String) {
+        guard let failed = agentFileFailures[itemID], let index = itemIndexByID[itemID],
+              items[index].attachments.isEmpty, items[index].content == .message(failed.text),
+              items[index].metadata.fileFailure != failed.failure else { return }
+        replaceItem(at: index, with: Self.showingFileFailure(failed.failure, on: items[index]))
+        updateProjectedMessage(items[index])
+    }
+
+    /// Messages whose files stopped load again, with their tries counted afresh. A new connection or
+    /// the chat attached again: every reason but a file too big for this device, which stays too big
+    /// (the plugin may have been updated, or the file saved since). A turn that ends (`onlyRefused`):
+    /// a reply Hermes hadn't saved yet, which it refuses until then.
+    func forgetAgentFileFailures(from owner: DirectHermesConversationClient, onlyRefused: Bool = false) {
+        guard (client as? DirectHermesConversationClient) === owner else { return }
+        let forgotten = agentFileFailures.filter { _, failed in
+            onlyRefused ? failed.failure == .refused : failed.failure != .tooBig
+        }.keys
+        for id in forgotten {
+            agentFileFailures[id] = nil
+            if let index = itemIndexByID[id], items[index].metadata.fileFailure != nil {
+                replaceItem(at: index, with: Self.showingFileFailure(nil, on: items[index]))
+                updateProjectedMessage(items[index])
+            }
+            _ = owner.retryMessageMedia(itemID: id)
+        }
+    }
+
+    /// Try again on a message whose files stopped loading. With no connection to ask, it says so.
+    func retryAgentFiles(itemID: String) {
+        guard let index = itemIndexByID[itemID], items[index].attachments.isEmpty,
+              case .message(let text) = items[index].content else { return }
+        agentFileFailures[itemID] = nil
+        if items[index].metadata.fileFailure != nil {
+            replaceItem(at: index, with: Self.showingFileFailure(nil, on: items[index]))
+            updateProjectedMessage(items[index])
+        }
+        guard let native = nativeConversationClient, native.retryMessageMedia(itemID: itemID) else {
+            AgentFileLoad.log.notice("Try again on a message's files: no connection to ask")
+            agentFileFailures[itemID] = (text, .unreachable)
+            showAgentFileFailure(itemID: itemID)
+            return
+        }
+    }
+
+    private static func showingFileFailure(_ failure: AgentFileFailure?, on row: TimelineItem) -> TimelineItem {
+        var metadata = row.metadata
+        metadata.fileFailure = failure
+        return TimelineItem(id: row.id, role: row.role, sender: row.sender, content: row.content,
+                            metadata: metadata, attachments: row.attachments)
     }
 
     func applyNativeMedia(_ item: TimelineItem, replacing source: TimelineItem,
@@ -387,10 +458,13 @@ extension ChatModel {
         }
         guard existing.role == source.role, existing.sender == source.sender, existing.content == source.content,
               existing.attachments == source.attachments else { return false }
+        var metadata = existing.metadata
+        if !item.attachments.isEmpty { metadata.fileFailure = nil }
         replaceItem(at: index, with: TimelineItem(id: existing.id, role: existing.role, sender: existing.sender,
-            content: item.content, metadata: existing.metadata, attachments: item.attachments))
+            content: item.content, metadata: metadata, attachments: item.attachments))
         if !item.attachments.isEmpty, case .message(let text) = source.content {
             deliveredFileSources[item.id] = text
+            agentFileFailures[item.id] = nil
         }
         updateProjectedMessage(items[index])
         persistSession()

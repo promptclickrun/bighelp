@@ -155,8 +155,8 @@ extension DirectHermesConversationClient {
 
     /// Downloads never hold up text, turn settlement, or navigation. A failed
     /// or empty read is asked again a few times (it can lose to Hermes saving
-    /// the turn or to a reload), then the message says plainly that the file
-    /// couldn't load instead of showing a host path.
+    /// the turn or to a reload), then the message shows why its files didn't
+    /// come, with Try again, instead of a loading tile or a host path.
     func scheduleMessageMedia() {
         guard connected, let attachmentResolver else { return }
         markLinkedPicturesShownInReply()
@@ -170,6 +170,11 @@ extension DirectHermesConversationClient {
                   case .message(let text) = item.content,
                   DirectHermesGeneratedMediaClient.hasAttachmentDirectives(text, role: item.role),
                   attachmentTasks[item.id] == nil else { continue }
+            // Stopped: it waits for Try again, and keeps its reason through a reload.
+            if model?.agentFileFailure(itemID: item.id, text: text) != nil {
+                model?.showAgentFileFailure(itemID: item.id)
+                continue
+            }
             let key = stored + "\0" + item.role.rawValue + "\0" + text
             guard attachmentAttempts[item.id] != key else { continue }
             attachmentAttempts[item.id] = key
@@ -191,21 +196,31 @@ extension DirectHermesConversationClient {
             }
             attachmentTasks[item.id] = Task { @MainActor [weak self] in
                 guard let self else { return }
+                var applied = false
+                var failure = AgentFileFailure.unknown
                 defer {
-                    if self.generation == owner {
+                    // A cancelled load leaves the row to whatever cancelled it (a disconnect or suspend).
+                    if self.generation == owner, !Task.isCancelled {
                         self.attachmentTasks[item.id] = nil
+                        if !applied, self.connected, self.storedID == stored {
+                            // Asked again a little later; the original marker stays meanwhile.
+                            self.retryMessageMedia(item, key: key, owner: owner, failure: failure)
+                        } else if !applied, self.attachmentAttempts[item.id] == key, self.mediaRetryTasks[item.id] == nil {
+                            // Nothing will ask again on its own: the next schedule does, so the row
+                            // never waits on an attempt that ended.
+                            self.attachmentAttempts[item.id] = nil
+                        }
                         self.scheduleMessageMedia()
                     }
                 }
-                var applied = false
                 do {
                     let results = try await attachmentResolver.resolve(agentID: self.profile, storedID: stored,
                         items: [.init(id: item.id, text: text, role: item.role)])
                     try Task.checkCancellation()
                     guard self.connected, self.generation == owner, self.storedID == stored else { return }
-                    if results.count == 1, let result = results.first, result.id == item.id,
-                       !result.attachments.isEmpty {
-                        applied = self.applyMessageMedia(result, replacing: item)
+                    if results.count == 1, let result = results.first, result.id == item.id {
+                        if !result.attachments.isEmpty { applied = self.applyMessageMedia(result, replacing: item) }
+                        failure = result.failure ?? failure
                     }
                     // Shown. If a reload brings the row back without its files,
                     // they're read again (from this device's copy) rather than skipped.
@@ -213,10 +228,8 @@ extension DirectHermesConversationClient {
                 } catch is CancellationError {
                     return
                 } catch {
-                    // Asked again below; the original marker stays meanwhile.
+                    failure = AgentFileFailure(error)
                 }
-                guard !applied, self.connected, self.generation == owner, self.storedID == stored else { return }
-                self.retryMessageMedia(item, key: key, owner: owner)
             }
         }
     }
@@ -273,16 +286,33 @@ extension DirectHermesConversationClient {
         }
     }
 
-    private func retryMessageMedia(_ item: TimelineItem, key: String, owner: UUID) {
+    /// Try again on a message whose files stopped loading: its tries start over. False when
+    /// this chat has no connection to ask.
+    func retryMessageMedia(itemID: String) -> Bool {
+        guard connected, attachmentResolver != nil else { return false }
+        let prefix = itemID + "\0"
+        mediaFailures = mediaFailures.filter { !$0.key.hasPrefix(prefix) }
+        AgentFileLoad.log.info("Try again on a message's files")
+        // A load still under way goes on, with its tries counted from here.
+        guard attachmentTasks[itemID] == nil else { return true }
+        mediaRetryTasks[itemID]?.cancel()
+        mediaRetryTasks[itemID] = nil
+        attachmentAttempts[itemID] = nil
+        scheduleMessageMedia()
+        return true
+    }
+
+    private func retryMessageMedia(_ item: TimelineItem, key: String, owner: UUID, failure: AgentFileFailure) {
         let failureKey = item.id + "\0" + key
         let failures = (mediaFailures[failureKey] ?? 0) + 1
         mediaFailures[failureKey] = failures
+        AgentFileLoad.log.notice("A message's files didn't load, try \(failures, privacy: .public): \(failure.rawValue, privacy: .public)")
         guard failures <= mediaRetryDelays.count else {
+            // The row says why, with Try again. A reload keeps that until Try again or the chat opens
+            // anew, rather than going back to a loading tile. Anything else keeps its attempt, so it
+            // isn't asked for again and again.
             if item.role == .assistant, case .message(let text) = item.content,
-               applyMessageMedia(.init(id: item.id, text: DirectHermesGeneratedMediaClient.unavailableMessageText(text),
-                                       attachments: []), replacing: item) {
-                // A reread of the saved history brings the file line back: it's asked for once more
-                // then (and says so again), not left on the loading tile.
+               model?.markAgentFilesFailed(failure, itemID: item.id, text: text, from: self) == true {
                 attachmentAttempts[item.id] = nil
             }
             return

@@ -25,7 +25,9 @@ HOME and HERMES_HOME, then runs the matching HostSignInMatrixUITests:
             that isn't in use (ShortcutGatewaySwitchHostUITests)
   media     no sign-in, with the bighelp plugin (--plugin) and the test-only
             Scripts/HostProbePlugin: a generated image stays in the chat after
-            the turn ends, and Hermes' vault code and save-login prompts open
+            the turn ends, two pictures an agent saved outside its folder show
+            in place of their `MEDIA:` lines (and ones that are gone say why,
+            with Try again), and Hermes' vault code and save-login prompts open
             bighelp's secure pop-up. Needs a Hermes with the vault (canary)
   drafts    no sign-in, with the bighelp plugin (--plugin) and a scripted model:
             a made-up business card sent from the app becomes a contact draft,
@@ -83,13 +85,22 @@ TESTS = {
               "ShortcutGatewaySwitchHostUITests/testAskAnAgentSwitchesToItsGatewayAndGetsTheAnswer"],
     "drafts": ["ImageDraftsHostUITests/testAContactDraftFromAPhotoSavesOnceAndTheAgentHearsIt",
                "ImageDraftsHostUITests/testAPhotoAloneGetsTheOfferAndTheAgentCantAddTheContactItself"],
-    "media": ["testGeneratedImageStaysAfterTheTurnEnds", "testVaultCodePopUpEntersTheCode",
+    "media": ["testGeneratedImageStaysAfterTheTurnEnds", "testPicturesAnAgentSavedShowInTheChat",
+              "testPicturesAnAgentSavedShowInItsBotChat", "testPicturesFromATurnThatEndedWhileAwayShow",
+              "testPicturesThatAreGoneSayWhyWithTryAgain", "testPicturesThatAreGoneSayWhyInDark",
+              "testVaultCodePopUpEntersTheCode",
               "testSaveLoginPopUpSavesTheLogin", "testVaultSavesAndImportsLoginsOnTheHost",
               "testACardStreamsBehindALoader"],
 }
 # 2.18.2, older than any release the app should offer.
 OLD_PLUGIN_REVISION = "34f2a16938ba69185a7f5ed9fa4a963f9a9fe1b4"
 STEER_OPEN = "[OUT-OF-BAND USER MESSAGE"
+# Two pictures an agent saved outside its working folder, sent as `MEDIA:` lines after a
+# reply with code spans and quotes, the way agents report work they did with their tools.
+FILES_REPLY = ("It works on this computer. Here is what I checked.\n\n"
+               "- The **screen** shows at once. I ran `device_list` and `device_open`, then saved `phone.png`.\n"
+               '- The tab said "all good" on the first try.\n\n'
+               "Both pictures are below.\n")
 # Streamed a few characters at a time, so the app shows a card still on its way.
 STREAMED_CARD = ("Here's your card.\n\n```loopdy-card\n"
                  '{"schema":"loopdy.generative_ui","version":1,"component":"summary",'
@@ -110,7 +121,7 @@ class ToolTurnModel(BaseHTTPRequestHandler):
         offered = {t.get("function", {}).get("name", "") for t in request.get("tools", [])}
         texts = [(i, str(m.get("content") or "")) for i, m in enumerate(messages) if m.get("role") == "user"]
         triggers = ("secure input test", "long tool test", "question test", "image test", "vault code test",
-                    "save login test", "card test")
+                    "save login test", "card test", "files test")
         start = max((i for i, text in texts if any(t in text for t in triggers)), default=-1)
         asked = str(messages[start].get("content", "")) if start >= 0 else ""
         secure = "secure input test" in asked
@@ -118,7 +129,8 @@ class ToolTurnModel(BaseHTTPRequestHandler):
         probe_tool = ("image_generate", {"prompt": "A probe picture", "aspect_ratio": "square"}) \
             if "image test" in asked else ("probe_vault_code", {"site": "example.com"}) \
             if "vault code test" in asked else ("probe_vault_save_login", {"origin": "https://example.com"}) \
-            if "save login test" in asked else None
+            if "save login test" in asked else ("terminal", {"command": "sleep 20" if "slow" in asked else "true"}) \
+            if "files test" in asked else None
         results = [str(m.get("content") or "") for m in messages[start + 1:] if m.get("role") == "tool"]
         steers = [re.sub(r"^\[OUT-OF-BAND[^\]]*\]\s*|\s*\[/OUT-OF-BAND USER MESSAGE\]$", "", text.strip())
                   for i, text in texts if i > start and STEER_OPEN in text]
@@ -166,6 +178,9 @@ class ToolTurnModel(BaseHTTPRequestHandler):
                                                    f"not saved ({outcome.get('error') or 'skipped' if outcome.get('skipped') else results[-1][:120]}).")
             elif question:
                 text = "Question fixture answered: " + results[-1][:80]
+            elif "files test" in asked:
+                sent = self.server.gone_files if "missing" in asked else self.server.sent_files
+                text = FILES_REPLY + "".join("\nMEDIA:" + path for path in sent)
             elif probe_tool and probe_tool[0] == "image_generate":
                 outcome = json.loads(results[-1]) if results and results[-1].startswith("{") else {}
                 text = ("MEDIA:" + outcome["image"]) if outcome.get("image") else "Image fixture failed: " + results[-1][:160]
@@ -634,6 +649,20 @@ def run_fleet(args, repo: Path) -> int:
             model.server_close()
 
 
+def fixture_png(seed: str, width: int = 240, height: int = 160) -> bytes:
+    """A made-up picture of about 100 KB: noise, so it doesn't compress away."""
+    import random
+    import struct
+    import zlib
+    noise = random.Random(seed)
+    rows = b"".join(b"\0" + noise.randbytes(width * 3) for _ in range(height))
+
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b""))
+
+
 def run_mode(mode: str, args, repo: Path) -> int:
     if mode == "fleet":
         return run_fleet(args, repo)
@@ -644,6 +673,15 @@ def run_mode(mode: str, args, repo: Path) -> int:
         project.mkdir()
         model = ThreadingHTTPServer(("127.0.0.1", 0), PhotoDraftModel if mode == "drafts"
                                     else ToolTurnModel if mode in ("tools", "media") else SyntheticModel)
+        model.sent_files, model.gone_files = [], []
+        if mode == "media":
+            # Named in a reply but not on the computer: the app says so, with Try again.
+            model.gone_files = [str(temp / "workspace" / "gone" / name) for name in ("panel-gone.png", "phone-gone.png")]
+            # Outside the terminal's folder and Hermes' caches, like a screenshot an agent saved.
+            for name in ("screens/panel-fixture.png", "phone/phone-fixture.png"):
+                (temp / "workspace" / name).parent.mkdir(parents=True, exist_ok=True)
+                (temp / "workspace" / name).write_bytes(fixture_png(name))
+                model.sent_files.append(str(temp / "workspace" / name))
         threading.Thread(target=model.serve_forever, daemon=True).start()
         port = free_port()
         origin = f"http://127.0.0.1:{port}"
@@ -733,7 +771,8 @@ def run_mode(mode: str, args, repo: Path) -> int:
                        "-derivedDataPath", str(args.derived_data), "-parallel-testing-enabled", "NO",
                        "-resultBundlePath", str(args.results / f"{mode}.xcresult")]
             command += [f"-only-testing:BighelpUITests/{name if '/' in name else 'HostSignInMatrixUITests/' + name}"
-                        for name in TESTS[mode]]
+                        for name in TESTS[mode]
+                        if not args.only or any(part in name for part in args.only.split(","))]
             with (args.results / f"xcodebuild-{mode}.log").open("w") as output:
                 result = subprocess.run(command, env=client_env, cwd=repo, stdout=output, stderr=subprocess.STDOUT,
                                         timeout=1500)
@@ -781,7 +820,7 @@ def main():
                         help="fleet and media modes: network delay each way between the app and each host")
     parser.add_argument("--rate-kbps", type=int, default=0,
                         help="media mode: throughput limit between the app and the host, in KiB a second")
-    parser.add_argument("--only", help="fleet mode: run only the tests whose names contain one of these, comma separated")
+    parser.add_argument("--only", help="run only the tests whose names contain one of these, comma separated")
     args = parser.parse_args()
     args.results.mkdir(parents=True, exist_ok=True)
     repo = Path(__file__).resolve().parents[1]

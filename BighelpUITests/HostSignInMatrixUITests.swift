@@ -222,6 +222,148 @@ final class HostSignInMatrixUITests: BighelpUITestCase {
         save("media-2-reopened", app)
     }
 
+    /// An agent saved two screenshots outside its working folder and named them with
+    /// `MEDIA:` lines under a reply with code spans and quotes. Both pictures show,
+    /// and no loading tile stays in their place.
+    @MainActor func testPicturesAnAgentSavedShowInTheChat() throws {
+        let app = try beginSetup(mode: "media")
+        let composer = try openFirstChat(app)
+        send("files test", composer: composer, in: app)
+        let stop = app.buttons["chat.stop"]
+        let ended = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: stop)
+        wait(for: [ended], timeout: 60)
+        let pictures = app.descendants(matching: .any)["chat.message-attachments"].firstMatch
+        let loading = app.descendants(matching: .any)["chat.message-attachments.loading"].firstMatch
+        XCTAssertTrue(pictures.waitForExistence(timeout: 30), "The pictures show")
+        XCTAssertFalse(loading.exists, "No loading tile stays")
+        XCTAssertFalse(text("MEDIA:", in: app).exists, "No raw MEDIA line in their place")
+        save("media-11-saved-pictures", app)
+
+        swipeBackFromLeadingEdge(in: app)
+        let row = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "session.row.")).firstMatch
+        if !row.waitForExistence(timeout: 5) { openRootTab("tab.sessions", in: app) }
+        XCTAssertTrue(row.waitForExistence(timeout: 15), "The chat is listed")
+        row.tap()
+        XCTAssertTrue(pictures.waitForExistence(timeout: 30), "The pictures are there after reopening the chat")
+        XCTAssertFalse(loading.exists, "No loading tile after reopening")
+        save("media-12-saved-pictures-reopened", app)
+    }
+
+    /// The same two pictures in the agent's Bot Chat, which Hermes keeps hidden and the
+    /// plugin makes as a `cli` chat.
+    @MainActor func testPicturesAnAgentSavedShowInItsBotChat() throws {
+        let app = try beginSetup(mode: "media")
+        try connect(app)
+        app.buttons["host-setup.continue"].tap()
+        openRootTab("tab.agents", in: app)
+        let agent = app.buttons["agent.default"].firstMatch
+        XCTAssertTrue(agent.waitForExistence(timeout: 30), "The agent is listed")
+        agent.tap()
+        let composer = app.textViews["chat.composer.text"]
+        XCTAssertTrue(composer.waitForExistence(timeout: 45), "Its Bot Chat opens")
+        let send = app.buttons["chat.send"]
+        composer.tap()
+        composer.typeText("files test")
+        let ready = Date().addingTimeInterval(30)
+        while !send.isEnabled, Date() < ready { Thread.sleep(forTimeInterval: 0.3) }
+        send.tap()
+        let stop = app.buttons["chat.stop"]
+        let ended = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: stop)
+        wait(for: [ended], timeout: 60)
+        let pictures = app.descendants(matching: .any)["chat.message-attachments"].firstMatch
+        let loading = app.descendants(matching: .any)["chat.message-attachments.loading"].firstMatch
+        XCTAssertTrue(pictures.waitForExistence(timeout: 30), "The pictures show in the Bot Chat")
+        XCTAssertFalse(loading.exists, "No loading tile stays")
+        save("media-13-bot-chat-pictures", app)
+
+        // Past the grace period the app closes its host connection; coming back reconnects.
+        XCUIDevice.shared.press(.home)
+        XCTAssertTrue(app.wait(for: .runningBackground, timeout: 10))
+        sleep(35)
+        app.activate()
+        XCTAssertTrue(pictures.waitForExistence(timeout: 30), "The pictures are there after coming back")
+        sleep(5)
+        XCTAssertTrue(pictures.exists, "The pictures stay after the reconnect")
+        XCTAssertFalse(loading.exists, "No loading tile after coming back")
+        save("media-14-bot-chat-after-return", app)
+
+        app.terminate()
+        app.launch()
+        openRootTab("tab.agents", in: app)
+        XCTAssertTrue(agent.waitForExistence(timeout: 30))
+        agent.tap()
+        XCTAssertTrue(pictures.waitForExistence(timeout: 45), "The pictures are there after a relaunch")
+        sleep(5)
+        XCTAssertFalse(loading.exists, "No loading tile after a relaunch")
+        save("media-15-bot-chat-after-relaunch", app)
+    }
+
+    /// The Bot Chat's turn is still at work when the app leaves, and it ends while the app
+    /// is away past its grace. Coming back, the reply's two pictures show.
+    @MainActor func testPicturesFromATurnThatEndedWhileAwayShow() throws {
+        let app = try beginSetup(mode: "media")
+        try connect(app)
+        app.buttons["host-setup.continue"].tap()
+        openRootTab("tab.agents", in: app)
+        let agent = app.buttons["agent.default"].firstMatch
+        XCTAssertTrue(agent.waitForExistence(timeout: 30), "The agent is listed")
+        agent.tap()
+        let composer = app.textViews["chat.composer.text"]
+        XCTAssertTrue(composer.waitForExistence(timeout: 45), "Its Bot Chat opens")
+        let send = app.buttons["chat.send"]
+        composer.tap()
+        composer.typeText("slow files test")
+        let ready = Date().addingTimeInterval(30)
+        while !send.isEnabled, Date() < ready { Thread.sleep(forTimeInterval: 0.3) }
+        send.tap()
+        XCTAssertTrue(app.buttons["chat.stop"].waitForExistence(timeout: 20), "The turn is at work")
+        sleep(3)
+        XCUIDevice.shared.press(.home)
+        XCTAssertTrue(app.wait(for: .runningBackground, timeout: 10))
+        sleep(45)
+        app.activate()
+        let pictures = app.descendants(matching: .any)["chat.message-attachments"].firstMatch
+        let loading = app.descendants(matching: .any)["chat.message-attachments.loading"].firstMatch
+        XCTAssertTrue(pictures.waitForExistence(timeout: 45), "The pictures show after coming back")
+        sleep(5)
+        XCTAssertFalse(loading.exists, "No loading tile stays")
+        save("media-16-ended-while-away", app)
+    }
+
+    /// A reply names two pictures that aren't on the computer. After its tries the message
+    /// says why, with Try again, instead of loading for good.
+    @MainActor func testPicturesThatAreGoneSayWhyWithTryAgain() throws {
+        let app = try gonePictures(appearance: "light")
+        app.buttons["chat.message-attachments.retry"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["chat.message-attachments.loading"].waitForExistence(timeout: 5),
+                      "Try again loads again")
+        checkGonePictures(in: app, "media-18-gone-after-try-again")
+    }
+
+    @MainActor func testPicturesThatAreGoneSayWhyInDark() throws {
+        _ = try gonePictures(appearance: "dark")
+    }
+
+    @MainActor private func gonePictures(appearance: String) throws -> XCUIApplication {
+        let app = try beginSetup(mode: "media", extraArguments: ["-loopdy.demo.appearance", appearance])
+        let composer = try openFirstChat(app)
+        send("missing files test", composer: composer, in: app)
+        checkGonePictures(in: app, "media-17-gone-\(appearance)")
+        return app
+    }
+
+    @MainActor private func checkGonePictures(in app: XCUIApplication, _ name: String) {
+        let failed = app.descendants(matching: .any)["chat.message-attachments.failed"].firstMatch
+        XCTAssertTrue(failed.waitForExistence(timeout: 60), "The tile ends, saying why")
+        XCTAssertTrue(text("It's no longer on your computer.", in: app).exists, "The plugin's reason")
+        XCTAssertTrue(text("Couldn't load 2 pictures", in: app).exists)
+        XCTAssertFalse(app.descendants(matching: .any)["chat.message-attachments.loading"].exists)
+        XCTAssertFalse(text("MEDIA:", in: app).exists, "No raw MEDIA line, on screen or for VoiceOver")
+        XCTAssertTrue(app.buttons["chat.message-attachments.retry"].exists, "Try again")
+        save(name, app)
+    }
+
     /// Hermes' browser vault asks for a one-time code with `vault.code`. It
     /// used to be refused at once; now the secure pop-up takes the code.
     @MainActor func testVaultCodePopUpEntersTheCode() throws {

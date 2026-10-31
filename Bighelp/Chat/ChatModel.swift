@@ -139,6 +139,7 @@ final class ChatModel {
                 if oldValue {
                     lastTurnEndedAt = Date()
                     flushPersistence()
+                    if let native = nativeConversationClient { forgetAgentFileFailures(from: native, onlyRefused: true) }
                 }
             }
         }
@@ -216,6 +217,9 @@ final class ChatModel {
     /// Messages whose files reached this device, by the saved text that named
     /// them, so a history reload of that same text keeps the files on screen.
     @ObservationIgnored var deliveredFileSources: [String: String] = [:]
+    /// Messages whose files stopped loading, by the text that named them and why. A reload
+    /// of that same text shows the reason and Try again, not loading tiles again.
+    @ObservationIgnored var agentFileFailures: [String: (text: String, failure: AgentFileFailure)] = [:]
     @ObservationIgnored var hasDeferredTranscriptChanges = false
 
     var transcriptProjectionWorkCount = 0
@@ -614,6 +618,8 @@ final class ChatModel {
         guard client is NativeWorkspaceUnavailableClient || nativeConversationClient === native else { return false }
         client = native
         native.model = self
+        // A client attached later can already be connected, so its rebind never counts as a reconnect.
+        forgetAgentFileFailures(from: native)
         if let context = native.sessionContext { reconcileSessionContext(context) }
         scheduleNativeGoalControlRefresh()
         BighelpVisibleChats.shared.identityChanged()

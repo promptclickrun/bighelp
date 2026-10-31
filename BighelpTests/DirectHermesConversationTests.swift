@@ -292,7 +292,9 @@ struct DirectHermesConversationTests {
             #expect(sends == 2)
             #expect(client.journal.unresolved.map(\.id) == [original.id])
         } else {
-            #expect(!model.canSend)
+            // Disconnected, the chat takes a new message to send once it's back
+            // (`stageComposerMessage`); connected with the lost receipt unresolved, it doesn't.
+            #expect(model.canSend == !client.connected)
             #expect(client.needsRecovery)
             #expect(reads == 1)
         }

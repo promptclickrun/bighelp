@@ -28,12 +28,18 @@ struct ChatBotModeIntegrationTests {
         } == events)
     }
 
-    @Test func anUnpreparedDirectChatCannotSendAndKeepsItsDraft() async {
+    /// Nothing goes out through the placeholder: the message waits for the chat's own connection,
+    /// and comes back to the box if that never comes.
+    @Test func anUnpreparedDirectChatWaitsForItsConnectionAndKeepsItsDraft() async throws {
         let model = ChatModel(conversationID: "unprepared-direct", client: NativeWorkspaceUnavailableClient(),
             initialItems: [], initialDraft: "Keep this draft")
         #expect(!model.isBotMode)
-        #expect(!model.canSend)
+        #expect(model.canSend)
         await model.send()
+        #expect(model.stagedSends.count == 1)
+        #expect(model.items.isEmpty)
+        model.connectionIsOverdue = true
+        for _ in 0..<200 where !model.stagedSends.isEmpty { try await Task.sleep(for: .milliseconds(10)) }
         #expect(model.draft == "Keep this draft")
         #expect(model.items.isEmpty)
     }

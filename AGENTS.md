@@ -244,11 +244,14 @@ change in both repos.
   them every refresh dropped the saved Bot Chat, and the first tap on a bot waited on a full lookup.
 - **Archived:** the catalog lists `archived=include` and keeps rows Hermes' idle sweep archived
   (`auto_archived`); deliberately archived chats live in Archived Chats (`archivedChats`, Restore).
-- **Rereads keep Send on:** while agents work together, an open chat rereads what Hermes saved every few seconds,
-  and each reread recovers the chat's connection. Send stays on through it (`acceptsSubmissionAfterCatchUp`); a
-  message sent then waits in the box until the recovery ends (`isAwaitingCatchUp`). As a turn, the recovery's idle
-  readback would take it for a stale one and drop it. Opening keeps Send on too: while a chat opens from its saved
-  copy (`isOpening`, a navigation open), a message waits the same way and goes out once the chat is connected.
+- **Send never waits for the connection:** while a chat has no working connection (back from the background, a
+  computer still connecting, a chat still opening or rereading what Hermes saved: `lacksConnection`), or a turn it
+  just started isn't live yet, Send, the message box and Stop stay on. A message sent then waits at the bottom of
+  the chat with "Sending…" under it (`stagedSends`, `ChatCanvasRow.staged`), outside the transcript: a recovery's
+  readback would drop a local row as stale. Staged messages go out in order once the chat can take them, each as
+  the row it waited in: a new turn, or a steer once the turn is live. Send goes off only after 25 s without a
+  connection while the app is open (`connectionIsOverdue`, `ChatConnectionGrace`); staged messages then go back in
+  the box. Commands (`/…`) and PDF pages still need the connection and wait in the box.
 - **Who's working:** Bots mode's home and the Agents screen show each agent's Bot Chat working or needing
   you from the plugin's `agents/activity` (`native-agents-activity-v1`): Hermes' turn leases in any process
   (the app, `message_agent`, `chat -q`) and the dashboard's open prompts, for up to 64 agents in one read.

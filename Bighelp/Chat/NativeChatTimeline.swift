@@ -7,6 +7,9 @@ import UIKit
 /// native layout as messages, so there is no separately estimated live tail.
 enum ChatCanvasRow: Identifiable, Equatable {
     case transcript(ChatTurnDisplayRow)
+    /// A message of the person's waiting for the chat to take it (`ChatModel.stagedSends`). It has
+    /// the ID of the row it becomes once sent, so it stays put as it goes.
+    case staged(TimelineItem)
     /// A folder of tool calls. `isLive`: the agent is still working on it.
     case workTrailHeader(ChatActivityTurn, isLive: Bool)
     case activityDetail(ChatActivityEvent)
@@ -40,6 +43,7 @@ enum ChatCanvasRow: Identifiable, Equatable {
     var id: String {
         switch self {
         case .transcript(let row): row.id
+        case .staged(let item): ChatTranscriptEntry.message(item).id
         case .workTrailHeader(let turn, _): "work-trail:\(turn.id)"
         case .activityDetail(let event): "activity-detail:\(event.id)"
         case .workTrailEnd(let id): "work-trail-end:\(id)"
@@ -79,7 +83,7 @@ enum ChatCanvasRow: Identifiable, Equatable {
         case (.activityDetail(let a), .activityDetail(let b)): a == b
         case (.workTrailEnd(let a), .workTrailEnd(let b)): a == b
         case (.agentTalk(let a), .agentTalk(let b)): a == b
-        case (.earlierMessage(let a), .earlierMessage(let b)): a == b
+        case (.earlierMessage(let a), .earlierMessage(let b)), (.staged(let a), .staged(let b)): a == b
         case (.divider(let a), .divider(let b)), (.botStatus(let a), .botStatus(let b)), (.failure(let a), .failure(let b)): a == b
         case (.previousHistory(let a, let b), .previousHistory(let c, let d)): a == c && b == d
         case (.memberFailure(let a), .memberFailure(let b)): a == b
@@ -1022,7 +1026,7 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             case .workTrailHeader, .agentTalk: return BighelpTokens.hitTarget + BighelpTokens.space8
             case .activityDetail: return 180
             case .transcript(.completed): return BighelpTokens.hitTarget + BighelpTokens.space16
-            case .transcript(.entry(.message(let item))), .earlierMessage(let item):
+            case .transcript(.entry(.message(let item))), .earlierMessage(let item), .staged(let item):
                 guard case .message(let text) = item.content else { return 240 }
                 let font = UIFont.bighelp(.body, compatibleWith: tableView.traitCollection)
                 let width = max(80, min(tableView.bounds.width - 40, ChatCanvasLayout.regularLaneMaximumWidth))

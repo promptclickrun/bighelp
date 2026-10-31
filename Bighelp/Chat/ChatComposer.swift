@@ -113,6 +113,7 @@ struct ChatComposer: View {
         .animation(reduceMotion ? nil : .easeInOut(duration: BighelpTokens.stateDuration), value: model.sessionContext)
         .animation(reduceMotion ? nil : .snappy(duration: BighelpTokens.stateDuration), value: model.compaction)
         .animation(reduceMotion ? nil : .easeInOut(duration: BighelpTokens.stateDuration), value: model.replyDraft)
+        .modifier(ChatConnectionGrace(model: model))
         .onChange(of: model.taskDrawer) { _, tasks in
             if tasks == nil, presentedStatus == .tasks {
                 presentedStatus = nil

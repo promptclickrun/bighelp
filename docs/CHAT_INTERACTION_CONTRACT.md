@@ -184,6 +184,14 @@ loaded host selection state.
 
 ## Composer and recovery ownership
 
+A chat waiting for its connection (coming back to the app, a computer still
+connecting, an open or catch-up under way) keeps Send, the message box and Stop
+on. A message sent then waits at the bottom of the chat with "Sending…" under
+it, outside the transcript, and goes out in order as that same row once the chat
+can take it. Send goes off only after `connectionGrace` without a connection
+while the app is open; waiting messages then go back in the box, never lost.
+`ChatSendWhileConnectingTests` protects this.
+
 A temporarily unavailable optional reference provider must not retire a prepared
 chat, discard plain text, or prevent ordinary Send. `ReferenceChatComposition`
 may bind the hub to no owner while account recovery runs; it must preserve the

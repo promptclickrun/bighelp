@@ -1,24 +1,5 @@
 import Foundation
 
-/// Settles a wait for whichever of three things comes first (the work, a timer, cancellation)
-/// without ever waiting on the one that lost.
-@MainActor
-private final class CatchUpRace {
-    var continuation: CheckedContinuation<Void, Never>?
-    var hydration: Task<Void, Never>?
-    var timer: Task<Void, Never>?
-    private(set) var isFinished = false
-
-    func finish() {
-        guard !isFinished else { return }
-        isFinished = true
-        hydration?.cancel()
-        timer?.cancel()
-        continuation?.resume()
-        continuation = nil
-    }
-}
-
 extension ChatModel {
     var retainedUnsentSubmissions: [DirectHermesDraftStore.Submission] {
         guard !referenceOwnerRetired, let native = nativeConversationClient,
@@ -59,57 +40,18 @@ extension ChatModel {
         !pendingIndependentMessageIDs.isEmpty
     }
 
-    /// A catch-up that never settles must not leave Send off for the rest of the app's life: the
-    /// message stays in the box, and a later Send goes through once the chat is ready.
-    private func awaitCatchUp(of native: DirectHermesConversationClient) async {
-        let timeout = catchUpTimeout
-        let race = CatchUpRace()
-        await withTaskCancellationHandler {
-            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-                guard !race.isFinished else {
-                    continuation.resume()
-                    return
-                }
-                race.continuation = continuation
-                race.hydration = Task { @MainActor in
-                    try? await native.awaitHydrationIfNeeded()
-                    race.finish()
-                }
-                race.timer = Task { @MainActor in
-                    try? await Task.sleep(for: timeout)
-                    race.finish()
-                }
-            }
-        } onCancel: {
-            Task { @MainActor in race.finish() }
-        }
-    }
-
     func send() async {
         // While a turn runs, this chat's own prompt counts as pending until the
         // turn ends, so "ready for a new turn" is false. A plain Send then steers
         // (or queues) through sendMidSession, which has its own checks.
-        guard permitsOrdinaryComposerSend, isBotMode || isMidSessionTurnLive
-            || (orderedDraftAttachments.isEmpty ? composerTransportIsReady : directTransportIsReady) else { return }
-        // Send stays on while the chat opens from its saved copy. The message waits here, still in
-        // the box, until the chat has its own connection; a reconnect can start the open again.
-        if !isBotMode, !isSending, !directTransportIsReady, isOpening {
-            guard !isAwaitingCatchUp else { return }
-            isAwaitingCatchUp = true
-            while !Task.isCancelled, !directTransportIsReady, let wait = opening?.wait { await wait() }
-            isAwaitingCatchUp = false
-            guard !isSending, directTransportIsReady || nativeConversationClient?.acceptsSubmissionAfterCatchUp == true
-            else { return }
-        }
-        // Send stays on while a working chat catches up. The message waits here, still in the box:
-        // as a turn, the catch-up's idle readback would take it for a stale one and drop it.
-        if !isBotMode, !isSending, !directTransportIsReady, let native = nativeConversationClient,
-           native.acceptsSubmissionAfterCatchUp {
-            guard !isAwaitingCatchUp else { return }
-            isAwaitingCatchUp = true
-            await awaitCatchUp(of: native)
-            isAwaitingCatchUp = false
-            guard directTransportIsReady, !isSending else { return }
+        guard permitsOrdinaryComposerSend,
+              isBotMode || isMidSessionTurnLive || directTransportIsReady || stagesComposerMessage else { return }
+        // A chat that can't hand the message to Hermes yet (still connecting, opening or catching up,
+        // or a turn it just started) takes it anyway: it waits in the chat and goes out in order.
+        // Only a staged row is safe there: as a turn, a catch-up's readback would take it for stale.
+        if stagesComposerMessage, !stagedSends.isEmpty || !takesMessageNow {
+            stageComposerMessage()
+            return
         }
         guard !isBotMode || botModeExecutionEnabled else {
             failureMessage = "Group chats are unavailable for this Hermes connection."
@@ -188,7 +130,7 @@ extension ChatModel {
         return true
     }
 
-    private func send(_ outgoing: ChatOutgoingMessage) async {
+    func send(_ outgoing: ChatOutgoingMessage) async {
         let message = outgoing.message
         let slashSelection = outgoing.slashSelection
         let nativeAdmissionIDs = Set(nativeConversationClient?.journal.unresolved.map(\.id) ?? [])
@@ -236,13 +178,14 @@ extension ChatModel {
         }
         var localHumanID: String?
         if !isBotModeConversation {
-            appendItem(humanItem(content: message, attachments: attachments))
+            appendItem(takeStagedItem(of: outgoing) ?? humanItem(content: message, attachments: attachments))
             if let item = items.last {
                 localHumanID = item.id
                 appendProjectedMessage(item)
             }
         }
-        if restoresDraft {
+        // A staged message left the box when it was staged; the box holds the next one now.
+        if restoresDraft, outgoing.stagedItem == nil {
             draft = ""
             replyDraft = nil
             draftAttachments = []
@@ -315,17 +258,13 @@ extension ChatModel {
                 // the local presentation during the delay: retain unsent intent,
                 // not an invented accepted human row beside that server turn.
                 // A card's answer isn't composer text: drop its row, keep the draft.
-                if !restoresDraft || draft.isEmpty {
-                    if restoresDraft {
-                        draft = message
-                        draftAttachments = attachments
-                        orderedDraftAttachments = orderedAttachments
-                    }
-                    if let localHumanID {
-                        removeItem(id: localHumanID)
-                        removeProjectedMessage(id: localHumanID)
-                        native.retainVisibleState()
-                    }
+                if restoresDraft {
+                    putBackInBox(message, attachments: attachments, orderedAttachments: orderedAttachments)
+                }
+                if let localHumanID {
+                    removeItem(id: localHumanID)
+                    removeProjectedMessage(id: localHumanID)
+                    native.retainVisibleState()
                 }
             }
             return
@@ -426,6 +365,18 @@ extension ChatModel {
             isStopping = false
             return
         }
+        // Stop stays on while the chat connects: it goes as soon as the chat has its connection.
+        // A connected chat rereading what Hermes saved stops at once, as before.
+        if lacksSocket {
+            isStopping = true
+            let connected = await waitForConnection(until: { !lacksSocket })
+            isStopping = false
+            guard connected else {
+                failureMessage = "The active turn could not be stopped. Try again."
+                return
+            }
+            guard isSending else { return }
+        }
         guard let stoppableClient = client as? any StoppableConversationClient else { return }
         isStopping = true
         failureMessage = nil
@@ -461,10 +412,15 @@ extension ChatModel {
             failureMessage = "Attachments can be queued after this turn. Your draft is unchanged."
             return
         }
+        // Picked from Send's choices before the turn is live, or behind messages still waiting.
+        if stagesComposerMessage, !stagedSends.isEmpty || !takesMessageNow {
+            stageComposerMessage(midSessionBehavior: behavior)
+            return
+        }
         await sendMidSession(ChatOutgoingMessage(composerOf: self), using: behavior)
     }
 
-    private func sendMidSession(_ outgoing: ChatOutgoingMessage, using behavior: MidSessionChatBehavior) async {
+    func sendMidSession(_ outgoing: ChatOutgoingMessage, using behavior: MidSessionChatBehavior) async {
         guard isMidSessionTurnLive,
               !hasExclusiveMidSessionSubmission,
               let midSessionClient = client as? any MidSessionConversationClient
@@ -497,7 +453,7 @@ extension ChatModel {
         let submissionGeneration = behavior == .interruptAndSend
             ? beginOwnerGeneration()
             : priorGeneration
-        let human = humanItem(content: message, attachments: attachments)
+        let human = takeStagedItem(of: outgoing) ?? humanItem(content: message, attachments: attachments)
 
         pendingMidSessionSubmissions.append(PendingMidSessionSubmission(
             id: human.id,
@@ -506,7 +462,7 @@ extension ChatModel {
         failureMessage = nil
         appendItem(human)
         appendProjectedMessage(human)
-        if restoresDraft {
+        if restoresDraft, outgoing.stagedItem == nil {
             draft = ""
             replyDraft = nil
             draftAttachments = []
@@ -790,9 +746,7 @@ extension ChatModel {
         orderedAttachments: [ChatDraftAttachment], restoresDraft: Bool = true
     ) {
         if restoresDraft, draft.isEmpty, orderedDraftAttachments.isEmpty {
-            draft = message
-            draftAttachments = attachments
-            orderedDraftAttachments = orderedAttachments
+            putBackInBox(message, attachments: attachments, orderedAttachments: orderedAttachments)
         }
         // The protected journal retains A even if a newer composer B prevents
         // restoration. Only A's optimistic presentation is removed.
@@ -826,9 +780,7 @@ extension ChatModel {
         removeItem(id: human.id)
         removeProjectedMessage(id: human.id)
         if restoresDraft {
-            draft = message
-            draftAttachments = attachments
-            orderedDraftAttachments = attachments.map(ChatDraftAttachment.attachment)
+            putBackInBox(message, attachments: attachments, orderedAttachments: attachments.map(ChatDraftAttachment.attachment))
         }
         persistSession()
     }
@@ -841,7 +793,8 @@ extension ChatModel {
         content: String,
         attachments: [ChatAttachment] = []
     ) -> TimelineItem {
-        let existingIDs = Set(items.map(\.id))
+        // A reload resets the count, so a message still waiting in the chat may hold the next ID.
+        let existingIDs = Set(items.map(\.id) + stagedSends.map(\.id))
         while existingIDs.contains("\(conversationID)-human-\(nextHumanSequence)") {
             nextHumanSequence += 1
         }
@@ -875,6 +828,9 @@ struct ChatOutgoingMessage {
     let slashSelection: SlashCommandSelection?
     /// Only the composer's own text is cleared on send and put back on failure.
     let isComposerDraft: Bool
+    /// The row a staged message already has in the chat (`ChatModel.stageComposerMessage`). It
+    /// goes out as that row, and the box it left isn't cleared again.
+    private(set) var stagedItem: TimelineItem?
 
     init(composerOf model: ChatModel) {
         message = model.outgoingDraftText
@@ -890,6 +846,12 @@ struct ChatOutgoingMessage {
         orderedAttachments = []
         slashSelection = nil
         isComposerDraft = false
+    }
+
+    func staged(as item: TimelineItem) -> Self {
+        var staged = self
+        staged.stagedItem = item
+        return staged
     }
 }
 

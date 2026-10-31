@@ -135,26 +135,11 @@ struct SessionOpenLatencyTests {
 
         for _ in 0..<200 where client.calls < 2 { try await Task.sleep(for: .milliseconds(5)) }
         #expect(client.calls == 2, "The failed open wasn't tried again")
-        #expect(model.isOpening, "Send stays on while it opens again")
         client.release()
-        for _ in 0..<200 where model.isOpening { try await Task.sleep(for: .milliseconds(5)) }
+        for _ in 0..<200 where model.items.last?.content != .message("Canonical answer") {
+            try await Task.sleep(for: .milliseconds(5))
+        }
         #expect(model.items.last?.content == .message("Canonical answer"))
-    }
-
-    @Test func aChatTakesAMessageWhileItOpens() async throws {
-        let client = HeldSessionPageClient()
-        let catalog = SessionCatalogStore(client: client, records: [client.record])
-        let features = ShellFeatureStore(timing: .immediate, catalog: catalog)
-        let route = AppRoute.chat(conversationID: client.record.id)
-        #expect(try features.prepareCachedForUserNavigation(route))
-        guard case .chat(let model)? = features.preparedModel(for: route) else { Issue.record("No model"); return }
-        #expect(!model.isOpening)
-        let handle = try features.startNavigationHydration(id: client.record.id)
-        #expect(model.isOpening, "Its saved copy shows and Send stays on while it opens")
-        for _ in 0..<100 where client.calls == 0 { try await Task.sleep(for: .milliseconds(5)) }
-        client.release()
-        _ = try await handle.value()
-        #expect(!model.isOpening)
     }
 
     @Test func navigationDeadlineReleasesItsFooterAndRejectsLateHistory() async throws {
@@ -167,7 +152,6 @@ struct SessionOpenLatencyTests {
         let handle = try features.startNavigationHydration(id: client.record.id)
         await #expect(throws: CancellationError.self) { try await handle.value() }
         #expect(!model.isHydratingHistory)
-        #expect(!model.isOpening)
         client.release()
         for _ in 0..<10 { await Task.yield() }
         #expect(catalog.session(id: client.record.id)?.items.isEmpty == true)

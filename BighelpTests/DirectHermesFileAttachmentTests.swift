@@ -321,11 +321,12 @@ struct DirectHermesFileAttachmentTests {
         #expect(!model.isSending)
         #expect(model.canSend, "A connected recovered draft must re-enable Send")
 
+        // Send stays on through both (a message waits in the chat), but nothing goes to Hermes.
         fixture.client.requireTransportCatchup()
         #expect(fixture.client.connected)
-        #expect(!model.canSend, "Connected but unverified event coverage must remain blocked")
+        #expect(!model.takesMessageNow, "Connected but unverified event coverage must remain blocked")
         fixture.client.suspend()
-        #expect(!model.canSend, "Disconnected authority must remain blocked")
+        #expect(!model.takesMessageNow, "Disconnected authority must remain blocked")
     }
 
     @Test(arguments: ["accepted", "rejected", "unknown"])

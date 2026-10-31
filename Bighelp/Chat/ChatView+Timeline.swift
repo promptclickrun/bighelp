@@ -18,6 +18,7 @@ extension ChatView {
                 rows.append(.divider("Group chat started"))
             }
             rows += transcript()
+            rows += model.stagedSends.map { ChatCanvasRow.staged($0.item) }
         }
         if let status = model.botModeStatus { rows.append(.botStatus(status)) }
         if model.showsUnconfirmedBotModeStop { rows.append(.botStopUnconfirmed(model.isStoppingBotModeAgain)) }
@@ -176,9 +177,12 @@ extension ChatView {
                               live: model.agentTalkLive.activities, loadSteps: model.agentTalkStepsLoader)
         case .earlierMessage(let item):
             TimelineItemView(item: item, onApprovalTap: onApprovalTap,
-                             pendingMidSessionBehavior: model.pendingMidSessionBehavior(for: item.id),
+                             pendingSend: model.pendingMidSessionBehavior(for: item.id).map(ChatPendingSend.midSession),
                              senderResolver: senderResolver, showsSenderName: model.isBotMode,
                              mentionIdentities: model.messageMentionIdentities)
+        case .staged(let item):
+            TimelineItemView(item: item, onApprovalTap: onApprovalTap, pendingSend: .staged,
+                             senderResolver: senderResolver, mentionIdentities: model.messageMentionIdentities)
         case .divider(let title): timelineDivider(title)
         case .previousHistory: previousHistoryButton
         case .welcome: emptyTimeline
@@ -273,6 +277,7 @@ extension ChatView {
     static func groupedMessageRowIDs(_ rows: [ChatCanvasRow]) -> Set<String> {
         func entry(_ row: ChatCanvasRow) -> ChatTranscriptEntry? {
             if case .transcript(.entry(let entry)) = row { return entry }
+            if case .staged(let item) = row { return .message(item) }
             return nil
         }
         var ids = Set<String>()
@@ -287,6 +292,7 @@ extension ChatView {
     static func continuedMessageRowIDs(_ rows: [ChatCanvasRow]) -> Set<String> {
         func entry(_ row: ChatCanvasRow) -> ChatTranscriptEntry? {
             if case .transcript(.entry(let entry)) = row { return entry }
+            if case .staged(let item) = row { return .message(item) }
             return nil
         }
         var ids = Set<String>()
@@ -367,7 +373,7 @@ extension ChatView {
                 item: item,
                 onApprovalTap: onApprovalTap,
                 onFork: model.isBotMode ? nil : onForkMessage,
-                pendingMidSessionBehavior: model.pendingMidSessionBehavior(for: item.id),
+                pendingSend: model.pendingMidSessionBehavior(for: item.id).map(ChatPendingSend.midSession),
                 senderResolver: senderResolver,
                 showsSenderName: model.isBotMode,
                 messageReaction: nativeReaction,

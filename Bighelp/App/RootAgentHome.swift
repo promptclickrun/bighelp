@@ -770,7 +770,7 @@ extension RootShellView {
                                                               knownAgentIDs: Set(agents.profiles.map(\.id)))
             }
             .task(id: usageReaderKey) { configureUsage(usageReaderKey) }
-            .task(id: usageWidgetKey) { await refreshUsageWidget() }
+            .task(id: usageWidgetKey) { await followUsageWidget() }
             .task(id: workflowsWidgetKey) { await followWorkflowsWidget() }
             .environment(\.providerUsage, providerUsage)
             .task(id: hostReactionsKey) { await syncHostReactions(hostReactionsKey) }

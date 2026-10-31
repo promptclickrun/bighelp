@@ -649,10 +649,15 @@ sections can crash only on devices ("Thread stack size exceeded").
   switch, or bighelp woken in the background (a Shortcut, the Watch, Background App Refresh) has no agents,
   chats or screens yet. Widget writers keep the saved data then: `AgentDirectoryStore.knowsProfiles`, the
   snapshot publisher's `saved` copy and `BighelpWidgetExtras.filled`, the Bots roster's carried gateways,
-  and Kanban, Workflows and Usage clear only on a switch within one run. A switch shows the next gateway's
+  and Kanban and Workflows clear only on a switch within one run. A switch shows the next gateway's
   saved copy (`retire(next:)`).
 - Background App Refresh (`BighelpWidgetBackgroundRefresh`, iPhone and iPad) wakes the app while a bighelp
   widget is on the device: it connects the way Shortcuts do and publishes the widgets' data. iOS picks when.
+- Usage widgets read for themselves (`UsageWidgetPublisher`): each gateway a Usage widget shows (the one in
+  use, `BighelpWidgetGatewayList.inUse`, or a chosen one over its own sign-in) has its own file. They read on
+  each new connection while bighelp is open, every 15 minutes, and on Background App Refresh; only a read
+  where every part worked counts toward the 15 minutes. A read the moment bighelp comes back used the closing
+  connection, failed, and then held off every retry.
 - A Shortcut on a gateway that isn't in use switches bighelp to it, and the app starts connecting at once.
   `reconnect()` returns at once while another connection is under way, so the Shortcut waits for that one
   (`BighelpShortcutConnectionWait`). `ShortcutGatewaySwitchHostUITests` checks it on two real hosts.

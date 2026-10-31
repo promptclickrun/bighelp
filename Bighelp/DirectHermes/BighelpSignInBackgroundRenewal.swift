@@ -28,7 +28,7 @@ enum BighelpSignInBackgroundRenewal {
     /// at once, not when the renewal on its way times out; a renewal cut off keeps its token anyway.
     nonisolated private static func handle(_ task: BGTask) {
         nonisolated(unsafe) let task = task
-        let completion = Completion(task)
+        let completion = BackgroundTaskCompletion(task)
         let work = Task { @MainActor in
             scheduleIfNeeded()
             if let registry { await renew(registry, deadline: Date(timeIntervalSinceNow: interval)) }
@@ -40,21 +40,6 @@ enum BighelpSignInBackgroundRenewal {
         }
     }
 
-    /// Reports the task done exactly once, from whichever side finishes first.
-    private final class Completion: @unchecked Sendable {
-        private let task: BGTask
-        private let lock = NSLock()
-        private var finished = false
-        init(_ task: BGTask) { self.task = task }
-
-        func finish(success: Bool) {
-            let first = lock.withLock { () -> Bool in
-                defer { finished = true }
-                return !finished
-            }
-            if first { task.setTaskCompleted(success: success) }
-        }
-    }
 
     /// Renews each computer that isn't connected and whose access token ends before `deadline`.
     static func renew(_ registry: BighelpHostRegistry, deadline: Date) async {
@@ -71,6 +56,22 @@ enum BighelpSignInBackgroundRenewal {
         let request = BGAppRefreshTaskRequest(identifier: identifier)
         request.earliestBeginDate = Date(timeIntervalSinceNow: interval)
         try? BGTaskScheduler.shared.submit(request)
+    }
+}
+/// Reports a background task done exactly once, from whichever side finishes first: the work, or
+/// iOS's time running out (then at once, not when the work on its way stops).
+final class BackgroundTaskCompletion: @unchecked Sendable {
+    private let task: BGTask
+    private let lock = NSLock()
+    private var finished = false
+    init(_ task: BGTask) { self.task = task }
+
+    func finish(success: Bool) {
+        let first = lock.withLock { () -> Bool in
+            defer { finished = true }
+            return !finished
+        }
+        if first { task.setTaskCompleted(success: success) }
     }
 }
 #endif

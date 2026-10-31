@@ -18,15 +18,20 @@ enum BighelpWidgetBackgroundRefresh {
         BGTaskScheduler.shared.register(forTaskWithIdentifier: identifier, using: nil, launchHandler: handle)
     }
 
-    /// BackgroundTasks calls this on its own queue.
+    /// BackgroundTasks calls this on its own queue. When iOS's time runs out the task is reported done
+    /// at once: a read of another gateway can still be connecting.
     nonisolated private static func handle(_ task: BGTask) {
         nonisolated(unsafe) let task = task
+        let completion = BackgroundTaskCompletion(task)
         let work = Task { @MainActor in
             scheduleIfWidgets()
             await refresh?()
-            task.setTaskCompleted(success: !Task.isCancelled)
+            completion.finish(success: !Task.isCancelled)
         }
-        task.expirationHandler = { work.cancel() }
+        task.expirationHandler = {
+            work.cancel()
+            completion.finish(success: false)
+        }
     }
 
     /// Asks iOS for the next wake, if any bighelp widget is on this device.

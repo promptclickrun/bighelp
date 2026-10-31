@@ -171,14 +171,17 @@ struct BighelpShortcutGatewayTests {
         let directory = FileManager.default.temporaryDirectory.appending(path: "gateway-copies-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
-        let prefix = BighelpWidgetSnapshot.gatewayFilePrefix
+        let prefix = BighelpWidgetSnapshot.gatewayFilePrefix, usage = BighelpUsageSnapshot.gatewayFilePrefix
         for name in [prefix + Self.home.uuidString + ".json", prefix + Self.studio.uuidString + ".json",
-                     BighelpWidgetSnapshot.fileName] {
+                     usage + Self.home.uuidString + ".json", usage + Self.studio.uuidString + ".json",
+                     BighelpWidgetSnapshot.fileName, BighelpUsageSnapshot.fileName] {
             try Data("{}".utf8).write(to: directory.appending(path: name))
         }
         BighelpWidgetGatewayPublisher.removeCopies(keeping: [Self.home.uuidString], in: directory)
         let left = try FileManager.default.contentsOfDirectory(atPath: directory.path).sorted()
-        #expect(left == [BighelpWidgetSnapshot.fileName, prefix + Self.home.uuidString + ".json"].sorted())
+        #expect(left == [BighelpWidgetSnapshot.fileName, prefix + Self.home.uuidString + ".json",
+                         usage + Self.home.uuidString + ".json"].sorted(),
+                "The removed gateway's usage goes too, and so does the usage file from before gateways had their own")
     }
 
     @Test func thePublisherMarksItsGateway() async throws {

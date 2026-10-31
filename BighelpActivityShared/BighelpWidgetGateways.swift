@@ -1,6 +1,7 @@
 // A widget can follow the gateway in use (the default) or stay on one gateway: it
-// shows that gateway's data from the last time it was in use, and its taps open
-// there, switching bighelp to it first. The app writes the list of gateways.
+// shows that gateway's data from the last time it was in use (Usage reads it while
+// another is in use too), and its taps open there, switching bighelp to it first.
+// The app writes the list of gateways.
 import AppIntents
 import WidgetKit
 
@@ -14,6 +15,8 @@ struct BighelpWidgetGatewayList: Codable, Equatable, Sendable {
     }
 
     var gateways: [Gateway]
+    /// The gateway in use, for widgets that read their own file for each gateway (Usage).
+    var inUse: String?
 
     static let fileName = "loopdy-widget-gateways-v1.json"
 
@@ -22,10 +25,14 @@ struct BighelpWidgetGatewayList: Codable, Equatable, Sendable {
             .appendingPathComponent(fileName, isDirectory: false)
     }
 
-    static func load() -> [Gateway] {
-        guard let url = fileURL, let data = try? Data(contentsOf: url), data.count <= 65_536,
-              let list = try? JSONDecoder().decode(Self.self, from: data) else { return [] }
-        return list.gateways
+    static func load() -> [Gateway] { read()?.gateways ?? [] }
+
+    /// Nil before bighelp has written it.
+    static func inUseID() -> String? { read()?.inUse }
+
+    private static func read() -> Self? {
+        guard let url = fileURL, let data = try? Data(contentsOf: url), data.count <= 65_536 else { return nil }
+        return try? JSONDecoder().decode(Self.self, from: data)
     }
 
     func save() throws {

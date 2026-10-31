@@ -265,6 +265,12 @@ struct BighelpApp: App {
                 }
                 try? await Task.sleep(for: .seconds(2))
                 runtime.publishWidgetsNow()
+                // Usage widgets read their gateways themselves: this one over the connection just made,
+                // with all its agents (before they're known, only the default agent's numbers come back).
+                if runtime.agents.knowsProfiles {
+                    await UsageWidgetPublisher.refresh(.live(connections: connections, agents: runtime.agents,
+                                                             fleet: widgetFleet))
+                }
                 // The feeds write half a second after a change.
                 try? await Task.sleep(for: .seconds(1))
             }

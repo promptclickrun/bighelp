@@ -187,6 +187,7 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession, Live
         guard !engine.isRunning else { return }
         do {
             try SystemVoiceAudioSession().setActive(true)
+            diagnostics.playerStopping()
             try Self.restart(player) {
                 try engine.start()
                 player.play()
@@ -237,6 +238,7 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession, Live
     func restartPlayback() {
         guard !closed, hold.isHeld else { return }
         diagnostics.event("Restart sound: player \(player.isPlaying ? "playing" : "stopped"), engine \(engine.isRunning ? "running" : "stopped")")
+        diagnostics.playerStopping()
         player.stop()
         playbackEndsAt = Date()
         uplink.agentPlays(until: playbackEndsAt)
@@ -313,6 +315,7 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession, Live
         diagnostics.event("configuration change: engine \(engine.isRunning ? "running" : "stopped"), player \(player.isPlaying ? "playing" : "stopped")")
         do {
             try SystemVoiceAudioSession().setActive(true)
+            diagnostics.playerStopping()
             try Self.restart(player) { try startEngine() }
         } catch {
             diagnostics.event("engine restart failed")
@@ -330,6 +333,7 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession, Live
     private func stopAudio() {
         for observer in observers { NotificationCenter.default.removeObserver(observer) }
         observers = []
+        diagnostics.playerStopping()
         player.stop()
         engine.inputNode.removeTap(onBus: 0)
         engine.mainMixerNode.removeTap(onBus: 0)
@@ -378,6 +382,7 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession, Live
         case .stopPlayback:
             diagnostics.count { $0.geminiStops += 1 }
             diagnostics.event("Gemini stopped its reply; playback cleared")
+            diagnostics.playerStopping()
             player.stop()
             playbackEndsAt = Date()
             uplink.agentPlays(until: playbackEndsAt)
@@ -416,7 +421,8 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession, Live
         playbackEndsAt = max(now, playbackEndsAt).addingTimeInterval(Double(count) / GeminiLiveWire.outputSampleRate)
         uplink.agentPlays(until: playbackEndsAt)
         player.scheduleBuffer(buffer, completionCallbackType: .dataPlayedBack,
-                              completionHandler: GeminiLiveAudioDiagnostics.finished(diagnostics))
+                              completionHandler: GeminiLiveAudioDiagnostics.finished(diagnostics,
+                                                                                     scheduledAfter: diagnostics.stopsSoFar))
         diagnostics.count { $0.scheduledBuffers += 1 }
         if !player.isPlaying {
             diagnostics.event("player started for new audio")

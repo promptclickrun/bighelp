@@ -23,7 +23,7 @@ struct GeminiLiveAudioReportTests {
         _ = diagnostics.report(state)
         clock.now += 1
         let report = diagnostics.report(state)
-        #expect(report.contains("Gemini sent 12 pieces (93 KB); 12 scheduled, 0 dropped (engine off), 0 finished"))
+        #expect(report.contains("Gemini sent 12 pieces (93 KB); 12 scheduled, 0 dropped (engine off), 0 finished, 0 cleared"))
         #expect(report.contains("Mixer output now: silent"))
         #expect(report.contains("Player: playing, position 4800 (not moving)"))
         #expect(report.hasPrefix("Call audio, 2 s"))
@@ -56,5 +56,18 @@ struct GeminiLiveAudioReportTests {
         #expect(events.count == GeminiLiveAudioDiagnostics.maximumEvents)
         #expect(events.first?.hasSuffix("change 10") == true)
         #expect(events.last == "  25.0 s change 49")
+    }
+
+    /// A player stop runs the completion of every buffer it clears: those never played, so "finished"
+    /// mustn't count them, or a stuck player that Gemini stopped once would look fine.
+    @Test func aBufferAPlayerStopClearedIsNotCountedAsPlayed() {
+        let diagnostics = GeminiLiveAudioDiagnostics()
+        let played = GeminiLiveAudioDiagnostics.finished(diagnostics, scheduledAfter: diagnostics.stopsSoFar)
+        let cleared = GeminiLiveAudioDiagnostics.finished(diagnostics, scheduledAfter: diagnostics.stopsSoFar)
+        played(.dataPlayedBack)
+        diagnostics.playerStopping()
+        cleared(.dataPlayedBack)
+        #expect(diagnostics.current.finishedBuffers == 1)
+        #expect(diagnostics.current.clearedBuffers == 1)
     }
 }

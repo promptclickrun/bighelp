@@ -24,6 +24,8 @@ final class GeminiLiveAudioDiagnostics: @unchecked Sendable {
         var scheduledBuffers = 0
         var droppedChunks = 0
         var finishedBuffers = 0
+        /// Scheduled, then cleared by a player stop before they played: their completion runs too.
+        var clearedBuffers = 0
         var configurationChanges = 0
         var routeChanges = 0
         var interruptions = 0
@@ -41,6 +43,8 @@ final class GeminiLiveAudioDiagnostics: @unchecked Sendable {
     private var windowFrames = 0
     private var loudest: Float = 0
     private var lastPlayerPosition: Int64?
+    /// Player stops so far: a buffer counts as finished only if none came after it was scheduled.
+    private var playerStops = 0
 
     init(clock: @escaping () -> Date = Date.init) {
         self.clock = clock
@@ -54,6 +58,18 @@ final class GeminiLiveAudioDiagnostics: @unchecked Sendable {
             events = []
             windowPeak = 0; windowSquares = 0; windowFrames = 0; loudest = 0
             lastPlayerPosition = nil
+            playerStops = 0
+        }
+    }
+
+    /// Before each `player.stop()`: what the player holds then is cleared, not played.
+    func playerStopping() { lock.withLock { playerStops += 1 } }
+
+    var stopsSoFar: Int { lock.withLock { playerStops } }
+
+    private func bufferCompleted(scheduledAfter stops: Int) {
+        lock.withLock {
+            if stops == playerStops { counts.finishedBuffers += 1 } else { counts.clearedBuffers += 1 }
         }
     }
 
@@ -104,8 +120,10 @@ final class GeminiLiveAudioDiagnostics: @unchecked Sendable {
         { buffer, _ in diagnostics.meter(buffer) }
     }
 
-    nonisolated static func finished(_ diagnostics: GeminiLiveAudioDiagnostics) -> AVAudioPlayerNodeCompletionHandler {
-        { _ in diagnostics.count { $0.finishedBuffers += 1 } }
+    /// A buffer's completion runs when it played and also when a player stop cleared it.
+    nonisolated static func finished(_ diagnostics: GeminiLiveAudioDiagnostics,
+                                     scheduledAfter stops: Int) -> AVAudioPlayerNodeCompletionHandler {
+        { _ in diagnostics.bufferCompleted(scheduledAfter: stops) }
     }
 
     /// The report, from what the engine, player and session look like now.
@@ -140,7 +158,7 @@ final class GeminiLiveAudioDiagnostics: @unchecked Sendable {
             String(format: "Call audio, %.0f s", seconds),
             "Gemini sent \(counts.receivedChunks) pieces (\(counts.receivedBytes / 1_024) KB); "
                 + "\(counts.scheduledBuffers) scheduled, \(counts.droppedChunks) dropped (engine off), "
-                + "\(counts.finishedBuffers) finished",
+                + "\(counts.finishedBuffers) finished, \(counts.clearedBuffers) cleared",
             "Mixer output now: \(mixerLine); loudest so far \(level(Double(mixer.loudest)))",
             "Player: \(state.playerPlaying ? "playing" : "stopped"), position "
                 + "\(state.playerPosition.map(String.init) ?? "none") (\(moving)); volume \(level(Double(state.playerVolume)))",

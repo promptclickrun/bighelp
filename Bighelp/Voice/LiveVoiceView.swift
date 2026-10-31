@@ -311,7 +311,8 @@ private struct LiveVoiceAudioReportSection: View {
 
     var body: some View {
         if nerdMode {
-            Group {
+            // A view that's there before the first report: a `.task` on an empty `Group` never runs.
+            VStack(alignment: .leading, spacing: 0) {
                 if let report {
                     VStack(alignment: .leading, spacing: BighelpTokens.space8) {
                         Text(report)
@@ -322,7 +323,8 @@ private struct LiveVoiceAudioReportSection: View {
                             .accessibilityIdentifier("live-voice.audio-report")
                         HStack(spacing: BighelpTokens.space12) {
                             Button("Copy report", systemImage: "doc.on.doc") {
-                                UIPasteboard.general.string = model.audioReport() ?? report
+                                // The text on screen: a new report would start a fresh, empty mixer reading.
+                                UIPasteboard.general.string = report
                             }
                             .accessibilityIdentifier("live-voice.audio-report.copy")
                             Button("Restart sound", systemImage: "arrow.clockwise") { model.restartPlayback() }
